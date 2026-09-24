@@ -42,7 +42,8 @@ export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, so
   if (ref.startsWith('local::')) return FREE;
   const price = priceOf(ref);
   if (!price) return UNKNOWN;
-  if (def.engine === 'video') {
+  if (def.engine === 'video' || def.engine === 'video_upscale' || def.engine === 'video_edit') {
+    // For video-to-video, `duration` is the source clip's length (per-second prices scale with it).
     return estimate(price, { count: 1, duration: videoSettings.duration, resolution: videoSettings.resolution, audio: videoSettings.audio, mode: 'image' });
   }
   const count = opCount(def, params);

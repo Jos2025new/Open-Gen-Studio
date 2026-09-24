@@ -195,9 +195,12 @@ async function execute(id: string): Promise<string[]> {
     const refs: MediaInput[] = [];
     let firstFrame: MediaInput | undefined;
     let lastFrame: MediaInput | undefined;
+    let video: MediaInput | undefined;
     if (g.op) {
       const def = OPS[g.op.id];
-      if (def.engine === 'video') {
+      if (def.engine === 'video_upscale' || def.engine === 'video_edit') {
+        video = await mediaInput(g.op.sourceAssetId);
+      } else if (def.engine === 'video') {
         firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
       } else {
         refs.push(await mediaInput(g.op.sourceAssetId));
@@ -210,6 +213,7 @@ async function execute(id: string): Promise<string[]> {
     if (g.kind === 'image' && (schema.slots.images?.min ?? 0) > refs.length) throw new Error(`${model.name} needs an input image.`);
     if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
     if (g.kind === 'video' && firstFrame && !schema.slots.firstFrame) throw new Error(`${model.name} cannot start from an image. Pick an image-to-video model.`);
+    if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
 
     const total = Math.max(1, g.settings.count);
     const perRequest = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
@@ -231,6 +235,7 @@ async function execute(id: string): Promise<string[]> {
         refs,
         firstFrame,
         lastFrame,
+        video,
         op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
         apiKey,
         signal,
@@ -360,8 +365,19 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   const choice = opModelFor(def.engine);
+  if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
+  if (def.engine === 'video_upscale' || def.engine === 'video_edit') {
+    const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
+    // Keep the source's length and framing: send duration/aspect only if the model insists.
+    settings.duration = undefined;
+    settings.aspect = undefined;
+    settings.audio = undefined;
+    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_edit' ? prompt : '', modelRef: choice.ref, settings, op };
+    const clip = get().assets[input.sourceAssetId];
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: clip?.duration }) };
+  }
   if (def.engine === 'video') {
     const video = get().composer.video.settings;
     const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });

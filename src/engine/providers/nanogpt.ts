@@ -3,7 +3,7 @@ import { HttpError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { encodeImage, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
 import type { GenOutput, GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -41,8 +41,15 @@ interface NanoVideoModel {
   name?: string;
   description?: string;
   pricing?: Loose;
-  capabilities?: { text_to_video?: boolean; image_to_video?: boolean; audio_generation?: boolean };
+  capabilities?: { text_to_video?: boolean; image_to_video?: boolean; video_to_video?: boolean; audio_generation?: boolean };
+  architecture?: { input_modalities?: string[] };
+  tags?: string[];
   supported_parameters?: { parameters?: Record<string, NanoVideoParam> };
+}
+
+/** Needs a source video (edit, upscale…), sent as `videoDataUrl` per NanoGPT's generate-video docs. */
+function takesVideo(m: NanoVideoModel): boolean {
+  return Boolean(m.capabilities?.video_to_video && m.architecture?.input_modalities?.includes('video'));
 }
 
 const imageRaw = new Map<string, NanoImageModel>();
@@ -215,8 +222,9 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
     params,
     slots: {
       prompt: 'prompt',
-      promptRequired: t2v && !i2v,
-      firstFrame: i2v ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
+      promptRequired: t2v && !i2v && !takesVideo(raw),
+      firstFrame: i2v && !takesVideo(raw) ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
+      video: takesVideo(raw) ? { key: 'videoDataUrl', format: 'data-url' } : undefined,
     },
     price: model.price,
     source: 'catalog',
@@ -249,7 +257,8 @@ export const nanogpt: ProviderAdapter = {
       });
     }
     for (const m of videos) {
-      if (!m.capabilities?.text_to_video && !m.capabilities?.image_to_video) continue;
+      const video = takesVideo(m);
+      if (!m.capabilities?.text_to_video && !m.capabilities?.image_to_video && !video) continue;
       videoRaw.set(m.id, m);
       out.push({
         ref: modelRef('nanogpt', m.id),
@@ -257,9 +266,10 @@ export const nanogpt: ProviderAdapter = {
         id: m.id,
         name: m.name ?? m.id,
         kind: 'video',
-        acceptsText: Boolean(m.capabilities?.text_to_video),
-        acceptsImage: Boolean(m.capabilities?.image_to_video),
-        tags: [],
+        acceptsText: Boolean(m.capabilities?.text_to_video) || (video && Boolean(m.architecture?.input_modalities?.includes('text'))),
+        acceptsImage: Boolean(m.capabilities?.image_to_video) && !video,
+        acceptsVideo: video,
+        tags: video ? (m.tags ?? []) : [],
         description: m.description,
         price: parseNanoVideoPrice(m.pricing),
       });
@@ -300,6 +310,7 @@ export const nanogpt: ProviderAdapter = {
     }
 
     if (req.firstFrame && req.schema.slots.firstFrame) body.imageDataUrl = await encodeImage(req.firstFrame, 'data-url');
+    if (req.video && req.schema.slots.video) body[req.schema.slots.video.key] = await encodeVideo(req.video);
     // Some aspect params are orientation based; keep the ratio-derived value only when valid.
     if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto') delete body.aspect_ratio;
     req.onStatus('Submitting');

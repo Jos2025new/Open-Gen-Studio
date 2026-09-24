@@ -3,7 +3,7 @@ import { fetchJsonWithRelay, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, extractOutputs, JSON_HEADERS } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -11,11 +11,13 @@ const API = 'https://api.fal.ai/v1';
 const QUEUE = 'https://queue.fal.run';
 const DAY = 24 * 3600 * 1000;
 
-const CATEGORIES: Array<{ category: string; kind: MediaKind; text: boolean; image: boolean; suffix: string }> = [
+const CATEGORIES: Array<{ category: string; kind: MediaKind; text: boolean; image: boolean; video?: boolean; suffix: string }> = [
   { category: 'text-to-image', kind: 'image', text: true, image: false, suffix: '' },
   { category: 'image-to-image', kind: 'image', text: true, image: true, suffix: ' · Edit' },
   { category: 'text-to-video', kind: 'video', text: true, image: false, suffix: '' },
   { category: 'image-to-video', kind: 'video', text: true, image: true, suffix: ' · I2V' },
+  // Edit, upscale and other clip tools; they need a source video (acceptsVideo).
+  { category: 'video-to-video', kind: 'video', text: true, image: false, video: true, suffix: ' · V2V' },
 ];
 
 interface FalModel {
@@ -103,6 +105,7 @@ export const fal: ProviderAdapter = {
           kind: c.kind,
           acceptsText: c.text && !tags.length,
           acceptsImage: c.image,
+          acceptsVideo: c.video,
           tags,
           description: m.metadata?.description,
         });
@@ -155,6 +158,8 @@ export const fal: ProviderAdapter = {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
       await put(schema.slots.images, req.refs);
+      // fal accepts data URIs for file inputs; a storage upload would be needed for very large clips.
+      if (req.video && schema.slots.video) body[schema.slots.video.key] = await encodeVideo(req.video);
     }
     req.onStatus('Submitting');
     const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${req.model.id}`, {

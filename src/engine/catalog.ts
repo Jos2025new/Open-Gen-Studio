@@ -145,9 +145,10 @@ export async function resolveModel(ref: string): Promise<{ model: ModelSummary; 
   return schema ? { model, schema } : null;
 }
 
+/** Models usable for ordinary generation. Video-to-video models are only reached through their operations. */
 export function modelsOf(kind: MediaKind): ModelSummary[] {
   const providers = connectedProviders();
-  return Object.values(get().catalog.models).filter((m) => m.kind === kind && providers.includes(m.provider));
+  return Object.values(get().catalog.models).filter((m) => m.kind === kind && !m.acceptsVideo && providers.includes(m.provider));
 }
 
 function firstAvailable(provider: RemoteProviderId, ids: string[]): string | null {
@@ -244,6 +245,18 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
   if (engine === 'video') {
     if (valid(ops.video)) return { ref: ops.video!, viaEdit: false };
     return { ref: defaultModelFor('video', true), viaEdit: false };
+  }
+  if (engine === 'video_upscale' || engine === 'video_edit') {
+    // Video-to-video: settings override, then each provider's preferred list, then any tagged model that takes video.
+    const key = engine === 'video_upscale' ? 'videoUpscale' : 'videoEdit';
+    if (valid(ops[key])) return { ref: ops[key]!, viaEdit: false };
+    for (const p of providerOrder('video')) {
+      const hit = firstAvailable(p, PREFERRED[p][key]);
+      if (hit) return { ref: hit, viaEdit: false };
+    }
+    const tag = engine === 'video_upscale' ? /upscal|enhance/ : /edit/;
+    const tagged = Object.values(get().catalog.models).find((m) => m.acceptsVideo && isConnected(m.provider) && (m.tags.some((t) => tag.test(t)) || tag.test(m.id)));
+    return { ref: tagged?.ref ?? '', viaEdit: false };
   }
   const key = engine === 'upscale' ? 'upscale' : 'removeBg';
   const override = ops[key];

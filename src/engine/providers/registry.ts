@@ -27,13 +27,18 @@ export const PROVIDER_SITES: Record<Exclude<ProviderId, 'local'>, { keys: string
  * Preferred defaults per provider, tried in order against the live catalog.
  * Only used to pick sensible defaults; users can choose any listed model.
  */
-export const PREFERRED: Record<Exclude<ProviderId, 'local'>, { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[] }> = {
+export const PREFERRED: Record<
+  Exclude<ProviderId, 'local'>,
+  { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[] }
+> = {
   openrouter: {
     image: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'bytedance-seed/seedream-4.5', 'openai/gpt-image-2'],
     video: ['google/veo-3.1-fast', 'kwaivgi/kling-v3.0-pro', 'bytedance/seedance-2.0'],
     edit: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'openai/gpt-image-2'],
     upscale: [],
     removeBg: [],
+    videoUpscale: [],
+    videoEdit: [],
   },
   fal: {
     image: ['fal-ai/nano-banana-pro', 'fal-ai/nano-banana-2', 'fal-ai/bytedance/seedream/v4/text-to-image'],
@@ -41,6 +46,8 @@ export const PREFERRED: Record<Exclude<ProviderId, 'local'>, { image: string[]; 
     edit: ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-2/edit', 'fal-ai/nano-banana/edit'],
     upscale: ['fal-ai/clarity-upscaler', 'fal-ai/seedvr/upscale/image'],
     removeBg: ['fal-ai/bria/background/remove', 'fal-ai/birefnet/v2'],
+    videoUpscale: ['fal-ai/bytedance-upscaler/upscale/video', 'fal-ai/seedvr/upscale/video'],
+    videoEdit: ['google/gemini-omni-flash/v1.1/edit', 'fal-ai/kling-video/o3/standard/video-to-video/edit'],
   },
   nanogpt: {
     image: ['nano-banana-pro', 'nano-banana-2', 'seedream-4.5-alternative'],
@@ -49,6 +56,8 @@ export const PREFERRED: Record<Exclude<ProviderId, 'local'>, { image: string[]; 
     // Faithful first (SeedVR2 $0.01, P-Image $0.005), then Clarity creative ($0.05, adds detail).
     upscale: ['seedvr2-image', 'pruna-ai/p-image/upscale', 'clarity-ai-creative-upscaler'],
     removeBg: ['birefnet/v2'],
+    videoUpscale: ['bytedance-seedance-upscaler', 'bytedance-video-enhancement-standard', 'clarity-ai/crystal-video-upscaler'],
+    videoEdit: ['alibaba/wan-3.0/video-edit', 'grok-imagine-video-edit', 'pruna-ai/p-video/edit', 'blackforestlabs/flux-3/edit-video', 'google/gemini-omni-flash/v1.1'],
   },
   atlas: {
     image: ['google/nano-banana-pro/text-to-image', 'google/nano-banana-2/text-to-image', 'black-forest-labs/flux-2-pro/text-to-image'],
@@ -56,6 +65,8 @@ export const PREFERRED: Record<Exclude<ProviderId, 'local'>, { image: string[]; 
     edit: ['google/nano-banana-pro/edit', 'google/nano-banana-2/edit', 'black-forest-labs/flux-2-pro/edit'],
     upscale: ['atlascloud/image-upscaler', 'tencent/image/upscaler'],
     removeBg: ['youchuan/v8.2/remove-background'],
+    videoUpscale: ['byteplus/video/upscaler', 'atlascloud/video-upscaler', 'tencent/video/upscaler'],
+    videoEdit: ['google/gemini-omni-1.1-flash/video-edit', 'alibaba/wan-2.7/video-edit', 'xai/grok-imagine-video/edit-video'],
   },
 };
 

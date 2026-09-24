@@ -72,6 +72,23 @@ describe('provider parameters', () => {
   });
 });
 
+describe('video input', () => {
+  it('finds the source video field in fal and Atlas schemas and never takes it as a frame', () => {
+    const falUpscaler = schemaFromJson({ ref: 'fal::bytedance-upscaler', kind: 'video', properties: {
+      video_url: { type: 'string' }, target_resolution: { type: 'string', enum: ['1080p', '2k', '4k'] },
+    }, required: ['video_url'], resolve: () => undefined, imageFormat: 'data-url', source: 'openapi' });
+    expect(falUpscaler.slots.video).toEqual({ key: 'video_url', format: 'data-url' });
+    expect(falUpscaler.slots.firstFrame).toBeUndefined();
+    expect(falUpscaler.params.some((p) => p.key === 'video_url')).toBe(false);
+    const atlasEdit = schemaFromJson({ ref: 'atlas::wan-2.7/video-edit', kind: 'video', properties: {
+      prompt: { type: 'string' }, video: { type: 'string' }, images: { type: 'array' }, resolution: { type: 'string', enum: ['720P', '1080P'] },
+    }, required: ['video'], resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
+    expect(atlasEdit.slots.video?.key).toBe('video');
+    expect(atlasEdit.slots.prompt).toBe('prompt');
+    expect(atlasEdit.slots.images?.key).toBe('images');
+  });
+});
+
 describe('agent model policy', () => {
   const llm = (id: string, tools = true, vision = true): LlmModel => ({ id, name: id, tools, vision });
   const catalog = [llm('anthropic/claude-opus-5.5'), llm('openai/gpt-5.6-sol'), llm('deepseek/deepseek-v4.1-flash'), llm('z-ai/glm-5.3-flash'), llm('x/other')];

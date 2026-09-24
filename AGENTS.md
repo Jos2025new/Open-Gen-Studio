@@ -12,7 +12,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — fase 1 de herramientas (2026-09-25)
+## Tarea actual — fase 3: entrada de vídeo (2026-09-25)
+Contrastado con esquemas vivos y docs: fal usa `video_url`; Atlas `video` o `video_url` (sube con `uploadMedia`); NanoGPT `videoDataUrl` en `generate-video` (docs oficiales). fal está bloqueado por saldo agotado.
+1. [x] `InputSlots.video`, `ModelSummary.acceptsVideo`, `GenRequest.video`. `schemaFromJson` detecta la clave de vídeo; NanoGPT la declara (`videoDataUrl`). *Razón: extensión mínima ya prevista.*
+2. [x] Descubrimiento: fal categoría `video-to-video`; Atlas deja de saltar `VIDEO-TO-VIDEO`; NanoGPT incluye modelos con entrada de vídeo. Los que necesitan vídeo no salen en los selectores normales. *Razón: evitar modelos que fallarían sin vídeo.*
+3. [x] Operaciones `video_upscale` y `video_edit` con listas preferidas por proveedor (IDs verificados) y fallback por etiqueta; ajustes Auto/override como el resto. *Razón: fallback entre los tres proveedores.*
+4. [x] Adaptadores: fal y NanoGPT envían data URL; Atlas sube con `uploadMedia` (extensión según MIME). Sin infraestructura nueva de subidas. *Razón: KISS; límite: vídeos grandes pueden exceder el tamaño de petición.*
+5. [x] Tests, typecheck, navegador (sin gastar sin permiso); commit. Verificado con adaptadores reales: NanoGPT 62 y Atlas 23 modelos con entrada de vídeo; esquemas y slots correctos. Falta una ejecución de pago de extremo a extremo (pendiente de permiso).
+
+## Tarea anterior — fase 1 de herramientas (2026-09-25)
 1. [x] Engine `frame` → `local` (operaciones gratis en el navegador). Extract frame gana "en el segundo X" (Capture). *Razón: un solo camino para lo local.*
 2. [x] Grid-split (local): corta una imagen en 2×2 o 3×3; cada trozo es una salida y el nodo elige cuál pasa aguas abajo. *Razón: gratis, sin proveedor.*
 3. [x] Nine-grid (edit): hoja de contactos 3×3 con nueve ángulos, vía el modelo de edición y su fallback. *Razón: ningún proveedor lo ofrece como modelo; es una instrucción, igual que Relight.*

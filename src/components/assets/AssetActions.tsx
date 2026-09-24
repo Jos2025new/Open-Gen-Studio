@@ -42,6 +42,8 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   continue: FastForward,
   contact_sheet: Grid3x3,
   grid_split: LayoutGrid,
+  video_upscale: Maximize,
+  video_edit: WandSparkles,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

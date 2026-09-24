@@ -34,7 +34,7 @@ export interface Settings {
   agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
   guidedRounds: number;
   budgetUsd: number;
-  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null };
+  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null };
 }
 
 export interface ComposerState {
@@ -129,7 +129,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
-  ops: { edit: null, upscale: null, removeBg: null, video: null },
+  ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null },
 };
 
 const initial: AppState = {

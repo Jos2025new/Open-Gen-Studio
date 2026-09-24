@@ -11,6 +11,11 @@ export async function encodeImage(input: MediaInput, format: ImageInputFormat, u
   return dataUrl;
 }
 
+/** Encode a source video: an uploaded URL when the provider needs one, else a data URL (no re-encoding). */
+export async function encodeVideo(input: MediaInput, upload?: (blob: Blob) => Promise<string>): Promise<string> {
+  return upload ? upload(input.blob) : blobToDataUrl(input.blob);
+}
+
 /** Find media outputs in the many response shapes providers use. */
 export function extractOutputs(json: unknown, kind: MediaKind): GenOutput[] {
   const out: GenOutput[] = [];

@@ -38,6 +38,8 @@ export interface InputSlots {
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
   firstFrame?: { key: string; format: ImageInputFormat };
   lastFrame?: { key: string; format: ImageInputFormat };
+  /** Source video for video-to-video models. */
+  video?: { key: string; format: ImageInputFormat };
 }
 
 export interface PriceSku {
@@ -67,6 +69,8 @@ export interface ModelSummary {
   kind: MediaKind;
   acceptsText: boolean;
   acceptsImage: boolean;
+  /** Needs a source video (edit, upscale…); kept out of the ordinary model pickers. */
+  acceptsVideo?: boolean;
   tags: string[];
   description?: string;
   price?: PriceRule;
@@ -139,7 +143,9 @@ export type OpId =
   | 'extract_frame'
   | 'continue'
   | 'contact_sheet'
-  | 'grid_split';
+  | 'grid_split'
+  | 'video_upscale'
+  | 'video_edit';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';

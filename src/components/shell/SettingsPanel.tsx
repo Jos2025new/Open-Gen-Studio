@@ -4,9 +4,10 @@ import { loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentMode
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS, LLM_TIERS, type LlmModel } from '../../engine/providers/llm';
-import type { LlmProviderId, RemoteProviderId } from '../../engine/types';
+import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
+import type { OpEngine } from '../../engine/ops';
 import { formatUsd } from '../../lib/format';
-import { setCatalog, setSettings, toast, useStore, wipeAllData } from '../../store/store';
+import { setCatalog, setSettings, toast, useStore, wipeAllData, type Settings } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
@@ -153,12 +154,12 @@ function LlmModelPicker() {
   );
 }
 
-function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slot: 'edit' | 'upscale' | 'removeBg' | 'video'; kind: 'image' | 'video'; engine: 'edit' | 'upscale' | 'remove_bg' | 'video'; filter: (m: { acceptsImage: boolean; tags: string[] }) => boolean }) {
+function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slot: keyof Settings['ops']; kind: 'image' | 'video'; engine: OpEngine; filter: (m: ModelSummary) => boolean }) {
   const value = useStore((s) => s.settings.ops[slot]);
   useStore((s) => s.catalog.models);
   const pop = usePopover();
   const auto = opModelFor(engine);
-  const autoName = modelSummary(auto.ref)?.name ?? (auto.ref.startsWith('local::') ? 'Local demo' : auto.ref);
+  const autoName = !auto.ref ? 'no connected provider' : modelSummary(auto.ref)?.name ?? (auto.ref.startsWith('local::') ? 'Local demo' : auto.ref);
   const current = value ? modelSummary(value)?.name ?? value : `Auto · ${autoName}${auto.viaEdit ? ' (instruction)' : ''}`;
   return (
     <div className="set-row">
@@ -287,7 +288,9 @@ export function SettingsPanel() {
         <OpsModelRow label="Edit · relight · angle" slot="edit" kind="image" engine="edit" filter={(m) => m.acceptsImage && !m.tags.length} />
         <OpsModelRow label="Upscale" slot="upscale" kind="image" engine="upscale" filter={(m) => m.acceptsImage} />
         <OpsModelRow label="Remove background" slot="removeBg" kind="image" engine="remove_bg" filter={(m) => m.acceptsImage} />
-        <OpsModelRow label="Animate · continue" slot="video" kind="video" engine="video" filter={(m) => m.acceptsImage} />
+        <OpsModelRow label="Animate · continue" slot="video" kind="video" engine="video" filter={(m) => m.acceptsImage && !m.acceptsVideo} />
+        <OpsModelRow label="Upscale video" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Edit video" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
       </section>
 
       <section className="set-section">

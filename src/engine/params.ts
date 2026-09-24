@@ -45,6 +45,8 @@ const PROMPT_KEYS = ['prompt', 'text', 'instruction'];
 const MULTI_IMAGE_KEYS = ['image_urls', 'images', 'input_references', 'reference_images', 'reference_image_urls', 'imagedataurls', 'image_list', 'ref_images'];
 const SINGLE_IMAGE_KEYS = ['image_url', 'image', 'input_image', 'imagedataurl', 'init_image', 'source_image', 'image_input'];
 const FIRST_FRAME_KEYS = ['start_image_url', 'first_frame_image', 'start_image', 'first_frame', 'first_frame_url', 'image_url', 'image', 'imagedataurl', 'input_image'];
+// Source video for edit/upscale models (fal: video_url; Atlas: video or video_url).
+const VIDEO_KEYS = ['video_url', 'video', 'input_video', 'source_video', 'video_input'];
 const LAST_FRAME_KEYS = ['end_image_url', 'last_image', 'tail_image_url', 'end_image', 'last_frame_image', 'last_frame', 'last_frame_url', 'tail_image'];
 
 export function normKey(k: string): string {
@@ -229,6 +231,11 @@ export function schemaFromJson(opts: {
   if (slots.prompt) used.add(slots.prompt);
 
   if (kind === 'video') {
+    const video = VIDEO_KEYS.map((k) => lower.get(k)).find(Boolean);
+    if (video) {
+      slots.video = { key: video, format: imageFormat };
+      used.add(video);
+    }
     const last = LAST_FRAME_KEYS.map((k) => lower.get(k)).find(Boolean);
     if (last) {
       slots.lastFrame = { key: last, format: imageFormat };

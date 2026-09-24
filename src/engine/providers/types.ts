@@ -19,6 +19,8 @@ export interface GenRequest {
   refs: MediaInput[];
   firstFrame?: MediaInput;
   lastFrame?: MediaInput;
+  /** Source video for video-to-video models. */
+  video?: MediaInput;
   /** Set for operations; remote providers only use the instruction prompt, the local demo applies the op itself. */
   op?: { id: OpId; params: Record<string, AdvancedValue> };
   apiKey: string;

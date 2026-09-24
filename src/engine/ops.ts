@@ -11,7 +11,7 @@ export interface OpField {
 }
 
 /** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local';
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit';
 
 export interface OpDef {
   id: OpId;
@@ -258,6 +258,27 @@ export const OPS: Record<OpId, OpDef> = {
     engine: 'local',
     quick: false,
     fields: [{ key: 'grid', label: 'Grid', type: 'choice', default: '3', options: opt(['2', '2×2'], ['3', '3×3']) }],
+  },
+  video_upscale: {
+    id: 'video_upscale',
+    label: 'Upscale video',
+    description: 'Raise resolution and restore detail of a clip.',
+    input: 'video',
+    output: 'video',
+    engine: 'video_upscale',
+    quick: true,
+    fields: [],
+  },
+  video_edit: {
+    id: 'video_edit',
+    label: 'Edit video',
+    description: 'Describe a change to apply to the whole clip.',
+    input: 'video',
+    output: 'video',
+    engine: 'video_edit',
+    quick: false,
+    fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. make it night with neon reflections', required: true }],
+    instruction: (p) => `${String(p.instruction).trim()}. Apply only this change; keep motion, timing, framing and everything else identical.`,
   },
 };
 

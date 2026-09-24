@@ -3,7 +3,7 @@ import { fetchJsonWithRelay, HttpError, requestJson, sleep } from '../../lib/htt
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -55,8 +55,10 @@ export const atlas: ProviderAdapter = {
       const text = cats.includes(kind === 'video' ? 'TEXT-TO-VIDEO' : 'TEXT-TO-IMAGE');
       const image = kind === 'video' ? cats.includes('IMAGE-TO-VIDEO') : cats.includes('IMAGE-TO-IMAGE');
       const tool = kind === 'image' && cats.includes('IMAGE-TOOLS');
-      // Skip 3D, video-to-video and audio-driven models: they need inputs/outputs we do not handle.
-      if (!text && !image && !tool) continue;
+      // Some edit models are filed under IMAGE-TO-VIDEO although they take a source video.
+      const video = kind === 'video' && (cats.includes('VIDEO-TO-VIDEO') || /(edit-video|video-edit)$/.test(m.model));
+      // Skip 3D and audio-driven models: they need inputs/outputs we do not handle.
+      if (!text && !image && !tool && !video) continue;
       raws.set(m.model, m);
       const tags: string[] = [];
       if (/upscal/i.test(m.model)) tags.push('upscale');
@@ -68,7 +70,8 @@ export const atlas: ProviderAdapter = {
         name: m.displayName ?? m.model,
         kind,
         acceptsText: text,
-        acceptsImage: image || tool,
+        acceptsImage: (image || tool) && !video,
+        acceptsVideo: video,
         tags,
         description: m.profile,
         price: atlasPrice(m),
@@ -123,6 +126,10 @@ export const atlas: ProviderAdapter = {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
       await put(schema.slots.images, req.refs);
+      if (req.video && schema.slots.video) {
+        req.onStatus('Uploading video');
+        body[schema.slots.video.key] = await encodeVideo(req.video, upload);
+      }
     }
     req.onStatus('Submitting');
     const endpoint = req.kind === 'image' ? 'generateImage' : 'generateVideo';
@@ -152,7 +159,7 @@ export const atlas: ProviderAdapter = {
 
 async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Promise<string> {
   const form = new FormData();
-  const ext = blob.type.includes('png') ? 'png' : blob.type.includes('webp') ? 'webp' : 'jpg';
+  const ext = blob.type.split('/')[1]?.replace('quicktime', 'mov').replace('jpeg', 'jpg').split(';')[0] || 'bin';
   form.append('file', blob, `input.${ext}`);
   const res = await requestJson<Record<string, unknown>>(`${BASE}/api/v1/model/uploadMedia`, {
     method: 'POST',
