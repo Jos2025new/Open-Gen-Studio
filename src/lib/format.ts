@@ -24,7 +24,9 @@ export function formatRelative(ts: number, now = Date.now()): string {
   if (d < min) return 'just now';
   if (d < hour) return `${Math.floor(d / min)}m ago`;
   if (d < day) return `${Math.floor(d / hour)}h ago`;
+  if (d < 2 * day) return 'yesterday';
   if (d < 7 * day) return `${Math.floor(d / day)}d ago`;
+  if (d < 30 * day) return `${Math.floor(d / (7 * day))}w ago`;
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 

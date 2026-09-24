@@ -24,7 +24,7 @@ export function SessionsPanel() {
   const stats = useMemo(() => {
     const m = new Map<string, Stats>();
     const entry = (id: string) => {
-      const e = m.get(id) ?? { assets: [], gens: 0, spend: 0, prompts: '' };
+      const e = m.get(id) ?? { assets: [], gens: 0, spend: 0 };
       m.set(id, e);
       return e;
     };
@@ -32,20 +32,14 @@ export function SessionsPanel() {
     for (const g of Object.values(generations)) {
       const e = entry(g.sessionId);
       e.gens++;
-      e.prompts += ` ${g.prompt ?? ''}`;
       if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
     }
     return m;
   }, [assets, generations]);
+  const matches = useSessionMatcher(q);
 
   const list = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    // Matches the title, the conversation and the prompts used in the session.
-    const matches = (s: Session) =>
-      s.title.toLowerCase().includes(needle) ||
-      s.feed.some((f) => 'text' in f && typeof f.text === 'string' && f.text.toLowerCase().includes(needle)) ||
-      (stats.get(s.id)?.prompts.toLowerCase().includes(needle) ?? false);
-    const arr = Object.values(sessions).filter((s) => (!pinnedOnly || s.pinned) && (!needle || matches(s)));
+    const arr = Object.values(sessions).filter((s) => (!pinnedOnly || s.pinned) && matches(s));
     const dir = reversed ? -1 : 1;
     arr.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -54,7 +48,7 @@ export function SessionsPanel() {
       return dir * (b.updatedAt - a.updatedAt);
     });
     return arr;
-  }, [sessions, stats, q, sort, reversed, pinnedOnly]);
+  }, [sessions, matches, sort, reversed, pinnedOnly]);
 
   return (
     <div className={`sessions ${compact ? 'is-compact' : ''}`}>
@@ -118,8 +112,24 @@ interface Stats {
   assets: string[];
   gens: number;
   spend: number;
-  /** Generation prompts, for search. */
-  prompts: string;
+}
+
+/** Session search shared by the panel and the top-bar switcher: title, conversation text and generation prompts. */
+export function useSessionMatcher(query: string): (s: Session) => boolean {
+  const generations = useStore((s) => s.generations);
+  const prompts = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const g of Object.values(generations)) m.set(g.sessionId, `${m.get(g.sessionId) ?? ''} ${g.prompt ?? ''}`.toLowerCase());
+    return m;
+  }, [generations]);
+  return useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return () => true;
+    return (s: Session) =>
+      s.title.toLowerCase().includes(needle) ||
+      s.feed.some((f) => 'text' in f && typeof f.text === 'string' && f.text.toLowerCase().includes(needle)) ||
+      (prompts.get(s.id)?.includes(needle) ?? false);
+  }, [query, prompts]);
 }
 
 function sortLabel(sort: Sort, reversed: boolean): string {
