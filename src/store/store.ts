@@ -3,7 +3,7 @@ import { createJSONStorage, persist, type StateStorage } from 'zustand/middlewar
 import { uid } from '../lib/id';
 import { stateDb } from '../lib/idb';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
-import type { LlmModel } from '../engine/providers/llm';
+import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
 import type {
@@ -31,7 +31,7 @@ import type {
 
 export interface Settings {
   keys: Record<RemoteProviderId, string>;
-  agent: { provider: LlmProviderId | 'offline'; model: string; effort: 'low' | 'medium' | 'high' };
+  agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
   guidedRounds: number;
   budgetUsd: number;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null };
@@ -124,7 +124,7 @@ const firstSession = createSession();
 
 export const DEFAULT_SETTINGS: Settings = {
   keys: { openrouter: '', fal: '', nanogpt: '', atlas: '' },
-  agent: { provider: 'offline', model: '', effort: 'medium' },
+  agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
   ops: { edit: null, upscale: null, removeBg: null, video: null },

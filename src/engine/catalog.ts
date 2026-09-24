@@ -69,12 +69,23 @@ export async function loadLlmCatalog(provider: LlmProviderId): Promise<void> {
     setCatalog((c) => ({ llm: { ...c.llm, [provider]: models }, llmStatus: { ...c.llmStatus, [provider]: 'ready' } }));
     const agent = get().settings.agent;
     if (agent.provider === provider && (!agent.model || !models.some((m) => m.id === agent.model))) {
-      const pick = pickDefaultLlm(models);
+      const pick = pickDefaultLlm(models, agent.tier);
       if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick } }));
     }
   } catch {
     setCatalog((c) => ({ llmStatus: { ...c.llmStatus, [provider]: 'error' } }));
   }
+}
+
+/** Pick the agent model again after the user changes the engine or the tier. */
+export async function repickAgentModel(): Promise<void> {
+  const { provider } = get().settings.agent;
+  if (provider === 'offline') return;
+  await loadLlmCatalog(provider);
+  const { agent } = get().settings;
+  const models = get().catalog.llm[provider];
+  const pick = agent.provider === provider && models ? pickDefaultLlm(models, agent.tier) : undefined;
+  if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick } }));
 }
 
 export function modelSummary(ref: string): ModelSummary | undefined {

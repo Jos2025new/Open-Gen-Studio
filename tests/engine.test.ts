@@ -3,6 +3,7 @@ import { estimate, needsSpendCheck, sumEstimates, UNKNOWN, FREE } from '../src/e
 import { coerceSettings, schemaFromJson, wireParams } from '../src/engine/params';
 import { MAX_PLAN_STEPS, normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
 import { proposePlanSchema } from '../src/engine/agent/tools';
+import { pickDefaultLlm, type LlmModel } from '../src/engine/providers/llm';
 import { connect, connectionError, graphToSteps, planToGraph } from '../src/engine/flow/graph';
 import { offlinePlan, type OfflineInput } from '../src/engine/agent/offline';
 import { createDoc, insertLayer, moveLayer, newRasterLayer, newTextLayer, newVectorLayer, removeLayer, scaleLayer } from '../src/engine/design/doc';
@@ -68,6 +69,24 @@ describe('provider parameters', () => {
       prompt: { type: 'string' }, image_size: { type: 'string', enum: ['1K', '2K'] }, orientation: { type: 'string', enum: ['default', 'align_image'] },
     }, required: [], resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
     expect(tiers.params.map((p) => p.role)).toEqual(['other', 'other']);
+  });
+});
+
+describe('agent model policy', () => {
+  const llm = (id: string, tools = true, vision = true): LlmModel => ({ id, name: id, tools, vision });
+  const catalog = [llm('anthropic/claude-opus-5.5'), llm('openai/gpt-5.6-sol'), llm('deepseek/deepseek-v4.1-flash'), llm('z-ai/glm-5.3-flash'), llm('x/other')];
+  it('keeps the normal tier on its own list, in order', () => {
+    expect(pickDefaultLlm(catalog)).toBe('z-ai/glm-5.3-flash');
+    expect(pickDefaultLlm(catalog.filter((m) => !m.id.includes('glm')))).toBe('deepseek/deepseek-v4.1-flash');
+  });
+  it('uses the top tier only when asked, and skips models without tools or vision', () => {
+    expect(pickDefaultLlm(catalog, 'top')).toBe('openai/gpt-5.6-sol');
+    const noTools = [llm('openai/gpt-5.6-sol', false), llm('anthropic/claude-opus-5.5', true, false), llm('zai-org/glm-5.3-flash')];
+    expect(pickDefaultLlm(noTools, 'top')).toBe('zai-org/glm-5.3-flash');
+  });
+  it('falls back to any capable model, then to any model with tools', () => {
+    expect(pickDefaultLlm([llm('a', false), llm('b', true, false), llm('c')])).toBe('c');
+    expect(pickDefaultLlm([llm('a', false), llm('b', true, false)])).toBe('b');
   });
 });
 

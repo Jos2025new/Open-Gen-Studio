@@ -12,7 +12,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — parámetros de proveedores (2026-09-24)
+## Tarea actual — prioridad de modelos del agente (2026-09-24)
+IDs contrastados con los catálogos vivos de OpenRouter, NanoGPT y Atlas.
+1. [x] `llm.ts`: `PREFERRED_LLM` → `NORMAL_LLM` y `TOP_LLM` (IDs reales de los tres catálogos, en orden); `pickDefaultLlm(models, tier)` recorre la lista del tier (top cae a normal) y exige tools + visión; luego el fallback genérico actual. `LlmModel.vision` leído del catálogo. *Razón: una sola lógica; el catálogo decide qué existe.*
+2. [x] `settings.agent.tier` (`normal` por defecto). *Razón: el Top Tier solo se usa si se elige explícitamente.*
+3. [x] `catalog.ts`: `repickAgentModel()` para cambio de proveedor o tier; elimina la copia de la lógica en `SettingsPanel`. *Razón: DRY.*
+4. [x] Ajustes: selector Normal/Top junto al modelo; el selector manual sigue igual. *Razón: elección explícita.*
+5. [x] Tests, typecheck, commit.
+
+## Tarea anterior — parámetros de proveedores (2026-09-24)
 Contrastado con esquemas vivos de fal, Atlas y NanoGPT antes de tocar código.
 1. [x] `ROLE_KEYS.count`: quitar `max_images` y `batch_size`. *Razón: Seedream (fal v4.5/edit) trae `max_images` antes que `num_images`; ambos recibían N (hasta N² imágenes). Ningún esquema vivo usa `batch_size`.*
 2. [x] Rol `aspect` solo si alguna opción del enum se interpreta como proporción; si no, `other`. *Razón: `image_size`/`orientation`/`ratio` a veces no son proporciones (p. ej. `align_image`, enteros); así el schema decide.*

@@ -9,6 +9,8 @@ export interface LlmModel {
   id: string;
   name: string;
   tools: boolean;
+  /** Accepts image input (undefined when the catalog does not say). */
+  vision?: boolean;
   contextLength?: number;
   /** USD per million tokens. */
   inputPrice?: number;
@@ -39,8 +41,23 @@ export const LLM_LABELS: Record<LlmProviderId, string> = {
   atlas: 'Atlas Cloud',
 };
 
-/** Preferred agent models, first match in the live list wins. */
-export const PREFERRED_LLM = ['anthropic/claude-opus-5', 'anthropic/claude-sonnet-5', 'anthropic/claude-opus-4.8', 'anthropic/claude-sonnet-4.6'];
+export type AgentTier = 'normal' | 'top';
+
+/*
+ * Agent model priority, best first. Ids exactly as each provider lists them (OpenRouter and NanoGPT
+ * share most ids; Atlas uses its own vendor prefixes); the first one in the live catalog wins.
+ */
+const NORMAL_LLM = [
+  'z-ai/glm-5.3-flash', 'zai-org/glm-5.3-flash', // GLM 5.3 Flash
+  'openai/gpt-6-luna', // GPT-6 Luna
+  'deepseek/deepseek-v4.1-flash', 'deepseek-ai/deepseek-v4.1-flash', // DeepSeek V4.1 Flash
+];
+const TOP_LLM = [
+  'openai/gpt-6-sol', 'openai/gpt-6-sol-codex', // GPT-6 Sol (Atlas lists it as gpt-6-sol-codex)
+  'openai/gpt-5.6-sol', // GPT-5.6 Sol
+  'anthropic/claude-opus-5.5', // Claude Opus 5.5
+  'qwen/qwen3.8-max', 'qwen/qwen3.8-max-0902', // Qwen 3.8 Max (OpenRouter only has the dated id)
+];
 
 function headers(provider: LlmProviderId, key: string): Record<string, string> {
   if (provider === 'openrouter') return orHeaders(key);
@@ -65,19 +82,23 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
     const id = String(m.id ?? '');
     if (!id) continue;
     let tools = false;
+    let vision: boolean | undefined;
     let inputPrice: number | undefined;
     let outputPrice: number | undefined;
     const pricing = (m.pricing ?? {}) as Loose;
     if (provider === 'openrouter') {
       tools = Array.isArray(m.supported_parameters) && (m.supported_parameters as string[]).includes('tools');
+      vision = ((m.architecture as Loose | undefined)?.input_modalities as string[] | undefined)?.includes('image');
       inputPrice = perMillion(pricing.prompt, 'token');
       outputPrice = perMillion(pricing.completion, 'token');
     } else if (provider === 'nanogpt') {
       tools = Boolean((m.capabilities as Loose | undefined)?.tool_calling);
+      vision = (m.capabilities as Loose | undefined)?.vision as boolean | undefined;
       inputPrice = perMillion(pricing.prompt, 'million');
       outputPrice = perMillion(pricing.completion, 'million');
     } else {
       tools = Array.isArray(m.supported_features) && (m.supported_features as string[]).includes('tools');
+      vision = (m.input_modalities as string[] | undefined)?.includes('image');
       inputPrice = perMillion(pricing.prompt, 'token');
       outputPrice = perMillion(pricing.completion, 'token');
     }
@@ -87,6 +108,7 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
       id,
       name: String(m.name ?? id).replace(/^[^:]+:\s*/, ''),
       tools,
+      vision,
       contextLength: typeof m.context_length === 'number' ? m.context_length : undefined,
       inputPrice,
       outputPrice,
@@ -96,9 +118,13 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
   return out;
 }
 
-export function pickDefaultLlm(models: LlmModel[]): string | undefined {
-  for (const id of PREFERRED_LLM) if (models.some((m) => m.id === id)) return id;
-  return models.find((m) => m.tools)?.id;
+const capable = (m: LlmModel) => m.tools && m.vision !== false;
+
+/** Default agent model: the tier's priority list (top falls back to normal), then any capable model. */
+export function pickDefaultLlm(models: LlmModel[], tier: AgentTier = 'normal'): string | undefined {
+  const order = tier === 'top' ? [...TOP_LLM, ...NORMAL_LLM] : NORMAL_LLM;
+  for (const id of order) if (models.some((m) => m.id === id && capable(m))) return id;
+  return (models.find(capable) ?? models.find((m) => m.tools))?.id;
 }
 
 /** Stream a chat completion, reporting text deltas. */

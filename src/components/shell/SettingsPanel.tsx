@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
-import { loadCatalogs, loadLlmCatalog, modelSummary, opModelFor } from '../../engine/catalog';
+import { loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
-import { LLM_LABELS, pickDefaultLlm } from '../../engine/providers/llm';
+import { LLM_LABELS } from '../../engine/providers/llm';
 import type { LlmProviderId, RemoteProviderId } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setCatalog, setSettings, toast, useStore, wipeAllData } from '../../store/store';
@@ -175,17 +175,9 @@ export function SettingsPanel() {
       toast(`Add your ${LLM_LABELS[v]} key above first.`, 'error');
       return;
     }
-    setSettings((s) => ({ agent: { ...s.agent, provider: v, model: v === s.agent.provider ? s.agent.model : '' } }));
-    if (v !== 'offline') {
-      void loadLlmCatalog(v).then(() => {
-        const st = useStore.getState();
-        const models = st.catalog.llm[v];
-        if (models && !st.settings.agent.model) {
-          const pick = pickDefaultLlm(models);
-          if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick } }));
-        }
-      });
-    }
+    const changed = v !== settings.agent.provider;
+    setSettings((s) => ({ agent: { ...s.agent, provider: v, model: changed ? '' : s.agent.model } }));
+    if (changed || !settings.agent.model) void repickAgentModel();
   };
 
   return (
@@ -206,10 +198,29 @@ export function SettingsPanel() {
           <Segmented value={settings.agent.provider} options={engines} onChange={setEngine} size="sm" />
         </div>
         {settings.agent.provider !== 'offline' ? (
-          <div className="set-row">
-            <span className="set-label">Model</span>
-            <LlmModelPicker />
-          </div>
+          <>
+            <div className="set-row">
+              <span className="set-label" data-tip="Normal: GLM 5.3 Flash, GPT-6 Luna, DeepSeek V4.1 Flash. Top: GPT-6 Sol, GPT-5.6 Sol, Claude Opus 5.5, Qwen 3.8 Max. Picks the first one your provider offers with tool calling.">
+                Tier
+              </span>
+              <Segmented
+                value={settings.agent.tier}
+                options={[
+                  { value: 'normal', label: 'Normal' },
+                  { value: 'top', label: 'Top' },
+                ]}
+                onChange={(v) => {
+                  setSettings((s) => ({ agent: { ...s.agent, tier: v } }));
+                  void repickAgentModel();
+                }}
+                size="sm"
+              />
+            </div>
+            <div className="set-row">
+              <span className="set-label">Model</span>
+              <LlmModelPicker />
+            </div>
+          </>
         ) : (
           <p className="set-note">The local planner handles common requests without an LLM. Connect a provider for the full agent.</p>
         )}
