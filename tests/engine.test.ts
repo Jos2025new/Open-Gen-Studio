@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { estimate, needsSpendCheck, sumEstimates, UNKNOWN, FREE } from '../src/engine/pricing';
 import { coerceSettings, schemaFromJson, wireParams } from '../src/engine/params';
-import { normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
+import { MAX_PLAN_STEPS, normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
+import { proposePlanSchema } from '../src/engine/agent/tools';
 import { connect, connectionError, graphToSteps, planToGraph } from '../src/engine/flow/graph';
 import { offlinePlan, type OfflineInput } from '../src/engine/agent/offline';
 import { createDoc, insertLayer, moveLayer, newRasterLayer, newTextLayer, newVectorLayer, removeLayer, scaleLayer } from '../src/engine/design/doc';
@@ -71,6 +72,14 @@ describe('provider parameters', () => {
 });
 
 describe('plan and graph validation', () => {
+  it('applies one step limit to the tool schema and the normalizer', async () => {
+    const steps = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `t${i + 1}`, kind: 'text', text: 'x' }));
+    expect(proposePlanSchema.safeParse({ steps: steps(MAX_PLAN_STEPS) }).success).toBe(true);
+    expect(proposePlanSchema.safeParse({ steps: steps(MAX_PLAN_STEPS + 1) }).success).toBe(false);
+    expect((await normalizePlan({ title: 'T', steps: steps(MAX_PLAN_STEPS) }, ctx, 'p1')).errors.join()).not.toMatch(/Too many steps/);
+    expect((await normalizePlan({ title: 'T', steps: steps(MAX_PLAN_STEPS + 1) }, ctx, 'p2')).errors.join()).toMatch(/Too many steps/);
+    expect((await normalizePlan({ title: 'T', steps: steps(3) }, { ...ctx, maxSteps: 2 }, 'p3')).errors.join()).toMatch(/limit is 2/);
+  });
   it('sorts dependencies and rejects cycles and missing references', () => {
     expect(topoOrder([...plan.steps].reverse())).toEqual(['prompt', 'image']);
     expect(() => topoOrder([{ ...image, refs: ['image'] }])).toThrow(/Cycle/);

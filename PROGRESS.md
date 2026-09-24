@@ -30,6 +30,12 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - Panel de capas: redimensionable (200–520 px), plegable y con secciones plegables; preferencias en `localStorage` (`ogs:layers-*`), el composer usa `--layers-w`.
 - Verificado en navegador (1400×860): formas, texto, pincel sobre vacío e imagen, panel, lista de modelos. Typecheck, 12 tests y build correctos.
 
+## Parámetros de proveedores — 2026-09-24 (detalle en `AGENTS.md`)
+- `max_images`/`batch_size` fuera del rol `count`; `aspect` solo si las opciones son proporciones; `portrait_3_4` (Krea/Ideogram) reconocido. Contrastado con esquemas vivos de fal/Atlas/NanoGPT antes y después.
+- fal pagina todas las páginas de cada categoría (image-to-image ~400).
+- `MAX_PLAN_STEPS` compartido; ops del agente desde `OPS`/`OP_IDS` (puntos 2 y 3 de `REMEDIATION_PLAN_AUDITED.md`).
+- Typecheck y 15 tests correctos. Navegador no verificado: el puerto 5173 lo ocupaba otra sesión.
+
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.
 - No hay backend ni despliegue de producción en este alcance.
