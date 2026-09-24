@@ -131,7 +131,8 @@ export async function probeMedia(blob: Blob): Promise<MediaInfo> {
 }
 
 /** Grab the first or last frame of a video as a PNG blob. */
-export async function extractVideoFrame(src: string, which: 'first' | 'last'): Promise<{ blob: Blob; width: number; height: number }> {
+/** A frame as PNG: the first, the last, or the one at `which` seconds (clamped to the clip). */
+export async function extractVideoFrame(src: string, which: 'first' | 'last' | number): Promise<{ blob: Blob; width: number; height: number }> {
   const v = await loadVideo(src);
   v.preload = 'auto';
   let duration = v.duration;
@@ -139,7 +140,7 @@ export async function extractVideoFrame(src: string, which: 'first' | 'last'): P
     await seek(v, 1e9);
     duration = Number.isFinite(v.duration) ? v.duration : v.currentTime;
   }
-  const t = which === 'first' ? 0.001 : Math.max(0, duration - 0.05);
+  const t = which === 'first' ? 0.001 : which === 'last' ? Math.max(0, duration - 0.05) : Math.min(Math.max(0.001, which), Math.max(0, duration - 0.05));
   await seek(v, t);
   const c = createCanvas(v.videoWidth, v.videoHeight);
   ctx2d(c).drawImage(v, 0, 0, c.width, c.height);

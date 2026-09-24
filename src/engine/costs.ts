@@ -37,7 +37,7 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
 
 export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, source: Pick<Asset, 'width' | 'height'> | undefined, videoSettings: GenSettings): Estimate {
   const def = OPS[opId];
-  if (def.engine === 'frame') return FREE;
+  if (def.engine === 'local') return FREE;
   const { ref } = opModelFor(def.engine);
   if (ref.startsWith('local::')) return FREE;
   const price = priceOf(ref);

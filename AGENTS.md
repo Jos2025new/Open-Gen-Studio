@@ -12,7 +12,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — Sketch sobre imagen (2026-09-25)
+## Tarea actual — fase 1 de herramientas (2026-09-25)
+1. [x] Engine `frame` → `local` (operaciones gratis en el navegador). Extract frame gana "en el segundo X" (Capture). *Razón: un solo camino para lo local.*
+2. [x] Grid-split (local): corta una imagen en 2×2 o 3×3; cada trozo es una salida y el nodo elige cuál pasa aguas abajo. *Razón: gratis, sin proveedor.*
+3. [x] Nine-grid (edit): hoja de contactos 3×3 con nueve ángulos, vía el modelo de edición y su fallback. *Razón: ningún proveedor lo ofrece como modelo; es una instrucción, igual que Relight.*
+4. [x] Barra del nodo: menú "More" con el resto de herramientas para ese tipo y el atajo Panorama (Reframe 21:9). *Razón: la barra solo muestra 4 rápidas.*
+5. [x] Tests, typecheck, navegador; commit.
+6. [x] Hallado al probar: `addConnected` apilaba nodos nuevos encima de los hijos existentes → se colocan bajo el último hijo. Medidas/selección del canvas con actualizaciones funcionales (varios avisos antes de un render perdían datos). Nota de pruebas: con la pestaña del navegador oculta los ResizeObserver no se ejecutan y los nodos salen ocultos; no es un fallo de la app.
+
+## Tarea anterior — Sketch sobre imagen (2026-09-25)
 1. [x] Trazo del pincel a `design/raster.ts` (`strokeSegment`), usado por el Designer y por Sketch. *Razón: no duplicar el pincel.*
 2. [x] `SketchEditor` modal: imagen grande, pincel, color, borrador, tamaño, deshacer/rehacer (trazos vectoriales, poca memoria), Guardar y ✕ que pide guardar o descartar si hay cambios. Reutiliza `ui.brush`, `assetCanvas` y el guardado de assets del Designer. *Razón: pintar sin salir del flujo.*
 3. [x] ~~Guardar crea nodos nuevos~~ → corregido a petición del usuario: el nodo guarda `sketchAssetId`; esa copia es lo único que va aguas abajo (`nodeOutputAsset`), la tarjeta muestra "Edited" y la barra "Reset image" vuelve al original. La copia (origen `sketch`) no sale en la galería y se borra al restablecer, reeditar o regenerar. *Razón: sin nodos duplicados ni dos imágenes enviadas al proveedor.*

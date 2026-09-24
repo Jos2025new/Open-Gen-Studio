@@ -94,7 +94,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
       <SpendConfirm
         title={via ? `via ${via}` : 'Cost'}
         estimate={estimate}
-        confirmLabel={def.engine === 'frame' ? 'Extract' : 'Apply'}
+        confirmLabel={def.engine === 'local' ? 'Run (free)' : 'Apply'}
         onConfirm={run}
         onCancel={onClose}
         blocked={missing ? `Fill in “${missing.label}”.` : null}

@@ -137,7 +137,9 @@ export type OpId =
   | 'edit'
   | 'animate'
   | 'extract_frame'
-  | 'continue';
+  | 'continue'
+  | 'contact_sheet'
+  | 'grid_split';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';

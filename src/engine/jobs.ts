@@ -1,7 +1,7 @@
 import { uid } from '../lib/id';
 import { AbortedError, isAbort } from '../lib/http';
 import { getAssetBlob, loadAssetUrl, putAssetBlob } from '../lib/idb';
-import { extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
+import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
 import { estimateMedia, estimateOp } from './costs';
@@ -32,7 +32,7 @@ export interface GenerationSpec {
 }
 
 export function modelName(ref: string): string {
-  if (ref === 'local::frame') return 'Frame extractor';
+  if (ref === 'local::frame') return 'Local tool';
   if (ref.startsWith('local::')) return ref === 'local::studio-video' ? 'Local Motion' : 'Local Sketch';
   return get().catalog.models[ref]?.name ?? parseModelRef(ref)?.id ?? ref;
 }
@@ -81,7 +81,7 @@ async function mediaInput(assetId: string): Promise<MediaInput> {
   return { assetId, blob, mime: blob.type || asset.mime, width: asset.width, height: asset.height };
 }
 
-async function frameInput(assetId: string, which: 'first' | 'last'): Promise<MediaInput> {
+async function frameInput(assetId: string, which: 'first' | 'last' | number): Promise<MediaInput> {
   const url = (await loadAssetUrl(assetId)) ?? get().assets[assetId]?.remoteUrl;
   if (!url) throw new Error('The source video is not available.');
   const f = await extractVideoFrame(url, which);
@@ -125,16 +125,34 @@ function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
   return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' ? s.duration : undefined };
 }
 
-/** Frame extraction is local and free; it never reaches a provider. */
-async function runExtractFrame(g: Generation, signal: AbortSignal): Promise<string[]> {
-  const src = g.op!.sourceAssetId;
-  const which = g.op!.params.which === 'first' ? 'first' : 'last';
-  const f = await frameInput(src, which);
+/** Local operations (frames, grid split) run in the browser for free; they never reach a provider. */
+async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]> {
+  const { id, sourceAssetId, params } = g.op!;
+  const images: Array<{ blob: Blob; width: number; height: number }> = [];
+  if (id === 'extract_frame') {
+    const seconds = parseFloat(String(params.seconds ?? ''));
+    const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
+    images.push(await frameInput(sourceAssetId, which));
+  } else if (id === 'grid_split') {
+    const n = Number(params.grid) === 2 ? 2 : 3;
+    const src = await blobToCanvas((await mediaInput(sourceAssetId)).blob);
+    const w = Math.floor(src.width / n);
+    const h = Math.floor(src.height / n);
+    for (let row = 0; row < n; row++) {
+      for (let col = 0; col < n; col++) {
+        const c = createCanvas(w, h);
+        ctx2d(c).drawImage(src, col * w, row * h, w, h, 0, 0, w, h);
+        images.push({ blob: await canvasToBlob(c, 'image/png'), width: w, height: h });
+      }
+    }
+  } else {
+    throw new Error(`${id} is not a local operation`);
+  }
   if (signal.aborted) throw new AbortedError();
-  const asset = await storeOutput({ blob: f.blob, mime: 'image/png' }, g, 'image', { width: f.width, height: f.height });
-  asset.origin = 'frame';
-  addAssets([asset]);
-  return [asset.id];
+  const assets = await Promise.all(images.map((f) => storeOutput({ blob: f.blob, mime: 'image/png' }, g, 'image', { width: f.width, height: f.height })));
+  assets.forEach((a) => (a.origin = 'frame'));
+  addAssets(assets);
+  return assets.map((a) => a.id);
 }
 
 /** Execute a queued generation. Resolves with the created asset ids. */
@@ -158,8 +176,8 @@ async function execute(id: string): Promise<string[]> {
   patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [] });
   const g = get().generations[id];
   try {
-    if (g.op?.id === 'extract_frame') {
-      const assetIds = await runExtractFrame(g, signal);
+    if (g.op && OPS[g.op.id].engine === 'local') {
+      const assetIds = await runLocalOp(g, signal);
       finish(id, assetIds, 0);
       return assetIds;
     }
@@ -337,8 +355,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const prompt = def.instruction ? def.instruction(input.params) : def.label;
   const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
-  if (def.engine === 'frame') {
-    return { ...base, kind: 'image', prompt: `${def.label} (${input.params.which})`, modelRef: 'local::frame', settings: { count: 1, advanced: {} }, op, estimate: { usd: 0, approximate: false } };
+  if (def.engine === 'local') {
+    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : `${input.params.grid}×${input.params.grid}`;
+    return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   const choice = opModelFor(def.engine);
   const resolved = await resolveModel(choice.ref);

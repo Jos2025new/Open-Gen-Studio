@@ -10,8 +10,8 @@ export interface OpField {
   required?: boolean;
 }
 
-/** Which engine runs the operation. 'edit' = an image model that accepts a source image. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'frame';
+/** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local';
 
 export interface OpDef {
   id: OpId;
@@ -216,12 +216,15 @@ export const OPS: Record<OpId, OpDef> = {
   extract_frame: {
     id: 'extract_frame',
     label: 'Extract frame',
-    description: 'Save the first or last frame as an image (free).',
+    description: 'Save a frame as an image: first, last or at a given second (free).',
     input: 'video',
     output: 'image',
-    engine: 'frame',
+    engine: 'local',
     quick: true,
-    fields: [{ key: 'which', label: 'Frame', type: 'choice', default: 'last', options: opt(['first', 'First'], ['last', 'Last']) }],
+    fields: [
+      { key: 'which', label: 'Frame', type: 'choice', default: 'last', options: opt(['first', 'First'], ['last', 'Last'], ['time', 'At second…']) },
+      { key: 'seconds', label: 'Second', type: 'text', default: '', placeholder: 'At second… e.g. 2.5' },
+    ],
   },
   continue: {
     id: 'continue',
@@ -233,6 +236,28 @@ export const OPS: Record<OpId, OpDef> = {
     quick: true,
     fields: [{ key: 'motion', label: 'Next', type: 'text', default: '', placeholder: 'What happens next' }],
     instruction: (p) => String(p.motion).trim() || 'Continue the action naturally from this frame with consistent motion and camera.',
+  },
+  contact_sheet: {
+    id: 'contact_sheet',
+    label: 'Nine-grid',
+    description: 'A 3×3 contact sheet: the same scene from nine camera angles.',
+    input: 'image',
+    output: 'image',
+    engine: 'edit',
+    quick: false,
+    fields: [{ key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'Optional detail, e.g. keep the rain' }],
+    instruction: (p) =>
+      `Create a 3×3 contact sheet: nine equal panels in a grid with thin gutters, each showing this exact scene from a different camera angle and shot size (wide, medium, close-up, low angle, high angle, over the shoulder, profile, top-down, detail). ${PRESERVE}${note(p)}`,
+  },
+  grid_split: {
+    id: 'grid_split',
+    label: 'Grid-split',
+    description: 'Cut a grid image (like a nine-grid) into separate images (free).',
+    input: 'image',
+    output: 'image',
+    engine: 'local',
+    quick: false,
+    fields: [{ key: 'grid', label: 'Grid', type: 'choice', default: '3', options: opt(['2', '2×2'], ['3', '3×3']) }],
   },
 };
 
@@ -251,6 +276,7 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
 
 export function opCount(op: OpDef, params: Record<string, AdvancedValue>): number {
   if (op.id === 'variations') return Math.max(1, Math.min(4, Number(params.count) || 1));
+  if (op.id === 'grid_split') return (Number(params.grid) || 3) ** 2;
   return 1;
 }
 

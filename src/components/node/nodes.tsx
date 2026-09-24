@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, ChevronDown, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
@@ -240,6 +240,33 @@ function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
   );
 }
 
+/** The tools that do not fit in the bar, plus Panorama (Reframe at 21:9). Each adds a connected tool node. */
+function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: OpId[] }) {
+  const sessionId = useSessionId();
+  const pop = usePopover();
+  const add = (op: OpId, patch: Partial<ToolNodeData> = {}) => {
+    pop.close();
+    const data = newNodeData('tool', { op }) as ToolNodeData;
+    addConnected(sessionId, node.id, { ...data, ...patch, params: { ...data.params, ...patch.params } });
+  };
+  const rest = OP_IDS.filter((id) => OPS[id].input === out && !skip.includes(id));
+  return (
+    <>
+      <button ref={pop.ref} type="button" className={`nt-btn nt-icon nodrag ${pop.open ? 'is-open' : ''}`} aria-label="More tools" data-tip="More tools" onClick={pop.toggle}>
+        <Ellipsis size={14} />
+      </button>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="More tools">
+        <div className="menu">
+          {out === 'image' ? <MenuItem icon={RectangleHorizontal} label="Panorama" detail="Reframe to 21:9" onClick={() => add('reframe', { title: 'Panorama', params: { aspect: '21:9' } })} /> : null}
+          {rest.map((id) => (
+            <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} detail={OPS[id].description} onClick={() => add(id)} />
+          ))}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
 /** Floating actions above the selected node: run, quick tools on its result, open, download, duplicate, delete. */
 function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
   const sessionId = useSessionId();
@@ -257,6 +284,7 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
           </button>
         );
       })}
+      {assetId && out ? <MoreTools node={node} out={out} skip={quick} /> : null}
       {runnable || quick.length ? <span className="nt-sep" /> : null}
       {assetId ? (
         <>

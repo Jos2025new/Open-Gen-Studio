@@ -7,6 +7,8 @@ import {
   Ellipsis,
   FastForward,
   Frame,
+  Grid3x3,
+  LayoutGrid,
   Maximize,
   Paperclip,
   PenTool,
@@ -38,6 +40,8 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   animate: Clapperboard,
   extract_frame: Frame,
   continue: FastForward,
+  contact_sheet: Grid3x3,
+  grid_split: LayoutGrid,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

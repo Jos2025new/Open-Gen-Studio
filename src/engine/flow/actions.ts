@@ -3,7 +3,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
 import { setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort } from './graph';
+import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 
 const get = useStore.getState;
@@ -50,8 +50,10 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   if (!from) return null;
   const type = outputPort(from.data, st.assets);
   const port = inputPorts(data).find((p) => p.type === type);
-  const siblings = graph.edges.filter((e) => e.source === fromId).length;
-  const id = addNode(sessionId, data, { x: from.position.x + NODE_WIDTH + 100, y: from.position.y + siblings * 80 });
+  // Stack below the nodes this one already feeds, so new cards never land on top of them.
+  const children = graph.edges.filter((e) => e.source === fromId).map((e) => graph.nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => Boolean(n));
+  const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
+  const id = addNode(sessionId, data, { x: from.position.x + NODE_WIDTH + 100, y });
   if (port) tryConnect(sessionId, { source: fromId, target: id, targetHandle: port.id });
   return id;
 }

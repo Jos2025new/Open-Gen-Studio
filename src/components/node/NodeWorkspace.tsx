@@ -135,46 +135,48 @@ function Canvas() {
     (changes: NodeChange<FlowNode>[]) => {
       const moves = new Map<string, { x: number; y: number }>();
       const removed: string[] = [];
-      let sel: Set<string> | null = null;
-      let sizes: Map<string, { width: number; height: number }> | null = null;
+      const picks: Array<[string, boolean]> = [];
+      const sizes: Array<[string, { width: number; height: number }]> = [];
       for (const c of changes) {
-        if (c.type === 'dimensions' && c.dimensions) (sizes ??= new Map(measured)).set(c.id, c.dimensions);
+        if (c.type === 'dimensions' && c.dimensions) sizes.push([c.id, c.dimensions]);
         else if (c.type === 'position' && c.position) moves.set(c.id, c.position);
         else if (c.type === 'remove') removed.push(c.id);
-        else if (c.type === 'select') {
-          sel = sel ?? new Set(selected);
-          if (c.selected) sel.add(c.id);
-          else sel.delete(c.id);
-        }
+        else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
       if (moves.size) setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
-      if (removed.length) {
-        deleteNodes(sessionId, removed);
-        sel = sel ?? new Set(selected);
-        for (const id of removed) sel.delete(id);
+      if (removed.length) deleteNodes(sessionId, removed);
+      // Functional updates: several reports can arrive before a re-render; none may be lost.
+      if (picks.length || removed.length) {
+        setSelected((prev) => {
+          const next = new Set(prev);
+          for (const [id, on] of picks) (on ? next.add(id) : next.delete(id));
+          for (const id of removed) next.delete(id);
+          return next;
+        });
       }
-      if (sel) setSelected(sel);
-      if (sizes) setMeasured(sizes);
+      if (sizes.length) setMeasured((prev) => new Map([...prev, ...sizes]));
     },
-    [sessionId, selected, measured],
+    [sessionId],
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange<Edge>[]) => {
       const removed = new Set<string>();
-      let sel: Set<string> | null = null;
+      const picks: Array<[string, boolean]> = [];
       for (const c of changes) {
         if (c.type === 'remove') removed.add(c.id);
-        else if (c.type === 'select') {
-          sel = sel ?? new Set(selectedEdges);
-          if (c.selected) sel.add(c.id);
-          else sel.delete(c.id);
-        }
+        else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
       if (removed.size) setGraph(sessionId, (g) => ({ ...g, edges: g.edges.filter((e) => !removed.has(e.id)) }));
-      if (sel) setSelectedEdges(sel);
+      if (picks.length) {
+        setSelectedEdges((prev) => {
+          const next = new Set(prev);
+          for (const [id, on] of picks) (on ? next.add(id) : next.delete(id));
+          return next;
+        });
+      }
     },
-    [sessionId, selectedEdges],
+    [sessionId],
   );
 
   const isValidConnection = useCallback(
