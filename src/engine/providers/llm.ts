@@ -119,7 +119,10 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
   return out;
 }
 
-const capable = (m: LlmModel) => m.tools && m.vision !== false;
+export const capable = (m: LlmModel) => m.tools && m.vision !== false;
+
+/** Priority lists by tier; the model picker shows these first. */
+export const LLM_TIERS: Record<AgentTier, string[]> = { normal: NORMAL_LLM, top: TOP_LLM };
 
 /** Default agent model: the tier's priority list (top falls back to normal), then any capable model. */
 export function pickDefaultLlm(models: LlmModel[], tier: AgentTier = 'normal'): string | undefined {

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Pin, PinOff, Plus, Search, Trash, X } from 'lucide-react';
+import { ArrowDownUp, LayoutList, List, Pencil, Pin, PinOff, Plus, Search, Trash, X } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { formatRelative, formatUsd } from '../../lib/format';
@@ -17,37 +17,47 @@ export function SessionsPanel() {
   const generations = useStore((s) => s.generations);
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('recent');
+  const [reversed, setReversed] = useState(false);
+  const [pinnedOnly, setPinnedOnly] = useState(false);
+  const [compact, setCompact] = useState(false);
 
   const stats = useMemo(() => {
-    const m = new Map<string, { assets: string[]; gens: number; spend: number }>();
-    for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) {
-      const e = m.get(a.sessionId) ?? { assets: [], gens: 0, spend: 0 };
-      e.assets.push(a.id);
-      m.set(a.sessionId, e);
-    }
+    const m = new Map<string, Stats>();
+    const entry = (id: string) => {
+      const e = m.get(id) ?? { assets: [], gens: 0, spend: 0, prompts: '' };
+      m.set(id, e);
+      return e;
+    };
+    for (const a of Object.values(assets).sort((x, y) => y.createdAt - x.createdAt)) entry(a.sessionId).assets.push(a.id);
     for (const g of Object.values(generations)) {
-      const e = m.get(g.sessionId) ?? { assets: [], gens: 0, spend: 0 };
+      const e = entry(g.sessionId);
       e.gens++;
+      e.prompts += ` ${g.prompt ?? ''}`;
       if (g.status === 'done') e.spend += g.actualUsd ?? g.estimate.usd ?? 0;
-      m.set(g.sessionId, e);
     }
     return m;
   }, [assets, generations]);
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const arr = Object.values(sessions).filter((s) => !needle || s.title.toLowerCase().includes(needle));
+    // Matches the title, the conversation and the prompts used in the session.
+    const matches = (s: Session) =>
+      s.title.toLowerCase().includes(needle) ||
+      s.feed.some((f) => 'text' in f && typeof f.text === 'string' && f.text.toLowerCase().includes(needle)) ||
+      (stats.get(s.id)?.prompts.toLowerCase().includes(needle) ?? false);
+    const arr = Object.values(sessions).filter((s) => (!pinnedOnly || s.pinned) && (!needle || matches(s)));
+    const dir = reversed ? -1 : 1;
     arr.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (sort === 'name') return a.title.localeCompare(b.title);
-      if (sort === 'created') return b.createdAt - a.createdAt;
-      return b.updatedAt - a.updatedAt;
+      if (sort === 'name') return dir * a.title.localeCompare(b.title);
+      if (sort === 'created') return dir * (b.createdAt - a.createdAt);
+      return dir * (b.updatedAt - a.updatedAt);
     });
     return arr;
-  }, [sessions, q, sort]);
+  }, [sessions, stats, q, sort, reversed, pinnedOnly]);
 
   return (
-    <div className="sessions">
+    <div className={`sessions ${compact ? 'is-compact' : ''}`}>
       <div className="panel-head">
         <div className="panel-title">
           Sessions <span className="faint num">{Object.keys(sessions).length}</span>
@@ -70,18 +80,29 @@ export function SessionsPanel() {
       <div className="gallery-controls">
         <div className="search-input">
           <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search names, chats and prompts" aria-label="Search sessions" />
+          {q ? (
+            <button type="button" aria-label="Clear search" onClick={() => setQ('')}>
+              <X size={13} />
+            </button>
+          ) : null}
         </div>
-        <Segmented
-          value={sort}
-          size="sm"
-          onChange={setSort}
-          options={[
-            { value: 'recent', label: 'Recent' },
-            { value: 'created', label: 'Created' },
-            { value: 'name', label: 'Name' },
-          ]}
-        />
+        <div className="gallery-tools">
+          <IconButton icon={Pin} label={pinnedOnly ? 'Showing pinned' : 'Pinned only'} size="sm" active={pinnedOnly} onClick={() => setPinnedOnly((v) => !v)} />
+          <IconButton icon={ArrowDownUp} label={sortLabel(sort, reversed)} size="sm" active={reversed} onClick={() => setReversed((v) => !v)} />
+          <Segmented
+            value={sort}
+            size="sm"
+            onChange={setSort}
+            options={[
+              { value: 'recent', label: 'Recent', tip: 'Last activity' },
+              { value: 'created', label: 'Created' },
+              { value: 'name', label: 'Name' },
+            ]}
+          />
+          <span className="spacer" />
+          <IconButton icon={compact ? List : LayoutList} label={compact ? 'Compact list · show thumbnails' : 'With thumbnails · compact list'} size="sm" onClick={() => setCompact((v) => !v)} />
+        </div>
       </div>
       <div className="sessions-scroll">
         {list.map((s) => (
@@ -93,7 +114,20 @@ export function SessionsPanel() {
   );
 }
 
-function SessionRow({ session, active, stats }: { session: Session; active: boolean; stats?: { assets: string[]; gens: number; spend: number } }) {
+interface Stats {
+  assets: string[];
+  gens: number;
+  spend: number;
+  /** Generation prompts, for search. */
+  prompts: string;
+}
+
+function sortLabel(sort: Sort, reversed: boolean): string {
+  if (sort === 'name') return reversed ? 'Z → A' : 'A → Z';
+  return reversed ? 'Oldest first' : 'Newest first';
+}
+
+function SessionRow({ session, active, stats }: { session: Session; active: boolean; stats?: Stats }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title);
   const del = usePopover();
@@ -148,22 +182,22 @@ function SessionRow({ session, active, stats }: { session: Session; active: bool
             aria-label="Session title"
           />
         ) : (
-          <span className="session-title">
+          <span className="session-title" title={session.title}>
             {session.pinned ? <Pin size={11} className="pin-mark" /> : null}
-            {session.title}
+            <span className="truncate">{session.title}</span>
           </span>
         )}
         <span className="session-meta faint num">{meta.join(' · ')}</span>
-        {stats?.assets.length ? (
-          <span className="session-thumbs">
-            {stats.assets.slice(0, 4).map((id) => (
-              <span key={id} className="session-thumb">
-                <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-              </span>
-            ))}
-          </span>
-        ) : null}
       </div>
+      {stats?.assets.length ? (
+        <span className="session-thumbs">
+          {stats.assets.slice(0, 3).map((id) => (
+            <span key={id} className="session-thumb">
+              <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+            </span>
+          ))}
+        </span>
+      ) : null}
       <div className="session-actions">
         <IconButton icon={session.pinned ? PinOff : Pin} label={session.pinned ? 'Unpin' : 'Pin'} size="sm" onClick={() => togglePinSession(session.id)} />
         <IconButton

@@ -3,7 +3,7 @@ import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lu
 import { loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
-import { LLM_LABELS } from '../../engine/providers/llm';
+import { LLM_LABELS, LLM_TIERS, type LlmModel } from '../../engine/providers/llm';
 import type { LlmProviderId, RemoteProviderId } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setCatalog, setSettings, toast, useStore, wipeAllData } from '../../store/store';
@@ -73,18 +73,43 @@ function LlmModelPicker() {
   const status = useStore((s) => (provider ? s.catalog.llmStatus[provider] : undefined));
   const pop = usePopover();
   const [q, setQ] = useState('');
+  const [browseAll, setBrowseAll] = useState(false);
   useEffect(() => {
     if (provider) void loadLlmCatalog(provider);
   }, [provider]);
-  const list = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return (models ?? [])
-      .filter((m) => m.tools)
-      .filter((m) => !needle || m.id.toLowerCase().includes(needle) || m.name.toLowerCase().includes(needle))
-      .slice(0, 200);
-  }, [models, q]);
+  const withTools = useMemo(() => (models ?? []).filter((m) => m.tools), [models]);
+  // Recommended = the tier lists, in priority order, as far as this provider offers them.
+  const groups = useMemo(
+    () =>
+      (['normal', 'top'] as const)
+        .map((tier) => ({ tier, models: LLM_TIERS[tier].map((id) => withTools.find((m) => m.id === id)).filter((m): m is LlmModel => Boolean(m)) }))
+        .filter((g) => g.models.length),
+    [withTools],
+  );
+  const needle = q.trim().toLowerCase();
+  const full = browseAll || Boolean(needle) || !groups.length;
+  const list = useMemo(
+    () => (full ? withTools.filter((m) => !needle || m.id.toLowerCase().includes(needle) || m.name.toLowerCase().includes(needle)).slice(0, 200) : []),
+    [full, withTools, needle],
+  );
   if (!provider) return null;
   const current = models?.find((m) => m.id === agent.model);
+  const row = (m: LlmModel) => (
+    <button
+      key={m.id}
+      type="button"
+      title={m.id}
+      className={`ml-row ${m.id === agent.model ? 'is-selected' : ''}`}
+      onClick={() => {
+        setSettings((s) => ({ agent: { ...s.agent, model: m.id } }));
+        pop.close();
+      }}
+    >
+      <span className="ml-name">{m.name}</span>
+      <span className="ml-price num">{m.inputPrice != null ? `${formatUsd(m.inputPrice)}/${formatUsd(m.outputPrice)}` : ''}</span>
+      {m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
+    </button>
+  );
   return (
     <>
       <Chip ref={pop.ref} onClick={pop.toggle} active={pop.open} className="wide-chip">
@@ -104,24 +129,25 @@ function LlmModelPicker() {
             </div>
           ) : null}
           {status === 'error' ? <div className="ml-error">Could not load the model list.</div> : null}
-          {list.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`ml-row ${m.id === agent.model ? 'is-selected' : ''}`}
-              onClick={() => {
-                setSettings((s) => ({ agent: { ...s.agent, model: m.id } }));
-                pop.close();
-              }}
-            >
-              <span className="ml-name">{m.name}</span>
-              <span className="ml-meta faint">{m.id}</span>
-              <span className="ml-price num">{m.inputPrice != null ? `${formatUsd(m.inputPrice)}/${formatUsd(m.outputPrice)}` : ''}</span>
-              {m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
-            </button>
-          ))}
+          {full
+            ? list.map(row)
+            : groups.map((g) => (
+                <div key={g.tier} className="ml-group">
+                  <div className="ml-group-head">{g.tier === 'normal' ? 'Recommended' : 'Top tier'}</div>
+                  {g.models.map(row)}
+                </div>
+              ))}
         </div>
-        <div className="pop-foot faint">Prices per million input/output tokens.</div>
+        <div className="ml-foot">
+          {groups.length && !needle ? (
+            <button type="button" className="ml-foot-main" onClick={() => setBrowseAll((v) => !v)}>
+              {browseAll ? 'Show recommended' : `Browse all models (${withTools.length})`}
+            </button>
+          ) : (
+            <span className="ml-foot-main faint">{withTools.length} models</span>
+          )}
+          <span className="faint ml-foot-note" data-tip="USD per million input / output tokens">$/M tokens</span>
+        </div>
       </Popover>
     </>
   );

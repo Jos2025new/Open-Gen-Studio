@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { Check, KeyRound, Search } from 'lucide-react';
+import { Check, KeyRound, Search, Settings2 } from 'lucide-react';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { recommendedRefs } from '../../engine/providers/registry';
 import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -26,7 +27,7 @@ function badges(m: ModelSummary): string[] {
   return out;
 }
 
-/** Searchable model list, grouped by provider. Popover content. */
+/** Model list grouped by provider: recommended models first, the full catalog on demand or when searching. Popover content. */
 export function ModelList({
   kind,
   value,
@@ -46,17 +47,31 @@ export function ModelList({
   useStore((s) => s.settings.keys);
   const [q, setQ] = useState('');
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
+  const [browseAll, setBrowseAll] = useState(false);
   const providers = connectedProviders();
 
-  const list = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return Object.values(models)
-      .filter((m) => m.kind === kind && providers.includes(m.provider))
-      .filter((m) => (filter ? filter(m) : true))
-      .filter((m) => provider === 'all' || m.provider === provider)
-      .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle))
-      .sort((a, b) => (a.provider === b.provider ? a.name.localeCompare(b.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider)));
-  }, [models, kind, filter, provider, q, providers]);
+  const all = useMemo(
+    () =>
+      Object.values(models)
+        .filter((m) => m.kind === kind && providers.includes(m.provider))
+        .filter((m) => (filter ? filter(m) : true))
+        .sort((a, b) => (a.provider === b.provider ? a.name.localeCompare(b.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider))),
+    [models, kind, filter, providers],
+  );
+  const recommended = useMemo(() => {
+    const rec = recommendedRefs();
+    return all.filter((m) => m.provider === 'local' || rec.has(m.ref) || m.ref === value);
+  }, [all, value]);
+  const needle = q.trim().toLowerCase();
+  // Searching always covers the whole catalog; with no recommendations there is nothing to curate.
+  const full = browseAll || Boolean(needle) || !recommended.length;
+  const list = useMemo(
+    () =>
+      (full ? all : recommended)
+        .filter((m) => !full || provider === 'all' || m.provider === provider)
+        .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
+    [full, all, recommended, provider, needle],
+  );
 
   const groups = useMemo(() => {
     const g = new Map<ProviderId, ModelSummary[]>();
@@ -72,7 +87,7 @@ export function ModelList({
         <Search size={14} />
         <input autoFocus placeholder={`Search ${kind} models`} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search models" />
       </div>
-      {remoteConnected ? (
+      {remoteConnected && full ? (
         <div className="ml-providers">
           {(['all', ...providers] as Array<ProviderId | 'all'>).map((p) => (
             <button key={p} type="button" className={`ml-prov ${provider === p ? 'is-active' : ''}`} onClick={() => setProvider(p)}>
@@ -129,10 +144,25 @@ export function ModelList({
           </div>
         ))}
       </div>
-      <button type="button" className="ml-connect" onClick={() => setUi({ settingsOpen: true })}>
-        <KeyRound size={13} />
-        {remoteConnected ? 'Manage providers' : 'Connect OpenRouter, fal.ai, NanoGPT or Atlas Cloud'}
-      </button>
+      {remoteConnected ? (
+        <div className="ml-foot">
+          {recommended.length && !needle ? (
+            <button type="button" className="ml-foot-main" onClick={() => setBrowseAll((v) => !v)}>
+              {browseAll ? 'Show recommended' : `Browse all models (${all.length})`}
+            </button>
+          ) : (
+            <span className="ml-foot-main faint">{needle ? `${list.length} of ${all.length}` : `${all.length} models`}</span>
+          )}
+          <button type="button" className="ml-foot-icon" aria-label="Manage providers" data-tip="Manage providers" onClick={() => setUi({ settingsOpen: true })}>
+            <Settings2 size={14} />
+          </button>
+        </div>
+      ) : (
+        <button type="button" className="ml-connect" onClick={() => setUi({ settingsOpen: true })}>
+          <KeyRound size={13} />
+          Connect OpenRouter, fal.ai, NanoGPT or Atlas Cloud
+        </button>
+      )}
     </div>
   );
 }

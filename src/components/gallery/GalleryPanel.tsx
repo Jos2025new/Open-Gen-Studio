@@ -101,9 +101,10 @@ export function GalleryPanel() {
             ]}
           />
         </div>
-        <div className="gallery-row">
+        <div className="gallery-tools">
           <IconButton icon={Star} label={favOnly ? 'Showing favorites' : 'Favorites only'} size="sm" active={favOnly} onClick={() => setFavOnly((v) => !v)} />
           <IconButton icon={ArrowDownUp} label={newest ? 'Newest first' : 'Oldest first'} size="sm" onClick={() => setNewest((v) => !v)} />
+          <span className="spacer" />
           <label className="density" data-tip="Grid density">
             <input type="range" min={2} max={expanded ? 8 : 5} value={cols} onChange={(e) => setCols(Number(e.target.value))} aria-label="Columns" />
           </label>

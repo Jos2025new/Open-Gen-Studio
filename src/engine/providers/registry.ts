@@ -1,4 +1,4 @@
-import type { ProviderId } from '../types';
+import type { ProviderId, RemoteProviderId } from '../types';
 import { atlas } from './atlas';
 import { local } from './demo';
 import { fal } from './fal';
@@ -78,4 +78,18 @@ export function editCounterpart(provider: ProviderId, id: string): string | null
   if (provider === 'atlas' && id.endsWith('/text-to-image')) return id.replace(/\/text-to-image$/, '/edit');
   if (provider === 'nanogpt' && /^nano-banana(-pro)?$/.test(id)) return `${id}-edit`;
   return null;
+}
+
+let recommended: Set<string> | null = null;
+
+/** Refs shown by default in model pickers: the preferred defaults above plus their image-input variants. */
+export function recommendedRefs(): Set<string> {
+  if (recommended) return recommended;
+  recommended = new Set();
+  for (const [p, lists] of Object.entries(PREFERRED) as Array<[RemoteProviderId, Record<string, string[]>]>) {
+    for (const id of Object.values(lists).flat()) {
+      for (const v of [id, i2vCounterpart(p, id), editCounterpart(p, id)]) if (v) recommended.add(`${p}::${v}`);
+    }
+  }
+  return recommended;
 }
