@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -12,69 +12,37 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { FileImage, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Wand, ChevronRight } from 'lucide-react';
+import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, useStore } from '../../store/store';
-import { addNode, deleteNodes, layoutAll, newNodeData, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
+import { addNode, deleteNodes, duplicateNode, layoutAll, newNodeData, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
-import { OPS, OP_IDS } from '../../engine/ops';
-import type { GraphNodeData, OpId } from '../../engine/types';
+import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { OP_ICONS } from '../assets/AssetActions';
-import { StudioNode, type FlowNode } from './nodes';
+import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
 
 const nodeTypes = { studio: StudioNode };
 
 function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
   const pop = usePopover();
-  const [tools, setTools] = useState(false);
-  const close = () => {
-    pop.close();
-    setTools(false);
-  };
   return (
     <>
       <Button ref={pop.ref} size="sm" icon={Plus} variant="secondary" onClick={pop.toggle}>
         Add node
       </Button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={260} label="Add node">
-        {tools ? (
-          <div className="menu">
-            <button type="button" className="menu-back" onClick={() => setTools(false)}>
-              ‹ Tools
-            </button>
-            {OP_IDS.map((id) => (
-              <MenuItem
-                key={id}
-                icon={OP_ICONS[id]}
-                label={OPS[id].label}
-                detail={`${OPS[id].input} → ${OPS[id].output}`}
-                onClick={() => {
-                  onAdd(newNodeData('tool', { op: id as OpId }));
-                  close();
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="menu">
-            <MenuItem icon={Type} label="Text" detail="Prompt or copy that feeds other nodes" onClick={() => (onAdd(newNodeData('text')), close())} />
-            <MenuItem icon={ImageIcon} label="Image" detail="Generate images" onClick={() => (onAdd(newNodeData('image')), close())} />
-            <MenuItem icon={Film} label="Video" detail="Generate video, optionally from a frame" onClick={() => (onAdd(newNodeData('video')), close())} />
-            <MenuItem icon={Wand} label="Tool" detail="Relight, angle, upscale, animate…" right={<ChevronRight size={14} />} onClick={() => setTools(true)} />
-            <MenuItem
-              icon={FileImage}
-              label="Asset"
-              detail="Drag one from the gallery onto the canvas"
-              onClick={() => {
-                close();
-                setUi({ panel: 'gallery' });
-              }}
-            />
-          </div>
-        )}
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="Add node">
+        <AddNodeItems
+          onPick={(data) => {
+            onAdd(data);
+            pop.close();
+          }}
+          onAsset={() => {
+            pop.close();
+            setUi({ panel: 'gallery' });
+          }}
+        />
       </Popover>
     </>
   );
@@ -115,20 +83,22 @@ function Canvas() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   const rf = useReactFlow();
+  // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
+  const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
 
-  const nodes: FlowNode[] = useMemo(
-    () =>
-      graph.nodes.map((n) => ({
+  const nodes: FlowNode[] = useMemo(() => {
+    // Count only live nodes: ids of deleted nodes must not keep the toolbar hidden.
+    const solo = graph.nodes.filter((n) => selected.has(n.id)).length === 1;
+    return graph.nodes.map((n) => ({
         id: n.id,
         type: 'studio',
         position: n.position,
-        data: { node: n },
+        data: { node: n, solo },
         selected: selected.has(n.id),
         width: NODE_WIDTH,
-        dragHandle: '.node-head',
-      })),
-    [graph.nodes, selected],
-  );
+        measured: measured.get(n.id),
+      }));
+  }, [graph.nodes, selected, measured]);
 
   const running = useMemo(() => {
     const set = new Set<string>();
@@ -166,8 +136,10 @@ function Canvas() {
       const moves = new Map<string, { x: number; y: number }>();
       const removed: string[] = [];
       let sel: Set<string> | null = null;
+      let sizes: Map<string, { width: number; height: number }> | null = null;
       for (const c of changes) {
-        if (c.type === 'position' && c.position) moves.set(c.id, c.position);
+        if (c.type === 'dimensions' && c.dimensions) (sizes ??= new Map(measured)).set(c.id, c.dimensions);
+        else if (c.type === 'position' && c.position) moves.set(c.id, c.position);
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') {
           sel = sel ?? new Set(selected);
@@ -176,10 +148,15 @@ function Canvas() {
         }
       }
       if (moves.size) setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
-      if (removed.length) deleteNodes(sessionId, removed);
+      if (removed.length) {
+        deleteNodes(sessionId, removed);
+        sel = sel ?? new Set(selected);
+        for (const id of removed) sel.delete(id);
+      }
       if (sel) setSelected(sel);
+      if (sizes) setMeasured(sizes);
     },
-    [sessionId, selected],
+    [sessionId, selected, measured],
   );
 
   const onEdgesChange = useCallback(
@@ -218,6 +195,16 @@ function Canvas() {
 
   const runIds = runnableIds(graph.nodes);
 
+  // Right-click menu, anchored to an invisible point at the cursor.
+  const menuAnchor = useRef<HTMLDivElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
+  const openMenu = (e: React.MouseEvent | MouseEvent, nodeId?: string) => {
+    e.preventDefault();
+    const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+    setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), nodeId });
+  };
+  const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
+
   return (
     <div
       className="node-canvas"
@@ -242,10 +229,6 @@ function Canvas() {
           window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 30);
         }} />
         <IconButton icon={Maximize} label="Fit view" size="sm" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
-        {selected.size ? <IconButton icon={Trash} label={`Delete ${selected.size} selected`} size="sm" tone="danger" onClick={() => {
-          deleteNodes(sessionId, [...selected]);
-          setSelected(new Set());
-        }} /> : null}
         <RunAll sessionId={sessionId} ids={runIds} />
       </TopbarActions>
       <ReactFlow<FlowNode, Edge>
@@ -254,6 +237,11 @@ function Canvas() {
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onPaneContextMenu={(e) => openMenu(e)}
+        onNodeContextMenu={(e, n) => {
+          setSelected(new Set([n.id]));
+          openMenu(e, n.id);
+        }}
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null })}
         isValidConnection={isValidConnection}
         colorMode="dark"
@@ -269,6 +257,38 @@ function Canvas() {
         <Controls showInteractive={false} position="bottom-right" />
         {graph.nodes.length > 6 ? <MiniMap pannable zoomable position="top-right" maskColor="rgba(10,10,11,0.7)" nodeColor="#2a2a30" /> : null}
       </ReactFlow>
+      <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
+      <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
+        {menuNode ? (
+          <div className="menu">
+            <MenuItem icon={Copy} label="Duplicate" onClick={() => (duplicateNode(sessionId, menuNode), setMenu(null))} />
+            <MenuItem
+              icon={Trash}
+              label="Delete"
+              detail="Del"
+              danger
+              onClick={() => {
+                deleteNodes(sessionId, [menuNode.id]);
+                setSelected(new Set());
+                setMenu(null);
+              }}
+            />
+          </div>
+        ) : menu ? (
+          <AddNodeItems
+            onPick={(data) => {
+              const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+              const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
+              setSelected(new Set([addNode(sessionId, data, pos)]));
+              setMenu(null);
+            }}
+            onAsset={() => {
+              setMenu(null);
+              setUi({ panel: 'gallery' });
+            }}
+          />
+        ) : null}
+      </Popover>
       {!graph.nodes.length ? (
         <div className="node-empty">
           <h2>Build a flow</h2>

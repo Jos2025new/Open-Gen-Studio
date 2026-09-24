@@ -111,7 +111,6 @@ export function Sidebar() {
         >
           <Settings size={18} strokeWidth={1.7} />
           <span className="side-label wide-only">Settings</span>
-          <span className={`side-budget num ${remaining <= 0 ? 'is-empty' : ''}`}>{formatUsd(Math.max(0, remaining))}</span>
         </button>
       </div>
       <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} placement="right-end" width={400} label="Settings" className="pop-scroll">

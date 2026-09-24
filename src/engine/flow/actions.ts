@@ -1,9 +1,9 @@
 import { uid } from '../../lib/id';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
-import type { Estimate, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
+import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
 import { setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, graphToSteps } from './graph';
+import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort } from './graph';
 import { budgetProblem } from '../actions';
 
 const get = useStore.getState;
@@ -40,6 +40,27 @@ export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<
 export function deleteNodes(sessionId: string, ids: string[]): void {
   const drop = new Set(ids);
   setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.filter((n) => !drop.has(n.id)), edges: g.edges.filter((e) => !drop.has(e.source) && !drop.has(e.target)) }));
+}
+
+/** Add a node to the right of `fromId`, wired to its first input that accepts the source's output. */
+export function addConnected(sessionId: string, fromId: string, data: GraphNodeData): string | null {
+  const st = get();
+  const graph = st.sessions[sessionId].graph;
+  const from = graph.nodes.find((n) => n.id === fromId);
+  if (!from) return null;
+  const type = outputPort(from.data, st.assets);
+  const port = inputPorts(data).find((p) => p.type === type);
+  const siblings = graph.edges.filter((e) => e.source === fromId).length;
+  const id = addNode(sessionId, data, { x: from.position.x + NODE_WIDTH + 100, y: from.position.y + siblings * 80 });
+  if (port) tryConnect(sessionId, { source: fromId, target: id, targetHandle: port.id });
+  return id;
+}
+
+/** Copy a node (without its results) slightly offset. */
+export function duplicateNode(sessionId: string, node: GraphNode): string {
+  const data = { ...node.data } as GraphNodeData;
+  if (data.kind === 'image' || data.kind === 'video' || data.kind === 'tool') delete (data as GenNodeData).generationId;
+  return addNode(sessionId, data, { x: node.position.x + 40, y: node.position.y + 40 });
 }
 
 export function tryConnect(sessionId: string, c: { source: string; target: string; targetHandle: string | null }): boolean {

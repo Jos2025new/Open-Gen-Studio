@@ -19,7 +19,7 @@ import type {
 
 /* Node editor model: ports, validation, plan ↔ graph conversion and auto layout. */
 
-export const NODE_WIDTH = 300;
+export const NODE_WIDTH = 260;
 
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
   switch (data.kind) {
@@ -155,15 +155,14 @@ export function planToGraph(plan: Plan): { nodes: GraphNode[]; edges: GraphEdge[
 
 export function estimatedHeight(data: GraphNodeData): number {
   switch (data.kind) {
+    // Media-first cards: a preview (or the text) plus the label above it; controls float outside.
     case 'text':
-      return 190;
+      return 170;
     case 'image':
     case 'video':
-      return 400;
     case 'tool':
-      return 300;
     case 'asset':
-      return 260;
+      return 220;
   }
 }
 
