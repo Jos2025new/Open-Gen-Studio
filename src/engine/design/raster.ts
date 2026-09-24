@@ -128,3 +128,25 @@ export function copyBuffer(fromId: string, toId: string): void {
   if (!src) return;
   setBuffer(toId, cloneCanvas(src));
 }
+
+/** One brush or eraser segment in canvas pixels (shared by the Designer and the sketch editor). */
+export function strokeSegment(
+  ctx: CanvasRenderingContext2D,
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  opts: { width: number; color: string; opacity: number; erase: boolean },
+): void {
+  ctx.save();
+  ctx.globalCompositeOperation = opts.erase ? 'destination-out' : 'source-over';
+  ctx.globalAlpha = opts.opacity;
+  ctx.strokeStyle = opts.color;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = opts.width;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  // A tiny offset so a click without movement still leaves a dot.
+  ctx.lineTo(b.x + 0.01, b.y);
+  ctx.stroke();
+  ctx.restore();
+}

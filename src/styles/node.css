@@ -37,3 +37,4 @@
 .nt-inline { display: flex; align-items: center; justify-content: space-between; }.nt-inline h5 { margin: 0; }
 .nt-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 8px; }.nt-pick button { aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }.nt-pick button:hover { border-color: var(--accent-line); }.nt-pick img, .nt-pick video { width: 100%; height: 100%; object-fit: cover; }
 .ctx-anchor { position: absolute; width: 1px; height: 1px; pointer-events: none; }
+.nt-ref-open { width: 100%; height: 100%; display: block; }.nt-ref-open:hover { opacity: .85; }

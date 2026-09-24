@@ -72,6 +72,8 @@ export interface UiState {
   panel: 'gallery' | 'sessions' | null;
   panelExpanded: boolean;
   lightbox: { assetIds: string[]; index: number } | null;
+  /** Sketch editor over an image; `nodeId`/`edgeId` say which attachment the result replaces. */
+  sketch: { assetId: string; nodeId?: string; edgeId?: string } | null;
   toasts: Toast[];
   tool: DesignTool;
   brush: { size: number; color: string; opacity: number };
@@ -163,6 +165,7 @@ const initial: AppState = {
     panel: null,
     panelExpanded: false,
     lightbox: null,
+    sketch: null,
     toasts: [],
     tool: 'move',
     brush: { size: 24, color: '#ffffff', opacity: 1 },

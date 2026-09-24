@@ -1,6 +1,6 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, ChevronDown, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, ChevronDown, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
@@ -256,6 +256,11 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
           <button type="button" className="nt-btn nt-icon nodrag" aria-label="Open" data-tip="Open" onClick={() => setUi({ lightbox: { assetIds: all, index: Math.max(0, all.indexOf(assetId)) } })}>
             <Maximize2 size={14} />
           </button>
+          {out === 'image' ? (
+            <button type="button" className="nt-btn nodrag" data-tip="Paint over the image; saves a new copy" onClick={() => setUi({ sketch: { assetId, nodeId: node.id } })}>
+              <Brush size={13} /> Sketch
+            </button>
+          ) : null}
           <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
             <Download size={14} />
           </button>
@@ -328,8 +333,14 @@ function InputRefs({ node }: { node: GraphNode }) {
   return (
     <div className="nt-refs">
       {linked.map((l) => (
-        <span key={l.edge.id} className="nt-ref" data-tip={l.label}>
-          {l.assetId ? <AssetMedia assetId={l.assetId} hoverPlay={false} draggable={false} /> : <ImageIcon size={14} />}
+        <span key={l.edge.id} className="nt-ref" data-tip={l.assetId ? `${l.label} · click to sketch over it` : l.label}>
+          {l.assetId ? (
+            <button type="button" className="nt-ref-open" aria-label="Sketch over this reference" onClick={() => setUi({ sketch: { assetId: l.assetId!, edgeId: l.edge.id } })}>
+              <AssetMedia assetId={l.assetId} hoverPlay={false} draggable={false} />
+            </button>
+          ) : (
+            <ImageIcon size={14} />
+          )}
           <button
             type="button"
             className="nt-ref-x"

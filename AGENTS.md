@@ -12,7 +12,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — tarjeta de prompt del nodo (2026-09-25)
+## Tarea actual — Sketch sobre imagen (2026-09-25)
+1. [x] Trazo del pincel a `design/raster.ts` (`strokeSegment`), usado por el Designer y por Sketch. *Razón: no duplicar el pincel.*
+2. [x] `SketchEditor` modal: imagen grande, pincel, color, borrador, tamaño, deshacer/rehacer (trazos vectoriales, poca memoria), Guardar y ✕ que pide guardar o descartar si hay cambios. Reutiliza `ui.brush`, `assetCanvas` y el guardado de assets del Designer. *Razón: pintar sin salir del flujo.*
+3. [x] Guardar crea un asset nuevo (el original no se toca) y actualiza el adjunto: nodo asset → cambia su imagen; referencia de otro nodo → nuevo nodo asset que reemplaza esa conexión; resultado de un nodo → nodo asset al lado. *Razón: "se actualiza el adjunto" sin perder el original.*
+4. [x] Accesos: botón Sketch en la barra del nodo con imagen y clic en las miniaturas de referencia. Tests, typecheck, navegador; commit.
+
+## Tarea anterior — tarjeta de prompt del nodo (2026-09-25)
 1. [x] Panel del nodo como tarjeta de prompt: miniaturas de las entradas conectadas + "Ref" (elegir de la galería crea un nodo asset conectado), prompt amplio, fila inferior con modelo · resumen de ajustes (resolución | duración | proporción) · nº de imágenes · Run con coste. *Razón: todo a mano sin abrir menús; mismos datos del schema.*
 2. [x] Popover de ajustes con segmentados (resolución, proporción con glifo, duración, audio) según el schema del modelo. *Razón: el proveedor decide qué opciones existen.*
 3. [x] Tests, typecheck, navegador; commit.

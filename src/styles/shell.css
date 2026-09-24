@@ -39,3 +39,13 @@
 .side-panel.is-expanded .session-row { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
 .side-panel.is-expanded .sessions:not(.is-compact) .session-thumb { width: 40px; height: 40px; }
 .side-panel.is-expanded .gallery-controls, .side-panel.is-expanded .sessions .gallery-controls { flex-direction: row; flex-wrap: wrap; align-items: center; }.side-panel.is-expanded .gallery-controls .search-input { flex: 1 1 320px; max-width: 520px; }
+
+.sketch { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--overlay); backdrop-filter: blur(10px); }
+.sketch-bar { display: flex; align-items: center; gap: 10px; margin: 16px auto 0; width: min(1100px, calc(100vw - 32px)); padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-pop); }.sketch-bar .spacer { flex: 1; }
+.sketch-bar .segmented button { display: grid; place-items: center; padding: 5px 8px; }.sketch-bar .segmented button.is-active { background: var(--surface-3); color: var(--text); }
+.sketch-swatches { display: flex; align-items: center; gap: 5px; }.sketch-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25); }.sketch-swatch.is-active { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--accent); }
+.sketch-custom { position: relative; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); cursor: pointer; }.sketch-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.sketch-size { display: flex; align-items: center; gap: 8px; }.sketch-size input { width: 110px; }.sketch-dot { display: inline-block; border-radius: 50%; background: var(--text-2); }
+.sketch-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 16px 24px 24px; }
+.sketch-frame { position: relative; max-width: min(1100px, 100%); max-height: 100%; width: 100%; box-shadow: var(--shadow-pop); border-radius: 6px; overflow: hidden; }
+.sketch-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; }.sketch-base { position: static!important; display: block; }.sketch-paint { cursor: crosshair; touch-action: none; }.sketch-paint.is-erase { cursor: cell; }

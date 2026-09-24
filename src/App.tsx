@@ -6,6 +6,7 @@ import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
 import { SidePanel } from './components/shell/SidePanel';
 import { Lightbox } from './components/assets/Lightbox';
+import { SketchEditor } from './components/assets/SketchEditor';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
 import { NodeWorkspace } from './components/node/NodeWorkspace';
 import { DesignerWorkspace } from './components/designer/DesignerWorkspace';
@@ -53,6 +54,7 @@ export function App() {
         </main>
         <SidePanel />
         <Lightbox />
+        <SketchEditor />
         <Toasts />
         <TooltipLayer />
       </div>

@@ -56,6 +56,23 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   return id;
 }
 
+/**
+ * Point an attachment at a sketched copy: an asset node takes the new image; a connection gets a new asset
+ * node as its source; any other node gets the sketch as an asset node beside it.
+ */
+export function applySketch(sessionId: string, target: { nodeId?: string; edgeId?: string }, assetId: string): void {
+  const graph = get().sessions[sessionId].graph;
+  const edge = target.edgeId ? graph.edges.find((e) => e.id === target.edgeId) : undefined;
+  const node = graph.nodes.find((n) => n.id === (edge ? edge.source : target.nodeId));
+  if (!node) return;
+  if (node.data.kind === 'asset') {
+    patchNodeData(sessionId, node.id, { assetId });
+    return;
+  }
+  const id = addNode(sessionId, { kind: 'asset', title: 'Sketch', assetId }, { x: node.position.x, y: node.position.y + 300 });
+  if (edge) setGraph(sessionId, (g) => ({ ...g, edges: g.edges.map((e) => (e.id === edge.id ? { ...e, source: id } : e)) }));
+}
+
 /** Copy a node (without its results) slightly offset. */
 export function duplicateNode(sessionId: string, node: GraphNode): string {
   const data = { ...node.data } as GraphNodeData;

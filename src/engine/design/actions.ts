@@ -72,7 +72,7 @@ export function deleteDoc(sessionId: string, docId: string): void {
   });
 }
 
-async function assetCanvas(assetId: string): Promise<HTMLCanvasElement> {
+export async function assetCanvas(assetId: string): Promise<HTMLCanvasElement> {
   const asset = get().assets[assetId];
   if (!asset) throw new Error('Asset not found');
   let blob = await getAssetBlob(assetId);
@@ -272,6 +272,12 @@ async function storeDesignAsset(sessionId: string, blob: Blob, width: number, he
   const asset: Asset = { id, kind: 'image', mime: blob.type || 'image/png', width, height, sessionId, origin, stored: true, favorite: false, createdAt: Date.now() };
   addAssets([asset]);
   return asset;
+}
+
+/** Save a canvas as a new image asset (PNG). */
+export async function canvasToAsset(sessionId: string, canvas: HTMLCanvasElement): Promise<Asset> {
+  const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
+  return storeDesignAsset(sessionId, blob, canvas.width, canvas.height, 'design');
 }
 
 /** Snapshot a raster layer's pixels as an asset (input for operations and references). */

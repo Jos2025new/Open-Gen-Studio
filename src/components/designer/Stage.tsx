@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import type { DesignDoc, Layer, TextLayer } from '../../engine/types';
 import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
-import { beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
+import { beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -296,18 +296,12 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     if (!ctx) return;
     const kx = layer.pxWidth / layer.width;
     const ky = layer.pxHeight / layer.height;
-    ctx.save();
-    ctx.globalCompositeOperation = erase ? 'destination-out' : 'source-over';
-    ctx.globalAlpha = brush.opacity;
-    ctx.strokeStyle = brush.color;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = brush.size * (kx + ky) / 2;
-    ctx.beginPath();
-    ctx.moveTo((a.x - layer.x) * kx, (a.y - layer.y) * ky);
-    ctx.lineTo((b.x - layer.x) * kx + 0.01, (b.y - layer.y) * ky);
-    ctx.stroke();
-    ctx.restore();
+    strokeSegment(ctx, { x: (a.x - layer.x) * kx, y: (a.y - layer.y) * ky }, { x: (b.x - layer.x) * kx, y: (b.y - layer.y) * ky }, {
+      width: (brush.size * (kx + ky)) / 2,
+      color: brush.color,
+      opacity: brush.opacity,
+      erase,
+    });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
