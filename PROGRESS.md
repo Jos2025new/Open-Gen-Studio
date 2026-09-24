@@ -1,12 +1,12 @@
 # Open Gen Studio — estado del trabajo (handoff)
 
-Última sesión: 2026-09-24. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
+Última sesión: 2026-09-25. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
 Proveedores: **OpenRouter, fal.ai, NanoGPT, Atlas Cloud** (+ "Local demo" procedural para usar sin claves).
 El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas (sin SDK de Anthropic; se desinstaló `@anthropic-ai/sdk`).
 
 ## Hecho (build y typecheck verificados)
 - `src/lib/*`: ids, rng, format, lang, IndexedDB (state/blobs/cache), http (errores, SSE), media.
-- `src/engine/types.ts` modelo de dominio; `pricing.ts` (SKUs normalizados + estimate); `params.ts` (roles de parámetros, JSON-schema→ParamDef, coerceSettings, wireParams); `ops.ts` (relight, angle, upscale, remove_bg, reframe, variations, edit, animate, extract_frame, continue).
+- `src/engine/types.ts` modelo de dominio; `pricing.ts` (SKUs normalizados + estimate); `params.ts` (roles de parámetros, JSON-schema→ParamDef, coerceSettings, wireParams); `ops.ts` (relight, angle, upscale, remove_bg, reframe, variations, edit, animate, extract_frame, continue, contact_sheet/Nine-grid, grid_split, video_upscale, video_edit).
 - `engine/providers/`: openrouter.ts (/images, /videos + polling), fal.ts (api.fal.ai/v1/models + OpenAPI vía relay `/x/fal-web`, queue.fal.run), nanogpt.ts (/api/v1/images, /api/generate-video, /api/video/status), atlas.ts (/api/v1/models, esquemas vía relay `/x/atlas-static`, uploadMedia, prediction), llm.ts (chat streaming con tools), demo/ (arte procedural, video MediaRecorder, ops locales), registry.ts (modelos preferidos).
 - `engine/catalog.ts` (catálogos dinámicos, esquemas, modelos por defecto, modelo por operación), `costs.ts`, `jobs.ts` (runner con reanudación tras recarga), `plan.ts` (validación DAG + reglas de capas), `executor.ts`, `actions.ts`, `flow/graph.ts` + `flow/actions.ts` (plan→nodos, auto-layout, grafo→pasos), `design/*` (reglas de capas, doc, buffers raster copy-on-write, render canvas, historial, acciones).
 - `engine/agent/`: tools.ts (ask_questions, propose_plan + zod), context.ts (system prompt + contexto), offline.ts (planificador local bilingüe), runtime.ts (auto/guiado con límite de rondas, validación de coste antes de gastar, aprobación, ejecución por workspace).
@@ -30,11 +30,51 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - Panel de capas: redimensionable (200–520 px), plegable y con secciones plegables; preferencias en `localStorage` (`ogs:layers-*`), el composer usa `--layers-w`.
 - Verificado en navegador (1400×860): formas, texto, pincel sobre vacío e imagen, panel, lista de modelos. Typecheck, 12 tests y build correctos.
 
-## Parámetros de proveedores — 2026-09-24 (detalle en `AGENTS.md`)
-- `max_images`/`batch_size` fuera del rol `count`; `aspect` solo si las opciones son proporciones; `portrait_3_4` (Krea/Ideogram) reconocido. Contrastado con esquemas vivos de fal/Atlas/NanoGPT antes y después.
-- fal pagina todas las páginas de cada categoría (image-to-image ~400).
-- `MAX_PLAN_STEPS` compartido; ops del agente desde `OPS`/`OP_IDS` (puntos 2 y 3 de `REMEDIATION_PLAN_AUDITED.md`).
-- Typecheck y 15 tests correctos. Navegador no verificado: el puerto 5173 lo ocupaba otra sesión.
+## Cambios 2026-09-24 → 2026-09-25 (un commit por tarea; plan paso a paso en `AGENTS.md`)
+Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints se contrastaron antes con catálogos, esquemas o docs en vivo.
+
+**Parámetros de proveedores** (`486d890`) — `engine/params.ts`, `providers/{fal,openrouter,nanogpt}.ts`, `plan.ts`, `agent/{tools,context}.ts`
+- `max_images`/`batch_size` fuera del rol `count`. *Por qué:* Seedream (fal) trae `max_images` y `num_images`; ambos recibían N → hasta N² imágenes cobradas.
+- `aspect` solo si las opciones del enum son proporciones; `ratioOf` entiende `portrait_3_4`. *Por qué:* `image_size`/`orientation` no siempre son proporciones, y en Krea/Ideogram un 9:16 se enviaba como `square_hd`.
+- fal pagina todas las páginas (tope 10). *Por qué:* image-to-image tiene ~400 modelos y se perdían 100.
+- `MAX_PLAN_STEPS` único y ops del agente desde `OPS`/`OP_IDS` (`8fc3df9` añade el test de bordes 16/17). *Por qué:* 16 vs 24 y listas duplicadas que podían divergir.
+
+**Agente y catálogos** (`d175c77`, `c04d479`) — `providers/llm.ts`, `catalog.ts`, `store.ts`, `SettingsPanel.tsx`, `providers/nanogpt.ts`
+- Tiers: Normal (GLM 5.3 Flash › GPT-6 Luna › DeepSeek V4.1 Flash) y Top (GPT-6 Sol › GPT-5.6 Sol › Claude Opus 5.5 › Qwen 3.8 Max); exige tools + visión; `repickAgentModel()` sustituye la lógica duplicada. *Por qué:* prioridad pedida; el catálogo decide qué existe; Top solo si se elige.
+- NanoGPT usa `nano-gpt.com/api` (`NANO_BASE`). *Por qué:* `api.nano-gpt.com` sirve catálogos desfasados (faltaban GPT-6 Sol/Luna, Opus 5.5 y modelos de imagen/vídeo).
+- `.env.local` ignorado por git (`d21ad88`) para claves temporales de prueba.
+
+**Selectores, sesiones, galería y barra superior** (`b5e2e3f`, `029f531`) — `ModelList.tsx`, `SettingsPanel.tsx`, `registry.ts`, `SessionsPanel.tsx`, `GalleryPanel.tsx`, `TopBar.tsx`, `lib/format.ts`
+- Selectores de modelo: recomendados primero (`PREFERRED` + variantes; tiers del agente) y "Browse all models (N)"; buscar recorre todo el catálogo. *Por qué:* listas de cientos de modelos.
+- Sesiones: búsqueda por título, chat y prompts (`useSessionMatcher`, compartido), filtro de fijadas, dirección de orden, vista compacta, filas de una línea. Selector rápido de sesiones y lápiz junto al título. *Por qué:* tarjetas demasiado altas y búsqueda solo por título.
+- Densidad de galería con ancho acotado; fechas relativas con "yesterday" y semanas.
+
+**Barra lateral, Provider pool y vistas completas** (`489f413`) — `Sidebar.tsx`, `ProviderPool.tsx`, `SidePanel.tsx`, `providers/{openrouter,nanogpt,atlas}.ts`, `ui/hooks.ts`
+- Barra plegable (riel o ancha con etiquetas); `usePref` pasa a `ui/hooks`. *Por qué:* preferencia del usuario; segundo uso de `usePref`.
+- Provider pool: saldo unificado con `adapter.balance()` (OpenRouter `/credits`, NanoGPT `/check-balance`, Atlas `/public/v1/balance`; fal no expone saldo a claves normales). *Por qué:* ver el saldo sin salir de la app.
+- Galería y Sesiones con vista completa (`panelExpanded` compartido) y grupos por fecha (`groupByDate`).
+
+**Canvas de nodos y tarjeta de prompt** (`c7e9490`, `246508f`) — `node/{nodes,NodeWorkspace}.tsx`, `flow/{actions,graph}.ts`, `styles/node.css`
+- Tarjetas centradas en el resultado; modelo/prompt/ajustes en un panel bajo el nodo seleccionado; barra flotante (Run, herramientas rápidas, abrir, descargar, duplicar, borrar con confirmación); "+" añade un nodo compatible conectado (`addConnected`); clic derecho para añadir/duplicar/borrar. Se quitó la papelera de la barra superior. *Por qué:* borraba sin aviso y las tarjetas eran pesadas.
+- Tarjeta de prompt: miniaturas de entradas conectadas + "Ref" desde la galería, resumen de ajustes con popover según el schema, Run con coste.
+- Correcciones: el flujo controlado descartaba las medidas de React Flow (nodos ocultos); medidas y selección con actualizaciones funcionales (ráfagas perdían datos); nodos nuevos se apilan bajo los hijos existentes.
+
+**Sketch** (`248abfd`, `e75e0f6`) — `assets/SketchEditor.tsx`, `design/{raster,actions}.ts`, `flow/{actions,graph}.ts`, `types.ts`
+- Editor emergente: pincel, borrador (solo tus trazos), colores, tamaño, deshacer/rehacer (trazos vectoriales), Guardar, y ✕ que pide guardar o descartar. Reutiliza `ui.brush` y el trazo común `strokeSegment`.
+- Edita el nodo en su sitio: `sketchAssetId` es lo único que va aguas abajo (`nodeOutputAsset`), "Edited" + "Reset image" vuelve al original; la copia (origen `sketch`) no sale en la galería y se borra al restablecer, reeditar o regenerar. *Por qué (a petición del usuario):* sin nodos duplicados ni dos imágenes enviadas al proveedor. Test incluido.
+
+**Herramientas fase 1** (`ab9f327`) — `ops.ts`, `jobs.ts`, `costs.ts`, `lib/media.ts`, `nodes.tsx`, `registry.ts`
+- Engine `local` (gratis, en navegador): Extract frame con "At second…" (Capture) y Grid-split 2×2/3×3 (cada trozo es una salida). Nine-grid como instrucción del modelo de edición (con su fallback). Menú "More" en la barra del nodo con el atajo Panorama (Reframe 21:9). Upscalers de NanoGPT (`seedvr2-image`, `pruna-ai/p-image/upscale`, `clarity-ai-creative-upscaler`). *Por qué:* lo que ofrecen las referencias, reutilizando motores existentes; ningún proveedor tiene Nine-grid como modelo.
+
+**Fase 3: entrada de vídeo** (`19a12b1`) — `types.ts`, `params.ts`, `providers/{fal,atlas,nanogpt,shared,registry}.ts`, `catalog.ts`, `jobs.ts`, `costs.ts`, `ops.ts`, `ModelList.tsx`, `SettingsPanel.tsx`
+- `InputSlots.video`, `ModelSummary.acceptsVideo`, `GenRequest.video`. Campo de vídeo: fal `video_url`; Atlas `video`/`video_url`; NanoGPT `videoDataUrl` (docs de `generate-video`).
+- Descubrimiento de modelos vídeo→vídeo en los tres; no aparecen en selectores normales (fallarían sin vídeo). *Efecto lateral corregido:* NanoGPT `wan-3.0/video-edit` ya no se ofrece como texto→vídeo.
+- Operaciones Upscale video y Edit video: override en Ajustes → lista preferida por proveedor (IDs verificados) → cualquier modelo etiquetado. Se conserva duración y encuadre del original; el coste usa la duración del clip.
+- fal/NanoGPT reciben data URL; Atlas sube con `uploadMedia`. *Por qué:* sin infraestructura nueva de subidas; límite: clips grandes pueden superar el tamaño máximo de petición.
+
+**Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
+
+Estado: typecheck limpio y **20 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
 
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.
@@ -53,10 +93,8 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - xyflow: los controles interactivos dentro de nodos llevan la clase `nodrag` (y `nowheel` si hacen scroll).
 - Popovers: `usePopover()` + `<Popover anchor={ref} placement="top-start">`; tooltips con el atributo `data-tip`.
 - Relays de Vite (sólo dev/preview): `/x/fal-web` (OpenAPI de fal) y `/x/atlas-static` (esquemas de Atlas); sin ellos esos modelos caen a un esquema mínimo.
-- IDs de NanoGPT verificados (2026-09-25) para fases futuras (requieren entrada de vídeo/audio, aún no soportada):
-  - Upscale vídeo: `bytedance-video-enhancement-standard`, `bytedance-video-enhancement-pro`, `clarity-ai/crystal-video-upscaler`, `bytedance-seedance-upscaler`.
-  - Edición de vídeo: `blackforestlabs/flux-3/edit-video`, `alibaba/wan-3.0/video-edit`, `pruna-ai/p-video/edit`, `grok-imagine-video-edit`, `google/gemini-omni-flash/v1.1`. Kling en NanoGPT solo tiene edición en `kling-o3-4k`.
-  - Quitar fondo de vídeo: `pixelcut/video-background-removal`. Segmentación de imagen: `sam3-image` (no es quitar fondo).
-  - Audio (catálogo `nano-gpt.com/api/v1/audio-models`, 90 modelos): STT Whisper-Large-V3, xai speech-to-text, gpt-4o-mini-transcribe, Elevenlabs-STT; música/TTS (elevenlabs/music, lyria, minimax music, xai-tts…).
+- IDs de NanoGPT verificados (2026-09-25): upscale y edición de vídeo ya en `PREFERRED` (fase 3). Pendientes para el futuro: quitar fondo de vídeo `pixelcut/video-background-removal`; audio (catálogo `nano-gpt.com/api/v1/audio-models`, 90 modelos: STT Whisper-Large-V3, gpt-4o-mini-transcribe, Elevenlabs-STT; música/TTS elevenlabs/music, lyria, minimax, xai-tts). `sam3-image` es segmentación, no quitar fondo. Kling en NanoGPT solo edita vídeo en `kling-o3-4k`.
+- fal (2026-09-25): la cuenta de prueba está bloqueada por saldo agotado; su API de subida (`rest.alpha.fal.ai/storage/upload/initiate`) existe y admite CORS, por si hiciera falta para clips grandes.
+- Pruebas en el navegador integrado: si la pestaña está oculta (`document.hidden`), los ResizeObserver no se ejecutan y React Flow deja los nodos ocultos. Traer la pestaña al frente antes de verificar el canvas.
 - NanoGPT: usar `nano-gpt.com/api` (`NANO_BASE`); `api.nano-gpt.com` sirve catálogos desfasados (LLM, imagen y vídeo). Comprobado 2026-09-24.
 - Sin verificar con clave real: forma de respuesta de NanoGPT `POST /api/v1/images`, respuesta de Atlas `uploadMedia`, CORS de OpenRouter `/videos/{id}/content`. Los parsers son tolerantes (`extractOutputs` en `providers/shared.ts`).
