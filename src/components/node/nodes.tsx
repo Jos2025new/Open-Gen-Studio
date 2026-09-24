@@ -1,19 +1,20 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, ChevronDown, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, Trash, Type, Wand, FileImage, Check } from 'lucide-react';
+import { Box, ChevronDown, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes } from '../../engine/flow/actions';
-import { inputPorts, outputPort } from '../../engine/flow/graph';
+import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, tryConnect } from '../../engine/flow/actions';
+import { inputPorts, NODE_WIDTH, outputPort } from '../../engine/flow/graph';
 import { downloadAsset } from '../../engine/actions';
-import type { GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
-import { setUi, useStore } from '../../store/store';
+import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
+import { setGraph, setUi, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Button, Chip, MenuItem, Segmented } from '../ui/primitives';
+import { Button, Chip, costLabel, MenuItem, Segmented, Toggle } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { ModelList } from '../composer/ModelList';
+import { AspectGlyph } from '../composer/MediaControls';
 import { OP_ICONS } from '../assets/AssetActions';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
@@ -67,17 +68,18 @@ export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType 
   );
 }
 
-function RunButton({ node }: { node: GraphNode }) {
+/** Run with spend confirmation. `primary` is the panel's big button and shows the estimated cost. */
+function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
   const sessionId = useSessionId();
   const pop = usePopover();
-  const preview = pop.open ? previewRun(sessionId, [node.id]) : null;
+  const preview = pop.open || primary ? previewRun(sessionId, [node.id]) : null;
   return (
     <>
-      <button ref={pop.ref} type="button" className={`nt-btn nt-run nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={pop.toggle}>
-        <Play size={12} fill="currentColor" /> Run
+      <button ref={pop.ref} type="button" className={`${primary ? 'nt-go' : 'nt-btn nt-run'} nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={pop.toggle}>
+        <Play size={12} fill="currentColor" /> {primary && preview ? costLabel(preview.estimate, { short: true }) : 'Run'}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run node">
-        {preview ? (
+        {pop.open && preview ? (
           <SpendConfirm
             title={preview.count > 1 ? `Run ${preview.count} nodes` : `Run “${node.data.title}”`}
             lines={preview.count > 1 ? ['Includes upstream nodes without output'] : undefined}
@@ -151,14 +153,20 @@ function StatusPill({ generationId }: { generationId?: string }) {
 }
 
 /** The asset a node currently shows (and passes downstream), plus its generation. */
+function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
+  const d = node.data;
+  if (d.kind === 'asset') return { g: undefined, assetId: d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [] };
+  const g = (d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') && d.generationId ? generations[d.generationId] : undefined;
+  const all = g?.status === 'done' ? g.assetIds : [];
+  const index = d.kind === 'text' ? 0 : d.outputIndex;
+  return { g, assetId: all[Math.min(index, all.length - 1)] as string | undefined, all };
+}
+
 function useNodeOutput(node: GraphNode) {
   const d = node.data;
   const genId = d.kind === 'image' || d.kind === 'video' || d.kind === 'tool' ? d.generationId : undefined;
   const g = useStore((s) => (genId ? s.generations[genId] : undefined));
-  if (d.kind === 'asset') return { g: undefined, assetId: d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [] };
-  const all = g?.status === 'done' ? g.assetIds : [];
-  const index = d.kind === 'text' ? 0 : d.outputIndex;
-  return { g, assetId: all[Math.min(index, all.length - 1)] as string | undefined, all };
+  return nodeOutput(node, g && genId ? { [genId]: g } : {});
 }
 
 /** Card content: the result first. Empty, running and error states keep the same footprint. */
@@ -291,51 +299,184 @@ function ParamSelect({ label, value, options, format, onChange }: { label: strin
   );
 }
 
-function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
+/** Image inputs as thumbnails (connected nodes) plus "Ref", which adds a gallery image as a connected asset node. */
+function InputRefs({ node }: { node: GraphNode }) {
+  const sessionId = useSessionId();
+  const graph = useStore((s) => s.sessions[s.activeSessionId].graph);
+  const generations = useStore((s) => s.generations);
+  const assets = useStore((s) => s.assets);
+  const pop = usePopover();
+  const ports = inputPorts(node.data).filter((p) => p.type === 'image');
+  if (!ports.length) return null;
+  const linked = graph.edges
+    .filter((e) => e.target === node.id && ports.some((p) => p.id === e.targetHandle))
+    .map((e) => {
+      const src = graph.nodes.find((n) => n.id === e.source);
+      return { edge: e, assetId: src ? nodeOutput(src, generations).assetId : undefined, label: ports.find((p) => p.id === e.targetHandle)?.label };
+    });
+  const free = ports.find((p) => p.multi || !linked.some((l) => l.edge.targetHandle === p.id));
+  const recent = Object.values(assets)
+    .filter((a) => a.kind === 'image')
+    .sort((x, y) => y.createdAt - x.createdAt)
+    .slice(0, 12);
+  const add = (assetId: string) => {
+    pop.close();
+    if (!free) return;
+    const id = addNode(sessionId, { kind: 'asset', title: 'Reference', assetId }, { x: node.position.x - NODE_WIDTH - 100, y: node.position.y + linked.length * 70 });
+    tryConnect(sessionId, { source: id, target: node.id, targetHandle: free.id });
+  };
+  return (
+    <div className="nt-refs">
+      {linked.map((l) => (
+        <span key={l.edge.id} className="nt-ref" data-tip={l.label}>
+          {l.assetId ? <AssetMedia assetId={l.assetId} hoverPlay={false} draggable={false} /> : <ImageIcon size={14} />}
+          <button
+            type="button"
+            className="nt-ref-x"
+            aria-label="Disconnect"
+            onClick={() => setGraph(sessionId, (g) => ({ ...g, edges: g.edges.filter((e) => e.id !== l.edge.id) }))}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      {free ? (
+        <button ref={pop.ref} type="button" className="nt-ref nt-ref-add" onClick={pop.toggle} data-tip={`Add ${free.label.toLowerCase()} from the gallery`}>
+          <Plus size={13} />
+          <span>Ref</span>
+        </button>
+      ) : null}
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Add reference">
+        <PopoverHeader title={free?.label ?? 'Reference'} sub={recent.length ? 'Pick an image; it is added as a connected node.' : 'Generate or upload an image first.'} />
+        <div className="nt-pick">
+          {recent.map((a) => (
+            <button key={a.id} type="button" onClick={() => add(a.id)}>
+              <AssetMedia assetId={a.id} hoverPlay={false} draggable={false} />
+            </button>
+          ))}
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+/** One popover with every generation setting the model's schema exposes. */
+function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
   const sessionId = useSessionId();
   const d = node.data;
   const schema = useStore((s) => s.catalog.schemas[d.modelRef]);
+  const pop = usePopover();
+  const aspect = paramByRole(schema, 'aspect');
+  const res = paramByRole(schema, 'resolution');
+  const audio = paramByRole(schema, 'audio');
+  const durations = durationChoices(schema);
+  const set = (patch: Partial<GenNodeData['settings']>) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, ...patch } });
+  const summary = [res?.options?.length ? d.settings.resolution : null, d.kind === 'video' && durations.length ? `${d.settings.duration ?? durations[0]}s` : null].filter(Boolean);
+  if (!aspect?.options?.length && !res?.options?.length && !durations.length && !audio) return null;
+  return (
+    <>
+      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} className="nodrag nt-summary" data-tip="Settings">
+        {summary.map((v) => (
+          <span key={String(v)}>{v}</span>
+        ))}
+        {aspect?.options?.length && d.settings.aspect ? (
+          <span>
+            <AspectGlyph value={d.settings.aspect} /> {aspectLabel(d.settings.aspect)}
+          </span>
+        ) : null}
+        {!summary.length && !d.settings.aspect ? <SlidersHorizontal size={13} /> : null}
+      </Chip>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={340} label="Settings">
+        <div className="nt-settings">
+          {res?.options?.length ? (
+            <section>
+              <h5>Resolution</h5>
+              <Segmented size="sm" value={String(d.settings.resolution ?? res.options[0])} options={res.options.map((o) => ({ value: String(o), label: String(o) }))} onChange={(v) => set({ resolution: v })} />
+            </section>
+          ) : null}
+          {d.kind === 'video' && durations.length ? (
+            <section>
+              <h5>Length</h5>
+              <div className="nt-options">
+                {durations.map((n) => (
+                  <button key={n} type="button" className={`option ${n === d.settings.duration ? 'is-active' : ''}`} onClick={() => set({ duration: n })}>
+                    {n}s
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {aspect?.options?.length ? (
+            <section>
+              <h5>Ratio</h5>
+              <div className="nt-options">
+                {aspect.options.map((o) => {
+                  const v = String(o);
+                  return (
+                    <button key={v} type="button" className={`option ${v === d.settings.aspect ? 'is-active' : ''}`} onClick={() => set({ aspect: v })}>
+                      <AspectGlyph value={v} /> {aspectLabel(v)}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+          {audio ? (
+            <section className="nt-inline">
+              <h5>Audio</h5>
+              <Toggle checked={Boolean(d.settings.audio)} onChange={(v) => set({ audio: v })} label="Generate audio" />
+            </section>
+          ) : null}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+/** Prompt card under the selected node: inputs, prompt, then model · settings · count · run. */
+function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
+  const sessionId = useSessionId();
+  const d = node.data;
   const hasPromptEdge = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.some((e) => e.target === node.id && e.targetHandle === 'prompt'));
   const modelPop = usePopover();
   useEffect(() => {
     void ensureSchema(d.modelRef);
   }, [d.modelRef]);
   const name = modelSummary(d.modelRef)?.name ?? (d.modelRef.startsWith('local::') ? (d.kind === 'image' ? 'Local Sketch' : 'Local Motion') : d.modelRef.split('::')[1]);
-  const aspect = paramByRole(schema, 'aspect');
-  const res = paramByRole(schema, 'resolution');
-  const durations = durationChoices(schema);
-  const setSettings = (patch: Partial<GenNodeData['settings']>) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, ...patch } });
   return (
     <>
-      <Chip ref={modelPop.ref} icon={Box} active={modelPop.open} onClick={modelPop.toggle} className="nodrag model-chip wide-chip">
-        <span className="truncate">{name}</span>
-        <ChevronDown size={12} />
-      </Chip>
-      <Popover open={modelPop.open} anchor={modelPop.ref} onClose={modelPop.close} width={420} label="Model">
-        <ModelList
-          kind={d.kind}
-          value={d.modelRef}
-          onSelect={async (ref) => {
-            modelPop.close();
-            if (!ref) return;
-            const sch = await ensureSchema(ref);
-            const { settings } = coerceSettings(sch ?? undefined, d.kind, { ...d.settings, advanced: {} });
-            patchNodeData(sessionId, node.id, { modelRef: ref, settings });
-          }}
-        />
-      </Popover>
+      <InputRefs node={node} />
       <textarea
-        className="node-textarea nodrag nowheel"
+        className="nt-prompt nodrag nowheel"
         rows={3}
         value={d.prompt}
         placeholder={hasPromptEdge ? 'Extra prompt (added after the connected text)' : d.kind === 'image' ? 'Describe the image…' : 'Describe the shot and motion…'}
         onChange={(e) => patchNodeData(sessionId, node.id, { prompt: e.target.value })}
       />
-      <div className="node-params">
-        {aspect?.options?.length ? <ParamSelect label="Aspect" value={d.settings.aspect} options={aspect.options} format={aspectLabel} onChange={(v) => setSettings({ aspect: v })} /> : null}
-        {res?.options?.length ? <ParamSelect label="Resolution" value={d.settings.resolution} options={res.options} onChange={(v) => setSettings({ resolution: v })} /> : null}
-        {d.kind === 'image' ? <ParamSelect label="Images" value={d.settings.count} options={[1, 2, 3, 4]} onChange={(v) => setSettings({ count: Number(v) })} /> : null}
-        {d.kind === 'video' && durations.length ? <ParamSelect label="Duration" value={d.settings.duration} options={durations} format={(v) => `${v}s`} onChange={(v) => setSettings({ duration: Number(v) })} /> : null}
+      <div className="nt-row">
+        <Chip ref={modelPop.ref} icon={Box} active={modelPop.open} onClick={modelPop.toggle} className="nodrag nt-model">
+          <span className="truncate">{name}</span>
+          <ChevronDown size={12} />
+        </Chip>
+        <Popover open={modelPop.open} anchor={modelPop.ref} onClose={modelPop.close} width={420} label="Model">
+          <ModelList
+            kind={d.kind}
+            value={d.modelRef}
+            onSelect={async (ref) => {
+              modelPop.close();
+              if (!ref) return;
+              const sch = await ensureSchema(ref);
+              const { settings } = coerceSettings(sch ?? undefined, d.kind, { ...d.settings, advanced: {} });
+              patchNodeData(sessionId, node.id, { modelRef: ref, settings });
+            }}
+          />
+        </Popover>
+        <SettingsChip node={node} />
+        <span className="spacer" />
+        {d.kind === 'image' ? (
+          <ParamSelect label="Images" value={d.settings.count} options={[1, 2, 3, 4]} format={(v) => `${v}×`} onChange={(v) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, count: Number(v) } })} />
+        ) : null}
+        <RunButton node={node} primary />
       </div>
     </>
   );
@@ -419,6 +560,10 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
           />
         ),
       )}
+      <div className="nt-row">
+        <span className="spacer" />
+        <RunButton node={node} primary />
+      </div>
     </>
   );
 }

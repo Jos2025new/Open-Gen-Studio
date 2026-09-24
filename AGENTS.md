@@ -12,7 +12,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — prioridad de modelos del agente (2026-09-24)
+## Tarea actual — tarjeta de prompt del nodo (2026-09-25)
+1. [x] Panel del nodo como tarjeta de prompt: miniaturas de las entradas conectadas + "Ref" (elegir de la galería crea un nodo asset conectado), prompt amplio, fila inferior con modelo · resumen de ajustes (resolución | duración | proporción) · nº de imágenes · Run con coste. *Razón: todo a mano sin abrir menús; mismos datos del schema.*
+2. [x] Popover de ajustes con segmentados (resolución, proporción con glifo, duración, audio) según el schema del modelo. *Razón: el proveedor decide qué opciones existen.*
+3. [x] Tests, typecheck, navegador; commit.
+
+## Tarea anterior — prioridad de modelos del agente (2026-09-24)
 IDs contrastados con los catálogos vivos de OpenRouter, NanoGPT y Atlas.
 1. [x] `llm.ts`: `PREFERRED_LLM` → `NORMAL_LLM` y `TOP_LLM` (IDs reales de los tres catálogos, en orden); `pickDefaultLlm(models, tier)` recorre la lista del tier (top cae a normal) y exige tools + visión; luego el fallback genérico actual. `LlmModel.vision` leído del catálogo. *Razón: una sola lógica; el catálogo decide qué existe.*
 2. [x] `settings.agent.tier` (`normal` por defecto). *Razón: el Top Tier solo se usa si se elige explícitamente.*

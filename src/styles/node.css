@@ -21,6 +21,19 @@
 .nt-bar { display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); white-space: nowrap; }
 .nt-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 6px; font-size: 11px; color: var(--text-2); }.nt-btn:hover, .nt-btn.is-open { color: var(--text); background: var(--surface-3); }.nt-icon { width: 28px; padding: 0; justify-content: center; }
 .nt-run { color: var(--accent); background: var(--accent-soft); }.nt-run:hover { color: var(--accent); }.nt-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
-.nt-panel { width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-pop); }
+.nt-panel { width: 400px; display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-pop); }
 .nt-panel .node-textarea { min-height: 70px; }
+.nt-refs { display: flex; gap: 6px; flex-wrap: wrap; }
+.nt-ref { position: relative; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 7px; overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-2); }
+.nt-ref > :first-child:not(button) { width: 100%; height: 100%; }.nt-ref img, .nt-ref video { width: 100%; height: 100%; object-fit: cover; }
+.nt-ref-x { position: absolute; top: 2px; right: 2px; width: 15px; height: 15px; display: grid; place-items: center; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; opacity: 0; }.nt-ref:hover .nt-ref-x { opacity: 1; }
+.nt-ref-add { flex-direction: column; gap: 1px; font-size: 9px; border-style: dashed; }.nt-ref-add:hover { color: var(--text); border-color: var(--accent-line); }
+.nt-prompt { width: 100%; min-height: 64px; max-height: 220px; resize: none; field-sizing: content; font-size: 13px; line-height: 1.5; border: 0!important; background: transparent!important; padding: 2px!important; }
+.nt-row { display: flex; align-items: center; gap: 6px; }.nt-row .spacer { flex: 1; }
+.nt-model { max-width: 170px; }.nt-summary { gap: 0; }.nt-summary > span { display: inline-flex; align-items: center; gap: 5px; }.nt-summary > span + span { padding-left: 8px; margin-left: 8px; border-left: 1px solid var(--border-strong); }
+.nt-go { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 14px; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 600; white-space: nowrap; }.nt-go:hover { filter: brightness(1.05); }
+.nt-settings { display: flex; flex-direction: column; gap: 14px; padding: 12px; }.nt-settings h5 { margin: 0 0 7px; font-size: 11px; font-weight: 500; color: var(--text-2); }.nt-settings .segmented { width: 100%; }
+.nt-options { display: flex; flex-wrap: wrap; gap: 4px; }.nt-options .option { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; font-size: 11px; }
+.nt-inline { display: flex; align-items: center; justify-content: space-between; }.nt-inline h5 { margin: 0; }
+.nt-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 8px; }.nt-pick button { aspect-ratio: 1; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }.nt-pick button:hover { border-color: var(--accent-line); }.nt-pick img, .nt-pick video { width: 100%; height: 100%; object-fit: cover; }
 .ctx-anchor { position: absolute; width: 1px; height: 1px; pointer-events: none; }
