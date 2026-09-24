@@ -168,7 +168,8 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
     };
   }
   const k = Math.max(0.05, Math.sqrt(Math.abs(sx * sy)));
-  return { ...layer, x: fx(layer.x), y: fy(layer.y), width: Math.max(20, layer.width * sx), fontSize: Math.max(4, layer.fontSize * k) };
+  // width 0 = auto width (the box follows the text).
+  return { ...layer, x: fx(layer.x), y: fy(layer.y), width: layer.width > 0 ? Math.max(20, layer.width * sx) : 0, fontSize: Math.max(4, layer.fontSize * k) };
 }
 
 /** Fit an image of w×h into the doc: 'cover' fills, 'contain' fits inside, both centered. */

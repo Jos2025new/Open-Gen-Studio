@@ -24,6 +24,12 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - Layout inspeccionado a 320, 768, 1024 y 1440 px, sin desbordamiento horizontal del documento. En móvil, herramientas y acciones superiores tienen scroll horizontal.
 - No se hicieron llamadas de pago. El build emite un aviso no bloqueante por el bundle principal de ~815 kB antes de gzip.
 
+## Correcciones Designer — 2026-09-24 (detalle en `AGENTS.md`)
+- Cada forma crea su capa; texto con ancho automático (`width: 0`) que crece al escribir; editor de texto ya no se cierra al crearse.
+- Imágenes protegidas (`RasterLayer.allowPaint`): el pincel pinta en una capa "Paint N" encima y la reutiliza; borrador bloqueado en imágenes protegidas.
+- Panel de capas: redimensionable (200–520 px), plegable y con secciones plegables; preferencias en `localStorage` (`ogs:layers-*`), el composer usa `--layers-w`.
+- Verificado en navegador (1400×860): formas, texto, pincel sobre vacío e imagen, panel, lista de modelos. Typecheck, 12 tests y build correctos.
+
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.
 - No hay backend ni despliegue de producción en este alcance.

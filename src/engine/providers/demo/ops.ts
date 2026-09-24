@@ -253,12 +253,12 @@ export function stylize(src: HTMLCanvasElement, prompt: string, seed: number, w:
   ctx.drawImage(src, (w - src.width * cover) / 2, (h - src.height * cover) / 2, src.width * cover, src.height * cover);
   const pal = paletteFor(prompt, seed);
   ctx.globalCompositeOperation = 'color';
-  ctx.fillStyle = withAlpha(pal.sky[1], 0.35);
+  ctx.fillStyle = withAlpha(pal.sky[1], 0.1);
   ctx.fillRect(0, 0, w, h);
   ctx.globalCompositeOperation = 'soft-light';
   const g = ctx.createLinearGradient(0, 0, w, h);
-  g.addColorStop(0, withAlpha(pal.light, 0.5));
-  g.addColorStop(1, withAlpha(pal.ink, 0.5));
+  g.addColorStop(0, withAlpha(pal.light, 0.18));
+  g.addColorStop(1, withAlpha(pal.ink, 0.18));
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
   ctx.globalCompositeOperation = 'source-over';

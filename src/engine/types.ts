@@ -435,6 +435,8 @@ export interface RasterLayer extends LayerBase {
   pxHeight: number;
   rev: number;
   sourceAssetId?: string;
+  /** Images are protected from brush/eraser unless the user allows painting on them. */
+  allowPaint?: boolean;
 }
 
 export interface VectorShape extends ShapeSpec {

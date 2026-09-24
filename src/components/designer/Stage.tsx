@@ -4,8 +4,8 @@ import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/rend
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
 import { beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
-import { toolBlockReason, TOOL_LAYER, type DesignTool } from '../../engine/design/rules';
-import { addTextLayer, getDoc, patchLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
+import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
+import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, toast, useStore } from '../../store/store';
 import { uid } from '../../lib/id';
 
@@ -23,6 +23,7 @@ type Drag =
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number };
 
 const HANDLE = 8;
+const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
 
 export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -253,14 +254,18 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     }
 
     if (tool === 'brush' || tool === 'eraser') {
-      if (blocked || !act || act.type !== 'raster') {
-        toast(blocked ?? 'Select a raster layer to paint.', 'error');
+      const erase = tool === 'eraser';
+      if (erase && (blocked || !act || act.type !== 'raster')) {
+        toast(blocked ?? 'Select a raster layer to erase.', 'error');
         return;
       }
       record(current);
-      beginEdit(act);
-      drag.current = { kind: 'paint', layerId: act.id, last: p, erase: tool === 'eraser' };
-      paintSegment(act, p, p, tool === 'eraser');
+      // Brush never touches protected images: it paints on its own layer.
+      const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
+      if (!target || target.type !== 'raster') return;
+      beginEdit(target);
+      drag.current = { kind: 'paint', layerId: target.id, last: p, erase };
+      paintSegment(target, p, p, erase);
       return;
     }
 
@@ -277,8 +282,8 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
         setEditingText(hit.id);
         return;
       }
-      const width = Math.max(200, Math.min(current.width - p.x, current.width * 0.6));
-      const id = addTextLayer(sessionId, doc.id, 'Text', { x: p.x, y: p.y, width }, { ...textStyle, fontSize: Math.max(12, Math.round(current.width / 14)) });
+      // width 0 = auto width: the box follows the text as it is typed.
+      const id = addTextLayer(sessionId, doc.id, 'Text', { x: p.x, y: p.y, width: 0 }, { ...textStyle, fontSize: Math.max(12, Math.round(current.width / 14)) });
       if (id) setEditingText(id);
     }
   };
@@ -374,10 +379,11 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       if (!current) return;
       const act = activeLayer(current);
       record(current);
-      if (act && act.type === 'vector' && !act.locked) {
+      // Each shape gets its own layer; only an empty vector layer is filled in place.
+      if (act && act.type === 'vector' && !act.locked && !act.shapes.length) {
         setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === act.id && l.type === 'vector' ? { ...l, shapes: [...l.shapes, shape] } : l)) }));
       } else {
-        const layer = newVectorLayer(`Shapes ${current.layers.length + 1}`);
+        const layer = newVectorLayer(`${SHAPE_NAMES[d.tool]} ${current.layers.length + 1}`);
         layer.shapes = [shape];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
       }
@@ -458,9 +464,6 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
         />
       ) : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
-      {TOOL_LAYER[tool] && tool !== 'brush' && tool !== 'eraser' && active && active.type !== TOOL_LAYER[tool] ? (
-        <div className="stage-hint subtle">Creates a new {TOOL_LAYER[tool]} layer</div>
-      ) : null}
     </div>
   );
 }
@@ -469,8 +472,12 @@ function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onD
   const [text, setText] = useState(layer.text);
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    ref.current?.focus();
-    ref.current?.select();
+    // Focus after the canvas mousedown has moved focus to <body>, or it would blur us at once.
+    const t = requestAnimationFrame(() => {
+      ref.current?.focus();
+      ref.current?.select();
+    });
+    return () => cancelAnimationFrame(t);
   }, []);
   const lay = layoutText({ ...layer, text });
   const z = view.zoom;
@@ -491,8 +498,9 @@ function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onD
       style={{
         left: view.x + layer.x * z,
         top: view.y + layer.y * z,
-        width: Math.max(40, lay.width * z) + 4,
-        height: lay.height * z + layer.fontSize * layer.lineHeight * z,
+        width: Math.max(8, lay.width * z) + layer.fontSize * 0.3 * z,
+        height: lay.height * z + 2,
+        whiteSpace: layer.width > 0 ? 'pre-wrap' : 'pre',
         font: `${layer.fontWeight} ${layer.fontSize * z}px ${fontStack(layer.fontFamily)}`,
         lineHeight: `${layer.lineHeight}`,
         letterSpacing: `${layer.letterSpacing * z}px`,

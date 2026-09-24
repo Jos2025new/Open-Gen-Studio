@@ -4,7 +4,7 @@ import { coerceSettings, schemaFromJson, wireParams } from '../src/engine/params
 import { normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
 import { connect, connectionError, graphToSteps, planToGraph } from '../src/engine/flow/graph';
 import { offlinePlan, type OfflineInput } from '../src/engine/agent/offline';
-import { createDoc, insertLayer, moveLayer, newTextLayer, newVectorLayer, removeLayer } from '../src/engine/design/doc';
+import { createDoc, insertLayer, moveLayer, newRasterLayer, newTextLayer, newVectorLayer, removeLayer, scaleLayer } from '../src/engine/design/doc';
 import { layerAccepts, toolBlockReason } from '../src/engine/design/rules';
 import type { ImageStep, Plan } from '../src/engine/types';
 
@@ -103,9 +103,18 @@ describe('Designer layers', () => {
     expect(removeLayer(doc, b.id).activeLayerId).toBe(a.id);
     expect(doc.layers).toHaveLength(2);
   });
-  it('blocks painting on text and moving locked layers', () => {
+  it('keeps images non-destructive and blocks moving locked layers', () => {
     const layer = newTextLayer('Title', 'Text', { x: 0, y: 0, width: 100 });
-    expect(toolBlockReason('brush', layer)).toMatch(/raster/);
+    // The brush paints on its own layer, so it never blocks; the eraser needs a raster layer.
+    expect(toolBlockReason('brush', layer)).toBeNull();
+    expect(toolBlockReason('eraser', layer)).toMatch(/raster/);
+    const image = newRasterLayer('Photo', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }, 'asset_1');
+    expect(toolBlockReason('eraser', image)).toMatch(/protected/);
+    expect(toolBlockReason('eraser', { ...image, allowPaint: true })).toBeNull();
+    expect(toolBlockReason('eraser', newRasterLayer('Paint', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 }))).toBeNull();
+    // Auto-width text stays auto-width when scaled.
+    const auto = scaleLayer(newTextLayer('T', 'Text', { x: 0, y: 0, width: 0 }), 2, 2, 0, 0);
+    expect(auto.type === 'text' && auto.width).toBe(0);
     expect(toolBlockReason('move', { ...layer, locked: true })).toMatch(/locked/);
     expect(layerAccepts('raster', 'video')).toBe(false);
     expect(toolBlockReason('rect', layer)).toBeNull();

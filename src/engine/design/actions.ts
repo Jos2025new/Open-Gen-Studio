@@ -1,13 +1,13 @@
 import { uid } from '../../lib/id';
 import { getAssetBlob, putAssetBlob } from '../../lib/idb';
-import { blobToCanvas, downloadBlob, fetchBlob } from '../../lib/media';
-import type { Asset, DesignDoc, Layer, LayerStep, OpId, AdvancedValue, ShapeSpec, TextStyle } from '../types';
+import { blobToCanvas, createCanvas, downloadBlob, fetchBlob } from '../../lib/media';
+import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, TextStyle } from '../types';
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
 import { exportDoc } from './render';
-import { placementError } from './rules';
+import { isProtectedImage, placementError } from './rules';
 
 const get = useStore.getState;
 
@@ -193,10 +193,33 @@ export function addEmptyLayer(sessionId: string, docId: string, type: Layer['typ
     layer = D.newVectorLayer(`Shapes ${n}`);
   } else {
     const ui = get().ui.text;
-    layer = D.newTextLayer(`Text ${n}`, 'Your text', { x: doc.width * 0.1, y: doc.height * 0.1, width: doc.width * 0.8 }, { ...ui, fontSize: Math.round(doc.width / 12) });
+    layer = D.newTextLayer(`Text ${n}`, 'Your text', { x: doc.width * 0.1, y: doc.height * 0.1, width: 0 }, { ...ui, fontSize: Math.round(doc.width / 12) });
   }
   mutateDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'above'));
   return layer.id;
+}
+
+/**
+ * Raster layer the brush should paint on: the active layer when it accepts strokes,
+ * else the unlocked paint layer right above it, else a new doc-sized "Paint" layer.
+ * The caller records history, so the new layer and its first stroke undo together.
+ */
+export function ensurePaintLayer(sessionId: string, docId: string): RasterLayer | null {
+  const doc = getDoc(sessionId, docId);
+  if (!doc) return null;
+  const act = D.activeLayer(doc);
+  const paintable = (l: Layer | undefined): l is RasterLayer => !!l && l.type === 'raster' && !l.locked && l.visible && !isProtectedImage(l);
+  if (paintable(act ?? undefined)) return act as RasterLayer;
+  const above = act ? doc.layers[doc.layers.indexOf(act) + 1] : undefined;
+  if (paintable(above) && !above.sourceAssetId) {
+    setActiveLayer(sessionId, docId, above.id);
+    return above;
+  }
+  const n = doc.layers.filter((l) => l.type === 'raster' && !l.sourceAssetId).length + 1;
+  const layer = D.newRasterLayer(`Paint ${n}`, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height });
+  setBuffer(layer.id, createCanvas(doc.width, doc.height));
+  setDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'above'));
+  return layer;
 }
 
 export function setActiveLayer(sessionId: string, docId: string, layerId: string | null): void {
