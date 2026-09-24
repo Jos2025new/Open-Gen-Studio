@@ -50,6 +50,24 @@ describe('provider parameters', () => {
     expect(result.settings.aspect).toBe('1:1');
     expect(result.changes).toHaveLength(1);
   });
+  it('sends the count only to num_images when a model also has max_images (Seedream)', () => {
+    const seedream = schemaFromJson({ ref: 'fal::seedream', kind: 'image', properties: {
+      prompt: { type: 'string' }, max_images: { type: 'integer', minimum: 1, maximum: 6, default: 1 },
+      num_images: { type: 'integer', minimum: 1, maximum: 6, default: 1 },
+    }, required: ['prompt'], resolve: () => undefined, imageFormat: 'data-url', source: 'openapi' });
+    expect(seedream.params.find((p) => p.key === 'max_images')?.role).toBe('other');
+    expect(wireParams(seedream, coerceSettings(seedream, 'image', { count: 3 }).settings, 3)).toEqual({ num_images: 3 });
+  });
+  it('treats image_size as aspect only when its options are ratios', () => {
+    const presets = schemaFromJson({ ref: 'atlas::krea', kind: 'image', properties: {
+      prompt: { type: 'string' }, image_size: { type: 'string', enum: ['square_hd', 'portrait_3_4', 'portrait_9_16', 'landscape_16_9'] },
+    }, required: [], resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
+    expect(coerceSettings(presets, 'image', { aspect: '9:16' }).settings.aspect).toBe('portrait_9_16');
+    const tiers = schemaFromJson({ ref: 'x::tiers', kind: 'image', properties: {
+      prompt: { type: 'string' }, image_size: { type: 'string', enum: ['1K', '2K'] }, orientation: { type: 'string', enum: ['default', 'align_image'] },
+    }, required: [], resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
+    expect(tiers.params.map((p) => p.role)).toEqual(['other', 'other']);
+  });
 });
 
 describe('plan and graph validation', () => {

@@ -101,7 +101,7 @@ export function parseOrVideoPricing(skus: Record<string, string> | null | undefi
 }
 
 function paramFromSupported(key: string, sp: SupportedParam): ParamDef | null {
-  const role = roleForKey(key);
+  const role = roleForKey(key, sp.type === 'enum' ? sp.values : undefined);
   if (sp.type === 'enum') {
     if (!sp.values?.length) return null;
     return { key, label: humanizeKey(key), role, type: 'enum', options: sp.values };

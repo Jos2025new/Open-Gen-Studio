@@ -1,11 +1,11 @@
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
-import type { RawPlan } from '../plan';
+import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
+import { OP_IDS } from '../ops';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
 const stepKinds = ['image', 'video', 'op', 'text', 'layer'] as const;
-const opIds = ['relight', 'angle', 'upscale', 'remove_bg', 'reframe', 'variations', 'edit', 'animate', 'extract_frame', 'continue'] as const;
 
 export const TOOLS: ToolSpec[] = [
   {
@@ -53,7 +53,7 @@ export const TOOLS: ToolSpec[] = [
           steps: {
             type: 'array',
             minItems: 1,
-            maxItems: 16,
+            maxItems: MAX_PLAN_STEPS,
             items: {
               type: 'object',
               properties: {
@@ -71,7 +71,7 @@ export const TOOLS: ToolSpec[] = [
                 refs: { type: 'array', items: { type: 'string' }, description: 'image: reference/source images.' },
                 first_frame: { type: 'string', description: 'video: start image reference.' },
                 last_frame: { type: 'string', description: 'video: end image reference.' },
-                op: { type: 'string', enum: [...opIds] },
+                op: { type: 'string', enum: [...OP_IDS] },
                 input: { type: 'string', description: 'op: the image or video to transform.' },
                 params: { type: 'object', description: 'op parameters.' },
                 text: { type: 'string', description: 'text step content, or the text of a text layer.' },
@@ -144,7 +144,7 @@ const stepSchema = z
 export const proposePlanSchema = z.object({
   title: z.string().max(200).optional(),
   summary: z.string().max(600).optional(),
-  steps: z.array(stepSchema).min(1).max(24),
+  steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
 });
 
 export function parseToolArgs(raw: string): { ok: true; value: unknown } | { ok: false; error: string } {

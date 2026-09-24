@@ -33,7 +33,8 @@ async function fetchCategory(category: string): Promise<FalModel[]> {
   if (cached) return cached;
   const all: FalModel[] = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 3; page++) {
+  // Categories run to a few hundred models (image-to-image ~400); the cap only guards against a runaway cursor.
+  for (let page = 0; page < 10; page++) {
     const url = `${API}/models?category=${category}&status=active&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
     const res: { models: FalModel[]; next_cursor?: string | null; has_more?: boolean } = await requestJson(url);
     all.push(...res.models);

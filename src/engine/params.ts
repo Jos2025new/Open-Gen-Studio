@@ -16,7 +16,8 @@ const ROLE_KEYS: Record<Exclude<ParamRole, 'other'>, string[]> = {
   aspect: ['aspect_ratio', 'aspectratio', 'ratio', 'image_size', 'orientation'],
   resolution: ['resolution', 'resolutions', 'size', 'quality_resolution', 'output_resolution'],
   duration: ['duration', 'seconds', 'duration_seconds', 'video_length'],
-  count: ['n', 'num_images', 'num_outputs', 'nimages', 'number_of_images', 'max_images', 'batch_size'],
+  // Not max_images: Seedream uses it for multi-image sets next to num_images.
+  count: ['n', 'num_images', 'num_outputs', 'nimages', 'number_of_images'],
   audio: ['generate_audio', 'generateaudio', 'sound', 'audio', 'enable_audio', 'with_audio', 'audio_generation'],
   seed: ['seed'],
   negative: ['negative_prompt', 'negativeprompt'],
@@ -50,10 +51,16 @@ export function normKey(k: string): string {
   return k.toLowerCase();
 }
 
-export function roleForKey(key: string): ParamRole {
+/**
+ * Canonical role of a parameter. An aspect-like key (image_size, orientation...) only
+ * counts as 'aspect' when its options read as ratios; otherwise it stays model-specific.
+ */
+export function roleForKey(key: string, options?: Array<string | number>): ParamRole {
   const k = normKey(key);
   for (const [role, keys] of Object.entries(ROLE_KEYS) as Array<[Exclude<ParamRole, 'other'>, string[]]>) {
-    if (keys.includes(k)) return role;
+    if (!keys.includes(k)) continue;
+    if (role === 'aspect' && !options?.some((o) => ratioOf(o) != null)) return 'other';
+    return role;
   }
   return 'other';
 }
@@ -73,20 +80,23 @@ export function humanizeKey(key: string): string {
 const ASPECT_ALIASES: Record<string, string> = {
   square_hd: '1:1',
   square: '1:1',
-  portrait_4_3: '3:4',
-  portrait_16_9: '9:16',
-  landscape_4_3: '4:3',
-  landscape_16_9: '16:9',
   landscape: '16:9',
   portrait: '9:16',
 };
+
+/** Ratio for a size preset. fal writes "portrait_4_3", Krea/Ideogram "portrait_3_4": both are 3:4. */
+function presetAspect(v: string): string | undefined {
+  const m = /^(portrait|landscape)_(\d+)_(\d+)$/.exec(v);
+  if (!m) return ASPECT_ALIASES[v];
+  const [short, long] = [Number(m[2]), Number(m[3])].sort((a, b) => a - b);
+  return m[1] === 'portrait' ? `${short}:${long}` : `${long}:${short}`;
+}
 
 /** Numeric w/h ratio for an aspect-ish value ("16:9", "landscape_4_3", "1280x720"), or null. */
 export function ratioOf(value: string | number | undefined): number | null {
   if (value == null) return null;
   const v = String(value).trim().toLowerCase();
-  const alias = ASPECT_ALIASES[v];
-  const src = alias ?? v;
+  const src = presetAspect(v) ?? v;
   const m = /^(\d+(?:\.\d+)?)\s*[:x*]\s*(\d+(?:\.\d+)?)$/.exec(src);
   if (!m) return null;
   const w = Number(m[1]);
@@ -97,7 +107,7 @@ export function ratioOf(value: string | number | undefined): number | null {
 export function aspectLabel(value: string | number | undefined): string {
   if (value == null) return '';
   const v = String(value);
-  const alias = ASPECT_ALIASES[v.toLowerCase()];
+  const alias = presetAspect(v.toLowerCase());
   if (alias) return v.toLowerCase().includes('hd') ? `${alias} HD` : alias;
   if (v === 'auto') return 'Auto';
   return v.replace('*', '×').replace(/(\d)x(\d)/, '$1×$2');
@@ -265,10 +275,10 @@ export function schemaFromJson(opts: {
     if (used.has(key) || isHiddenKey(key)) continue;
     const p = flattenProp(properties[key], resolve);
     const t = primaryType(p);
-    const role = roleForKey(key);
+    const options = (p.enum ?? []).filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
+    const role = roleForKey(key, options);
     const base = { key, label: humanizeKey(p.title && p.title.length < 40 ? p.title : key), role, description: p.description?.slice(0, 200) };
     if (p.enum?.length) {
-      const options = p.enum.filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
       if (!options.length) continue;
       const def = typeof p.default === 'string' || typeof p.default === 'number' ? p.default : undefined;
       params.push({ ...base, type: 'enum', options, default: def });

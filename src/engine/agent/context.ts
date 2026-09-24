@@ -1,7 +1,7 @@
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, durationChoices, paramByRole } from '../params';
 import { skillById, workflowById, describeWorkflow } from '../skills';
-import { OPS } from '../ops';
+import { OPS, OP_IDS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { isConnected, modelSummary } from '../catalog';
 import type { AgentStyle, Session, Workspace } from '../types';
@@ -9,6 +9,13 @@ import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
 
 const get = useStore.getState;
+
+/** One line per operation, built from OPS so the prompt cannot drift from the registry. */
+const OP_LINES = OP_IDS.map((id) => {
+  const op = OPS[id];
+  const fields = op.fields.map((f) => (f.options ? `${f.key}: ${f.options.map((o) => o.value).join('|')}` : f.key)).join(', ');
+  return `  ${id} {${fields}} (${op.input} → ${op.output}) — ${op.description}`;
+}).join('\n');
 
 export const SYSTEM_PROMPT = `You are the operator of Open Gen Studio, a creative production tool for images, video and layered design. You turn requests into precise, executable plans. You are efficient: you remove ambiguity with specific, sensible decisions and you do exactly what was asked — no extra deliverables, no filler.
 
@@ -27,10 +34,7 @@ Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for lay
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
 - video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?.
 - op: op, input, params? — operations on an existing image or video:
-  relight {preset: golden-hour|softbox|overcast|rim|neon|candle|moonlight|chiaroscuro, direction: left|right|top|front|behind|below, intensity: subtle|medium|strong}
-  angle {angle: front|three-quarter-left|three-quarter-right|profile-left|profile-right|back|top-down|high|low|close-up|wide}
-  upscale {factor: 2|4} · remove_bg {} · reframe {aspect} · variations {strength: subtle|medium|strong, count: 1-4} · edit {instruction}
-  animate {motion} (image → video) · extract_frame {which: first|last} (video → image, free) · continue {motion} (video → next clip from its last frame)
+${OP_LINES}
 - text: text — copy, or a shared prompt used by image/video steps through prompt_from.
 - layer (Designer workspace only): layer_type raster|text|vector.
   raster: source (an image reference), target "base" | "new" | <raster layer id>. "base" is layer 1: the main generated image always goes to base.

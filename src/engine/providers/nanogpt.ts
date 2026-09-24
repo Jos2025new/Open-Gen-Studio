@@ -162,7 +162,8 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
     if (!def || typeof def !== 'object' || isHiddenKey(key)) continue;
     const d = def as Loose;
     if (d.type === 'enum' && Array.isArray(d.values) && d.values.length) {
-      params.push({ key, label: humanizeKey(key), role: roleForKey(key), type: 'enum', options: (d.values as unknown[]).map(String), default: d.default as string | undefined });
+      const options = (d.values as unknown[]).map(String);
+      params.push({ key, label: humanizeKey(key), role: roleForKey(key, options), type: 'enum', options, default: d.default as string | undefined });
     } else if (d.type === 'range') {
       params.push({ key, label: humanizeKey(key), role: roleForKey(key), type: 'integer', min: num(d.min), max: num(d.max), default: num(d.default) });
     }
@@ -188,9 +189,9 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const params: ParamDef[] = [];
   for (const [key, d] of Object.entries(defs)) {
     if (isHiddenKey(key) || /trajectory|keyframe|script|story|voice|character|lora/i.test(key)) continue;
-    const role = roleForKey(key);
-    const label = d.label ?? humanizeKey(key);
     const type = (d.type ?? '').toLowerCase();
+    const role = roleForKey(key, d.options?.map((o) => o.value));
+    const label = d.label ?? humanizeKey(key);
     if ((type === 'select' || type === 'enum' || type === 'radio') && d.options?.length) {
       const options = d.options.map((o) => o.value);
       params.push({ key, label, role, type: 'enum', options, default: d.default as string | number | undefined, description: d.description });

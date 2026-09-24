@@ -21,6 +21,9 @@ import type {
   Workspace,
 } from './types';
 
+/** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
+export const MAX_PLAN_STEPS = 16;
+
 /* Plans are DAGs of steps proposed by the agent. This module validates them. */
 
 export interface RawStep {
@@ -197,7 +200,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   const errors: string[] = [];
   const adjustments: string[] = [];
   const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
-  const maxSteps = ctx.maxSteps ?? 16;
+  const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
   if (rawSteps.length > maxSteps) errors.push(`Too many steps (${rawSteps.length}); the limit is ${maxSteps}.`);
 
