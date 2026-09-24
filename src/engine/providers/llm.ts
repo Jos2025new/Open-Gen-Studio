@@ -1,6 +1,7 @@
 import { cacheDb } from '../../lib/idb';
 import { AbortedError, HttpError, extractErrorMessage, isAbort, readSse, requestJson } from '../../lib/http';
 import type { LlmMessage, LlmProviderId } from '../types';
+import { NANO_BASE } from './nanogpt';
 import { orHeaders } from './openrouter';
 
 /* OpenAI-compatible chat completions for the agent (OpenRouter, NanoGPT, Atlas Cloud). */
@@ -31,7 +32,7 @@ export interface ChatResult {
 
 const ENDPOINTS: Record<LlmProviderId, { chat: string; models: string }> = {
   openrouter: { chat: 'https://openrouter.ai/api/v1/chat/completions', models: 'https://openrouter.ai/api/v1/models' },
-  nanogpt: { chat: 'https://api.nano-gpt.com/api/v1/chat/completions', models: 'https://api.nano-gpt.com/api/v1/models?detailed=true' },
+  nanogpt: { chat: `${NANO_BASE}/v1/chat/completions`, models: `${NANO_BASE}/v1/models?detailed=true` },
   atlas: { chat: 'https://api.atlascloud.ai/v1/chat/completions', models: 'https://api.atlascloud.ai/v1/models' },
 };
 
@@ -73,7 +74,7 @@ function perMillion(v: unknown, unit: 'token' | 'million'): number | undefined {
 }
 
 export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]> {
-  const cacheKey = `llm:${provider}`;
+  const cacheKey = `llm:v2:${provider}`;
   const cached = await cacheDb.get<LlmModel[]>(cacheKey, 12 * 3600 * 1000);
   if (cached) return cached;
   const res = await requestJson<{ data: Loose[] }>(ENDPOINTS[provider].models);

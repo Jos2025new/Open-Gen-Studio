@@ -53,4 +53,5 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - xyflow: los controles interactivos dentro de nodos llevan la clase `nodrag` (y `nowheel` si hacen scroll).
 - Popovers: `usePopover()` + `<Popover anchor={ref} placement="top-start">`; tooltips con el atributo `data-tip`.
 - Relays de Vite (sólo dev/preview): `/x/fal-web` (OpenAPI de fal) y `/x/atlas-static` (esquemas de Atlas); sin ellos esos modelos caen a un esquema mínimo.
+- NanoGPT: usar `nano-gpt.com/api` (`NANO_BASE`); `api.nano-gpt.com` sirve catálogos desfasados (LLM, imagen y vídeo). Comprobado 2026-09-24.
 - Sin verificar con clave real: forma de respuesta de NanoGPT `POST /api/v1/images`, respuesta de Atlas `uploadMedia`, CORS de OpenRouter `/videos/{id}/content`. Los parsers son tolerantes (`extractOutputs` en `providers/shared.ts`).

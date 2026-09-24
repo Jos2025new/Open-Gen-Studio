@@ -7,7 +7,9 @@ import { encodeImage, extractOutputs, JSON_HEADERS, numberOrUndefined } from './
 import type { GenOutput, GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
-const BASE = 'https://api.nano-gpt.com/api';
+// api.nano-gpt.com serves an outdated catalog (no GPT-6, Opus 5.5, Seedream 5 Flash...); the root host is current.
+export const NANO_BASE = 'https://nano-gpt.com/api';
+const BASE = NANO_BASE;
 const DAY = 24 * 3600 * 1000;
 
 type Loose = Record<string, unknown>;
@@ -51,18 +53,18 @@ function nanoHeaders(key: string): Record<string, string> {
 }
 
 async function fetchImages(): Promise<NanoImageModel[]> {
-  const cached = await cacheDb.get<NanoImageModel[]>('nano:images', DAY / 2);
+  const cached = await cacheDb.get<NanoImageModel[]>('nano:v2:images', DAY / 2);
   if (cached) return cached;
   const res = await requestJson<{ data: NanoImageModel[] }>(`${BASE}/v1/images/models`);
-  await cacheDb.set('nano:images', res.data);
+  await cacheDb.set('nano:v2:images', res.data);
   return res.data;
 }
 
 async function fetchVideos(): Promise<NanoVideoModel[]> {
-  const cached = await cacheDb.get<NanoVideoModel[]>('nano:videos', DAY / 2);
+  const cached = await cacheDb.get<NanoVideoModel[]>('nano:v2:videos', DAY / 2);
   if (cached) return cached;
   const res = await requestJson<{ data: NanoVideoModel[] }>(`${BASE}/v1/video-models?detailed=true`);
-  await cacheDb.set('nano:videos', res.data);
+  await cacheDb.set('nano:v2:videos', res.data);
   return res.data;
 }
 
