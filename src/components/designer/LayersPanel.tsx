@@ -7,18 +7,10 @@ import { OPS } from '../../engine/ops';
 import { Button, Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
+import { usePref } from '../ui/hooks';
 
 const MIN_W = 200;
 const MAX_W = 520;
-
-/** Panel layout preference kept per browser (width, collapsed panel, collapsed sections). */
-function usePref<T>(key: string, initial: T): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => {
-    try { const raw = localStorage.getItem(key); return raw == null ? initial : (JSON.parse(raw) as T); } catch { return initial; }
-  });
-  const set = (v: T) => { setValue(v); try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage unavailable */ } };
-  return [value, set];
-}
 
 function Section({ title, open, onToggle, extra, children }: { title: string; open: boolean; onToggle: () => void; extra?: ReactNode; children: ReactNode }) {
   return <section className="panel-section">

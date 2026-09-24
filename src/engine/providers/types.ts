@@ -54,6 +54,8 @@ export interface ProviderAdapter {
   generate(req: GenRequest): Promise<GenResult>;
   /** Continue polling a job submitted before a reload. */
   resume?(job: RemoteJob, ctx: ResumeContext): Promise<GenResult>;
+  /** Spendable USD on the account, when the provider exposes it to a normal API key. */
+  balance?(apiKey: string, signal?: AbortSignal): Promise<number | undefined>;
 }
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {

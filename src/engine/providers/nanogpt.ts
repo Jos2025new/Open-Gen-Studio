@@ -316,6 +316,11 @@ export const nanogpt: ProviderAdapter = {
     return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
+  async balance(apiKey, signal) {
+    const res = await requestJson<{ usd_balance?: string | number }>(`${BASE}/check-balance`, { method: 'POST', headers: nanoHeaders(apiKey), signal });
+    return numberOrUndefined(res.usd_balance);
+  },
+
   resume(job, ctx) {
     return pollVideo(job, ctx);
   },

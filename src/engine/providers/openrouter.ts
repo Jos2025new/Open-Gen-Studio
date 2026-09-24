@@ -284,6 +284,12 @@ export const openrouter: ProviderAdapter = {
     return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
+  async balance(apiKey, signal) {
+    const res = await requestJson<{ data?: { total_credits?: number; total_usage?: number } }>(`${BASE}/credits`, { headers: orHeaders(apiKey), signal });
+    const d = res.data;
+    return d?.total_credits != null && d.total_usage != null ? d.total_credits - d.total_usage : undefined;
+  },
+
   resume(job, ctx) {
     return pollVideo(job, ctx);
   },

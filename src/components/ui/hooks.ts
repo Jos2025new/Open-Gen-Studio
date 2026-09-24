@@ -46,3 +46,12 @@ export function useNow(intervalMs = 1000, active = true): number {
   }, [intervalMs, active]);
   return now;
 }
+
+/** Panel layout preference kept per browser (width, collapsed panel, collapsed sections). */
+export function usePref<T>(key: string, initial: T): [T, (v: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    try { const raw = localStorage.getItem(key); return raw == null ? initial : (JSON.parse(raw) as T); } catch { return initial; }
+  });
+  const set = (v: T) => { setValue(v); try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage unavailable */ } };
+  return [value, set];
+}

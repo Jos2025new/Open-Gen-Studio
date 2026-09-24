@@ -139,6 +139,12 @@ export const atlas: ProviderAdapter = {
     return poll(job, { kind: req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
+  async balance(apiKey, signal) {
+    // Billing lives under /public/v1 (same endpoint the official atlascloud-mcp uses).
+    const res = await requestJson<{ available?: { value?: string } }>(`${BASE}/public/v1/balance`, { headers: { Authorization: `Bearer ${apiKey}` }, signal });
+    return numberOrUndefined(res.available?.value);
+  },
+
   resume(job, ctx) {
     return poll(job, ctx);
   },

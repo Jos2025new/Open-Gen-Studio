@@ -70,7 +70,7 @@ export interface Toast {
 export interface UiState {
   workspace: Workspace;
   panel: 'gallery' | 'sessions' | null;
-  galleryExpanded: boolean;
+  panelExpanded: boolean;
   lightbox: { assetIds: string[]; index: number } | null;
   toasts: Toast[];
   tool: DesignTool;
@@ -161,7 +161,7 @@ const initial: AppState = {
   ui: {
     workspace: 'chat',
     panel: null,
-    galleryExpanded: false,
+    panelExpanded: false,
     lightbox: null,
     toasts: [],
     tool: 'move',

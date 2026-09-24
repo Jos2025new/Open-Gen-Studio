@@ -30,6 +30,30 @@ export function formatRelative(ts: number, now = Date.now()): string {
   return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+/** Calendar bucket for grouping lists by date. */
+export function dateGroup(ts: number, now = Date.now()): string {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  const day = 24 * 3600 * 1000;
+  const t = start.getTime();
+  if (ts >= t) return 'Today';
+  if (ts >= t - day) return 'Yesterday';
+  if (ts >= t - 6 * day) return 'This week';
+  if (ts >= t - 29 * day) return 'This month';
+  return new Date(ts).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+/** Split an already sorted list into consecutive date groups. */
+export function groupByDate<T>(items: T[], ts: (item: T) => number): Array<{ label: string; items: T[] }> {
+  const out: Array<{ label: string; items: T[] }> = [];
+  for (const item of items) {
+    const label = dateGroup(ts(item));
+    if (out[out.length - 1]?.label === label) out[out.length - 1].items.push(item);
+    else out.push({ label, items: [item] });
+  }
+  return out;
+}
+
 export function formatDateTime(ts: number): string {
   return new Date(ts).toLocaleString(undefined, {
     month: 'short',

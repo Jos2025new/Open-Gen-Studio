@@ -1,11 +1,13 @@
-import { useRef } from 'react';
-import { FolderClock, Images, MessageSquare, PenTool, Plus, Settings, Workflow } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { FolderClock, Images, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { Popover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';
+import { ProviderPool } from './ProviderPool';
+import { usePref } from '../ui/hooks';
 
 const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: string }> = [
   { id: 'chat', label: 'Chat', icon: MessageSquare, hint: 'Conversation, questions and results' },
@@ -20,13 +22,30 @@ export function Sidebar() {
   const remaining = useStore((s) => s.settings.budgetUsd - s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const settingsRef = useRef<HTMLButtonElement>(null);
+  const [wide, setWide] = usePref('ogs:sidebar-wide', false);
+
+  // --sidebar-w drives the layout (side panels are anchored to it), so the mode lives on the root.
+  useEffect(() => {
+    document.documentElement.classList.toggle('sidebar-wide', wide);
+  }, [wide]);
 
   const togglePanel = (p: 'gallery' | 'sessions') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
     <nav className="sidebar" aria-label="Main">
-      <div className="brand" aria-hidden>
-        <span className="brand-mark" />
+      <div className="brand">
+        <span className="brand-mark" aria-hidden />
+        <span className="brand-name">Open Gen Studio</span>
+        <button
+          type="button"
+          className="side-collapse"
+          aria-label={wide ? 'Collapse panel' : 'Expand panel'}
+          data-tip={wide ? 'Collapse panel' : 'Expand panel'}
+          data-tip-side="right"
+          onClick={() => setWide(!wide)}
+        >
+          {wide ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+        </button>
       </div>
       <div className="side-group">
         {WORKSPACES.map((w) => (
@@ -77,7 +96,9 @@ export function Sidebar() {
       <div className="side-group">
         <button type="button" className="side-btn" data-tip="New session" data-tip-side="right" aria-label="New session" onClick={() => newSession()}>
           <Plus size={18} strokeWidth={1.7} />
+          <span className="side-label wide-only">New session</span>
         </button>
+        <ProviderPool wide={wide} />
         <button
           ref={settingsRef}
           type="button"
@@ -89,6 +110,7 @@ export function Sidebar() {
           onClick={() => setUi((u) => ({ settingsOpen: !u.settingsOpen }))}
         >
           <Settings size={18} strokeWidth={1.7} />
+          <span className="side-label wide-only">Settings</span>
           <span className={`side-budget num ${remaining <= 0 ? 'is-empty' : ''}`}>{formatUsd(Math.max(0, remaining))}</span>
         </button>
       </div>

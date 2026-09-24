@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckSquare, Download, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X, Film, Clock, ArrowDownUp } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
-import { formatDuration } from '../../lib/format';
+import { formatDuration, groupByDate } from '../../lib/format';
 import { IconButton, Button, Segmented } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -15,7 +15,7 @@ export function GalleryPanel() {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const sessionId = useStore((s) => s.activeSessionId);
-  const expanded = useStore((s) => s.ui.galleryExpanded);
+  const expanded = useStore((s) => s.ui.panelExpanded);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
@@ -66,7 +66,7 @@ export function GalleryPanel() {
           {running ? <span className="running-pill num">{running} running</span> : null}
         </div>
         <div className="panel-head-actions">
-          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ galleryExpanded: !expanded })} />
+          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
         </div>
       </div>
@@ -156,11 +156,18 @@ export function GalleryPanel() {
       </div>
       <div className="gallery-scroll">
         {list.length ? (
-          <div className="gallery-grid" style={{ ['--cols' as string]: cols }}>
-            {list.map((a) => (
-              <GalleryTile key={a.id} asset={a} selected={selected.has(a.id)} selecting={selecting} onOpen={() => open(a)} />
-            ))}
-          </div>
+          groupByDate(list, (a) => a.createdAt).map((g) => (
+            <section key={g.label} className="date-group">
+              <h4 className="date-head">
+                {g.label} <span className="faint num">{g.items.length}</span>
+              </h4>
+              <div className="gallery-grid" style={{ ['--cols' as string]: cols }}>
+                {g.items.map((a) => (
+                  <GalleryTile key={a.id} asset={a} selected={selected.has(a.id)} selecting={selecting} onOpen={() => open(a)} />
+                ))}
+              </div>
+            </section>
+          ))
         ) : (
           <div className="empty-block">
             <p>{Object.keys(assets).length ? 'Nothing matches these filters.' : 'Your generations will appear here.'}</p>

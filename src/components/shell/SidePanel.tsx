@@ -6,7 +6,7 @@ import { SessionsPanel } from './SessionsPanel';
 /* Drawers anchored to the sidebar. No scrim: assets can be dragged from the gallery onto canvases. */
 export function SidePanel() {
   const panel = useStore((s) => s.ui.panel);
-  const expanded = useStore((s) => s.ui.galleryExpanded);
+  const expanded = useStore((s) => s.ui.panelExpanded);
   const lightbox = useStore((s) => s.ui.lightbox);
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function SidePanel() {
 
   if (!panel) return null;
   return (
-    <aside className={`side-panel panel-${panel} ${panel === 'gallery' && expanded ? 'is-expanded' : ''}`} aria-label={panel === 'gallery' ? 'Gallery' : 'Sessions'}>
+    <aside className={`side-panel panel-${panel} ${expanded ? 'is-expanded' : ''}`} aria-label={panel === 'gallery' ? 'Gallery' : 'Sessions'}>
       {panel === 'gallery' ? <GalleryPanel /> : <SessionsPanel />}
     </aside>
   );

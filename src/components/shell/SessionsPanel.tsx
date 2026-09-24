@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownUp, LayoutList, List, Pencil, Pin, PinOff, Plus, Search, Trash, X } from 'lucide-react';
+import { ArrowDownUp, LayoutList, List, Maximize2, Minimize2, Pencil, Pin, PinOff, Plus, Search, Trash, X } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
-import { formatRelative, formatUsd } from '../../lib/format';
+import { formatRelative, formatUsd, groupByDate } from '../../lib/format';
 import { Button, IconButton, Segmented } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -20,6 +20,7 @@ export function SessionsPanel() {
   const [reversed, setReversed] = useState(false);
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [compact, setCompact] = useState(false);
+  const expanded = useStore((s) => s.ui.panelExpanded);
 
   const stats = useMemo(() => {
     const m = new Map<string, Stats>();
@@ -50,6 +51,14 @@ export function SessionsPanel() {
     return arr;
   }, [sessions, matches, sort, reversed, pinnedOnly]);
 
+  // Pinned sessions stay on top as their own group; the rest are grouped by date unless sorted by name.
+  const groups = useMemo(() => {
+    const pinned = list.filter((s) => s.pinned);
+    const rest = list.filter((s) => !s.pinned);
+    const dated = sort === 'name' ? [{ label: '', items: rest }] : groupByDate(rest, (s) => (sort === 'created' ? s.createdAt : s.updatedAt));
+    return [...(pinned.length ? [{ label: 'Pinned', items: pinned }] : []), ...dated].filter((g) => g.items.length);
+  }, [list, sort]);
+
   return (
     <div className={`sessions ${compact ? 'is-compact' : ''}`}>
       <div className="panel-head">
@@ -68,6 +77,7 @@ export function SessionsPanel() {
           >
             New
           </Button>
+          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
         </div>
       </div>
@@ -99,8 +109,19 @@ export function SessionsPanel() {
         </div>
       </div>
       <div className="sessions-scroll">
-        {list.map((s) => (
-          <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} />
+        {groups.map((g) => (
+          <section key={g.label} className="date-group">
+            {g.label ? (
+              <h4 className="date-head">
+                {g.label} <span className="faint num">{g.items.length}</span>
+              </h4>
+            ) : null}
+            <div className="session-list">
+              {g.items.map((s) => (
+                <SessionRow key={s.id} session={s} active={s.id === activeId} stats={stats.get(s.id)} />
+              ))}
+            </div>
+          </section>
         ))}
         {!list.length ? <div className="empty-block">No sessions match.</div> : null}
       </div>
