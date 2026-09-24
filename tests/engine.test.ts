@@ -112,6 +112,15 @@ describe('plan and graph validation', () => {
     expect(video.plan).toBeNull();
     expect(video.errors.length).toBeGreaterThan(0);
   });
+  it('sends only the sketched copy downstream, never the original too', () => {
+    const graph = planToGraph(plan);
+    const imageId = graph.nodes.find((n) => n.data.kind === 'image')!.id;
+    graph.nodes.push({ id: 'ref', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Ref', assetId: 'original', sketchAssetId: 'edited' } });
+    graph.edges.push({ id: 'e-ref', source: 'ref', sourceHandle: 'out', target: imageId, targetHandle: 'ref' });
+    const text = JSON.stringify(graphToSteps(graph, [imageId], {}).steps);
+    expect(text).toContain('edited');
+    expect(text).not.toContain('original');
+  });
   it('roundtrips prompt wiring through graph execution', () => {
     const graph = planToGraph(plan);
     const promptId = graph.nodes.find((n) => n.data.kind === 'text')!.id;

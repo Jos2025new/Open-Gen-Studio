@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Brush, Eraser, Redo2, Undo2, X } from 'lucide-react';
 import { assetCanvas, canvasToAsset } from '../../engine/design/actions';
 import { strokeSegment } from '../../engine/design/raster';
-import { applySketch } from '../../engine/flow/actions';
+import { setSketch } from '../../engine/flow/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton } from '../ui/primitives';
@@ -124,9 +124,9 @@ export function SketchEditor() {
       const ctx = out.getContext('2d')!;
       ctx.drawImage(baseRef.current, 0, 0);
       ctx.drawImage(paintRef.current, 0, 0);
-      const asset = await canvasToAsset(sessionId, out);
-      if (target.nodeId || target.edgeId) applySketch(sessionId, target, asset.id);
-      toast('Sketch saved as a new image', 'success');
+      const asset = await canvasToAsset(sessionId, out, 'sketch');
+      setSketch(sessionId, target.nodeId, asset.id);
+      toast('Sketch applied · Reset image restores the original', 'success');
       close();
     } catch (err) {
       toast((err as Error).message, 'error');

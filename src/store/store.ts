@@ -72,8 +72,8 @@ export interface UiState {
   panel: 'gallery' | 'sessions' | null;
   panelExpanded: boolean;
   lightbox: { assetIds: string[]; index: number } | null;
-  /** Sketch editor over an image; `nodeId`/`edgeId` say which attachment the result replaces. */
-  sketch: { assetId: string; nodeId?: string; edgeId?: string } | null;
+  /** Sketch editor over a node's image; saving sets that node's painted-over copy. */
+  sketch: { assetId: string; nodeId: string } | null;
   toasts: Toast[];
   tool: DesignTool;
   brush: { size: number; color: string; opacity: number };

@@ -1,10 +1,10 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, ChevronDown, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, ChevronDown, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, tryConnect } from '../../engine/flow/actions';
+import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, setSketch, tryConnect } from '../../engine/flow/actions';
 import { inputPorts, NODE_WIDTH, outputPort } from '../../engine/flow/graph';
 import { downloadAsset } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
@@ -155,11 +155,13 @@ function StatusPill({ generationId }: { generationId?: string }) {
 /** The asset a node currently shows (and passes downstream), plus its generation. */
 function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
   const d = node.data;
-  if (d.kind === 'asset') return { g: undefined, assetId: d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [] };
+  // A sketch replaces the result: it is what the card shows and what goes downstream.
+  const sketch = d.kind !== 'text' ? d.sketchAssetId : undefined;
+  if (d.kind === 'asset') return { g: undefined, assetId: sketch ?? d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [], sketch };
   const g = (d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') && d.generationId ? generations[d.generationId] : undefined;
   const all = g?.status === 'done' ? g.assetIds : [];
   const index = d.kind === 'text' ? 0 : d.outputIndex;
-  return { g, assetId: all[Math.min(index, all.length - 1)] as string | undefined, all };
+  return { g, assetId: sketch ?? (all[Math.min(index, all.length - 1)] as string | undefined), all, sketch };
 }
 
 function useNodeOutput(node: GraphNode) {
@@ -172,7 +174,7 @@ function useNodeOutput(node: GraphNode) {
 /** Card content: the result first. Empty, running and error states keep the same footprint. */
 function Preview({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
-  const { g, assetId, all } = useNodeOutput(node);
+  const { g, assetId, all, sketch } = useNodeOutput(node);
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
   if (g && (g.status === 'running' || g.status === 'queued')) {
@@ -198,7 +200,12 @@ function Preview({ node }: { node: GraphNode }) {
       <div className="nc-media">
         <AssetMedia assetId={assetId} draggable={false} />
       </div>
-      {all.length > 1 && d.kind !== 'asset' ? (
+      {sketch ? (
+        <span className="nc-badge" data-tip="Sketched · Reset image restores the original">
+          <Brush size={10} /> Edited
+        </span>
+      ) : null}
+      {all.length > 1 && d.kind !== 'asset' && !sketch ? (
         <div className="nc-strip nodrag">
           {all.map((id, i) => (
             <button key={id} type="button" className={id === assetId ? 'is-active' : ''} onClick={() => patchNodeData(sessionId, node.id, { outputIndex: i })} data-tip={`Use output ${i + 1} downstream`}>
@@ -236,7 +243,7 @@ function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
 /** Floating actions above the selected node: run, quick tools on its result, open, download, duplicate, delete. */
 function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
   const sessionId = useSessionId();
-  const { assetId, all } = useNodeOutput(node);
+  const { assetId, all, sketch } = useNodeOutput(node);
   const runnable = node.data.kind === 'image' || node.data.kind === 'video' || node.data.kind === 'tool';
   const quick = assetId && out ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
@@ -257,8 +264,13 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
             <Maximize2 size={14} />
           </button>
           {out === 'image' ? (
-            <button type="button" className="nt-btn nodrag" data-tip="Paint over the image; saves a new copy" onClick={() => setUi({ sketch: { assetId, nodeId: node.id } })}>
+            <button type="button" className="nt-btn nodrag" data-tip="Paint over the image; the edited version is what goes downstream" onClick={() => setUi({ sketch: { assetId, nodeId: node.id } })}>
               <Brush size={13} /> Sketch
+            </button>
+          ) : null}
+          {sketch ? (
+            <button type="button" className="nt-btn nodrag" data-tip="Discard the sketch and use the original again" onClick={() => setSketch(sessionId, node.id, undefined)}>
+              <RotateCcw size={13} /> Reset image
             </button>
           ) : null}
           <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
@@ -317,7 +329,8 @@ function InputRefs({ node }: { node: GraphNode }) {
     .filter((e) => e.target === node.id && ports.some((p) => p.id === e.targetHandle))
     .map((e) => {
       const src = graph.nodes.find((n) => n.id === e.source);
-      return { edge: e, assetId: src ? nodeOutput(src, generations).assetId : undefined, label: ports.find((p) => p.id === e.targetHandle)?.label };
+      const out = src ? nodeOutput(src, generations) : undefined;
+      return { edge: e, assetId: out?.assetId, edited: Boolean(out?.sketch), label: ports.find((p) => p.id === e.targetHandle)?.label };
     });
   const free = ports.find((p) => p.multi || !linked.some((l) => l.edge.targetHandle === p.id));
   const recent = Object.values(assets)
@@ -333,9 +346,9 @@ function InputRefs({ node }: { node: GraphNode }) {
   return (
     <div className="nt-refs">
       {linked.map((l) => (
-        <span key={l.edge.id} className="nt-ref" data-tip={l.assetId ? `${l.label} · click to sketch over it` : l.label}>
+        <span key={l.edge.id} className={`nt-ref ${l.edited ? 'is-edited' : ''}`} data-tip={l.assetId ? `${l.label}${l.edited ? ' · edited' : ''} · click to sketch over it` : l.label}>
           {l.assetId ? (
-            <button type="button" className="nt-ref-open" aria-label="Sketch over this reference" onClick={() => setUi({ sketch: { assetId: l.assetId!, edgeId: l.edge.id } })}>
+            <button type="button" className="nt-ref-open" aria-label="Sketch over this reference" onClick={() => setUi({ sketch: { assetId: l.assetId!, nodeId: l.edge.source } })}>
               <AssetMedia assetId={l.assetId} hoverPlay={false} draggable={false} />
             </button>
           ) : (

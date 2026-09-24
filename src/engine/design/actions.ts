@@ -275,9 +275,9 @@ async function storeDesignAsset(sessionId: string, blob: Blob, width: number, he
 }
 
 /** Save a canvas as a new image asset (PNG). */
-export async function canvasToAsset(sessionId: string, canvas: HTMLCanvasElement): Promise<Asset> {
+export async function canvasToAsset(sessionId: string, canvas: HTMLCanvasElement, origin: Asset['origin'] = 'design'): Promise<Asset> {
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Export failed'))), 'image/png'));
-  return storeDesignAsset(sessionId, blob, canvas.width, canvas.height, 'design');
+  return storeDesignAsset(sessionId, blob, canvas.width, canvas.height, origin);
 }
 
 /** Snapshot a raster layer's pixels as an asset (input for operations and references). */

@@ -118,7 +118,8 @@ export interface Asset {
   duration?: number;
   sessionId: string;
   generationId?: string;
-  origin: 'generated' | 'upload' | 'design' | 'frame';
+  /** 'sketch': painted-over copy owned by a node; not listed in the gallery. */
+  origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch';
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   stored: boolean;
@@ -357,6 +358,8 @@ export interface GenNodeData {
   settings: GenSettings;
   generationId?: string;
   outputIndex: number;
+  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  sketchAssetId?: string;
 }
 
 export interface ToolNodeData {
@@ -366,12 +369,16 @@ export interface ToolNodeData {
   params: Record<string, AdvancedValue>;
   generationId?: string;
   outputIndex: number;
+  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  sketchAssetId?: string;
 }
 
 export interface AssetNodeData {
   kind: 'asset';
   title: string;
   assetId: string | null;
+  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  sketchAssetId?: string;
 }
 
 export type GraphNodeData = TextNodeData | GenNodeData | ToolNodeData | AssetNodeData;

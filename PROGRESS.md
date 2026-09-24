@@ -53,5 +53,10 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - xyflow: los controles interactivos dentro de nodos llevan la clase `nodrag` (y `nowheel` si hacen scroll).
 - Popovers: `usePopover()` + `<Popover anchor={ref} placement="top-start">`; tooltips con el atributo `data-tip`.
 - Relays de Vite (sólo dev/preview): `/x/fal-web` (OpenAPI de fal) y `/x/atlas-static` (esquemas de Atlas); sin ellos esos modelos caen a un esquema mínimo.
+- IDs de NanoGPT verificados (2026-09-25) para fases futuras (requieren entrada de vídeo/audio, aún no soportada):
+  - Upscale vídeo: `bytedance-video-enhancement-standard`, `bytedance-video-enhancement-pro`, `clarity-ai/crystal-video-upscaler`, `bytedance-seedance-upscaler`.
+  - Edición de vídeo: `blackforestlabs/flux-3/edit-video`, `alibaba/wan-3.0/video-edit`, `pruna-ai/p-video/edit`, `grok-imagine-video-edit`, `google/gemini-omni-flash/v1.1`. Kling en NanoGPT solo tiene edición en `kling-o3-4k`.
+  - Quitar fondo de vídeo: `pixelcut/video-background-removal`. Segmentación de imagen: `sam3-image` (no es quitar fondo).
+  - Audio (catálogo `nano-gpt.com/api/v1/audio-models`, 90 modelos): STT Whisper-Large-V3, xai speech-to-text, gpt-4o-mini-transcribe, Elevenlabs-STT; música/TTS (elevenlabs/music, lyria, minimax music, xai-tts…).
 - NanoGPT: usar `nano-gpt.com/api` (`NANO_BASE`); `api.nano-gpt.com` sirve catálogos desfasados (LLM, imagen y vídeo). Comprobado 2026-09-24.
 - Sin verificar con clave real: forma de respuesta de NanoGPT `POST /api/v1/images`, respuesta de Atlas `uploadMedia`, CORS de OpenRouter `/videos/{id}/content`. Los parsers son tolerantes (`extractOutputs` en `providers/shared.ts`).

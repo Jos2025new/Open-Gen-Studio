@@ -238,6 +238,7 @@ export interface GraphRunPlan {
 
 function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>): string | null {
   const d = node.data;
+  if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
   if (d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') {
     const g = d.generationId ? generations[d.generationId] : undefined;

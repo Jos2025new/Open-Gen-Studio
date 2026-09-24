@@ -15,7 +15,8 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 ## Tarea actual — Sketch sobre imagen (2026-09-25)
 1. [x] Trazo del pincel a `design/raster.ts` (`strokeSegment`), usado por el Designer y por Sketch. *Razón: no duplicar el pincel.*
 2. [x] `SketchEditor` modal: imagen grande, pincel, color, borrador, tamaño, deshacer/rehacer (trazos vectoriales, poca memoria), Guardar y ✕ que pide guardar o descartar si hay cambios. Reutiliza `ui.brush`, `assetCanvas` y el guardado de assets del Designer. *Razón: pintar sin salir del flujo.*
-3. [x] Guardar crea un asset nuevo (el original no se toca) y actualiza el adjunto: nodo asset → cambia su imagen; referencia de otro nodo → nuevo nodo asset que reemplaza esa conexión; resultado de un nodo → nodo asset al lado. *Razón: "se actualiza el adjunto" sin perder el original.*
+3. [x] ~~Guardar crea nodos nuevos~~ → corregido a petición del usuario: el nodo guarda `sketchAssetId`; esa copia es lo único que va aguas abajo (`nodeOutputAsset`), la tarjeta muestra "Edited" y la barra "Reset image" vuelve al original. La copia (origen `sketch`) no sale en la galería y se borra al restablecer, reeditar o regenerar. *Razón: sin nodos duplicados ni dos imágenes enviadas al proveedor.*
+5. [x] Upscale de NanoGPT: `seedvr2-image`, `pruna-ai/p-image/upscale`, `clarity-ai-creative-upscaler` (verificados). IDs de vídeo/audio anotados en `PROGRESS.md` para fases futuras.
 4. [x] Accesos: botón Sketch en la barra del nodo con imagen y clic en las miniaturas de referencia. Tests, typecheck, navegador; commit.
 
 ## Tarea anterior — tarjeta de prompt del nodo (2026-09-25)

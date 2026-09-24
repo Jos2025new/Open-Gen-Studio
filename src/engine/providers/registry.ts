@@ -46,7 +46,8 @@ export const PREFERRED: Record<Exclude<ProviderId, 'local'>, { image: string[]; 
     image: ['nano-banana-pro', 'nano-banana-2', 'seedream-4.5-alternative'],
     video: ['kling-v30-pro', 'bytedance/seedance-2.5', 'alibaba/wan-3.0/text-to-video'],
     edit: ['nano-banana-pro-edit', 'nano-banana-pro', 'nano-banana-edit'],
-    upscale: [],
+    // Faithful first (SeedVR2 $0.01, P-Image $0.005), then Clarity creative ($0.05, adds detail).
+    upscale: ['seedvr2-image', 'pruna-ai/p-image/upscale', 'clarity-ai-creative-upscaler'],
     removeBg: ['birefnet/v2'],
   },
   atlas: {
