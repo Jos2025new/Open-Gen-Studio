@@ -1,0 +1,53 @@
+:root {
+  color-scheme: dark;
+
+  /* Surfaces: near-black neutrals, one step apart. */
+  --bg: #0a0a0b;
+  --bg-canvas: #0d0d0f;
+  --surface: #131315;
+  --surface-2: #19191c;
+  --surface-3: #202024;
+  --surface-hover: #1e1e22;
+  --overlay: rgba(6, 6, 8, 0.72);
+
+  --border: #232327;
+  --border-strong: #2f2f35;
+  --border-focus: #45454d;
+
+  --text: #ececef;
+  --text-2: #a2a2ab;
+  --text-3: #6c6c75;
+  --text-4: #4a4a52;
+
+  /* The single accent, used sparingly: primary action, active state, progress. */
+  --accent: #d4f25a;
+  --accent-soft: rgba(212, 242, 90, 0.12);
+  --accent-line: rgba(212, 242, 90, 0.35);
+  --accent-ink: #0b0c05;
+
+  --danger: #f06a6a;
+  --danger-soft: rgba(240, 106, 106, 0.12);
+  --warn: #efb85a;
+  --ok: #7fd49a;
+
+  /* Port / media type hues, muted. */
+  --type-text: #a2a2ab;
+  --type-image: #8cb4ff;
+  --type-video: #c5a3ff;
+
+  --radius-xs: 5px;
+  --radius-s: 7px;
+  --radius: 10px;
+  --radius-l: 14px;
+  --radius-xl: 18px;
+
+  --shadow-pop: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  --font: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --sidebar-w: 56px;
+  --topbar-h: 48px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}

@@ -1,0 +1,87 @@
+import { useRef, useState } from 'react';
+import { ImageOff } from 'lucide-react';
+import { useStore } from '../../store/store';
+import { useAssetUrl } from './hooks';
+
+/** Renders an asset (image or video) from local storage or its remote URL. */
+export function AssetMedia({
+  assetId,
+  fit = 'cover',
+  controls = false,
+  hoverPlay = true,
+  className,
+  draggable = true,
+}: {
+  assetId: string;
+  fit?: 'cover' | 'contain';
+  controls?: boolean;
+  hoverPlay?: boolean;
+  className?: string;
+  draggable?: boolean;
+}) {
+  const asset = useStore((s) => s.assets[assetId]);
+  const url = useAssetUrl(assetId);
+  const [failed, setFailed] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  if (!asset) {
+    return (
+      <div className={`media media-missing ${className ?? ''}`}>
+        <ImageOff size={18} />
+        <span>Deleted</span>
+      </div>
+    );
+  }
+  if (!url || failed) {
+    return (
+      <div className={`media media-loading ${failed ? 'is-failed' : ''} ${className ?? ''}`} style={{ aspectRatio: `${asset.width} / ${asset.height}` }}>
+        {failed ? <ImageOff size={18} /> : null}
+      </div>
+    );
+  }
+  const onDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('application/x-ogs-asset', assetId);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+  if (asset.kind === 'video') {
+    return (
+      <video
+        ref={videoRef}
+        className={`media media-${fit} ${className ?? ''}`}
+        src={url}
+        muted={!controls}
+        loop
+        playsInline
+        preload="metadata"
+        controls={controls}
+        autoPlay={controls}
+        draggable={draggable}
+        onDragStart={onDragStart}
+        onError={() => setFailed(true)}
+        onMouseEnter={hoverPlay && !controls ? () => void videoRef.current?.play().catch(() => undefined) : undefined}
+        onMouseLeave={
+          hoverPlay && !controls
+            ? () => {
+                const v = videoRef.current;
+                if (v) {
+                  v.pause();
+                  v.currentTime = 0;
+                }
+              }
+            : undefined
+        }
+      />
+    );
+  }
+  return (
+    <img
+      className={`media media-${fit} ${className ?? ''}`}
+      src={url}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onError={() => setFailed(true)}
+    />
+  );
+}
