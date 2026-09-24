@@ -8,6 +8,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — plan auditado (2026-09-24)
+1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
+2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
+
 ## Tarea actual — correcciones Designer (2026-09-24)
 1. [x] "Free" en la lista de modelos muy separado → pegarlo al nombre. *Razón: lectura rápida del precio junto al modelo.*
 2. [x] Aviso "Creates a new vector layer" fijo (`Stage.tsx`, `.stage-hint subtle`): sale mientras haya herramienta de forma y la capa activa no sea vectorial (p. ej. tras colocar una imagen) → eliminarlo. *Razón: con el paso 4 toda forma crea su capa; el aviso ya no informa nada.*
