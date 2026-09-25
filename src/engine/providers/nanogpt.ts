@@ -186,7 +186,8 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
     slots: {
       prompt: inputs.includes('text') ? 'prompt' : undefined,
       promptRequired: inputs.includes('text') && !needsImage,
-      images: maxIn > 0 || needsImage ? { key: 'input_references', max: Math.max(1, maxIn), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
+      // POST /api/v1/images ignores `input_references` (despite the docs) and reads `imageDataUrls`; verified 2026-09-25.
+      images: maxIn > 0 || needsImage ? { key: 'imageDataUrls', max: Math.max(1, maxIn), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
     },
     price: model.price,
     source: 'catalog',
@@ -295,7 +296,7 @@ export const nanogpt: ProviderAdapter = {
 
     if (req.kind === 'image') {
       if (req.refs.length && req.schema.slots.images) {
-        body.input_references = await Promise.all(req.refs.slice(0, req.schema.slots.images.max).map((r) => encodeImage(r, 'data-url')));
+        body[req.schema.slots.images.key] = await Promise.all(req.refs.slice(0, req.schema.slots.images.max).map((r) => encodeImage(r, 'data-url')));
       }
       req.onStatus('Generating');
       const res = await requestJson<Loose>(`${BASE}/v1/images`, {

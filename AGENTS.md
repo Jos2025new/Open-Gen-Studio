@@ -12,7 +12,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — correcciones tras la primera generación real (2026-09-25)
+## Tarea actual — NanoGPT ignoraba las imágenes de entrada (2026-09-25)
+1. [x] Relight devolvía otra persona y Remove BG/Upscale decían "requires an image". Probado contra la API (sin coste, con `birefnet/v2` e imágenes por debajo del mínimo): `POST /api/v1/images` **ignora `input_references`** (pese a la documentación) en ambos hosts y lee `imageDataUrl`/`imageDataUrls` (PNG, JPEG y WebP). El adaptador pasa a `imageDataUrls` y usa la clave del slot. *Razón: la imagen nunca llegaba y los modelos que aceptan solo texto generaban sin ella.*
+2. [x] Nota: una prueba con `nano-banana-pro` y una imagen de 4×4 px generó de verdad (~0,28 USD no autorizados). Para sondear la API sin coste usar solo modelos que no generan sin imagen (`birefnet/v2`) o imágenes por debajo del mínimo (1×1).
+
+## Tarea anterior — correcciones tras la primera generación real (2026-09-25)
 Prueba real: el agente (GLM 5.3 Flash · NanoGPT) animó un personaje con Seedance 2.0 Mini de Atlas. Estimado 0,055 USD; cobrado 0,122 USD (saldo Atlas 3,319255 → 3,197287).
 1. [x] Tarjeta del plan en "Running" para siempre tras recargar a mitad: la ejecución vive en memoria. `settleInterruptedPlans()` sigue al arrancar las generaciones que `resumeInterrupted` retoma (sin reenviar nada) y cierra el plan con su estado real. *Razón: el vídeo llegaba pero la tarjeta nunca se cerraba.*
 2. [x] El resultado de Atlas quedó solo en su almacén (`*.volces.com`, sin CORS, URL firmada que caduca en 24 h), así que no se guardaba y Extract frame fallaba ("Video failed to load"). Relay `/x/media` en dev/preview solo para hosts de almacenamiento de proveedores (lista blanca, 403 al resto); `fetchBlob` reintenta por él; `ensureAssetBlob` guarda el archivo al usarlo y `adoptRemoteAssets()` al arrancar; los fotogramas se leen de bytes locales. *Razón: no perder resultados ni fallar herramientas.* Límite: sin backend en producción, esos hosts seguirán sin poder descargarse.
