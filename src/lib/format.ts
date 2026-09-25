@@ -2,7 +2,9 @@ export function formatUsd(v: number | null | undefined, opts: { approx?: boolean
   if (v == null || !Number.isFinite(v)) return '—';
   if (v === 0) return '$0';
   const abs = Math.abs(v);
-  const digits = abs < 0.1 ? 3 : 2;
+  // A real cost never reads as zero: tiny amounts (per-minute speech-to-text) show as "<$0.001".
+  if (abs < 0.001) return `${opts.approx ? '≈' : ''}<$0.001`;
+  const digits = abs < 0.01 ? 4 : abs < 0.1 ? 3 : 2;
   const s = `$${v.toFixed(digits).replace(/(\.\d*?[1-9])0+$/, '$1').replace(/\.0+$/, '')}`;
   return opts.approx ? `≈${s}` : s;
 }

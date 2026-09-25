@@ -42,6 +42,15 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
   });
 }
 
+/** Speech-to-text is billed per minute of audio (NanoGPT catalog). Short clips still bill a minimum second. */
+export function estimateTranscribe(usdPerMinute: number | undefined, seconds: number | undefined): Estimate {
+  if (usdPerMinute == null) return UNKNOWN;
+  const usd = (usdPerMinute * Math.max(seconds ?? 60, 1)) / 60;
+  // A paid run never shows as free: amounts under the display precision count as the smallest step.
+  const shown = usd > 0 ? Math.max(0.0001, Math.round(usd * 10000) / 10000) : 0;
+  return { usd: shown, approximate: seconds == null || shown > usd, note: `${usdPerMinute} USD per minute` };
+}
+
 export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, source: Pick<Asset, 'width' | 'height'> | undefined, videoSettings: GenSettings): Estimate {
   const def = OPS[opId];
   if (def.engine === 'local') return FREE;

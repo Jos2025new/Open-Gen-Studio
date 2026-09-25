@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { CircleAlert, CircleStop, Copy, Expand, Info, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
-import { setUi, useStore } from '../../store/store';
+import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
+import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
@@ -75,7 +75,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   return (
     <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''}`}>
       <header className="gen-head">
-        <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : <ImageIcon size={13} />}</span>
+        <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
         <div className="gen-title">
           {g.op && source ? (
             <button type="button" className="gen-source" onClick={() => setUi({ lightbox: { assetIds: [source.id], index: 0 } })} data-tip="Source">
@@ -101,6 +101,28 @@ export function GenerationCard({ generationId, compact = false }: { generationId
               Check again
             </Button>
           ) : null}
+        </div>
+      ) : g.kind === 'text' && g.status === 'done' ? (
+        // Transcription: the text, ready to copy or to send to the composer as a prompt.
+        <div className="gen-text">
+          <p>{g.text || <span className="faint">No speech was found.</span>}</p>
+          <div className="gen-text-actions">
+            <Button size="sm" variant="ghost" icon={Copy} disabled={!g.text} onClick={() => void copyText(g.text ?? '')}>
+              Copy
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={!g.text}
+              onClick={() => {
+                setComposer({ text: g.text ?? '' });
+                setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
+                toast('Transcription placed in the composer.', 'info');
+              }}
+            >
+              Use as prompt
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="tiles" style={{ ['--cols' as string]: cols }}>

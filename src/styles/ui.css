@@ -66,6 +66,6 @@ svg { flex-shrink: 0; }
 .spacer { flex: 1; }.col { display: flex; flex-direction: column; gap: 4px; }.wrap { flex-wrap: wrap; }
 .option-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
 .option { padding: 7px 9px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); font-size: 12px; }
-.text-area { width: 100%; }.num-input { width: 75px; }.wide-chip { width: 100%; justify-content: space-between; }
+.text-area { width: 100%; }.num-input { width: 75px; }.wide-chip { width: 100%; justify-content: space-between; }select.wide-chip { font-size: 11px; padding: 5px 8px; }
 .link-btn { color: var(--accent); font-size: 11px; padding: 5px; }
 .shimmer { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-3) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 2s infinite; }

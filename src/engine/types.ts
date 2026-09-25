@@ -92,6 +92,21 @@ export interface PriceRule {
   lowerBound?: boolean;
 }
 
+/** A speech-to-text model (audio → text); kept apart from the image/video catalog. */
+export interface TranscriberSummary {
+  ref: string;
+  provider: RemoteProviderId;
+  id: string;
+  name: string;
+  usdPerMinute?: number;
+  /** Largest file sent directly (multipart), in bytes. */
+  maxDirectBytes: number;
+  /** Also transcribes video files. */
+  video: boolean;
+  diarization: boolean;
+  languages?: string[];
+}
+
 export interface ModelSummary {
   /** Globally unique reference: `provider::id`. */
   ref: string;
@@ -184,7 +199,8 @@ export type OpId =
   | 'grid_split'
   | 'video_upscale'
   | 'video_edit'
-  | 'video_extend';
+  | 'video_extend'
+  | 'transcribe';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';
@@ -199,7 +215,8 @@ export interface RemoteJob {
 export interface Generation {
   id: string;
   sessionId: string;
-  kind: MediaKind;
+  /** 'text' for transcriptions: no asset, the result is `text`. */
+  kind: MediaKind | 'text';
   prompt: string;
   modelRef: string;
   modelName: string;
@@ -221,6 +238,8 @@ export interface Generation {
   progress?: number;
   error?: string;
   assetIds: string[];
+  /** Text result (transcription). */
+  text?: string;
   estimate: Estimate;
   actualUsd?: number;
   parentId?: string;

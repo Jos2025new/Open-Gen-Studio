@@ -177,11 +177,23 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   const graph = get().sessions[sessionId].graph;
   const bounds = graphBounds(graph.nodes);
   const origin = bounds ? { x: bounds.x, y: bounds.y + bounds.h + 120 } : { x: 0, y: 0 };
+  if (spec.kind === 'text') return;
   const promptNode: GraphNode = { id: uid('nd'), position: origin, data: { kind: 'text', title: 'Prompt', text: spec.prompt } };
-  const refNodes: GraphNode[] = (spec.inputs?.refs.length ? spec.inputs.refs : spec.inputs?.firstFrame ? [spec.inputs.firstFrame] : []).map((assetId) => ({
+  // Each input to the port for its kind: the start frame, then references / keyframes, reference videos or clips, audio.
+  const port = (assetId: string) => {
+    const kind = get().assets[assetId]?.kind;
+    if (spec.kind === 'image') return kind === 'video' ? 'clip' : 'ref';
+    return kind === 'video' ? 'refVideo' : kind === 'audio' ? 'audio' : 'ref';
+  };
+  const inputs = [
+    ...(spec.inputs?.firstFrame && spec.kind === 'video' ? [{ assetId: spec.inputs.firstFrame, handle: 'first' }] : []),
+    ...(spec.inputs?.refs ?? []).map((assetId) => ({ assetId, handle: port(assetId) })),
+  ];
+  const refNodes: Array<GraphNode & { handle: string }> = inputs.map(({ assetId, handle }) => ({
     id: uid('nd'),
     position: origin,
     data: { kind: 'asset', title: 'Reference', assetId },
+    handle,
   }));
   const g = createGeneration(spec);
   const genNode: GraphNode = {
@@ -191,9 +203,9 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   };
   const edges = [
     { id: uid('edge'), source: promptNode.id, target: genNode.id, sourceHandle: 'out', targetHandle: 'prompt' },
-    ...refNodes.map((r) => ({ id: uid('edge'), source: r.id, target: genNode.id, sourceHandle: 'out', targetHandle: spec.kind === 'image' ? 'ref' : 'first' })),
+    ...refNodes.map((r) => ({ id: uid('edge'), source: r.id, target: genNode.id, sourceHandle: 'out', targetHandle: r.handle })),
   ];
-  const nodes = [promptNode, ...refNodes, genNode];
+  const nodes: GraphNode[] = [promptNode, ...refNodes.map(({ handle: _h, ...n }) => n), genNode];
   const pos = autoLayout(nodes, edges, origin);
   setGraph(sessionId, (gr) => ({ ...gr, nodes: [...gr.nodes, ...nodes.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position }))], edges: [...gr.edges, ...edges] }));
   runGeneration(g.id).catch((err) => {
@@ -223,7 +235,7 @@ function specFrom(g: Generation): GenerationSpec {
 export function regenerateEstimate(generationId: string): Estimate | null {
   const g = get().generations[generationId];
   if (!g) return null;
-  if (g.op) return g.estimate;
+  if (g.op || g.kind === 'text') return g.estimate;
   return estimateMedia(g.modelRef, g.kind, g.settings, Boolean(g.inputs.refs.length || g.inputs.firstFrame));
 }
 
@@ -257,17 +269,18 @@ export async function regenerate(generationId: string): Promise<void> {
 export async function editInComposer(generationId: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
-  if (g.op) {
+  if (g.op || g.kind === 'text') {
     toast('Operations are edited from their source: open the source asset and apply the operation again.', 'info');
     return;
   }
-  await selectComposerModel(g.kind, g.modelRef);
+  const kind = g.kind;
+  await selectComposerModel(kind, g.modelRef);
   setComposer((c) => ({
-    mode: g.kind,
+    mode: kind,
     text: g.prompt,
-    attachments: g.kind === 'image' ? g.inputs.refs.filter((id) => get().assets[id]) : g.inputs.firstFrame && get().assets[g.inputs.firstFrame] ? [g.inputs.firstFrame] : [],
+    attachments: kind === 'image' ? g.inputs.refs.filter((id) => get().assets[id]) : g.inputs.firstFrame && get().assets[g.inputs.firstFrame] ? [g.inputs.firstFrame] : [],
     editing: { generationId },
-    [g.kind]: { ...c[g.kind], modelRef: g.modelRef, settings: { ...g.settings, seed: undefined } },
+    [kind]: { ...c[kind], modelRef: g.modelRef, settings: { ...g.settings, seed: undefined } },
   }));
   setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
 }
@@ -412,7 +425,8 @@ export async function attachFiles(files: File[]): Promise<void> {
 
 export async function opEstimate(assetId: string, op: OpId, params: Record<string, AdvancedValue>): Promise<{ estimate: Estimate; modelName: string; viaNote?: string }> {
   const spec = await opSpec({ sessionId: get().activeSessionId, sourceAssetId: assetId, op, params, origin: 'op' });
-  const name = spec.modelRef === 'local::frame' ? 'Local, free' : modelSummary(spec.modelRef)?.name ?? (spec.modelRef.startsWith('local::') ? 'Local demo' : spec.modelRef);
+  const ref = spec.modelRef;
+  const name = ref === 'local::frame' ? 'Local, free' : modelSummary(ref)?.name ?? get().catalog.transcribers?.[ref]?.name ?? (ref.startsWith('local::') ? 'Local demo' : ref);
   return { estimate: spec.estimate ?? { usd: null, approximate: true }, modelName: name };
 }
 

@@ -140,7 +140,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params: s.params });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return { assetIds: await runGeneration(g.id) };
+        const assetIds = await runGeneration(g.id);
+        // Text results (Transcribe) feed later prompts through prompt_from.
+        return { assetIds, text: useStore.getState().generations[g.id]?.text };
       }
       case 'layer': {
         if (!ctx.docId) throw new Error('No design document to place layers in.');

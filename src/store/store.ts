@@ -22,6 +22,7 @@ import type {
   ModelSummary,
   ProviderId,
   RemoteProviderId,
+  TranscriberSummary,
   Session,
   TextStyle,
   Workspace,
@@ -35,7 +36,7 @@ export interface Settings {
   agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
   guidedRounds: number;
   budgetUsd: number;
-  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null };
+  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null };
 }
 
 export interface ComposerState {
@@ -64,6 +65,8 @@ export interface CatalogState {
   errors: Partial<Record<ProviderId, string>>;
   llm: Partial<Record<LlmProviderId, LlmModel[]>>;
   llmStatus: Partial<Record<LlmProviderId, CatalogStatus>>;
+  /** Speech-to-text models (Transcribe operation). */
+  transcribers?: Record<string, TranscriberSummary>;
 }
 
 export interface Toast {
@@ -134,7 +137,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
-  ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null },
+  ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null, transcribe: null },
 };
 
 const initial: AppState = {

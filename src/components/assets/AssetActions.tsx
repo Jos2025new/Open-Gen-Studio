@@ -6,6 +6,7 @@ import {
   Download,
   Ellipsis,
   FastForward,
+  FileText,
   Frame,
   Grid3x3,
   LayoutGrid,
@@ -46,6 +47,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   video_upscale: Maximize,
   video_edit: WandSparkles,
   video_extend: SkipForward,
+  transcribe: FileText,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

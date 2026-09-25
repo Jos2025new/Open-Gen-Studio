@@ -277,6 +277,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     const runnable = n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool';
     if (!runnable) return;
     if (!forced && nodeOutputAsset(n, generations)) return;
+    // A finished text result (Transcribe) is an output too: reuse it instead of running again.
+    if (!forced && n.data.kind === 'tool' && n.data.generationId && generations[n.data.generationId]?.status === 'done' && generations[n.data.generationId]?.text != null) return;
     run.add(id);
     graph.edges.filter((e) => e.target === id).forEach((e) => visit(e.source, false));
   };
@@ -305,6 +307,14 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       if (src?.data.kind === 'text') {
         promptFrom = src.id;
         if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: src.data.text });
+      } else if (src?.data.kind === 'tool' && OPS[src.data.op].output === 'text') {
+        // A Transcribe node: its text from this run, or the text it already produced.
+        promptFrom = src.id;
+        const done = src.data.generationId ? generations[src.data.generationId] : undefined;
+        if (!run.has(src.id) && !textSteps.has(src.id)) {
+          if (done?.text != null) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: done.text });
+          else errors.push(`"${src.data.title}" has no text yet.`);
+        }
       }
     }
     if (d.kind === 'image') {

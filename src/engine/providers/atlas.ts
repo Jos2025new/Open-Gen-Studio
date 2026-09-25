@@ -223,6 +223,7 @@ async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Pro
 }
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
+  const kind = ctx.kind === 'text' ? 'image' : ctx.kind; // no text jobs at Atlas Cloud
   return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' ? 2000 : 5000, async () => {
     const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] } }>(
       `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
@@ -231,7 +232,7 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
     const status = String(res.data?.status ?? '').toLowerCase();
     if (status === 'completed' || status === 'succeeded') {
       const outputs = await Promise.all(
-        extractOutputs(res, ctx.kind).map(async (o): Promise<GenOutput> => {
+        extractOutputs(res, kind).map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
           try {
             return { blob: await fetchBlob(o.url, { signal: ctx.signal }), mime: o.mime };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
-import { loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel } from '../../engine/catalog';
+import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel, transcriberFor } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS, LLM_TIERS, type LlmModel } from '../../engine/providers/llm';
@@ -154,6 +154,36 @@ function LlmModelPicker() {
   );
 }
 
+/** Speech-to-text model for Transcribe: Auto (preferred list) or a pick from the provider's catalog. */
+function TranscriberRow() {
+  const value = useStore((s) => s.settings.ops.transcribe);
+  const all = useStore((s) => s.catalog.transcribers);
+  useStore((s) => s.settings.keys);
+  const list = Object.values(all ?? {}).filter((m) => isConnected(m.provider));
+  const auto = transcriberFor();
+  const price = (usd?: number) => (usd != null ? ` · $${usd}/min` : '');
+  return (
+    <div className="set-row">
+      <span className="set-label">Transcribe</span>
+      <select
+        className="wide-chip"
+        value={value ?? ''}
+        onChange={(e) => setSettings((s) => ({ ops: { ...s.ops, transcribe: e.target.value || null } }))}
+        aria-label="Transcribe model"
+      >
+        <option value="">{`Auto · ${auto ? auto.name + price(auto.usdPerMinute) : 'no connected provider'}`}</option>
+        {list.map((m) => (
+          <option key={m.ref} value={m.ref}>
+            {m.name}
+            {price(m.usdPerMinute)}
+            {m.diarization ? ' · speakers' : ''}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slot: keyof Settings['ops']; kind: 'image' | 'video'; engine: OpEngine; filter: (m: ModelSummary) => boolean }) {
   const value = useStore((s) => s.settings.ops[slot]);
   useStore((s) => s.catalog.models);
@@ -292,6 +322,7 @@ export function SettingsPanel() {
         <OpsModelRow label="Upscale video" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
         <OpsModelRow label="Edit video" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
         <OpsModelRow label="Extend video" slot="videoExtend" kind="video" engine="video_extend" filter={(m) => Boolean(m.acceptsVideo)} />
+        <TranscriberRow />
       </section>
 
       <section className="set-section">

@@ -11,7 +11,7 @@ export interface OpField {
 }
 
 /** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend';
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe';
 
 export interface OpDef {
   id: OpId;
@@ -292,6 +292,24 @@ export const OPS: Record<OpId, OpDef> = {
     fields: [{ key: 'instruction', label: 'Then', type: 'text', default: '', placeholder: 'e.g. the camera pulls back as she walks into the rain', required: true }],
     instruction: (p) =>
       `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same characters, setting, style, lighting and camera language.`,
+  },
+  transcribe: {
+    id: 'transcribe',
+    label: 'Transcribe',
+    description: 'Turn speech into text you can reuse as a prompt.',
+    input: 'audio',
+    output: 'text',
+    engine: 'transcribe',
+    quick: true,
+    fields: [
+      {
+        key: 'language',
+        label: 'Language',
+        type: 'choice',
+        default: 'auto',
+        options: opt(['auto', 'Detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['pt', 'Portuguese'], ['it', 'Italian'], ['ja', 'Japanese'], ['zh', 'Chinese']),
+      },
+    ],
   },
 };
 

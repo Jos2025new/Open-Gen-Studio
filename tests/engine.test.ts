@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { formatUsd } from '../src/lib/format';
 import { extractErrorMessage, HttpError, JobFailedError, NetworkError, requestJson } from '../src/lib/http';
 import { pollJob } from '../src/engine/providers/shared';
 import type { ResumeContext } from '../src/engine/providers/types';
@@ -242,5 +243,15 @@ describe('remote job polling', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+});
+
+describe('money formatting', () => {
+  it('never shows a real cost as zero', () => {
+    expect(formatUsd(0)).toBe('$0');
+    expect(formatUsd(0.00003)).toBe('<$0.001');
+    expect(formatUsd(0.0051)).toBe('$0.0051');
+    expect(formatUsd(0.055)).toBe('$0.055');
+    expect(formatUsd(1.2)).toBe('$1.2');
   });
 });

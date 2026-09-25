@@ -4277,3 +4277,18 @@ nanogpt::z-image-turbo-lora [image] text
   inputs (as the agent reads them): no image input
   resolution: aspect enum[256*256,512*512,768*768,1024*1024,1280*720,720*1280,1536*1024,1024*1536,1536*1536]
   n: count integer(1..4) =1
+
+## NanoGPT speech-to-text (Transcribe)
+nanogpt::Elevenlabs-Scribe-V2 — ElevenLabs Scribe V2 · $0.051/min · direct ≤3.0 MB · speakers
+nanogpt::Elevenlabs-STT — ElevenLabs Scribe V1 · $0.051/min · direct ≤3.0 MB · speakers
+nanogpt::fun-asr-flash-2026-06-15 — Alibaba Fun-ASR Flash · $0.003689/min · direct ≤3.0 MB · video
+nanogpt::gpt-4o-mini-transcribe — GPT-4o Mini Transcribe · $0.0051/min · direct ≤3.0 MB · video
+nanogpt::gpt-4o-mini-transcribe-2025-03-20 — GPT-4o Mini Transcribe (2025-03-20) · $0.0051/min · direct ≤3.0 MB · video
+nanogpt::gpt-4o-mini-transcribe-2025-12-15 — GPT-4o Mini Transcribe (2025-12-15) · $0.0051/min · direct ≤3.0 MB · video
+nanogpt::microsoft/mai-transcribe-1.5 — MAI-Transcribe 1.5 · $0.0102/min · direct ≤3.0 MB · video
+nanogpt::nvidia/nemotron-asr-multilingual/asr — NVIDIA Nemotron ASR Multilingual · $0.0136/min · direct ≤3.0 MB
+nanogpt::openai-whisper-with-video — OpenAI Whisper With Video · $0.102/min · direct ≤3.0 MB · video
+nanogpt::whisper-1 — Whisper-1 · $0.0102/min · direct ≤3.0 MB · video
+nanogpt::Whisper-Large-V3 — Whisper Large V3 · $0.000495/min · direct ≤3.0 MB
+nanogpt::Wizper — Wizper · $0.017/min · direct ≤3.0 MB
+nanogpt::xai/speech-to-text/v1 — Grok Speech-to-Text · $0.002834/min · direct ≤3.0 MB · video · speakers

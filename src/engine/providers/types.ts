@@ -1,4 +1,4 @@
-import type { AdvancedValue, GenSettings, MediaKind, ModelSchema, ModelSummary, OpId, ProviderId, RemoteJob } from '../types';
+import type { AdvancedValue, GenSettings, MediaKind, ModelSchema, ModelSummary, OpId, ProviderId, RemoteJob, TranscriberSummary } from '../types';
 
 export interface MediaInput {
   assetId: string;
@@ -49,10 +49,23 @@ export interface GenOutput {
 export interface GenResult {
   outputs: GenOutput[];
   costUsd?: number;
+  /** Text result (transcription). */
+  text?: string;
+}
+
+export interface TranscribeRequest {
+  model: TranscriberSummary;
+  input: MediaInput;
+  /** ISO code or 'auto'. */
+  language: string;
+  apiKey: string;
+  signal: AbortSignal;
+  onStatus: (text: string) => void;
+  onRemoteJob: (job: RemoteJob) => void;
 }
 
 export interface ResumeContext {
-  kind: MediaKind;
+  kind: MediaKind | 'text';
   apiKey: string;
   signal: AbortSignal;
   onStatus: (text: string, progress?: number) => void;
@@ -67,6 +80,10 @@ export interface ProviderAdapter {
   generate(req: GenRequest): Promise<GenResult>;
   /** Continue polling a job submitted before a reload. */
   resume?(job: RemoteJob, ctx: ResumeContext): Promise<GenResult>;
+  /** Speech-to-text models, when the provider has them. */
+  listTranscribers?(signal?: AbortSignal): Promise<TranscriberSummary[]>;
+  /** Audio (or video) → text. Result in `text`. */
+  transcribe?(req: TranscribeRequest): Promise<GenResult>;
   /** Spendable USD on the account, when the provider exposes it to a normal API key. */
   balance?(apiKey: string, signal?: AbortSignal): Promise<number | undefined>;
 }

@@ -3,8 +3,8 @@ import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
-import { estimateMedia, estimateOp } from './costs';
+import { apiKeyFor, isConnected, opModelFor, resolveModel, transcriberFor } from './catalog';
+import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
@@ -20,7 +20,7 @@ const running = new Map<string, Promise<string[]>>();
 
 export interface GenerationSpec {
   sessionId: string;
-  kind: MediaKind;
+  kind: MediaKind | 'text';
   prompt: string;
   modelRef: string;
   settings: GenSettings;
@@ -36,7 +36,7 @@ export interface GenerationSpec {
 export function modelName(ref: string): string {
   if (ref === 'local::frame') return 'Local tool';
   if (ref.startsWith('local::')) return ref === 'local::studio-video' ? 'Local Motion' : 'Local Sketch';
-  return get().catalog.models[ref]?.name ?? parseModelRef(ref)?.id ?? ref;
+  return get().catalog.models[ref]?.name ?? get().catalog.transcribers?.[ref]?.name ?? parseModelRef(ref)?.id ?? ref;
 }
 
 export function estimateSpec(spec: GenerationSpec): Estimate {
@@ -44,6 +44,7 @@ export function estimateSpec(spec: GenerationSpec): Estimate {
     const src = get().assets[spec.op.sourceAssetId];
     return estimateOp(spec.op.id, spec.op.params, src, spec.settings);
   }
+  if (spec.kind === 'text') return { usd: null, approximate: true };
   const withImage = Boolean(spec.inputs?.refs.length || spec.inputs?.firstFrame);
   return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage);
 }
@@ -204,6 +205,11 @@ async function execute(id: string): Promise<string[]> {
       finish(id, assetIds, 0);
       return assetIds;
     }
+    if (g.op && OPS[g.op.id].engine === 'transcribe') {
+      await runTranscribe(g, signal);
+      return [];
+    }
+    if (g.kind === 'text') throw new Error('Text results come only from Transcribe.');
     const resolved = await resolveModel(g.modelRef);
     if (!resolved) {
       const parsed = parseModelRef(g.modelRef);
@@ -328,7 +334,8 @@ async function execute(id: string): Promise<string[]> {
       });
       if (result.costUsd != null) cost += result.costUsd;
       else costKnown = false;
-      const assets = await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, g.kind, fallback)));
+      const kind = g.kind;
+      const assets = await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       assetIds.push(...assets.map((a) => a.id));
       patchGeneration(id, { assetIds: [...assetIds] });
@@ -356,6 +363,37 @@ async function execute(id: string): Promise<string[]> {
  */
 function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
   return err instanceof JobFailedError ? undefined : job;
+}
+
+/** Audio → text with the transcriber recorded on the generation. */
+async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> {
+  const model = get().catalog.transcribers?.[g.modelRef];
+  if (!model) throw new Error(`${g.modelName} is not available. Connect NanoGPT or pick another model in Settings → Operations.`);
+  const adapter = ADAPTERS[model.provider];
+  const apiKey = apiKeyFor(model.provider);
+  if (!adapter.transcribe || !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
+  const input = await mediaInput(g.op!.sourceAssetId);
+  if (input.blob.size > model.maxDirectBytes) {
+    const mb = (n: number) => (n / 1048576).toFixed(1);
+    throw new InputError('AUDIO_TOO_LARGE', `${model.name} takes files up to ${mb(model.maxDirectBytes)} MB from the app; this one is ${mb(input.blob.size)} MB. Use a shorter or compressed (MP3) clip.`);
+  }
+  const result = await adapter.transcribe({
+    model,
+    input,
+    language: String(g.op!.params.language ?? 'auto'),
+    apiKey,
+    signal,
+    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+  });
+  finishText(g.id, result.text ?? '', result.costUsd);
+}
+
+function finishText(id: string, text: string, actualUsd: number | undefined): void {
+  const g = get().generations[id];
+  if (!g) return;
+  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, remoteJob: undefined });
+  addSpend(actualUsd ?? g.estimate.usd ?? 0);
 }
 
 function finish(id: string, assetIds: string[], actualUsd: number | undefined): void {
@@ -435,8 +473,13 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
         signal: controller.signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: text, progress }),
       });
-      const fallback = expectedDims(g.kind, g.settings);
-      const assets = await Promise.all(result.outputs.map((o) => storeOutput(o, g, g.kind, fallback)));
+      if (g.kind === 'text') {
+        finishText(id, result.text ?? '', result.costUsd);
+        return [];
+      }
+      const kind = g.kind;
+      const fallback = expectedDims(kind, g.settings);
+      const assets = await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       finish(id, assets.map((a) => a.id), result.costUsd);
       return assets.map((a) => a.id);
@@ -480,6 +523,13 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   if (def.engine === 'local') {
     const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : `${input.params.grid}×${input.params.grid}`;
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
+  }
+  if (def.engine === 'transcribe') {
+    const t = transcriberFor();
+    if (!t) throw new Error('No connected provider offers Transcribe. Connect NanoGPT.');
+    const clip = get().assets[input.sourceAssetId];
+    const language = String(input.params.language ?? 'auto');
+    return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
   const choice = opModelFor(def.engine);
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);

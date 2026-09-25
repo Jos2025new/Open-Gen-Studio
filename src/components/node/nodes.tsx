@@ -186,6 +186,8 @@ function Preview({ node }: { node: GraphNode }) {
     );
   }
   if (g?.status === 'error') return <div className="nc-empty nc-error">{g.error}</div>;
+  // Transcribe: the text is the output (it can feed a Prompt port).
+  if (g?.status === 'done' && g.kind === 'text') return <div className="nc-text">{g.text || <span className="faint">No speech was found.</span>}</div>;
   if (!assetId) {
     const hint = d.kind === 'image' || d.kind === 'video' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
     return (

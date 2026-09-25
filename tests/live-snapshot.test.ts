@@ -33,6 +33,7 @@ function serve(url: string): unknown {
   if (u.pathname.endsWith('/openapi.json')) return F.models.find((m: { endpoint_id: string }) => m.endpoint_id === u.searchParams.get('endpoint_id'))?.schemaDoc;
   if (u.pathname.endsWith('/v1/video-models')) return { data: N.video };
   if (u.pathname.endsWith('/v1/images/models')) return { data: N.image };
+  if (u.pathname.endsWith('/v1/audio-models')) return { data: N.audio ?? [] };
   throw new Error(`unexpected fetch ${url}`);
 }
 
@@ -82,7 +83,11 @@ describe('live provider snapshot', () => {
       return body === undefined ? new Response('not in snapshot', { status: 404 }) : new Response(JSON.stringify(body));
     });
     const header = `# Parse of the live snapshot (Atlas ${A.date}, fal ${F.date}, NanoGPT ${N.date}). Regenerate: see tests/live-snapshot.test.ts`;
-    const text = [header, '', '## Atlas', await snapshot(atlas), '', '## fal', await snapshot(fal), '', '## NanoGPT', await snapshot(nanogpt), ''].join('\n');
+    const transcribers = (await nanogpt.listTranscribers!())
+      .sort((a, b) => a.ref.localeCompare(b.ref))
+      .map((t) => `${t.ref} — ${t.name} · $${t.usdPerMinute ?? '?'}/min · direct ≤${(t.maxDirectBytes / 1048576).toFixed(1)} MB${t.video ? ' · video' : ''}${t.diarization ? ' · speakers' : ''}`)
+      .join('\n');
+    const text = [header, '', '## Atlas', await snapshot(atlas), '', '## fal', await snapshot(fal), '', '## NanoGPT', await snapshot(nanogpt), '', '## NanoGPT speech-to-text (Transcribe)', transcribers, ''].join('\n');
     await expect(text).toMatchFileSnapshot('fixtures/live/expected.txt');
     vi.unstubAllGlobals();
   }, 60_000);

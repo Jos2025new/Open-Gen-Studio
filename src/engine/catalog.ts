@@ -4,7 +4,7 @@ import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
 import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
 import type { OpEngine } from './ops';
-import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId } from './types';
+import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
 import { setCatalog, setComposerMedia, setSettings, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -50,6 +50,16 @@ function loadProvider(p: ProviderId, force = false): Promise<void> {
         for (const m of list) models[m.ref] = m;
         return { models, status: { ...c.status, [p]: 'ready' } };
       });
+      // Speech-to-text models live apart from the image/video catalog; a failure here leaves the rest usable.
+      const listTranscribers = ADAPTERS[p].listTranscribers;
+      if (listTranscribers) {
+        const list = await listTranscribers().catch(() => []);
+        setCatalog((c) => {
+          const transcribers = Object.fromEntries(Object.entries(c.transcribers ?? {}).filter(([, m]) => m.provider !== p));
+          for (const m of list) transcribers[m.ref] = m;
+          return { transcribers };
+        });
+      }
     } catch (err) {
       setCatalog((c) => ({ status: { ...c.status, [p]: 'error' }, errors: { ...c.errors, [p]: (err as Error).message } }));
     } finally {
@@ -234,10 +244,21 @@ export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
   return any?.ref ?? (kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF);
 }
 
+/** Speech-to-text model for the Transcribe operation: the settings override, then the preferred list, then any. */
+export function transcriberFor(): TranscriberSummary | undefined {
+  const all = get().catalog.transcribers ?? {};
+  const connected = (ref: string | null | undefined) => (ref && all[ref] && isConnected(all[ref].provider) ? all[ref] : undefined);
+  const chosen = connected(get().settings.ops.transcribe);
+  if (chosen) return chosen;
+  for (const p of REMOTE_PROVIDERS) for (const id of PREFERRED[p].transcribe) if (connected(`${p}::${id}`)) return all[`${p}::${id}`];
+  return Object.values(all).find((m) => isConnected(m.provider));
+}
+
 /** Which model runs an operation engine. */
 export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } {
   const ops = get().settings.ops;
   const valid = (ref: string | null) => Boolean(ref && isConnected(parseModelRef(ref)?.provider ?? 'local') && (ref.startsWith('local::') || modelSummary(ref)));
+  if (engine === 'transcribe') return { ref: transcriberFor()?.ref ?? '', viaEdit: false };
   if (engine === 'edit') {
     if (valid(ops.edit)) return { ref: ops.edit!, viaEdit: false };
     return { ref: defaultModelFor('image', true), viaEdit: false };

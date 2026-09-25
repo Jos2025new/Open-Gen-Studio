@@ -213,6 +213,7 @@ export const fal: ProviderAdapter = {
 };
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
+  const kind = ctx.kind === 'text' ? 'image' : ctx.kind; // no text jobs at fal.ai
   return pollJob(ctx, 'fal.ai', ctx.kind === 'image' ? 1500 : 4000, async () => {
     const st = await requestJson<{ status: string; queue_position?: number }>(job.meta.status_url, {
       headers: falHeaders(ctx.apiKey),
@@ -229,7 +230,7 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
         throw err;
       }
       const outputs = await Promise.all(
-        extractOutputs(res, ctx.kind).map(async (o): Promise<GenOutput> => {
+        extractOutputs(res, kind).map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
           try {
             return { blob: await fetchBlob(o.url, { signal: ctx.signal }), mime: o.mime };

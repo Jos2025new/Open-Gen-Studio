@@ -83,10 +83,12 @@ for (const m of fal) {
 // NanoGPT: the catalogs carry the parameters.
 const nanoVideo = (await get('https://nano-gpt.com/api/v1/video-models?detailed=true')).data.filter((m) => matches(VIDEO, m.id, m.name));
 const nanoImage = (await get('https://nano-gpt.com/api/v1/images/models')).data.filter((m) => matches(IMAGE, m.id, m.name));
+// Speech-to-text models (Transcribe operation): all of them, they are few.
+const nanoAudio = (await get('https://nano-gpt.com/api/v1/audio-models?detailed=true')).data.filter((m) => m.capabilities?.speech_to_text);
 
 fs.mkdirSync(out, { recursive: true });
 const date = new Date().toISOString().slice(0, 10);
 fs.writeFileSync(path.join(out, 'atlas.json'), JSON.stringify({ date, models: atlas }));
 fs.writeFileSync(path.join(out, 'fal.json'), JSON.stringify({ date, models: fal }));
-fs.writeFileSync(path.join(out, 'nanogpt.json'), JSON.stringify({ date, video: nanoVideo, image: nanoImage }));
-console.log(`atlas ${atlas.length} · fal ${fal.length} · nanogpt ${nanoVideo.length} video + ${nanoImage.length} image → tests/fixtures/live (${date})`);
+fs.writeFileSync(path.join(out, 'nanogpt.json'), JSON.stringify({ date, video: nanoVideo, image: nanoImage, audio: nanoAudio }));
+console.log(`atlas ${atlas.length} · fal ${fal.length} · nanogpt ${nanoVideo.length} video + ${nanoImage.length} image + ${nanoAudio.length} speech-to-text → tests/fixtures/live (${date})`);
