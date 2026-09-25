@@ -20,6 +20,10 @@ export interface GenRequest {
   refs: MediaInput[];
   /** Reference videos, for models with `refVideos` or `mixedRefs`. */
   refVideos?: MediaInput[];
+  /** One audio track (lip-sync speech, soundtrack), for models with an `audio` slot. */
+  audio?: MediaInput;
+  /** Reference audio, for models with `refAudios` or `mixedRefs`. */
+  refAudios?: MediaInput[];
   /** Keyframe images with their frame index, for models with a `keyframes` slot. */
   keyframes?: Array<{ input: MediaInput; frame: number }>;
   /** Reference clips with their trim in seconds, for models with a `clips` slot. */

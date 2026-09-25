@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckSquare, Download, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X, Film, Clock, ArrowDownUp } from 'lucide-react';
+import { ArrowDownUp, AudioLines, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { formatDuration, groupByDate } from '../../lib/format';
@@ -8,7 +8,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Asset } from '../../engine/types';
 
-type KindFilter = 'all' | 'image' | 'video';
+type KindFilter = 'all' | 'image' | 'video' | 'audio';
 type Scope = 'session' | 'all';
 
 export function GalleryPanel() {
@@ -89,6 +89,7 @@ export function GalleryPanel() {
               { value: 'all', label: 'All' },
               { value: 'image', label: 'Images' },
               { value: 'video', label: 'Videos' },
+              { value: 'audio', label: 'Audio' },
             ]}
           />
           <Segmented
@@ -185,9 +186,9 @@ function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; sel
       <button ref={ref} type="button" className="g-open" onClick={onOpen} aria-label="Open">
         <AssetMedia assetId={asset.id} />
       </button>
-      {asset.kind === 'video' ? (
+      {asset.kind === 'video' || asset.kind === 'audio' ? (
         <span className="g-badge num">
-          <Film size={11} />
+          {asset.kind === 'audio' ? <AudioLines size={11} /> : <Film size={11} />}
           {asset.duration ? formatDuration(asset.duration * 1000) : ''}
         </span>
       ) : null}

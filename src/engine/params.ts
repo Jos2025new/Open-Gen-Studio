@@ -49,6 +49,10 @@ const FIRST_FRAME_KEYS = ['start_image_url', 'first_frame_image', 'start_image',
 const VIDEO_KEYS = ['video_url', 'video', 'input_video', 'source_video', 'video_input'];
 // Lists of reference clips (Atlas: reference_videos; fal: video_urls, reference_video_urls).
 const REF_VIDEO_KEYS = ['reference_videos', 'reference_video_urls', 'video_urls'];
+// Audio inputs: reference lists, and single tracks (lip-sync speech, soundtrack). `audio` alone is usually the
+// "generate audio" switch, so a single-track key only counts when its value is a string.
+const REF_AUDIO_KEYS = ['reference_audios', 'reference_audio_urls', 'audio_urls'];
+const AUDIO_KEYS = ['audio_url', 'target_audio_url', 'driving_audio_url', 'input_audio', 'audio_file'];
 const LAST_FRAME_KEYS = ['end_image_url', 'last_image', 'tail_image_url', 'end_image', 'last_frame_image', 'last_frame', 'last_frame_url', 'tail_image'];
 
 export function normKey(k: string): string {
@@ -372,6 +376,16 @@ export function schemaFromJson(opts: {
     if (used.has(k)) continue;
     const p = flattenProp(properties[k], resolve);
     const min = required.includes(k) ? Math.max(1, p.minItems ?? 1) : 0;
+    if (REF_AUDIO_KEYS.includes(normKey(k)) && primaryType(p) === 'array') {
+      slots.refAudios = { key: k, max: p.maxItems ?? 3, min, format: imageFormat };
+      used.add(k);
+      continue;
+    }
+    if (AUDIO_KEYS.includes(normKey(k)) && primaryType(p) === 'string' && !slots.audio) {
+      slots.audio = { key: k, required: required.includes(k), format: imageFormat };
+      used.add(k);
+      continue;
+    }
     const kf = keyframeList(p, resolve);
     if (kf) {
       const fps = /(\d+)\s*fps/i.exec(`${p.description ?? ''} ${JSON.stringify(p.items ?? {})}`);
@@ -609,14 +623,33 @@ export function routeVideoInputs<T>(slots: InputSlots, images: T[], videos: T[],
   return { firstFrame: first, images: rest, videos };
 }
 
+/** Audio inputs: the first track goes to a single-track field (lip-sync, soundtrack) when there is one, the rest are references. */
+export function routeAudio<T>(slots: InputSlots, audios: T[]): { audio?: T; refAudios: T[] } {
+  if (slots.audio && !slots.mixedRefs && audios.length) return { audio: audios[0], refAudios: audios.slice(1) };
+  return { refAudios: [...audios] };
+}
+
+/** Why a model cannot take this many audio inputs, or null. */
+export function audioInputProblem(slots: InputSlots, audios: number): string | null {
+  if (slots.mixedRefs) return null; // counted with the other references
+  const max = (slots.audio ? 1 : 0) + (slots.refAudios?.max ?? 0);
+  if (audios > max) return max ? `accepts up to ${max} audio track${max > 1 ? 's' : ''}.` : 'does not accept audio.';
+  if (slots.audio?.required && audios < 1) return 'needs an audio track.';
+  if (audios < (slots.refAudios?.min ?? 0) + (slots.audio?.required ? 1 : 0)) return 'needs reference audio.';
+  return null;
+}
+
 /** Why a video model cannot take these routed inputs, or null. Sentence without subject ("needs …"). */
-export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; images: number; videos: number }): string | null {
+export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; images: number; videos: number; audios?: number }): string | null {
   if (n.firstFrame && !slots.firstFrame) return 'cannot start from an image.';
+  const audioProblem = audioInputProblem(slots, n.audios ?? 0);
+  if (audioProblem) return audioProblem;
   const mixed = slots.mixedRefs;
   if (mixed) {
-    const total = n.images + n.videos;
+    const total = n.images + n.videos + (n.audios ?? 0);
     if (total > mixed.max) return `accepts up to ${mixed.max} references.`;
-    if (total < mixed.min) return 'needs at least one reference image or video.';
+    // Audio alone is not a reference set (MiniMax H3): at least one image or video.
+    if (n.images + n.videos < mixed.min) return 'needs at least one reference image or video.';
     return null;
   }
   const kf = slots.keyframes;
@@ -678,6 +711,9 @@ export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind
     out.push(s.images ? `up to ${s.images.max + (s.source ? 1 : 0)} image refs${s.images.min ? ' (required)' : ''}` : 'no image input');
     if (s.clips) out.push(`${s.clips.max} video clip ref${s.clips.min ? ' (required)' : ''}`);
   }
+  if (s.audio) out.push(`an audio ref${s.audio.required ? ' (required: the speech or track to follow)' : ' (optional soundtrack)'}`);
+  if (s.refAudios) out.push(`up to ${s.refAudios.max} reference audio refs`);
+  if (s.mixedRefs) out.push('audio refs count among the references');
   if (schema.missing?.length) out.push(`cannot run from the app (needs ${schema.missing.join(', ')})`);
   return out;
 }

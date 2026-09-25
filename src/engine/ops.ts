@@ -1,4 +1,4 @@
-import type { AdvancedValue, MediaKind, OpId } from './types';
+import type { AdvancedValue, AssetKind, OpId } from './types';
 
 export interface OpField {
   key: string;
@@ -17,8 +17,9 @@ export interface OpDef {
   id: OpId;
   label: string;
   description: string;
-  input: MediaKind;
-  output: MediaKind;
+  input: AssetKind;
+  /** 'text' = the result is text (transcription), shown in the card and usable as a prompt. */
+  output: AssetKind | 'text';
   engine: OpEngine;
   fields: OpField[];
   /** Shown as a one-click chip on generation cards. */
@@ -299,7 +300,7 @@ function note(p: Record<string, AdvancedValue>): string {
   return n ? ` Additional direction: ${n}.` : '';
 }
 
-export function opsFor(kind: MediaKind): OpDef[] {
+export function opsFor(kind: AssetKind): OpDef[] {
   return Object.values(OPS).filter((o) => o.input === kind);
 }
 

@@ -9,7 +9,7 @@ import { estimateMedia } from './costs';
 import { autoLayout, graphBounds } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
-import { paramByRole, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, paramByRole, routeVideoInputs, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
@@ -68,7 +68,10 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
   if (st.ui.workspace === 'designer' && kind === 'video') return { ok: false, reason: 'Designer layers cannot hold video.', estimate };
   if (schema.missing?.length) return { ok: false, reason: `This model needs ${schema.missing.join(', ')}, which the app cannot send yet.`, estimate };
+  const audioAtt = attachments.filter((id) => st.assets[id]?.kind === 'audio');
   if (kind === 'image') {
+    const audioProblem = audioInputProblem(schema.slots, audioAtt.length);
+    if (audioProblem) return { ok: false, reason: `This model ${audioProblem}`, estimate };
     const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
     const clips = schema.slots.clips;
     if (videoAtt.length && !clips) return { ok: false, reason: 'Remove the video attachment (use Extract frame first).', estimate };
@@ -84,7 +87,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   } else {
     const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
     const routed = routeVideoInputs(schema.slots, imageAtt, videoAtt);
-    const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length });
+    const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioAtt.length });
     if (problem) return { ok: false, reason: `This model ${problem}`, estimate };
     if (!text && !attachments.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
@@ -113,6 +116,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   const text = st.composer.text.trim();
   const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
   const videoAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'video');
+  const audioAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'audio');
   // Video: the first image is the start frame when the model has one; the rest are references.
   const slots = st.catalog.schemas[modelRef]?.slots ?? {};
   const routed = routeVideoInputs(slots, attachments, videoAttachments);
@@ -124,7 +128,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     modelRef,
     settings: { ...settings, seed: undefined },
     inputs: {
-      ...(kind === 'image' ? { refs: [...attachments, ...videoAttachments] } : { refs: [...routed.images, ...routed.videos], firstFrame: routed.firstFrame }),
+      ...(kind === 'image' ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] } : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
       times: pick(st.composer.times, attachments),
       trims: pick(st.composer.trims, videoAttachments),
     },
@@ -357,12 +361,15 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
+/** Audio files the app stores and the providers read (MP3, WAV, M4A, AAC, OGG, FLAC, WebM). */
+export const AUDIO_MIME = /^audio\/(mpeg|mp3|wav|x-wav|mp4|x-m4a|aac|ogg|flac|webm)$/;
+
 export async function uploadFiles(files: File[]): Promise<string[]> {
   const st = get();
   const sessionId = st.activeSessionId;
   const out: Asset[] = [];
   for (const f of files) {
-    if (!/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
+    if (!AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
       toast(`${f.name}: unsupported file type`, 'error');
       continue;
     }
@@ -376,7 +383,7 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
       await putAssetBlob(id, f);
       out.push({
         id,
-        kind: f.type.startsWith('video/') ? 'video' : 'image',
+        kind: f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
         mime: f.type,
         width: info.width,
         height: info.height,

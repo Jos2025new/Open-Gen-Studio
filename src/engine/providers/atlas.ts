@@ -159,7 +159,11 @@ export const atlas: ProviderAdapter = {
       }
       if (schema.slots.mixedRefs) {
         // `refers`: one list of { url, type } for images and videos.
-        const items = [...req.refs.map((input) => ({ input, type: 'image' as const })), ...refVideos.map((input) => ({ input, type: 'video' as const }))];
+        const items = [
+          ...req.refs.map((input) => ({ input, type: 'image' as const })),
+          ...refVideos.map((input) => ({ input, type: 'video' as const })),
+          ...(req.refAudios ?? []).map((input) => ({ input, type: 'audio' as const })),
+        ];
         if (items.length) {
           req.onStatus('Uploading references');
           body[schema.slots.mixedRefs.key] = await Promise.all(
@@ -172,7 +176,7 @@ export const atlas: ProviderAdapter = {
         body[schema.slots.video.key] = await encodeVideo(req.video, upload);
       }
     }
-    if (req.keyframes?.length || req.clips?.length) {
+    if (req.keyframes?.length || req.clips?.length || req.audio || req.refAudios?.length) {
       req.onStatus('Uploading inputs');
       Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
     }

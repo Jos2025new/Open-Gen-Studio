@@ -98,6 +98,16 @@ export async function fetchBlob(url: string, init?: RequestInit): Promise<Blob> 
   return res.blob();
 }
 
+function loadAudio(src: string): Promise<HTMLAudioElement> {
+  return new Promise((resolve, reject) => {
+    const a = document.createElement('audio');
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => resolve(a);
+    a.onerror = () => reject(new Error('Audio failed to load'));
+    a.src = src;
+  });
+}
+
 function loadVideo(src: string): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
@@ -115,6 +125,10 @@ function loadVideo(src: string): Promise<HTMLVideoElement> {
 export async function probeMedia(blob: Blob): Promise<MediaInfo> {
   const url = URL.createObjectURL(blob);
   try {
+    if (blob.type.startsWith('audio/')) {
+      const a = await loadAudio(url);
+      return { width: 0, height: 0, duration: Number.isFinite(a.duration) ? a.duration : undefined };
+    }
     if (blob.type.startsWith('video/')) {
       const v = await loadVideo(url);
       let duration = v.duration;
@@ -193,6 +207,15 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function extensionForMime(mime: string): string {
+  if (mime.startsWith('audio/')) {
+    if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('mp4') || mime.includes('m4a')) return 'm4a';
+    if (mime.includes('aac')) return 'aac';
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('flac')) return 'flac';
+    if (mime.includes('webm')) return 'weba';
+  }
   if (mime.includes('png')) return 'png';
   if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
   if (mime.includes('webp')) return 'webp';

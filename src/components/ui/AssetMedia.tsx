@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { AudioLines, ImageOff } from 'lucide-react';
 import { useStore } from '../../store/store';
+import { formatDuration } from '../../lib/format';
 import { useAssetUrl } from './hooks';
 
 /** Renders an asset (image or video) from local storage or its remote URL. */
@@ -33,7 +34,7 @@ export function AssetMedia({
   }
   if (!url || failed) {
     return (
-      <div className={`media media-loading ${failed ? 'is-failed' : ''} ${className ?? ''}`} style={{ aspectRatio: `${asset.width} / ${asset.height}` }}>
+      <div className={`media media-loading ${failed ? 'is-failed' : ''} ${className ?? ''}`} style={{ aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : '1' }}>
         {failed ? <ImageOff size={18} /> : null}
       </div>
     );
@@ -42,6 +43,16 @@ export function AssetMedia({
     e.dataTransfer.setData('application/x-ogs-asset', assetId);
     e.dataTransfer.effectAllowed = 'copy';
   };
+  if (asset.kind === 'audio') {
+    // Audio has no picture: an icon tile with its length, and the player where controls are wanted.
+    return (
+      <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={onDragStart}>
+        <AudioLines size={controls ? 28 : 18} />
+        {asset.duration ? <span className="num">{formatDuration(asset.duration * 1000)}</span> : null}
+        {controls ? <audio src={url} controls autoPlay onError={() => setFailed(true)} /> : null}
+      </div>
+    );
+  }
   if (asset.kind === 'video') {
     return (
       <video

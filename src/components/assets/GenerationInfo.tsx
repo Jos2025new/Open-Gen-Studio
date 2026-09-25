@@ -45,7 +45,8 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
     rows.push(['Origin', g.origin]);
   }
   if (asset) {
-    rows.push(['File', `${asset.width}×${asset.height}${asset.duration ? ` · ${formatDuration(asset.duration * 1000)}` : ''} · ${asset.mime}`]);
+    const dims = asset.kind === 'audio' ? [] : [`${asset.width}×${asset.height}`];
+    rows.push(['File', [...dims, asset.duration ? formatDuration(asset.duration * 1000) : '', asset.mime].filter(Boolean).join(' · ')]);
     if (!asset.stored) rows.push(['Storage', 'Provider URL only (may expire)']);
   }
   if (session) rows.push(['Session', session]);

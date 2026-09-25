@@ -4,6 +4,8 @@ export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video';
 export type AgentStyle = 'auto' | 'guided';
 export type MediaKind = 'image' | 'video';
+/** Assets can also be audio (uploaded, or produced by audio models); generations produce MediaKind or audio. */
+export type AssetKind = MediaKind | 'audio';
 
 export type ProviderId = 'local' | 'openrouter' | 'fal' | 'nanogpt' | 'atlas';
 export type RemoteProviderId = Exclude<ProviderId, 'local'>;
@@ -50,6 +52,10 @@ export interface InputSlots {
   mixedRefs?: { key: string; max: number; min: number };
   /** Images pinned to frame positions (FLUX 3: `{ image_url, frame_index }`, 24 fps). Takes every input image. */
   keyframes?: { key: string; max: number; min: number; imageKey: string; indexKey: string; fps: number };
+  /** One audio track: lip-sync / avatar speech (`audio_url`, required there) or a soundtrack (`target_audio_url`). */
+  audio?: { key: string; required: boolean; format: ImageInputFormat };
+  /** Reference audio list (`reference_audios`, `audio_urls`, `reference_audio_urls`). */
+  refAudios?: { key: string; max: number; min: number; format: ImageInputFormat };
   /** Trimmed reference clips (`video_clips: { url, start, ends[, fps] }`). Takes the input videos. */
   clips?: {
     key: string;
@@ -147,7 +153,7 @@ export interface Estimate {
 
 export interface Asset {
   id: string;
-  kind: MediaKind;
+  kind: AssetKind;
   mime: string;
   width: number;
   height: number;
@@ -395,7 +401,7 @@ export type FeedItem =
 // Node graph
 
 export type NodeKind = 'text' | 'image' | 'video' | 'tool' | 'asset';
-export type PortType = 'text' | 'image' | 'video';
+export type PortType = 'text' | 'image' | 'video' | 'audio';
 
 export interface TextNodeData {
   kind: 'text';

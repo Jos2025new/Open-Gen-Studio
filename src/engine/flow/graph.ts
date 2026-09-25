@@ -53,6 +53,8 @@ export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortT
         // Reference-to-video models take these as references; keyframe models pin them in order.
         { id: 'ref', type: 'image', label: 'References / keyframes', multi: true },
         { id: 'refVideo', type: 'video', label: 'Reference videos', multi: true },
+        // Lip-sync speech, a soundtrack or reference audio, as the model takes it.
+        { id: 'audio', type: 'audio', label: 'Audio', multi: true },
       ];
     case 'tool':
       return [{ id: 'input', type: OPS[data.op].input, label: 'Input', multi: false }];
@@ -142,12 +144,13 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle });
   };
 
-  const isVideo = (ref: string) => {
+  const kindOfRef = (ref: string) => {
     const p = parseRef(ref);
-    if (p?.type === 'asset') return kindOf(p.id) === 'video';
+    if (p?.type === 'asset') return kindOf(p.id);
     const step = p?.type === 'step' ? plan.steps.find((x) => x.id === p.id) : undefined;
-    return step?.kind === 'video' || (step?.kind === 'op' && OPS[step.op].output === 'video');
+    return step?.kind === 'op' ? OPS[step.op].output : step?.kind;
   };
+  const isVideo = (ref: string) => kindOfRef(ref) === 'video';
   for (const s of plan.steps) {
     const target = nodeOf.get(s.id);
     if (!target) continue;
@@ -158,7 +161,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
       link(s.promptFrom, target, 'prompt');
       link(s.firstFrame, target, 'first');
       link(s.lastFrame, target, 'last');
-      (s.refs ?? []).forEach((r) => link(r, target, isVideo(r) ? 'refVideo' : 'ref'));
+      (s.refs ?? []).forEach((r) => link(r, target, kindOfRef(r) === 'audio' ? 'audio' : isVideo(r) ? 'refVideo' : 'ref'));
     } else if (s.kind === 'op') {
       link(s.input, target, 'input');
     }
@@ -314,7 +317,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       const first = inEdges.find((e) => e.targetHandle === 'first');
       const last = inEdges.find((e) => e.targetHandle === 'last');
       const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo')
+        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo' || e.targetHandle === 'audio')
         .map((e) => refFor(e.source))
         .filter((r): r is string => Boolean(r));
       steps.push({

@@ -259,6 +259,15 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
         ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,
       refVideos: 'reference_videos' in defs ? { key: 'referenceVideos', max: upTo(defs.reference_videos, 3), min: 0, format: 'data-url' } : undefined,
+      // Audio: the catalog's `audio` field (Seedance talking avatar), else the documented audioDataUrl for
+      // audio-driven models (lip-sync, avatar). referenceAudios follows the referenceImages/Videos naming (unverified).
+      audio:
+        defs.audio && (defs.audio.type ?? 'string') === 'string'
+          ? { key: 'audio', required: /required/i.test(defs.audio.description ?? ''), format: 'data-url' }
+          : inputs.includes('audio') && /lip-?sync|avatar/.test(raw.id)
+            ? { key: 'audioDataUrl', required: true, format: 'data-url' }
+            : undefined,
+      refAudios: 'reference_audios' in defs ? { key: 'referenceAudios', max: upTo(defs.reference_audios, 3), min: 0, format: 'data-url' } : undefined,
       video: takesVideo(raw) ? { key: 'videoDataUrl', format: 'data-url' } : undefined,
     },
     price: model.price,
@@ -350,6 +359,8 @@ export const nanogpt: ProviderAdapter = {
     if (req.lastFrame && slots.lastFrame) body[slots.lastFrame.key] = await encodeImage(req.lastFrame, 'data-url');
     if (req.refs.length && slots.images) body[slots.images.key] = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
     if (req.refVideos?.length && slots.refVideos) body[slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, slots.refVideos.max).map((v) => encodeVideo(v)));
+    if (req.audio && slots.audio) body[slots.audio.key] = await encodeVideo(req.audio);
+    if (req.refAudios?.length && slots.refAudios) body[slots.refAudios.key] = await Promise.all(req.refAudios.slice(0, slots.refAudios.max).map((a) => encodeVideo(a)));
     if (req.video && slots.video) {
       if (req.video.blob.size > MAX_VIDEO_DATA_URL_BYTES) throw new Error(`NanoGPT accepts source videos up to 4 MB (this one is ${(req.video.blob.size / 1048576).toFixed(1)} MB). Trim it or use Atlas Cloud.`);
       body[slots.video.key] = await encodeVideo(req.video);

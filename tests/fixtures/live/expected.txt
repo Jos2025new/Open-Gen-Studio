@@ -92,7 +92,7 @@ atlas::alibaba/wan-3.0-prime/image-to-video [video] image
   seed: seed integer
 atlas::alibaba/wan-3.0-prime/reference-to-video [video] text,image
   slots: prompt=prompt* mixedRefs=refers≤20
-  inputs (as the agent reads them): up to 20 image/video refs
+  inputs (as the agent reads them): up to 20 image/video refs; audio refs count among the references
   resolution: resolution enum[1080p,720p,480p,720p-esr,1080p-esr,1440p-esr,4k-esr] =1080p
   duration: duration enum[-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =5
   ratio: aspect enum[adaptive,16:9,4:3,1:1,3:4,9:16] =adaptive
@@ -116,7 +116,7 @@ atlas::alibaba/wan-3.0/image-to-video [video] image
   seed: seed integer
 atlas::alibaba/wan-3.0/reference-to-video [video] text,image
   slots: prompt=prompt* mixedRefs=refers≤20
-  inputs (as the agent reads them): up to 20 image/video refs
+  inputs (as the agent reads them): up to 20 image/video refs; audio refs count among the references
   resolution: resolution enum[1080p,720p,480p,720p-esr,1080p-esr,1440p-esr,4k-esr] =1080p
   duration: duration enum[-1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =5
   ratio: aspect enum[adaptive,16:9,4:3,1:1,3:4,9:16] =adaptive
@@ -201,8 +201,8 @@ atlas::bytedance/seedance-2.0-fast/image-to-video [video] image
   watermark: other boolean =false
   return_last_frame: other boolean =false
 atlas::bytedance/seedance-2.0-fast/reference-to-video [video] text,image
-  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url refAudios=reference_audios≤3 url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   duration: duration enum[-1,4,5,6,7,8,9,10,11,12,13,14,15] =5
   resolution: resolution enum[480p,720p,720p-SR,1080p-SR,1440p-SR] =720p
   ratio: aspect enum[16:9,4:3,1:1,3:4,9:16,21:9,adaptive] =adaptive
@@ -234,8 +234,8 @@ atlas::bytedance/seedance-2.0-mini/image-to-video [video] image
   watermark: other boolean =false
   return_last_frame: other boolean =false
 atlas::bytedance/seedance-2.0-mini/reference-to-video [video] text,image
-  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url refAudios=reference_audios≤3 url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   duration: duration enum[-1,4,5,6,7,8,9,10,11,12,13,14,15] =5
   resolution: resolution enum[480p,720p,720p-SR,1080p-SR,1440p-SR] =720p
   ratio: aspect enum[16:9,4:3,1:1,3:4,9:16,21:9,adaptive] =adaptive
@@ -267,8 +267,8 @@ atlas::bytedance/seedance-2.0/image-to-video [video] image
   watermark: other boolean =false
   return_last_frame: other boolean =false
 atlas::bytedance/seedance-2.0/reference-to-video [video] text,image
-  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt images=reference_images[]≤9 url refVideos=reference_videos≤3 url refAudios=reference_audios≤3 url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   duration: duration enum[-1,4,5,6,7,8,9,10,11,12,13,14,15] =5
   resolution: resolution enum[480p,720p,720p-SR,1080p,1080p-SR,1440p-SR,4k] =720p
   ratio: aspect enum[16:9,4:3,1:1,3:4,9:16,21:9,adaptive] =adaptive
@@ -299,8 +299,8 @@ atlas::bytedance/seedance-2.5/image-to-video [video] image
   return_last_frame: other boolean =false
   output_format: other enum[mp4,mov] =mp4
 atlas::bytedance/seedance-2.5/reference-to-video [video] text,image,video-in
-  slots: prompt=prompt images=reference_images[]≤30 url refVideos=reference_videos≤10 url
-  inputs (as the agent reads them): up to 30 reference image refs; up to 10 reference video refs
+  slots: prompt=prompt images=reference_images[]≤30 url refVideos=reference_videos≤10 url refAudios=reference_audios≤10 url
+  inputs (as the agent reads them): up to 30 reference image refs; up to 10 reference video refs; up to 10 reference audio refs
   duration: duration enum[-1,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =5
   resolution: resolution enum[480p,720p,720p-sr,720p-esr,1080p,1080p-sr,1080p-esr,1080p-esr & 60fps,1440p-sr,1440p-esr,4k-esr] =720p
   ratio: aspect enum[16:9,4:3,1:1,3:4,9:16,21:9,adaptive] =adaptive
@@ -882,7 +882,7 @@ atlas::minimax/h3-developer/image-to-video [video] image
   prompt_expansion: other boolean =false
 atlas::minimax/h3-developer/reference-to-video [video] text,image
   slots: prompt=prompt* mixedRefs=refers≤9 min1
-  inputs (as the agent reads them): up to 9 image/video refs (at least one required)
+  inputs (as the agent reads them): up to 9 image/video refs (at least one required); audio refs count among the references
   resolution: resolution enum[480P,768P,1440p-sr,4k-sr] =768P
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =8
   ratio: aspect enum[adaptive,21:9,16:9,4:3,1:1,3:4,9:16] =adaptive
@@ -903,7 +903,7 @@ atlas::minimax/h3-fast/image-to-video [video] image
   prompt_expansion: other boolean =false
 atlas::minimax/h3-fast/reference-to-video [video] text,image
   slots: prompt=prompt* mixedRefs=refers≤9 min1
-  inputs (as the agent reads them): up to 9 image/video refs (at least one required)
+  inputs (as the agent reads them): up to 9 image/video refs (at least one required); audio refs count among the references
   resolution: resolution enum[480P] =480P
   duration: duration enum[5,6,7,8,9,10,11,12,13,14,15] =8
   ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
@@ -950,7 +950,7 @@ atlas::minimax/h3/image-to-video [video] image
   prompt_expansion: other boolean =false
 atlas::minimax/h3/reference-to-video [video] text,image
   slots: prompt=prompt* mixedRefs=refers≤9 min1
-  inputs (as the agent reads them): up to 9 image/video refs (at least one required)
+  inputs (as the agent reads them): up to 9 image/video refs (at least one required); audio refs count among the references
   resolution: resolution enum[480P,768P,2K,1080p-esr,1440p-esr,4k-esr] =2K
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =8
   ratio: aspect enum[adaptive,21:9,16:9,4:3,1:1,3:4,9:16] =adaptive
@@ -1324,8 +1324,8 @@ fal::alibaba/wan-3.0-prime/image-to-video [video] text,image
   resolution: resolution enum[480p,720p,1080p] =1080p
   seed: seed integer(0..2147483647)
 fal::alibaba/wan-3.0-prime/reference-to-video [video] text,image
-  slots: prompt=prompt images=reference_image_urls[]≤10 data-url refVideos=reference_video_urls≤5 data-url
-  inputs (as the agent reads them): up to 10 reference image refs; up to 5 reference video refs
+  slots: prompt=prompt images=reference_image_urls[]≤10 data-url refVideos=reference_video_urls≤5 data-url refAudios=reference_audio_urls≤5 data-url
+  inputs (as the agent reads them): up to 10 reference image refs; up to 5 reference video refs; up to 5 reference audio refs
   enable_prompt_expansion: other boolean =true
   aspect_ratio: aspect enum[adaptive,16:9,4:3,1:1,3:4,9:16] =adaptive
   duration: duration integer(2..30) =5
@@ -1357,8 +1357,8 @@ fal::alibaba/wan-3.0/image-to-video [video] text,image
   resolution: resolution enum[480p,720p,1080p] =1080p
   enable_prompt_expansion: other boolean =true
 fal::alibaba/wan-3.0/reference-to-video [video] text,image
-  slots: prompt=prompt images=reference_image_urls[]≤10 data-url refVideos=reference_video_urls≤5 data-url
-  inputs (as the agent reads them): up to 10 reference image refs; up to 5 reference video refs
+  slots: prompt=prompt images=reference_image_urls[]≤10 data-url refVideos=reference_video_urls≤5 data-url refAudios=reference_audio_urls≤5 data-url
+  inputs (as the agent reads them): up to 10 reference image refs; up to 5 reference video refs; up to 5 reference audio refs
   enable_thinking: other boolean =false
   enable_safety_checker: other boolean =true
   aspect_ratio: aspect enum[adaptive,16:9,4:3,1:1,3:4,9:16] =adaptive
@@ -1472,8 +1472,8 @@ fal::bytedance/seedance-2.0/fast/image-to-video [video] text,image
   codec: other enum[auto,H264,H265] =auto
   duration: duration enum[auto,4,5,6,7,8,9,10,11,12,13,14,15] =auto
 fal::bytedance/seedance-2.0/fast/reference-to-video [video] text,image
-  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   bitrate_mode: other enum[standard,high] =standard
@@ -1507,8 +1507,8 @@ fal::bytedance/seedance-2.0/mini/image-to-video [video] text,image
   resolution: resolution enum[480p,720p] =720p
   duration: duration enum[auto,4,5,6,7,8,9,10,11,12,13,14,15] =auto
 fal::bytedance/seedance-2.0/mini/reference-to-video [video] text,image
-  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   codec: other enum[auto,H264,H265] =auto
@@ -1523,8 +1523,8 @@ fal::bytedance/seedance-2.0/mini/text-to-video [video] text
   resolution: resolution enum[480p,720p] =720p
   codec: other enum[auto,H264,H265] =auto
 fal::bytedance/seedance-2.0/reference-to-video [video] text,image
-  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   bitrate_mode: other enum[standard,high] =standard
@@ -1550,8 +1550,8 @@ fal::bytedance/seedance-2.0/us/image-to-video [video] text,image
   codec: other enum[auto,H264,H265] =auto
   duration: duration enum[auto,4,5,6,7,8,9,10,11,12,13,14,15] =auto
 fal::bytedance/seedance-2.0/us/reference-to-video [video] text,image
-  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤9 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   bitrate_mode: other enum[standard,high] =standard
@@ -1576,8 +1576,8 @@ fal::bytedance/seedance-2.5/image-to-video [video] text,image
   codec: other enum[auto,H264,H265] =auto
   duration: duration enum[auto,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =auto
 fal::bytedance/seedance-2.5/reference-to-video [video] text,image,video-in
-  slots: prompt=prompt* images=image_urls[]≤4 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤4 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   task: other enum[reference,editing,extension] =reference
@@ -1604,8 +1604,8 @@ fal::bytedance/seedance-2.5/us/image-to-video [video] text,image
   codec: other enum[auto,H264,H265] =auto
   duration: duration enum[auto,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =auto
 fal::bytedance/seedance-2.5/us/reference-to-video [video] text,image,video-in
-  slots: prompt=prompt* images=image_urls[]≤4 data-url refVideos=video_urls≤3 data-url
-  inputs (as the agent reads them): up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=image_urls[]≤4 data-url refVideos=video_urls≤3 data-url refAudios=audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   generate_audio: audio boolean =true
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16] =auto
   task: other enum[reference,editing,extension] =reference
@@ -2065,8 +2065,8 @@ fal::fal-ai/nano-banana-2 [image] text
   num_images: count integer(1..4) =1
   aspect_ratio: aspect enum[auto,21:9,16:9,3:2,4:3,5:4,1:1,4:5,3:4,2:3,9:16,4:1,1:4,8:1,1:8] =auto
 fal::fal-ai/nano-banana-2/edit [image] text,image
-  slots: prompt=prompt* images=image_urls[]≤10 data-url
-  inputs (as the agent reads them): up to 10 image refs
+  slots: prompt=prompt* images=image_urls[]≤10 data-url audio=audio_url data-url
+  inputs (as the agent reads them): up to 10 image refs; an audio ref (optional soundtrack)
   output_format: other enum[jpeg,png,webp] =png
   safety_tolerance: other enum[1,2,3,4,5,6] =4
   resolution: resolution enum[0.5K,1K,2K,4K] =1K
@@ -3113,16 +3113,16 @@ fal::ideogram/v4/tiling/lora [image] text,image
   strength: other number(0..1) =0.8
   output_format: other enum[jpeg,png] =jpeg
 fal::minimax/h3-max-turbo/image-to-video [video] text,image
-  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url audio=target_audio_url data-url
+  inputs (as the agent reads them): first_frame; last_frame; an audio ref (optional soundtrack)
   duration: duration integer(5..15) =5
   seed: seed integer
   resolution: resolution enum[480P,768P,1080P] =768P
   enable_safety_checker: other boolean =true
   fixed: {"prompt_expansion_mode":"balanced"}
 fal::minimax/h3-max-turbo/text-to-video [video] text
-  slots: prompt=prompt*
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt* audio=target_audio_url data-url
+  inputs (as the agent reads them): text-to-video only; an audio ref (optional soundtrack)
   duration: duration integer(5..15) =5
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   seed: seed integer
@@ -3155,24 +3155,23 @@ fal::minimax/h3-max/extend-video [video] text,video-in,NEEDS-VIDEO
   enable_safety_checker: other boolean =true
   enable_prompt_expansion: other boolean =true
 fal::minimax/h3-max/image-to-video [video] text,image
-  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url audio=target_audio_url data-url
+  inputs (as the agent reads them): first_frame; last_frame; an audio ref (optional soundtrack)
   duration: duration integer(5..15) =5
   seed: seed integer
   resolution: resolution enum[480P,768P,1080P] =768P
   enable_safety_checker: other boolean =true
   fixed: {"prompt_expansion_mode":"balanced"}
 fal::minimax/h3-max/lip-sync/image-to-video [video] text,image
-  slots: firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; cannot run from the app (needs audio_url)
+  slots: firstFrame=image_url data-url audio=audio_url data-url
+  inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   enable_transcription: other boolean =false
   seed: seed integer(0..2147483647)
   resolution: resolution enum[480P,768P,1080P,2K] =768P
   enable_safety_checker: other boolean =true
-  MISSING: audio_url
 fal::minimax/h3-max/reference-to-video [video] text,image
-  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url refAudios=reference_audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   duration: duration integer(5..15) =5
   aspect_ratio: aspect enum[adaptive,21:9,16:9,4:3,1:1,3:4,9:16] =adaptive
   seed: seed integer
@@ -3211,8 +3210,8 @@ fal::minimax/h3-max/styles/vhs [video] text
   duration: duration integer(5..15) =5
   damage_level: other enum[light,medium,heavy] =medium
 fal::minimax/h3-max/text-to-video [video] text
-  slots: prompt=prompt*
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt* audio=target_audio_url data-url
+  inputs (as the agent reads them): text-to-video only; an audio ref (optional soundtrack)
   duration: duration integer(5..15) =5
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   seed: seed integer
@@ -3220,31 +3219,31 @@ fal::minimax/h3-max/text-to-video [video] text
   enable_safety_checker: other boolean =true
   fixed: {"prompt_expansion_mode":"balanced"}
 fal::minimax/h3/image-to-video [video] text,image
-  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url audio=target_audio_url data-url
+  inputs (as the agent reads them): first_frame; last_frame; an audio ref (optional soundtrack)
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
   seed: seed integer
   duration: duration integer(5..15) =5
 fal::minimax/h3/image-to-video/lora [video] text,image
-  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame; cannot run from the app (needs loras)
+  slots: prompt=prompt* lastFrame=end_image_url data-url firstFrame=image_url data-url audio=target_audio_url data-url
+  inputs (as the agent reads them): first_frame; last_frame; an audio ref (optional soundtrack); cannot run from the app (needs loras)
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
   seed: seed integer
   duration: duration integer(5..15) =5
   MISSING: loras
 fal::minimax/h3/reference-to-video [video] text,image
-  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url refAudios=reference_audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   aspect_ratio: aspect enum[adaptive,21:9,16:9,4:3,1:1,3:4,9:16] =adaptive
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
   seed: seed integer
   duration: duration integer(5..15) =5
 fal::minimax/h3/reference-to-video/lora [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; cannot run from the app (needs loras)
+  slots: prompt=prompt* images=reference_image_urls[]≤9 data-url refVideos=reference_video_urls≤3 data-url refAudios=reference_audio_urls≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs; cannot run from the app (needs loras)
   aspect_ratio: aspect enum[adaptive,21:9,16:9,4:3,1:1,3:4,9:16] =adaptive
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
@@ -3252,16 +3251,16 @@ fal::minimax/h3/reference-to-video/lora [video] text,video-in,NEEDS-VIDEO
   duration: duration integer(5..15) =5
   MISSING: loras
 fal::minimax/h3/text-to-video [video] text
-  slots: prompt=prompt*
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt* audio=target_audio_url data-url
+  inputs (as the agent reads them): text-to-video only; an audio ref (optional soundtrack)
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
   seed: seed integer
   duration: duration integer(5..15) =5
 fal::minimax/h3/text-to-video/lora [video] text
-  slots: prompt=prompt*
-  inputs (as the agent reads them): text-to-video only; cannot run from the app (needs loras)
+  slots: prompt=prompt* audio=target_audio_url data-url
+  inputs (as the agent reads them): text-to-video only; an audio ref (optional soundtrack); cannot run from the app (needs loras)
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   resolution: resolution enum[480P,768P,2K,4K] =2K
   enable_safety_checker: other boolean =true
@@ -3530,30 +3529,30 @@ nanogpt::blackforestlabs/flux-3/edit-video [video] video-in,NEEDS-VIDEO
   inputs (as the agent reads them): text-to-video only
   safety_tolerance: other number(0..4) =2
 nanogpt::bytedance-seedance-2-0 [video] text,image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[5,10,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
   enable_web_search: other boolean =false
 nanogpt::bytedance-seedance-2-0-fast [video] text,image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[5,10,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
   enable_web_search: other boolean =false
 nanogpt::bytedance-seedance-2-0-fast-video-edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=videoDataUrl data-url
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): text-to-video only; up to 3 reference audio refs
   resolution: resolution enum[480p,720p,1080p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
   enable_web_search: other boolean =false
   generateAudio: audio boolean =false
 nanogpt::bytedance-seedance-2-0-fast-video-edit-turbo [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=videoDataUrl data-url
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): text-to-video only; up to 3 reference audio refs
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
@@ -3567,8 +3566,8 @@ nanogpt::bytedance-seedance-2-0-fast-video-extend [video] text,video-in,NEEDS-VI
   enable_web_search: other boolean =false
   generateAudio: audio boolean =false
 nanogpt::bytedance-seedance-2-0-mini [video] text,image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   variant: other enum[standard,turbo] =standard
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[5,6,7,8,9,10,11,12] =5
@@ -3576,8 +3575,8 @@ nanogpt::bytedance-seedance-2-0-mini [video] text,image
   generateAudio: audio boolean =true
   enable_web_search: other boolean =false
 nanogpt::bytedance-seedance-2-0-mini-video-edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=videoDataUrl data-url
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): text-to-video only; up to 3 reference audio refs
   variant: other enum[standard,turbo] =standard
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[5,6,7,8,9,10,11,12] =5
@@ -3592,16 +3591,16 @@ nanogpt::bytedance-seedance-2-0-mini-video-extend [video] text,video-in,NEEDS-VI
   enable_web_search: other boolean =false
   generateAudio: audio boolean =false
 nanogpt::bytedance-seedance-2-0-video-edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=videoDataUrl data-url
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): text-to-video only; up to 3 reference audio refs
   resolution: resolution enum[480p,720p,1080p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
   enable_web_search: other boolean =false
   generateAudio: audio boolean =false
 nanogpt::bytedance-seedance-2-0-video-edit-turbo [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=videoDataUrl data-url
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): text-to-video only; up to 3 reference audio refs
   resolution: resolution enum[720p,1080p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,4:3,3:4,1:1,21:9] =16:9
@@ -3661,8 +3660,8 @@ nanogpt::bytedance/seedance-2.5-turbo [video] text,image,video-in
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   generate_audio: audio boolean =true
 nanogpt::bytedance/seedance-2.5/talking-avatar [video] image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audio data-url
+  inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   resolution: resolution enum[480p,720p] =480p
 nanogpt::bytedance/seedream-v5.0-flash [image] text,image
   slots: prompt=prompt* images=imageDataUrls[]≤10 data-url
@@ -3701,15 +3700,15 @@ nanogpt::bytedance/seedream/v5/pro/text-to-image [image] text,image
   resolution: aspect enum[1:1,16:9,9:16,3:2,2:3,4:3,3:4,1k,2k]
   n: count integer(1..4) =1
 nanogpt::doubao-seedance-2-0 [video] text,image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   resolution: resolution enum[480p,720p,1080p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,1:1,3:4,4:3,21:9] =16:9
   enable_web_search: other boolean =false
 nanogpt::doubao-seedance-2-0-fast [video] text,image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url lastFrame=last_image data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   resolution: resolution enum[480p,720p] =720p
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,1:1,3:4,4:3,21:9] =16:9
@@ -3863,8 +3862,8 @@ nanogpt::kling-v30-std-motion-control [video] video-in,NEEDS-VIDEO
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30] =3
   keep_original_sound: other boolean =true
 nanogpt::minimax-h3 [video] text,image,video-in
-  slots: prompt=prompt firstFrame=imageDataUrl data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url video=videoDataUrl data-url
-  inputs (as the agent reads them): first_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): first_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   mode: other enum[auto,reference-to-video,video-edit,video-extend] =auto
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[auto,21:9,16:9,4:3,1:1,3:4,9:16,9:21] =auto
@@ -3893,16 +3892,16 @@ nanogpt::minimax-h3/image-to-video-spicy [video] image
   seed: seed number =-1
   generateAudio: audio boolean =false
 nanogpt::minimax-h3/reference-to-video [video] text,image
-  slots: prompt=prompt images=referenceImages[]≤9 data-url refVideos=referenceVideos≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt images=referenceImages[]≤9 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   resolution: resolution enum[480p,540p,768p,1080p] =480p
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,1:1,4:3,3:4,21:9,9:21] =16:9
   seed: seed number =-1
   generateAudio: audio boolean =false
 nanogpt::minimax/h3-max [video] text,image,video-in
-  slots: prompt=prompt firstFrame=imageDataUrl data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url video=videoDataUrl data-url
-  inputs (as the agent reads them): first_frame; up to 4 reference image refs; up to 3 reference video refs
+  slots: prompt=prompt firstFrame=imageDataUrl data-url images=referenceImages[]≤4 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url video=videoDataUrl data-url
+  inputs (as the agent reads them): first_frame; up to 4 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
   mode: other enum[auto,reference-to-video] =auto
   duration: duration enum[5,6,7,8,9,10,11,12,13,14,15] =5
   resolution: resolution enum[480p,768p,1080p] =768p
@@ -3920,8 +3919,8 @@ nanogpt::minimax/h3-max-turbo [video] text,image
   enable_safety_checker: other boolean =true
   seed: seed number(-1..2147483647) =-1
 nanogpt::minimax/h3-max/lip-sync/image-to-video [video] image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audioDataUrl data-url
+  inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   resolution: resolution enum[480p,768p,1080p,2k] =768p
   seed: seed number(-1..2147483647) =-1
 nanogpt::minimax/h3-max/multi-angle/image-to-video [video] image

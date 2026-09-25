@@ -52,6 +52,7 @@ Model-specific inputs (each model's accepted inputs are listed in the context; u
 - Reference-to-video models take refs (images, and videos where listed) instead of first_frame; describe in the prompt what each reference is for (character, style, setting).
 - Keyframe models (FLUX 3 keyframes-to-video): refs are the keyframe images in order. One image opens the clip; two pin start and end (works best when they share camera position, lighting and objects); 3–10 form an experimental storyboard spread evenly, reliable for simple transitions, weak for large subject motion. Set an explicit duration (5–20 s): it sets the pace, shorter is punchier. Use times only to pin a moment on purpose; positions must be unique. Keep the output aspect equal to the keyframes' aspect. The prompt describes the journey between frames ("starts as…, then…, ends as…"); write HARD CUT only when a cut is wanted.
 - Clip models (video_clips): a video ref is trimmed to the span the model takes; the app picks the whole clip or its first seconds.
+- Audio: an audio asset in refs is the speech for lip-sync / avatar models (required there), an optional soundtrack, or reference audio, as the model's inputs say.
 - Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
 Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 
@@ -79,6 +80,12 @@ function describeModel(kind: 'image' | 'video'): string {
   ].filter(Boolean);
   if (cur.length) parts.push(`current: ${cur.join(', ')}`);
   return parts.join(' · ');
+}
+
+/** "image 1024×768", "video 1280×720 5.0s", "audio 12.4s". */
+function assetShape(a: { kind: string; width: number; height: number; duration?: number }): string {
+  const secs = a.duration ? ` ${a.duration.toFixed(1)}s` : '';
+  return a.kind === 'audio' ? `audio${secs}` : `${a.kind} ${a.width}×${a.height}${secs}`;
 }
 
 function alternatives(): string {
@@ -122,7 +129,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
       `attached by the user: ${opts.attachments
         .map((id) => {
           const a = st.assets[id];
-          return a ? `asset:${id} (${a.kind} ${a.width}×${a.height})` : '';
+          return a ? `asset:${id} (${assetShape(a)})` : '';
         })
         .filter(Boolean)
         .join(', ')}`,
@@ -138,7 +145,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
         .map((a) => {
           const g = a.generationId ? st.generations[a.generationId] : undefined;
           const what = g ? (g.op ? OPS[g.op.id].label : truncate(g.prompt, 70)) : a.origin;
-          return `  asset:${a.id} — ${a.kind} ${a.width}×${a.height} — ${what}`;
+          return `  asset:${a.id} — ${assetShape(a)} — ${what}`;
         })
         .join('\n')}`,
     );

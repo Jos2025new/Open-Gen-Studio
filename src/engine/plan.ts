@@ -1,7 +1,8 @@
 import { OPS } from './ops';
-import { coerceSettings, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, coerceSettings, routeVideoInputs, videoInputProblem } from './params';
 import type {
   AdvancedValue,
+  AssetKind,
   GenSettings,
   ImageStep,
   LayerStep,
@@ -61,14 +62,14 @@ export interface RawPlan {
   steps?: RawStep[];
 }
 
-export type OutputKind = MediaKind | 'text' | 'layer';
+export type OutputKind = AssetKind | 'text' | 'layer';
 
 export interface PlanContext {
   workspace: Workspace;
   getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
   defaultModel: (kind: MediaKind, needsImage: boolean) => string | null;
   defaultSettings: (kind: MediaKind) => Partial<GenSettings>;
-  asset: (id: string) => { kind: MediaKind } | undefined;
+  asset: (id: string) => { kind: AssetKind } | undefined;
   layer: (id: string) => { type: LayerType } | undefined;
   maxSteps?: number;
 }
@@ -272,13 +273,14 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const k = refKind(s.prompt_from, where);
           if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step.`);
         }
-        // References are images, or videos for reference-video / clip models.
+        // References are images, videos (reference-video / clip models) or audio (lip-sync, soundtrack, reference audio).
         const refKinds = refs.map((r) => refKind(r, where));
         refKinds.forEach((k, i) => {
-          if (k && k !== 'image' && k !== 'raster' && k !== 'video') errors.push(`${where}: ref "${refs[i]}" produces ${k}; refs must be images or videos.`);
+          if (k && k !== 'image' && k !== 'raster' && k !== 'video' && k !== 'audio') errors.push(`${where}: ref "${refs[i]}" produces ${k}; refs must be images, videos or audio.`);
         });
-        const imageRefs = refs.filter((_, i) => refKinds[i] !== 'video');
+        const imageRefs = refs.filter((_, i) => refKinds[i] !== 'video' && refKinds[i] !== 'audio');
         const videoRefs = refs.filter((_, i) => refKinds[i] === 'video');
+        const audioRefs = refs.filter((_, i) => refKinds[i] === 'audio');
         if (kind === 'video') {
           expectImage(s.first_frame, `${where} first_frame`);
           expectImage(s.last_frame, `${where} last_frame`);
@@ -309,10 +311,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const clips = schema.slots.clips;
           if (videoRefs.length && !clips) errors.push(`${where}: model "${modelRef}" does not take video refs.`);
           else if (clips && (videoRefs.length > clips.max || videoRefs.length < clips.min)) errors.push(`${where}: model "${modelRef}" takes ${clips.min}–${clips.max} video clip ref(s).`);
+          const audioProblem = audioInputProblem(schema.slots, audioRefs.length);
+          if (audioProblem) errors.push(`${where}: model "${modelRef}" ${audioProblem}`);
         } else {
           // Same routing as the composer and the job runner (params.routeVideoInputs).
           const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
-          const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length });
+          const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length });
           if (problem) errors.push(`${where}: model "${modelRef}" ${problem}`);
           if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame.`);
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame.`);

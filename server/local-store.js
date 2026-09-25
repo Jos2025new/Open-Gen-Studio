@@ -13,6 +13,16 @@ const MIME_EXT = {
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/quicktime': 'mov',
+  // Audio: the x- aliases first, so the reverse table maps each extension to the standard type.
+  'audio/x-wav': 'wav',
+  'audio/wav': 'wav',
+  'audio/mpeg': 'mp3',
+  'audio/x-m4a': 'm4a',
+  'audio/mp4': 'm4a',
+  'audio/aac': 'aac',
+  'audio/ogg': 'ogg',
+  'audio/flac': 'flac',
+  'audio/webm': 'weba',
 };
 const EXT_MIME = Object.fromEntries(Object.entries(MIME_EXT).map(([m, e]) => [e, m]));
 const SAFE = /^[A-Za-z0-9_-]+$/;

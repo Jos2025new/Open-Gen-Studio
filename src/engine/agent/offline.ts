@@ -1,7 +1,7 @@
 import { detectLang, type Lang } from '../../lib/lang';
 import type { RawPlan, RawStep } from '../plan';
 import type { Workflow } from '../skills';
-import type { AgentQuestion, AgentStyle, MediaKind, Workspace } from '../types';
+import type { AgentQuestion, AgentStyle, AssetKind, Workspace } from '../types';
 
 /*
  * Deterministic planner used when no LLM provider is configured. It covers the
@@ -20,7 +20,7 @@ export interface OfflineInput {
   maxRounds: number;
   style: AgentStyle;
   workspace: Workspace;
-  attachments: Array<{ id: string; kind: MediaKind }>;
+  attachments: Array<{ id: string; kind: AssetKind }>;
   skillHint?: string;
   workflow?: Workflow;
   doc?: { width: number; height: number };

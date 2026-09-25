@@ -8,10 +8,10 @@ import { estimateMedia, estimateOp } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
-import { clipTrim, coerceSettings, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, clipTrim, coerceSettings, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
-import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
+import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -218,6 +218,7 @@ async function execute(id: string): Promise<string[]> {
     // Inputs
     let refs: MediaInput[] = [];
     let refVideos: MediaInput[] = [];
+    let audios: MediaInput[] = [];
     let firstFrame: MediaInput | undefined;
     let lastFrame: MediaInput | undefined;
     let video: MediaInput | undefined;
@@ -242,7 +243,10 @@ async function execute(id: string): Promise<string[]> {
         refs.push(await mediaInput(g.op.sourceAssetId));
       }
     } else {
-      for (const r of g.inputs.refs) (get().assets[r]?.kind === 'video' ? refVideos : refs).push(await mediaInput(r));
+      for (const r of g.inputs.refs) {
+        const kind = get().assets[r]?.kind;
+        (kind === 'video' ? refVideos : kind === 'audio' ? audios : refs).push(await mediaInput(r));
+      }
       if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
       if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     }
@@ -254,12 +258,18 @@ async function execute(id: string): Promise<string[]> {
       // A reference-to-video model has no start frame: an image given as one becomes a reference.
       const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
       ({ firstFrame, images: refs, videos: refVideos } = routed);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), images: refs.length, videos: refVideos.length });
+      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), images: refs.length, videos: refVideos.length, audios: audios.length });
       if (problem) throw new Error(`${model.name} ${problem}`);
     }
     if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
     if (g.kind === 'image' && refVideos.length && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
     if (g.kind === 'image' && refVideos.length < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
+    if (g.kind === 'image') {
+      const problem = audioInputProblem(schema.slots, audios.length);
+      if (problem) throw new InputError('AUDIO_INPUT', `${model.name} ${problem}`);
+    }
+    // Audio: the first track to a single-track field (lip-sync, soundtrack), the rest as references.
+    const { audio, refAudios } = routeAudio(schema.slots, audios);
 
     // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
     let genSettings = g.settings;
@@ -305,6 +315,8 @@ async function execute(id: string): Promise<string[]> {
         refVideos,
         keyframes,
         clips,
+        audio,
+        refAudios,
         firstFrame,
         lastFrame,
         video,
@@ -526,6 +538,6 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   return { ...spec, estimate: estimateOp(input.op, input.params, source, settings) };
 }
 
-export function inputKindOf(assetId: string): MediaKind | undefined {
+export function inputKindOf(assetId: string): AssetKind | undefined {
   return get().assets[assetId]?.kind;
 }

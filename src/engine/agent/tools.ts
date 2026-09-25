@@ -72,7 +72,7 @@ export const TOOLS: ToolSpec[] = [
                   type: 'array',
                   items: { type: 'string' },
                   description:
-                    'image: reference/source images (and a video clip for clip models). video: reference images/videos for reference-to-video models, or the keyframe images (in order) for keyframe models.',
+                    'image: reference/source images (and a video clip for clip models). video: reference images/videos/audio for reference-to-video models, the keyframe images (in order) for keyframe models, or the audio track for lip-sync / soundtrack models.',
                 },
                 times: {
                   type: 'array',

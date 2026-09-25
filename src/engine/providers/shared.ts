@@ -18,16 +18,24 @@ export function splitSource(slots: InputSlots, refs: MediaInput[]): { source?: M
 }
 
 /**
- * Keyframe and trimmed-clip lists (FLUX 3 `keyframes`, `video_clips`), built from the slot's field names.
- * `image`/`video` encode one input the way the provider takes files (uploaded URL or data URL).
+ * Keyframe and trimmed-clip lists (FLUX 3 `keyframes`, `video_clips`) and audio inputs, built from the slot's
+ * field names. `image`/`video` encode one input the way the provider takes files (uploaded URL or data URL);
+ * `video` also encodes audio (both are sent as files, untouched).
  */
 export async function structuredInputs(
   slots: InputSlots,
-  req: { keyframes?: Array<{ input: MediaInput; frame: number }>; clips?: Array<{ input: MediaInput; start: number; end: number }> },
+  req: {
+    keyframes?: Array<{ input: MediaInput; frame: number }>;
+    clips?: Array<{ input: MediaInput; start: number; end: number }>;
+    audio?: MediaInput;
+    refAudios?: MediaInput[];
+  },
   image: (m: MediaInput) => Promise<unknown>,
   video: (m: MediaInput) => Promise<string>,
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
+  if (slots.audio && req.audio) out[slots.audio.key] = await video(req.audio);
+  if (slots.refAudios && req.refAudios?.length) out[slots.refAudios.key] = await Promise.all(req.refAudios.slice(0, slots.refAudios.max).map(video));
   const kf = slots.keyframes;
   if (kf && req.keyframes?.length) {
     out[kf.key] = await Promise.all(req.keyframes.slice(0, kf.max).map(async (k) => ({ [kf.imageKey]: await image(k.input), [kf.indexKey]: k.frame })));

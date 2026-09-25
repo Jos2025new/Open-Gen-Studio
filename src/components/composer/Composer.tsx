@@ -222,6 +222,8 @@ export function Composer() {
     mode === 'video'
       ? { multiple: Boolean(mediaSlots?.images || mediaSlots?.mixedRefs || mediaSlots?.keyframes), videos: Boolean(mediaSlots?.refVideos || mediaSlots?.mixedRefs || mediaSlots?.clips) }
       : { multiple: true, videos: Boolean(mediaSlots?.clips) };
+  // Audio attachments: speech for lip-sync / avatars, a soundtrack, or reference audio.
+  const takesAudio = mode === 'agent' || Boolean(mediaSlots?.audio || mediaSlots?.refAudios || (mode === 'video' && mediaSlots?.mixedRefs));
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -272,16 +274,26 @@ export function Composer() {
       toast('This model takes no reference videos. Extract a frame to use one as an image.', 'error');
       return;
     }
+    if (!takesAudio && kinds.includes('audio')) {
+      toast('This model takes no audio.', 'error');
+      return;
+    }
     setComposer((c) => ({ attachments: [...c.attachments, ...ids.filter((id) => !c.attachments.includes(id))] }));
   };
 
   const onFiles = (files: FileList | File[] | null) => {
     if (!files?.length) return;
-    if (!acceptsImages) {
+    const list = [...files];
+    const onlyAudio = list.every((f) => f.type.startsWith('audio/'));
+    if (!acceptsImages && !(takesAudio && onlyAudio)) {
       toast('The selected model does not take input images.', 'error');
       return;
     }
-    void attachFiles([...files]);
+    if (!takesAudio && list.some((f) => f.type.startsWith('audio/'))) {
+      toast('This model takes no audio.', 'error');
+      return;
+    }
+    void attachFiles(list);
   };
 
   return (
@@ -364,15 +376,17 @@ export function Composer() {
           <div className="composer-end">
             <IconButton
               icon={Paperclip}
-              label={acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : 'Attach images') : 'This model takes no input images'}
+              label={
+                acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
+              }
               size="md"
-              disabled={!acceptsImages}
+              disabled={!acceptsImages && !takesAudio}
               onClick={() => fileRef.current?.click()}
             />
             <input
               ref={fileRef}
               type="file"
-              accept={mode === 'agent' || videoRefs.videos ? 'image/png,image/jpeg,image/webp,video/mp4,video/webm' : 'image/png,image/jpeg,image/webp'}
+              accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : ''].filter(Boolean).join(',')}
               multiple={mode !== 'video' || videoRefs.multiple}
               hidden
               onChange={(e) => {
