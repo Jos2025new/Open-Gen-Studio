@@ -85,7 +85,14 @@ export async function fetchBlob(url: string, init?: RequestInit): Promise<Blob> 
     res = await fetch(url, init);
   } catch (err) {
     if (isAbort(err)) throw new AbortedError();
-    throw new Error('Could not download the result (network or CORS).');
+    // Storage without CORS: retry through the dev/preview relay (allow-listed hosts only; absent in production).
+    try {
+      res = await fetch(`/x/media?url=${encodeURIComponent(url)}`, { signal: init?.signal });
+    } catch (relayErr) {
+      if (isAbort(relayErr)) throw new AbortedError();
+      throw new Error('Could not download the result (network or CORS).');
+    }
+    if (!res.ok) throw new Error('Could not download the result (network or CORS).');
   }
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
   return res.blob();

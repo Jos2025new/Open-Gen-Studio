@@ -12,7 +12,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — fase 3: entrada de vídeo (2026-09-25)
+## Tarea actual — correcciones tras la primera generación real (2026-09-25)
+Prueba real: el agente (GLM 5.3 Flash · NanoGPT) animó un personaje con Seedance 2.0 Mini de Atlas. Estimado 0,055 USD; cobrado 0,122 USD (saldo Atlas 3,319255 → 3,197287).
+1. [x] Tarjeta del plan en "Running" para siempre tras recargar a mitad: la ejecución vive en memoria. `settleInterruptedPlans()` sigue al arrancar las generaciones que `resumeInterrupted` retoma (sin reenviar nada) y cierra el plan con su estado real. *Razón: el vídeo llegaba pero la tarjeta nunca se cerraba.*
+2. [x] El resultado de Atlas quedó solo en su almacén (`*.volces.com`, sin CORS, URL firmada que caduca en 24 h), así que no se guardaba y Extract frame fallaba ("Video failed to load"). Relay `/x/media` en dev/preview solo para hosts de almacenamiento de proveedores (lista blanca, 403 al resto); `fetchBlob` reintenta por él; `ensureAssetBlob` guarda el archivo al usarlo y `adoptRemoteAssets()` al arrancar; los fotogramas se leen de bytes locales. *Razón: no perder resultados ni fallar herramientas.* Límite: sin backend en producción, esos hosts seguirán sin poder descargarse.
+3. [x] Precio de vídeo de Atlas mostrado como mínimo (`≥`, `PriceRule.lowerBound`): Atlas solo publica el tramo más barato; a 720p cuesta ~2×. *Razón: no prometer un importe menor al real.*
+
+## Tarea anterior — fase 3: entrada de vídeo (2026-09-25)
 Contrastado con esquemas vivos y docs: fal usa `video_url`; Atlas `video` o `video_url` (sube con `uploadMedia`); NanoGPT `videoDataUrl` en `generate-video` (docs oficiales). fal está bloqueado por saldo agotado.
 1. [x] `InputSlots.video`, `ModelSummary.acceptsVideo`, `GenRequest.video`. `schemaFromJson` detecta la clave de vídeo; NanoGPT la declara (`videoDataUrl`). *Razón: extensión mínima ya prevista.*
 2. [x] Descubrimiento: fal categoría `video-to-video`; Atlas deja de saltar `VIDEO-TO-VIDEO`; NanoGPT incluye modelos con entrada de vídeo. Los que necesitan vídeo no salen en los selectores normales. *Razón: evitar modelos que fallarían sin vídeo.*

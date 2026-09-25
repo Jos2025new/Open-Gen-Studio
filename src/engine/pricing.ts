@@ -68,7 +68,7 @@ export function estimate(rule: PriceRule | undefined, ctx: EstimateContext): Est
   }
   if (ctx.audio && sku.audio == null && rule.audioMultiplier) usd *= rule.audioMultiplier;
   if (rule.minimumUsd != null && usd < rule.minimumUsd * count) usd = rule.minimumUsd * count;
-  return { usd: round4(usd), approximate, note: rule.note };
+  return { usd: round4(usd), approximate, lowerBound: rule.lowerBound || undefined, note: rule.note };
 }
 
 export function sumEstimates(parts: Estimate[]): Estimate {

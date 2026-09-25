@@ -72,6 +72,10 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - Operaciones Upscale video y Edit video: override en Ajustes → lista preferida por proveedor (IDs verificados) → cualquier modelo etiquetado. Se conserva duración y encuadre del original; el coste usa la duración del clip.
 - fal/NanoGPT reciben data URL; Atlas sube con `uploadMedia`. *Por qué:* sin infraestructura nueva de subidas; límite: clips grandes pueden superar el tamaño máximo de petición.
 
+**Primera generación real y correcciones** (2026-09-25) — `agent/runtime.ts`, `jobs.ts`, `lib/media.ts`, `vite.config.ts`, `providers/atlas.ts`, `pricing.ts`, `App.tsx`
+- Prueba: animación de caminata de un personaje con el agente (GLM 5.3 Flash · NanoGPT) y Seedance 2.0 Mini de Atlas; 5 s a 960×960. Estimado 0,055 USD, cobrado 0,122 USD.
+- Planes cortados por una recarga se cierran con su estado real (`settleInterruptedPlans`). Resultados en almacenes sin CORS (Atlas `*.volces.com`, enlaces de 24 h) se descargan por el relay `/x/media` (solo dev/preview, lista blanca) y se guardan (`ensureAssetBlob`, `adoptRemoteAssets`); Extract frame lee bytes locales. Precio de vídeo de Atlas mostrado como mínimo (`≥`).
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
 Estado: typecheck limpio y **20 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.

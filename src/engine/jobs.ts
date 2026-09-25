@@ -1,6 +1,6 @@
 import { uid } from '../lib/id';
 import { AbortedError, isAbort } from '../lib/http';
-import { getAssetBlob, loadAssetUrl, putAssetBlob } from '../lib/idb';
+import { getAssetBlob, putAssetBlob } from '../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
@@ -10,7 +10,7 @@ import { coerceSettings, dimsFor, longEdgeFor, maxCountPerRequest, nearestAspect
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId } from './types';
-import { addAssets, addSpend, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
 const controllers = new Map<string, AbortController>();
@@ -72,20 +72,41 @@ export function createGeneration(spec: GenerationSpec): Generation {
   return g;
 }
 
-async function mediaInput(assetId: string): Promise<MediaInput> {
+/** An asset's bytes. A result that still lives only at the provider is downloaded and kept, since provider links expire. */
+async function ensureAssetBlob(assetId: string): Promise<Blob> {
   const asset = get().assets[assetId];
   if (!asset) throw new Error('An input asset was deleted.');
-  let blob = await getAssetBlob(assetId);
-  if (!blob && asset.remoteUrl) blob = await fetchBlob(asset.remoteUrl);
-  if (!blob) throw new Error('An input asset is not available offline.');
+  const stored = await getAssetBlob(assetId);
+  if (stored) return stored;
+  if (!asset.remoteUrl) throw new Error('An input asset is not available offline.');
+  const blob = await fetchBlob(asset.remoteUrl);
+  await putAssetBlob(assetId, blob);
+  patchAsset(assetId, { stored: true, remoteUrl: undefined });
+  return blob;
+}
+
+/** Keep results that are still only at the provider (e.g. after a download was blocked). Best effort. */
+export async function adoptRemoteAssets(): Promise<void> {
+  for (const a of Object.values(get().assets)) {
+    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(() => undefined);
+  }
+}
+
+async function mediaInput(assetId: string): Promise<MediaInput> {
+  const asset = get().assets[assetId];
+  const blob = await ensureAssetBlob(assetId);
   return { assetId, blob, mime: blob.type || asset.mime, width: asset.width, height: asset.height };
 }
 
 async function frameInput(assetId: string, which: 'first' | 'last' | number): Promise<MediaInput> {
-  const url = (await loadAssetUrl(assetId)) ?? get().assets[assetId]?.remoteUrl;
-  if (!url) throw new Error('The source video is not available.');
-  const f = await extractVideoFrame(url, which);
-  return { assetId, blob: f.blob, mime: 'image/png', width: f.width, height: f.height };
+  // Read frames from local bytes: a remote video without CORS cannot be drawn to a canvas.
+  const url = URL.createObjectURL(await ensureAssetBlob(assetId));
+  try {
+    const f = await extractVideoFrame(url, which);
+    return { assetId, blob: f.blob, mime: 'image/png', width: f.width, height: f.height };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallback: MediaInfo): Promise<Asset> {

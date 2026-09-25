@@ -58,6 +58,8 @@ export interface PriceRule {
   note?: string;
   /** true when the provider bills something we cannot predict (tokens, GPU time). */
   approximate?: boolean;
+  /** The published price is the cheapest configuration; higher resolution or audio cost more. Shown as "≥". */
+  lowerBound?: boolean;
 }
 
 export interface ModelSummary {

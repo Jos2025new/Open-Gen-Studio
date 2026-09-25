@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useStore } from './store/store';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
-import { resumeInterrupted } from './engine/jobs';
+import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
+import { settleInterruptedPlans } from './engine/agent/runtime';
 import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
 import { SidePanel } from './components/shell/SidePanel';
@@ -31,6 +32,9 @@ export function App() {
     void ensureSchema(st.composer.video.modelRef);
     if (st.settings.agent.provider !== 'offline') void loadLlmCatalog(st.settings.agent.provider);
     void resumeInterrupted();
+    // Plans cut by the reload follow their resumed generations; results still only at a provider get saved.
+    settleInterruptedPlans();
+    void adoptRemoteAssets();
   }, [hydrated]);
 
   if (!hydrated) {

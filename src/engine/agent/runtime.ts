@@ -609,3 +609,46 @@ export function repairHistory(history: LlmMessage[]): LlmMessage[] {
   }
   return out;
 }
+
+/**
+ * After a reload, plans that were running have lost their executor. Their generations are resumed by
+ * `resumeInterrupted`; follow them and close each card with its real outcome instead of "Running" forever.
+ * Nothing is submitted again: steps that had not started before the reload are reported as not run.
+ */
+export function settleInterruptedPlans(): void {
+  const open = new Set<string>();
+  for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan' && f.status === 'running') open.add(`${s.id}|${f.id}`);
+  if (!open.size) return;
+  const check = () => {
+    const gens = get().generations;
+    for (const key of [...open]) {
+      const [sessionId, itemId] = key.split('|');
+      const item = get().sessions[sessionId]?.feed.find((f) => f.id === itemId);
+      if (!item || item.type !== 'plan' || item.status !== 'running') {
+        open.delete(key);
+        continue;
+      }
+      const states: Record<string, StepState> = { ...item.stepStates };
+      let pending = false;
+      for (const st of item.plan.steps) {
+        const gid = item.stepGenerations[st.id];
+        const g = gid ? gens[gid] : undefined;
+        if (g) states[st.id] = g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
+        else if (states[st.id] !== 'done') states[st.id] = 'skipped';
+      }
+      if (pending) continue;
+      open.delete(key);
+      const done = Object.values(states).filter((v) => v === 'done').length;
+      const all = item.plan.steps.length;
+      updateFeedItem<PlanFeedItem>(sessionId, itemId, {
+        stepStates: states,
+        status: done === all ? 'done' : done ? 'partial' : 'error',
+        error: done === all ? undefined : 'Interrupted by a page reload; some steps did not run.',
+      });
+    }
+    if (!open.size) unsubscribe();
+  };
+  const unsubscribe = useStore.subscribe(check);
+  check();
+}
+

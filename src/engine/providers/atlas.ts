@@ -37,7 +37,8 @@ function atlasPrice(m: AtlasModel): PriceRule | undefined {
   const base = numberOrUndefined(m.price?.actual?.base_price);
   if (base == null) return undefined;
   if (m.type === 'Video') {
-    return { skus: [{ unit: 'second', usd: base }], approximate: true, note: 'Atlas base price per output second' };
+    // Atlas publishes only the cheapest tier (lowest resolution, no audio); real runs at 720p cost ~2× (seen: 0.055 → 0.122 USD).
+    return { skus: [{ unit: 'second', usd: base }], approximate: true, lowerBound: true, note: 'Atlas base price per second (lowest tier); higher resolution or audio cost more' };
   }
   return { skus: [{ unit: 'output', usd: base }] };
 }
