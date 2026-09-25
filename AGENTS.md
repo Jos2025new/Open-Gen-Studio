@@ -8,6 +8,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — comparación documental de proveedores (2026-09-25)
+1. [x] Comparar los ejemplos de `/home/samuel/Descargas/API DOC` con los adaptadores y parámetros. *Razón: identificar incompatibilidades concretas sin consumir APIs de pago.*
+2. [x] Comunicar diferencias, coincidencias y límites en `API_DOC_REVIEW.md`; registrar la revisión documental. *Razón: separar errores de funciones no implementadas, sin modificar la aplicación. Typecheck y 20 tests correctos; sin navegador ni ejecución remota por ser revisión documental.*
+
 ## Tarea — plan auditado (2026-09-24)
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
