@@ -56,6 +56,8 @@ React 19, Vite 8, TypeScript, zustand, @xyflow/react, IndexedDB (idb-keyval), zo
 - [`PROGRESS.md`](PROGRESS.md): estado actual y registro de cambios con sus razones.
 - [`AGENTS.md`](AGENTS.md): guía para agentes y plan paso a paso de cada tarea.
 - [`PROPUESTAS.md`](PROPUESTAS.md): ideas en discusión (despliegue, acceso, herramientas pendientes).
+- [`MODEL_VALIDATION.md`](MODEL_VALIDATION.md): validación de las familias de modelos prioritarias contra los esquemas reales de cada proveedor.
+- [`TRAZABILIDAD.md`](TRAZABILIDAD.md): qué verifica cada cambio y cómo detectar regresiones (incluye la red de regresión de proveedores, `npm run snapshot:models`).
 
 ## Licencia
 
