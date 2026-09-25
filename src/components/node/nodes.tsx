@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
-import { aspectLabel, coerceSettings, durationChoices, paramByRole, ratioOf } from '../../engine/params';
+import { aspectLabel, coerceSettings, durationChoices, durationLabel, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, setSketch, tryConnect } from '../../engine/flow/actions';
 import { inputPorts, NODE_WIDTH, outputPort } from '../../engine/flow/graph';
@@ -423,7 +423,7 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
   const audio = paramByRole(schema, 'audio');
   const durations = durationChoices(schema);
   const set = (patch: Partial<GenNodeData['settings']>) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, ...patch } });
-  const summary = [res?.options?.length ? d.settings.resolution : null, d.kind === 'video' && durations.length ? `${d.settings.duration ?? durations[0]}s` : null].filter(Boolean);
+  const summary = [res?.options?.length ? d.settings.resolution : null, d.kind === 'video' && durations.length ? durationLabel(d.settings.duration ?? durations[0]) : null].filter(Boolean);
   if (!aspect?.options?.length && !res?.options?.length && !durations.length && !audio) return null;
   return (
     <>
@@ -452,7 +452,7 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
               <div className="nt-options">
                 {durations.map((n) => (
                   <button key={n} type="button" className={`option ${n === d.settings.duration ? 'is-active' : ''}`} onClick={() => set({ duration: n })}>
-                    {n}s
+                    {durationLabel(n)}
                   </button>
                 ))}
               </div>

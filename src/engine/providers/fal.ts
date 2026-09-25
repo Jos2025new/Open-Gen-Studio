@@ -1,9 +1,9 @@
 import { cacheDb } from '../../lib/idb';
-import { fetchJsonWithRelay, requestJson, sleep } from '../../lib/http';
+import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -183,16 +183,22 @@ export const fal: ProviderAdapter = {
   },
 };
 
-async function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  const started = Date.now();
-  const interval = ctx.kind === 'image' ? 1500 : 4000;
-  for (;;) {
+function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
+  return pollJob(ctx, 'fal.ai', ctx.kind === 'image' ? 1500 : 4000, async () => {
     const st = await requestJson<{ status: string; queue_position?: number }>(job.meta.status_url, {
       headers: falHeaders(ctx.apiKey),
       signal: ctx.signal,
+      timeoutMs: POLL_TIMEOUT_MS,
     });
     if (st.status === 'COMPLETED') {
-      const res = await requestJson<unknown>(job.meta.response_url, { headers: falHeaders(ctx.apiKey), signal: ctx.signal });
+      // fal reports model errors (e.g. 422) when the response is fetched, not in the status.
+      let res: unknown;
+      try {
+        res = await requestJson<unknown>(job.meta.response_url, { headers: falHeaders(ctx.apiKey), signal: ctx.signal, timeoutMs: 2 * POLL_TIMEOUT_MS });
+      } catch (err) {
+        if (err instanceof HttpError && !isTransient(err) && err.status !== 401 && err.status !== 403) throw new JobFailedError(err.message);
+        throw err;
+      }
       const outputs = await Promise.all(
         extractOutputs(res, ctx.kind).map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
@@ -203,11 +209,9 @@ async function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
           }
         }),
       );
-      if (!outputs.length) throw new Error('fal.ai finished without outputs');
+      if (!outputs.length) throw new JobFailedError('fal.ai finished without outputs');
       return { outputs };
     }
-    const elapsed = Math.round((Date.now() - started) / 1000);
-    ctx.onStatus(st.status === 'IN_QUEUE' ? `Queued${st.queue_position != null ? ` #${st.queue_position + 1}` : ''} · ${elapsed}s` : `Rendering · ${elapsed}s`);
-    await sleep(interval, ctx.signal);
-  }
+    return st.status === 'IN_QUEUE' ? `Queued${st.queue_position != null ? ` #${st.queue_position + 1}` : ''}` : 'Rendering';
+  });
 }

@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { CircleAlert, CircleStop, Copy, Expand, Info, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
-import { cancelGeneration } from '../../engine/jobs';
-import { aspectLabel, ratioOf } from '../../engine/params';
+import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
+import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
 import { formatDuration } from '../../lib/format';
 import type { Generation } from '../../engine/types';
@@ -21,7 +21,7 @@ function metaLine(g: Generation): string {
     g.modelName,
     s.aspect && s.aspect !== 'auto' ? aspectLabel(s.aspect) : null,
     s.resolution ?? null,
-    g.kind === 'video' && s.duration ? `${s.duration}s` : null,
+    g.kind === 'video' && s.duration ? durationLabel(s.duration) : null,
     g.kind === 'image' && s.count > 1 ? `×${s.count}` : null,
   ]
     .filter(Boolean)
@@ -96,6 +96,11 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         <div className={`gen-error ${g.status === 'canceled' ? 'is-canceled' : ''}`}>
           <CircleAlert size={15} />
           <span>{g.status === 'canceled' ? 'Canceled' : g.error}</span>
+          {canRecheck(g) ? (
+            <Button size="sm" variant="secondary" icon={RefreshCw} className="gen-recheck" data-tip="The job was submitted and may still finish at the provider" onClick={() => void recheckGeneration(g.id)}>
+              Check again
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="tiles" style={{ ['--cols' as string]: cols }}>

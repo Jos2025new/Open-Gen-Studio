@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Box, ChevronDown, Clock, Dices, Layers, SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, selectComposerModel } from '../../engine/catalog';
-import { aspectLabel, durationChoices, paramByRole, ratioOf, maxCountPerRequest } from '../../engine/params';
+import { aspectLabel, durationChoices, durationLabel, paramByRole, ratioOf, maxCountPerRequest } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
 import type { AdvancedValue, MediaKind, ParamDef } from '../../engine/types';
 import { setComposerMedia, useStore } from '../../store/store';
@@ -137,7 +137,7 @@ function DurationChip() {
   return (
     <>
       <Chip ref={pop.ref} icon={Clock} active={pop.open} onClick={pop.toggle} data-tip="Duration">
-        {duration ?? choices[0]}s
+        {durationLabel(duration ?? choices[0])}
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="Duration">
         <PopoverHeader title="Duration" />
@@ -153,7 +153,7 @@ function DurationChip() {
                 pop.close();
               }}
             >
-              {d}s
+              {durationLabel(d)}
             </button>
           ))}
         </div>

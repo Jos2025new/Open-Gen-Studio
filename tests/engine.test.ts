@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { extractErrorMessage, HttpError, JobFailedError, NetworkError, requestJson } from '../src/lib/http';
+import { pollJob } from '../src/engine/providers/shared';
+import type { ResumeContext } from '../src/engine/providers/types';
 import { estimate, needsSpendCheck, sumEstimates, UNKNOWN, FREE } from '../src/engine/pricing';
 import { coerceSettings, schemaFromJson, wireParams } from '../src/engine/params';
 import { MAX_PLAN_STEPS, normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
@@ -31,6 +34,14 @@ describe('cost checks', () => {
   });
   it('multiplies per-second pricing by duration and output count', () => {
     expect(estimate({ skus: [{ unit: 'second', usd: 0.1 }] }, { count: 2, duration: 8 }).usd).toBe(1.6);
+  });
+  it('prices an automatic duration (-1) at the longest allowed, never negative', () => {
+    const rule = { skus: [{ unit: 'second' as const, usd: 0.1 }] };
+    const auto = estimate(rule, { count: 1, duration: -1, maxDuration: 12 });
+    expect(auto.usd).toBeCloseTo(1.2);
+    expect(auto.approximate).toBe(true);
+    expect(auto.note).toMatch(/Automatic duration/);
+    expect(estimate(rule, { count: 1, duration: -1 }).usd).toBeGreaterThan(0);
   });
   it('preserves the lower-bound flag for minimum-only pricing', () => {
     const minimum = estimate({ skus: [], minimumUsd: 0.05 }, { count: 3 });
@@ -190,5 +201,46 @@ describe('Designer layers', () => {
     expect(toolBlockReason('move', { ...layer, locked: true })).toMatch(/locked/);
     expect(layerAccepts('raster', 'video')).toBe(false);
     expect(toolBlockReason('rect', layer)).toBeNull();
+  });
+});
+
+describe('remote job polling', () => {
+  const ctx = (): ResumeContext & { statuses: string[] } => {
+    const statuses: string[] = [];
+    return { kind: 'video', apiKey: 'k', signal: new AbortController().signal, onStatus: (t) => statuses.push(t), statuses };
+  };
+  it('retries failed status checks instead of failing the job', async () => {
+    const c = ctx();
+    let calls = 0;
+    const result = await pollJob(c, 'Test', 1, async () => {
+      calls++;
+      if (calls === 1) throw new NetworkError('offline');
+      if (calls === 2) throw new HttpError(503, 'busy', null);
+      if (calls === 3) return 'Rendering';
+      return { outputs: [{ url: 'https://x/v.mp4' }] };
+    });
+    expect(result.outputs).toHaveLength(1);
+    expect(c.statuses.some((s) => s.startsWith('Connection problem'))).toBe(true);
+  });
+  it('stops at a confirmed failure or a non-temporary error without retrying', async () => {
+    await expect(pollJob(ctx(), 'Test', 1, async () => { throw new JobFailedError('moderated'); })).rejects.toBeInstanceOf(JobFailedError);
+    let calls = 0;
+    const auth = pollJob(ctx(), 'Test', 1, async () => { calls++; throw new HttpError(401, 'bad key', null); });
+    await expect(auth).rejects.toBeInstanceOf(HttpError);
+    expect(calls).toBe(1);
+  });
+  it('reads provider error objects as text', () => {
+    expect(extractErrorMessage({ status: 'FAILED', error: { message: 'Content rejected' } }, 'x')).toBe('Content rejected');
+    expect(extractErrorMessage({ userFriendlyError: 'Try another prompt', error: { code: 1 } }, 'x')).toBe('Try another prompt');
+    expect(extractErrorMessage({ error: { code: 1 } }, 'Video failed')).toBe('Video failed');
+  });
+  it('turns a hung request into a network error, not a cancel', async () => {
+    vi.stubGlobal('location', { href: 'http://localhost/' });
+    vi.stubGlobal('fetch', (_: string, init: RequestInit) => new Promise((_r, reject) => init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))));
+    try {
+      await expect(requestJson('https://api.example.com/status', { timeoutMs: 5 })).rejects.toBeInstanceOf(NetworkError);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

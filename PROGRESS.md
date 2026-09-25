@@ -84,9 +84,15 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - "Wipe all data" mueve `data/` a `data.bak-<fecha>`: no reaparece al recargar y no se pierde. `navigator.storage.persist()` al arrancar.
 - Verificado: generar una imagen → aparece en `data/`; borrar a mano todo el almacenamiento del navegador → al recargar vuelven sesión e imagen; wipe → copia en `data.bak-*` y arranque limpio. `data/` y `data.bak-*` fuera de git.
 
+**Trabajos remotos y duración automática** (2026-09-24) — `lib/http.ts`, `providers/{shared,atlas,fal,nanogpt}.ts`, `jobs.ts`, `pricing.ts`, `costs.ts`, `GenerationCard.tsx`
+- *Por qué:* fallos 4–6 de `API_DOC_REVIEW.md`. Un error al consultar borraba el ID de un trabajo ya pagado; `duration: -1` daba precios negativos; NanoGPT esperaba sin límite y mostraba `[object Object]`.
+- `pollJob()` común: reintenta con espera creciente los fallos temporales (red, timeout de 30 s por petición, 408/429/5xx); límite local de 10 min (imagen) o 30 min (vídeo). Solo `JobFailedError` (fallo confirmado por el proveedor, o un 4xx de fal al leer el resultado) borra `remoteJob`. Error de autenticación, límite de espera, cancelación local o recarga sin clave conservan el trabajo y la tarjeta ofrece **Check again** (`recheckGeneration`).
+- Duración `<= 0`: se estima con la mayor duración del modelo, aproximada y con nota; la interfaz la muestra como "Auto".
+- Verificado en navegador con `fetch` simulado (sin llamadas reales): 503 → processing → completed guarda el resultado; 401 conserva el trabajo; `failed` lo cierra con el mensaje de `error.message`; cancelar conserva el trabajo. Datos de prueba borrados.
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
-Estado: typecheck limpio y **20 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
+Estado: typecheck limpio y **25 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
 
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.

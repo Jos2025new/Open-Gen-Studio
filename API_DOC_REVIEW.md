@@ -1,5 +1,7 @@
 # Comparación con los ejemplos aportados
 
+> **Estado (2026-09-24):** los puntos 4, 5 y 6 están corregidos (ver `PROGRESS.md`, «Trabajos remotos y duración automática»); `/generate-video/recover` sigue sin integrar. Los puntos 1–3 siguen pendientes.
+
 Revisión: GPT 6 ASTRA, 2026-09-25. Fuentes: `/home/samuel/Descargas/API DOC`. Comparación estática del código actual; ninguna generación ni consulta autenticada. Los ejemplos se tratan como contratos documentados, no como prueba de disponibilidad actual de esos modelos.
 
 ## Diferencias que afectan al funcionamiento

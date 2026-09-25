@@ -1,9 +1,9 @@
 import { cacheDb } from '../../lib/idb';
-import { HttpError, requestJson, sleep } from '../../lib/http';
+import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
 import type { GenOutput, GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -351,26 +351,23 @@ async function materialize(outputs: GenOutput[], signal: AbortSignal): Promise<G
   );
 }
 
-async function pollVideo(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  const started = Date.now();
-  for (;;) {
+function pollVideo(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
+  return pollJob(ctx, 'NanoGPT', 5000, async () => {
     const res = await requestJson<Loose>(`${BASE}/video/status?requestId=${encodeURIComponent(job.id)}`, {
       headers: { 'x-api-key': ctx.apiKey },
       signal: ctx.signal,
+      timeoutMs: POLL_TIMEOUT_MS,
     });
     const data = (res.data ?? res) as Loose;
     const status = String(data.status ?? '').toUpperCase();
     if (status === 'COMPLETED') {
       const outputs = await materialize(extractOutputs(res, 'video'), ctx.signal);
-      if (!outputs.length) throw new Error('NanoGPT finished without a video URL');
+      if (!outputs.length) throw new JobFailedError('NanoGPT finished without a video URL');
       return { outputs, costUsd: num(data.cost) ?? num(job.meta.submitCost) };
     }
     if (status === 'FAILED' || status === 'CANCELED' || status === 'CANCELLED') {
-      const msg = String(data.userFriendlyError ?? data.error ?? `Video ${status.toLowerCase()}`);
-      throw new HttpError(500, msg, res);
+      throw new JobFailedError(extractErrorMessage(data, `Video ${status.toLowerCase()}`));
     }
-    const elapsed = Math.round((Date.now() - started) / 1000);
-    ctx.onStatus(`${status === 'IN_QUEUE' || status === 'PENDING' || status === 'QUEUED' ? 'Queued' : 'Rendering'} · ${elapsed}s`);
-    await sleep(5000, ctx.signal);
-  }
+    return status === 'IN_QUEUE' || status === 'PENDING' || status === 'QUEUED' ? 'Queued' : 'Rendering';
+  });
 }

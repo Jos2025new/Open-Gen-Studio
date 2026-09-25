@@ -2,7 +2,7 @@ import { Check, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Type
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
-import { aspectLabel } from '../../engine/params';
+import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
 import type { PlanFeedItem, PlanStep, StepState } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
@@ -30,7 +30,7 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string): string {
     case 'image':
       return [modelName(s.modelRef), s.settings.aspect ? aspectLabel(s.settings.aspect) : '', s.settings.count > 1 ? `×${s.settings.count}` : '', s.refs.length ? `${s.refs.length} ref` : ''].filter(Boolean).join(' · ');
     case 'video':
-      return [modelName(s.modelRef), s.settings.duration ? `${s.settings.duration}s` : '', s.firstFrame ? `from ${s.firstFrame}` : ''].filter(Boolean).join(' · ');
+      return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${s.firstFrame}` : ''].filter(Boolean).join(' · ');
     case 'op':
       return `${OPS[s.op].label} of ${s.input}`;
     case 'text':

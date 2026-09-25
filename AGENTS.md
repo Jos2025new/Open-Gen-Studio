@@ -8,6 +8,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea actual — trabajos remotos y duración automática (2026-09-24)
+Fallos 4, 5 y 6 de `API_DOC_REVIEW.md`. Sin llamadas de pago.
+1. [x] `http.ts`: `NetworkError` (red o timeout por petición, `timeoutMs`) y `JobFailedError` (el proveedor confirma el fallo). `providers/shared.ts`: `pollJob()` común con reintentos y espera creciente ante fallos temporales (red, 408/429/5xx) y límite local de espera que no declara fallido el trabajo. Atlas, fal y NanoGPT lo usan. *Razón: un fallo al consultar no es un fallo remoto.*
+2. [x] `jobs.ts`: solo `JobFailedError` borra `remoteJob`; con cualquier otro error, límite de espera o cancelación local se conserva, y `recheckGeneration()` reanuda la consulta (botón "Check again" en la tarjeta). *Razón: no perder un trabajo ya pagado.*
+3. [x] NanoGPT: mensaje de error legible aunque `error` sea un objeto; mismo criterio en Atlas. *Razón: `[object Object]`.*
+4. [x] `pricing.ts`/`costs.ts`: duración `<= 0` (automática) se estima con la duración máxima del modelo y se marca aproximada con nota; etiqueta "Auto" en la interfaz. *Razón: `-1` daba un importe negativo; el máximo mantiene prudente el control de gasto.*
+5. [x] Tests (poll simulado, precio con `-1`), typecheck, navegador; commit. 25 tests. Navegador con `fetch` simulado: 503→completed guarda el resultado; 401 y cancelar conservan el trabajo; `failed` lo cierra. Pendiente: `/generate-video/recover` de NanoGPT (solo si el ID ya se perdió) y los fallos 1–3.
+
 ## Tarea — licencia (2026-09-25)
 1. [x] Apache 2.0: `LICENSE` (texto oficial de apache.org), `NOTICE` con la atribución, `"license": "Apache-2.0"` en `package.json` y sección en el README. *Razón: el usuario quiere uso libre para cualquiera con atribución explícita; comparada con MIT, MPL 2.0 y AGPL 3.0 (Gentle AI usa MIT; OpenMontage, AGPL-3.0).*
 
@@ -19,7 +27,7 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — persistencia en disco (2026-09-25)
+## Tarea anterior — persistencia en disco (2026-09-25)
 La app no tiene backend; el navegador perdió sesiones, archivos y claves al reiniciarse su perfil.
 1. [x] `server/local-store.js`: plugin de Vite (dev/preview) con `/x/store`: estado en `data/state.json` (permisos 600, contiene claves) y archivos en `data/<ns>/<id>.<ext>` (PNG/MP4 legibles). Escritura atómica, nombres validados. *Razón: mini-backend local que solo existe mientras se ejecuta el servidor; mismo patrón que los relays `/x/*`.*
 2. [x] `src/lib/disk.ts` + `idb.ts`: espejo en el único punto de guardado (`stateDb`, `blobDb`). Estado con marca `savedAt`: al cargar gana el más reciente. Archivos: si faltan en el navegador se leen del disco. Al arrancar se suben al disco los que falten. Sin servidor (web estática) se desactiva solo. *Razón: el resto de la app no cambia.*

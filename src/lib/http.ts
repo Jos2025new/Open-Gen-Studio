@@ -9,6 +9,28 @@ export class HttpError extends Error {
   }
 }
 
+/** The request never got an answer (offline, DNS, timeout). Says nothing about the remote job. */
+export class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+/** The provider confirmed that a remote job ended without a result (failed or canceled there). */
+export class JobFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'JobFailedError';
+  }
+}
+
+/** Worth asking again: no answer, rate limited, or a server-side hiccup. */
+export function isTransient(err: unknown): boolean {
+  if (err instanceof NetworkError) return true;
+  return err instanceof HttpError && (err.status === 408 || err.status === 425 || err.status === 429 || err.status >= 500);
+}
+
 export class AbortedError extends Error {
   constructor() {
     super('Canceled');
@@ -31,6 +53,7 @@ export function extractErrorMessage(body: unknown, fallback: string): string {
   if (typeof body !== 'object') return fallback;
   const b = body as Record<string, unknown>;
   const candidates: unknown[] = [
+    b.userFriendlyError,
     (b.error as Record<string, unknown> | undefined)?.message,
     b.error,
     b.message,
@@ -61,16 +84,31 @@ async function readBody(res: Response): Promise<unknown> {
 
 export async function requestJson<T = unknown>(
   url: string,
-  init: RequestInit & { signal?: AbortSignal } = {},
+  init: RequestInit & { signal?: AbortSignal; timeoutMs?: number } = {},
 ): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch (err) {
-    if (isAbort(err)) throw new AbortedError();
-    throw new Error(`Network error reaching ${new URL(url, location.href).host}. Check your connection.`);
+  const { timeoutMs, signal, ...rest } = init;
+  const controller = timeoutMs ? new AbortController() : undefined;
+  let timedOut = false;
+  const timer = controller ? setTimeout(() => ((timedOut = true), controller.abort()), timeoutMs) : undefined;
+  const forward = () => controller?.abort();
+  if (controller && signal) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener('abort', forward, { once: true });
   }
-  const body = await readBody(res);
+  let res: Response;
+  let body: unknown;
+  try {
+    res = await fetch(url, { ...rest, signal: controller?.signal ?? signal });
+    body = await readBody(res);
+  } catch (err) {
+    const host = new URL(url, location.href).host;
+    if (timedOut) throw new NetworkError(`${host} did not answer within ${Math.round(timeoutMs! / 1000)}s.`);
+    if (isAbort(err)) throw new AbortedError();
+    throw new NetworkError(`Network error reaching ${host}. Check your connection.`);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', forward);
+  }
   if (!res.ok) {
     const msg = extractErrorMessage(body, `${res.status} ${res.statusText || 'Request failed'}`);
     throw new HttpError(res.status, friendlyStatus(res.status, msg), body);

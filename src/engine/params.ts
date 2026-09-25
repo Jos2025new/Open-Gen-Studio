@@ -331,6 +331,11 @@ export function durationChoices(schema: ModelSchema | undefined): number[] {
   return p ? durationOptions(p) : [];
 }
 
+/** Some models take -1 (or 0) for "let the model choose the length". */
+export function durationLabel(seconds: number): string {
+  return seconds > 0 ? `${seconds}s` : 'Auto';
+}
+
 export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind): GenSettings {
   const s: GenSettings = { count: 1, advanced: {} };
   if (!schema) return s;

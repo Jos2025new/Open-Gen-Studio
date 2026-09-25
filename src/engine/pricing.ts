@@ -3,6 +3,8 @@ import type { Estimate, PriceRule, PriceSku } from './types';
 export interface EstimateContext {
   count: number;
   duration?: number;
+  /** Longest duration the model allows; prices an automatic duration (-1). */
+  maxDuration?: number;
   resolution?: string;
   audio?: boolean;
   mode?: 'text' | 'image';
@@ -51,13 +53,18 @@ export function estimate(rule: PriceRule | undefined, ctx: EstimateContext): Est
   const sku = candidates.reduce((best, s) => (specificity(s) > specificity(best) ? s : best), candidates[0]);
   const count = Math.max(1, ctx.count);
   let usd: number;
+  let durationNote: string | undefined;
   switch (sku.unit) {
     case 'output':
       usd = sku.usd * count;
       break;
     case 'second': {
-      if (ctx.duration == null) approximate = true;
-      usd = sku.usd * (ctx.duration ?? 5) * count;
+      // 0 or less (-1) means the model picks the length: price the longest it allows, never a negative amount.
+      const known = ctx.duration != null && ctx.duration > 0 ? ctx.duration : undefined;
+      const seconds = known ?? ctx.maxDuration ?? 5;
+      if (known == null) approximate = true;
+      if (ctx.duration != null && known == null) durationNote = `Automatic duration, priced at ${seconds}s${ctx.maxDuration != null ? ' (the longest)' : ''}`;
+      usd = sku.usd * seconds * count;
       break;
     }
     case 'megapixel': {
@@ -68,7 +75,8 @@ export function estimate(rule: PriceRule | undefined, ctx: EstimateContext): Est
   }
   if (ctx.audio && sku.audio == null && rule.audioMultiplier) usd *= rule.audioMultiplier;
   if (rule.minimumUsd != null && usd < rule.minimumUsd * count) usd = rule.minimumUsd * count;
-  return { usd: round4(usd), approximate, lowerBound: rule.lowerBound || undefined, note: rule.note };
+  const note = [durationNote, rule.note].filter(Boolean).join('. ') || undefined;
+  return { usd: round4(usd), approximate, lowerBound: rule.lowerBound || undefined, note };
 }
 
 export function sumEstimates(parts: Estimate[]): Estimate {

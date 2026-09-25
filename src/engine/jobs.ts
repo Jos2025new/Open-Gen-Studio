@@ -1,5 +1,5 @@
 import { uid } from '../lib/id';
-import { AbortedError, isAbort } from '../lib/http';
+import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
@@ -9,7 +9,7 @@ import { OPS, opCount } from './ops';
 import { coerceSettings, dimsFor, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
-import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId } from './types';
+import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -143,7 +143,7 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
 
 function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
   const ratio = ratioOf(s.aspect) ?? (kind === 'video' ? 16 / 9 : 1);
-  return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' ? s.duration : undefined };
+  return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' && s.duration != null && s.duration > 0 ? s.duration : undefined };
 }
 
 /** Local operations (frames, grid split) run in the browser for free; they never reach a provider. */
@@ -194,7 +194,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [] });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined });
   const g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -276,14 +276,23 @@ async function execute(id: string): Promise<string[]> {
     return assetIds;
   } catch (err) {
     const cur = get().generations[id];
+    const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
-      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob: undefined });
+      patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
       if (cur?.assetIds.length) chargePartial(cur);
       throw new AbortedError();
     }
-    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob: undefined });
+    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
     throw err;
   }
+}
+
+/**
+ * A submitted job ends only when the provider says it failed. A failed status check, the local time limit
+ * or a local cancel just stop waiting: the job may still finish (and be charged), so keep it for "Check again".
+ */
+function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
+  return err instanceof JobFailedError ? undefined : job;
 }
 
 function finish(id: string, assetIds: string[], actualUsd: number | undefined): void {
@@ -321,41 +330,65 @@ export async function resumeInterrupted(): Promise<void> {
   const gens = Object.values(get().generations).filter((g) => g.status === 'running' || g.status === 'queued');
   for (const g of gens) {
     const job = g.remoteJob;
-    const adapter = job ? ADAPTERS[job.provider] : undefined;
-    if (!job || !adapter?.resume || !isConnected(job.provider)) {
-      patchGeneration(g.id, { status: 'error', error: 'Interrupted by a page reload. Regenerate to try again.', statusText: undefined, finishedAt: Date.now() });
+    if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
+      const error = job ? `Interrupted by a page reload. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload. Regenerate to try again.';
+      patchGeneration(g.id, { status: 'error', error, statusText: undefined, finishedAt: Date.now() });
       continue;
     }
-    const controller = new AbortController();
-    controllers.set(g.id, controller);
-    const p = (async () => {
-      try {
-        patchGeneration(g.id, { statusText: 'Resuming' });
-        const result = await adapter.resume!(job, {
-          kind: g.kind,
-          apiKey: apiKeyFor(job.provider),
-          signal: controller.signal,
-          onStatus: (text, progress) => patchGeneration(g.id, { statusText: text, progress }),
-        });
-        const fallback = expectedDims(g.kind, g.settings);
-        const assets = await Promise.all(result.outputs.map((o) => storeOutput(o, g, g.kind, fallback)));
-        addAssets(assets);
-        finish(g.id, assets.map((a) => a.id), result.costUsd);
-        return assets.map((a) => a.id);
-      } catch (err) {
-        if (isAbort(err)) {
-          patchGeneration(g.id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob: undefined });
-        } else {
-          patchGeneration(g.id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob: undefined });
-        }
-        return [];
-      } finally {
-        running.delete(g.id);
-        controllers.delete(g.id);
-      }
-    })();
-    running.set(g.id, p);
+    patchGeneration(g.id, { statusText: 'Resuming' });
+    followRemote(g.id, job);
   }
+}
+
+/** True when a stopped generation still has a submitted job whose result can be fetched. */
+export function canRecheck(g: Generation): boolean {
+  return Boolean(g.remoteJob && ADAPTERS[g.remoteJob.provider]?.resume && g.status !== 'running' && g.status !== 'queued' && g.status !== 'done');
+}
+
+/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
+export function recheckGeneration(id: string): Promise<string[]> {
+  const pending = running.get(id);
+  if (pending) return pending;
+  const g = get().generations[id];
+  const job = g?.remoteJob;
+  if (!g || !job || !canRecheck(g)) return Promise.resolve([]);
+  if (!isConnected(job.provider)) {
+    patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[job.provider]} in Settings to check this job.` });
+    return Promise.resolve([]);
+  }
+  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Checking', progress: undefined, finishedAt: undefined });
+  return followRemote(id, job);
+}
+
+function followRemote(id: string, job: RemoteJob): Promise<string[]> {
+  const controller = new AbortController();
+  controllers.set(id, controller);
+  const p = (async () => {
+    try {
+      const g = get().generations[id];
+      const result = await ADAPTERS[job.provider].resume!(job, {
+        kind: g.kind,
+        apiKey: apiKeyFor(job.provider),
+        signal: controller.signal,
+        onStatus: (text, progress) => patchGeneration(id, { statusText: text, progress }),
+      });
+      const fallback = expectedDims(g.kind, g.settings);
+      const assets = await Promise.all(result.outputs.map((o) => storeOutput(o, g, g.kind, fallback)));
+      addAssets(assets);
+      finish(id, assets.map((a) => a.id), result.costUsd);
+      return assets.map((a) => a.id);
+    } catch (err) {
+      const remoteJob = keptJob(err, job);
+      if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
+      else patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
+      return [];
+    } finally {
+      running.delete(id);
+      controllers.delete(id);
+    }
+  })();
+  running.set(id, p);
+  return p;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 import { Copy } from 'lucide-react';
 import { OPS } from '../../engine/ops';
-import { aspectLabel } from '../../engine/params';
+import { aspectLabel, durationLabel } from '../../engine/params';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';
 import { formatDateTime, formatDuration, formatUsd } from '../../lib/format';
@@ -29,7 +29,7 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
     const params = [
       s.aspect ? aspectLabel(s.aspect) : null,
       s.resolution ?? null,
-      g.kind === 'video' && s.duration ? `${s.duration}s` : null,
+      g.kind === 'video' && s.duration ? durationLabel(s.duration) : null,
       g.kind === 'image' && s.count > 1 ? `${s.count} images` : null,
       s.audio != null ? (s.audio ? 'audio on' : 'audio off') : null,
       ...Object.entries(s.advanced).map(([k, v]) => `${k}: ${String(v)}`),

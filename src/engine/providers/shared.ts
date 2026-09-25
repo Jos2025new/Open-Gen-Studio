@@ -1,6 +1,7 @@
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
 import type { ImageInputFormat, MediaKind } from '../types';
-import type { GenOutput, MediaInput } from './types';
+import { isTransient, sleep } from '../../lib/http';
+import type { GenOutput, GenResult, MediaInput, ResumeContext } from './types';
 
 /** Encode an input image for a JSON body (data URL, or an OpenAI-style content part). */
 export async function encodeImage(input: MediaInput, format: ImageInputFormat, upload?: (blob: Blob) => Promise<string>): Promise<unknown> {
@@ -84,3 +85,36 @@ export function authBearer(key: string): Record<string, string> {
 }
 
 export const JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+/** Per-request limit for status checks: a hung request must not stall the wait loop. */
+export const POLL_TIMEOUT_MS = 30_000;
+
+/**
+ * Wait for a remote job. `check` returns the result, or a status label while it is still running.
+ * A failed check (offline, timeout, 408/429/5xx) is retried with a growing pause: it says nothing about the job.
+ * Only `check` decides that the job failed (by throwing JobFailedError). Past the local time limit the wait
+ * stops with a plain error, and the caller keeps the job so it can be checked again later.
+ */
+export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: number, check: () => Promise<GenResult | string>): Promise<GenResult> {
+  const started = Date.now();
+  const maxWaitMs = (ctx.kind === 'image' ? 10 : 30) * 60_000;
+  let failures = 0;
+  for (;;) {
+    let wait = intervalMs;
+    try {
+      const r = await check();
+      if (typeof r !== 'string') return r;
+      failures = 0;
+      ctx.onStatus(`${r} · ${Math.round((Date.now() - started) / 1000)}s`);
+    } catch (err) {
+      if (!isTransient(err)) throw err;
+      failures++;
+      wait = Math.min(60_000, intervalMs * 2 ** failures);
+      ctx.onStatus(`Connection problem · retrying in ${Math.round(wait / 1000)}s`);
+    }
+    if (Date.now() - started + wait > maxWaitMs) {
+      throw new Error(`Stopped waiting after ${maxWaitMs / 60_000} min; the job may still finish at ${provider}. Use Check again later.`);
+    }
+    await sleep(wait, ctx.signal);
+  }
+}

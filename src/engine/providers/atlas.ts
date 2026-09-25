@@ -1,9 +1,9 @@
 import { cacheDb } from '../../lib/idb';
-import { fetchJsonWithRelay, HttpError, requestJson, sleep } from '../../lib/http';
+import { extractErrorMessage, fetchJsonWithRelay, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -174,13 +174,11 @@ async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Pro
   return url;
 }
 
-async function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  const started = Date.now();
-  const interval = ctx.kind === 'image' ? 2000 : 5000;
-  for (;;) {
-    const res = await requestJson<{ data?: { status?: string; error?: string | null; outputs?: string[] } }>(
+function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
+  return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' ? 2000 : 5000, async () => {
+    const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] } }>(
       `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
-      { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal },
+      { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal, timeoutMs: POLL_TIMEOUT_MS },
     );
     const status = String(res.data?.status ?? '').toLowerCase();
     if (status === 'completed' || status === 'succeeded') {
@@ -194,14 +192,12 @@ async function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
           }
         }),
       );
-      if (!outputs.length) throw new Error('Atlas Cloud finished without outputs');
+      if (!outputs.length) throw new JobFailedError('Atlas Cloud finished without outputs');
       return { outputs };
     }
     if (status === 'failed' || status === 'canceled' || status === 'cancelled') {
-      throw new HttpError(500, res.data?.error || 'Generation failed', res);
+      throw new JobFailedError(extractErrorMessage(res.data, 'Generation failed'));
     }
-    const elapsed = Math.round((Date.now() - started) / 1000);
-    ctx.onStatus(`${status === 'processing' ? 'Rendering' : 'Queued'} · ${elapsed}s`);
-    await sleep(interval, ctx.signal);
-  }
+    return status === 'processing' ? 'Rendering' : 'Queued';
+  });
 }

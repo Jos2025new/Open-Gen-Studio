@@ -1,5 +1,5 @@
 import { estimate, sumEstimates, FREE, UNKNOWN } from './pricing';
-import { longEdgeFor, ratioOf } from './params';
+import { durationChoices, longEdgeFor, ratioOf } from './params';
 import { OPS, opCount } from './ops';
 import { opModelFor } from './catalog';
 import type { AdvancedValue, Asset, Estimate, GenSettings, MediaKind, OpId, PriceRule } from './types';
@@ -10,6 +10,12 @@ const get = useStore.getState;
 export function priceOf(ref: string): PriceRule | undefined {
   const c = get().catalog;
   return c.schemas[ref]?.price ?? c.models[ref]?.price;
+}
+
+/** Longest duration a model accepts, to price an automatic (-1) duration. */
+function maxDuration(ref: string): number | undefined {
+  const d = durationChoices(get().catalog.schemas[ref]).filter((n) => n > 0);
+  return d.length ? Math.max(...d) : undefined;
 }
 
 function megapixels(settings: GenSettings): number {
@@ -29,6 +35,7 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
   return estimate(price, {
     count: settings.count,
     duration: settings.duration,
+    maxDuration: maxDuration(ref),
     resolution: settings.resolution,
     audio: settings.audio,
     mode: withImage ? 'image' : 'text',
@@ -44,7 +51,7 @@ export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, so
   if (!price) return UNKNOWN;
   if (def.engine === 'video' || def.engine === 'video_upscale' || def.engine === 'video_edit') {
     // For video-to-video, `duration` is the source clip's length (per-second prices scale with it).
-    return estimate(price, { count: 1, duration: videoSettings.duration, resolution: videoSettings.resolution, audio: videoSettings.audio, mode: 'image' });
+    return estimate(price, { count: 1, duration: videoSettings.duration, maxDuration: maxDuration(ref), resolution: videoSettings.resolution, audio: videoSettings.audio, mode: 'image' });
   }
   const count = opCount(def, params);
   let mp = source ? (source.width * source.height) / 1_000_000 : 1;
