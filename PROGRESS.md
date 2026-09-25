@@ -139,3 +139,7 @@ Estado: typecheck limpio y **84 tests**. Verificación en navegador con modelos 
 - NanoGPT imágenes de entrada: `POST /api/v1/images` **ignora `input_references`** (aunque la documentación lo presenta como campo principal) y lee `imageDataUrl`/`imageDataUrls` (PNG/JPEG/WebP); el adaptador usa `imageDataUrls`. Comprobado 2026-09-25 en ambos hosts. Para sondear la API sin coste: `birefnet/v2` (no genera sin imagen) o imágenes 1×1 (bajo el mínimo); nunca un modelo que acepte solo texto.
 - NanoGPT: usar `nano-gpt.com/api` (`NANO_BASE`); `api.nano-gpt.com` sirve catálogos desfasados (LLM, imagen y vídeo). Comprobado 2026-09-24.
 - Sin verificar con clave real: forma de respuesta de NanoGPT `POST /api/v1/images`, respuesta de Atlas `uploadMedia`, CORS de OpenRouter `/videos/{id}/content`. Los parsers son tolerantes (`extractOutputs` en `providers/shared.ts`).
+
+## Plan 3D y Designer — 2026-09-25
+- `PLAN_3D_DESIGNER.md`: contratos de ocho endpoints prioritarios (Tripo H3.1, Meshy 7.1, Seed3D 2.0 y TRELLIS.2), archivos afectados, fases P1–P9, criterios de aceptación y límites de rendimiento/interoperabilidad. Seguimiento en AGENTS.md.
+- Solo documentación: esquemas Atlas y catálogo NanoGPT consultados sin coste; sin código, generaciones ni navegador. Pruebas reales y compatibilidad Inkscape pendientes de implementación.

@@ -8,6 +8,20 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Plan — 3D prioritario, exportación y trazos editables (2026-09-25)
+Solicitud actual: solo planificación. Detalle y aceptación en `PLAN_3D_DESIGNER.md`; esta sección es la lista de ejecución, sin otro plan paralelo.
+- [x] P0. Documentar contratos reales, archivos y fases; revisar y guardar el plan. *Razón: separar evidencia de propuestas antes de implementar.*
+- [ ] P1. Fijar fixtures de los ocho endpoints elegidos y resolver contratos de envío, consulta, salida y precio. *Razón: no extrapolar versiones ni tipos de archivo.*
+- [ ] P2. Incorporar asset 3D persistente y visor GLB bajo demanda con una muestra local. *Razón: probar almacenamiento y consumo antes de gastar.*
+- [ ] P3. Completar generación TRELLIS.2 en NanoGPT por composer, agente y nodos. *Razón: primera ruta completa reutilizable.*
+- [ ] P4. Completar Tripo H3.1 en Atlas (texto e imagen). *Razón: distinguir archivos de modelo y miniaturas.*
+- [ ] P5. Completar Seed3D 2.0 en ambos proveedores y extracción acotada del ZIP de Atlas. *Razón: preservar el archivo y consultar la ruta correcta.*
+- [ ] P6. Completar Meshy 7.1 en NanoGPT (texto, imagen y multivista). *Razón: no confundirlo con Meshy v7 de Atlas.*
+- [ ] P7. Exponer exportación PNG/JPG y añadir SVG/PDF con pruebas de fidelidad. *Razón: reutilizar el renderer y comprobar interoperabilidad.*
+- [ ] P8. Añadir lineart editable con presión y contorno vectorial. *Razón: conservar el gesto para editarlo después.*
+- [ ] P9. Añadir textura a lo largo del trazo, caché por trazo y exportación híbrida. *Razón: editar el pincel sin rasterizar todo el documento.*
+Las fases P7–P9 son propuestas técnicas, no conformidad ya demostrada con Inkscape. No se autorizan generaciones de pago por aprobar este plan documental.
+
 ## Tarea actual (en pausa tras la fase 7) — cobertura completa de las familias prioritarias (2026-09-25)
 Lo que quedó "fuera de alcance" en `MODEL_VALIDATION.md` pasa a implementarse. Reglas: un commit por fase; en cada una, tests, diff revisado de `tests/fixtures/live/expected.txt` (la red de regresión) y una fila en `TRAZABILIDAD.md`. Las decisiones de producto se preguntan antes de la fase que las necesita; los bugs se corrigen.
 0. [x] Documentar lo hecho y crear la red de regresión (`TRAZABILIDAD.md`, `npm run snapshot:models`, `tests/live-snapshot.test.ts`). Línea base: 557 variantes, 21 con entradas obligatorias sin enviar. *Razón: saber si un cambio nuevo rompe algo.*
