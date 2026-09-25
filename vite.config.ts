@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
+import { localStore } from './server/local-store.js';
 import react from '@vitejs/plugin-react';
 
 // Provider schema documents are served without CORS headers, so the dev and
@@ -55,7 +56,8 @@ function mediaRelay(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), mediaRelay()],
+  // localStore: disk copy of state and media in ./data (dev/preview only; the app has no backend).
+  plugins: [react(), mediaRelay(), localStore()],
   server: { port: 5173, proxy },
   preview: { port: 4173, proxy },
   test: {

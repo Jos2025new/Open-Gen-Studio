@@ -2,6 +2,7 @@
 
 Última sesión: 2026-09-25. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
 Proveedores: **OpenRouter, fal.ai, NanoGPT, Atlas Cloud** (+ "Local demo" procedural para usar sin claves).
+Sin backend: corre en el navegador; el servidor de Vite solo la sirve en local y aporta rutas `/x/*` (relays y copia en disco). Opciones de despliegue discutidas en `PROPUESTAS.md`.
 El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas (sin SDK de Anthropic; se desinstaló `@anthropic-ai/sdk`).
 
 ## Hecho (build y typecheck verificados)
@@ -76,6 +77,13 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - Prueba: animación de caminata de un personaje con el agente (GLM 5.3 Flash · NanoGPT) y Seedance 2.0 Mini de Atlas; 5 s a 960×960. Estimado 0,055 USD, cobrado 0,122 USD.
 - Planes cortados por una recarga se cierran con su estado real (`settleInterruptedPlans`). Resultados en almacenes sin CORS (Atlas `*.volces.com`, enlaces de 24 h) se descargan por el relay `/x/media` (solo dev/preview, lista blanca) y se guardan (`ensureAssetBlob`, `adoptRemoteAssets`); Extract frame lee bytes locales. Precio de vídeo de Atlas mostrado como mínimo (`≥`).
 
+**Persistencia en disco** (2026-09-25) — `server/local-store.js`, `src/lib/{disk,idb}.ts`, `store.ts`, `App.tsx`, `vite.config.ts`
+- *Por qué:* el navegador integrado perdió sesiones, archivos y claves al reiniciarse su perfil; todo vivía solo en IndexedDB.
+- Plugin de Vite `/x/store` (dev/preview): `data/state.json` (permisos 600, incluye claves) y archivos legibles `data/asset/<id>.png|jpg|mp4…` y `data/raster/<id>.png` (capas del Designer). Escritura atómica, claves validadas (400 si intentan salir de la carpeta).
+- Espejo en el único punto de guardado (`stateDb`/`blobDb`): el estado lleva `savedAt` y al cargar gana la copia más reciente; un archivo que falte en el navegador se lee del disco; al arrancar se suben los que falten (uno a uno). Sin el servidor (web estática) se desactiva solo.
+- "Wipe all data" mueve `data/` a `data.bak-<fecha>`: no reaparece al recargar y no se pierde. `navigator.storage.persist()` al arrancar.
+- Verificado: generar una imagen → aparece en `data/`; borrar a mano todo el almacenamiento del navegador → al recargar vuelven sesión e imagen; wipe → copia en `data.bak-*` y arranque limpio. `data/` y `data.bak-*` fuera de git.
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
 Estado: typecheck limpio y **20 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
@@ -91,7 +99,7 @@ Estado: typecheck limpio y **20 tests**. Verificación en navegador con modelos 
 - Esqueleto de carpetas vacío creado por el usuario a las 09:13 se adoptó (`src/engine/{agent,design,flow,providers/demo}`, `src/components/{shell,ui,...}`).
 
 ## Notas para el siguiente agente
-- Arranque: `npm install`, `npm run dev` (puerto 5173). Typecheck: `npx tsc --noEmit -p .`. Tests: `npm test` (vitest, `tests/**/*.test.ts`, entorno node).
+- Arranque: `npm install`, `npm run dev` (puerto 5173). Los datos quedan también en `data/` (copia de seguridad = copiar esa carpeta; contiene claves). Typecheck: `npx tsc --noEmit -p .`. Tests: `npm test` (vitest, `tests/**/*.test.ts`, entorno node).
 - Designer integra `Stage`, `newBlankDoc` y `selectDoc`; sus controles y exportación se probaron en navegador.
 - zustand 5: un selector nunca debe devolver un objeto o array nuevo en cada llamada (bucle de renders). Usa primitivos, referencias del estado o `useShallow`.
 - xyflow: los controles interactivos dentro de nodos llevan la clase `nodrag` (y `nowheel` si hacen scroll).

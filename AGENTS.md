@@ -12,7 +12,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 1. [x] Crear `REMEDIATION_PLAN_AUDITED.md` con la revisión de GPT 6 ASTRA. *Razón: corregir premisas y prioridades conservando el original.*
 2. [x] Revisar el documento y registrar un commit. *Razón: dejar una propuesta trazable; sin cambios de código. Verificación documental; pruebas de aplicación pendientes de implementación.*
 
-## Tarea actual — NanoGPT ignoraba las imágenes de entrada (2026-09-25)
+## Tarea actual — persistencia en disco (2026-09-25)
+La app no tiene backend; el navegador perdió sesiones, archivos y claves al reiniciarse su perfil.
+1. [x] `server/local-store.js`: plugin de Vite (dev/preview) con `/x/store`: estado en `data/state.json` (permisos 600, contiene claves) y archivos en `data/<ns>/<id>.<ext>` (PNG/MP4 legibles). Escritura atómica, nombres validados. *Razón: mini-backend local que solo existe mientras se ejecuta el servidor; mismo patrón que los relays `/x/*`.*
+2. [x] `src/lib/disk.ts` + `idb.ts`: espejo en el único punto de guardado (`stateDb`, `blobDb`). Estado con marca `savedAt`: al cargar gana el más reciente. Archivos: si faltan en el navegador se leen del disco. Al arrancar se suben al disco los que falten. Sin servidor (web estática) se desactiva solo. *Razón: el resto de la app no cambia.*
+3. [x] "Wipe all data" mueve `data/` a `data.bak-<fecha>` en vez de borrarlo, para que no reaparezca al recargar y sin pérdida irreversible. `navigator.storage.persist()`. *Razón: coherencia y seguridad.*
+4. [x] `data/` en `.gitignore`. Tests, typecheck, navegador; commit. `PROPUESTAS.md` con las opciones de despliegue discutidas (no es un plan fijo).
+
+## Tarea anterior — NanoGPT ignoraba las imágenes de entrada (2026-09-25)
 1. [x] Relight devolvía otra persona y Remove BG/Upscale decían "requires an image". Probado contra la API (sin coste, con `birefnet/v2` e imágenes por debajo del mínimo): `POST /api/v1/images` **ignora `input_references`** (pese a la documentación) en ambos hosts y lee `imageDataUrl`/`imageDataUrls` (PNG, JPEG y WebP). El adaptador pasa a `imageDataUrls` y usa la clave del slot. *Razón: la imagen nunca llegaba y los modelos que aceptan solo texto generaban sin ella.*
 2. [x] Nota: una prueba con `nano-banana-pro` y una imagen de 4×4 px generó de verdad (~0,28 USD no autorizados). Para sondear la API sin coste usar solo modelos que no generan sin imagen (`birefnet/v2`) o imágenes por debajo del mínimo (1×1).
 

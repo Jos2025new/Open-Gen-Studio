@@ -3,6 +3,7 @@ import { useStore } from './store/store';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
 import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
 import { settleInterruptedPlans } from './engine/agent/runtime';
+import { syncBlobsToDisk } from './lib/idb';
 import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
 import { SidePanel } from './components/shell/SidePanel';
@@ -35,6 +36,9 @@ export function App() {
     // Plans cut by the reload follow their resumed generations; results still only at a provider get saved.
     settleInterruptedPlans();
     void adoptRemoteAssets();
+    // Disk copy: bring older blobs over, and ask the browser not to evict its own copy under storage pressure.
+    void syncBlobsToDisk();
+    void navigator.storage?.persist?.().catch(() => false);
   }, [hydrated]);
 
   if (!hydrated) {

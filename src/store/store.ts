@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import { uid } from '../lib/id';
 import { stateDb } from '../lib/idb';
+import { disk } from '../lib/disk';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
@@ -400,6 +401,8 @@ export async function wipeAllData(): Promise<void> {
   pendingWrite = null;
   window.clearTimeout(writeTimer);
   await stateDb.del('ogs-app').catch(() => undefined);
+  // The disk copy moves to data.bak-<date>: otherwise the next load would restore it, and nothing is lost for good.
+  await disk.wipe();
   for (const name of ['ogs-state', 'ogs-blobs', 'ogs-cache']) indexedDB.deleteDatabase(name);
   window.setTimeout(() => location.reload(), 150);
 }
