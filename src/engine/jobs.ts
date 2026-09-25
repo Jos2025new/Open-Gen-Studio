@@ -5,8 +5,10 @@ import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fet
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
 import { estimateMedia, estimateOp } from './costs';
+import { InputError } from './errors';
+import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
-import { coerceSettings, dimsFor, isAutoOption, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { coerceSettings, dimsFor, durationChoices, isAutoOption, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -221,8 +223,19 @@ async function execute(id: string): Promise<string[]> {
     let video: MediaInput | undefined;
     if (g.op) {
       const def = OPS[g.op.id];
-      if (def.engine === 'video_upscale' || def.engine === 'video_edit') {
+      if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
         video = await mediaInput(g.op.sourceAssetId);
+        const rule = sourceVideoRule(model.id);
+        const range = def.engine === 'video_edit' ? rule?.seconds.edit : def.engine === 'video_extend' ? rule?.seconds.extend : undefined;
+        const seconds = get().assets[g.op.sourceAssetId]?.duration;
+        if (range && seconds != null && (seconds < range[0] || seconds > range[1])) {
+          throw new InputError('VIDEO_DURATION', `${model.name} takes clips of ${range[0]}–${range[1]} s for this; this one is ${seconds.toFixed(1)} s.`);
+        }
+        // No source-video field (Seedance 2.5 omni reference): the clip goes in as the one reference video.
+        if (!schema.slots.video && (schema.slots.refVideos || schema.slots.mixedRefs)) {
+          refVideos = [video];
+          video = undefined;
+        }
       } else if (def.engine === 'video') {
         firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
       } else {
@@ -237,7 +250,7 @@ async function execute(id: string): Promise<string[]> {
       throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
     }
     if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
-    if (g.kind === 'video' && !video) {
+    if (g.kind === 'video' && !video && !(g.op && refVideos.length)) {
       // A reference-to-video model has no start frame: an image given as one becomes a reference.
       const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
       ({ firstFrame, images: refs, videos: refVideos } = routed);
@@ -433,15 +446,25 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
-  if (def.engine === 'video_upscale' || def.engine === 'video_edit') {
+  if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
     const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
-    // Keep the source's length and framing: send duration/aspect only if the model insists.
-    settings.duration = undefined;
-    settings.aspect = undefined;
-    settings.audio = undefined;
-    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_edit' ? prompt : '', modelRef: choice.ref, settings, op };
+    const extend = def.engine === 'video_extend';
+    // Keep the source's framing: the model's "auto"/"adaptive" option, else nothing.
+    const auto = paramByRole(schema, 'aspect')?.options?.find(isAutoOption);
+    settings.aspect = auto != null ? String(auto) : undefined;
+    if (!extend) {
+      // Edits follow the source's length: -1 where the model has it (Seedance 2.5 edit requires it), else nothing.
+      settings.duration = durationChoices(schema).includes(-1) ? -1 : undefined;
+      settings.audio = undefined;
+    }
+    // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
+    const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
+    if (mode && def.engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
+    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
     const clip = get().assets[input.sourceAssetId];
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: clip?.duration }) };
+    // Per-second prices: an edit or upscale is billed on the clip, an extension on the new seconds.
+    const seconds = extend ? settings.duration : clip?.duration;
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: seconds }) };
   }
   if (def.engine === 'video') {
     const video = get().composer.video.settings;

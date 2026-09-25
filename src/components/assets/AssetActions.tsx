@@ -15,6 +15,7 @@ import {
   Rotate3d,
   Scissors,
   Shuffle,
+  SkipForward,
   Star,
   Sun,
   WandSparkles,
@@ -44,6 +45,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   grid_split: LayoutGrid,
   video_upscale: Maximize,
   video_edit: WandSparkles,
+  video_extend: SkipForward,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

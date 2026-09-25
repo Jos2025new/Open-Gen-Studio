@@ -11,7 +11,7 @@ export interface OpField {
 }
 
 /** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit';
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend';
 
 export interface OpDef {
   id: OpId;
@@ -279,6 +279,18 @@ export const OPS: Record<OpId, OpDef> = {
     quick: false,
     fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. make it night with neon reflections', required: true }],
     instruction: (p) => `${String(p.instruction).trim()}. Apply only this change; keep motion, timing, framing and everything else identical.`,
+  },
+  video_extend: {
+    id: 'video_extend',
+    label: 'Extend video',
+    description: 'Continue the clip from its last frame with new action.',
+    input: 'video',
+    output: 'video',
+    engine: 'video_extend',
+    quick: false,
+    fields: [{ key: 'instruction', label: 'Then', type: 'text', default: '', placeholder: 'e.g. the camera pulls back as she walks into the rain', required: true }],
+    instruction: (p) =>
+      `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same characters, setting, style, lighting and camera language.`,
   },
 };
 

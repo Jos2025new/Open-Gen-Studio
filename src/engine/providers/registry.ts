@@ -29,7 +29,7 @@ export const PROVIDER_SITES: Record<Exclude<ProviderId, 'local'>, { keys: string
  */
 export const PREFERRED: Record<
   Exclude<ProviderId, 'local'>,
-  { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[] }
+  { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[]; videoExtend: string[] }
 > = {
   openrouter: {
     image: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'bytedance-seed/seedream-4.5', 'openai/gpt-image-2'],
@@ -39,6 +39,7 @@ export const PREFERRED: Record<
     removeBg: [],
     videoUpscale: [],
     videoEdit: [],
+    videoExtend: [],
   },
   fal: {
     image: ['fal-ai/nano-banana-pro', 'fal-ai/nano-banana-2', 'fal-ai/bytedance/seedream/v4/text-to-image'],
@@ -47,7 +48,9 @@ export const PREFERRED: Record<
     upscale: ['fal-ai/clarity-upscaler', 'fal-ai/seedvr/upscale/image'],
     removeBg: ['fal-ai/bria/background/remove', 'fal-ai/birefnet/v2'],
     videoUpscale: ['fal-ai/bytedance-upscaler/upscale/video', 'fal-ai/seedvr/upscale/video'],
-    videoEdit: ['google/gemini-omni-flash/v1.1/edit', 'fal-ai/kling-video/o3/standard/video-to-video/edit'],
+    videoEdit: ['google/gemini-omni-flash/v1.1/edit', 'fal-ai/kling-video/o3/standard/video-to-video/edit', 'bytedance/seedance-2.5/reference-to-video'],
+    // IDs from the live snapshot (tests/fixtures/live, 2026-09-25).
+    videoExtend: ['fal-ai/veo3.1/fast/extend-video', 'xai/grok-imagine-video/extend-video', 'blackforestlabs/flux-3/extend-video', 'minimax/h3-max/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
   nanogpt: {
     image: ['nano-banana-pro', 'nano-banana-2', 'seedream-4.5-alternative'],
@@ -57,7 +60,8 @@ export const PREFERRED: Record<
     upscale: ['seedvr2-image', 'pruna-ai/p-image/upscale', 'clarity-ai-creative-upscaler'],
     removeBg: ['birefnet/v2'],
     videoUpscale: ['bytedance-seedance-upscaler', 'bytedance-video-enhancement-standard', 'clarity-ai/crystal-video-upscaler'],
-    videoEdit: ['alibaba/wan-3.0/video-edit', 'grok-imagine-video-edit', 'pruna-ai/p-video/edit', 'blackforestlabs/flux-3/edit-video', 'google/gemini-omni-flash/v1.1'],
+    videoEdit: ['alibaba/wan-3.0/video-edit', 'grok-imagine-video-edit', 'pruna-ai/p-video/edit', 'blackforestlabs/flux-3/edit-video', 'google/gemini-omni-flash/v1.1', 'bytedance/seedance-2.5'],
+    videoExtend: ['alibaba/wan-3.0/video-extend', 'grok-imagine-video-extend', 'veo3-1-fast-extend', 'bytedance-seedance-2-0-video-extend', 'bytedance/seedance-2.5'],
   },
   atlas: {
     image: ['google/nano-banana-pro/text-to-image', 'google/nano-banana-2/text-to-image', 'black-forest-labs/flux-2-pro/text-to-image'],
@@ -66,7 +70,8 @@ export const PREFERRED: Record<
     upscale: ['atlascloud/image-upscaler', 'tencent/image/upscaler'],
     removeBg: ['youchuan/v8.2/remove-background'],
     videoUpscale: ['byteplus/video/upscaler', 'atlascloud/video-upscaler', 'tencent/video/upscaler'],
-    videoEdit: ['google/gemini-omni-1.1-flash/video-edit', 'alibaba/wan-2.7/video-edit', 'xai/grok-imagine-video/edit-video'],
+    videoEdit: ['google/gemini-omni-1.1-flash/video-edit', 'alibaba/wan-2.7/video-edit', 'xai/grok-imagine-video/edit-video', 'bytedance/seedance-2.5/reference-to-video'],
+    videoExtend: ['google/gemini-omni-1.1-flash/video-extend', 'xai/grok-imagine-video/extend-video', 'black-forest-labs/flux-3/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
 };
 

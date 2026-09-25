@@ -161,7 +161,8 @@ export type OpId =
   | 'contact_sheet'
   | 'grid_split'
   | 'video_upscale'
-  | 'video_edit';
+  | 'video_edit'
+  | 'video_extend';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';

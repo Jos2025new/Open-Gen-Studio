@@ -6,6 +6,7 @@ import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from 
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
+import { takesSourceAsReference } from '../modelRules';
 
 const API = 'https://api.fal.ai/v1';
 const QUEUE = 'https://queue.fal.run';
@@ -123,7 +124,7 @@ export const fal: ProviderAdapter = {
           kind: c.kind,
           acceptsText: c.text && !tags.length,
           acceptsImage: c.image || refs,
-          acceptsVideo: c.video && !refs,
+          acceptsVideo: (c.video && !refs) || takesSourceAsReference(m.endpoint_id),
           needsVideo: c.video && !refs,
           tags,
           description: m.metadata?.description,

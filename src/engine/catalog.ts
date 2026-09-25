@@ -246,15 +246,15 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
     if (valid(ops.video)) return { ref: ops.video!, viaEdit: false };
     return { ref: defaultModelFor('video', true), viaEdit: false };
   }
-  if (engine === 'video_upscale' || engine === 'video_edit') {
+  if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
     // Video-to-video: settings override, then each provider's preferred list, then any tagged model that takes video.
-    const key = engine === 'video_upscale' ? 'videoUpscale' : 'videoEdit';
+    const key = engine === 'video_upscale' ? 'videoUpscale' : engine === 'video_edit' ? 'videoEdit' : 'videoExtend';
     if (valid(ops[key])) return { ref: ops[key]!, viaEdit: false };
     for (const p of providerOrder('video')) {
       const hit = firstAvailable(p, PREFERRED[p][key]);
       if (hit) return { ref: hit, viaEdit: false };
     }
-    const tag = engine === 'video_upscale' ? /upscal|enhance/ : /edit/;
+    const tag = engine === 'video_upscale' ? /upscal|enhance/ : engine === 'video_edit' ? /edit/ : /extend/;
     const tagged = Object.values(get().catalog.models).find((m) => m.acceptsVideo && isConnected(m.provider) && (m.tags.some((t) => tag.test(t)) || tag.test(m.id)));
     return { ref: tagged?.ref ?? '', viaEdit: false };
   }

@@ -291,6 +291,7 @@ export function SettingsPanel() {
         <OpsModelRow label="Animate · continue" slot="video" kind="video" engine="video" filter={(m) => m.acceptsImage && !m.needsVideo} />
         <OpsModelRow label="Upscale video" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
         <OpsModelRow label="Edit video" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Extend video" slot="videoExtend" kind="video" engine="video_extend" filter={(m) => Boolean(m.acceptsVideo)} />
       </section>
 
       <section className="set-section">

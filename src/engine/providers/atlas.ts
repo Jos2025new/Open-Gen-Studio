@@ -6,6 +6,7 @@ import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
+import { takesSourceAsReference } from '../modelRules';
 
 const BASE = 'https://api.atlascloud.ai';
 const STATIC = 'https://static.atlascloud.ai';
@@ -92,7 +93,7 @@ export const atlas: ProviderAdapter = {
         kind,
         acceptsText: text,
         acceptsImage: (image || tool) && !video,
-        acceptsVideo: video,
+        acceptsVideo: video || takesSourceAsReference(m.model),
         needsVideo: video,
         tags,
         description: m.profile,
