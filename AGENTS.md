@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — licencia (2026-09-25)
+1. [x] Apache 2.0: `LICENSE` (texto oficial de apache.org), `NOTICE` con la atribución, `"license": "Apache-2.0"` en `package.json` y sección en el README. *Razón: el usuario quiere uso libre para cualquiera con atribución explícita; comparada con MIT, MPL 2.0 y AGPL 3.0 (Gentle AI usa MIT; OpenMontage, AGPL-3.0).*
+
 ## Tarea — comparación documental de proveedores (2026-09-25)
 1. [x] Comparar los ejemplos de `/home/samuel/Descargas/API DOC` con los adaptadores y parámetros. *Razón: identificar incompatibilidades concretas sin consumir APIs de pago.*
 2. [x] Comunicar diferencias, coincidencias y límites en `API_DOC_REVIEW.md`; registrar la revisión documental. *Razón: separar errores de funciones no implementadas, sin modificar la aplicación. Typecheck y 20 tests correctos; sin navegador ni ejecución remota por ser revisión documental.*

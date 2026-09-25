@@ -59,4 +59,6 @@ React 19, Vite 8, TypeScript, zustand, @xyflow/react, IndexedDB (idb-keyval), zo
 
 ## Licencia
 
-Sin licencia definida por ahora.
+[Apache License 2.0](LICENSE). Cualquiera puede usar, modificar y distribuir la app, también con fines comerciales, siempre que conserve el aviso de copyright y el archivo [`NOTICE`](NOTICE) con la atribución al autor e indique los cambios que haga. La licencia no da derecho a usar el nombre del proyecto ni del autor para promocionar derivados.
+
+Copyright 2026 Samuel.
