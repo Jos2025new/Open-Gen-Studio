@@ -29,7 +29,7 @@ export const PROVIDER_SITES: Record<Exclude<ProviderId, 'local'>, { keys: string
  */
 export const PREFERRED: Record<
   Exclude<ProviderId, 'local'>,
-  { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[]; videoExtend: string[]; transcribe: string[] }
+  { image: string[]; video: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[]; videoExtend: string[]; transcribe: string[]; inpaint: string[]; removeObject: string[] }
 > = {
   openrouter: {
     image: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'bytedance-seed/seedream-4.5', 'openai/gpt-image-2'],
@@ -41,6 +41,8 @@ export const PREFERRED: Record<
     videoEdit: [],
     videoExtend: [],
     transcribe: [],
+    inpaint: [],
+    removeObject: [],
   },
   fal: {
     image: ['fal-ai/nano-banana-pro', 'fal-ai/nano-banana-2', 'fal-ai/bytedance/seedream/v4/text-to-image'],
@@ -52,6 +54,9 @@ export const PREFERRED: Record<
     videoEdit: ['google/gemini-omni-flash/v1.1/edit', 'fal-ai/kling-video/o3/standard/video-to-video/edit', 'bytedance/seedance-2.5/reference-to-video'],
     // IDs from the live snapshot (tests/fixtures/live, 2026-09-25).
     transcribe: [],
+    // Mask models (live snapshot 2026-09-25): white-mask inpainting first, GPT Image (alpha mask) after.
+    inpaint: ['fal-ai/ideogram/v3/edit', 'fal-ai/qwen-image-edit/inpaint', 'openai/gpt-image-2.5/flare/edit', 'openai/gpt-image-2/edit', 'fal-ai/z-image/turbo/inpaint'],
+    removeObject: ['fal-ai/ideogram/object-removal'],
     videoExtend: ['fal-ai/veo3.1/fast/extend-video', 'xai/grok-imagine-video/extend-video', 'blackforestlabs/flux-3/extend-video', 'minimax/h3-max/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
   nanogpt: {
@@ -64,6 +69,8 @@ export const PREFERRED: Record<
     videoUpscale: ['bytedance-seedance-upscaler', 'bytedance-video-enhancement-standard', 'clarity-ai/crystal-video-upscaler'],
     videoEdit: ['alibaba/wan-3.0/video-edit', 'grok-imagine-video-edit', 'pruna-ai/p-video/edit', 'blackforestlabs/flux-3/edit-video', 'google/gemini-omni-flash/v1.1', 'bytedance/seedance-2.5'],
     // Speech-to-text chosen by the user (2026-09-25), cheapest first.
+    inpaint: [],
+    removeObject: [],
     transcribe: ['Whisper-Large-V3', 'xai/speech-to-text/v1', 'gpt-4o-mini-transcribe', 'Elevenlabs-STT'],
     videoExtend: ['alibaba/wan-3.0/video-extend', 'grok-imagine-video-extend', 'veo3-1-fast-extend', 'bytedance-seedance-2-0-video-extend', 'bytedance/seedance-2.5'],
   },
@@ -76,6 +83,8 @@ export const PREFERRED: Record<
     videoUpscale: ['byteplus/video/upscaler', 'atlascloud/video-upscaler', 'tencent/video/upscaler'],
     videoEdit: ['google/gemini-omni-1.1-flash/video-edit', 'alibaba/wan-2.7/video-edit', 'xai/grok-imagine-video/edit-video', 'bytedance/seedance-2.5/reference-to-video'],
     transcribe: [],
+    inpaint: ['openai/gpt-image-2.5-flare/edit', 'openai/gpt-image-2.5-sunburst/edit'],
+    removeObject: [],
     videoExtend: ['google/gemini-omni-1.1-flash/video-extend', 'xai/grok-imagine-video/extend-video', 'black-forest-labs/flux-3/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
 };

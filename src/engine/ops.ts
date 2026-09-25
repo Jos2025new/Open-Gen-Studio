@@ -11,7 +11,7 @@ export interface OpField {
 }
 
 /** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'voice';
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'voice' | 'inpaint' | 'remove_object';
 
 export interface OpDef {
   id: OpId;
@@ -24,6 +24,8 @@ export interface OpDef {
   fields: OpField[];
   /** Shown as a one-click chip on generation cards. */
   quick: boolean;
+  /** Needs a mask drawn in Sketch: launched from there, not from menus, nodes or the agent. */
+  viaSketch?: boolean;
   /** Returns the instruction prompt sent to the model (edit / video engines). */
   instruction?: (p: Record<string, AdvancedValue>) => string;
 }
@@ -293,6 +295,30 @@ export const OPS: Record<OpId, OpDef> = {
     instruction: (p) =>
       `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same characters, setting, style, lighting and camera language.`,
   },
+  edit_region: {
+    id: 'edit_region',
+    label: 'Edit region',
+    description: 'Change only the painted area of an image.',
+    input: 'image',
+    output: 'image',
+    engine: 'inpaint',
+    quick: false,
+    viaSketch: true,
+    fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. a red umbrella', required: true }],
+    instruction: (p) => `${String(p.instruction).trim()}. Change only the masked area and blend it seamlessly with the rest of the image.`,
+  },
+  remove_object: {
+    id: 'remove_object',
+    label: 'Remove object',
+    description: 'Erase the painted object and fill in the background.',
+    input: 'image',
+    output: 'image',
+    engine: 'remove_object',
+    quick: false,
+    viaSketch: true,
+    fields: [],
+    instruction: () => 'Remove the masked object completely and fill the area with the surrounding background, matching light, texture and perspective.',
+  },
   create_voice: {
     id: 'create_voice',
     label: 'Create Kling voice',
@@ -328,8 +354,9 @@ function note(p: Record<string, AdvancedValue>): string {
   return n ? ` Additional direction: ${n}.` : '';
 }
 
+/** Operations offered in menus and nodes; mask operations start from Sketch. */
 export function opsFor(kind: AssetKind): OpDef[] {
-  return Object.values(OPS).filter((o) => o.input === kind);
+  return Object.values(OPS).filter((o) => o.input === kind && !o.viaSketch);
 }
 
 export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
@@ -343,3 +370,5 @@ export function opCount(op: OpDef, params: Record<string, AdvancedValue>): numbe
 }
 
 export const OP_IDS = Object.keys(OPS) as OpId[];
+/** What the agent may plan: it cannot draw masks. */
+export const AGENT_OP_IDS = OP_IDS.filter((id) => !OPS[id].viaSketch);

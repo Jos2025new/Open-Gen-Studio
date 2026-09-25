@@ -81,6 +81,11 @@ export interface InputSlots {
     /** The top-level prompt and the shots are mutually exclusive (fal). */
     exclusivePrompt: boolean;
   };
+  /**
+   * Inpainting mask, same size as the source image. `white`: white = area to change (Ideogram, Qwen, Z-Image);
+   * `alpha`: transparent = area to change (OpenAI GPT Image).
+   */
+  mask?: { key: string; required: boolean; convention: 'white' | 'alpha'; format: ImageInputFormat };
   /** Trimmed reference clips (`video_clips: { url, start, ends[, fps] }`). Takes the input videos. */
   clips?: {
     key: string;
@@ -205,7 +210,8 @@ export interface Asset {
   sessionId: string;
   generationId?: string;
   /** 'sketch': painted-over copy owned by a node; not listed in the gallery. */
-  origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch';
+  /** 'mask': drawn in Sketch for Edit region / Remove object; hidden from the gallery like 'sketch'. */
+  origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask';
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   stored: boolean;
@@ -230,7 +236,9 @@ export type OpId =
   | 'video_edit'
   | 'video_extend'
   | 'transcribe'
-  | 'create_voice';
+  | 'create_voice'
+  | 'edit_region'
+  | 'remove_object';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';

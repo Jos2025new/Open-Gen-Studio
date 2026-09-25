@@ -963,7 +963,7 @@ atlas::openai/gpt-image-2.5-flare-developer/text-to-image [image] text
   moderation: other enum[auto,low] =auto
   n: count integer(1..10) =1
 atlas::openai/gpt-image-2.5-flare/edit [image] image
-  slots: prompt=prompt* images=images[]≤16 min1 url
+  slots: prompt=prompt* images=images[]≤16 min1 url mask=mask url alpha
   inputs (as the agent reads them): up to 16 image refs (required)
   quality: other enum[auto,low,medium,high,xhigh,max] =medium
   size: aspect enum[auto,1024x768,768x1024,1024x1536,1536x1024,2048x2048,2048x1152,1152x2048,2560x1088,1088x2560,2880x2160,2160x2880,3840x2160,2160x3840] =1024x1024
@@ -997,7 +997,7 @@ atlas::openai/gpt-image-2.5-sunburst-developer/text-to-image [image] text
   moderation: other enum[auto,low] =auto
   n: count integer(1..10) =1
 atlas::openai/gpt-image-2.5-sunburst/edit [image] image
-  slots: prompt=prompt* images=images[]≤16 min1 url
+  slots: prompt=prompt* images=images[]≤16 min1 url mask=mask url alpha
   inputs (as the agent reads them): up to 16 image refs (required)
   quality: other enum[auto,low,medium,high,xhigh,max] =medium
   size: aspect enum[auto,1024x1024,1024x768,768x1024,1024x1536,1536x1024,2048x2048,2048x1152,1152x2048,2560x1088,1088x2560,2880x2160,2160x2880,3840x2160,2160x3840] =1024x1024
@@ -1670,13 +1670,12 @@ fal::fal-ai/ideogram/character [image] text,image
   style: other enum[AUTO,REALISTIC,FICTION] =AUTO
   seed: seed integer
 fal::fal-ai/ideogram/character/edit [image] text,image
-  slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url
-  inputs (as the agent reads them): source image first in refs, then references; up to 11 image refs (required); cannot run from the app (needs mask_url)
+  slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): source image first in refs, then references; up to 11 image refs (required)
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   expand_prompt: other boolean =true
   seed: seed integer
-  MISSING: mask_url
 fal::fal-ai/ideogram/character/remix [image] text,image
   slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url
   inputs (as the agent reads them): source image first in refs, then references; up to 11 image refs (required)
@@ -1699,9 +1698,8 @@ fal::fal-ai/ideogram/custom-models/generate [image] text
   seed: seed integer
   MISSING: model_id
 fal::fal-ai/ideogram/object-removal [image] text,image
-  slots: images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_url)
-  MISSING: mask_url
+  slots: images=image_url≤1 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
 fal::fal-ai/ideogram/remove-background [image] image
   slots: images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
@@ -1721,12 +1719,11 @@ fal::fal-ai/ideogram/v2 [image] text
   negative_prompt: negative string =
   seed: seed integer
 fal::fal-ai/ideogram/v2/edit [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   seed: seed integer
   expand_prompt: other boolean =true
   style: other enum[auto,general,realistic,design,render_3D,anime] =auto
-  MISSING: mask_url
 fal::fal-ai/ideogram/v2/remix [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
@@ -1744,12 +1741,11 @@ fal::fal-ai/ideogram/v2/turbo [image] text
   negative_prompt: negative string =
   seed: seed integer
 fal::fal-ai/ideogram/v2/turbo/edit [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   seed: seed integer
   expand_prompt: other boolean =true
   style: other enum[auto,general,realistic,design,render_3D,anime] =auto
-  MISSING: mask_url
 fal::fal-ai/ideogram/v2/turbo/remix [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
@@ -1800,14 +1796,13 @@ fal::fal-ai/ideogram/v3 [image] text
   negative_prompt: negative string =
   seed: seed integer
 fal::fal-ai/ideogram/v3/edit [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   style_preset: other enum[80S_ILLUSTRATION,90S_NOSTALGIA,ABSTRACT_ORGANIC,ANALOG_NOSTALGIA,ART_BRUT,ART_DECO,ART_POSTER,AURA,AVANT_GARDE,BAUHAUS,BLUEPRINT,BLURRY_MOTION,BRIGHT_ART,C4D_CARTOON,CHILDRENS_BOOK,COLLAGE,COLORING_BOOK_I,COLORING_BOOK_II,CUBISM,DARK_AURA,DOODLE,DOUBLE_EXPOSURE,DRAMATIC_CINEMA,EDITORIAL,EMOTIONAL_MINIMAL,ETHEREAL_PARTY,EXPIRED_FILM,FLAT_ART,FLAT_VECTOR,FOREST_REVERIE,GEO_MINIMALIST,GLASS_PRISM,GOLDEN_HOUR,GRAFFITI_I,GRAFFITI_II,HALFTONE_PRINT,HIGH_CONTRAST,HIPPIE_ERA,ICONIC,JAPANDI_FUSION,JAZZY,LONG_EXPOSURE,MAGAZINE_EDITORIAL,MINIMAL_ILLUSTRATION,MIXED_MEDIA,MONOCHROME,NIGHTLIFE,OIL_PAINTING,OLD_CARTOONS,PAINT_GESTURE,POP_ART,RETRO_ETCHING,RIVIERA_POP,SPOTLIGHT_80S,STYLIZED_RED,SURREAL_COLLAGE,TRAVEL_POSTER,VINTAGE_GEO,VINTAGE_POSTER,WATERCOLOR,WEIRD,WOODBLOCK_PRINT]
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   expand_prompt: other boolean =true
   seed: seed integer
-  MISSING: mask_url
 fal::fal-ai/ideogram/v3/generate-transparent [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
@@ -2472,8 +2467,8 @@ fal::fal-ai/qwen-image-edit/image-to-image [image] text,image
   strength: other number(0.01..1) =0.94
   negative_prompt: negative string = 
 fal::fal-ai/qwen-image-edit/inpaint [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   num_inference_steps: other integer(2..50) =30
   num_images: count integer(1..4) =1
   acceleration: other enum[none,regular,high] =regular
@@ -2484,7 +2479,6 @@ fal::fal-ai/qwen-image-edit/inpaint [image] text,image
   output_format: other enum[jpeg,png] =png
   strength: other number(0.01..1) =0.93
   negative_prompt: negative string = 
-  MISSING: mask_url
 fal::fal-ai/qwen-image-layered [image] text,image
   slots: prompt=prompt images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
@@ -2847,8 +2841,8 @@ fal::fal-ai/z-image/turbo/image-to-image/lora [image] text,image
   output_format: other enum[jpeg,png,webp] =png
   acceleration: other enum[none,regular,high] =regular
 fal::fal-ai/z-image/turbo/inpaint [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_image_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_image_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   strength: other number(..1) =1
   num_images: count integer(1..4) =1
   seed: seed integer
@@ -2858,10 +2852,9 @@ fal::fal-ai/z-image/turbo/inpaint [image] text,image
   acceleration: other enum[none,regular,high] =regular
   enable_prompt_expansion: other boolean =false
   num_inference_steps: other integer(1..8) =8
-  MISSING: mask_image_url
 fal::fal-ai/z-image/turbo/inpaint/lora [image] text,image
-  slots: prompt=prompt* images=image_url≤1 min1 data-url
-  inputs (as the agent reads them): up to 1 image refs (required); cannot run from the app (needs mask_image_url)
+  slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_image_url data-url white required
+  inputs (as the agent reads them): up to 1 image refs (required)
   strength: other number(..1) =1
   num_images: count integer(1..4) =1
   seed: seed integer
@@ -2871,7 +2864,6 @@ fal::fal-ai/z-image/turbo/inpaint/lora [image] text,image
   acceleration: other enum[none,regular,high] =regular
   enable_prompt_expansion: other boolean =false
   num_inference_steps: other integer(1..8) =8
-  MISSING: mask_image_url
 fal::fal-ai/z-image/turbo/lora [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
@@ -2884,7 +2876,7 @@ fal::fal-ai/z-image/turbo/lora [image] text
   output_format: other enum[jpeg,png,webp] =png
   acceleration: other enum[none,regular,high] =regular
 fal::fal-ai/z-image/turbo/tiling [image] text
-  slots: prompt=prompt* images=image_url≤1 data-url
+  slots: prompt=prompt* images=image_url≤1 data-url mask=mask_image_url data-url white
   inputs (as the agent reads them): up to 1 image refs
   strength: other number(..1) =0.6
   num_images: count integer(1..4) =1
@@ -2899,7 +2891,7 @@ fal::fal-ai/z-image/turbo/tiling [image] text
   num_inference_steps: other integer(1..8) =8
   tiling_mode: other enum[both,horizontal,vertical] =both
 fal::fal-ai/z-image/turbo/tiling/lora [image] text
-  slots: prompt=prompt* images=image_url≤1 data-url
+  slots: prompt=prompt* images=image_url≤1 data-url mask=mask_image_url data-url white
   inputs (as the agent reads them): up to 1 image refs
   tiling_mode: other enum[both,horizontal,vertical] =both
   strength: other number(..1) =0.6
@@ -3046,7 +3038,7 @@ fal::ideogram/v4/lora [image] text
   enable_safety_checker: other boolean =true
   expansion_model: other enum[None,Medium,Large] =Medium
 fal::ideogram/v4/tiling [image] text,image
-  slots: prompt=prompt* images=image_url≤1 data-url
+  slots: prompt=prompt* images=image_url≤1 data-url mask=mask_url data-url white
   inputs (as the agent reads them): up to 1 image refs
   output_format: other enum[jpeg,png] =jpeg
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
@@ -3059,7 +3051,7 @@ fal::ideogram/v4/tiling [image] text,image
   enable_safety_checker: other boolean =true
   expansion_model: other enum[None,Medium,Large] =Medium
 fal::ideogram/v4/tiling/lora [image] text,image
-  slots: prompt=prompt* images=image_url≤1 data-url
+  slots: prompt=prompt* images=image_url≤1 data-url mask=mask_url data-url white
   inputs (as the agent reads them): up to 1 image refs
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
   seed: seed integer
@@ -3122,7 +3114,7 @@ fal::minimax/h3-max/image-to-video [video] text,image
   enable_safety_checker: other boolean =true
   fixed: {"prompt_expansion_mode":"balanced"}
 fal::minimax/h3-max/lip-sync/image-to-video [video] text,image
-  slots: firstFrame=image_url data-url audio=audio_url data-url
+  slots: firstFrame=image_url data-url audio=audio_url data-url required
   inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   enable_transcription: other boolean =false
   seed: seed integer(0..2147483647)
@@ -3235,7 +3227,7 @@ fal::openai/gpt-image-2 [image] text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9,auto] =landscape_4_3
   output_format: other enum[jpeg,png,webp] =png
 fal::openai/gpt-image-2.5/flare/edit [image] text,image
-  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url
+  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url mask=mask_url data-url alpha
   inputs (as the agent reads them): up to 16 image refs (required)
   num_images: count integer(1..10) =1
   output_compression: other integer(0..100)
@@ -3253,7 +3245,7 @@ fal::openai/gpt-image-2.5/flare/text-to-image [image] text
   quality: other enum[auto,low,medium,high,xhigh,max] =high
   background: other enum[auto,transparent,opaque] =auto
 fal::openai/gpt-image-2.5/sunburst/edit [image] text,image
-  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url
+  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url mask=mask_url data-url alpha
   inputs (as the agent reads them): up to 16 image refs (required)
   num_images: count integer(1..10) =1
   output_compression: other integer(0..100)
@@ -3271,7 +3263,7 @@ fal::openai/gpt-image-2.5/sunburst/text-to-image [image] text
   quality: other enum[auto,low,medium,high,xhigh,max] =high
   background: other enum[auto,transparent,opaque] =auto
 fal::openai/gpt-image-2/edit [image] text,image
-  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url
+  slots: prompt=prompt* images=image_urls[]≤16 min1 data-url mask=mask_url data-url alpha
   inputs (as the agent reads them): up to 16 image refs (required)
   quality: other enum[auto,low,medium,high] =high
   num_images: count integer(1..4) =1
@@ -3619,7 +3611,7 @@ nanogpt::bytedance/seedance-2.5-turbo [video] text,image,video-in
   aspect_ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =16:9
   generate_audio: audio boolean =true
 nanogpt::bytedance/seedance-2.5/talking-avatar [video] image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audio data-url
+  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audio data-url required
   inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   resolution: resolution enum[480p,720p] =480p
 nanogpt::bytedance/seedream-v5.0-flash [image] text,image
@@ -3878,7 +3870,7 @@ nanogpt::minimax/h3-max-turbo [video] text,image
   enable_safety_checker: other boolean =true
   seed: seed number(-1..2147483647) =-1
 nanogpt::minimax/h3-max/lip-sync/image-to-video [video] image
-  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audioDataUrl data-url
+  slots: prompt=prompt firstFrame=imageDataUrl data-url audio=audioDataUrl data-url required
   inputs (as the agent reads them): first_frame; an audio ref (required: the speech or track to follow)
   resolution: resolution enum[480p,768p,1080p,2k] =768p
   seed: seed number(-1..2147483647) =-1

@@ -32,7 +32,7 @@ export function GalleryPanel() {
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return Object.values(assets)
-      .filter((a) => a.origin !== 'sketch' && (scope === 'session' ? a.sessionId === sessionId : true))
+      .filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && (scope === 'session' ? a.sessionId === sessionId : true))
       .filter((a) => kind === 'all' || a.kind === kind)
       .filter((a) => !favOnly || a.favorite)
       .filter((a) => {

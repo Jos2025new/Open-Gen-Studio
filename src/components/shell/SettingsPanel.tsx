@@ -154,6 +154,13 @@ function LlmModelPicker() {
   );
 }
 
+/** Models that take an inpainting mask: known from the loaded schema, else from the endpoint name. */
+function takesMask(m: ModelSummary): boolean {
+  const schema = useStore.getState().catalog.schemas[m.ref];
+  if (schema) return Boolean(schema.slots.mask);
+  return m.kind === 'image' && /inpaint|object-removal|ideogram\/v[23].*\/edit|gpt-image-2(\.5)?.*\/edit/.test(m.id);
+}
+
 /** Speech-to-text model for Transcribe: Auto (preferred list) or a pick from the provider's catalog. */
 function TranscriberRow() {
   const value = useStore((s) => s.settings.ops.transcribe);
@@ -322,6 +329,8 @@ export function SettingsPanel() {
         <OpsModelRow label="Upscale video" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
         <OpsModelRow label="Edit video" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
         <OpsModelRow label="Extend video" slot="videoExtend" kind="video" engine="video_extend" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Edit region" slot="editRegion" kind="image" engine="inpaint" filter={takesMask} />
+        <OpsModelRow label="Remove object" slot="removeObject" kind="image" engine="remove_object" filter={takesMask} />
         <TranscriberRow />
       </section>
 

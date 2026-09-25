@@ -30,11 +30,13 @@ export async function structuredInputs(
     audio?: MediaInput;
     refAudios?: MediaInput[];
     elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
+    mask?: MediaInput;
   },
   image: (m: MediaInput) => Promise<unknown>,
   video: (m: MediaInput) => Promise<string>,
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
+  if (slots.mask && req.mask) out[slots.mask.key] = await image(req.mask);
   const el = slots.elements;
   if (el && req.elements?.length) {
     out[el.key] = await Promise.all(

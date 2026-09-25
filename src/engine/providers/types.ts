@@ -24,6 +24,8 @@ export interface GenRequest {
   audio?: MediaInput;
   /** Reference audio, for models with `refAudios` or `mixedRefs`. */
   refAudios?: MediaInput[];
+  /** Inpainting mask in the model's convention (see InputSlots.mask). */
+  mask?: MediaInput;
   /** Subjects (Kling elements), in mention order: element n is the n-th. */
   elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
   /** Keyframe images with their frame index, for models with a `keyframes` slot. */

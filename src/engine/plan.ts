@@ -366,6 +366,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           errors.push(`${where}: unknown op "${s.op}". Valid: ${Object.keys(OPS).join(', ')}.`);
           continue;
         }
+        if (def.viaSketch) {
+          errors.push(`${where}: "${s.op}" needs a mask the user paints in Sketch; use an edit op with an instruction instead.`);
+          continue;
+        }
         const k = refKind(s.input, where);
         if (!s.input) errors.push(`${where}: "input" is required.`);
         else if (k) {

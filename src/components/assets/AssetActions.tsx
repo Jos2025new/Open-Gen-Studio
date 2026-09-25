@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   AudioLines,
+  Brush,
+  Eraser,
   Clapperboard,
   Crop,
   Download,
@@ -27,7 +29,7 @@ import { OPS, opsFor } from '../../engine/ops';
 import { downloadAsset, sendToNodes, toggleFavorite, useAsReference } from '../../engine/actions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId } from '../../engine/types';
-import { useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, MenuItem } from '../ui/primitives';
 import { OpForm } from './OpForm';
@@ -50,6 +52,8 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   video_extend: SkipForward,
   transcribe: FileText,
   create_voice: AudioLines,
+  edit_region: Brush,
+  remove_object: Eraser,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {
@@ -114,10 +118,21 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
       <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="More actions">
         {view === 'menu' ? (
           <div className="menu">
-            {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : 'Video operations'}</div> : null}
+            {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : 'Video operations'}</div> : null}
             {rest.map((o) => (
               <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} detail={o.description} onClick={() => setView(o.id)} />
             ))}
+            {asset.kind === 'image' ? (
+              <MenuItem
+                icon={Brush}
+                label="Edit region / Remove object"
+                detail="Paint the area in Sketch, then describe the change"
+                onClick={() => {
+                  close();
+                  setUi({ sketch: { assetId, mode: 'mask' } });
+                }}
+              />
+            ) : null}
             {rest.length ? <div className="menu-sep" /> : null}
             {asset.kind === 'image' ? (
               <>

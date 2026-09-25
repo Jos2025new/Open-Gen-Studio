@@ -44,7 +44,7 @@ function describeModel(m: ModelSummary, s: ModelSchema | string): string {
   const slot = (name: string, v: unknown) => {
     if (!v || typeof v !== 'object') return null;
     const o = v as Record<string, unknown>;
-    return `${name}=${o.key}${o.multiple ? '[]' : ''}${o.max != null ? `≤${o.max}` : ''}${o.min ? ` min${o.min}` : ''}${o.format ? ` ${o.format}` : ''}`;
+    return `${name}=${o.key}${o.multiple ? '[]' : ''}${o.max != null ? `≤${o.max}` : ''}${o.min ? ` min${o.min}` : ''}${o.format ? ` ${o.format}` : ''}${o.convention ? ` ${o.convention}` : ''}${o.required ? ' required' : ''}`;
   };
   const slots = Object.entries(s.slots)
     .map(([k, v]) => (k === 'prompt' ? `prompt=${v}${s.slots.promptRequired ? '*' : ''}` : k === 'promptRequired' ? null : slot(k, v)))

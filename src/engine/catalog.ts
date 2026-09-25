@@ -263,6 +263,20 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
   const valid = (ref: string | null) => Boolean(ref && isConnected(parseModelRef(ref)?.provider ?? 'local') && (ref.startsWith('local::') || modelSummary(ref)));
   if (engine === 'transcribe') return { ref: transcriberFor()?.ref ?? '', viaEdit: false };
   if (engine === 'voice') return { ref: isConnected('fal') ? KLING_VOICE_REF : '', viaEdit: false };
+  if (engine === 'inpaint' || engine === 'remove_object') {
+    // Only mask-capable models: the settings override, then each provider's list; object removal falls back to inpainting with an instruction.
+    const key = engine === 'inpaint' ? 'editRegion' : 'removeObject';
+    if (valid(ops[key])) return { ref: ops[key]!, viaEdit: false };
+    for (const p of providerOrder('image')) {
+      const hit = firstAvailable(p, PREFERRED[p][engine === 'inpaint' ? 'inpaint' : 'removeObject']);
+      if (hit) return { ref: hit, viaEdit: false };
+    }
+    if (engine === 'remove_object') {
+      const inpaint = opModelFor('inpaint');
+      return { ref: inpaint.ref, viaEdit: Boolean(inpaint.ref) };
+    }
+    return { ref: '', viaEdit: false };
+  }
   if (engine === 'edit') {
     if (valid(ops.edit)) return { ref: ops.edit!, viaEdit: false };
     return { ref: defaultModelFor('image', true), viaEdit: false };

@@ -51,6 +51,8 @@ const VIDEO_KEYS = ['video_url', 'video', 'input_video', 'source_video', 'video_
 const REF_VIDEO_KEYS = ['reference_videos', 'reference_video_urls', 'video_urls'];
 // Audio inputs: reference lists, and single tracks (lip-sync speech, soundtrack). `audio` alone is usually the
 // "generate audio" switch, so a single-track key only counts when its value is a string.
+// Inpainting masks (fal: mask_url, mask_image_url; Atlas GPT Image 2.5: mask).
+const MASK_KEYS = ['mask_url', 'mask_image_url', 'mask', 'mask_image'];
 const REF_AUDIO_KEYS = ['reference_audios', 'reference_audio_urls', 'audio_urls'];
 const AUDIO_KEYS = ['audio_url', 'target_audio_url', 'driving_audio_url', 'input_audio', 'audio_file'];
 const LAST_FRAME_KEYS = ['end_image_url', 'last_image', 'tail_image_url', 'end_image', 'last_frame_image', 'last_frame', 'last_frame_url', 'tail_image'];
@@ -402,6 +404,13 @@ export function schemaFromJson(opts: {
     if (used.has(k)) continue;
     const p = flattenProp(properties[k], resolve);
     const min = required.includes(k) ? Math.max(1, p.minItems ?? 1) : 0;
+    if (MASK_KEYS.includes(normKey(k)) && primaryType(p) === 'string' && !slots.mask) {
+      // OpenAI masks mark the area with transparency; the others with white.
+      const alpha = /transparen/i.test(p.description ?? '') || /gpt-image/i.test(opts.ref);
+      slots.mask = { key: k, required: required.includes(k), convention: alpha ? 'alpha' : 'white', format: imageFormat };
+      used.add(k);
+      continue;
+    }
     if (REF_AUDIO_KEYS.includes(normKey(k)) && primaryType(p) === 'array') {
       slots.refAudios = { key: k, max: p.maxItems ?? 3, min, format: imageFormat };
       used.add(k);

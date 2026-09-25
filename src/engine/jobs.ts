@@ -1,7 +1,7 @@
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
-import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
+import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
@@ -260,6 +260,22 @@ async function execute(id: string): Promise<string[]> {
       if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
       if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     }
+    // Mask operations (Edit region, Remove object): only models that declare a mask, in their convention.
+    let mask: MediaInput | undefined;
+    const engine = g.op ? OPS[g.op.id].engine : undefined;
+    if (g.op && (engine === 'inpaint' || engine === 'remove_object')) {
+      const def = OPS[g.op.id];
+      const maskId = String(g.op.params.mask ?? '');
+      const maskAsset = get().assets[maskId];
+      if (!maskAsset) throw new InputError('MASK_MISSING', `${def.label} needs a mask: paint the area in Sketch.`);
+      if (!schema.slots.mask) throw new InputError('MASK_UNSUPPORTED', `${model.name} cannot take a mask. Pick a model for ${def.label} in Settings → Operations.`);
+      const src = get().assets[g.op.sourceAssetId];
+      if (src && (maskAsset.width !== src.width || maskAsset.height !== src.height)) {
+        throw new InputError('MASK_SIZE', `The mask is ${maskAsset.width}×${maskAsset.height} but the image is ${src.width}×${src.height}.`);
+      }
+      const input = await mediaInput(maskId);
+      mask = schema.slots.mask.convention === 'alpha' ? { ...input, blob: await maskToAlpha(input.blob), mime: 'image/png' } : input;
+    }
     if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > refs.length) {
       throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
     }
@@ -356,6 +372,7 @@ async function execute(id: string): Promise<string[]> {
         audio,
         refAudios,
         elements,
+        mask,
         firstFrame,
         lastFrame,
         video,

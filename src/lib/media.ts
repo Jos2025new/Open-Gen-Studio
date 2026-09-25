@@ -237,3 +237,26 @@ export function guessMimeFromUrl(url: string, kind: 'image' | 'video'): string {
   if (path.endsWith('.mp4')) return 'video/mp4';
   return kind === 'image' ? 'image/png' : 'video/mp4';
 }
+
+/**
+ * A white-on-black mask (white = area to change) as an OpenAI alpha mask: transparent where the image should
+ * change, opaque elsewhere. Same size.
+ */
+export async function maskToAlpha(mask: Blob): Promise<Blob> {
+  const c = await blobToCanvas(mask);
+  const ctx = ctx2d(c);
+  const data = ctx.getImageData(0, 0, c.width, c.height);
+  whiteToAlpha(data.data);
+  ctx.putImageData(data, 0, 0);
+  return canvasToBlob(c, 'image/png');
+}
+
+/** RGBA pixels, in place: white (area to change) → transparent, black (keep) → opaque black. */
+export function whiteToAlpha(px: Uint8ClampedArray): Uint8ClampedArray {
+  for (let i = 0; i < px.length; i += 4) {
+    const lum = px[i];
+    px[i] = px[i + 1] = px[i + 2] = 0;
+    px[i + 3] = 255 - lum;
+  }
+  return px;
+}

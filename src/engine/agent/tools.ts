@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
-import { OP_IDS } from '../ops';
+import { AGENT_OP_IDS } from '../ops';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
@@ -86,7 +86,7 @@ export const TOOLS: ToolSpec[] = [
                 },
                 first_frame: { type: 'string', description: 'video: start image reference.' },
                 last_frame: { type: 'string', description: 'video: end image reference.' },
-                op: { type: 'string', enum: [...OP_IDS] },
+                op: { type: 'string', enum: [...AGENT_OP_IDS] },
                 input: { type: 'string', description: 'op: the image or video to transform.' },
                 params: { type: 'object', description: 'op parameters.' },
                 text: { type: 'string', description: 'text step content, or the text of a text layer.' },

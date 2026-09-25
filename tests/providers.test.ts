@@ -152,10 +152,12 @@ describe('image schemas', () => {
     expect(z.default).toBe('1024*1536');
     expect(z.options).toContain('1536*864');
   });
-  it('sends the source image to the required field and names inputs the app cannot send', () => {
+  it('sends the source image to the required field and reads masks', () => {
     expect(parseImage(img.falIdeogramRemix).slots.images).toMatchObject({ key: 'image_url', min: 1, multiple: false });
     expect(parseImage(img.falIdeogramCharacter).slots.images).toMatchObject({ key: 'reference_image_urls', min: 1 });
-    expect(parseImage(img.falIdeogramEdit).missing).toEqual(['mask_url']);
+    // Phase 6: masks are an input now (white = area to change for Ideogram).
+    expect(parseImage(img.falIdeogramEdit).slots.mask).toEqual({ key: 'mask_url', required: true, convention: 'white', format: 'url' });
+    expect(parseImage(img.falIdeogramEdit).missing).toBeUndefined();
   });
   it('reads NanoGPT framing and image inputs from the catalog', async () => {
     vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify({ data: url.includes('images/models') ? img.nanoImage : [] })));

@@ -36,7 +36,7 @@ export interface Settings {
   agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
   guidedRounds: number;
   budgetUsd: number;
-  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null };
+  ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 
 export interface ComposerState {
@@ -81,7 +81,8 @@ export interface UiState {
   panelExpanded: boolean;
   lightbox: { assetIds: string[]; index: number } | null;
   /** Sketch editor over a node's image; saving sets that node's painted-over copy. */
-  sketch: { assetId: string; nodeId: string } | null;
+  /** Sketch editor: paint over a node's image (saved to the node), or draw a mask for Edit region / Remove object. */
+  sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
   tool: DesignTool;
   brush: { size: number; color: string; opacity: number };
@@ -137,7 +138,7 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
-  ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null, transcribe: null },
+  ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null, transcribe: null, editRegion: null, removeObject: null },
 };
 
 const initial: AppState = {

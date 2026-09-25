@@ -1,7 +1,7 @@
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
 import { skillById, workflowById, describeWorkflow } from '../skills';
-import { OPS, OP_IDS } from '../ops';
+import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { isConnected, modelSummary } from '../catalog';
 import type { AgentStyle, Session, Workspace } from '../types';
@@ -11,7 +11,7 @@ import { activeDoc } from '../design/actions';
 const get = useStore.getState;
 
 /** One line per operation, built from OPS so the prompt cannot drift from the registry. */
-const OP_LINES = OP_IDS.map((id) => {
+const OP_LINES = AGENT_OP_IDS.map((id) => {
   const op = OPS[id];
   const fields = op.fields.map((f) => (f.options ? `${f.key}: ${f.options.map((o) => o.value).join('|')}` : f.key)).join(', ');
   return `  ${id} {${fields}} (${op.input} → ${op.output}) — ${op.description}`;
