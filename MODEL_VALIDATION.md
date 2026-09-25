@@ -42,3 +42,45 @@ Verificación: 35 tests, incluidos fragmentos de los esquemas reales en `tests/f
 - **Seedance 2.5, edición y extensión explícitas** (un vídeo de 4–30 s, `ratio: adaptive`, `duration: -1`): con referencias se deja `omni_reference_task_type` sin fijar (modo automático del proveedor), como recomienda su documentación.
 - **Kling motion-control** necesita imagen y vídeo a la vez; se lista como "necesita vídeo", pero la operación Edit video no aporta la imagen.
 - NanoGPT no publica los nombres de sus campos de medios por modelo. `referenceImages`, `referenceVideos` y `last_image` con data URL siguen la guía, pero no se han probado con una generación real.
+
+---
+
+# Familias de imagen
+
+Revisión: 2026-09-24. Familias: GPT Image 2 y 2.5 (Flare, Sunburst, developer), Seedream V5 (Pro, Lite, Flash, sequential, layerize), Nano Banana (1, 2, 2 Lite/Fast, Pro, Pro Ultra), Qwen Image (2.0, 2.1, 2512, 3.0, Max, Edit/Plus/2509/2511), Grok Imagine Image (1.0, Quality, 2.0), Step Image (Step1X Edit, StepX Edit 2, Step Image Edit 2), P Image (Pruna), Recraft (V3, V4, V4.1, Style, vector, utility), Ideogram (V2, V2a, V3, V4, Character) y Z-Image (Turbo, Base, image-to-image).
+
+**Método.** El mismo que en vídeo: catálogos y esquemas públicos en vivo, sin clave ni coste. Atlas: 67 variantes. fal: 137. NanoGPT: 76. Atlas no tiene Recraft, P Image ni Step. Cada esquema se pasó por el parser real.
+
+## Lo que ya funcionaba
+
+- Texto a imagen y edición en las diez familias. Prompt, número de imágenes, semilla y prompt negativo se reconocen.
+- Imágenes de entrada: `images` (Atlas), `image_urls`/`image_url` (fal) e `imageDataUrls` (NanoGPT), con sus máximos (hasta 16 en GPT Image 2.5 y 14 en Nano Banana 2).
+- Proporción en los modelos con `aspect_ratio` o `image_size` preestablecido (Nano Banana, Grok, Ideogram y Recraft en fal…), y resolución `1k`/`2k`/`4k`.
+
+## Fallos encontrados
+
+1. **Tamaño en píxeles ignorado como proporción (Atlas).** GPT Image 2 y 2.5 y Seedream V5 exponen `size` como lista de píxeles (`2048x1152`, `2048*2048`). El parser lo trataba como resolución: una proporción pedida por el agente o el composer (16:9) se descartaba sin aviso.
+2. **Tamaño de texto libre descartado (Atlas).** Qwen Image 2.0 y 3.0 y Z-Image Turbo usan `size` como texto `ancho*alto` sin lista de valores. No había ningún control de encuadre: Z-Image salía siempre en retrato (`1024*1536`, su valor por defecto).
+3. **Imagen de origen en el campo equivocado (fal).** Ideogram V3 remix, reframe y replace-background exigen `image_url`, y el parser elegía `image_urls` (referencias de estilo opcionales). Ideogram Character exige `reference_image_urls` y se elegía `image_urls`.
+4. **Campos obligatorios imposibles de enviar.** Máscaras (Ideogram edit, Qwen inpaint, Z-Image inpaint) y `video_clips` (Nano Banana 2 y 2 Lite reference-to-image en Atlas). La app lanzaba la petición y el proveedor la rechazaba.
+5. **NanoGPT: encuadre mezclado.** Seedream V5 Pro y la versión alternativa ponen proporciones y niveles en el mismo `resolution` (`16:9`, `2k`). Se trataba como resolución y la proporción pedida se perdía.
+6. **NanoGPT: imágenes en endpoints solo de texto.** GPT Image 2.5 text-to-image, Nano Banana Pro Ultra y Qwen Image Max declaran `max_input_images`, pero su entrada es solo texto. La app ofrecía adjuntar imágenes.
+7. **"Auto" con otro nombre.** P Image usa `match_input_image` y Seedance `adaptive`. Solo se reconocía `auto`, así que las operaciones sobre una imagen no conservaban su encuadre.
+
+## Correcciones aplicadas
+
+- Una lista de tamaños en píxeles es el control de encuadre ("Size"). Al pedir una proporción se elige el tamaño más cercano con la escala del valor por defecto (16:9 → `2048x1152` en GPT Image 2).
+- Un `size` de texto `ancho*alto` genera tamaños para 1:1, 4:3, 3:4, 16:9, 9:16, 3:2, 2:3 y 21:9, a la escala del valor por defecto o del máximo documentado. Si el modelo puede elegir el tamaño, se ofrece "Auto", que no se envía (`ParamDef.omit`).
+- La imagen de origen va al campo obligatorio (`image_url`, `reference_image_urls`) cuando la lista alternativa es opcional.
+- `ModelSchema.missing`: los campos obligatorios que la app no puede enviar bloquean el envío con un mensaje claro ("needs mask_url…"), antes de gastar.
+- NanoGPT: el `resolution` mixto es el encuadre, y solo se adjuntan imágenes si el modelo declara entrada de imagen.
+- `isAutoOption` reconoce `auto`, `match_input_image` y `adaptive`. La caché de esquemas pasa a `v3`.
+
+Verificación: 39 tests, con fragmentos reales en `tests/fixtures/image-schemas.json`. En el navegador, con catálogos públicos y el envío interceptado, un 16:9 se envió como `size: 2048x1152` (GPT Image 2), `2048*1152` (Qwen 3.0), `1536*864` (Z-Image) y `resolution: 16:9` (Seedream V5 Pro en NanoGPT). Nano Banana 2 reference-to-image muestra "needs video_clips". No se hizo ninguna generación de pago.
+
+## Fuera de alcance
+
+- Máscaras (inpaint, edit con máscara, object removal): la app no tiene editor de máscaras. Estos modelos se bloquean con aviso.
+- Paletas y estilos de Recraft (`colors`, `style_id`, `background_color`), `style_codes` y `color_palette` de Ideogram, y `mask` opcional de GPT Image 2.5.
+- LoRA (`loras`), ControlNet, tiling, `custom-models` de Ideogram y `rendering_speed` de Ideogram en NanoGPT.
+- Seedream sequential: `max_images` (series de hasta 15) se ofrece como ajuste avanzado, no como número de imágenes.

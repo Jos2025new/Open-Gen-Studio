@@ -117,24 +117,36 @@ export function aspectLabel(value: string | number | undefined): string {
   return v.replace('*', '×').replace(/(\d)x(\d)/, '$1×$2');
 }
 
-/** Pick the option whose ratio is closest to `target` (a ratio string or number). */
-export function nearestAspect(options: Array<string | number>, target: string | number | undefined): string | undefined {
+/** Options that mean "let the model decide" (P Image: match_input_image; Seedance: adaptive). */
+export function isAutoOption(o: string | number): boolean {
+  return /^(auto|match_input_image|adaptive)$/.test(String(o));
+}
+
+/** Pixel area of a "1024x768" / "1024*768" option, else null. */
+function pixelArea(o: string | number | undefined): number | null {
+  const m = /^(\d+)\s*[x*]\s*(\d+)$/.exec(String(o ?? '').trim());
+  return m ? Number(m[1]) * Number(m[2]) : null;
+}
+
+/**
+ * Pick the option whose ratio is closest to `target` (a ratio string or number). Among sizes of the same
+ * ratio (1024x1024, 2048x2048) the one closest in area to `like` wins, so the scale is kept.
+ */
+export function nearestAspect(options: Array<string | number>, target: string | number | undefined, like?: string | number): string | undefined {
   if (!options.length) return undefined;
   const tr = typeof target === 'number' ? target : ratioOf(target);
   if (target != null && options.some((o) => String(o) === String(target))) return String(target);
   if (tr == null) return undefined;
-  let best: string | undefined;
-  let bestD = Infinity;
-  for (const o of options) {
+  const scored = options.flatMap((o) => {
     const r = ratioOf(o);
-    if (r == null) continue;
-    const d = Math.abs(Math.log(r / tr));
-    if (d < bestD) {
-      bestD = d;
-      best = String(o);
-    }
-  }
-  return best;
+    return r == null ? [] : [{ o: String(o), d: Math.abs(Math.log(r / tr)) }];
+  });
+  if (!scored.length) return undefined;
+  const bestD = Math.min(...scored.map((x) => x.d));
+  const near = scored.filter((x) => x.d <= bestD + 0.02);
+  const area = pixelArea(like);
+  if (area == null || near.length === 1) return near[0].o;
+  return near.reduce((a, b) => (Math.abs((pixelArea(b.o) ?? 0) - area) < Math.abs((pixelArea(a.o) ?? 0) - area) ? b : a)).o;
 }
 
 /** Output pixel dimensions for an aspect ratio at a long-edge size. */
@@ -208,6 +220,27 @@ function primaryType(p: JsonProp): string | undefined {
   return p.type;
 }
 
+const SIZE_RATIOS: Array<[number, number]> = [[1, 1], [4, 3], [3, 4], [16, 9], [9, 16], [3, 2], [2, 3], [21, 9]];
+
+/**
+ * A free "width*height" text field (Atlas Qwen Image, Z-Image) becomes a list of sizes at the model's default
+ * scale, or its largest one. Without a default the model may pick the size itself: "auto" (not sent) is offered.
+ */
+function sizeOptions(p: JsonProp): { options: string[]; default?: string; omit?: string } | null {
+  const text = `${typeof p.default === 'string' ? p.default : ''} ${p.description ?? ''}`;
+  const sizes = [...text.matchAll(/(\d{3,4})\s*([x*])\s*(\d{3,4})/g)];
+  if (!sizes.length) return null;
+  const sep = sizes[0][2];
+  const def = typeof p.default === 'string' && /^\d+\s*[x*]\s*\d+$/.test(p.default) ? p.default : undefined;
+  const edges = sizes.map((m) => Math.max(Number(m[1]), Number(m[3])));
+  const long = def ? Math.max(...def.split(/[x*]/).map(Number)) : Math.min(p.maximum ?? Math.max(...edges), Math.max(...edges));
+  const min = p.minimum ?? 256;
+  const edge = (v: number) => Math.max(min, Math.round(v / 16) * 16);
+  const options = SIZE_RATIOS.map(([w, h]) => (w >= h ? `${long}${sep}${edge((long * h) / w)}` : `${edge((long * w) / h)}${sep}${long}`));
+  if (def && !options.includes(def)) options.unshift(def);
+  return def ? { options, default: def } : { options: ['auto', ...options], default: 'auto', omit: 'auto' };
+}
+
 /** An array of `{ url, type: 'image' | 'video' | … }` items (Atlas `refers`). */
 function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): boolean {
   if (primaryType(p) !== 'array' || !p.items) return false;
@@ -278,7 +311,11 @@ export function schemaFromJson(opts: {
       used.add(mixed);
     }
   } else {
-    const multi = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).find(Boolean);
+    const multiKeys = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).filter((k): k is string => Boolean(k));
+    let multi: string | undefined = multiKeys.find((k) => required.includes(k)) ?? multiKeys[0];
+    const required1 = SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && required.includes(k));
+    // Ideogram remix/reframe: the source goes to a required image_url; image_urls are optional style refs.
+    if (multi && required1 && !required.includes(multi)) multi = undefined;
     if (multi) {
       const p = flattenProp(properties[multi], resolve);
       slots.images = {
@@ -290,7 +327,7 @@ export function schemaFromJson(opts: {
       };
       used.add(multi);
     } else {
-      const single = SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find(Boolean);
+      const single = required1 ?? SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find(Boolean);
       if (single) {
         slots.images = { key: single, max: 1, min: required.includes(single) ? 1 : 0, multiple: false, format: imageFormat };
         used.add(single);
@@ -322,6 +359,9 @@ export function schemaFromJson(opts: {
     } else if (t === 'integer' || t === 'number') {
       const def = typeof p.default === 'number' ? p.default : undefined;
       params.push({ ...base, type: t, min: p.minimum, max: p.maximum, default: def, step: t === 'integer' ? 1 : undefined });
+    } else if (t === 'string' && role === 'resolution' && sizeOptions(p)) {
+      const sized = sizeOptions(p)!;
+      params.push({ ...base, label: 'Size', role: 'aspect', type: 'enum', options: sized.options, default: sized.default, omit: sized.omit });
     } else if (t === 'string' && role === 'negative') {
       // Of the free-text params only the negative prompt is surfaced.
       params.push({ ...base, type: 'string', default: typeof p.default === 'string' ? p.default : undefined });
@@ -329,7 +369,14 @@ export function schemaFromJson(opts: {
     // A required field we do not surface (e.g. fal's prompt_expansion_mode) still has to be sent.
     if (params.length === before && required.includes(key) && p.default !== undefined) fixed[key] = p.default;
   }
-  return { ref: opts.ref, params, slots, fixed: Object.keys(fixed).length ? fixed : undefined, source: opts.source };
+  // A list of pixel sizes ("1024x768", "2048*2048") sets the framing: treat it as the aspect control.
+  if (!params.some((p) => p.role === 'aspect')) {
+    const sizes = params.find((p) => p.role === 'resolution' && p.options?.some((o) => pixelArea(o) != null) && p.options.every((o) => pixelArea(o) != null || isAutoOption(o)));
+    if (sizes) Object.assign(sizes, { role: 'aspect', label: 'Size' });
+  }
+  const slotKeys = new Set(Object.values(slots).flatMap((v) => (v && typeof v === 'object' ? [v.key] : typeof v === 'string' ? [v] : [])));
+  const missing = required.filter((k) => !slotKeys.has(k) && !isHiddenKey(k) && !params.some((p) => p.key === k) && !(k in fixed));
+  return { ref: opts.ref, params, slots, fixed: Object.keys(fixed).length ? fixed : undefined, missing: missing.length ? missing : undefined, source: opts.source };
 }
 
 // ---------------------------------------------------------------------------
@@ -372,7 +419,8 @@ export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind
   const aspect = paramByRole(schema, 'aspect');
   if (aspect?.options?.length) {
     const preferred = kind === 'video' ? '16:9' : '1:1';
-    s.aspect = nearestAspect(aspect.options.filter((o) => String(o) !== 'auto'), preferred) ?? String(aspect.default ?? aspect.options[0]);
+    const def = typeof aspect.default !== 'boolean' && aspect.default !== aspect.omit ? aspect.default : undefined;
+    s.aspect = nearestAspect(aspect.options.filter((o) => !isAutoOption(o)), preferred, def) ?? String(aspect.default ?? aspect.options[0]);
   }
   const res = paramByRole(schema, 'resolution');
   if (res?.options?.length) s.resolution = String(res.default ?? res.options[0]);
@@ -397,7 +445,7 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
   const aspect = paramByRole(schema, 'aspect');
   if (aspect?.options?.length && input.aspect != null) {
     const exact = aspect.options.find((o) => String(o) === String(input.aspect));
-    const near = exact != null ? String(exact) : nearestAspect(aspect.options, input.aspect);
+    const near = exact != null ? String(exact) : nearestAspect(aspect.options, input.aspect, base.aspect);
     if (near) {
       out.aspect = near;
       if (near !== String(input.aspect)) changes.push(`aspect ${input.aspect} → ${aspectLabel(near)}`);
@@ -441,7 +489,7 @@ export function wireParams(schema: ModelSchema, settings: GenSettings, countForR
   for (const p of schema.params) {
     switch (p.role) {
       case 'aspect':
-        if (settings.aspect != null) out[p.key] = castOption(p, settings.aspect);
+        if (settings.aspect != null && settings.aspect !== p.omit) out[p.key] = castOption(p, settings.aspect);
         break;
       case 'resolution':
         if (settings.resolution != null) out[p.key] = castOption(p, settings.resolution);

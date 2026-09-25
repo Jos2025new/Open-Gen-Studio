@@ -67,6 +67,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0);
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
   if (st.ui.workspace === 'designer' && kind === 'video') return { ok: false, reason: 'Designer layers cannot hold video.', estimate };
+  if (schema.missing?.length) return { ok: false, reason: `This model needs ${schema.missing.join(', ')}, which the app cannot send yet.`, estimate };
   if (kind === 'image') {
     if (attachments.some((id) => st.assets[id]?.kind === 'video')) return { ok: false, reason: 'Remove the video attachment (use Extract frame first).', estimate };
     const slot = schema.slots.images;

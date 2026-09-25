@@ -171,8 +171,10 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
   const aspects = toStrings(sp.aspect_ratio);
   if (resolutions.length) {
     const cls = classifyResolutions(resolutions);
-    if (cls === 'sizes' || (cls === 'ratios' && !aspects.length)) {
-      params.push({ key: 'resolution', label: cls === 'sizes' ? 'Size' : 'Aspect ratio', role: 'aspect', type: 'enum', options: resolutions });
+    // Seedream V5 Pro mixes ratios and tiers ("16:9", "2k") in one field: without an aspect field it is the framing.
+    const framing = cls === 'sizes' || (!aspects.length && (cls === 'ratios' || (cls === 'mixed' && resolutions.some((r) => ratioOf(r) != null))));
+    if (framing) {
+      params.push({ key: 'resolution', label: cls === 'ratios' ? 'Aspect ratio' : 'Size', role: 'aspect', type: 'enum', options: resolutions });
     } else {
       params.push({ key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: resolutions });
     }
@@ -195,6 +197,8 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
   const maxIn = num(sp.max_input_images) ?? 0;
   const inputs = raw.architecture?.input_modalities ?? ['text'];
   const needsImage = !inputs.includes('text') || /(^|[/-])(edit|image-to-image|img2img)/.test(raw.id);
+  // Some text-only endpoints still declare max_input_images; images are only sent where the model takes them.
+  const takesImages = inputs.includes('image') && (maxIn > 0 || needsImage);
   return {
     ref: model.ref,
     params,
@@ -202,7 +206,7 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
       prompt: inputs.includes('text') ? 'prompt' : undefined,
       promptRequired: inputs.includes('text') && !needsImage,
       // POST /api/v1/images ignores `input_references` (despite the docs) and reads `imageDataUrls`; verified 2026-09-25.
-      images: maxIn > 0 || needsImage ? { key: 'imageDataUrls', max: Math.max(1, maxIn), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
+      images: takesImages ? { key: 'imageDataUrls', max: Math.max(1, maxIn), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
     },
     price: model.price,
     source: 'catalog',

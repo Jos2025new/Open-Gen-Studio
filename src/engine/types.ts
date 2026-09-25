@@ -26,6 +26,8 @@ export interface ParamDef {
   step?: number;
   default?: string | number | boolean;
   description?: string;
+  /** Option that means "let the model decide": chosen in the UI, never sent. */
+  omit?: string;
 }
 
 export type ImageInputFormat = 'content-part' | 'url' | 'data-url';
@@ -90,6 +92,8 @@ export interface ModelSchema {
   slots: InputSlots;
   /** Values always sent: required fields with a default that the UI does not expose. */
   fixed?: Record<string, unknown>;
+  /** Required inputs the app cannot send yet (mask, keyframe list…): the model cannot run from here. */
+  missing?: string[];
   price?: PriceRule;
   /** Where the schema came from; 'derived' means reconstructed from catalog metadata. */
   source: 'catalog' | 'openapi' | 'derived' | 'builtin';

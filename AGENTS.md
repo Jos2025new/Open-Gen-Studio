@@ -8,7 +8,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
-## Tarea actual — validación de modelos prioritarios (2026-09-24)
+## Tarea actual — validación de familias de imagen (2026-09-24)
+Familias: GPT Image 2/2.5, Seedream V5, Nano Banana, Qwen Image, Grok Imagine Image, Step Image, P Image, Recraft, Ideogram, Z-Image (con variantes).
+1. [x] Catálogos y esquemas públicos de Atlas, fal y NanoGPT (sin clave ni coste); pasar cada esquema por el parser. *Razón: mismo método que en vídeo.*
+2. [x] Informe en `MODEL_VALIDATION.md` (sección de imagen). *Razón: saber qué falla antes de tocar código.*
+3. [x] Corregir lo hallado con tests de fixtures reales; typecheck, navegador sin envío real; commit. 7 fallos corregidos (tamaños como encuadre, `size` de texto libre, campo de imagen obligatorio, `missing`, NanoGPT mixto y solo texto, `isAutoOption`); 39 tests; payloads verificados con envío interceptado.
+
+## Tarea anterior — validación de modelos prioritarios (vídeo) (2026-09-24)
 Modelos: Wan 3, MiniMax H3, Seedance 2.0/2.5, Flux 3 (y Video Edit), Veo 3.1, Kling V3, Kling O3/Omni 3, Grok Imagine Video (y Edits), Gemini Omni Flash 1.1, HappyHorse 1.1, con todas sus variantes.
 1. [x] Descargar catálogos y esquemas públicos (Atlas 95, fal 116, NanoGPT 63 variantes; sin clave ni coste). *Razón: validar contra lo que sirve el proveedor, no contra ejemplos.*
 2. [x] Pasar cada esquema por nuestro parser y comparar. Informe en `MODEL_VALIDATION.md` (10 fallos, límites anotados). *Razón: saber qué falla antes de tocar código.*

@@ -1,0 +1,309 @@
+{
+ "atlasQwen3Edit": {
+  "properties": {
+   "prompt": {
+    "description": "The editing instruction describing how to transform the reference image(s).",
+    "type": "string",
+    "minLength": 1
+   },
+   "reference_image_urls": {
+    "description": "Reference image URLs for image editing. Provide one URL for single-image editing, or up to three URLs for multi-image reference / subject-driven editing. Accept",
+    "type": "array",
+    "items": {
+     "type": "string"
+    },
+    "minItems": 1,
+    "maxItems": 3
+   },
+   "size": {
+    "description": "Output resolution as width*height (e.g. 1440*1440). Omit to let the model pick a resolution automatically. Valid range: 512*512–1440*1440.",
+    "type": "string"
+   }
+  },
+  "required": [
+   "prompt",
+   "reference_image_urls"
+  ]
+ },
+ "atlasZImage": {
+  "properties": {
+   "prompt": {
+    "description": "The positive prompt for the generation.",
+    "type": "string"
+   },
+   "size": {
+    "default": "1024*1536",
+    "maximum": 2048,
+    "minimum": 512,
+    "description": "The size of the generated media in pixels (width*height).",
+    "type": "string"
+   }
+  },
+  "required": [
+   "prompt"
+  ]
+ },
+ "atlasGptImage2": {
+  "properties": {
+   "prompt": {
+    "description": "The positive prompt for the generation.",
+    "minLength": 1,
+    "type": "string"
+   },
+   "quality": {
+    "default": "medium",
+    "description": "The quality of the generated image.",
+    "enum": [
+     "low",
+     "medium",
+     "high"
+    ],
+    "type": "string"
+   },
+   "size": {
+    "default": "1024x1024",
+    "description": "optional string or auto or 1024x1024 or 1536x1024 or 5 moreThe size ofthe generated images.For gpt-image-2 and gpt-image-2-2026-04-21,arbitraryresolutions are s",
+    "enum": [
+     "1024x1024",
+     "1024x768",
+     "768x1024",
+     "1024x1536",
+     "1536x1024",
+     "2048x2048",
+     "2048x1152",
+     "1152x2048",
+     "2560x1088",
+     "1088x2560",
+     "2880x2160",
+     "2160x2880",
+     "3840x2160",
+     "2160x3840"
+    ],
+    "type": "string"
+   }
+  },
+  "required": [
+   "prompt"
+  ]
+ },
+ "falIdeogramRemix": {
+  "properties": {
+   "prompt": {
+    "type": "string",
+    "description": "The prompt to remix the image with"
+   },
+   "image_urls": {
+    "anyOf": [
+     {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "description": "A set of images to use as style references (maximum total size 10MB across all style references). The images should be in JPEG, PNG or WebP format"
+   },
+   "image_url": {
+    "type": "string",
+    "description": "The image URL to remix"
+   }
+  },
+  "required": [
+   "prompt",
+   "image_url"
+  ]
+ },
+ "falIdeogramEdit": {
+  "properties": {
+   "prompt": {
+    "type": "string",
+    "description": "The prompt to fill the masked part of the image."
+   },
+   "mask_url": {
+    "type": "string",
+    "description": "The mask URL to inpaint the image. MUST have the exact same dimensions (width and height) as the input image."
+   },
+   "image_urls": {
+    "anyOf": [
+     {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "description": "A set of images to use as style references (maximum total size 10MB across all style references). The images should be in JPEG, PNG or WebP format"
+   },
+   "image_url": {
+    "type": "string",
+    "description": "The image URL to generate an image from. MUST have the exact same dimensions (width and height) as the mask image."
+   }
+  },
+  "required": [
+   "prompt",
+   "image_url",
+   "mask_url"
+  ]
+ },
+ "falIdeogramCharacter": {
+  "properties": {
+   "prompt": {
+    "type": "string",
+    "description": "The prompt to fill the masked part of the image."
+   },
+   "image_urls": {
+    "anyOf": [
+     {
+      "items": {
+       "type": "string"
+      },
+      "type": "array"
+     },
+     {
+      "type": "null"
+     }
+    ],
+    "description": "A set of images to use as style references (maximum total size 10MB across all style references). The images should be in JPEG, PNG or WebP format"
+   },
+   "reference_image_urls": {
+    "items": {
+     "type": "string"
+    },
+    "type": "array",
+    "description": "A set of images to use as character references. Currently only 1 image is supported, rest will be ignored. (maximum total size 10MB across all character referen"
+   }
+  },
+  "required": [
+   "prompt",
+   "reference_image_urls"
+  ]
+ },
+ "nanoImage": [
+  {
+   "id": "openai/gpt-image-2.5/flare/text-to-image",
+   "name": "GPT Image 2.5 Flare",
+   "architecture": {
+    "modality": "text->image",
+    "input_modalities": [
+     "text"
+    ],
+    "output_modalities": [
+     "image"
+    ]
+   },
+   "capabilities": {
+    "image_generation": true,
+    "image_to_image": false,
+    "inpainting": false,
+    "nsfw": false
+   },
+   "supported_parameters": {
+    "resolutions": [
+     "1k",
+     "2k",
+     "4k"
+    ],
+    "aspect_ratio": [
+     "1:1",
+     "1:2",
+     "2:1",
+     "1:3",
+     "3:1",
+     "2:3",
+     "3:2",
+     "3:4",
+     "4:3",
+     "4:5",
+     "5:4",
+     "9:16",
+     "16:9",
+     "9:21",
+     "21:9"
+    ],
+    "max_images": 4,
+    "max_output_images": 4,
+    "max_input_images": 16
+   }
+  },
+  {
+   "id": "pruna-ai/p-image/edit",
+   "name": "P-Image Edit",
+   "architecture": {
+    "modality": "text+image->image",
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "image"
+    ]
+   },
+   "capabilities": {
+    "image_generation": true,
+    "image_to_image": true,
+    "inpainting": false,
+    "nsfw": false
+   },
+   "supported_parameters": {
+    "resolutions": [
+     "auto"
+    ],
+    "aspect_ratio": [
+     "match_input_image",
+     "1:1",
+     "16:9",
+     "9:16",
+     "4:3",
+     "3:4",
+     "3:2",
+     "2:3"
+    ],
+    "max_images": 4,
+    "max_output_images": 4,
+    "max_input_images": 5
+   }
+  },
+  {
+   "id": "bytedance/seedream-v5.0-pro",
+   "name": "Seedream 5.0 Pro",
+   "architecture": {
+    "modality": "text+image->image",
+    "input_modalities": [
+     "text",
+     "image"
+    ],
+    "output_modalities": [
+     "image"
+    ]
+   },
+   "capabilities": {
+    "image_generation": true,
+    "image_to_image": true,
+    "inpainting": false,
+    "nsfw": true
+   },
+   "supported_parameters": {
+    "resolutions": [
+     "1:1",
+     "16:9",
+     "9:16",
+     "3:2",
+     "2:3",
+     "4:3",
+     "3:4",
+     "1k",
+     "2k"
+    ],
+    "max_images": 4,
+    "max_output_images": 4,
+    "max_input_images": 10
+   }
+  }
+ ]
+}

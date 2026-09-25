@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fixtures from './fixtures/provider-schemas.json';
-import { routeVideoInputs, schemaFromJson, videoInputProblem, wireParams, type JsonProp } from '../src/engine/params';
+import imageFixtures from './fixtures/image-schemas.json';
+import { coerceSettings, isAutoOption, routeVideoInputs, schemaFromJson, videoInputProblem, wireParams, type JsonProp } from '../src/engine/params';
 import { atlas, atlasVideoCaps } from '../src/engine/providers/atlas';
 import { nanogpt } from '../src/engine/providers/nanogpt';
 import type { GenRequest, MediaInput } from '../src/engine/providers/types';
@@ -123,5 +124,44 @@ describe('request payloads', () => {
     const schema: ModelSchema = { ref: 'nanogpt::e', params: [], slots: { prompt: 'prompt', video: { key: 'videoDataUrl', format: 'data-url' } }, source: 'catalog' };
     await expect(nanogpt.generate(request({ provider: 'nanogpt' }, schema, { video: clip(5 * 1024 * 1024) }))).rejects.toThrow(/up to 4 MB/);
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+// Image families (GPT Image, Seedream V5, Qwen, Z-Image, Ideogram, P Image…), trimmed from live schemas 2026-09-24.
+describe('image schemas', () => {
+  type Fx = { properties: Record<string, JsonProp>; required: string[] };
+  const img = imageFixtures as unknown as Record<string, Fx> & { nanoImage: unknown[] };
+  const parseImage = (f: Fx) => schemaFromJson({ ref: 'atlas::i', kind: 'image', properties: f.properties, required: f.required, resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
+
+  it('turns a list of pixel sizes into the framing control and keeps its scale', () => {
+    const s = parseImage(img.atlasGptImage2);
+    expect(s.params.find((p) => p.key === 'size')?.role).toBe('aspect');
+    const { settings } = coerceSettings(s, 'image', { aspect: '16:9', count: 1 });
+    expect(settings.aspect).toBe('2048x1152');
+    expect(wireParams(s, settings, 1).size).toBe('2048x1152');
+  });
+  it('offers sizes for a free "width*height" field, with an unsent Auto when the model may choose', () => {
+    const qwen = parseImage(img.atlasQwen3Edit).params.find((p) => p.key === 'size')!;
+    expect(qwen).toMatchObject({ role: 'aspect', omit: 'auto', default: 'auto' });
+    expect(qwen.options).toContain('1440*816');
+    expect(wireParams(parseImage(img.atlasQwen3Edit), { aspect: 'auto', count: 1, advanced: {} }, 1)).not.toHaveProperty('size');
+    const z = parseImage(img.atlasZImage).params.find((p) => p.key === 'size')!;
+    expect(z.default).toBe('1024*1536');
+    expect(z.options).toContain('1536*864');
+  });
+  it('sends the source image to the required field and names inputs the app cannot send', () => {
+    expect(parseImage(img.falIdeogramRemix).slots.images).toMatchObject({ key: 'image_url', min: 1, multiple: false });
+    expect(parseImage(img.falIdeogramCharacter).slots.images).toMatchObject({ key: 'reference_image_urls', min: 1 });
+    expect(parseImage(img.falIdeogramEdit).missing).toEqual(['mask_url']);
+  });
+  it('reads NanoGPT framing and image inputs from the catalog', async () => {
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify({ data: url.includes('images/models') ? img.nanoImage : [] })));
+    const models = await nanogpt.listModels(undefined);
+    const schema = (id: string) => nanogpt.loadSchema(models.find((m) => m.id === id)!, undefined);
+    // Seedream V5 Pro mixes ratios and tiers in `resolution`: it is the framing control.
+    expect((await schema('bytedance/seedream-v5.0-pro')).params.find((p) => p.key === 'resolution')?.role).toBe('aspect');
+    // A text-only endpoint that declares max_input_images takes no images.
+    expect((await schema('openai/gpt-image-2.5/flare/text-to-image')).slots.images).toBeUndefined();
+    expect(isAutoOption('match_input_image')).toBe(true);
   });
 });

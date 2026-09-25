@@ -6,7 +6,7 @@ import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
 import { estimateMedia, estimateOp } from './costs';
 import { OPS, opCount } from './ops';
-import { coerceSettings, dimsFor, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { coerceSettings, dimsFor, isAutoOption, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -209,6 +209,7 @@ async function execute(id: string): Promise<string[]> {
       throw new Error(parsed && !isConnected(parsed.provider) ? `Connect ${prov} in Settings to use ${g.modelName}.` : `Model ${g.modelName} is not available.`);
     }
     const { model, schema } = resolved;
+    if (schema.missing?.length) throw new Error(`${model.name} needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
     const apiKey = apiKeyFor(model.provider);
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
 
@@ -445,7 +446,8 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });
     if (source && paramByRole(schema, 'aspect')?.options) {
       const opts = paramByRole(schema, 'aspect')!.options!;
-      settings.aspect = opts.some((o) => String(o) === 'auto') ? 'auto' : nearestAspect(opts, source.width / source.height) ?? settings.aspect;
+      const auto = opts.find(isAutoOption);
+      settings.aspect = auto != null ? String(auto) : nearestAspect(opts, source.width / source.height, settings.aspect) ?? settings.aspect;
     }
     const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: choice.ref, settings, op };
     return { ...spec, estimate: estimateOp(input.op, input.params, source, settings) };
@@ -456,8 +458,8 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const aspectParam = paramByRole(schema, 'aspect');
   if (aspectParam?.options?.length) {
     const target = input.op === 'reframe' ? String(input.params.aspect) : source ? source.width / source.height : undefined;
-    const hasAuto = aspectParam.options.some((o) => String(o) === 'auto');
-    settings.aspect = input.op !== 'reframe' && hasAuto ? 'auto' : nearestAspect(aspectParam.options, target) ?? settings.aspect;
+    const auto = aspectParam.options.find(isAutoOption);
+    settings.aspect = input.op !== 'reframe' && auto != null ? String(auto) : nearestAspect(aspectParam.options, target, settings.aspect) ?? settings.aspect;
   }
   if (input.op === 'upscale') {
     const res = paramByRole(schema, 'resolution');

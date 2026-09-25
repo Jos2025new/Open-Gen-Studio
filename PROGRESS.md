@@ -95,9 +95,13 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - Corregido: variantes ocultas o mal clasificadas (FLUX 3 y varios reference-to-video en Atlas, multimodo en NanoGPT); las imágenes de referencia nunca llegaban a los modelos de vídeo; `refers` de Atlas; vídeos de referencia; referencias y último fotograma en NanoGPT; campos obligatorios con valor por defecto; opciones `disabled`; límite de 4 MB de NanoGPT.
 - Fuera de alcance: audio de referencia, `elements` de Kling, `keyframes` de FLUX 3 y `video_clips` de Gemini (esos dos endpoints se ocultan).
 
+**Validación de familias de imagen** (2026-09-24) — `MODEL_VALIDATION.md` (sección de imagen), `params.ts`, `jobs.ts`, `actions.ts`, `providers/{atlas,fal,nanogpt}.ts`
+- *Por qué:* familias prioritarias GPT Image 2/2.5, Seedream V5, Nano Banana, Qwen Image, Grok Imagine Image, Step Image, P Image, Recraft, Ideogram y Z-Image. Validadas contra Atlas (67 variantes), fal (137) y NanoGPT (76), sin coste.
+- Corregido: las listas de tamaños en píxeles pasan a controlar el encuadre y conservan su escala; un `size` de texto `ancho*alto` genera opciones, con "Auto" no enviado; la imagen de origen va al campo obligatorio (Ideogram); los campos obligatorios imposibles (máscaras, `video_clips`) se bloquean con aviso; en NanoGPT, el `resolution` mixto es el encuadre y no se adjuntan imágenes a endpoints solo de texto; `match_input_image`/`adaptive` cuentan como auto.
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
-Estado: typecheck limpio y **35 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
+Estado: typecheck limpio y **39 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
 
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.
