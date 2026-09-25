@@ -11,6 +11,7 @@ const out = path.join(root, 'tests/fixtures/live');
 const fam = JSON.parse(fs.readFileSync(path.join(root, 'scripts/model-families.json'), 'utf8'));
 const VIDEO = new RegExp(fam.video, 'i');
 const IMAGE = new RegExp(fam.image, 'i');
+const AUDIO = new RegExp(fam.audio, 'i');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function get(url) {
@@ -47,7 +48,7 @@ const matches = (re, ...names) => names.some((n) => n && re.test(n));
 const atlasAll = (await get('https://api.atlascloud.ai/api/v1/models')).data;
 const atlas = [];
 for (const m of atlasAll) {
-  const re = m.type === 'Video' ? VIDEO : m.type === 'Image' ? IMAGE : null;
+  const re = m.type === 'Video' ? VIDEO : m.type === 'Image' ? IMAGE : m.type === 'Audio' ? AUDIO : null;
   if (!re || !matches(re, m.model, m.displayName)) continue;
   const doc = m.schema ? await get(m.schema) : null;
   const schemas = doc?.components?.schemas ?? {};

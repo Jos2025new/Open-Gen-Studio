@@ -140,3 +140,33 @@ describe('agent plans with audio', () => {
     expect(veo.errors.join(' ')).toMatch(/does not accept audio/);
   });
 });
+
+describe('talking avatars (Atlas)', () => {
+  it('sends portrait and voice to OmniHuman and polls where Atlas says', async () => {
+    const schemas = (atlasSnapshot as Loose).models.find((m: Loose) => m.model === 'bytedance/avatar-omni-human-v1.5').schemaDoc.components.schemas;
+    const schema = schemaFromJson({ ref: 'atlas::omni', kind: 'video', properties: schemas.Input.properties, required: schemas.Input.required, resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
+    expect(videoInputProblem(schema.slots, { firstFrame: false, images: 0, videos: 0, audios: 1 })).toBe('needs a start image.');
+    const polled: string[] = [];
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url.includes('uploadMedia')) return new Response(JSON.stringify({ data: { download_url: `https://cdn.test/${((init?.body as FormData).get('file') as File).type}` } }));
+      if (url.includes('generateVideo')) {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ data: { id: 'p7', urls: { get: 'https://api.atlascloud.ai/api/v1/model/result/p7' } } }));
+      }
+      if (url.includes('/model/')) {
+        polled.push(url);
+        return new Response(JSON.stringify({ data: { status: 'failed', error: 'stop here' } }));
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const file = (type: string) => ({ assetId: type, blob: new Blob([new Uint8Array(2)], { type }), mime: type, width: 1, height: 1 });
+    const req: GenRequest = {
+      kind: 'video', model: { ref: 'atlas::omni', provider: 'atlas', id: 'bytedance/avatar-omni-human-v1.5', name: 'OmniHuman', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] }, schema, prompt: '',
+      settings: { count: 1, advanced: {} }, count: 1, refs: [], firstFrame: file('image/png'), audio: file('audio/mpeg'), apiKey: 'k', signal: new AbortController().signal, onStatus: () => undefined, onRemoteJob: () => undefined,
+    };
+    await expect(atlas.generate(req)).rejects.toThrow('stop here');
+    expect(body).toMatchObject({ model: 'bytedance/avatar-omni-human-v1.5', image_url: 'https://cdn.test/image/png', audio_url: 'https://cdn.test/audio/mpeg' });
+    expect(polled).toEqual(['https://api.atlascloud.ai/api/v1/model/result/p7']);
+  });
+});

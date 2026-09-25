@@ -54,7 +54,8 @@ const REF_VIDEO_KEYS = ['reference_videos', 'reference_video_urls', 'video_urls'
 // Inpainting masks (fal: mask_url, mask_image_url; Atlas GPT Image 2.5: mask).
 const MASK_KEYS = ['mask_url', 'mask_image_url', 'mask', 'mask_image'];
 const REF_AUDIO_KEYS = ['reference_audios', 'reference_audio_urls', 'audio_urls'];
-const AUDIO_KEYS = ['audio_url', 'target_audio_url', 'driving_audio_url', 'input_audio', 'audio_file'];
+// `audio` counts only as text (InfiniteTalk's track); as a boolean it is the generate-audio switch.
+const AUDIO_KEYS = ['audio_url', 'target_audio_url', 'driving_audio_url', 'input_audio', 'audio_file', 'audio'];
 const LAST_FRAME_KEYS = ['end_image_url', 'last_image', 'tail_image_url', 'end_image', 'last_frame_image', 'last_frame', 'last_frame_url', 'tail_image'];
 
 export function normKey(k: string): string {
@@ -456,7 +457,7 @@ export function schemaFromJson(opts: {
     }
     const first = FIRST_FRAME_KEYS.map((k) => lower.get(k)).find((k) => k && !used.has(k));
     if (first) {
-      slots.firstFrame = { key: first, format: imageFormat };
+      slots.firstFrame = { key: first, format: imageFormat, ...(required.includes(first) ? { required: true } : {}) };
       used.add(first);
     }
     const refs = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && !used.has(k));
@@ -849,6 +850,7 @@ export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; i
   const videoMax = videos?.max ?? 0;
   if (n.videos > videoMax) return videoMax ? `accepts up to ${videoMax} reference ${slots.clips ? 'clip' : 'video'}${videoMax > 1 ? 's' : ''}.` : 'does not accept reference videos (use Extract frame to start from a still).';
   if (videos && n.videos < videos.min) return slots.clips ? 'needs a reference video clip.' : 'needs a reference video.';
+  if (slots.firstFrame?.required && !n.firstFrame) return 'needs a start image.';
   return null;
 }
 

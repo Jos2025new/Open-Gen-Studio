@@ -57,6 +57,8 @@ export function atlasVideoCaps(id: string, cats: string[]): { text: boolean; ima
   if (task === 'reference-to-video') return { text: true, image: true, video: false };
   if (/(image|frame)-to-video$/.test(task)) return { text: cats.includes('TEXT-TO-VIDEO'), image: true, video: false };
   if (task === 'text-to-video') return { text: true, image: false, video: false };
+  // Talking avatars (InfiniteTalk, OmniHuman): a portrait plus a voice track.
+  if (cats.includes('AUDIO-TO-VIDEO')) return { text: true, image: true, video: false };
   return { text: cats.includes('TEXT-TO-VIDEO'), image: cats.includes('IMAGE-TO-VIDEO'), video: cats.includes('VIDEO-TO-VIDEO') };
 }
 
@@ -182,7 +184,7 @@ export const atlas: ProviderAdapter = {
     }
     req.onStatus('Submitting');
     const endpoint = req.kind === 'image' ? 'generateImage' : 'generateVideo';
-    const submit = await requestJson<{ data?: { id?: string } }>(`${BASE}/api/v1/model/${endpoint}`, {
+    const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(`${BASE}/api/v1/model/${endpoint}`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${req.apiKey}` },
       body: JSON.stringify(body),
@@ -190,7 +192,9 @@ export const atlas: ProviderAdapter = {
     });
     const id = submit.data?.id;
     if (!id) throw new Error('Atlas Cloud did not return a prediction id');
-    const job: RemoteJob = { provider: 'atlas', id, meta: {} };
+    // Poll where Atlas says (OmniHuman answers at /model/result/{id}, most models at /model/prediction/{id}).
+    const get = submit.data?.urls?.get;
+    const job: RemoteJob = { provider: 'atlas', id, meta: get?.startsWith(`${BASE}/`) ? { pollUrl: get } : {} };
     req.onRemoteJob(job);
     return poll(job, { kind: req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
@@ -226,7 +230,7 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'image' : ctx.kind; // no text jobs at Atlas Cloud
   return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' ? 2000 : 5000, async () => {
     const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] } }>(
-      `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
+      job.meta.pollUrl ?? `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
       { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal, timeoutMs: POLL_TIMEOUT_MS },
     );
     const status = String(res.data?.status ?? '').toLowerCase();

@@ -1,5 +1,6 @@
 {
-  "_comment": "Priority model families (user, 2026-09-24). Regexes match provider model ids or names. Used by scripts/model-snapshot.mjs.",
-  "video": "wan[-_ .]?3(?![0-9])|minimax.*h3|seedance[-_ .]?2|flux[-_ .]?3|veo[-_ .]?3[-_ .]?1|kling.*(v3|o3|v30)|grok.*imagine.*video|gemini.*omni|happy[-_ ]?horse",
-  "image": "gpt[-_ .]?image[-_ .]?2|seedream([-_ .]?v?5|/v5)|nano[-_ .]?banana|qwen[-_ .]?image|grok[-_ .]?imagine[-_ .]?image|step1x|stepx|step[-_ ]image|p-image|prunaai|recraft|ideogram|z[-_]?image"
+  "_comment": "Priority model families (user, 2026-09-24). Regexes match provider model ids or names. Used by scripts/model-snapshot.mjs. Audio added 2026-09-25 (user): MiniMax Music 3, Lyrics Generation.",
+  "video": "wan[-_ .]?3(?![0-9])|minimax.*h3|seedance[-_ .]?2|flux[-_ .]?3|veo[-_ .]?3[-_ .]?1|kling.*(v3|o3|v30)|grok.*imagine.*video|gemini.*omni|happy[-_ ]?horse|infinitetalk|omni-?human",
+  "image": "gpt[-_ .]?image[-_ .]?2|seedream([-_ .]?v?5|/v5)|nano[-_ .]?banana|qwen[-_ .]?image|grok[-_ .]?imagine[-_ .]?image|step1x|stepx|step[-_ ]image|p-image|prunaai|recraft|ideogram|z[-_]?image",
+  "audio": "minimax/music-3|lyrics-generation"
 }

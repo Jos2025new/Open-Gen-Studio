@@ -49,7 +49,8 @@ export interface InputSlots {
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
   /** Image models with a source image and a separate reference list (Ideogram Character remix): the first input image. */
   source?: { key: string; format: ImageInputFormat };
-  firstFrame?: { key: string; format: ImageInputFormat };
+  /** `required`: the model cannot run without it (talking avatars, lip-sync). */
+  firstFrame?: { key: string; format: ImageInputFormat; required?: boolean };
   lastFrame?: { key: string; format: ImageInputFormat };
   /** Source video for video-to-video models. */
   video?: { key: string; format: ImageInputFormat };
