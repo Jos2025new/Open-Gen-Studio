@@ -21,7 +21,8 @@ export interface ParamDef {
   key: string;
   label: string;
   role: ParamRole;
-  type: 'enum' | 'integer' | 'number' | 'boolean' | 'string';
+  /** 'multi': several values from `options` (up to `max`), kept in `settings.extras`. */
+  type: 'enum' | 'integer' | 'number' | 'boolean' | 'string' | 'multi';
   options?: Array<string | number>;
   min?: number;
   max?: number;
@@ -56,6 +57,30 @@ export interface InputSlots {
   audio?: { key: string; required: boolean; format: ImageInputFormat };
   /** Reference audio list (`reference_audios`, `audio_urls`, `reference_audio_urls`). */
   refAudios?: { key: string; max: number; min: number; format: ImageInputFormat };
+  /** Reusable subjects (Kling elements), mentioned in the prompt as @Name and sent as the provider's element list. */
+  elements?: {
+    key: string;
+    max: number;
+    /** Atlas creates elements inline (element_name…); fal takes image sets (frontal_image_url…). */
+    style: 'atlas' | 'fal';
+    /** How the prompt names element n: "<<<element_{n}>>>" (Atlas) or "@Element{n}" (fal). */
+    mention: string;
+    refMax: number;
+    video: boolean;
+    voice: boolean;
+  };
+  /** Multi-shot prompts (`multi_prompt`: per-shot prompt + seconds). */
+  shots?: {
+    key: string;
+    max: number;
+    indexed: boolean;
+    durationAsString: boolean;
+    /** Switch and mode fields that turn the storyboard on (Atlas: multi_shot, shot_type=customize). */
+    flagKey?: string;
+    modeKey?: string;
+    /** The top-level prompt and the shots are mutually exclusive (fal). */
+    exclusivePrompt: boolean;
+  };
   /** Trimmed reference clips (`video_clips: { url, start, ends[, fps] }`). Takes the input videos. */
   clips?: {
     key: string;
@@ -152,6 +177,10 @@ export interface GenSettings {
   seed?: number;
   negative?: string;
   advanced: Record<string, AdvancedValue>;
+  /** Multi-shot storyboard (Kling multi_prompt): seconds must add up to `duration`. */
+  shots?: Array<{ prompt: string; duration: number }>;
+  /** Structured parameter values (lists, colors…), by wire key. */
+  extras?: Record<string, unknown>;
 }
 
 export interface Estimate {
@@ -200,7 +229,8 @@ export type OpId =
   | 'video_upscale'
   | 'video_edit'
   | 'video_extend'
-  | 'transcribe';
+  | 'transcribe'
+  | 'create_voice';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';
@@ -576,6 +606,21 @@ export interface AgentState {
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
 }
 
+/** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
+export interface Subject {
+  id: string;
+  name: string;
+  description?: string;
+  /** Main (frontal) image. */
+  frontalAssetId?: string;
+  /** Extra views (up to 3). */
+  refAssetIds: string[];
+  /** Or a short video of the subject. */
+  videoAssetId?: string;
+  /** Provider voice bound to the subject (Kling voice_id). */
+  voiceId?: string;
+}
+
 export interface Session {
   id: string;
   title: string;
@@ -589,4 +634,5 @@ export interface Session {
   activeDocId: string | null;
   agent: AgentState;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
+  subjects?: Subject[];
 }

@@ -37,7 +37,8 @@ function closure(schemas, start) {
   };
   keep[start] = schemas[start];
   visit(schemas[start]);
-  return JSON.parse(JSON.stringify(keep, (k, v) => (k === 'description' && typeof v === 'string' && v.length > 400 ? v.slice(0, 400) : k === 'examples' ? undefined : v)));
+  // The parser reads some descriptions (sizes, limits, mention syntax): keep them nearly whole.
+  return JSON.parse(JSON.stringify(keep, (k, v) => (k === 'description' && typeof v === 'string' && v.length > 2000 ? v.slice(0, 2000) : k === 'examples' ? undefined : v)));
 }
 
 const matches = (re, ...names) => names.some((n) => n && re.test(n));

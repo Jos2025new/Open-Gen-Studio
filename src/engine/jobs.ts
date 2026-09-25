@@ -3,12 +3,12 @@ import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isConnected, opModelFor, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, clipTrim, coerceSettings, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -209,6 +209,10 @@ async function execute(id: string): Promise<string[]> {
       await runTranscribe(g, signal);
       return [];
     }
+    if (g.op && OPS[g.op.id].engine === 'voice') {
+      await runCreateVoice(g, signal);
+      return [];
+    }
     if (g.kind === 'text') throw new Error('Text results come only from Transcribe.');
     const resolved = await resolveModel(g.modelRef);
     if (!resolved) {
@@ -277,6 +281,34 @@ async function execute(id: string): Promise<string[]> {
     // Audio: the first track to a single-track field (lip-sync, soundtrack), the rest as references.
     const { audio, refAudios } = routeAudio(schema.slots, audios);
 
+    // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
+    const subjects = get().sessions[g.sessionId]?.subjects ?? [];
+    const elSlot = schema.slots.elements;
+    const mentioned = mentionSubjects(g.prompt, subjects, elSlot?.mention);
+    let prompt = mentioned.prompt;
+    let elements: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }> | undefined;
+    if (elSlot && mentioned.ids.length) {
+      if (mentioned.ids.length > elSlot.max) throw new InputError('SUBJECTS_MAX', `${model.name} takes up to ${elSlot.max} subjects; the prompt mentions ${mentioned.ids.length}.`);
+      elements = [];
+      for (const sid of mentioned.ids) {
+        const s = subjects.find((x) => x.id === sid)!;
+        const video = elSlot.video && s.videoAssetId ? await mediaInput(s.videoAssetId) : undefined;
+        if (!s.frontalAssetId && !video) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${s.name}" needs a frontal image${elSlot.video ? ' or a video' : ''}.`);
+        elements.push({
+          name: s.name,
+          description: s.description,
+          frontal: s.frontalAssetId ? await mediaInput(s.frontalAssetId) : undefined,
+          refs: await Promise.all(s.refAssetIds.slice(0, elSlot.refMax).map((r) => mediaInput(r))),
+          video,
+          voiceId: s.voiceId,
+        });
+      }
+    }
+    // Multi-shot storyboard: shots must add up to the clip; some providers take shots instead of the prompt.
+    const shotProblem = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
+    if (shotProblem) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotProblem}`);
+    if (schema.slots.shots?.exclusivePrompt && g.settings.shots?.length) prompt = '';
+
     // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
     let genSettings = g.settings;
     let keyframes: Array<{ input: MediaInput; frame: number }> | undefined;
@@ -314,7 +346,7 @@ async function execute(id: string): Promise<string[]> {
         kind: g.kind,
         model,
         schema,
-        prompt: g.prompt,
+        prompt,
         settings,
         count: n,
         refs,
@@ -323,6 +355,7 @@ async function execute(id: string): Promise<string[]> {
         clips,
         audio,
         refAudios,
+        elements,
         firstFrame,
         lastFrame,
         video,
@@ -381,6 +414,22 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     model,
     input,
     language: String(g.op!.params.language ?? 'auto'),
+    apiKey,
+    signal,
+    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+  });
+  finishText(g.id, result.text ?? '', result.costUsd);
+}
+
+/** Kling custom voice (fal): 5–30 s of speech → voice_id. */
+async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void> {
+  const apiKey = apiKeyFor('fal');
+  if (!apiKey || !ADAPTERS.fal.createVoice) throw new Error('Add your fal.ai key in Settings to create Kling voices.');
+  const seconds = get().assets[g.op!.sourceAssetId]?.duration;
+  if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
+  const result = await ADAPTERS.fal.createVoice({
+    input: await mediaInput(g.op!.sourceAssetId),
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
@@ -523,6 +572,10 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   if (def.engine === 'local') {
     const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : `${input.params.grid}×${input.params.grid}`;
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
+  }
+  if (def.engine === 'voice') {
+    if (!isConnected('fal')) throw new Error('Creating Kling voices needs fal.ai. Connect it in Settings.');
+    return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: 'fal bills the voice when it is created' } };
   }
   if (def.engine === 'transcribe') {
     const t = transcriberFor();

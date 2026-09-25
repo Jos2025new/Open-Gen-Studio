@@ -245,6 +245,32 @@ function sizeOptions(p: JsonProp): { options: string[]; default?: string; omit?:
   return def ? { options, default: def } : { options: ['auto', ...options], default: 'auto', omit: 'auto' };
 }
 
+/** Kling elements: `{ element_name, frontal_image, refer_images… }` (Atlas) or `{ frontal_image_url, reference_image_urls… }` (fal). */
+function elementList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): Omit<NonNullable<InputSlots['elements']>, 'key'> | null {
+  if (primaryType(p) !== 'array' || !p.items) return null;
+  const props = flattenProp(p.items, resolve).properties ?? {};
+  const frontal = props.frontal_image ?? props.frontal_image_url;
+  if (!frontal) return null;
+  const refs = flattenProp(props.refer_images ?? props.reference_image_urls ?? {}, resolve);
+  return {
+    max: p.maxItems ?? 6,
+    style: props.element_name ? 'atlas' : 'fal',
+    // Atlas's wrapper names elements <<<element_N>>>; fal's schemas say @Element1.
+    mention: props.element_name || /<<<element_N>>>/.test(p.description ?? '') ? '<<<element_{n}>>>' : '@Element{n}',
+    refMax: refs.maxItems ?? 3,
+    video: Boolean(props.refer_videos ?? props.video_url),
+    voice: Boolean(props.voice_id),
+  };
+}
+
+/** Kling multi-shot: `[{ prompt, duration }]`, sometimes with a 1-based `index`. */
+function shotList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): { indexed: boolean; durationAsString: boolean; max: number } | null {
+  if (primaryType(p) !== 'array' || !p.items) return null;
+  const props = flattenProp(p.items, resolve).properties ?? {};
+  if (!props.prompt || !props.duration) return null;
+  return { indexed: Boolean(props.index), durationAsString: primaryType(flattenProp(props.duration, resolve)) === 'string', max: p.maxItems ?? 6 };
+}
+
 /** An array of `{ image_url, frame_index }` items (FLUX 3 keyframes). */
 function keyframeList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): { imageKey: string; indexKey: string } | null {
   if (primaryType(p) !== 'array' || !p.items) return null;
@@ -386,6 +412,23 @@ export function schemaFromJson(opts: {
       used.add(k);
       continue;
     }
+    const el = elementList(p, resolve);
+    if (el) {
+      slots.elements = { key: k, ...el };
+      used.add(k);
+      continue;
+    }
+    const shots = normKey(k) === 'multi_prompt' ? shotList(p, resolve) : null;
+    if (shots) {
+      const flagKey = lower.get('multi_shot');
+      const modeKey = lower.get('shot_type');
+      const exclusive = /not both/i.test(`${p.description ?? ''} ${properties[slots.prompt ?? '']?.description ?? ''}`);
+      slots.shots = { key: k, ...shots, flagKey, modeKey, exclusivePrompt: exclusive };
+      used.add(k);
+      if (flagKey) used.add(flagKey);
+      if (modeKey) used.add(modeKey);
+      continue;
+    }
     const kf = keyframeList(p, resolve);
     if (kf) {
       const fps = /(\d+)\s*fps/i.exec(`${p.description ?? ''} ${JSON.stringify(p.items ?? {})}`);
@@ -424,6 +467,10 @@ export function schemaFromJson(opts: {
     } else if (t === 'integer' || t === 'number') {
       const def = typeof p.default === 'number' ? p.default : undefined;
       params.push({ ...base, type: t, min: p.minimum, max: p.maximum, default: def, step: t === 'integer' ? 1 : undefined });
+    } else if (t === 'array' && p.items && flattenProp(p.items, resolve).enum?.length) {
+      // A list of fixed choices (Grok voice_ids): several can be picked.
+      const choices = (flattenProp(p.items, resolve).enum ?? []).filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
+      params.push({ ...base, type: 'multi', options: choices, max: p.maxItems, min: p.minItems });
     } else if (t === 'string' && role === 'resolution' && sizeOptions(p)) {
       const sized = sizeOptions(p)!;
       params.push({ ...base, label: 'Size', role: 'aspect', type: 'enum', options: sized.options, default: sized.default, omit: sized.omit });
@@ -542,6 +589,20 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
   if (paramByRole(schema, 'seed') && input.seed != null) out.seed = input.seed;
   if (paramByRole(schema, 'negative') && input.negative) out.negative = input.negative;
 
+  // Structured values survive a model change only where the new model takes them.
+  if (schema.slots.shots && input.shots?.length) {
+    const shots = input.shots.filter((sh) => sh.prompt.trim() && sh.duration >= 1).slice(0, schema.slots.shots.max);
+    if (shots.length) out.shots = shots;
+  } else if (input.shots?.length) changes.push('multi-shot not supported by this model');
+  const extras: Record<string, unknown> = {};
+  for (const p of schema.params.filter((x) => x.type === 'multi')) {
+    const v = input.extras?.[p.key];
+    if (!Array.isArray(v)) continue;
+    const picked = v.filter((x) => p.options?.some((o) => String(o) === String(x))).slice(0, p.max ?? v.length);
+    if (picked.length) extras[p.key] = picked;
+  }
+  if (Object.keys(extras).length) out.extras = extras;
+
   for (const [k, v] of Object.entries(input.advanced ?? {})) {
     const def = schema.params.find((p) => p.key === k && p.role === 'other');
     if (!def) continue;
@@ -589,9 +650,19 @@ export function wireParams(schema: ModelSchema, settings: GenSettings, countForR
         if (settings.negative) out[p.key] = settings.negative;
         break;
       case 'other':
-        if (settings.advanced[p.key] !== undefined) out[p.key] = settings.advanced[p.key];
+        if (p.type === 'multi') {
+          const picked = settings.extras?.[p.key];
+          if (Array.isArray(picked) && picked.length) out[p.key] = picked;
+        } else if (settings.advanced[p.key] !== undefined) out[p.key] = settings.advanced[p.key];
         break;
     }
+  }
+  // Multi-shot storyboard: the shots, plus the switches that turn it on.
+  const shots = schema.slots.shots;
+  if (shots && settings.shots?.length) {
+    out[shots.key] = settings.shots.map((sh, i) => ({ ...(shots.indexed ? { index: i + 1 } : {}), prompt: sh.prompt, duration: shots.durationAsString ? String(sh.duration) : sh.duration }));
+    if (shots.flagKey) out[shots.flagKey] = true;
+    if (shots.modeKey) out[shots.modeKey] = 'customize';
   }
   return out;
 }
@@ -711,9 +782,46 @@ export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind
     out.push(s.images ? `up to ${s.images.max + (s.source ? 1 : 0)} image refs${s.images.min ? ' (required)' : ''}` : 'no image input');
     if (s.clips) out.push(`${s.clips.max} video clip ref${s.clips.min ? ' (required)' : ''}`);
   }
+  if (s.elements) out.push(`subjects: mention session subjects as @Name (up to ${s.elements.max}; each a frontal image + up to ${s.elements.refMax} views${s.elements.video ? ' or a video' : ''}${s.elements.voice ? ', optional voice' : ''})`);
+  if (s.shots) out.push(`multi-shot: shots [{prompt, duration}] adding up to the duration (up to ${s.shots.max})`);
   if (s.audio) out.push(`an audio ref${s.audio.required ? ' (required: the speech or track to follow)' : ' (optional soundtrack)'}`);
   if (s.refAudios) out.push(`up to ${s.refAudios.max} reference audio refs`);
   if (s.mixedRefs) out.push('audio refs count among the references');
   if (schema.missing?.length) out.push(`cannot run from the app (needs ${schema.missing.join(', ')})`);
   return out;
+}
+
+/**
+ * Subject mentions: "@Name" in the prompt, in order of first appearance. With a template ("@Element{n}",
+ * "<<<element_{n}>>>") each mention becomes the provider's element reference; without one, the plain name.
+ */
+export function mentionSubjects(prompt: string, subjects: Array<{ id: string; name: string }>, template?: string): { prompt: string; ids: string[] } {
+  const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Longest names claim their text first, so "@Ana Maria" is never also read as "@Ana".
+  const hits: Array<{ start: number; end: number; id: string; name: string }> = [];
+  for (const s of subjects.filter((x) => x.name.trim()).sort((a, b) => b.name.length - a.name.length)) {
+    for (const m of prompt.matchAll(new RegExp(`@${esc(s.name)}(?![\\p{L}\\p{N}_-])`, 'giu'))) {
+      const start = m.index ?? 0;
+      const end = start + m[0].length;
+      if (!hits.some((h) => start < h.end && end > h.start)) hits.push({ start, end, id: s.id, name: s.name });
+    }
+  }
+  hits.sort((a, b) => a.start - b.start);
+  const ids = [...new Set(hits.map((h) => h.id))];
+  let out = '';
+  let at = 0;
+  for (const h of hits) {
+    out += prompt.slice(at, h.start) + (template ? template.replace('{n}', String(ids.indexOf(h.id) + 1)) : h.name);
+    at = h.end;
+  }
+  return { prompt: out + prompt.slice(at), ids };
+}
+
+/** Why a storyboard does not fit the clip, or null: shots must add up to the duration. */
+export function shotsProblem(shots: Array<{ prompt: string; duration: number }> | undefined, duration: number | undefined): string | null {
+  if (!shots?.length) return null;
+  if (shots.some((s) => !s.prompt.trim())) return 'every shot needs a prompt.';
+  const total = shots.reduce((t, s) => t + s.duration, 0);
+  if (duration != null && duration > 0 && total !== duration) return `shots add up to ${total} s but the clip is ${duration} s.`;
+  return null;
 }

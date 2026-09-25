@@ -244,6 +244,9 @@ export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
   return any?.ref ?? (kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF);
 }
 
+/** fal endpoint that creates Kling custom voices (the only provider that exposes it). */
+export const KLING_VOICE_REF = 'fal::fal-ai/kling-video/create-voice';
+
 /** Speech-to-text model for the Transcribe operation: the settings override, then the preferred list, then any. */
 export function transcriberFor(): TranscriberSummary | undefined {
   const all = get().catalog.transcribers ?? {};
@@ -259,6 +262,7 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
   const ops = get().settings.ops;
   const valid = (ref: string | null) => Boolean(ref && isConnected(parseModelRef(ref)?.provider ?? 'local') && (ref.startsWith('local::') || modelSummary(ref)));
   if (engine === 'transcribe') return { ref: transcriberFor()?.ref ?? '', viaEdit: false };
+  if (engine === 'voice') return { ref: isConnected('fal') ? KLING_VOICE_REF : '', viaEdit: false };
   if (engine === 'edit') {
     if (valid(ops.edit)) return { ref: ops.edit!, viaEdit: false };
     return { ref: defaultModelFor('image', true), viaEdit: false };

@@ -723,74 +723,62 @@ atlas::ideogram/v4/turbo/text-to-image [image] text
   output_format: other enum[jpeg,png] =jpeg
   seed: seed integer(0..)
 atlas::kwaivgi/kling-v3.0-4k/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-4k/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-pro/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
   resolution: resolution enum[1080P,1440P-SR] =1080P
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-pro/motion-control [video] text,video-in,NEEDS-VIDEO
   slots: prompt=prompt video=video url firstFrame=image url
   inputs (as the agent reads them): first_frame
   character_orientation: other enum[image,video]
   keep_original_sound: other boolean =true
 atlas::kwaivgi/kling-v3.0-pro/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-std/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
   resolution: resolution enum[720P,1080P-SR,1440P-SR] =720P
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-std/motion-control [video] text,video-in,NEEDS-VIDEO
   slots: prompt=prompt video=video url firstFrame=image url
   inputs (as the agent reads them): first_frame
   character_orientation: other enum[image,video]
   keep_original_sound: other boolean =true
 atlas::kwaivgi/kling-v3.0-std/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   cfg_scale: other number(0..1) =0.5
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   negative_prompt: negative string
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-v3.0-turbo/image-to-video [video] image
   slots: prompt=prompt firstFrame=image url
   inputs (as the agent reads them): first_frame
@@ -803,72 +791,56 @@ atlas::kwaivgi/kling-v3.0-turbo/text-to-video [video] text
   resolution: resolution enum[720p,1080p] =1080p
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
 atlas::kwaivgi/kling-video-o3-4k/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-4k/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): text-to-video only; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-pro/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-pro/reference-to-video [video] text,image
-  slots: prompt=prompt video=video url images=images[]≤7 url
-  inputs (as the agent reads them): up to 7 reference image refs
+  slots: prompt=prompt video=video url images=images[]≤7 url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): up to 7 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   keep_original_sound: other boolean =true
   sound: audio boolean =false
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-pro/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): text-to-video only; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-pro/video-edit [video] text,video-in,NEEDS-VIDEO
   slots: prompt=prompt* video=video url images=images[]≤4 url
   inputs (as the agent reads them): up to 4 reference image refs
   keep_original_sound: other boolean =true
 atlas::kwaivgi/kling-video-o3-std/image-to-video [video] image
-  slots: prompt=prompt lastFrame=end_image url firstFrame=image url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image url firstFrame=image url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-std/reference-to-video [video] text,image
-  slots: prompt=prompt video=video url images=images[]≤7 url
-  inputs (as the agent reads them): up to 7 reference image refs
+  slots: prompt=prompt video=video url images=images[]≤7 url shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): up to 7 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   keep_original_sound: other boolean =true
   sound: audio boolean =false
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-std/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6 elements=elements≤6
+  inputs (as the agent reads them): text-to-video only; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 4 views or a video); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   sound: audio boolean =true
-  multi_shot: other boolean =false
-  shot_type: other enum[customize,intelligence]
 atlas::kwaivgi/kling-video-o3-std/video-edit [video] text,video-in,NEEDS-VIDEO
   slots: prompt=prompt* video=video url images=images[]≤4 url
   inputs (as the agent reads them): up to 4 reference image refs
@@ -1174,6 +1146,7 @@ atlas::xai/grok-imagine-video-v1.5-developer/reference-to-video [video] text,ima
   duration: duration integer(1..15) =8
   resolution: resolution enum[480p,720p] =720p
   aspect_ratio: aspect enum[1:1,16:9,9:16,4:3,3:4,3:2,2:3] =16:9
+  voice_ids: other multi[altair,ara,atlas,carina,castor,celeste,cosmo,eve,helios,helix,iris,kepler,leo,lumen,luna,lux,naksh,orion,perseus,rex,rigel,sal,sirius,ursa,zagan,zenith]
 atlas::xai/grok-imagine-video-v1.5-developer/text-to-video [video] text
   slots: prompt=prompt*
   inputs (as the agent reads them): text-to-video only
@@ -1192,6 +1165,7 @@ atlas::xai/grok-imagine-video-v1.5/reference-to-video [video] text,image
   duration: duration integer(1..15) =8
   resolution: resolution enum[480p,720p] =720p
   aspect_ratio: aspect enum[1:1,16:9,9:16,4:3,3:4,3:2,2:3] =16:9
+  voice_ids: other multi[altair,ara,atlas,carina,castor,celeste,cosmo,eve,helios,helix,iris,kepler,leo,lumen,luna,lux,naksh,orion,perseus,rex,rigel,sal,sirius,ursa,zagan,zenith]
 atlas::xai/grok-imagine-video-v1.5/text-to-video [video] text
   slots: prompt=prompt*
   inputs (as the agent reads them): text-to-video only
@@ -1877,172 +1851,157 @@ fal::fal-ai/ideogram/v3/replace-background [image] text,image
   expand_prompt: other boolean =true
   seed: seed integer
 fal::fal-ai/kling-video/o3/4k/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
-  shot_type: other enum[customize,intelligent] =customize
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
 fal::fal-ai/kling-video/o3/4k/reference-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/4k/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/4k/video-to-video/edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/o3/4k/video-to-video/reference [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   aspect_ratio: aspect enum[auto,16:9,9:16,1:1] =auto
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15]
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/o3/pro/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
-  shot_type: other enum[customize,intelligent] =customize
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
 fal::fal-ai/kling-video/o3/pro/reference-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/pro/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/pro/video-to-video/edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/o3/pro/video-to-video/reference [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   aspect_ratio: aspect enum[auto,16:9,9:16,1:1] =auto
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15]
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/o3/standard/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
-  shot_type: other enum[customize,intelligent] =customize
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=image_url data-url shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
 fal::fal-ai/kling-video/o3/standard/reference-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url images=image_urls[]≤4 data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/standard/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =false
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/o3/standard/video-to-video/edit [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/o3/standard/video-to-video/reference [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url
-  inputs (as the agent reads them): up to 4 reference image refs
+  slots: prompt=prompt* video=video_url data-url images=image_urls[]≤4 data-url elements=elements≤6
+  inputs (as the agent reads them): up to 4 reference image refs; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   aspect_ratio: aspect enum[auto,16:9,9:16,1:1] =auto
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15]
   keep_audio: other boolean =true
 fal::fal-ai/kling-video/v3/4k/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/4k/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/pro/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/pro/motion-control [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=video_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt video=video_url data-url firstFrame=image_url data-url elements=elements≤6
+  inputs (as the agent reads them): first_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   character_orientation: other enum[image,video]
   keep_original_sound: other boolean =true
 fal::fal-ai/kling-video/v3/pro/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/standard/image-to-video [video] text,image
-  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url
-  inputs (as the agent reads them): first_frame; last_frame
+  slots: prompt=prompt lastFrame=end_image_url data-url firstFrame=start_image_url data-url elements=elements≤6 shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; last_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views or a video, optional voice); multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/standard/motion-control [video] text,video-in,NEEDS-VIDEO
-  slots: prompt=prompt video=video_url data-url firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt video=video_url data-url firstFrame=image_url data-url elements=elements≤6
+  inputs (as the agent reads them): first_frame; subjects: mention session subjects as @Name (up to 6; each a frontal image + up to 3 views)
   character_orientation: other enum[image,video]
   keep_original_sound: other boolean =true
 fal::fal-ai/kling-video/v3/standard/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   cfg_scale: other number(0..1) =0.5
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   negative_prompt: negative string =blur, distort, and low quality
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   generate_audio: audio boolean =true
-  shot_type: other enum[customize,intelligent] =customize
 fal::fal-ai/kling-video/v3/turbo/pro/image-to-video [video] text,image
-  slots: prompt=prompt firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt firstFrame=image_url data-url shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
 fal::fal-ai/kling-video/v3/turbo/pro/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
 fal::fal-ai/kling-video/v3/turbo/standard/image-to-video [video] text,image
-  slots: prompt=prompt firstFrame=image_url data-url
-  inputs (as the agent reads them): first_frame
+  slots: prompt=prompt firstFrame=image_url data-url shots=multi_prompt≤6
+  inputs (as the agent reads them): first_frame; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
 fal::fal-ai/kling-video/v3/turbo/standard/text-to-video [video] text
-  slots: prompt=prompt
-  inputs (as the agent reads them): text-to-video only
+  slots: prompt=prompt shots=multi_prompt≤6
+  inputs (as the agent reads them): text-to-video only; multi-shot: shots [{prompt, duration}] adding up to the duration (up to 6)
   aspect_ratio: aspect enum[16:9,9:16,1:1] =16:9
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
 fal::fal-ai/nano-banana [image] text

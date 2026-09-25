@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
+  AudioLines,
   Clapperboard,
   Crop,
   Download,
@@ -48,6 +49,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   video_edit: WandSparkles,
   video_extend: SkipForward,
   transcribe: FileText,
+  create_voice: AudioLines,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

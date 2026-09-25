@@ -11,7 +11,7 @@ export interface OpField {
 }
 
 /** Which engine runs the operation. 'edit' = an image model that accepts a source image; 'local' = free, in the browser. */
-export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe';
+export type OpEngine = 'edit' | 'upscale' | 'remove_bg' | 'video' | 'local' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'voice';
 
 export interface OpDef {
   id: OpId;
@@ -292,6 +292,16 @@ export const OPS: Record<OpId, OpDef> = {
     fields: [{ key: 'instruction', label: 'Then', type: 'text', default: '', placeholder: 'e.g. the camera pulls back as she walks into the rain', required: true }],
     instruction: (p) =>
       `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same characters, setting, style, lighting and camera language.`,
+  },
+  create_voice: {
+    id: 'create_voice',
+    label: 'Create Kling voice',
+    description: 'Make a reusable Kling voice from 5–30 s of clean speech (for subjects).',
+    input: 'audio',
+    output: 'text',
+    engine: 'voice',
+    quick: false,
+    fields: [],
   },
   transcribe: {
     id: 'transcribe',

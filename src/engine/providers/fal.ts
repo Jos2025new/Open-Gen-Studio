@@ -210,10 +210,26 @@ export const fal: ProviderAdapter = {
   resume(job, ctx) {
     return poll(job, ctx);
   },
+
+  async createVoice(req) {
+    // Kling custom voice from 5–30 s of clean speech; the result is the voice_id to bind to a subject.
+    const endpoint = 'fal-ai/kling-video/create-voice';
+    req.onStatus('Uploading voice');
+    const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${endpoint}`, {
+      method: 'POST',
+      headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) },
+      body: JSON.stringify({ voice_url: await encodeVideo(req.input) }),
+      signal: req.signal,
+    });
+    const base = `${QUEUE}/fal-ai/kling-video/requests/${submit.request_id}`;
+    const job: RemoteJob = { provider: 'fal', id: submit.request_id, meta: { status_url: submit.status_url ?? `${base}/status`, response_url: submit.response_url ?? base } };
+    req.onRemoteJob(job);
+    return poll(job, { kind: 'text', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+  },
 };
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  const kind = ctx.kind === 'text' ? 'image' : ctx.kind; // no text jobs at fal.ai
+  const kind = ctx.kind === 'text' ? 'image' : ctx.kind;
   return pollJob(ctx, 'fal.ai', ctx.kind === 'image' ? 1500 : 4000, async () => {
     const st = await requestJson<{ status: string; queue_position?: number }>(job.meta.status_url, {
       headers: falHeaders(ctx.apiKey),
@@ -228,6 +244,12 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
       } catch (err) {
         if (err instanceof HttpError && !isTransient(err) && err.status !== 401 && err.status !== 403) throw new JobFailedError(err.message);
         throw err;
+      }
+      // Text jobs (Kling create-voice) answer with a field, not media.
+      if (ctx.kind === 'text') {
+        const text = (res as { voice_id?: unknown })?.voice_id;
+        if (typeof text !== 'string' || !text) throw new JobFailedError('fal.ai finished without a voice id');
+        return { outputs: [], text };
       }
       const outputs = await Promise.all(
         extractOutputs(res, kind).map(async (o): Promise<GenOutput> => {

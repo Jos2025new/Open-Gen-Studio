@@ -24,6 +24,8 @@ export interface GenRequest {
   audio?: MediaInput;
   /** Reference audio, for models with `refAudios` or `mixedRefs`. */
   refAudios?: MediaInput[];
+  /** Subjects (Kling elements), in mention order: element n is the n-th. */
+  elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
   /** Keyframe images with their frame index, for models with a `keyframes` slot. */
   keyframes?: Array<{ input: MediaInput; frame: number }>;
   /** Reference clips with their trim in seconds, for models with a `clips` slot. */
@@ -84,6 +86,8 @@ export interface ProviderAdapter {
   listTranscribers?(signal?: AbortSignal): Promise<TranscriberSummary[]>;
   /** Audio (or video) → text. Result in `text`. */
   transcribe?(req: TranscribeRequest): Promise<GenResult>;
+  /** Kling custom voice from a speech sample; result (voice_id) in `text`. */
+  createVoice?(req: { input: MediaInput; apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }): Promise<GenResult>;
   /** Spendable USD on the account, when the provider exposes it to a normal API key. */
   balance?(apiKey: string, signal?: AbortSignal): Promise<number | undefined>;
 }

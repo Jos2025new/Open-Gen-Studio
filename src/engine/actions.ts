@@ -9,17 +9,18 @@ import { estimateMedia } from './costs';
 import { autoLayout, graphBounds } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
-import { audioInputProblem, paramByRole, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
 import { designerDims } from './agent/runtime';
-import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Workspace } from './types';
+import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, Workspace } from './types';
 import {
   addAssets,
   appendFeed,
   autoTitleSession,
   newSession,
+  patchSession,
   setComposer,
   setGraph,
   setUi,
@@ -31,6 +32,58 @@ const get = useStore.getState;
 
 function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace };
+}
+
+// ---------------------------------------------------------------------------
+// Subjects (Kling elements), per session
+
+export function saveSubject(sessionId: string, subject: Subject): void {
+  patchSession(sessionId, (s) => {
+    const list = s.subjects ?? [];
+    return { ...s, subjects: list.some((x) => x.id === subject.id) ? list.map((x) => (x.id === subject.id ? subject : x)) : [...list, subject] };
+  });
+}
+
+export function deleteSubject(sessionId: string, id: string): void {
+  patchSession(sessionId, (s) => ({ ...s, subjects: (s.subjects ?? []).filter((x) => x.id !== id) }));
+}
+
+/** A new subject from the composer attachments: the first image is the frontal view, up to 3 more are views; or a video. */
+export function subjectFromAttachments(name: string): Subject | null {
+  const st = get();
+  const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
+  const video = st.composer.attachments.find((id) => st.assets[id]?.kind === 'video');
+  const clean = name.trim().replace(/^@/, '');
+  if (!clean || (!images.length && !video)) return null;
+  const subject: Subject = { id: uid('sub'), name: clean, frontalAssetId: images[0], refAssetIds: images.slice(1, 4), videoAssetId: images.length ? undefined : video };
+  saveSubject(st.activeSessionId, subject);
+  const used = new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId]);
+  setComposer((c) => ({ attachments: c.attachments.filter((a) => !used.has(a)) }));
+  return subject;
+}
+
+/** Create a Kling voice (fal) from the attached audio and bind it to the subject when it is ready. Call after cost confirmation. */
+export async function createSubjectVoice(sessionId: string, subjectId: string): Promise<void> {
+  const st = get();
+  const audio = st.composer.attachments.find((id) => st.assets[id]?.kind === 'audio');
+  if (!audio) {
+    toast('Attach 5–30 s of clean speech first.', 'error');
+    return;
+  }
+  try {
+    const spec = await opSpec({ sessionId, sourceAssetId: audio, op: 'create_voice', params: {}, origin: 'op' });
+    const g = createGeneration(spec);
+    appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
+    await runGeneration(g.id);
+    const voiceId = get().generations[g.id]?.text;
+    const subject = get().sessions[sessionId]?.subjects?.find((x) => x.id === subjectId);
+    if (voiceId && subject) {
+      saveSubject(sessionId, { ...subject, voiceId });
+      toast(`Voice bound to @${subject.name}.`, 'info');
+    }
+  } catch (err) {
+    if (!isAbort(err)) toast((err as Error).message, 'error');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +142,14 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     const routed = routeVideoInputs(schema.slots, imageAtt, videoAtt);
     const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioAtt.length });
     if (problem) return { ok: false, reason: `This model ${problem}`, estimate };
-    if (!text && !attachments.length) return { ok: false, reason: 'Write a prompt.', estimate };
+    const shots = schema.slots.shots ? shotsProblem(settings.shots, settings.duration) : null;
+    if (shots) return { ok: false, reason: `Multi-shot: ${shots}`, estimate };
+    const el = schema.slots.elements;
+    if (el) {
+      const mentioned = mentionSubjects(text, st.sessions[st.activeSessionId]?.subjects ?? []).ids.length;
+      if (mentioned > el.max) return { ok: false, reason: `This model takes up to ${el.max} subjects.`, estimate };
+    }
+    if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
   }
   const budget = budgetProblem(estimate);

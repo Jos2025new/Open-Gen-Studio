@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Box, ChevronDown, Clock, Dices, Layers, SlidersHorizontal, Volume2, VolumeX } from 'lucide-react';
+import { Box, ChevronDown, Clapperboard, Clock, Dices, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, selectComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, paramByRole, ratioOf, maxCountPerRequest } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
-import type { AdvancedValue, MediaKind, ParamDef } from '../../engine/types';
-import { setComposerMedia, useStore } from '../../store/store';
+import type { AdvancedValue, MediaKind, ParamDef, Subject } from '../../engine/types';
+import { createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
+import { SpendConfirm } from '../ui/SpendConfirm';
+import { setComposer, setComposerMedia, useStore } from '../../store/store';
+import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Chip, Segmented, Toggle } from '../ui/primitives';
+import { Button, Chip, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { ModelList, priceHint } from './ModelList';
 
 export function AspectGlyph({ value }: { value: string }) {
@@ -183,6 +186,35 @@ function AudioChip() {
   );
 }
 
+/** Several values from a fixed list (Grok voice_ids), kept in settings.extras. */
+function MultiField({ kind, p }: { kind: MediaKind; p: ParamDef }) {
+  const picked = useStore((s) => s.composer[kind].settings.extras?.[p.key]);
+  const values = Array.isArray(picked) ? picked.map(String) : [];
+  const toggle = (v: string) => {
+    const cur = useStore.getState().composer[kind].settings;
+    const next = values.includes(v) ? values.filter((x) => x !== v) : p.max && values.length >= p.max ? values : [...values, v];
+    const extras = { ...cur.extras };
+    if (next.length) extras[p.key] = next;
+    else delete extras[p.key];
+    setComposerMedia(kind, { settings: { ...cur, extras: Object.keys(extras).length ? extras : undefined } });
+  };
+  return (
+    <div className="adv-row col">
+      <span className="field-label" data-tip={p.description}>
+        {p.label}
+        {p.max ? <span className="faint"> · up to {p.max}</span> : null}
+      </span>
+      <div className="multi-options">
+        {(p.options ?? []).map((o) => (
+          <button key={String(o)} type="button" className={`option ${values.includes(String(o)) ? 'is-active' : ''}`} onClick={() => toggle(String(o))}>
+            {String(o)}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AdvancedField({ p, value, onChange }: { p: ParamDef; value: AdvancedValue | undefined; onChange: (v: AdvancedValue | undefined) => void }) {
   const current = value ?? p.default;
   if (p.type === 'boolean') {
@@ -255,7 +287,7 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
   const others = schema.params.filter((p) => p.role === 'other');
   const seed = paramByRole(schema, 'seed');
   const negative = paramByRole(schema, 'negative');
-  const changed = Object.keys(settings.advanced).length + (settings.seed != null ? 1 : 0) + (settings.negative ? 1 : 0);
+  const changed = Object.keys(settings.advanced).length + Object.keys(settings.extras ?? {}).length + (settings.seed != null ? 1 : 0) + (settings.negative ? 1 : 0);
   if (!others.length && !seed && !negative) return null;
   const update = (patch: Partial<typeof settings>) => setComposerMedia(kind, { settings: { ...useStore.getState().composer[kind].settings, ...patch } });
   return (
@@ -269,7 +301,7 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
           sub={modelSummary(ref)?.name}
           right={
             changed ? (
-              <button type="button" className="link-btn" onClick={() => update({ advanced: {}, seed: undefined, negative: undefined })}>
+              <button type="button" className="link-btn" onClick={() => update({ advanced: {}, extras: undefined, seed: undefined, negative: undefined })}>
                 Reset
               </button>
             ) : undefined
@@ -299,7 +331,10 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
               <textarea className="text-area" rows={2} value={settings.negative ?? ''} placeholder="What to avoid" onChange={(e) => update({ negative: e.target.value || undefined })} />
             </label>
           ) : null}
-          {others.map((p) => (
+          {others.filter((p) => p.type === 'multi').map((p) => (
+            <MultiField key={p.key} kind={kind} p={p} />
+          ))}
+          {others.filter((p) => p.type !== 'multi').map((p) => (
             <AdvancedField
               key={p.key}
               p={p}
@@ -313,6 +348,153 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
             />
           ))}
           {schema.source === 'derived' ? <p className="set-note">Parameters for this model could not be loaded; it runs with provider defaults.</p> : null}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+const NO_SUBJECTS: Subject[] = [];
+
+/** Session subjects for Kling elements: create from attachments, mention as @Name. */
+function SubjectsChip() {
+  const ref = useStore((s) => s.composer.video.modelRef);
+  const slot = useStore((s) => s.catalog.schemas[ref]?.slots.elements);
+  const sessionId = useStore((s) => s.activeSessionId);
+  const subjects = useStore((s) => s.sessions[s.activeSessionId]?.subjects) ?? NO_SUBJECTS;
+  const attachments = useStore((s) => s.composer.attachments);
+  const assets = useStore((s) => s.assets);
+  const [name, setName] = useState('');
+  const [voiceFor, setVoiceFor] = useState<string | null>(null);
+  const pop = usePopover();
+  if (!slot) return null;
+  const audio = attachments.find((id) => assets[id]?.kind === 'audio');
+  const usable = attachments.some((id) => assets[id]?.kind === 'image' || (slot.video && assets[id]?.kind === 'video'));
+  const insert = (n: string) => setComposer((c) => ({ text: `${c.text}${c.text && !c.text.endsWith(' ') ? ' ' : ''}@${n} ` }));
+  return (
+    <>
+      <Chip ref={pop.ref} icon={Users} active={pop.open} onClick={pop.toggle} aria-label="Subjects" data-tip="Subjects: mention them as @Name in the prompt">
+        {subjects.length ? <span className="num">{subjects.length}</span> : null}
+      </Chip>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={330} label="Subjects" className="pop-scroll">
+        <PopoverHeader title="Subjects" sub={`Mention as @Name · up to ${slot.max} per video`} />
+        <div className="subjects">
+          {subjects.map((s) => (
+            <div key={s.id} className="subject-row">
+              <span className="subject-thumb">{s.frontalAssetId || s.videoAssetId ? <AssetMedia assetId={(s.frontalAssetId ?? s.videoAssetId)!} hoverPlay={false} draggable={false} /> : null}</span>
+              <div className="subject-main">
+                <button type="button" className="subject-name" onClick={() => insert(s.name)} data-tip="Insert in the prompt">
+                  @{s.name}
+                </button>
+                <span className="faint">{s.videoAssetId && !s.frontalAssetId ? 'video' : `${1 + s.refAssetIds.length} view${s.refAssetIds.length ? 's' : ''}`}</span>
+                {slot.voice ? (
+                  <div className="subject-voice-row">
+                    <input className="subject-voice" placeholder="Voice ID (optional)" value={s.voiceId ?? ''} onChange={(e) => saveSubject(sessionId, { ...s, voiceId: e.target.value.trim() || undefined })} />
+                    <button type="button" className="link-btn" disabled={!audio} data-tip={audio ? 'Create a Kling voice from the attached audio' : 'Attach 5–30 s of speech first'} onClick={() => setVoiceFor(s.id)}>
+                      From audio
+                    </button>
+                  </div>
+                ) : null}
+                {voiceFor === s.id ? (
+                  <SpendConfirm
+                    title={`Kling voice for @${s.name}`}
+                    lines={['fal.ai creates the voice from the attached audio (5–30 s, one speaker).']}
+                    estimate={{ usd: null, approximate: true, note: 'fal bills the voice when it is created' }}
+                    confirmLabel="Create voice"
+                    onConfirm={() => {
+                      setVoiceFor(null);
+                      void createSubjectVoice(sessionId, s.id);
+                    }}
+                    onCancel={() => setVoiceFor(null)}
+                  />
+                ) : null}
+              </div>
+              <IconButton icon={Trash} label="Delete subject" size="sm" tone="danger" onClick={() => deleteSubject(sessionId, s.id)} />
+            </div>
+          ))}
+          <div className="subject-new">
+            <input placeholder="New subject name, e.g. Mia" value={name} onChange={(e) => setName(e.target.value)} />
+            <Button
+              size="sm"
+              icon={Plus}
+              disabled={!name.trim() || !usable}
+              onClick={() => {
+                const s = subjectFromAttachments(name);
+                if (s) {
+                  setName('');
+                  insert(s.name);
+                }
+              }}
+            >
+              From attachments
+            </Button>
+            <p className="faint">Attach a frontal image first (plus up to {slot.refMax} more views{slot.video ? ', or a short video' : ''}).</p>
+          </div>
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+/** Multi-shot storyboard: a prompt and seconds per shot, adding up to the clip length. */
+function ShotsChip() {
+  const ref = useStore((s) => s.composer.video.modelRef);
+  const schema = useStore((s) => s.catalog.schemas[ref]);
+  const settings = useStore((s) => s.composer.video.settings);
+  const pop = usePopover();
+  const slot = schema?.slots.shots;
+  if (!slot) return null;
+  const shots = settings.shots ?? [];
+  const duration = settings.duration ?? (Number(paramByRole(schema, 'duration')?.default) || 5);
+  const total = shots.reduce((t, s) => t + s.duration, 0);
+  const set = (next: Array<{ prompt: string; duration: number }>) =>
+    setComposerMedia('video', { settings: { ...useStore.getState().composer.video.settings, shots: next.length ? next : undefined } });
+  const add = () => {
+    if (!shots.length) {
+      const half = Math.max(1, Math.floor(duration / 2));
+      set([{ prompt: '', duration: half }, { prompt: '', duration: Math.max(1, duration - half) }]);
+    } else if (shots.length < slot.max) set([...shots, { prompt: '', duration: 1 }]);
+  };
+  return (
+    <>
+      <Chip ref={pop.ref} icon={Clapperboard} active={pop.open || shots.length > 0} onClick={pop.toggle} aria-label="Shots" data-tip="Multi-shot storyboard">
+        {shots.length ? <span className="num">{shots.length}</span> : null}
+      </Chip>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label="Shots" className="pop-scroll">
+        <PopoverHeader
+          title="Shots"
+          sub={shots.length ? `${total} of ${duration} s` : 'One prompt per shot, in order'}
+          right={
+            shots.length ? (
+              <button type="button" className="link-btn" onClick={() => set([])}>
+                Clear
+              </button>
+            ) : undefined
+          }
+        />
+        <div className="shots">
+          {shots.map((sh, i) => (
+            <div key={i} className="shot-row">
+              <span className="num faint">{i + 1}</span>
+              <textarea rows={2} value={sh.prompt} placeholder="What happens in this shot" onChange={(e) => set(shots.map((x, j) => (j === i ? { ...x, prompt: e.target.value } : x)))} />
+              <input
+                type="number"
+                min={1}
+                max={duration}
+                className="num-input num"
+                value={sh.duration}
+                onChange={(e) => set(shots.map((x, j) => (j === i ? { ...x, duration: Math.max(1, Math.round(Number(e.target.value) || 1)) } : x)))}
+              />
+              <IconButton icon={Trash} label="Remove shot" size="sm" onClick={() => set(shots.filter((_, j) => j !== i))} />
+            </div>
+          ))}
+          {shots.length && total !== duration ? <p className="shots-warn">Shots add up to {total} s; the clip is {duration} s.</p> : null}
+          {shots.length < slot.max ? (
+            <Button size="sm" variant="ghost" icon={Plus} onClick={add}>
+              {shots.length ? 'Add shot' : 'Split into shots'}
+            </Button>
+          ) : null}
+          {slot.exclusivePrompt && shots.length ? <p className="faint">With shots, the main prompt is not sent.</p> : null}
         </div>
       </Popover>
     </>
@@ -333,6 +515,8 @@ export function MediaControls({ kind }: { kind: MediaKind }) {
       <OptionPopover kind={kind} role="resolution" />
       {kind === 'image' ? <CountChip /> : <DurationChip />}
       {kind === 'video' ? <AudioChip /> : null}
+      {kind === 'video' ? <SubjectsChip /> : null}
+      {kind === 'video' ? <ShotsChip /> : null}
       <AdvancedChip kind={kind} />
     </>
   );

@@ -29,11 +29,29 @@ export async function structuredInputs(
     clips?: Array<{ input: MediaInput; start: number; end: number }>;
     audio?: MediaInput;
     refAudios?: MediaInput[];
+    elements?: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }>;
   },
   image: (m: MediaInput) => Promise<unknown>,
   video: (m: MediaInput) => Promise<string>,
 ): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
+  const el = slots.elements;
+  if (el && req.elements?.length) {
+    out[el.key] = await Promise.all(
+      req.elements.slice(0, el.max).map(async (e) => {
+        const frontal = e.frontal ? await image(e.frontal) : undefined;
+        const refs = await Promise.all(e.refs.slice(0, el.refMax).map(image));
+        const clip = el.video && e.video ? await video(e.video) : undefined;
+        if (el.style === 'atlas') {
+          // Atlas creates the element inline: an image set needs at least one extra view, the frontal image serves.
+          return clip && !frontal
+            ? { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'video_refer', refer_videos: [clip] }
+            : { element_name: e.name, ...(e.description ? { element_description: e.description } : {}), reference_type: 'image_refer', frontal_image: frontal, refer_images: refs.length ? refs : [frontal] };
+        }
+        return { ...(frontal ? { frontal_image_url: frontal } : {}), ...(refs.length ? { reference_image_urls: refs } : {}), ...(clip ? { video_url: clip } : {}), ...(el.voice && e.voiceId ? { voice_id: e.voiceId } : {}) };
+      }),
+    );
+  }
   if (slots.audio && req.audio) out[slots.audio.key] = await video(req.audio);
   if (slots.refAudios && req.refAudios?.length) out[slots.refAudios.key] = await Promise.all(req.refAudios.slice(0, slots.refAudios.max).map(video));
   const kf = slots.keyframes;

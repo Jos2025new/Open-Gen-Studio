@@ -74,6 +74,11 @@ export const TOOLS: ToolSpec[] = [
                   description:
                     'image: reference/source images (and a video clip for clip models). video: reference images/videos/audio for reference-to-video models, the keyframe images (in order) for keyframe models, or the audio track for lip-sync / soundtrack models.',
                 },
+                shots: {
+                  type: 'array',
+                  items: { type: 'object', properties: { prompt: { type: 'string' }, duration: { type: 'integer', minimum: 1 } }, required: ['prompt', 'duration'] },
+                  description: 'video multi-shot models: one prompt per shot, seconds adding up to duration.',
+                },
                 times: {
                   type: 'array',
                   items: { type: ['number', 'null'] },
@@ -137,6 +142,7 @@ const stepSchema = z
     seed: num.optional(),
     refs: z.array(z.string()).optional(),
     times: z.array(z.union([num, z.null()])).optional(),
+    shots: z.array(z.object({ prompt: z.string().max(512), duration: num })).max(6).optional(),
     first_frame: z.string().optional(),
     last_frame: z.string().optional(),
     op: z.string().optional(),

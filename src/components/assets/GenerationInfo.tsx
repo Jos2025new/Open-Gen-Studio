@@ -9,7 +9,8 @@ import type { Asset, Generation } from '../../engine/types';
 import { CostTag, IconButton } from '../ui/primitives';
 
 export function generationTitle(g: Generation): string {
-  if (!g.op) return g.prompt;
+  // A storyboard without a main prompt is named by its shots.
+  if (!g.op) return g.prompt || (g.settings.shots?.length ? g.settings.shots.map((sh, i) => `${i + 1}. ${sh.prompt}`).join('  ') : '');
   const def = OPS[g.op.id];
   const detail = def.fields
     .filter((f) => f.type === 'choice')

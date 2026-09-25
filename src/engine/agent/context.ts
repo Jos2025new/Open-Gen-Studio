@@ -54,6 +54,8 @@ Model-specific inputs (each model's accepted inputs are listed in the context; u
 - Clip models (video_clips): a video ref is trimmed to the span the model takes; the app picks the whole clip or its first seconds.
 - Audio: an audio asset in refs is the speech for lip-sync / avatar models (required there), an optional soundtrack, or reference audio, as the model's inputs say.
 - Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
+- Subjects (Kling models listing "subjects"): mention a session subject as @Name in the prompt; the app sends its images as the model's element and keeps the identity. Use only subjects listed in the context.
+- Multi-shot (models listing "multi-shot"): shots [{prompt, duration}] whose seconds add up to the step duration; one clear action per shot.
 Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 
 function describeModel(kind: 'image' | 'video'): string {
@@ -121,6 +123,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (skill) lines.push(`skill: ${skill.name} — ${skill.guidance}`);
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (follow this structure, adapt prompts to the request):\n${describeWorkflow(wf)}`);
+  const subjects = session.subjects ?? [];
+  if (subjects.length) lines.push(`subjects (mention as @Name): ${subjects.map((s) => `@${s.name}${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(`image model: ${describeModel('image')}`);
   lines.push(`video model: ${describeModel('video')}`);
   lines.push(`other models:\n${alternatives()}`);

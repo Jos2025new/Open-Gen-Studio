@@ -176,7 +176,7 @@ export const atlas: ProviderAdapter = {
         body[schema.slots.video.key] = await encodeVideo(req.video, upload);
       }
     }
-    if (req.keyframes?.length || req.clips?.length || req.audio || req.refAudios?.length) {
+    if (req.keyframes?.length || req.clips?.length || req.audio || req.refAudios?.length || req.elements?.length) {
       req.onStatus('Uploading inputs');
       Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
     }

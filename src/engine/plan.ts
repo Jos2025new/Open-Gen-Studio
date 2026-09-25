@@ -1,5 +1,5 @@
 import { OPS } from './ops';
-import { audioInputProblem, coerceSettings, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, coerceSettings, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import type {
   AdvancedValue,
   AssetKind,
@@ -42,6 +42,7 @@ export interface RawStep {
   seed?: number;
   refs?: string[];
   times?: Array<number | null>;
+  shots?: Array<{ prompt: string; duration: number }>;
   first_frame?: string;
   last_frame?: string;
   op?: string;
@@ -333,9 +334,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           audio: s.audio ?? defaults.audio,
           count: s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
           seed: s.seed,
+          shots: kind === 'video' ? s.shots : undefined,
           advanced: s.model ? cleanParams(s.params) : { ...(defaults.advanced ?? {}), ...cleanParams(s.params) },
         });
         changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));
+        const shotProblem = kind === 'video' && schema.slots.shots ? shotsProblem(settings.shots, settings.duration) : null;
+        if (shotProblem) errors.push(`${where}: ${shotProblem}`);
         if (kind === 'image') {
           steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings, refs } satisfies ImageStep);
         } else {
