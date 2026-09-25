@@ -4,7 +4,7 @@ import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../l
 import { downloadBlob, extensionForMime, fetchBlob, probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
-import { ensureSchema, modelSummary, selectComposerModel } from './catalog';
+import { ensureSchema, modelSummary, RECRAFT_STYLE_REF, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
 import { autoLayout, graphBounds } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
@@ -22,6 +22,7 @@ import {
   newSession,
   patchSession,
   setComposer,
+  setComposerMedia,
   setGraph,
   setUi,
   toast,
@@ -60,6 +61,29 @@ export function subjectFromAttachments(name: string): Subject | null {
   const used = new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId]);
   setComposer((c) => ({ attachments: c.attachments.filter((a) => !used.has(a)) }));
   return subject;
+}
+
+/** Create a Recraft V4 style (fal) from the attached images, save it in the session and select it. Call after cost confirmation. */
+export async function createRecraftStyle(sessionId: string, name: string): Promise<void> {
+  const st = get();
+  const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image').slice(0, 10);
+  if (!images.length) {
+    toast('Attach 1–10 reference images first.', 'error');
+    return;
+  }
+  const g = createGeneration({ sessionId, kind: 'text', prompt: `Create Recraft style “${name}”`, modelRef: RECRAFT_STYLE_REF, settings: { count: 1, advanced: {} }, inputs: { refs: images }, origin: 'composer', estimate: { usd: null, approximate: true, note: 'fal bills the style when it is created' } });
+  appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
+  try {
+    await runGeneration(g.id);
+    const styleId = get().generations[g.id]?.text;
+    if (!styleId) return;
+    patchSession(sessionId, (s) => ({ ...s, styles: [...(s.styles ?? []), { id: uid('sty'), name: name.trim() || 'Style', family: 'recraft-v4', styleId }] }));
+    const cur = get().composer.image.settings;
+    setComposerMedia('image', { settings: { ...cur, extras: { ...cur.extras, style_id: styleId } } });
+    toast(`Style “${name}” saved and selected.`, 'info');
+  } catch (err) {
+    if (!isAbort(err)) toast((err as Error).message, 'error');
+  }
 }
 
 /** Create a Kling voice (fal) from the attached audio and bind it to the subject when it is ready. Call after cost confirmation. */

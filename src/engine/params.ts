@@ -301,6 +301,113 @@ function clipList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): 
   };
 }
 
+/**
+ * Style controls that are not simple values: RGB colors and lists (Recraft), Ideogram palettes, style codes,
+ * custom style / model ids. Their values live in settings.extras (see structuredWire / normalizeStructured).
+ */
+function structuredParam(key: string, p: JsonProp, resolve: (ref: string) => JsonProp | undefined): Pick<ParamDef, 'type' | 'options' | 'max' | 'pattern'> | null {
+  const isRgb = (x: JsonProp | undefined) => Boolean(x?.properties?.r && x.properties.g && x.properties.b);
+  const item = p.items ? flattenProp(p.items, resolve) : undefined;
+  const t = primaryType(p);
+  const k = normKey(key);
+  if (t === 'array' && isRgb(item)) return { type: 'colors', max: p.maxItems ?? 5 };
+  if (isRgb(p)) return { type: 'color' };
+  if (p.properties?.members && p.properties.name) {
+    const presets = (flattenProp(p.properties.name, resolve).enum ?? []).filter((v): v is string => typeof v === 'string');
+    return { type: 'palette', options: presets };
+  }
+  if (t === 'array' && item && primaryType(item) === 'string' && !item.enum && k === 'style_codes') return { type: 'textList', pattern: '^[0-9a-fA-F]{8}$', max: p.maxItems };
+  if (t === 'string' && (k === 'style_id' || k === 'model_id')) return { type: 'text' };
+  return null;
+}
+
+type Rgb = { r: number; g: number; b: number };
+
+/** "#rrggbb" or {r,g,b} → {r,g,b}. */
+export function toRgb(v: unknown): Rgb | null {
+  if (typeof v === 'string') {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(v.trim());
+    return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
+  }
+  if (v && typeof v === 'object' && ['r', 'g', 'b'].every((c) => Number.isFinite((v as Record<string, unknown>)[c]))) {
+    const o = v as Rgb;
+    return { r: Math.round(o.r), g: Math.round(o.g), b: Math.round(o.b) };
+  }
+  return null;
+}
+
+export function rgbHex(c: Rgb): string {
+  return `#${[c.r, c.g, c.b].map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Ideogram palette as stored: a preset, or colors with weights. */
+export type PaletteValue = { preset?: string; colors?: Array<{ hex: string; weight?: number }> };
+
+/** A structured value from the UI or the agent (hex strings, comma lists…) in its stored form, or undefined. */
+export function normalizeStructured(p: ParamDef, v: unknown): unknown {
+  const list = (x: unknown) => (Array.isArray(x) ? x : typeof x === 'string' ? x.split(',') : []);
+  switch (p.type) {
+    case 'color': {
+      const c = toRgb(v);
+      return c ? rgbHex(c) : undefined;
+    }
+    case 'colors': {
+      const cs = list(v).map(toRgb).filter((c): c is Rgb => Boolean(c)).slice(0, p.max ?? 5).map(rgbHex);
+      return cs.length ? cs : undefined;
+    }
+    case 'palette': {
+      const presetOf = (x: unknown) => (typeof x === 'string' && p.options?.some((o) => String(o) === x.trim().toUpperCase()) ? x.trim().toUpperCase() : undefined);
+      if (presetOf(v)) return { preset: presetOf(v) };
+      const o = v && typeof v === 'object' && !Array.isArray(v) ? (v as { preset?: unknown; colors?: unknown }) : { colors: v };
+      if (presetOf(o.preset)) return { preset: presetOf(o.preset) };
+      const colors: Array<{ hex: string; weight?: number }> = [];
+      for (const c of list(o.colors)) {
+        const entry: { hex: unknown; weight?: unknown } = c && typeof c === 'object' && 'hex' in c ? (c as { hex: unknown; weight?: unknown }) : { hex: c };
+        const rgb = toRgb(entry.hex);
+        if (!rgb) continue;
+        const w = Number(entry.weight);
+        colors.push(Number.isFinite(w) && w > 0 ? { hex: rgbHex(rgb), weight: Math.max(0.05, Math.min(1, w)) } : { hex: rgbHex(rgb) });
+      }
+      return colors.length ? { colors } : undefined;
+    }
+    case 'text': {
+      const s = typeof v === 'string' ? v.trim() : '';
+      return s || undefined;
+    }
+    case 'textList': {
+      const re = p.pattern ? new RegExp(p.pattern) : null;
+      const items = list(v).map((x) => String(x).trim()).filter((x) => x && (!re || re.test(x))).slice(0, p.max ?? 20);
+      return items.length ? items : undefined;
+    }
+    case 'multi': {
+      const picked = list(v).map(String).filter((x) => p.options?.some((o) => String(o) === x)).slice(0, p.max ?? 99);
+      return picked.length ? picked : undefined;
+    }
+    default:
+      return undefined;
+  }
+}
+
+/** The request value for a stored structured value. */
+export function structuredWire(p: ParamDef, v: unknown): unknown {
+  const stored = normalizeStructured(p, v);
+  if (stored === undefined) return undefined;
+  switch (p.type) {
+    case 'color':
+      return toRgb(stored);
+    case 'colors':
+      return (stored as string[]).map(toRgb);
+    case 'palette': {
+      const pal = stored as PaletteValue;
+      return pal.preset ? { name: pal.preset } : { members: (pal.colors ?? []).map((c) => ({ rgb: toRgb(c.hex), ...(c.weight ? { color_weight: c.weight } : {}) })) };
+    }
+    default:
+      return stored;
+  }
+}
+
+export const STRUCTURED_TYPES = new Set<ParamDef['type']>(['multi', 'color', 'colors', 'palette', 'text', 'textList']);
+
 /** An array of `{ url, type: 'image' | 'video' | … }` items (Atlas `refers`). */
 function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): boolean {
   if (primaryType(p) !== 'array' || !p.items) return false;
@@ -467,7 +574,10 @@ export function schemaFromJson(opts: {
     const options = (p.enum ?? []).filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
     const role = roleForKey(key, options);
     const base = { key, label: humanizeKey(p.title && p.title.length < 40 ? p.title : key), role, description: p.description?.slice(0, 200) };
-    if (p.enum?.length) {
+    const structured = structuredParam(key, p, resolve);
+    if (structured) {
+      params.push({ ...base, role: 'other', ...structured });
+    } else if (p.enum?.length) {
       if (!options.length) continue;
       const def = typeof p.default === 'string' || typeof p.default === 'number' ? p.default : undefined;
       params.push({ ...base, type: 'enum', options, default: def });
@@ -604,11 +714,9 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
     if (shots.length) out.shots = shots;
   } else if (input.shots?.length) changes.push('multi-shot not supported by this model');
   const extras: Record<string, unknown> = {};
-  for (const p of schema.params.filter((x) => x.type === 'multi')) {
-    const v = input.extras?.[p.key];
-    if (!Array.isArray(v)) continue;
-    const picked = v.filter((x) => p.options?.some((o) => String(o) === String(x))).slice(0, p.max ?? v.length);
-    if (picked.length) extras[p.key] = picked;
+  for (const p of schema.params.filter((x) => STRUCTURED_TYPES.has(x.type))) {
+    const v = normalizeStructured(p, input.extras?.[p.key]);
+    if (v !== undefined) extras[p.key] = v;
   }
   if (Object.keys(extras).length) out.extras = extras;
 
@@ -659,9 +767,9 @@ export function wireParams(schema: ModelSchema, settings: GenSettings, countForR
         if (settings.negative) out[p.key] = settings.negative;
         break;
       case 'other':
-        if (p.type === 'multi') {
-          const picked = settings.extras?.[p.key];
-          if (Array.isArray(picked) && picked.length) out[p.key] = picked;
+        if (STRUCTURED_TYPES.has(p.type)) {
+          const v = structuredWire(p, settings.extras?.[p.key]);
+          if (v !== undefined) out[p.key] = v;
         } else if (settings.advanced[p.key] !== undefined) out[p.key] = settings.advanced[p.key];
         break;
     }

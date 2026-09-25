@@ -21,8 +21,14 @@ export interface ParamDef {
   key: string;
   label: string;
   role: ParamRole;
-  /** 'multi': several values from `options` (up to `max`), kept in `settings.extras`. */
-  type: 'enum' | 'integer' | 'number' | 'boolean' | 'string' | 'multi';
+  /**
+   * Structured types keep their value in `settings.extras`: 'multi' (several of `options`), 'color' ({r,g,b}),
+   * 'colors' (list of {r,g,b}), 'palette' (Ideogram: preset name or weighted colors), 'text' (free id),
+   * 'textList' (list of strings matching `pattern`).
+   */
+  type: 'enum' | 'integer' | 'number' | 'boolean' | 'string' | 'multi' | 'color' | 'colors' | 'palette' | 'text' | 'textList';
+  /** 'textList' / 'text': what each value must look like (regex source). */
+  pattern?: string;
   options?: Array<string | number>;
   min?: number;
   max?: number;
@@ -629,6 +635,15 @@ export interface Subject {
   voiceId?: string;
 }
 
+/** A provider style made from reference images (Recraft V4 style_id), kept per session. */
+export interface SavedStyle {
+  id: string;
+  name: string;
+  /** Which endpoints accept it: Recraft V4 styles work with the V4 style models. */
+  family: 'recraft-v4';
+  styleId: string;
+}
+
 export interface Session {
   id: string;
   title: string;
@@ -643,4 +658,5 @@ export interface Session {
   agent: AgentState;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
   subjects?: Subject[];
+  styles?: SavedStyle[];
 }

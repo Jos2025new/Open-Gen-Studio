@@ -335,6 +335,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           count: s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
           seed: s.seed,
           shots: kind === 'video' ? s.shots : undefined,
+          // Structured params (colors as hex, palettes, style codes, ids): coerceSettings keeps only what the model takes.
+          extras: s.params,
           advanced: s.model ? cleanParams(s.params) : { ...(defaults.advanced ?? {}), ...cleanParams(s.params) },
         });
         changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));

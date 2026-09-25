@@ -88,6 +88,8 @@ export interface ProviderAdapter {
   listTranscribers?(signal?: AbortSignal): Promise<TranscriberSummary[]>;
   /** Audio (or video) → text. Result in `text`. */
   transcribe?(req: TranscribeRequest): Promise<GenResult>;
+  /** Recraft V4 custom style from reference images; result (style_id) in `text`. */
+  createStyle?(req: { images: MediaInput[]; apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }): Promise<GenResult>;
   /** Kling custom voice from a speech sample; result (voice_id) in `text`. */
   createVoice?(req: { input: MediaInput; apiKey: string; signal: AbortSignal; onStatus: (text: string) => void; onRemoteJob: (job: RemoteJob) => void }): Promise<GenResult>;
   /** Spendable USD on the account, when the provider exposes it to a normal API key. */

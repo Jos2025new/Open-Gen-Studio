@@ -3,7 +3,7 @@ import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
@@ -213,7 +213,11 @@ async function execute(id: string): Promise<string[]> {
       await runCreateVoice(g, signal);
       return [];
     }
-    if (g.kind === 'text') throw new Error('Text results come only from Transcribe.');
+    if (g.kind === 'text' && g.modelRef === RECRAFT_STYLE_REF) {
+      await runCreateStyle(g, signal);
+      return [];
+    }
+    if (g.kind === 'text') throw new Error('Text results come only from Transcribe, voices and styles.');
     const resolved = await resolveModel(g.modelRef);
     if (!resolved) {
       const parsed = parseModelRef(g.modelRef);
@@ -447,6 +451,22 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
   if (seconds != null && (seconds < 5 || seconds > 30)) throw new InputError('VOICE_DURATION', `Kling voices need 5–30 s of speech; this clip is ${seconds.toFixed(1)} s.`);
   const result = await ADAPTERS.fal.createVoice({
     input: await mediaInput(g.op!.sourceAssetId),
+    apiKey,
+    signal,
+    onStatus: (text) => patchGeneration(g.id, { statusText: text }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+  });
+  finishText(g.id, result.text ?? '', result.costUsd);
+}
+
+/** Recraft V4 style (fal): the generation's reference images → style_id. */
+async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void> {
+  const apiKey = apiKeyFor('fal');
+  if (!apiKey || !ADAPTERS.fal.createStyle) throw new Error('Add your fal.ai key in Settings to create Recraft styles.');
+  const images = g.inputs.refs.filter((r) => get().assets[r]?.kind === 'image');
+  if (!images.length || images.length > 10) throw new InputError('STYLE_IMAGES', `A Recraft style needs 1–10 reference images; ${images.length} given.`);
+  const result = await ADAPTERS.fal.createStyle({
+    images: await Promise.all(images.map((r) => mediaInput(r))),
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),

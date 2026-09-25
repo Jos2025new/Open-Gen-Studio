@@ -1662,6 +1662,8 @@ fal::fal-ai/flux-3-action/so101 [video] text,video-in,NEEDS-VIDEO
 fal::fal-ai/ideogram/character [image] text,image
   slots: prompt=prompt* images=reference_image_urls[]≤10 min1 data-url
   inputs (as the agent reads them): up to 10 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   negative_prompt: negative string =
   num_images: count integer(1..8) =1
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
@@ -1672,6 +1674,8 @@ fal::fal-ai/ideogram/character [image] text,image
 fal::fal-ai/ideogram/character/edit [image] text,image
   slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url mask=mask_url data-url white required
   inputs (as the agent reads them): source image first in refs, then references; up to 11 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   expand_prompt: other boolean =true
@@ -1679,24 +1683,26 @@ fal::fal-ai/ideogram/character/edit [image] text,image
 fal::fal-ai/ideogram/character/remix [image] text,image
   slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url
   inputs (as the agent reads them): source image first in refs, then references; up to 11 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
   strength: other number(0.01..1) =0.8
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
   expand_prompt: other boolean =true
   negative_prompt: negative string =
   seed: seed integer
+  style_codes: other textList
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   style: other enum[AUTO,REALISTIC,FICTION] =AUTO
 fal::fal-ai/ideogram/custom-models/generate [image] text
   slots: prompt=prompt*
-  inputs (as the agent reads them): no image input; cannot run from the app (needs model_id)
+  inputs (as the agent reads them): no image input
   expand_prompt: other boolean =true
   aspect_ratio: aspect enum[1:3,3:1,1:2,2:1,9:16,16:9,10:16,16:10,2:3,3:2,3:4,4:3,4:5,5:4,1:1] =1:1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   negative_prompt: negative string =
   num_images: count integer(1..8) =1
+  model_id: other text
   seed: seed integer
-  MISSING: model_id
 fal::fal-ai/ideogram/object-removal [image] text,image
   slots: images=image_url≤1 min1 data-url mask=mask_url data-url white required
   inputs (as the agent reads them): up to 1 image refs (required)
@@ -1787,6 +1793,8 @@ fal::fal-ai/ideogram/v2a/turbo/remix [image] text,image
 fal::fal-ai/ideogram/v3 [image] text
   slots: prompt=prompt* images=image_urls[]≤10 data-url
   inputs (as the agent reads them): up to 10 image refs
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   style: other enum[AUTO,GENERAL,REALISTIC,DESIGN]
   style_preset: other enum[80S_ILLUSTRATION,90S_NOSTALGIA,ABSTRACT_ORGANIC,ANALOG_NOSTALGIA,ART_BRUT,ART_DECO,ART_POSTER,AURA,AVANT_GARDE,BAUHAUS,BLUEPRINT,BLURRY_MOTION,BRIGHT_ART,C4D_CARTOON,CHILDRENS_BOOK,COLLAGE,COLORING_BOOK_I,COLORING_BOOK_II,CUBISM,DARK_AURA,DOODLE,DOUBLE_EXPOSURE,DRAMATIC_CINEMA,EDITORIAL,EMOTIONAL_MINIMAL,ETHEREAL_PARTY,EXPIRED_FILM,FLAT_ART,FLAT_VECTOR,FOREST_REVERIE,GEO_MINIMALIST,GLASS_PRISM,GOLDEN_HOUR,GRAFFITI_I,GRAFFITI_II,HALFTONE_PRINT,HIGH_CONTRAST,HIPPIE_ERA,ICONIC,JAPANDI_FUSION,JAZZY,LONG_EXPOSURE,MAGAZINE_EDITORIAL,MINIMAL_ILLUSTRATION,MIXED_MEDIA,MONOCHROME,NIGHTLIFE,OIL_PAINTING,OLD_CARTOONS,PAINT_GESTURE,POP_ART,RETRO_ETCHING,RIVIERA_POP,SPOTLIGHT_80S,STYLIZED_RED,SURREAL_COLLAGE,TRAVEL_POSTER,VINTAGE_GEO,VINTAGE_POSTER,WATERCOLOR,WEIRD,WOODBLOCK_PRINT]
   num_images: count integer(1..8) =1
@@ -1798,6 +1806,8 @@ fal::fal-ai/ideogram/v3 [image] text
 fal::fal-ai/ideogram/v3/edit [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url mask=mask_url data-url white required
   inputs (as the agent reads them): up to 1 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   style_preset: other enum[80S_ILLUSTRATION,90S_NOSTALGIA,ABSTRACT_ORGANIC,ANALOG_NOSTALGIA,ART_BRUT,ART_DECO,ART_POSTER,AURA,AVANT_GARDE,BAUHAUS,BLUEPRINT,BLURRY_MOTION,BRIGHT_ART,C4D_CARTOON,CHILDRENS_BOOK,COLLAGE,COLORING_BOOK_I,COLORING_BOOK_II,CUBISM,DARK_AURA,DOODLE,DOUBLE_EXPOSURE,DRAMATIC_CINEMA,EDITORIAL,EMOTIONAL_MINIMAL,ETHEREAL_PARTY,EXPIRED_FILM,FLAT_ART,FLAT_VECTOR,FOREST_REVERIE,GEO_MINIMALIST,GLASS_PRISM,GOLDEN_HOUR,GRAFFITI_I,GRAFFITI_II,HALFTONE_PRINT,HIGH_CONTRAST,HIPPIE_ERA,ICONIC,JAPANDI_FUSION,JAZZY,LONG_EXPOSURE,MAGAZINE_EDITORIAL,MINIMAL_ILLUSTRATION,MIXED_MEDIA,MONOCHROME,NIGHTLIFE,OIL_PAINTING,OLD_CARTOONS,PAINT_GESTURE,POP_ART,RETRO_ETCHING,RIVIERA_POP,SPOTLIGHT_80S,STYLIZED_RED,SURREAL_COLLAGE,TRAVEL_POSTER,VINTAGE_GEO,VINTAGE_POSTER,WATERCOLOR,WEIRD,WOODBLOCK_PRINT]
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
@@ -1819,6 +1829,8 @@ fal::fal-ai/ideogram/v3/layerize-text [image] text,image
 fal::fal-ai/ideogram/v3/reframe [image] text,image
   slots: images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   style_preset: other enum[80S_ILLUSTRATION,90S_NOSTALGIA,ABSTRACT_ORGANIC,ANALOG_NOSTALGIA,ART_BRUT,ART_DECO,ART_POSTER,AURA,AVANT_GARDE,BAUHAUS,BLUEPRINT,BLURRY_MOTION,BRIGHT_ART,C4D_CARTOON,CHILDRENS_BOOK,COLLAGE,COLORING_BOOK_I,COLORING_BOOK_II,CUBISM,DARK_AURA,DOODLE,DOUBLE_EXPOSURE,DRAMATIC_CINEMA,EDITORIAL,EMOTIONAL_MINIMAL,ETHEREAL_PARTY,EXPIRED_FILM,FLAT_ART,FLAT_VECTOR,FOREST_REVERIE,GEO_MINIMALIST,GLASS_PRISM,GOLDEN_HOUR,GRAFFITI_I,GRAFFITI_II,HALFTONE_PRINT,HIGH_CONTRAST,HIPPIE_ERA,ICONIC,JAPANDI_FUSION,JAZZY,LONG_EXPOSURE,MAGAZINE_EDITORIAL,MINIMAL_ILLUSTRATION,MIXED_MEDIA,MONOCHROME,NIGHTLIFE,OIL_PAINTING,OLD_CARTOONS,PAINT_GESTURE,POP_ART,RETRO_ETCHING,RIVIERA_POP,SPOTLIGHT_80S,STYLIZED_RED,SURREAL_COLLAGE,TRAVEL_POSTER,VINTAGE_GEO,VINTAGE_POSTER,WATERCOLOR,WEIRD,WOODBLOCK_PRINT]
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
@@ -1828,7 +1840,9 @@ fal::fal-ai/ideogram/v3/reframe [image] text,image
 fal::fal-ai/ideogram/v3/remix [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
   strength: other number(0.01..1) =0.8
+  style_codes: other textList
   negative_prompt: negative string =
   style: other enum[AUTO,GENERAL,REALISTIC,DESIGN]
   num_images: count integer(1..8) =1
@@ -1839,6 +1853,8 @@ fal::fal-ai/ideogram/v3/remix [image] text,image
 fal::fal-ai/ideogram/v3/replace-background [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
+  color_palette: other palette[EMBER,FRESH,JUNGLE,MAGIC,MELON,MOSAIC,PASTEL,ULTRAMARINE]
+  style_codes: other textList
   style: other enum[AUTO,GENERAL,REALISTIC,DESIGN]
   style_preset: other enum[80S_ILLUSTRATION,90S_NOSTALGIA,ABSTRACT_ORGANIC,ANALOG_NOSTALGIA,ART_BRUT,ART_DECO,ART_POSTER,AURA,AVANT_GARDE,BAUHAUS,BLUEPRINT,BLURRY_MOTION,BRIGHT_ART,C4D_CARTOON,CHILDRENS_BOOK,COLLAGE,COLORING_BOOK_I,COLORING_BOOK_II,CUBISM,DARK_AURA,DOODLE,DOUBLE_EXPOSURE,DRAMATIC_CINEMA,EDITORIAL,EMOTIONAL_MINIMAL,ETHEREAL_PARTY,EXPIRED_FILM,FLAT_ART,FLAT_VECTOR,FOREST_REVERIE,GEO_MINIMALIST,GLASS_PRISM,GOLDEN_HOUR,GRAFFITI_I,GRAFFITI_II,HALFTONE_PRINT,HIGH_CONTRAST,HIPPIE_ERA,ICONIC,JAPANDI_FUSION,JAZZY,LONG_EXPOSURE,MAGAZINE_EDITORIAL,MINIMAL_ILLUSTRATION,MIXED_MEDIA,MONOCHROME,NIGHTLIFE,OIL_PAINTING,OLD_CARTOONS,PAINT_GESTURE,POP_ART,RETRO_ETCHING,RIVIERA_POP,SPOTLIGHT_80S,STYLIZED_RED,SURREAL_COLLAGE,TRAVEL_POSTER,VINTAGE_GEO,VINTAGE_POSTER,WATERCOLOR,WEIRD,WOODBLOCK_PRINT]
   num_images: count integer(1..8) =1
@@ -2540,6 +2556,8 @@ fal::fal-ai/recraft-20b [image] text
   inputs (as the agent reads them): no image input
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
   style: other enum[any,realistic_image,digital_illustration,vector_illustration,realistic_image/b_and_w,realistic_image/enterprise,realistic_image/hard_flash,realistic_image/hdr,realistic_image/motion_blur,realistic_image/natural_light,realistic_image/studio_portrait,digital_illustration/2d_art_poster,digital_illustration/2d_art_poster_2,digital_illustration/3d,digital_illustration/80s,digital_illustration/engraving_color,digital_illustration/glow,digital_illustration/grain,digital_illustration/hand_drawn,digital_illustration/hand_drawn_outline,digital_illustration/handmade_3d,digital_illustration/infantile_sketch,digital_illustration/kawaii,digital_illustration/pixel_art,digital_illustration/psychedelic,digital_illustration/seamless,digital_illustration/voxel,digital_illustration/watercolor,vector_illustration/cartoon,vector_illustration/doodle_line_art,vector_illustration/engraving,vector_illustration/flat_2,vector_illustration/kawaii,vector_illustration/line_art,vector_illustration/line_circuit,vector_illustration/linocut,vector_illustration/seamless] =realistic_image
+  style_id: other text
+  colors: other colors(..5)
   enable_safety_checker: other boolean =false
 fal::fal-ai/recraft/upscale/creative [image] image
   slots: images=image_url≤1 min1 data-url
@@ -2553,62 +2571,86 @@ fal::fal-ai/recraft/v3/image-to-image [image] text,image
   slots: prompt=prompt* images=image_url≤1 min1 data-url
   inputs (as the agent reads them): up to 1 image refs (required)
   strength: other number(0..1) =0.5
+  style_id: other text
   negative_prompt: negative string
   style: other enum[any,realistic_image,digital_illustration,vector_illustration,realistic_image/b_and_w,realistic_image/hard_flash,realistic_image/hdr,realistic_image/natural_light,realistic_image/studio_portrait,realistic_image/enterprise,realistic_image/motion_blur,realistic_image/evening_light,realistic_image/faded_nostalgia,realistic_image/forest_life,realistic_image/mystic_naturalism,realistic_image/natural_tones,realistic_image/organic_calm,realistic_image/real_life_glow,realistic_image/retro_realism,realistic_image/retro_snapshot,realistic_image/urban_drama,realistic_image/village_realism,realistic_image/warm_folk,digital_illustration/pixel_art,digital_illustration/hand_drawn,digital_illustration/grain,digital_illustration/infantile_sketch,digital_illustration/2d_art_poster,digital_illustration/handmade_3d,digital_illustration/hand_drawn_outline,digital_illustration/engraving_color,digital_illustration/2d_art_poster_2,digital_illustration/antiquarian,digital_illustration/bold_fantasy,digital_illustration/child_book,digital_illustration/child_books,digital_illustration/cover,digital_illustration/crosshatch,digital_illustration/digital_engraving,digital_illustration/expressionism,digital_illustration/freehand_details,digital_illustration/grain_20,digital_illustration/graphic_intensity,digital_illustration/hard_comics,digital_illustration/long_shadow,digital_illustration/modern_folk,digital_illustration/multicolor,digital_illustration/neon_calm,digital_illustration/noir,digital_illustration/nostalgic_pastel,digital_illustration/outline_details,digital_illustration/pastel_gradient,digital_illustration/pastel_sketch,digital_illustration/pop_art,digital_illustration/pop_renaissance,digital_illustration/street_art,digital_illustration/tablet_sketch,digital_illustration/urban_glow,digital_illustration/urban_sketching,digital_illustration/vanilla_dreams,digital_illustration/young_adult_book,digital_illustration/young_adult_book_2,vector_illustration/bold_stroke,vector_illustration/chemistry,vector_illustration/colored_stencil,vector_illustration/contour_pop_art,vector_illustration/cosmics,vector_illustration/cutout,vector_illustration/depressive,vector_illustration/editorial,vector_illustration/emotional_flat,vector_illustration/infographical,vector_illustration/marker_outline,vector_illustration/mosaic,vector_illustration/naivector,vector_illustration/roundish_flat,vector_illustration/segmented_colors,vector_illustration/sharp_contrast,vector_illustration/thin,vector_illustration/vector_photo,vector_illustration/vivid_shapes,vector_illustration/engraving,vector_illustration/line_art,vector_illustration/line_circuit,vector_illustration/linocut] =realistic_image
+  colors: other colors(..5)
 fal::fal-ai/recraft/v3/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
   enable_safety_checker: other boolean =false
   style: other enum[any,realistic_image,digital_illustration,vector_illustration,realistic_image/b_and_w,realistic_image/hard_flash,realistic_image/hdr,realistic_image/natural_light,realistic_image/studio_portrait,realistic_image/enterprise,realistic_image/motion_blur,realistic_image/evening_light,realistic_image/faded_nostalgia,realistic_image/forest_life,realistic_image/mystic_naturalism,realistic_image/natural_tones,realistic_image/organic_calm,realistic_image/real_life_glow,realistic_image/retro_realism,realistic_image/retro_snapshot,realistic_image/urban_drama,realistic_image/village_realism,realistic_image/warm_folk,digital_illustration/pixel_art,digital_illustration/hand_drawn,digital_illustration/grain,digital_illustration/infantile_sketch,digital_illustration/2d_art_poster,digital_illustration/handmade_3d,digital_illustration/hand_drawn_outline,digital_illustration/engraving_color,digital_illustration/2d_art_poster_2,digital_illustration/antiquarian,digital_illustration/bold_fantasy,digital_illustration/child_book,digital_illustration/child_books,digital_illustration/cover,digital_illustration/crosshatch,digital_illustration/digital_engraving,digital_illustration/expressionism,digital_illustration/freehand_details,digital_illustration/grain_20,digital_illustration/graphic_intensity,digital_illustration/hard_comics,digital_illustration/long_shadow,digital_illustration/modern_folk,digital_illustration/multicolor,digital_illustration/neon_calm,digital_illustration/noir,digital_illustration/nostalgic_pastel,digital_illustration/outline_details,digital_illustration/pastel_gradient,digital_illustration/pastel_sketch,digital_illustration/pop_art,digital_illustration/pop_renaissance,digital_illustration/street_art,digital_illustration/tablet_sketch,digital_illustration/urban_glow,digital_illustration/urban_sketching,digital_illustration/vanilla_dreams,digital_illustration/young_adult_book,digital_illustration/young_adult_book_2,vector_illustration/bold_stroke,vector_illustration/chemistry,vector_illustration/colored_stencil,vector_illustration/contour_pop_art,vector_illustration/cosmics,vector_illustration/cutout,vector_illustration/depressive,vector_illustration/editorial,vector_illustration/emotional_flat,vector_illustration/infographical,vector_illustration/marker_outline,vector_illustration/mosaic,vector_illustration/naivector,vector_illustration/roundish_flat,vector_illustration/segmented_colors,vector_illustration/sharp_contrast,vector_illustration/thin,vector_illustration/vector_photo,vector_illustration/vivid_shapes,vector_illustration/engraving,vector_illustration/line_art,vector_illustration/line_circuit,vector_illustration/linocut] =realistic_image
+  style_id: other text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/pro/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/pro/text-to-vector [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/text-to-vector [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/utility/pro/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4.1/utility/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4/pro/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4/pro/text-to-vector [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/v4/text-to-vector [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::fal-ai/recraft/vectorize [image] text,image
@@ -3273,31 +3315,45 @@ fal::openai/gpt-image-2/edit [image] text,image
 fal::recraft/v4.1/flash/text-to-image [image] text
   slots: prompt=prompt*
   inputs (as the agent reads them): no image input
+  colors: other colors(..5)
+  background_color: other color
   enable_safety_checker: other boolean =true
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
 fal::recraft/v4/style/pro/text-to-image [image] text
   slots: prompt=prompt* images=image_urls[]≤10 data-url
   inputs (as the agent reads them): up to 10 image refs
+  style_id: other text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
+  background_color: other color
   style_match: other enum[precise,flexible]
+  colors: other colors(..5)
   enable_safety_checker: other boolean =true
 fal::recraft/v4/style/pro/text-to-vector [image] text
   slots: prompt=prompt* images=image_urls[]≤10 data-url
   inputs (as the agent reads them): up to 10 image refs
+  style_id: other text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
+  background_color: other color
   style_match: other enum[precise,flexible]
+  colors: other colors(..5)
   enable_safety_checker: other boolean =true
 fal::recraft/v4/style/text-to-image [image] text
   slots: prompt=prompt* images=image_urls[]≤10 data-url
   inputs (as the agent reads them): up to 10 image refs
+  style_id: other text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
+  background_color: other color
   style_match: other enum[precise,flexible]
+  colors: other colors(..5)
   enable_safety_checker: other boolean =true
 fal::recraft/v4/style/text-to-vector [image] text
   slots: prompt=prompt* images=image_urls[]≤10 data-url
   inputs (as the agent reads them): up to 10 image refs
+  style_id: other text
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
+  background_color: other color
   style_match: other enum[precise,flexible]
+  colors: other colors(..5)
   enable_safety_checker: other boolean =true
 fal::xai/grok-imagine-image [image] text
   slots: prompt=prompt*

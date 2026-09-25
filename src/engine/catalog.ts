@@ -246,6 +246,8 @@ export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
 
 /** fal endpoint that creates Kling custom voices (the only provider that exposes it). */
 export const KLING_VOICE_REF = 'fal::fal-ai/kling-video/create-voice';
+/** fal endpoint that creates Recraft V4 styles from reference images. */
+export const RECRAFT_STYLE_REF = 'fal::fal-ai/recraft/v4/create-style';
 
 /** Speech-to-text model for the Transcribe operation: the settings override, then the preferred list, then any. */
 export function transcriberFor(): TranscriberSummary | undefined {

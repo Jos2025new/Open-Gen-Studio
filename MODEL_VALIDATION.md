@@ -84,3 +84,12 @@ Verificación: 39 tests, con fragmentos reales en `tests/fixtures/image-schemas.
 - Paletas y estilos de Recraft (`colors`, `style_id`, `background_color`), `style_codes` y `color_palette` de Ideogram, y `mask` opcional de GPT Image 2.5.
 - LoRA (`loras`), ControlNet, tiling, `custom-models` de Ideogram y `rendering_speed` de Ideogram en NanoGPT.
 - Seedream sequential: `max_images` (series de hasta 15) se ofrece como ajuste avanzado, no como número de imágenes.
+
+---
+
+## Cobertura ampliada (2026-09-25)
+
+Lo marcado antes como "fuera de alcance" se fue implementando por fases; el detalle, las pruebas y los límites de cada una están en `TRAZABILIDAD.md`:
+
+- **Hecho:** extender vídeo y reglas de Seedance 2.5 (fase 2); keyframes de FLUX 3 y clips recortados (fase 3); audio como asset y como entrada, y transcripción (fases 4a y 4b); sujetos de Kling, multiplano y voces (fase 5); máscaras en Sketch (fase 6); paletas, `style_codes`, `style_id` y `model_id` (fase 7).
+- **Pendiente:** LoRA, ControlNet y tiling (fase 8), motion-control de Kling desde el vídeo y desde la imagen (fase 9) y generación de audio (4c, familias por confirmar con el usuario).

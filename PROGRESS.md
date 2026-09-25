@@ -99,9 +99,22 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - *Por qué:* familias prioritarias GPT Image 2/2.5, Seedream V5, Nano Banana, Qwen Image, Grok Imagine Image, Step Image, P Image, Recraft, Ideogram y Z-Image. Validadas contra Atlas (67 variantes), fal (137) y NanoGPT (76), sin coste.
 - Corregido: las listas de tamaños en píxeles pasan a controlar el encuadre y conservan su escala; un `size` de texto `ancho*alto` genera opciones, con "Auto" no enviado; la imagen de origen va al campo obligatorio (Ideogram); los campos obligatorios imposibles (máscaras, `video_clips`) se bloquean con aviso; en NanoGPT, el `resolution` mixto es el encuadre y no se adjuntan imágenes a endpoints solo de texto; `match_input_image`/`adaptive` cuentan como auto.
 
+**Cobertura completa de las familias prioritarias** (2026-09-25, fases 0–7; plan en `AGENTS.md`, registro por commit en `TRAZABILIDAD.md`)
+- Fase 0 (`175b4e0`): red de regresión de proveedores (`npm run snapshot:models`, `tests/live-snapshot.test.ts`) y `TRAZABILIDAD.md`.
+- Fase 1 (`327b549`): imagen de origen + referencias (Ideogram Character), series de Seedream, listas de NanoGPT, listado de fal robusto ante 429.
+- Fase 2 (`acfd4a2`): operación Extend video, reglas de Seedance 2.5 (`modelRules.ts`), errores con código (`InputError`).
+- Fase 3 (`9372eea`): keyframes de FLUX 3 (guía de BFL) y clips recortados; agente y nodos con referencias.
+- Fase 4a (`6af89c6`): audio como asset y como entrada (lip-sync, bandas sonoras, referencias).
+- Fase 4b (`5ad83f5`): transcripción con los modelos elegidos por el usuario; generaciones de texto.
+- Fase 5 (`f46c736`): sujetos de Kling, multiplano, voces (Grok y Kling).
+- Fase 6 (`71e4d97`): máscaras en Sketch (Edit region, Remove object).
+- Fase 7: paletas, códigos e IDs de estilo; estilos Recraft V4.
+- Fallos hallados y corregidos por el camino: nodos con referencias en el puerto equivocado, nodo de texto re-ejecutado, precios mínimos mostrados como gratis, `formatUsd` a $0, menciones solapadas, sintaxis de Atlas leída de una descripción recortada, chips sin nombre accesible.
+- Pendiente: fase 8 (LoRA/ControlNet/tiling), fase 9 (motion-control), 4c (generación de audio: confirmar familias). Ninguna generación de pago se ha lanzado.
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
-Estado: typecheck limpio y **39 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
+Estado: typecheck limpio y **84 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
 
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.
