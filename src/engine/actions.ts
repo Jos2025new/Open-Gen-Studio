@@ -4,12 +4,12 @@ import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../l
 import { downloadBlob, extensionForMime, fetchBlob, probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
-import { ensureSchema, modelSummary, RECRAFT_STYLE_REF, selectComposerModel } from './catalog';
+import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
-import { autoLayout, graphBounds } from './flow/graph';
+import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
-import { audioInputProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
+import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
@@ -142,8 +142,9 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const text = st.composer.text.trim();
   const imageAtt = attachments.filter((id) => st.assets[id]?.kind === 'image');
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0);
+  if (kind === 'audio' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud in Settings to generate music.', estimate };
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
-  if (st.ui.workspace === 'designer' && kind === 'video') return { ok: false, reason: 'Designer layers cannot hold video.', estimate };
+  if (st.ui.workspace === 'designer' && kind !== 'image') return { ok: false, reason: `Designer layers cannot hold ${kind}.`, estimate };
   if (schema.missing?.length) return { ok: false, reason: `This model needs ${schema.missing.join(', ')}, which the app cannot send yet.`, estimate };
   const audioAtt = attachments.filter((id) => st.assets[id]?.kind === 'audio');
   if (kind === 'image') {
@@ -161,6 +162,13 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (slot && imageAtt.length > slot.max + extra) return { ok: false, reason: `This model accepts up to ${slot.max + extra} images.`, estimate };
     if (slot && imageAtt.length < slot.min + extra) return { ok: false, reason: extra ? 'This model needs a source image first, then reference images.' : 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
+  } else if (kind === 'audio') {
+    if (attachments.length > audioAtt.length) return { ok: false, reason: 'Music models take no images or videos.', estimate };
+    const audioProblem = audioInputProblem(schema.slots, audioAtt.length);
+    if (audioProblem) return { ok: false, reason: `This model ${audioProblem}`, estimate };
+    if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
+    const song = songProblem(schema, text, settings);
+    if (song) return { ok: false, reason: `This model ${song.message}`, estimate };
   } else {
     const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
     const routed = routeVideoInputs(schema.slots, imageAtt, videoAtt);
@@ -207,12 +215,17 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   const parentId = st.composer.editing?.generationId;
   const spec: GenerationSpec = {
     sessionId,
-    kind,
+    // A lyrics model answers with text.
+    kind: kind === 'audio' && st.catalog.models[modelRef]?.textOutput ? 'text' : kind,
     prompt: text,
     modelRef,
     settings: { ...settings, seed: undefined },
     inputs: {
-      ...(kind === 'image' ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] } : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
+      ...(kind === 'image'
+        ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] }
+        : kind === 'audio'
+          ? { refs: audioAttachments }
+          : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
       times: pick(st.composer.times, attachments),
       trims: pick(st.composer.trims, videoAttachments),
     },
@@ -220,7 +233,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     parentId,
     estimate: check.estimate,
   };
-  autoTitleSession(sessionId, text || 'Image');
+  autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
   setComposer({ text: '', attachments: [], times: {}, trims: {}, editing: null });
 
@@ -261,7 +274,10 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   const graph = get().sessions[sessionId].graph;
   const bounds = graphBounds(graph.nodes);
   const origin = bounds ? { x: bounds.x, y: bounds.y + bounds.h + 120 } : { x: 0, y: 0 };
-  if (spec.kind === 'text') return;
+  // Text comes only from audio models here (lyrics): an audio node with a text output.
+  const textOutput = spec.kind === 'text';
+  const kind = textOutput ? 'audio' : spec.kind;
+  if (kind === 'text') return;
   const promptNode: GraphNode = { id: uid('nd'), position: origin, data: { kind: 'text', title: 'Prompt', text: spec.prompt } };
   // Each input to the port for its kind: the start frame, then references / keyframes, reference videos or clips, audio.
   const port = (assetId: string) => {
@@ -283,7 +299,16 @@ async function runInNodes(sessionId: string, spec: GenerationSpec): Promise<void
   const genNode: GraphNode = {
     id: uid('nd'),
     position: origin,
-    data: { kind: spec.kind, title: spec.kind === 'image' ? 'Image' : 'Video', prompt: '', modelRef: spec.modelRef, settings: spec.settings, generationId: g.id, outputIndex: 0 },
+    data: {
+      kind,
+      title: kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : textOutput ? 'Lyrics' : 'Audio',
+      prompt: '',
+      modelRef: spec.modelRef,
+      settings: spec.settings,
+      generationId: g.id,
+      outputIndex: 0,
+      ...(textOutput ? { textOutput: true } : {}),
+    },
   };
   const edges = [
     { id: uid('edge'), source: promptNode.id, target: genNode.id, sourceHandle: 'out', targetHandle: 'prompt' },
@@ -337,7 +362,7 @@ export async function regenerate(generationId: string): Promise<void> {
   const next = createGeneration({ ...spec, settings: { ...spec.settings, seed: randomSeed() }, estimate });
   const session = get().sessions[g.sessionId];
   // Node generations update their node; everything else appears in the conversation.
-  const node = session?.graph.nodes.find((n) => (n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool') && n.data.generationId === g.id);
+  const node = session?.graph.nodes.find((n) => runsGeneration(n.data) && n.data.generationId === g.id);
   if (node) {
     if (node.data.kind !== 'text' && node.data.sketchAssetId) deleteAssets([node.data.sketchAssetId]);
     setGraph(g.sessionId, (gr) => ({ ...gr, nodes: gr.nodes.map((n) => (n.id === node.id ? { ...n, data: { ...n.data, generationId: next.id, sketchAssetId: undefined } as GraphNode['data'] } : n)) }));
@@ -349,20 +374,52 @@ export async function regenerate(generationId: string): Promise<void> {
   });
 }
 
+/**
+ * Put song lyrics (a MiniMax Lyrics result, a transcription…) into Audio mode on a music model: the selected one,
+ * or the preferred music model when a lyrics model is selected. "Write lyrics for me" is turned off, since the
+ * model rejects it together with given lyrics.
+ */
+export async function applyLyrics(text: string): Promise<void> {
+  const st = get();
+  const current = st.composer.audio.modelRef;
+  const isMusic = (ref: string) => Boolean(ref && st.catalog.models[ref] && !st.catalog.models[ref].textOutput);
+  const preferred = preferredModel('audio');
+  const ref = isMusic(current) ? current : isMusic(preferred) ? preferred : modelsOf('audio').find((m) => !m.textOutput)?.ref;
+  if (!ref) {
+    toast('No music model is available. Connect Atlas Cloud in Settings.', 'error');
+    return;
+  }
+  if (ref !== current) await selectComposerModel('audio', ref);
+  const schema = await ensureSchema(ref);
+  const p = lyricsParam(schema ?? undefined);
+  if (!p) {
+    toast(`${modelSummary(ref)?.name ?? 'This model'} takes no lyrics.`, 'error');
+    return;
+  }
+  const cur = get().composer.audio.settings;
+  const advanced = Object.fromEntries(Object.entries(cur.advanced).filter(([k]) => k !== 'lyrics_optimizer'));
+  setComposerMedia('audio', { settings: { ...cur, advanced, extras: { ...cur.extras, [p.key]: lyricsBody(text) } } });
+  setComposer({ mode: 'audio' });
+  setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
+  toast('Lyrics placed in Audio mode. Describe the music and generate.', 'info');
+}
+
 /** Load a generation back into the composer to tweak and run again. */
 export async function editInComposer(generationId: string): Promise<void> {
   const g = get().generations[generationId];
   if (!g) return;
-  if (g.op || g.kind === 'text') {
+  // Lyrics (text from an audio model) are edited in Audio mode.
+  const lyrics = g.kind === 'text' && get().catalog.models[g.modelRef]?.textOutput;
+  if (g.op || (g.kind === 'text' && !lyrics)) {
     toast('Operations are edited from their source: open the source asset and apply the operation again.', 'info');
     return;
   }
-  const kind = g.kind;
+  const kind = g.kind === 'text' ? 'audio' : g.kind;
   await selectComposerModel(kind, g.modelRef);
   setComposer((c) => ({
     mode: kind,
     text: g.prompt,
-    attachments: kind === 'image' ? g.inputs.refs.filter((id) => get().assets[id]) : g.inputs.firstFrame && get().assets[g.inputs.firstFrame] ? [g.inputs.firstFrame] : [],
+    attachments: kind === 'image' || kind === 'audio' ? g.inputs.refs.filter((id) => get().assets[id]) : g.inputs.firstFrame && get().assets[g.inputs.firstFrame] ? [g.inputs.firstFrame] : [],
     editing: { generationId },
     [kind]: { ...c[kind], modelRef: g.modelRef, settings: { ...g.settings, seed: undefined } },
   }));
@@ -388,7 +445,7 @@ export function deleteGeneration(generationId: string): void {
             graph: {
               ...s.graph,
               nodes: s.graph.nodes.map((n) =>
-                (n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool') && n.data.generationId === generationId
+                runsGeneration(n.data) && n.data.generationId === generationId
                   ? { ...n, data: { ...n.data, generationId: undefined } as GraphNode['data'] }
                   : n,
               ),

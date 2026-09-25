@@ -5,7 +5,7 @@ import { AGENT_OP_IDS } from '../ops';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
-const stepKinds = ['image', 'video', 'op', 'text', 'layer'] as const;
+const stepKinds = ['image', 'video', 'audio', 'op', 'text', 'layer'] as const;
 
 export const TOOLS: ToolSpec[] = [
   {
@@ -60,8 +60,9 @@ export const TOOLS: ToolSpec[] = [
                 id: { type: 'string', description: 'Unique id: s1, s2, … (l1… for layers).' },
                 kind: { type: 'string', enum: [...stepKinds] },
                 title: { type: 'string', description: 'Short label shown on the card or node.' },
-                prompt: { type: 'string', description: 'image/video: full generation prompt (English works best).' },
-                prompt_from: { type: 'string', description: 'image/video: id of a text step whose text prefixes the prompt.' },
+                prompt: { type: 'string', description: 'image/video: full generation prompt (English works best). audio: the music description, or the lyrics theme for a lyrics model.' },
+                prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
+                lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
                 model: { type: 'string', description: 'Model ref "provider::id". Omit to use the user\'s selected model.' },
                 aspect: { type: 'string', description: 'e.g. "16:9", "9:16", "1:1", "4:5".' },
                 resolution: { type: 'string', description: 'A value from the model options (e.g. "2K", "1080p").' },
@@ -88,7 +89,7 @@ export const TOOLS: ToolSpec[] = [
                 last_frame: { type: 'string', description: 'video: end image reference.' },
                 op: { type: 'string', enum: [...AGENT_OP_IDS] },
                 input: { type: 'string', description: 'op: the image or video to transform.' },
-                params: { type: 'object', description: 'op parameters.' },
+                params: { type: 'object', description: 'op parameters; for image/video/audio steps, model parameters listed in the context (style values; audio: lyrics, is_instrumental, lyrics_optimizer, mode, title).' },
                 text: { type: 'string', description: 'text step content, or the text of a text layer.' },
                 layer_type: { type: 'string', enum: ['raster', 'text', 'vector'] },
                 source: { type: 'string', description: 'raster layer: image reference.' },
@@ -133,6 +134,7 @@ const stepSchema = z
     title: z.string().max(120).optional(),
     prompt: z.string().max(4000).optional(),
     prompt_from: z.string().optional(),
+    lyrics_from: z.string().optional(),
     model: z.string().optional(),
     aspect: z.string().optional(),
     resolution: z.string().optional(),

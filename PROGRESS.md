@@ -108,9 +108,11 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - Fase 4b (`5ad83f5`): transcripción con los modelos elegidos por el usuario; generaciones de texto.
 - Fase 5 (`f46c736`): sujetos de Kling, multiplano, voces (Grok y Kling).
 - Fase 6 (`71e4d97`): máscaras en Sketch (Edit region, Remove object).
-- Fase 7: paletas, códigos e IDs de estilo; estilos Recraft V4.
+- Fase 7 (`a1f5252`): paletas, códigos e IDs de estilo; estilos Recraft V4.
+- Fase 4c-1 (`5cab903`): avatares parlantes de Atlas (InfiniteTalk, OmniHuman 1.5); imagen de inicio obligatoria comprobada antes de enviar.
+- Fase 4c-2: música y letras (MiniMax Music 3 y Lyrics en Atlas): modo Audio en el composer, chip Lyrics, "Use as lyrics", paso `audio` del agente (`lyrics_from`), nodo Audio con puerto Lyrics. Reglas del proveedor comprobadas antes de enviar (`LYRICS_MISSING`, `LYRICS_CONFLICT`, `PROMPT_MISSING`, `LYRICS_TOO_LONG`).
 - Fallos hallados y corregidos por el camino: nodos con referencias en el puerto equivocado, nodo de texto re-ejecutado, precios mínimos mostrados como gratis, `formatUsd` a $0, menciones solapadas, sintaxis de Atlas leída de una descripción recortada, chips sin nombre accesible.
-- Pendiente: fase 8 (LoRA/ControlNet/tiling), fase 9 (motion-control), 4c (generación de audio: confirmar familias). Ninguna generación de pago se ha lanzado.
+- Pendiente: fase 8 (LoRA/ControlNet/tiling), fase 9 (motion-control). Otras familias de audio (TTS, efectos, música de otros proveedores) esperan decisión del usuario. Ninguna generación de pago se ha lanzado.
 
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 

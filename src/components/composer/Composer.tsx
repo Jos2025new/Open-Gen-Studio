@@ -97,6 +97,7 @@ const PLACEHOLDER = {
   },
   image: 'Describe the image…',
   video: 'Describe the shot and the motion…',
+  audio: 'Describe the music: genre, mood, tempo, instruments, voice…',
 };
 
 function DesignerTargetChip() {
@@ -234,7 +235,7 @@ export function Composer() {
 
   // Video cannot live on designer layers: switch the composer to image there.
   useEffect(() => {
-    if (workspace === 'designer' && mode === 'video') {
+    if (workspace === 'designer' && (mode === 'video' || mode === 'audio')) {
       setComposer({ mode: 'image' });
       toast('Designer layers hold images, text and shapes — switched to Image.', 'info');
     }

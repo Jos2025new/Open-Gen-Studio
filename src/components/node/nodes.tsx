@@ -1,11 +1,11 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
-import { aspectLabel, coerceSettings, durationChoices, durationLabel, paramByRole, ratioOf } from '../../engine/params';
+import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, setSketch, tryConnect } from '../../engine/flow/actions';
-import { inputPorts, NODE_WIDTH, outputPort } from '../../engine/flow/graph';
+import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, setNodeModel, setSketch, tryConnect } from '../../engine/flow/actions';
+import { inputPorts, NODE_WIDTH, outputPort, runsGeneration } from '../../engine/flow/graph';
 import { downloadAsset } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setGraph, setUi, useStore } from '../../store/store';
@@ -21,7 +21,7 @@ import { OP_ICONS } from '../assets/AssetActions';
 export type FlowNodeData = { node: GraphNode; solo: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
-const KIND_ICON = { text: Type, image: ImageIcon, video: Film, tool: Wand, asset: FileImage } as const;
+const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, tool: Wand, asset: FileImage } as const;
 
 function PortHandle({ id, type, side, top, label, portType }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null }) {
   return (
@@ -43,7 +43,7 @@ function useSessionId() {
 /** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
 export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void }) {
   const [tools, setTools] = useState(false);
-  const takes = (kind: 'image' | 'video') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
+  const takes = (kind: 'image' | 'video' | 'audio') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
   const toolIds = OP_IDS.filter((id) => !accepts || OPS[id].input === accepts);
   if (tools) {
     return (
@@ -61,7 +61,8 @@ export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType 
     <div className="menu">
       {!accepts ? <MenuItem icon={Type} label="Text" detail="Prompt or copy that feeds other nodes" onClick={() => onPick(newNodeData('text'))} /> : null}
       {takes('image') ? <MenuItem icon={ImageIcon} label="Image" detail={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} onClick={() => onPick(newNodeData('image'))} /> : null}
-      {takes('video') ? <MenuItem icon={Film} label="Video" detail={accepts === 'image' ? 'Use it as the first frame' : 'Generate video'} onClick={() => onPick(newNodeData('video'))} /> : null}
+      {takes('video') ? <MenuItem icon={Film} label="Video" detail={accepts === 'image' ? 'Use it as the first frame' : accepts === 'audio' ? 'Use it as speech or soundtrack' : 'Generate video'} onClick={() => onPick(newNodeData('video'))} /> : null}
+      {takes('audio') ? <MenuItem icon={Music} label="Audio" detail={accepts === 'text' ? 'Use it as the prompt of a song' : 'Generate music or song lyrics'} onClick={() => onPick(newNodeData('audio'))} /> : null}
       {toolIds.length ? <MenuItem icon={Wand} label="Tool" detail="Relight, angle, upscale, animate…" right={<ChevronRight size={14} />} onClick={() => setTools(true)} /> : null}
       {onAsset ? <MenuItem icon={FileImage} label="Asset" detail="Drag one from the gallery onto the canvas" onClick={onAsset} /> : null}
     </div>
@@ -158,7 +159,7 @@ function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
   // A sketch replaces the result: it is what the card shows and what goes downstream.
   const sketch = d.kind !== 'text' ? d.sketchAssetId : undefined;
   if (d.kind === 'asset') return { g: undefined, assetId: sketch ?? d.assetId ?? undefined, all: d.assetId ? [d.assetId] : [], sketch };
-  const g = (d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') && d.generationId ? generations[d.generationId] : undefined;
+  const g = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
   const all = g?.status === 'done' ? g.assetIds : [];
   const index = d.kind === 'text' ? 0 : d.outputIndex;
   return { g, assetId: sketch ?? (all[Math.min(index, all.length - 1)] as string | undefined), all, sketch };
@@ -166,7 +167,7 @@ function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
 
 function useNodeOutput(node: GraphNode) {
   const d = node.data;
-  const genId = d.kind === 'image' || d.kind === 'video' || d.kind === 'tool' ? d.generationId : undefined;
+  const genId = runsGeneration(d) ? d.generationId : undefined;
   const g = useStore((s) => (genId ? s.generations[genId] : undefined));
   return nodeOutput(node, g && genId ? { [genId]: g } : {});
 }
@@ -189,7 +190,7 @@ function Preview({ node }: { node: GraphNode }) {
   // Transcribe: the text is the output (it can feed a Prompt port).
   if (g?.status === 'done' && g.kind === 'text') return <div className="nc-text">{g.text || <span className="faint">No speech was found.</span>}</div>;
   if (!assetId) {
-    const hint = d.kind === 'image' || d.kind === 'video' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
+    const hint = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
     return (
       <div className="nc-empty">
         <Icon size={18} />
@@ -273,7 +274,7 @@ function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: 
 function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
   const sessionId = useSessionId();
   const { assetId, all, sketch } = useNodeOutput(node);
-  const runnable = node.data.kind === 'image' || node.data.kind === 'video' || node.data.kind === 'tool';
+  const runnable = runsGeneration(node.data);
   const quick = assetId && out ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
     <div className="nt-bar">
@@ -424,9 +425,17 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
   const res = paramByRole(schema, 'resolution');
   const audio = paramByRole(schema, 'audio');
   const durations = durationChoices(schema);
+  // Audio models: their switches and choices (instrumental, write lyrics, mode, format).
+  const options = d.kind === 'audio' ? (schema?.params ?? []).filter((p) => p.role === 'other' && (p.type === 'boolean' || (p.type === 'enum' && p.options?.length))) : [];
   const set = (patch: Partial<GenNodeData['settings']>) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, ...patch } });
+  const setOption = (key: string, v: string | boolean, def: unknown) => {
+    const advanced = { ...d.settings.advanced };
+    if (v === def) delete advanced[key];
+    else advanced[key] = v;
+    set({ advanced });
+  };
   const summary = [res?.options?.length ? d.settings.resolution : null, d.kind === 'video' && durations.length ? durationLabel(d.settings.duration ?? durations[0]) : null].filter(Boolean);
-  if (!aspect?.options?.length && !res?.options?.length && !durations.length && !audio) return null;
+  if (!aspect?.options?.length && !res?.options?.length && !durations.length && !audio && !options.length) return null;
   return (
     <>
       <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} className="nodrag nt-summary" data-tip="Settings">
@@ -481,6 +490,25 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
               <Toggle checked={Boolean(d.settings.audio)} onChange={(v) => set({ audio: v })} label="Generate audio" />
             </section>
           ) : null}
+          {options.map((p) =>
+            p.type === 'boolean' ? (
+              <section key={p.key} className="nt-inline">
+                <h5 data-tip={p.description}>{p.label}</h5>
+                <Toggle checked={Boolean(d.settings.advanced[p.key] ?? p.default)} onChange={(v) => setOption(p.key, v, p.default ?? false)} label={p.label} />
+              </section>
+            ) : (
+              <section key={p.key}>
+                <h5 data-tip={p.description}>{p.label}</h5>
+                <div className="nt-options">
+                  {p.options!.map((o) => (
+                    <button key={String(o)} type="button" className={`option ${String(o) === String(d.settings.advanced[p.key] ?? p.default) ? 'is-active' : ''}`} onClick={() => setOption(p.key, String(o), String(p.default))}>
+                      {String(o).replace(/_/g, ' ')}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ),
+          )}
         </div>
       </Popover>
     </>
@@ -492,11 +520,21 @@ function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
   const sessionId = useSessionId();
   const d = node.data;
   const hasPromptEdge = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.some((e) => e.target === node.id && e.targetHandle === 'prompt'));
+  const hasLyricsEdge = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.some((e) => e.target === node.id && e.targetHandle === 'lyrics'));
+  const lyrics = lyricsParam(useStore((s) => s.catalog.schemas[d.modelRef]));
   const modelPop = usePopover();
   useEffect(() => {
-    void ensureSchema(d.modelRef);
+    if (d.modelRef) void ensureSchema(d.modelRef);
   }, [d.modelRef]);
-  const name = modelSummary(d.modelRef)?.name ?? (d.modelRef.startsWith('local::') ? (d.kind === 'image' ? 'Local Sketch' : 'Local Motion') : d.modelRef.split('::')[1]);
+  const name = !d.modelRef ? 'No audio model' : modelSummary(d.modelRef)?.name ?? (d.modelRef.startsWith('local::') ? (d.kind === 'image' ? 'Local Sketch' : 'Local Motion') : d.modelRef.split('::')[1]);
+  const setLyrics = (text: string) => {
+    if (!lyrics) return;
+    const extras = { ...d.settings.extras };
+    const v = normalizeStructured(lyrics, text);
+    if (v === undefined) delete extras[lyrics.key];
+    else extras[lyrics.key] = v;
+    patchNodeData(sessionId, node.id, { settings: { ...d.settings, extras: Object.keys(extras).length ? extras : undefined } });
+  };
   return (
     <>
       <InputRefs node={node} />
@@ -504,9 +542,21 @@ function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
         className="nt-prompt nodrag nowheel"
         rows={3}
         value={d.prompt}
-        placeholder={hasPromptEdge ? 'Extra prompt (added after the connected text)' : d.kind === 'image' ? 'Describe the image…' : 'Describe the shot and motion…'}
+        placeholder={
+          hasPromptEdge ? 'Extra prompt (added after the connected text)' : d.kind === 'image' ? 'Describe the image…' : d.kind === 'audio' ? 'Describe the music (or the song theme)…' : 'Describe the shot and motion…'
+        }
         onChange={(e) => patchNodeData(sessionId, node.id, { prompt: e.target.value })}
       />
+      {lyrics && !hasLyricsEdge ? (
+        <textarea
+          className="nt-prompt nt-lyrics nodrag nowheel"
+          rows={4}
+          value={typeof d.settings.extras?.[lyrics.key] === 'string' ? (d.settings.extras[lyrics.key] as string) : ''}
+          placeholder={'Lyrics (or connect a text or lyrics node)\n[Verse]\n…'}
+          onChange={(e) => setLyrics(e.target.value)}
+          aria-label="Lyrics"
+        />
+      ) : null}
       <div className="nt-row">
         <Chip ref={modelPop.ref} icon={Box} active={modelPop.open} onClick={modelPop.toggle} className="nodrag nt-model">
           <span className="truncate">{name}</span>
@@ -521,7 +571,7 @@ function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
               if (!ref) return;
               const sch = await ensureSchema(ref);
               const { settings } = coerceSettings(sch ?? undefined, d.kind, { ...d.settings, advanced: {} });
-              patchNodeData(sessionId, node.id, { modelRef: ref, settings });
+              setNodeModel(sessionId, node.id, { modelRef: ref, settings });
             }}
           />
         </Popover>
@@ -626,7 +676,7 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
 function previewRatio(node: GraphNode, assetId: string | undefined, assets: ReturnType<typeof useStore.getState>['assets']): number {
   const a = assetId ? assets[assetId] : undefined;
   const d = node.data;
-  const r = a?.width && a.height ? a.width / a.height : d.kind === 'image' || d.kind === 'video' ? ratioOf(d.settings.aspect) ?? 4 / 3 : 4 / 3;
+  const r = a?.width && a.height ? a.width / a.height : d.kind === 'audio' ? 2 : d.kind === 'image' || d.kind === 'video' ? ratioOf(d.settings.aspect) ?? 4 / 3 : 4 / 3;
   return Math.min(2, Math.max(0.6, r));
 }
 
@@ -639,9 +689,9 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
   const { assetId } = useNodeOutput(node);
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
-  const genId = d.kind === 'image' || d.kind === 'video' || d.kind === 'tool' ? d.generationId : undefined;
+  const genId = runsGeneration(d) ? d.generationId : undefined;
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
-  const panel = d.kind === 'image' || d.kind === 'video' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
+  const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
   const showTools = Boolean(selected) && solo;
   return (
     <>

@@ -944,6 +944,21 @@ atlas::minimax/h3/text-to-video [video] text
   duration: duration enum[4,5,6,7,8,9,10,11,12,13,14,15] =8
   ratio: aspect enum[21:9,16:9,4:3,1:1,3:4,9:16] =1:1
   prompt_expansion: other boolean =false
+atlas::minimax/lyrics-generation [audio] text,TEXT-OUT
+  slots: prompt=prompt*
+  inputs (as the agent reads them): lyrics: params.lyrics (≤3500 chars, lines with section tags like [Verse], [Chorus]) or lyrics_from a text step; mode edit rewrites the given lyrics; write_full_song takes no lyrics; text only (no media input)
+  mode: other enum[write_full_song,edit] =write_full_song
+  lyrics: other text(..3500)
+  title: other text
+atlas::minimax/music-3.0 [audio] text
+  slots: prompt=prompt
+  inputs (as the agent reads them): lyrics: params.lyrics (≤3500 chars, lines with section tags like [Verse], [Chorus]) or lyrics_from a text step; is_instrumental: true for music without vocals (prompt required); lyrics_optimizer: true writes the lyrics from the prompt (leave lyrics empty); text only (no media input)
+  lyrics: other text(..3500)
+  is_instrumental: other boolean =false
+  lyrics_optimizer: other boolean =false
+  format: other enum[mp3,wav] =mp3
+  sample_rate: other enum[16000,24000,32000,44100] =44100
+  bitrate: other enum[32000,64000,128000,256000] =256000
 atlas::openai/gpt-image-2-developer/edit [image] image
   slots: prompt=prompt* images=images[]≤10 min1 url
   inputs (as the agent reads them): up to 10 image refs (required)

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
+import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Music, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
-import { copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
+import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
@@ -29,7 +29,8 @@ function metaLine(g: Generation): string {
 }
 
 function Placeholder({ g, index }: { g: Generation; index: number }) {
-  const ratio = ratioOf(g.settings.aspect) ?? (g.kind === 'video' ? 16 / 9 : 1);
+  // Sound and text have no frame: a flat strip while they run.
+  const ratio = g.kind === 'audio' || g.kind === 'text' ? 4 : ratioOf(g.settings.aspect) ?? (g.kind === 'video' ? 16 / 9 : 1);
   const now = useNow(1000, g.status === 'running' || g.status === 'queued');
   const elapsed = g.startedAt ? formatDuration(now - g.startedAt) : '';
   return (
@@ -58,6 +59,8 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const regen = usePopover();
   const del = usePopover();
   const info = usePopover();
+  // Text from a lyrics model (MiniMax Lyrics), as opposed to a transcription or an id.
+  const lyrics = useStore((s) => Boolean(g && s.catalog.models[g.modelRef]?.textOutput));
 
   if (!g) {
     return <div className="gen-card is-deleted faint">This generation was deleted.</div>;
@@ -75,7 +78,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   return (
     <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''}`}>
       <header className="gen-head">
-        <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
+        <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'audio' ? <Music size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
         <div className="gen-title">
           {g.op && source ? (
             <button type="button" className="gen-source" onClick={() => setUi({ lightbox: { assetIds: [source.id], index: 0 } })} data-tip="Source">
@@ -103,9 +106,9 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           ) : null}
         </div>
       ) : g.kind === 'text' && g.status === 'done' ? (
-        // Transcription: the text, ready to copy or to send to the composer as a prompt.
+        // Transcription or lyrics: the text, ready to copy, to use as a prompt or as the lyrics of a song.
         <div className="gen-text">
-          <p>{g.text || <span className="faint">No speech was found.</span>}</p>
+          <p>{g.text || <span className="faint">{lyrics ? 'No lyrics came back.' : 'No speech was found.'}</span>}</p>
           <div className="gen-text-actions">
             <Button size="sm" variant="ghost" icon={Copy} disabled={!g.text} onClick={() => void copyText(g.text ?? '')}>
               Copy
@@ -117,11 +120,16 @@ export function GenerationCard({ generationId, compact = false }: { generationId
               onClick={() => {
                 setComposer({ text: g.text ?? '' });
                 setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
-                toast('Transcription placed in the composer.', 'info');
+                toast(`${lyrics ? 'Lyrics' : 'Transcription'} placed in the composer.`, 'info');
               }}
             >
               Use as prompt
             </Button>
+            {lyrics || g.op?.id === 'transcribe' ? (
+              <Button size="sm" variant={lyrics ? 'primary' : 'secondary'} icon={Music} disabled={!g.text} data-tip="Put this text in the lyrics of a music model" onClick={() => void applyLyrics(g.text ?? '')}>
+                Use as lyrics
+              </Button>
+            ) : null}
           </div>
         </div>
       ) : (

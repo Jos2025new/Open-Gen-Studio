@@ -1,4 +1,4 @@
-import { Bot, Check, ChevronDown, Film, Image } from 'lucide-react';
+import { Bot, Check, ChevronDown, Film, Image, Music } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ComposerMode } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';
@@ -8,6 +8,7 @@ export const MODES: Array<{ id: ComposerMode; label: string; icon: LucideIcon; d
   { id: 'agent', label: 'Agent', icon: Bot, desc: 'Plans and runs multi-step work, with skills and workflows' },
   { id: 'image', label: 'Image', icon: Image, desc: 'Generate images directly with a chosen model' },
   { id: 'video', label: 'Video', icon: Film, desc: 'Generate video directly with a chosen model' },
+  { id: 'audio', label: 'Audio', icon: Music, desc: 'Music and song lyrics with a chosen model' },
 ];
 
 export function ModeMenu() {
@@ -25,7 +26,7 @@ export function ModeMenu() {
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={270} label="Mode">
         <div className="menu" role="menu">
           {MODES.map((m) => {
-            const disabled = workspace === 'designer' && m.id === 'video';
+            const disabled = workspace === 'designer' && (m.id === 'video' || m.id === 'audio');
             return (
               <button
                 key={m.id}
@@ -34,7 +35,7 @@ export function ModeMenu() {
                 aria-checked={m.id === mode}
                 className={`menu-item ${m.id === mode ? 'is-active' : ''}`}
                 disabled={disabled}
-                data-tip={disabled ? 'Designer layers hold images, text and shapes, not video' : undefined}
+                data-tip={disabled ? `Designer layers hold images, text and shapes, not ${m.id}` : undefined}
                 onClick={() => {
                   setComposer({ mode: m.id });
                   pop.close();

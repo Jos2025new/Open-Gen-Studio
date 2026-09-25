@@ -3,7 +3,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
 import { setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort } from './graph';
+import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort, runsGeneration } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 
 const get = useStore.getState;
@@ -14,9 +14,12 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
     case 'text':
       return { kind: 'text', title: 'Prompt', text: '' };
     case 'image':
-    case 'video': {
+    case 'video':
+    case 'audio': {
       const c = st.composer[kind as MediaKind];
-      return { kind, title: kind === 'image' ? 'Image' : 'Video', prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0 };
+      const title = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'Audio';
+      const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
+      return { kind, title, prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
     }
     case 'tool': {
       const op = opts.op ?? 'relight';
@@ -58,6 +61,27 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   return id;
 }
 
+/**
+ * Change a generation node's model. Audio nodes follow the model's output (lyrics models answer with text), and
+ * connections the new output or inputs no longer fit are dropped.
+ */
+export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenNodeData, 'modelRef' | 'settings'>): void {
+  const node = get().sessions[sessionId].graph.nodes.find((n) => n.id === nodeId);
+  if (!node || (node.data.kind !== 'image' && node.data.kind !== 'video' && node.data.kind !== 'audio')) return;
+  const textOutput = node.data.kind === 'audio' && get().catalog.models[patch.modelRef]?.textOutput ? true : undefined;
+  patchNodeData(sessionId, nodeId, { ...patch, textOutput });
+  if (Boolean(textOutput) === Boolean(node.data.textOutput)) return;
+  setGraph(sessionId, (g) => {
+    const out = outputPort(g.nodes.find((n) => n.id === nodeId)!.data, get().assets);
+    const edges = g.edges.filter((e) => {
+      if (e.source !== nodeId) return true;
+      const tgt = g.nodes.find((n) => n.id === e.target);
+      return inputPorts(tgt?.data ?? node.data).find((p) => p.id === e.targetHandle)?.type === out;
+    });
+    return { ...g, edges };
+  });
+}
+
 /** Set (or clear, with `undefined`) a node's painted-over copy. The copy it replaces is deleted. */
 export function setSketch(sessionId: string, nodeId: string, assetId: string | undefined): void {
   const node = get().sessions[sessionId].graph.nodes.find((n) => n.id === nodeId);
@@ -70,7 +94,7 @@ export function setSketch(sessionId: string, nodeId: string, assetId: string | u
 /** Copy a node (without its results) slightly offset. */
 export function duplicateNode(sessionId: string, node: GraphNode): string {
   const data = { ...node.data } as GraphNodeData;
-  if (data.kind === 'image' || data.kind === 'video' || data.kind === 'tool') delete (data as GenNodeData).generationId;
+  if (runsGeneration(data)) delete (data as GenNodeData).generationId;
   return addNode(sessionId, data, { x: node.position.x + 40, y: node.position.y + 40 });
 }
 
@@ -93,7 +117,7 @@ export function layoutAll(sessionId: string): void {
 }
 
 export function runnableIds(nodes: GraphNode[]): string[] {
-  return nodes.filter((n) => n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool').map((n) => n.id);
+  return nodes.filter((n) => runsGeneration(n.data)).map((n) => n.id);
 }
 
 export interface NodeRunPreview {
@@ -137,7 +161,7 @@ export async function runNodes(sessionId: string, targets: string[]): Promise<vo
       setGraph(sessionId, (g) => ({
         ...g,
         nodes: g.nodes.map((n) =>
-          n.id === stepId && (n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool') ? { ...n, data: { ...n.data, generationId: info.generationId } } : n,
+          n.id === stepId && runsGeneration(n.data) ? { ...n, data: { ...n.data, generationId: info.generationId } } : n,
         ),
       }));
     },

@@ -38,7 +38,7 @@ function serve(url: string): unknown {
 }
 
 function describeModel(m: ModelSummary, s: ModelSchema | string): string {
-  const caps = [m.acceptsText && 'text', m.acceptsImage && 'image', m.acceptsVideo && 'video-in', m.needsVideo && 'NEEDS-VIDEO'].filter(Boolean).join(',');
+  const caps = [m.acceptsText && 'text', m.acceptsImage && 'image', m.acceptsVideo && 'video-in', m.needsVideo && 'NEEDS-VIDEO', m.textOutput && 'TEXT-OUT'].filter(Boolean).join(',');
   const lines = [`${m.ref} [${m.kind}] ${caps}`];
   if (typeof s === 'string') return [...lines, `  ERROR ${s}`].join('\n');
   const slot = (name: string, v: unknown) => {

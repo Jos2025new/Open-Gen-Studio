@@ -4,7 +4,7 @@ import { skillById, workflowById, describeWorkflow } from '../skills';
 import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { isConnected, modelSummary } from '../catalog';
-import type { AgentStyle, Session, Workspace } from '../types';
+import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
 
@@ -17,10 +17,10 @@ const OP_LINES = AGENT_OP_IDS.map((id) => {
   return `  ${id} {${fields}} (${op.input} → ${op.output}) — ${op.description}`;
 }).join('\n');
 
-export const SYSTEM_PROMPT = `You are the operator of Open Gen Studio, a creative production tool for images, video and layered design. You turn requests into precise, executable plans. You are efficient: you remove ambiguity with specific, sensible decisions and you do exactly what was asked — no extra deliverables, no filler.
+export const SYSTEM_PROMPT = `You are the operator of Open Gen Studio, a creative production tool for images, video, music and layered design. You turn requests into precise, executable plans. You are efficient: you remove ambiguity with specific, sensible decisions and you do exactly what was asked — no extra deliverables, no filler.
 
 How you act
-- Creative work (anything that produces or edits images, videos, node flows or layouts) always goes through propose_plan. The app validates the plan, shows it with its cost, the user approves and the app executes it. Never claim you generated something yourself.
+- Creative work (anything that produces or edits images, videos, music, node flows or layouts) always goes through propose_plan. The app validates the plan, shows it with its cost, the user approves and the app executes it. Never claim you generated something yourself.
 - Conversation, advice or questions about the app: answer in plain text, briefly, without tools.
 - Mode "auto": never ask questions. Decide missing details yourself (style, framing, lighting, format, count) and propose the plan in this turn.
 - Mode "guided": call ask_questions to settle real ambiguity, at most the number of rounds stated in the context, 1-4 questions per round, each with concrete options. When rounds are used up or nothing important is ambiguous, propose the plan.
@@ -33,9 +33,10 @@ Writing prompts
 Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for layers)
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
 - video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?, refs? (reference images/videos, or keyframe images in order), times? (keyframe seconds, parallel to refs).
+- audio: prompt, model?, params?, lyrics_from? — music (an audio asset) or, with a lyrics model, song lyrics (text).
 - op: op, input, params? — operations on an existing image or video:
 ${OP_LINES}
-- text: text — copy, or a shared prompt used by image/video steps through prompt_from.
+- text: text — copy, or a shared prompt used by image/video/audio steps through prompt_from (or as lyrics through lyrics_from).
 - layer (Designer workspace only): layer_type raster|text|vector.
   raster: source (an image reference), target "base" | "new" | <raster layer id>. "base" is layer 1: the main generated image always goes to base.
   text: text, style {font_family: Inter|Grotesk|Serif|Display|Condensed|Mono, font_size, font_weight, color "#hex", align left|center|right, line_height, letter_spacing}, box {x, y, width} in document pixels, target "new" or an existing text layer id.
@@ -54,14 +55,18 @@ Model-specific inputs (each model's accepted inputs are listed in the context; u
 - Clip models (video_clips): a video ref is trimmed to the span the model takes; the app picks the whole clip or its first seconds.
 - Style params (params): colors / background_color as hex ("#1a2b3c"), color_palette as a preset name or a hex list, style_codes as 8-hex codes, style_id / model_id as given by the user. Only for models whose parameters include them.
 - Audio: an audio asset in refs is the speech for lip-sync / avatar models (required there), an optional soundtrack, or reference audio, as the model's inputs say.
+- Music (MiniMax Music): the prompt describes genre, mood, tempo (bpm), key, instrumentation, vocal timbre and delivery, production (≤2000 chars). Songs need lyrics: write them yourself in params.lyrics (≤3500 chars; one line per sung line, a blank line for a pause, section tags on their own line: [Intro], [Verse], [Pre Chorus], [Chorus], [Bridge], [Outro]…), or set params.lyrics_optimizer true with no lyrics to let the model write them, or take them from a lyrics step with lyrics_from. params.is_instrumental true makes music without vocals (the prompt is then required; lyrics are ignored). One song per step.
+- Lyrics (MiniMax Lyrics, text output): params.mode "write_full_song" writes a new song from the prompt (theme, style; no lyrics); "edit" rewrites or continues params.lyrics following the prompt. Its text feeds a music step through lyrics_from. Use it only when asked; otherwise write the lyrics yourself.
+- Music results are audio assets: a video step can take them in refs as a soundtrack or as the speech of lip-sync / avatar models.
 - Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
 - Subjects (Kling models listing "subjects"): mention a session subject as @Name in the prompt; the app sends its images as the model's element and keeps the identity. Use only subjects listed in the context.
 - Multi-shot (models listing "multi-shot"): shots [{prompt, duration}] whose seconds add up to the step duration; one clear action per shot.
 Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 
-function describeModel(kind: 'image' | 'video'): string {
+function describeModel(kind: MediaKind): string {
   const st = get();
   const { modelRef, settings } = st.composer[kind];
+  if (!modelRef) return 'none (connect Atlas Cloud for music)';
   const m = modelSummary(modelRef);
   const schema = st.catalog.schemas[modelRef];
   const parts = [`${modelRef}${m ? ` (${m.name})` : ''}`];
@@ -96,10 +101,13 @@ function alternatives(): string {
   const lines: string[] = [];
   for (const p of REMOTE_PROVIDERS) {
     if (!isConnected(p)) continue;
-    const ids = [...PREFERRED[p].image.slice(0, 2), ...PREFERRED[p].edit.slice(0, 1), ...PREFERRED[p].video.slice(0, 2)];
+    const ids = [...PREFERRED[p].image.slice(0, 2), ...PREFERRED[p].edit.slice(0, 1), ...PREFERRED[p].video.slice(0, 2), ...PREFERRED[p].audio];
     for (const id of ids) {
       const m = modelSummary(`${p}::${id}`);
-      if (m) lines.push(`${m.ref} — ${m.kind}${m.acceptsImage ? ', image input' : ''} — ${m.name}`);
+      if (!m) continue;
+      const schema = m.kind === 'audio' ? st.catalog.schemas[m.ref] : undefined;
+      const what = m.textOutput ? 'audio model with text output (lyrics)' : m.kind;
+      lines.push(`${m.ref} — ${what}${m.acceptsImage ? ', image input' : ''} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}`);
     }
     // Models with special inputs, so the agent can pick one when the request needs it.
     const special = Object.values(st.catalog.models).filter((m) => m.provider === p && /(keyframes|reference)-to-(video|image)/.test(m.id)).slice(0, 6);
@@ -128,6 +136,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (subjects.length) lines.push(`subjects (mention as @Name): ${subjects.map((s) => `@${s.name}${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(`image model: ${describeModel('image')}`);
   lines.push(`video model: ${describeModel('video')}`);
+  lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`other models:\n${alternatives()}`);
   if (opts.attachments.length) {
     lines.push(

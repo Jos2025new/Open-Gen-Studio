@@ -5,7 +5,7 @@ import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { normalizePlan, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps } from '../executor';
-import { autoLayout, graphBounds, graphToSteps, planToGraph } from '../flow/graph';
+import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
 import { skillById, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
@@ -324,7 +324,7 @@ function removeDraftNodes(sessionId: string, planId: string): void {
   setGraph(sessionId, (g) => {
     const drop = new Set(
       g.nodes
-        .filter((n) => n.planId === planId && !((n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool') && n.data.generationId))
+        .filter((n) => n.planId === planId && !(runsGeneration(n.data) && n.data.generationId))
         .map((n) => n.id),
     );
     if (!drop.size) return g;
@@ -397,7 +397,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
           setGraph(sessionId, (g) => ({
             ...g,
             nodes: g.nodes.map((n) =>
-              n.id === nodeId && (n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool') ? { ...n, data: { ...n.data, generationId: info.generationId } } : n,
+              n.id === nodeId && runsGeneration(n.data) ? { ...n, data: { ...n.data, generationId: info.generationId } } : n,
             ),
           }));
         }

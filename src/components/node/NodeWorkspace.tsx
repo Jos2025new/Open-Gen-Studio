@@ -15,7 +15,7 @@ import {
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, useStore } from '../../store/store';
 import { addNode, deleteNodes, duplicateNode, layoutAll, newNodeData, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, outputPort, NODE_WIDTH } from '../../engine/flow/graph';
+import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover, usePopover } from '../ui/Popover';
@@ -104,7 +104,7 @@ function Canvas() {
     const set = new Set<string>();
     for (const n of graph.nodes) {
       const d = n.data;
-      if ((d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') && d.generationId) {
+      if (runsGeneration(d) && d.generationId) {
         const st = generations[d.generationId]?.status;
         if (st === 'running' || st === 'queued') set.add(n.id);
       }

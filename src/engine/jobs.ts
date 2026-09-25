@@ -8,7 +8,7 @@ import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -44,7 +44,11 @@ export function estimateSpec(spec: GenerationSpec): Estimate {
     const src = get().assets[spec.op.sourceAssetId];
     return estimateOp(spec.op.id, spec.op.params, src, spec.settings);
   }
-  if (spec.kind === 'text') return { usd: null, approximate: true };
+  if (spec.kind === 'text') {
+    // Text from a model (MiniMax Lyrics) is priced like its media kind; other text results are not predictable.
+    const m = get().catalog.models[spec.modelRef];
+    return m?.textOutput ? estimateMedia(spec.modelRef, m.kind, spec.settings, false) : { usd: null, approximate: true };
+  }
   const withImage = Boolean(spec.inputs?.refs.length || spec.inputs?.firstFrame);
   return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage);
 }
@@ -130,7 +134,7 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
   return {
     id,
     kind,
-    mime: blob?.type || o.mime || (kind === 'image' ? 'image/png' : 'video/mp4'),
+    mime: blob?.type || o.mime || (kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4'),
     width: info.width || fallback.width,
     height: info.height || fallback.height,
     duration: info.duration ?? fallback.duration,
@@ -145,6 +149,7 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
 }
 
 function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
+  if (kind === 'audio') return { width: 0, height: 0 };
   const ratio = ratioOf(s.aspect) ?? (kind === 'video' ? 16 / 9 : 1);
   return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' && s.duration != null && s.duration > 0 ? s.duration : undefined };
 }
@@ -217,7 +222,6 @@ async function execute(id: string): Promise<string[]> {
       await runCreateStyle(g, signal);
       return [];
     }
-    if (g.kind === 'text') throw new Error('Text results come only from Transcribe, voices and styles.');
     const resolved = await resolveModel(g.modelRef);
     if (!resolved) {
       const parsed = parseModelRef(g.modelRef);
@@ -225,6 +229,9 @@ async function execute(id: string): Promise<string[]> {
       throw new Error(parsed && !isConnected(parsed.provider) ? `Connect ${prov} in Settings to use ${g.modelName}.` : `Model ${g.modelName} is not available.`);
     }
     const { model, schema } = resolved;
+    if (g.kind === 'text' && !model.textOutput) throw new Error(`${model.name} makes ${model.kind}, not text.`);
+    // What the provider is asked for: a text-output model (lyrics) runs as its media kind.
+    const kind: MediaKind = g.kind === 'text' ? model.kind : g.kind;
     if (schema.missing?.length) throw new Error(`${model.name} needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
     const apiKey = apiKeyFor(model.provider);
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
@@ -294,9 +301,14 @@ async function execute(id: string): Promise<string[]> {
     if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
     if (g.kind === 'image' && refVideos.length && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
     if (g.kind === 'image' && refVideos.length < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
-    if (g.kind === 'image') {
+    if (kind === 'image' || kind === 'audio') {
       const problem = audioInputProblem(schema.slots, audios.length);
       if (problem) throw new InputError('AUDIO_INPUT', `${model.name} ${problem}`);
+    }
+    if (kind === 'audio') {
+      if (refs.length || refVideos.length || firstFrame || lastFrame) throw new InputError('AUDIO_MEDIA_INPUT', `${model.name} takes no images or videos.`);
+      const song = songProblem(schema, g.prompt, g.settings);
+      if (song) throw new InputError(song.code, `${model.name}: ${song.message}`);
     }
     // Audio: the first track to a single-track field (lip-sync, soundtrack), the rest as references.
     const { audio, refAudios } = routeAudio(schema.slots, audios);
@@ -354,7 +366,7 @@ async function execute(id: string): Promise<string[]> {
 
     const total = Math.max(1, g.settings.count);
     const perRequest = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
-    const fallback = expectedDims(g.kind, g.settings);
+    const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     let cost = 0;
     let costKnown = true;
@@ -363,7 +375,7 @@ async function execute(id: string): Promise<string[]> {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
       const result = await ADAPTERS[model.provider].generate({
-        kind: g.kind,
+        kind,
         model,
         schema,
         prompt,
@@ -388,7 +400,10 @@ async function execute(id: string): Promise<string[]> {
       });
       if (result.costUsd != null) cost += result.costUsd;
       else costKnown = false;
-      const kind = g.kind;
+      if (g.kind === 'text') {
+        finishText(id, result.text ?? '', result.costUsd);
+        return [];
+      }
       const assets = await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       assetIds.push(...assets.map((a) => a.id));

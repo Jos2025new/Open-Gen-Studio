@@ -1,11 +1,11 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
 export type Workspace = 'chat' | 'node' | 'designer';
-export type ComposerMode = 'agent' | 'image' | 'video';
+export type ComposerMode = 'agent' | 'image' | 'video' | 'audio';
 export type AgentStyle = 'auto' | 'guided';
-export type MediaKind = 'image' | 'video';
-/** Assets can also be audio (uploaded, or produced by audio models); generations produce MediaKind or audio. */
-export type AssetKind = MediaKind | 'audio';
+export type MediaKind = 'image' | 'video' | 'audio';
+/** Every asset kind is also a generation kind (audio: music models). */
+export type AssetKind = MediaKind;
 
 export type ProviderId = 'local' | 'openrouter' | 'fal' | 'nanogpt' | 'atlas';
 export type RemoteProviderId = Exclude<ProviderId, 'local'>;
@@ -29,6 +29,10 @@ export interface ParamDef {
   type: 'enum' | 'integer' | 'number' | 'boolean' | 'string' | 'multi' | 'color' | 'colors' | 'palette' | 'text' | 'textList';
   /** 'textList' / 'text': what each value must look like (regex source). */
   pattern?: string;
+  /** 'text': long free text edited in a text area (song lyrics). */
+  multiline?: boolean;
+  /** 'text': tags the editor offers to insert on their own line (lyrics sections: [Verse], [Chorus]…). */
+  tags?: string[];
   options?: Array<string | number>;
   min?: number;
   max?: number;
@@ -157,6 +161,8 @@ export interface ModelSummary {
   acceptsVideo?: boolean;
   /** Cannot run without a source video; kept out of the ordinary model pickers. */
   needsVideo?: boolean;
+  /** Answers with text, not media (MiniMax Lyrics): its generations are text results. */
+  textOutput?: boolean;
   tags: string[];
   description?: string;
   price?: PriceRule;
@@ -364,6 +370,19 @@ export interface VideoStep extends StepBase {
   times?: Array<number | null>;
 }
 
+/** Music (MiniMax Music) or, with a text-output model, song lyrics (MiniMax Lyrics). */
+export interface AudioStep extends StepBase {
+  kind: 'audio';
+  prompt: string;
+  promptFrom?: StepRef;
+  /** Text of an earlier step (a lyrics step, a text step, a transcription) sent as the song lyrics. */
+  lyricsFrom?: StepRef;
+  modelRef: string;
+  settings: GenSettings;
+  /** The model answers with text (lyrics), so the step's output is text. */
+  textOutput?: boolean;
+}
+
 export interface OpStep extends StepBase {
   kind: 'op';
   op: OpId;
@@ -385,7 +404,7 @@ export interface LayerStep extends StepBase {
   shapes?: ShapeSpec[];
 }
 
-export type PlanStep = TextStep | ImageStep | VideoStep | OpStep | LayerStep;
+export type PlanStep = TextStep | ImageStep | VideoStep | AudioStep | OpStep | LayerStep;
 
 export interface Plan {
   id: string;
@@ -464,7 +483,7 @@ export type FeedItem =
 // ---------------------------------------------------------------------------
 // Node graph
 
-export type NodeKind = 'text' | 'image' | 'video' | 'tool' | 'asset';
+export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'tool' | 'asset';
 export type PortType = 'text' | 'image' | 'video' | 'audio';
 
 export interface TextNodeData {
@@ -474,7 +493,7 @@ export interface TextNodeData {
 }
 
 export interface GenNodeData {
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'audio';
   title: string;
   prompt: string;
   modelRef: string;
@@ -483,6 +502,8 @@ export interface GenNodeData {
   outputIndex: number;
   /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
   sketchAssetId?: string;
+  /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept in step with `modelRef`. */
+  textOutput?: boolean;
 }
 
 export interface ToolNodeData {

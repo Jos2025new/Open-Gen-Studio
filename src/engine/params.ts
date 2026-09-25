@@ -207,6 +207,8 @@ export interface JsonProp {
   properties?: Record<string, JsonProp>;
   /** Atlas marks options it does not accept yet. */
   disabled?: boolean;
+  /** MiniMax lyrics: section tags ([Verse], [Chorus]…) the text may use. */
+  'x-structure-tags'?: { section?: string[] };
 }
 
 function flattenProp(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): JsonProp {
@@ -372,8 +374,9 @@ export function normalizeStructured(p: ParamDef, v: unknown): unknown {
       return colors.length ? { colors } : undefined;
     }
     case 'text': {
-      const s = typeof v === 'string' ? v.trim() : '';
-      return s || undefined;
+      // Lyrics keep their line breaks while typed; ids are trimmed.
+      const s = typeof v === 'string' ? (p.multiline ? v : v.trim()) : '';
+      return s.trim() ? s : undefined;
     }
     case 'textList': {
       const re = p.pattern ? new RegExp(p.pattern) : null;
@@ -402,6 +405,8 @@ export function structuredWire(p: ParamDef, v: unknown): unknown {
       const pal = stored as PaletteValue;
       return pal.preset ? { name: pal.preset } : { members: (pal.colors ?? []).map((c) => ({ rgb: toRgb(c.hex), ...(c.weight ? { color_weight: c.weight } : {}) })) };
     }
+    case 'text':
+      return (stored as string).trim();
     default:
       return stored;
   }
@@ -478,7 +483,7 @@ export function schemaFromJson(opts: {
       slots.mixedRefs = { key: mixed, max: p.maxItems ?? 9, min: required.includes(mixed) ? Math.max(1, p.minItems ?? 1) : 0 };
       used.add(mixed);
     }
-  } else {
+  } else if (kind === 'image') {
     const multiKeys = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).filter((k): k is string => Boolean(k));
     let multi: string | undefined = multiKeys.find((k) => required.includes(k)) ?? multiKeys[0];
     const required1 = SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && required.includes(k));
@@ -576,7 +581,16 @@ export function schemaFromJson(opts: {
     const role = roleForKey(key, options);
     const base = { key, label: humanizeKey(p.title && p.title.length < 40 ? p.title : key), role, description: p.description?.slice(0, 200) };
     const structured = structuredParam(key, p, resolve);
-    if (structured) {
+    const nk = normKey(key);
+    if (kind === 'audio' && t === 'string' && !p.enum && (nk === 'lyrics' || nk === 'title')) {
+      // Song text (MiniMax Music / Lyrics): lyrics in a text area with its section tags, the title as a line.
+      const tags = p['x-structure-tags']?.section ?? [];
+      params.push({ ...base, role: 'other', type: 'text', max: p.maxLength, ...(nk === 'lyrics' ? { multiline: true, tags } : {}) });
+    } else if (kind === 'audio' && nk === 'format' && options.includes('pcm')) {
+      // Raw PCM has no container: the browser can neither play nor measure it.
+      const playable = options.filter((o) => o !== 'pcm');
+      params.push({ ...base, type: 'enum', options: playable, default: playable.includes(p.default as string) ? (p.default as string) : playable[0] });
+    } else if (structured) {
       params.push({ ...base, role: 'other', ...structured });
     } else if (p.enum?.length) {
       if (!options.length) continue;
@@ -723,7 +737,8 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
 
   for (const [k, v] of Object.entries(input.advanced ?? {})) {
     const def = schema.params.find((p) => p.key === k && p.role === 'other');
-    if (!def) continue;
+    // Structured values (lyrics, colors…) live in extras, never in advanced.
+    if (!def || STRUCTURED_TYPES.has(def.type)) continue;
     if (def.type === 'enum' && !def.options?.some((o) => String(o) === String(v))) continue;
     if (def.type === 'boolean' && typeof v !== 'boolean') continue;
     if ((def.type === 'number' || def.type === 'integer') && typeof v !== 'number') continue;
@@ -883,6 +898,55 @@ export function clipTrim(slot: NonNullable<InputSlots['clips']>, seconds: number
 }
 
 /** What a model takes as input, in the words the agent's plan uses (refs, first_frame, times…). */
+/** The lyrics field of a song model (MiniMax Music / Lyrics), when it has one. */
+export function lyricsParam(schema: ModelSchema | undefined): ParamDef | undefined {
+  return schema?.params.find((p) => p.type === 'text' && p.multiline && normKey(p.key) === 'lyrics');
+}
+
+/** Lyrics from a MiniMax Lyrics result (see atlas `lyricsText`): the "# Title" and "Style:" header lines dropped. */
+export function lyricsBody(text: string): string {
+  const lines = text.split('\n');
+  let i = 0;
+  if (/^# /.test(lines[i] ?? '')) i++;
+  if (/^Style: /.test(lines[i] ?? '')) i++;
+  if (i && !lines[i]?.trim()) i++;
+  return lines.slice(i).join('\n').trim();
+}
+
+/**
+ * The request rules MiniMax publishes as JSON-schema conditions (allOf), checked before sending so a request the
+ * provider would reject costs nothing. Driven by which fields the model has, not by its name:
+ * music — instrumental needs a prompt; the lyrics optimizer writes the lyrics itself (the field must be empty);
+ * otherwise lyrics are required. Lyrics — "edit" needs lyrics to edit, "write_full_song" must get none.
+ */
+export function songProblem(schema: ModelSchema | undefined, prompt: string, settings: GenSettings): { code: string; message: string } | null {
+  const lyricsDef = lyricsParam(schema);
+  if (!schema || !lyricsDef) return null;
+  const lyrics = String(settings.extras?.[lyricsDef.key] ?? '').trim();
+  if (lyricsDef.max != null && lyrics.length > lyricsDef.max) return { code: 'LYRICS_TOO_LONG', message: `lyrics are ${lyrics.length} characters; the limit is ${lyricsDef.max}.` };
+  const flag = (key: string) => {
+    const p = schema.params.find((x) => x.type === 'boolean' && normKey(x.key) === key);
+    return p ? Boolean(settings.advanced[p.key] ?? p.default) : undefined;
+  };
+  const instrumental = flag('is_instrumental');
+  const optimizer = flag('lyrics_optimizer');
+  if (instrumental !== undefined) {
+    if (instrumental) return prompt.trim() ? null : { code: 'PROMPT_MISSING', message: 'an instrumental needs a description of the music in the prompt.' };
+    if (optimizer) {
+      if (lyrics) return { code: 'LYRICS_CONFLICT', message: '“Write lyrics for me” is on, so the lyrics must be empty. Turn it off to use your lyrics.' };
+      return prompt.trim() ? null : { code: 'PROMPT_MISSING', message: 'to write the lyrics it needs a description of the song in the prompt.' };
+    }
+    return lyrics ? null : { code: 'LYRICS_MISSING', message: 'needs lyrics, or turn on Instrumental or “write lyrics for me”.' };
+  }
+  const modeDef = schema.params.find((p) => normKey(p.key) === 'mode' && p.options?.includes('edit'));
+  if (modeDef) {
+    const mode = String(settings.advanced[modeDef.key] ?? modeDef.default ?? '');
+    if (mode === 'edit' && !lyrics) return { code: 'LYRICS_MISSING', message: 'editing needs the lyrics to edit.' };
+    if (mode !== 'edit' && lyrics) return { code: 'LYRICS_CONFLICT', message: 'writes a new song from the prompt; clear the lyrics or switch the mode to Edit.' };
+  }
+  return null;
+}
+
 export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind): string[] {
   if (!schema) return ['inputs unknown until the model loads'];
   const s = schema.slots;
@@ -896,6 +960,14 @@ export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind
     if (s.mixedRefs) out.push(`up to ${s.mixedRefs.max} image/video refs${s.mixedRefs.min ? ' (at least one required)' : ''}`);
     if (s.clips) out.push(`${s.clips.max} reference video clip${s.clips.maxSpan ? ` (≤${s.clips.maxSpan} s used)` : ''}${s.clips.min ? ' (required)' : ''}`);
     if (!out.length) out.push('text-to-video only');
+  } else if (kind === 'audio') {
+    const lyrics = lyricsParam(schema);
+    if (lyrics) out.push(`lyrics: params.lyrics (≤${lyrics.max ?? '?'} chars, lines with section tags like [Verse], [Chorus]) or lyrics_from a text step`);
+    const has = (key: string) => schema.params.some((p) => normKey(p.key) === key);
+    if (has('is_instrumental')) out.push('is_instrumental: true for music without vocals (prompt required)');
+    if (has('lyrics_optimizer')) out.push('lyrics_optimizer: true writes the lyrics from the prompt (leave lyrics empty)');
+    if (schema.params.some((p) => normKey(p.key) === 'mode' && p.options?.includes('edit'))) out.push('mode edit rewrites the given lyrics; write_full_song takes no lyrics');
+    if (!s.audio && !s.refAudios) out.push('text only (no media input)');
   } else {
     if (s.source) out.push('source image first in refs, then references');
     out.push(s.images ? `up to ${s.images.max + (s.source ? 1 : 0)} image refs${s.images.min ? ' (required)' : ''}` : 'no image input');

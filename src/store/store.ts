@@ -47,6 +47,8 @@ export interface ComposerState {
   text: string;
   image: { modelRef: string; settings: GenSettings };
   video: { modelRef: string; settings: GenSettings };
+  /** '' until an audio provider is connected (there is no local audio model). */
+  audio: { modelRef: string; settings: GenSettings };
   attachments: string[];
   /** Keyframe second per attached image (keyframe models); unset ones are spread evenly. */
   times?: Record<string, number>;
@@ -157,6 +159,7 @@ const initial: AppState = {
     text: '',
     image: { modelRef: LOCAL_IMAGE_REF, settings: { aspect: '1:1', resolution: '1K', count: 1, advanced: {} } },
     video: { modelRef: LOCAL_VIDEO_REF, settings: { aspect: '16:9', resolution: '720p', duration: 5, count: 1, advanced: {} } },
+    audio: { modelRef: '', settings: { count: 1, advanced: {} } },
     attachments: [],
     editing: null,
     designerTarget: 'new',

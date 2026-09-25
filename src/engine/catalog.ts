@@ -183,6 +183,8 @@ export function preferredModel(kind: MediaKind): string {
     const hit = firstAvailable(p, PREFERRED[p][kind]);
     if (hit) return hit;
   }
+  // No local audio model: any connected one that makes sound, else none ('').
+  if (kind === 'audio') return modelsOf('audio').find((m) => !m.textOutput)?.ref ?? '';
   return kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF;
 }
 
@@ -192,7 +194,7 @@ export function preferredModel(kind: MediaKind): string {
  */
 export function ensureComposerModels(preferRemote = false): void {
   const st = get();
-  for (const kind of ['image', 'video'] as const) {
+  for (const kind of ['image', 'video', 'audio'] as const) {
     const ref = st.composer[kind].modelRef;
     const parsed = parseModelRef(ref);
     // A model is only replaced once its provider catalog loaded and it is missing from it.

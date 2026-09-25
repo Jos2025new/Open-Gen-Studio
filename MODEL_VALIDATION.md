@@ -91,5 +91,5 @@ Verificación: 39 tests, con fragmentos reales en `tests/fixtures/image-schemas.
 
 Lo marcado antes como "fuera de alcance" se fue implementando por fases; el detalle, las pruebas y los límites de cada una están en `TRAZABILIDAD.md`:
 
-- **Hecho:** extender vídeo y reglas de Seedance 2.5 (fase 2); keyframes de FLUX 3 y clips recortados (fase 3); audio como asset y como entrada, y transcripción (fases 4a y 4b); sujetos de Kling, multiplano y voces (fase 5); máscaras en Sketch (fase 6); paletas, `style_codes`, `style_id` y `model_id` (fase 7).
-- **Pendiente:** LoRA, ControlNet y tiling (fase 8), motion-control de Kling desde el vídeo y desde la imagen (fase 9) y generación de audio (4c, familias por confirmar con el usuario).
+- **Hecho:** extender vídeo y reglas de Seedance 2.5 (fase 2); keyframes de FLUX 3 y clips recortados (fase 3); audio como asset y como entrada, y transcripción (fases 4a y 4b); avatares parlantes (InfiniteTalk, OmniHuman 1.5) y música y letras de MiniMax (fase 4c); sujetos de Kling, multiplano y voces (fase 5); máscaras en Sketch (fase 6); paletas, `style_codes`, `style_id` y `model_id` (fase 7).
+- **Pendiente:** LoRA, ControlNet y tiling (fase 8), motion-control de Kling desde el vídeo y desde la imagen (fase 9). Otras familias de audio, cuando el usuario las elija.

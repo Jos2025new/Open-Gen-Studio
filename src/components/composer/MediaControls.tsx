@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Box, ChevronDown, Clapperboard, Clock, Dices, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Box, ChevronDown, Clapperboard, Clock, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, selectComposerModel } from '../../engine/catalog';
-import { aspectLabel, durationChoices, durationLabel, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
+import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
 import type { AdvancedValue, MediaKind, ParamDef, SavedStyle, Subject } from '../../engine/types';
 import { createRecraftStyle, createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
@@ -25,7 +25,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
   const model = useStore((s) => s.catalog.models[ref]);
   const loading = useStore((s) => !s.catalog.schemas[ref]);
   const pop = usePopover();
-  const name = model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
+  const name = !ref ? 'No audio model' : model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
   return (
     <>
       <Chip ref={pop.ref} icon={Box} active={pop.open} onClick={pop.toggle} data-tip={loading ? 'Loading model parameters…' : `Model${model ? ` · ${priceHint(model)}` : ''}`} className="model-chip">
@@ -280,7 +280,7 @@ function StyleField({ kind, p }: { kind: MediaKind; p: ParamDef }) {
       {label}
       <input
         className="text-input"
-        placeholder={p.type === 'textList' ? 'e.g. 1A2B3C4D, 5E6F7A8B' : p.key === 'style_id' ? 'Style ID (uuid)' : 'ID'}
+        placeholder={p.type === 'textList' ? 'e.g. 1A2B3C4D, 5E6F7A8B' : p.key === 'style_id' ? 'Style ID (uuid)' : p.key === 'model_id' ? 'ID' : p.label}
         value={draft || shown}
         onChange={(e) => {
           setDraft(e.target.value);
@@ -487,7 +487,7 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
           {others.filter((p) => p.type === 'multi').map((p) => (
             <MultiField key={p.key} kind={kind} p={p} />
           ))}
-          {others.filter((p) => STRUCTURED_TYPES.has(p.type) && p.type !== 'multi').map((p) => (
+          {others.filter((p) => STRUCTURED_TYPES.has(p.type) && p.type !== 'multi' && !p.multiline).map((p) => (
             <StyleField key={p.key} kind={kind} p={p} />
           ))}
           {others.filter((p) => !STRUCTURED_TYPES.has(p.type)).map((p) => (
@@ -657,7 +657,66 @@ function ShotsChip() {
   );
 }
 
-/** Contextual controls for image / video mode. */
+/** Song lyrics (MiniMax Music / Lyrics): a text area with the model's section tags and its length limit. */
+function LyricsChip({ kind }: { kind: MediaKind }) {
+  const ref = useStore((s) => s.composer[kind].modelRef);
+  const p = lyricsParam(useStore((s) => s.catalog.schemas[ref]));
+  const value = useStore((s) => (p ? s.composer[kind].settings.extras?.[p.key] : undefined));
+  const pop = usePopover();
+  const taRef = useRef<HTMLTextAreaElement>(null);
+  if (!p) return null;
+  const text = typeof value === 'string' ? value : '';
+  const over = p.max != null && text.trim().length > p.max;
+  const insert = (tag: string) => {
+    const ta = taRef.current;
+    const at = ta?.selectionStart ?? text.length;
+    const before = text.slice(0, at);
+    const piece = `${before && !before.endsWith('\n') ? '\n' : ''}${tag}\n`;
+    setExtra(kind, p, before + piece + text.slice(at));
+    requestAnimationFrame(() => {
+      ta?.focus();
+      ta?.setSelectionRange(at + piece.length, at + piece.length);
+    });
+  };
+  return (
+    <>
+      <Chip ref={pop.ref} icon={FileText} active={pop.open || Boolean(text.trim())} onClick={pop.toggle} data-tip="Song lyrics">
+        {text.trim() ? `${text.trim().split('\n').filter((l) => l.trim()).length} lines` : 'Lyrics'}
+      </Chip>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={420} label="Lyrics">
+        <PopoverHeader
+          title="Lyrics"
+          sub="One line per sung line, a blank line for a pause, section tags on their own line."
+          right={
+            text ? (
+              <button type="button" className="link-btn" onClick={() => setExtra(kind, p, undefined)}>
+                Clear
+              </button>
+            ) : undefined
+          }
+        />
+        <div className="lyrics-editor">
+          {p.tags?.length ? (
+            <div className="lyrics-tags">
+              {p.tags.map((t) => (
+                <button key={t} type="button" className="option" onClick={() => insert(t)}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <textarea ref={taRef} className="text-area lyrics-text" rows={12} value={text} placeholder={'[Verse]\nFirst line of the song…'} onChange={(e) => setExtra(kind, p, e.target.value)} aria-label="Lyrics" />
+          <span className={`lyrics-count num ${over ? 'field-error' : 'faint'}`}>
+            {text.trim().length}
+            {p.max != null ? ` / ${p.max}` : ''}
+          </span>
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+/** Contextual controls for image / video / audio mode. */
 export function MediaControls({ kind }: { kind: MediaKind }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const [, force] = useState(0);
@@ -669,7 +728,7 @@ export function MediaControls({ kind }: { kind: MediaKind }) {
       <ModelChip kind={kind} />
       <OptionPopover kind={kind} role="aspect" format={aspectLabel} render={(v) => <AspectGlyph value={v} />} />
       <OptionPopover kind={kind} role="resolution" />
-      {kind === 'image' ? <CountChip /> : <DurationChip />}
+      {kind === 'image' ? <CountChip /> : kind === 'video' ? <DurationChip /> : <LyricsChip kind={kind} />}
       {kind === 'video' ? <AudioChip /> : null}
       {kind === 'video' ? <SubjectsChip /> : null}
       {kind === 'video' ? <ShotsChip /> : null}

@@ -1,8 +1,9 @@
 import { OPS } from './ops';
-import { audioInputProblem, coerceSettings, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
+import { audioInputProblem, coerceSettings, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
   AdvancedValue,
   AssetKind,
+  AudioStep,
   GenSettings,
   ImageStep,
   LayerStep,
@@ -33,6 +34,8 @@ export interface RawStep {
   title?: string;
   prompt?: string;
   prompt_from?: string;
+  /** Audio steps: the text of an earlier step used as song lyrics. */
+  lyrics_from?: string;
   model?: string;
   aspect?: string;
   resolution?: string;
@@ -98,6 +101,8 @@ export function stepOutputKind(step: PlanStep): OutputKind {
       return 'image';
     case 'video':
       return 'video';
+    case 'audio':
+      return step.textOutput ? 'text' : 'audio';
     case 'op':
       return OPS[step.op].output;
     case 'layer':
@@ -113,6 +118,8 @@ export function stepDeps(step: PlanStep): StepRef[] {
       return [...(step.promptFrom ? [step.promptFrom] : []), ...step.refs];
     case 'video':
       return [step.promptFrom, step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r));
+    case 'audio':
+      return [step.promptFrom, step.lyricsFrom].filter((r): r is string => Boolean(r));
     case 'op':
       return [step.input];
     case 'layer':
@@ -219,6 +226,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     const k = s.kind;
     if (k === 'text') kindById.set(s.id!, 'text');
     else if (k === 'image' || k === 'video') kindById.set(s.id!, k);
+    else if (k === 'audio') {
+      // A lyrics model answers with text: later steps read it through prompt_from / lyrics_from.
+      const ref = s.model?.trim() || ctx.defaultModel('audio', false);
+      kindById.set(s.id!, ref && (await ctx.getModel(ref))?.model.textOutput ? 'text' : 'audio');
+    }
     else if (k === 'op' && s.op && s.op in OPS) kindById.set(s.id!, OPS[s.op as OpId].output);
     else if (k === 'layer') kindById.set(s.id!, 'layer');
   }
@@ -361,6 +373,49 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         break;
       }
+      case 'audio': {
+        const modelRef = s.model?.trim() || ctx.defaultModel('audio', false);
+        if (!modelRef) {
+          errors.push(`${where}: no audio model is available. Ask the user to connect Atlas Cloud.`);
+          continue;
+        }
+        const resolved = await ctx.getModel(modelRef);
+        if (!resolved) {
+          errors.push(`${where}: model "${modelRef}" was not found in the catalog. Use one of the listed model refs or omit "model".`);
+          continue;
+        }
+        if (resolved.model.kind !== 'audio') {
+          errors.push(`${where}: model "${modelRef}" generates ${resolved.model.kind}, not audio.`);
+          continue;
+        }
+        const { schema } = resolved;
+        for (const [key, ref] of [['prompt_from', s.prompt_from], ['lyrics_from', s.lyrics_from]] as const) {
+          const k = refKind(ref, where);
+          if (k && k !== 'text') errors.push(`${where}: ${key} must reference a text step (a text step, a lyrics step or a transcription).`);
+        }
+        if (s.refs?.length) errors.push(`${where}: audio steps take no refs.`);
+        const lyricsDef = lyricsParam(schema);
+        if (s.lyrics_from && !lyricsDef) errors.push(`${where}: model "${modelRef}" takes no lyrics.`);
+        const prompt = (s.prompt ?? '').trim();
+        if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
+        const { settings, changes } = coerceSettings(schema, 'audio', { count: 1, extras: s.params, advanced: cleanParams(s.params) });
+        changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));
+        // Lyrics arriving from another step are only known at run time; the same rules then run in the job.
+        const song = s.lyrics_from || s.prompt_from ? null : songProblem(schema, prompt, settings);
+        if (song) errors.push(`${where}: model "${modelRef}" ${song.message} [${song.code}]`);
+        steps.push({
+          id: s.id!,
+          kind: 'audio',
+          title,
+          prompt,
+          promptFrom: s.prompt_from,
+          lyricsFrom: s.lyrics_from,
+          modelRef,
+          settings: { ...settings, count: 1 },
+          ...(resolved.model.textOutput ? { textOutput: true } : {}),
+        } satisfies AudioStep);
+        break;
+      }
       case 'op': {
         const opId = s.op as OpId;
         const def = OPS[opId];
@@ -442,7 +497,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         break;
       }
       default:
-        errors.push(`${where}: unknown kind "${s.kind}". Use text, image, video, op or layer.`);
+        errors.push(`${where}: unknown kind "${s.kind}". Use text, image, video, audio, op or layer.`);
     }
   }
 

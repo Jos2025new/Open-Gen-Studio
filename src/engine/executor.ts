@@ -1,7 +1,9 @@
 import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
+import { ensureSchema } from './catalog';
 import { createGeneration, opSpec, runGeneration } from './jobs';
+import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
 import { parseRef, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
@@ -38,6 +40,7 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
   for (const s of steps) {
     if (s.kind === 'image') perStep[s.id] = estimateMedia(s.modelRef, 'image', s.settings, s.refs.length > 0);
     else if (s.kind === 'video') perStep[s.id] = estimateMedia(s.modelRef, 'video', s.settings, Boolean(s.firstFrame));
+    else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false);
     else if (s.kind === 'op') {
       const p = parseRef(s.input);
       const src = p?.type === 'asset' ? get().assets[p.id] : undefined;
@@ -63,7 +66,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         ? [s.promptFrom, ...s.refs]
         : s.kind === 'video'
           ? [s.promptFrom, s.firstFrame, s.lastFrame, ...(s.refs ?? [])]
-          : s.kind === 'op'
+          : s.kind === 'audio'
+            ? [s.promptFrom, s.lyricsFrom]
+            : s.kind === 'op'
             ? [s.input]
             : s.kind === 'layer'
               ? [s.source]
@@ -133,6 +138,22 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
+      }
+      case 'audio': {
+        // Lyrics from an earlier step (a lyrics result keeps only the song text) into the model's lyrics field.
+        let settings = s.settings;
+        if (s.lyricsFrom) {
+          const p = parseRef(s.lyricsFrom);
+          const text = p?.type === 'step' ? outputs.get(p.id)?.text ?? '' : '';
+          const key = lyricsParam((await ensureSchema(s.modelRef)) ?? undefined)?.key;
+          if (!key) throw new Error(`${s.title}: the model takes no lyrics.`);
+          settings = { ...settings, extras: { ...settings.extras, [key]: lyricsBody(text) } };
+        }
+        const kind = s.textOutput ? 'text' : 'audio';
+        const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: { refs: [] } });
+        ctx.onState(s.id, 'running', { generationId: g.id });
+        const assetIds = await runGeneration(g.id);
+        return { assetIds, text: get().generations[g.id]?.text };
       }
       case 'op': {
         const source = await resolveAsset(s.input);

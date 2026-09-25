@@ -3,6 +3,9 @@ import { OPS } from '../ops';
 import { parseRef } from '../plan';
 import type {
   Asset,
+  AudioStep,
+  GenNodeData,
+  ToolNodeData,
   Generation,
   Graph,
   GraphEdge,
@@ -21,6 +24,11 @@ import type {
 
 export const NODE_WIDTH = 260;
 
+/** Nodes that run a generation (and so hold a `generationId`). */
+export function runsGeneration(d: GraphNodeData): d is GenNodeData | ToolNodeData {
+  return d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'tool';
+}
+
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
   switch (data.kind) {
     case 'text':
@@ -29,6 +37,8 @@ export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): 
       return 'image';
     case 'video':
       return 'video';
+    case 'audio':
+      return data.textOutput ? 'text' : 'audio';
     case 'tool':
       return OPS[data.op].output;
     case 'asset':
@@ -55,6 +65,12 @@ export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortT
         { id: 'refVideo', type: 'video', label: 'Reference videos', multi: true },
         // Lip-sync speech, a soundtrack or reference audio, as the model takes it.
         { id: 'audio', type: 'audio', label: 'Audio', multi: true },
+      ];
+    case 'audio':
+      return [
+        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
+        // Song lyrics: a text node, a lyrics node or a transcription.
+        { id: 'lyrics', type: 'text', label: 'Lyrics', multi: false },
       ];
     case 'tool':
       return [{ id: 'input', type: OPS[data.op].input, label: 'Input', multi: false }];
@@ -120,6 +136,8 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     if (s.kind === 'text') data = { kind: 'text', title: s.title, text: s.text };
     else if (s.kind === 'image' || s.kind === 'video')
       data = { kind: s.kind, title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0 };
+    else if (s.kind === 'audio')
+      data = { kind: 'audio', title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0, ...(s.textOutput ? { textOutput: true } : {}) };
     else if (s.kind === 'op') data = { kind: 'tool', title: s.title, op: s.op, params: s.params, outputIndex: 0 };
     if (!data) continue;
     const id = nid(s.id);
@@ -162,6 +180,9 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
       link(s.firstFrame, target, 'first');
       link(s.lastFrame, target, 'last');
       (s.refs ?? []).forEach((r) => link(r, target, kindOfRef(r) === 'audio' ? 'audio' : isVideo(r) ? 'refVideo' : 'ref'));
+    } else if (s.kind === 'audio') {
+      link(s.promptFrom, target, 'prompt');
+      link(s.lyricsFrom, target, 'lyrics');
     } else if (s.kind === 'op') {
       link(s.input, target, 'input');
     }
@@ -176,6 +197,7 @@ export function estimatedHeight(data: GraphNodeData): number {
       return 170;
     case 'image':
     case 'video':
+    case 'audio':
     case 'tool':
     case 'asset':
       return 220;
@@ -256,11 +278,19 @@ function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation
   const d = node.data;
   if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
-  if (d.kind === 'image' || d.kind === 'video' || d.kind === 'tool') {
+  if (runsGeneration(d)) {
     const g = d.generationId ? generations[d.generationId] : undefined;
     if (g?.status === 'done') return g.assetIds[d.outputIndex] ?? g.assetIds[0] ?? null;
   }
   return null;
+}
+
+/** The text a node already produced (Transcribe, lyrics), or undefined. */
+function finishedText(node: GraphNode, generations: Record<string, Generation>): string | undefined {
+  const d = node.data;
+  if ((d.kind !== 'tool' && d.kind !== 'audio') || !d.generationId) return undefined;
+  const g = generations[d.generationId];
+  return g?.status === 'done' && g.text != null ? g.text : undefined;
 }
 
 /**
@@ -274,11 +304,11 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const visit = (id: string, forced: boolean) => {
     const n = byId.get(id);
     if (!n || run.has(id)) return;
-    const runnable = n.data.kind === 'image' || n.data.kind === 'video' || n.data.kind === 'tool';
+    const runnable = runsGeneration(n.data);
     if (!runnable) return;
     if (!forced && nodeOutputAsset(n, generations)) return;
-    // A finished text result (Transcribe) is an output too: reuse it instead of running again.
-    if (!forced && n.data.kind === 'tool' && n.data.generationId && generations[n.data.generationId]?.status === 'done' && generations[n.data.generationId]?.text != null) return;
+    // A finished text result (Transcribe, lyrics) is an output too: reuse it instead of running again.
+    if (!forced && finishedText(n, generations) != null) return;
     run.add(id);
     graph.edges.filter((e) => e.target === id).forEach((e) => visit(e.source, false));
   };
@@ -300,23 +330,25 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     const n = byId.get(id)!;
     const inEdges = graph.edges.filter((e) => e.target === id);
     const d = n.data;
-    const promptEdge = inEdges.find((e) => e.targetHandle === 'prompt');
-    let promptFrom: string | undefined;
-    if (promptEdge) {
-      const src = byId.get(promptEdge.source);
-      if (src?.data.kind === 'text') {
-        promptFrom = src.id;
+    // Text ports (prompt, lyrics): a text node, or a node with a text result (Transcribe, lyrics) from this run or before.
+    const textFrom = (handle: string): string | undefined => {
+      const edge = inEdges.find((e) => e.targetHandle === handle);
+      const src = edge ? byId.get(edge.source) : undefined;
+      if (!src) return undefined;
+      if (src.data.kind === 'text') {
         if (!textSteps.has(src.id)) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: src.data.text });
-      } else if (src?.data.kind === 'tool' && OPS[src.data.op].output === 'text') {
-        // A Transcribe node: its text from this run, or the text it already produced.
-        promptFrom = src.id;
-        const done = src.data.generationId ? generations[src.data.generationId] : undefined;
-        if (!run.has(src.id) && !textSteps.has(src.id)) {
-          if (done?.text != null) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: done.text });
-          else errors.push(`"${src.data.title}" has no text yet.`);
-        }
+        return src.id;
       }
-    }
+      const textual = (src.data.kind === 'tool' && OPS[src.data.op].output === 'text') || (src.data.kind === 'audio' && src.data.textOutput);
+      if (!textual) return undefined;
+      if (!run.has(src.id) && !textSteps.has(src.id)) {
+        const done = finishedText(src, generations);
+        if (done != null) textSteps.set(src.id, { id: src.id, kind: 'text', title: src.data.title, text: done });
+        else errors.push(`"${src.data.title}" has no text yet.`);
+      }
+      return src.id;
+    };
+    const promptFrom = textFrom('prompt');
     if (d.kind === 'image') {
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
@@ -342,6 +374,18 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
         lastFrame: last ? refFor(last.source) ?? undefined : undefined,
         refs: refs.length ? refs : undefined,
       } satisfies VideoStep);
+    } else if (d.kind === 'audio') {
+      steps.push({
+        id,
+        kind: 'audio',
+        title: d.title,
+        prompt: d.prompt,
+        promptFrom,
+        lyricsFrom: textFrom('lyrics'),
+        modelRef: d.modelRef,
+        settings: d.settings,
+        ...(d.textOutput ? { textOutput: true } : {}),
+      } satisfies AudioStep);
     } else if (d.kind === 'tool') {
       const input = inEdges.find((e) => e.targetHandle === 'input');
       const ref = input ? refFor(input.source) : null;

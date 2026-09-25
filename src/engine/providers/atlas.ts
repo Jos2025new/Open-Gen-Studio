@@ -26,13 +26,17 @@ interface AtlasModel {
 const raws = new Map<string, AtlasModel>();
 
 async function fetchCatalog(): Promise<AtlasModel[]> {
-  const cached = await cacheDb.get<AtlasModel[]>('atlas:models', DAY / 2);
+  // v2: audio models too.
+  const cached = await cacheDb.get<AtlasModel[]>('atlas:models:v2', DAY / 2);
   if (cached) return cached;
   const res = await requestJson<{ data: AtlasModel[] }>(`${BASE}/api/v1/models`);
-  const media = res.data.filter((m) => m.type === 'Image' || m.type === 'Video');
-  await cacheDb.set('atlas:models', media);
+  const media = res.data.filter((m) => m.type === 'Image' || m.type === 'Video' || (m.type === 'Audio' && AUDIO_FAMILIES.test(m.model)));
+  await cacheDb.set('atlas:models:v2', media);
   return media;
 }
+
+/** Audio families confirmed by the user (2026-09-25): MiniMax Music and MiniMax Lyrics. Others wait for a decision. */
+const AUDIO_FAMILIES = /^minimax\/(music|lyrics)/;
 
 function atlasPrice(m: AtlasModel): PriceRule | undefined {
   const base = numberOrUndefined(m.price?.actual?.base_price);
@@ -71,6 +75,24 @@ export const atlas: ProviderAdapter = {
     const out: ModelSummary[] = [];
     for (const m of models) {
       const cats = (m.categories ?? []).map((c) => c.toUpperCase());
+      if (m.type === 'Audio') {
+        if (!cats.includes('TEXT-TO-AUDIO')) continue;
+        raws.set(m.model, m);
+        out.push({
+          ref: modelRef('atlas', m.model),
+          provider: 'atlas',
+          id: m.model,
+          name: m.displayName ?? m.model,
+          kind: 'audio',
+          acceptsText: true,
+          acceptsImage: false,
+          tags: [],
+          ...(/lyrics/.test(m.model) ? { textOutput: true } : {}),
+          description: m.profile,
+          price: atlasPrice(m),
+        });
+        continue;
+      }
       const kind = m.type === 'Video' ? 'video' : 'image';
       let text = cats.includes(kind === 'video' ? 'TEXT-TO-VIDEO' : 'TEXT-TO-IMAGE');
       let image = kind === 'video' ? cats.includes('IMAGE-TO-VIDEO') : cats.includes('IMAGE-TO-IMAGE');
@@ -183,7 +205,7 @@ export const atlas: ProviderAdapter = {
       Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
     }
     req.onStatus('Submitting');
-    const endpoint = req.kind === 'image' ? 'generateImage' : 'generateVideo';
+    const endpoint = req.kind === 'image' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
     const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(`${BASE}/api/v1/model/${endpoint}`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${req.apiKey}` },
@@ -196,7 +218,7 @@ export const atlas: ProviderAdapter = {
     const get = submit.data?.urls?.get;
     const job: RemoteJob = { provider: 'atlas', id, meta: get?.startsWith(`${BASE}/`) ? { pollUrl: get } : {} };
     req.onRemoteJob(job);
-    return poll(job, { kind: req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+    return poll(job, { kind: req.model.textOutput ? 'text' : req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
   async balance(apiKey, signal) {
@@ -227,14 +249,19 @@ async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Pro
 }
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  const kind = ctx.kind === 'text' ? 'image' : ctx.kind; // no text jobs at Atlas Cloud
-  return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' ? 2000 : 5000, async () => {
-    const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] } }>(
+  const kind = ctx.kind === 'text' ? 'audio' : ctx.kind; // text jobs are lyrics (audio models)
+  return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' || ctx.kind === 'text' ? 2000 : 5000, async () => {
+    const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[]; lyrics_result?: LyricsResult | null } }>(
       job.meta.pollUrl ?? `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
       { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal, timeoutMs: POLL_TIMEOUT_MS },
     );
     const status = String(res.data?.status ?? '').toLowerCase();
     if (status === 'completed' || status === 'succeeded') {
+      if (ctx.kind === 'text') {
+        const lyrics = res.data?.lyrics_result;
+        if (!lyrics?.lyrics) throw new JobFailedError('Atlas Cloud finished without lyrics');
+        return { outputs: [], text: lyricsText(lyrics) };
+      }
       const outputs = await Promise.all(
         extractOutputs(res, kind).map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
@@ -254,3 +281,19 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
     return status === 'processing' ? 'Rendering' : 'Queued';
   });
 }
+
+interface LyricsResult {
+  song_title?: string;
+  style_tags?: string[];
+  lyrics?: string;
+}
+
+/**
+ * MiniMax Lyrics result as one text: "# Title", "Style: tags", then the lyrics. `lyricsBody` (params.ts) gives
+ * back what the music models take.
+ */
+export function lyricsText(r: LyricsResult): string {
+  const head = [r.song_title ? `# ${r.song_title}` : '', r.style_tags?.length ? `Style: ${r.style_tags.join(', ')}` : ''].filter(Boolean);
+  return [...head, ...(head.length ? [''] : []), r.lyrics ?? ''].join('\n');
+}
+

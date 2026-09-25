@@ -1,13 +1,13 @@
 # Open Gen Studio
 
-Estudio de generación de imagen y vídeo con IA que corre en tu navegador. Un agente convierte peticiones en planes ejecutables, y puedes trabajar en tres espacios: **Chat**, **Node** (flujos de nodos conectados) y **Designer** (capas raster, vectoriales y de texto).
+Estudio de generación de imagen, vídeo y música con IA que corre en tu navegador. Un agente convierte peticiones en planes ejecutables, y puedes trabajar en tres espacios: **Chat**, **Node** (flujos de nodos conectados) y **Designer** (capas raster, vectoriales y de texto).
 
 Usa tus propias claves de **OpenRouter, fal.ai, NanoGPT y Atlas Cloud**. Incluye además modelos demo locales para probarla sin claves.
 
 ## Qué hace
 
 - **Agente**: planifica y ejecuta trabajos de varios pasos. Muestra el coste antes de gastar y pide aprobación. Modos Auto y Guiado; tiers de modelo Normal y Top.
-- **Generación**: imagen y vídeo con modelos de cada proveedor, leyendo en vivo sus catálogos y parámetros.
+- **Generación**: imagen y vídeo con modelos de cada proveedor, leyendo en vivo sus catálogos y parámetros. Música y letras de canciones (MiniMax Music 3 y Lyrics, en Atlas Cloud) en el modo Audio; las letras generadas pasan a la canción con "Use as lyrics".
 - **Herramientas sobre resultados**: Relight, cambio de ángulo, upscale, quitar fondo, reframe/panorama, Nine-grid, Grid-split, animar, continuar plano, extraer fotograma, Sketch (pintar encima), y upscale y edición de vídeo. Cuando varios proveedores ofrecen lo mismo, elige automáticamente uno disponible.
 - **Canvas de nodos**: tarjetas centradas en el resultado, prompt y ajustes bajo el nodo, menús con clic derecho.
 - **Presupuesto y saldo**: límite de gasto en USD y saldo unificado de los proveedores conectados.

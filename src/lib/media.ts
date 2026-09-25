@@ -226,7 +226,7 @@ export function extensionForMime(mime: string): string {
   return 'bin';
 }
 
-export function guessMimeFromUrl(url: string, kind: 'image' | 'video'): string {
+export function guessMimeFromUrl(url: string, kind: 'image' | 'video' | 'audio'): string {
   const path = url.split('?')[0].toLowerCase();
   if (path.endsWith('.png')) return 'image/png';
   if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
@@ -235,7 +235,12 @@ export function guessMimeFromUrl(url: string, kind: 'image' | 'video'): string {
   if (path.endsWith('.webm')) return 'video/webm';
   if (path.endsWith('.mov')) return 'video/quicktime';
   if (path.endsWith('.mp4')) return 'video/mp4';
-  return kind === 'image' ? 'image/png' : 'video/mp4';
+  if (path.endsWith('.mp3')) return 'audio/mpeg';
+  if (path.endsWith('.wav')) return 'audio/wav';
+  if (path.endsWith('.flac')) return 'audio/flac';
+  if (path.endsWith('.ogg')) return 'audio/ogg';
+  if (path.endsWith('.m4a') || path.endsWith('.aac')) return 'audio/aac';
+  return kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4';
 }
 
 /**
