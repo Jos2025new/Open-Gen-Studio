@@ -72,8 +72,10 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (attachments.some((id) => st.assets[id]?.kind === 'video')) return { ok: false, reason: 'Remove the video attachment (use Extract frame first).', estimate };
     const slot = schema.slots.images;
     if (imageAtt.length && !slot) return { ok: false, reason: 'This model does not accept reference images.', estimate };
-    if (slot && imageAtt.length > slot.max) return { ok: false, reason: `This model accepts up to ${slot.max} images.`, estimate };
-    if (slot && imageAtt.length < slot.min) return { ok: false, reason: 'This model needs an input image.', estimate };
+    // A `source` slot (Ideogram Character remix) takes the first image; the rest are references.
+    const extra = schema.slots.source ? 1 : 0;
+    if (slot && imageAtt.length > slot.max + extra) return { ok: false, reason: `This model accepts up to ${slot.max + extra} images.`, estimate };
+    if (slot && imageAtt.length < slot.min + extra) return { ok: false, reason: extra ? 'This model needs a source image first, then reference images.' : 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
   } else {
     const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
@@ -515,7 +517,7 @@ export async function prepareModel(ref: string): Promise<void> {
 export function acceptsImages(kind: MediaKind): { accepts: boolean; max: number } {
   const st = get();
   const schema = st.catalog.schemas[st.composer[kind].modelRef];
-  if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: schema?.slots.images?.max ?? 0 };
+  if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: (schema?.slots.images?.max ?? 0) + (schema?.slots.source ? 1 : 0) };
   const slots = schema?.slots ?? {};
   const refs = slots.mixedRefs?.max ?? slots.images?.max ?? 0;
   return { accepts: Boolean(slots.firstFrame || refs), max: (slots.firstFrame ? 1 : 0) + refs };

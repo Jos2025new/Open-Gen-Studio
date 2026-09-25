@@ -1,9 +1,9 @@
 import { cacheDb } from '../../lib/idb';
-import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson } from '../../lib/http';
+import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -29,7 +29,21 @@ function falHeaders(key: string): Record<string, string> {
   return { Authorization: `Key ${key}` };
 }
 
-async function fetchCategory(category: string): Promise<FalModel[]> {
+/** The public listing rate-limits anonymous bursts: ask with the key when there is one, and back off on a 429. */
+async function listPage(url: string, apiKey: string | undefined): Promise<{ models: FalModel[]; next_cursor?: string | null; has_more?: boolean }> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestJson(url, { headers: apiKey ? falHeaders(apiKey) : undefined });
+    } catch (err) {
+      // The listing is public: a rejected key must not hide the catalog.
+      if (apiKey && err instanceof HttpError && (err.status === 401 || err.status === 403)) return listPage(url, undefined);
+      if (!(err instanceof HttpError && err.status === 429) || attempt >= 3) throw err;
+      await sleep(2000 * 2 ** attempt);
+    }
+  }
+}
+
+async function fetchCategory(category: string, apiKey: string | undefined): Promise<FalModel[]> {
   const cacheKey = `fal:models:${category}`;
   const cached = await cacheDb.get<FalModel[]>(cacheKey, DAY / 2);
   if (cached) return cached;
@@ -38,7 +52,7 @@ async function fetchCategory(category: string): Promise<FalModel[]> {
   // Categories run to a few hundred models (image-to-image ~400); the cap only guards against a runaway cursor.
   for (let page = 0; page < 10; page++) {
     const url = `${API}/models?category=${category}&status=active&limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`;
-    const res: { models: FalModel[]; next_cursor?: string | null; has_more?: boolean } = await requestJson(url);
+    const res = await listPage(url, apiKey);
     all.push(...res.models);
     if (!res.has_more || !res.next_cursor) break;
     cursor = res.next_cursor;
@@ -88,10 +102,12 @@ export const fal: ProviderAdapter = {
   id: 'fal',
   label: 'fal.ai',
 
-  async listModels() {
+  async listModels(apiKey) {
     const out: ModelSummary[] = [];
     const seen = new Set<string>();
-    const lists = await Promise.all(CATEGORIES.map((c) => fetchCategory(c.category).then((models) => ({ c, models }))));
+    // One category at a time: five parallel listings trip fal's rate limit.
+    const lists: Array<{ c: (typeof CATEGORIES)[number]; models: FalModel[] }> = [];
+    for (const c of CATEGORIES) lists.push({ c, models: await fetchCategory(c.category, apiKey) });
     for (const { c, models } of lists) {
       for (const m of models) {
         if (seen.has(m.endpoint_id) || (m.metadata?.status && m.metadata.status !== 'active')) continue;
@@ -157,7 +173,11 @@ export const fal: ProviderAdapter = {
       const encoded = await Promise.all(inputs.slice(0, slot.max ?? 1).map((i) => encodeImage(i, 'data-url')));
       body[slot.key] = slot.multiple ? encoded : encoded[0];
     };
-    if (req.kind === 'image') await put(schema.slots.images, req.refs);
+    if (req.kind === 'image') {
+      const { source, refs } = splitSource(schema.slots, req.refs);
+      if (source && schema.slots.source) body[schema.slots.source.key] = await encodeImage(source, 'data-url');
+      await put(schema.slots.images, refs);
+    }
     else {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);

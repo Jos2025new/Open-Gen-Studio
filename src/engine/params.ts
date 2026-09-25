@@ -316,6 +316,11 @@ export function schemaFromJson(opts: {
     const required1 = SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && required.includes(k));
     // Ideogram remix/reframe: the source goes to a required image_url; image_urls are optional style refs.
     if (multi && required1 && !required.includes(multi)) multi = undefined;
+    // Ideogram Character remix/edit: a required source image and a required reference list.
+    if (multi && required1 && required.includes(multi)) {
+      slots.source = { key: required1, format: imageFormat };
+      used.add(required1);
+    }
     if (multi) {
       const p = flattenProp(properties[multi], resolve);
       slots.images = {
@@ -368,6 +373,11 @@ export function schemaFromJson(opts: {
     }
     // A required field we do not surface (e.g. fal's prompt_expansion_mode) still has to be sent.
     if (params.length === before && required.includes(key) && p.default !== undefined) fixed[key] = p.default;
+  }
+  // Seedream sequential: max_images is the series length when the model has no other count field.
+  if (!params.some((p) => p.role === 'count')) {
+    const series = params.find((p) => normKey(p.key) === 'max_images' && (p.type === 'integer' || p.type === 'number'));
+    if (series) Object.assign(series, { role: 'count', label: 'Images' });
   }
   // A list of pixel sizes ("1024x768", "2048*2048") sets the framing: treat it as the aspect control.
   if (!params.some((p) => p.role === 'aspect')) {

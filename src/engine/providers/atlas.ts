@@ -3,7 +3,7 @@ import { extractErrorMessage, fetchJsonWithRelay, JobFailedError, requestJson } 
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
@@ -144,7 +144,9 @@ export const atlas: ProviderAdapter = {
       body[slot.key] = slot.multiple ? urls : urls[0];
     };
     if (req.kind === 'image') {
-      await put(schema.slots.images, req.refs);
+      const { source, refs } = splitSource(schema.slots, req.refs);
+      if (source && schema.slots.source) body[schema.slots.source.key] = await encodeImage(source, 'url', upload);
+      await put(schema.slots.images, refs);
     } else {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);

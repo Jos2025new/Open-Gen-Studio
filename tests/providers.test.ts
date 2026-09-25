@@ -3,7 +3,9 @@ import fixtures from './fixtures/provider-schemas.json';
 import imageFixtures from './fixtures/image-schemas.json';
 import { coerceSettings, isAutoOption, routeVideoInputs, schemaFromJson, videoInputProblem, wireParams, type JsonProp } from '../src/engine/params';
 import { atlas, atlasVideoCaps } from '../src/engine/providers/atlas';
+import { fal } from '../src/engine/providers/fal';
 import { nanogpt } from '../src/engine/providers/nanogpt';
+import { splitSource } from '../src/engine/providers/shared';
 import type { GenRequest, MediaInput } from '../src/engine/providers/types';
 import type { ModelSchema, ModelSummary } from '../src/engine/types';
 
@@ -163,5 +165,38 @@ describe('image schemas', () => {
     // A text-only endpoint that declares max_input_images takes no images.
     expect((await schema('openai/gpt-image-2.5/flare/text-to-image')).slots.images).toBeUndefined();
     expect(isAutoOption('match_input_image')).toBe(true);
+  });
+  it('sends the first image as source and the rest as references (Ideogram Character remix)', () => {
+    const img = (id: string) => ({ assetId: id, blob: new Blob(), mime: 'image/png', width: 1, height: 1 });
+    const slots = { source: { key: 'image_url', format: 'data-url' as const }, images: { key: 'reference_image_urls', max: 10, min: 1, multiple: true, format: 'data-url' as const } };
+    const r = splitSource(slots, [img('a'), img('b'), img('c')]);
+    expect(r.source?.assetId).toBe('a');
+    expect(r.refs.map((x) => x.assetId)).toEqual(['b', 'c']);
+    expect(splitSource({ images: slots.images }, [img('a')]).refs).toHaveLength(1);
+  });
+});
+
+describe('fal catalog listing', () => {
+  it('backs off on 429 and retries without a rejected key', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('location', { href: 'http://localhost/' });
+    const seen: Array<{ category: string | null; auth: boolean }> = [];
+    let limited = true;
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      const auth = Boolean((init?.headers as Record<string, string> | undefined)?.Authorization);
+      seen.push({ category: new URL(url).searchParams.get('category'), auth });
+      if (auth) return new Response('{"detail":"bad key"}', { status: 401 });
+      if (limited) {
+        limited = false;
+        return new Response('{"detail":"Too Many Requests"}', { status: 429 });
+      }
+      return new Response(JSON.stringify({ models: [{ endpoint_id: `x/${new URL(url).searchParams.get('category')}`, metadata: {} }], has_more: false }));
+    });
+    const listing = fal.listModels('bad-key');
+    await vi.runAllTimersAsync();
+    const models = await listing;
+    vi.useRealTimers();
+    expect(models).toHaveLength(5);
+    expect(seen.filter((r) => r.category === 'text-to-image').map((r) => r.auth)).toEqual([true, false, false]);
   });
 });

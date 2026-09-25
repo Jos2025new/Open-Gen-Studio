@@ -192,6 +192,10 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
       params.push({ key, label: humanizeKey(key), role: roleForKey(key, options), type: 'enum', options, default: d.default as string | undefined });
     } else if (d.type === 'range') {
       params.push({ key, label: humanizeKey(key), role: roleForKey(key), type: 'integer', min: num(d.min), max: num(d.max), default: num(d.default) });
+    } else if (Array.isArray(def) && def.length && def.every((v) => typeof v === 'string' || typeof v === 'number')) {
+      // Plain value lists, e.g. Ideogram rendering_speed: ["TURBO", "BALANCED", "QUALITY"].
+      const options = (def as Array<string | number>).map(String);
+      params.push({ key, label: humanizeKey(key), role: roleForKey(key, options), type: 'enum', options });
     }
   }
   const maxIn = num(sp.max_input_images) ?? 0;

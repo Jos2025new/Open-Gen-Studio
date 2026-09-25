@@ -38,6 +38,8 @@ export interface InputSlots {
   promptRequired?: boolean;
   /** Reference / source images. */
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
+  /** Image models with a source image and a separate reference list (Ideogram Character remix): the first input image. */
+  source?: { key: string; format: ImageInputFormat };
   firstFrame?: { key: string; format: ImageInputFormat };
   lastFrame?: { key: string; format: ImageInputFormat };
   /** Source video for video-to-video models. */

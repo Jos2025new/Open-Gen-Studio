@@ -282,12 +282,12 @@ atlas::bytedance/seedream-v5.0-lite/edit [image] image
   output_format: other enum[jpeg,png] =jpeg
 atlas::bytedance/seedream-v5.0-lite/edit-sequential [image] image
   slots: prompt=prompt* images=images[]≤14 url
-  max_images: other integer(1..15) =1
+  max_images: count integer(1..15) =1
   size: aspect enum[2048*2048,2304*1728,1728*2304,2848*1600,1600*2848,2496*1664,1664*2496,3136*1344,3072*3072,3456*2592,2592*3456,4096*2304,2304*4096,2496*3744,3744*2496,4704*2016] =2048*2048
   output_format: other enum[jpeg,png] =jpeg
 atlas::bytedance/seedream-v5.0-lite/sequential [image] text
   slots: prompt=prompt*
-  max_images: other integer(1..15) =1
+  max_images: count integer(1..15) =1
   size: aspect enum[2048*2048,2304*1728,1728*2304,2848*1600,1600*2848,2496*1664,1664*2496,3136*1344,3072*3072,3456*2592,2592*3456,4096*2304,2304*4096,2496*3744,3744*2496,4704*2016] =2048*2048
   output_format: other enum[jpeg,png] =jpeg
 atlas::bytedance/seedream-v5.0-pro/edit [image] image
@@ -1470,14 +1470,14 @@ fal::fal-ai/ideogram/character [image] text,image
   style: other enum[AUTO,REALISTIC,FICTION] =AUTO
   seed: seed integer
 fal::fal-ai/ideogram/character/edit [image] text,image
-  slots: prompt=prompt* images=reference_image_urls[]≤10 min1 data-url
+  slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   expand_prompt: other boolean =true
   seed: seed integer
-  MISSING: image_url, mask_url
+  MISSING: mask_url
 fal::fal-ai/ideogram/character/remix [image] text,image
-  slots: prompt=prompt* images=reference_image_urls[]≤10 min1 data-url
+  slots: prompt=prompt* source=image_url data-url images=reference_image_urls[]≤10 min1 data-url
   strength: other number(0.01..1) =0.8
   image_size: aspect enum[square_hd,square,portrait_4_3,portrait_16_9,landscape_4_3,landscape_16_9] =square_hd
   expand_prompt: other boolean =true
@@ -1486,7 +1486,6 @@ fal::fal-ai/ideogram/character/remix [image] text,image
   num_images: count integer(1..8) =1
   rendering_speed: other enum[TURBO,BALANCED,QUALITY] =BALANCED
   style: other enum[AUTO,REALISTIC,FICTION] =AUTO
-  MISSING: image_url
 fal::fal-ai/ideogram/custom-models/generate [image] text
   slots: prompt=prompt*
   expand_prompt: other boolean =true
@@ -3314,20 +3313,24 @@ nanogpt::ideogram-ai/ideogram-v2-turbo [image] text
 nanogpt::ideogram-v3-generate-transparent [image] text
   slots: prompt=prompt*
   resolution: aspect enum[1:1,16:9,9:16,4:3,3:4,3:2,2:3]
+  rendering_speed: other enum[flash,turbo,balanced,quality]
 nanogpt::ideogram-v3-remove-text [image] image
   slots: prompt=undefined images=imageDataUrls[]≤1 min1 data-url
 nanogpt::ideogram:4@0 [image] text
   slots: prompt=prompt*
   resolution: aspect enum[2048x2048,1440x2880,2880x1440,1664x2496,2496x1664,1792x2240,2240x1792,1440x2560,2560x1440,1600x2560,2560x1600,1728x2304,2304x1728,1296x3168,3168x1296,1152x2944,2944x1152,1248x3328,3328x1248,1280x3072,3072x1280,1024x3072,3072x1024]
   n: count integer(1..4) =1
+  rendering_speed: other enum[TURBO,DEFAULT,QUALITY]
 nanogpt::ideogram/v4/fast [image] text
   slots: prompt=prompt*
   resolution: aspect enum[1024x1024,1536x1536,2048x2048,2048x1152,1152x2048,1536x1024,1024x1536]
   n: count integer(1..4) =1
+  rendering_speed: other enum[TURBO,BALANCED,QUALITY]
 nanogpt::ideogram/v4/instant [image] text
   slots: prompt=prompt*
   resolution: aspect enum[1024x1024,1536x1536,2048x2048,2048x1152,1152x2048,1536x1024,1024x1536]
   n: count integer(1..4) =1
+  rendering_speed: other enum[TURBO,BALANCED,QUALITY]
 nanogpt::kling-o3-4k [video] text,image,video-in
   slots: prompt=prompt firstFrame=imageDataUrl data-url video=videoDataUrl data-url
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5

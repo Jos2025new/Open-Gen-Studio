@@ -1,5 +1,5 @@
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
-import type { ImageInputFormat, MediaKind } from '../types';
+import type { ImageInputFormat, InputSlots, MediaKind } from '../types';
 import { isTransient, sleep } from '../../lib/http';
 import type { GenOutput, GenResult, MediaInput, ResumeContext } from './types';
 
@@ -10,6 +10,11 @@ export async function encodeImage(input: MediaInput, format: ImageInputFormat, u
   const dataUrl = await blobToDataUrl(prepared);
   if (format === 'content-part') return { type: 'image_url', image_url: { url: dataUrl } };
   return dataUrl;
+}
+
+/** Image models with a `source` slot take the first input image there and the rest as references. */
+export function splitSource(slots: InputSlots, refs: MediaInput[]): { source?: MediaInput; refs: MediaInput[] } {
+  return slots.source && refs.length ? { source: refs[0], refs: refs.slice(1) } : { refs };
 }
 
 /** Encode a source video: an uploaded URL when the provider needs one, else a data URL (no re-encoding). */

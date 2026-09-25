@@ -233,7 +233,9 @@ async function execute(id: string): Promise<string[]> {
       if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
       if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     }
-    if (g.kind === 'image' && (schema.slots.images?.min ?? 0) > refs.length) throw new Error(`${model.name} needs an input image.`);
+    if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > refs.length) {
+      throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
+    }
     if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
     if (g.kind === 'video' && !video) {
       // A reference-to-video model has no start frame: an image given as one becomes a reference.
