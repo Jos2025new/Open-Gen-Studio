@@ -90,9 +90,14 @@ Criterio común: KISS/YAGNI/DRY, sin capas nuevas; todo IDs, campos y endpoints 
 - Duración `<= 0`: se estima con la mayor duración del modelo, aproximada y con nota; la interfaz la muestra como "Auto".
 - Verificado en navegador con `fetch` simulado (sin llamadas reales): 503 → processing → completed guarda el resultado; 401 conserva el trabajo; `failed` lo cierra con el mensaje de `error.message`; cancelar conserva el trabajo. Datos de prueba borrados.
 
+**Validación de modelos prioritarios** (2026-09-24) — `MODEL_VALIDATION.md`, `params.ts`, `jobs.ts`, `actions.ts`, `Composer.tsx`, `providers/{atlas,fal,nanogpt}.ts`
+- *Por qué:* el usuario prioriza Wan 3, MiniMax H3, Seedance 2.0/2.5, FLUX 3, Veo 3.1, Kling V3/O3, Grok Imagine Video, Gemini Omni Flash y HappyHorse, con todas sus variantes. Se validaron contra los catálogos y esquemas vivos (Atlas 95, fal 116, NanoGPT 63), sin coste.
+- Corregido: variantes ocultas o mal clasificadas (FLUX 3 y varios reference-to-video en Atlas, multimodo en NanoGPT); las imágenes de referencia nunca llegaban a los modelos de vídeo; `refers` de Atlas; vídeos de referencia; referencias y último fotograma en NanoGPT; campos obligatorios con valor por defecto; opciones `disabled`; límite de 4 MB de NanoGPT.
+- Fuera de alcance: audio de referencia, `elements` de Kling, `keyframes` de FLUX 3 y `video_clips` de Gemini (esos dos endpoints se ocultan).
+
 **Descartado:** fase 2 (Analysis/describir con el LLM), por decisión del usuario.
 
-Estado: typecheck limpio y **25 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
+Estado: typecheck limpio y **35 tests**. Verificación en navegador con modelos demo (gratis). No se ha hecho ninguna ejecución de pago de vídeo a vídeo.
 
 ## Fuera de la verificación local
 - Integraciones reales con claves y los casos de proveedor anotados abajo siguen sin verificar.

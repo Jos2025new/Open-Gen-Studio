@@ -97,6 +97,8 @@ export const fal: ProviderAdapter = {
         if (seen.has(m.endpoint_id) || (m.metadata?.status && m.metadata.status !== 'active')) continue;
         seen.add(m.endpoint_id);
         const tags = toolTags(m.endpoint_id);
+        // Reference-to-video takes reference media, not a source clip, whatever its category.
+        const refs = c.kind === 'video' && /reference-to-video$/.test(m.endpoint_id);
         out.push({
           ref: modelRef('fal', m.endpoint_id),
           provider: 'fal',
@@ -104,8 +106,9 @@ export const fal: ProviderAdapter = {
           name: `${m.metadata?.display_name ?? m.endpoint_id}${c.suffix}`,
           kind: c.kind,
           acceptsText: c.text && !tags.length,
-          acceptsImage: c.image,
-          acceptsVideo: c.video,
+          acceptsImage: c.image || refs,
+          acceptsVideo: c.video && !refs,
+          needsVideo: c.video && !refs,
           tags,
           description: m.metadata?.description,
         });
@@ -115,7 +118,8 @@ export const fal: ProviderAdapter = {
   },
 
   async loadSchema(model, apiKey) {
-    const cacheKey = `fal:schema:${model.id}`;
+    // v2: reference slots (refVideos) and fixed required fields.
+    const cacheKey = `fal:schema:v2:${model.id}`;
     let schema = await cacheDb.get<ModelSchema>(cacheKey, DAY);
     if (!schema) {
       const qs = `endpoint_id=${encodeURIComponent(model.id)}`;
@@ -158,6 +162,9 @@ export const fal: ProviderAdapter = {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
       await put(schema.slots.images, req.refs);
+      if (schema.slots.refVideos && req.refVideos?.length) {
+        body[schema.slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, schema.slots.refVideos.max).map((v) => encodeVideo(v)));
+      }
       // fal accepts data URIs for file inputs; a storage upload would be needed for very large clips.
       if (req.video && schema.slots.video) body[schema.slots.video.key] = await encodeVideo(req.video);
     }

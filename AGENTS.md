@@ -8,7 +8,17 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
-## Tarea actual — trabajos remotos y duración automática (2026-09-24)
+## Tarea actual — validación de modelos prioritarios (2026-09-24)
+Modelos: Wan 3, MiniMax H3, Seedance 2.0/2.5, Flux 3 (y Video Edit), Veo 3.1, Kling V3, Kling O3/Omni 3, Grok Imagine Video (y Edits), Gemini Omni Flash 1.1, HappyHorse 1.1, con todas sus variantes.
+1. [x] Descargar catálogos y esquemas públicos (Atlas 95, fal 116, NanoGPT 63 variantes; sin clave ni coste). *Razón: validar contra lo que sirve el proveedor, no contra ejemplos.*
+2. [x] Pasar cada esquema por nuestro parser y comparar. Informe en `MODEL_VALIDATION.md` (10 fallos, límites anotados). *Razón: saber qué falla antes de tocar código.*
+3. [x] Listado: `ModelSummary.needsVideo` (no puede ejecutarse sin vídeo) separado de `acceptsVideo` (admite vídeo de origen). Atlas deduce la capacidad del sufijo del ID cuando falta la categoría o contradice al esquema; NanoGPT distingue multimodo de edición/extensión. *Razón: fallos 1, 2 y 6.*
+4. [x] Entradas de vídeo: el composer, el agente y los nodos envían también las referencias; `jobs.ts` las reparte según el esquema (primer fotograma si existe, el resto como referencias; sin primer fotograma, todas como referencias) y por tipo de asset (imagen/vídeo). *Razón: fallo 3.*
+5. [x] Slots `refVideos` (`reference_videos`, `video_urls`, `reference_video_urls`, NanoGPT `referenceVideos`) y `mixedRefs` (`refers` de Atlas con `{url, type}`); NanoGPT `referenceImages` y `last_image`. *Razón: fallos 4, 5 y 7.*
+6. [x] Parser: parámetros obligatorios con valor por defecto se envían fijos; propiedades `disabled` se omiten; NanoGPT rechaza antes de enviar vídeos de más de 4 MB. *Razón: fallos 8–10.*
+7. [x] Tests de payload con esquemas reales recortados (`tests/fixtures/provider-schemas.json`), typecheck, navegador; commit. 35 tests. Navegador con catálogos públicos y `fetch` interceptado (sin envío real): Atlas Wan 3.0 reference manda `refers` con dos imágenes subidas; NanoGPT Seedance 2.5 manda `imageDataUrl` y MiniMax H3 reference `referenceImages`. Datos de prueba borrados.
+
+## Tarea anterior — trabajos remotos y duración automática (2026-09-24)
 Fallos 4, 5 y 6 de `API_DOC_REVIEW.md`. Sin llamadas de pago.
 1. [x] `http.ts`: `NetworkError` (red o timeout por petición, `timeoutMs`) y `JobFailedError` (el proveedor confirma el fallo). `providers/shared.ts`: `pollJob()` común con reintentos y espera creciente ante fallos temporales (red, 408/429/5xx) y límite local de espera que no declara fallido el trabajo. Atlas, fal y NanoGPT lo usan. *Razón: un fallo al consultar no es un fallo remoto.*
 2. [x] `jobs.ts`: solo `JobFailedError` borra `remoteJob`; con cualquier otro error, límite de espera o cancelación local se conserva, y `recheckGeneration()` reanuda la consulta (botón "Check again" en la tarjeta). *Razón: no perder un trabajo ya pagado.*

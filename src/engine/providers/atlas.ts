@@ -43,6 +43,22 @@ function atlasPrice(m: AtlasModel): PriceRule | undefined {
   return { skus: [{ unit: 'output', usd: base }] };
 }
 
+/**
+ * What an Atlas video endpoint takes. The catalog leaves some categories empty (FLUX 3, several
+ * reference-to-video) and files others wrongly (Wan reference under VIDEO-TO-VIDEO, Grok extend under
+ * IMAGE-TO-VIDEO), so an explicit task in the endpoint name wins. `video`: needs a source clip.
+ * Null: inputs we do not build yet (keyframe lists, trimmed reference clips).
+ */
+export function atlasVideoCaps(id: string, cats: string[]): { text: boolean; image: boolean; video: boolean } | null {
+  const task = (id.split('/').pop() ?? '').replace(/-developer$/, '');
+  if (task === 'keyframes-to-video' || id.endsWith('/reference-to-video-developer')) return null;
+  if (/(edit-video|video-edit|extend-video|video-extend|motion-control)$/.test(task)) return { text: true, image: false, video: true };
+  if (task === 'reference-to-video') return { text: true, image: true, video: false };
+  if (/(image|frame)-to-video$/.test(task)) return { text: cats.includes('TEXT-TO-VIDEO'), image: true, video: false };
+  if (task === 'text-to-video') return { text: true, image: false, video: false };
+  return { text: cats.includes('TEXT-TO-VIDEO'), image: cats.includes('IMAGE-TO-VIDEO'), video: cats.includes('VIDEO-TO-VIDEO') };
+}
+
 export const atlas: ProviderAdapter = {
   id: 'atlas',
   label: 'Atlas Cloud',
@@ -53,11 +69,15 @@ export const atlas: ProviderAdapter = {
     for (const m of models) {
       const cats = (m.categories ?? []).map((c) => c.toUpperCase());
       const kind = m.type === 'Video' ? 'video' : 'image';
-      const text = cats.includes(kind === 'video' ? 'TEXT-TO-VIDEO' : 'TEXT-TO-IMAGE');
-      const image = kind === 'video' ? cats.includes('IMAGE-TO-VIDEO') : cats.includes('IMAGE-TO-IMAGE');
+      let text = cats.includes(kind === 'video' ? 'TEXT-TO-VIDEO' : 'TEXT-TO-IMAGE');
+      let image = kind === 'video' ? cats.includes('IMAGE-TO-VIDEO') : cats.includes('IMAGE-TO-IMAGE');
       const tool = kind === 'image' && cats.includes('IMAGE-TOOLS');
-      // Some edit models are filed under IMAGE-TO-VIDEO although they take a source video.
-      const video = kind === 'video' && (cats.includes('VIDEO-TO-VIDEO') || /(edit-video|video-edit)$/.test(m.model));
+      let video = false;
+      if (kind === 'video') {
+        const caps = atlasVideoCaps(m.model, cats);
+        if (!caps) continue;
+        ({ text, image, video } = caps);
+      }
       // Skip 3D and audio-driven models: they need inputs/outputs we do not handle.
       if (!text && !image && !tool && !video) continue;
       raws.set(m.model, m);
@@ -73,6 +93,7 @@ export const atlas: ProviderAdapter = {
         acceptsText: text,
         acceptsImage: (image || tool) && !video,
         acceptsVideo: video,
+        needsVideo: video,
         tags,
         description: m.profile,
         price: atlasPrice(m),
@@ -82,7 +103,8 @@ export const atlas: ProviderAdapter = {
   },
 
   async loadSchema(model) {
-    const cacheKey = `atlas:schema:${model.id}`;
+    // v2: reference slots (refVideos, mixedRefs) and fixed required fields.
+    const cacheKey = `atlas:schema:v2:${model.id}`;
     const cached = await cacheDb.get<ModelSchema>(cacheKey, DAY);
     if (cached) return { ...cached, price: model.price ?? cached.price };
     if (!raws.has(model.id)) await atlas.listModels(undefined);
@@ -127,6 +149,21 @@ export const atlas: ProviderAdapter = {
       await put(schema.slots.firstFrame, req.firstFrame ? [req.firstFrame] : []);
       await put(schema.slots.lastFrame, req.lastFrame ? [req.lastFrame] : []);
       await put(schema.slots.images, req.refs);
+      const refVideos = req.refVideos ?? [];
+      if (schema.slots.refVideos && refVideos.length) {
+        req.onStatus('Uploading references');
+        body[schema.slots.refVideos.key] = await Promise.all(refVideos.slice(0, schema.slots.refVideos.max).map((v) => encodeVideo(v, upload)));
+      }
+      if (schema.slots.mixedRefs) {
+        // `refers`: one list of { url, type } for images and videos.
+        const items = [...req.refs.map((input) => ({ input, type: 'image' as const })), ...refVideos.map((input) => ({ input, type: 'video' as const }))];
+        if (items.length) {
+          req.onStatus('Uploading references');
+          body[schema.slots.mixedRefs.key] = await Promise.all(
+            items.slice(0, schema.slots.mixedRefs.max).map(async ({ input, type }) => ({ url: type === 'image' ? await encodeImage(input, 'url', upload) : await encodeVideo(input, upload), type })),
+          );
+        }
+      }
       if (req.video && schema.slots.video) {
         req.onStatus('Uploading video');
         body[schema.slots.video.key] = await encodeVideo(req.video, upload);

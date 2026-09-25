@@ -145,10 +145,10 @@ export async function resolveModel(ref: string): Promise<{ model: ModelSummary; 
   return schema ? { model, schema } : null;
 }
 
-/** Models usable for ordinary generation. Video-to-video models are only reached through their operations. */
+/** Models usable for ordinary generation. Models that need a source video are only reached through their operations. */
 export function modelsOf(kind: MediaKind): ModelSummary[] {
   const providers = connectedProviders();
-  return Object.values(get().catalog.models).filter((m) => m.kind === kind && !m.acceptsVideo && providers.includes(m.provider));
+  return Object.values(get().catalog.models).filter((m) => m.kind === kind && !m.needsVideo && providers.includes(m.provider));
 }
 
 function firstAvailable(provider: RemoteProviderId, ids: string[]): string | null {

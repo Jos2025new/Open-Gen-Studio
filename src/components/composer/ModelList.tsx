@@ -23,7 +23,7 @@ function badges(m: ModelSummary): string[] {
   if (m.tags.includes('background-removal')) out.push('Cutout');
   if (m.tags.includes('vector')) out.push('SVG');
   if (m.kind === 'image' && m.acceptsImage && !m.tags.length) out.push(m.acceptsText ? 'Edit' : 'Image in');
-  if (m.kind === 'video' && m.acceptsVideo) out.push('Video in');
+  if (m.kind === 'video' && m.needsVideo) out.push('Video in');
   else if (m.kind === 'video' && m.acceptsImage) out.push(m.acceptsText ? 'I2V' : 'I2V only');
   return out;
 }
@@ -56,7 +56,7 @@ export function ModelList({
       Object.values(models)
         .filter((m) => m.kind === kind && providers.includes(m.provider))
         // Models that need a source video only appear where a picker asks for them (operations).
-        .filter((m) => (filter ? filter(m) : !m.acceptsVideo))
+        .filter((m) => (filter ? filter(m) : !m.needsVideo))
         .sort((a, b) => (a.provider === b.provider ? a.name.localeCompare(b.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider))),
     [models, kind, filter, providers],
   );

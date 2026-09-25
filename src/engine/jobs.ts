@@ -6,7 +6,7 @@ import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, opModelFor, resolveModel } from './catalog';
 import { estimateMedia, estimateOp } from './costs';
 import { OPS, opCount } from './ops';
-import { coerceSettings, dimsFor, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf } from './params';
+import { coerceSettings, dimsFor, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -213,7 +213,8 @@ async function execute(id: string): Promise<string[]> {
     if (model.provider !== 'local' && !apiKey) throw new Error(`Add your ${PROVIDER_LABELS[model.provider]} key in Settings.`);
 
     // Inputs
-    const refs: MediaInput[] = [];
+    let refs: MediaInput[] = [];
+    let refVideos: MediaInput[] = [];
     let firstFrame: MediaInput | undefined;
     let lastFrame: MediaInput | undefined;
     let video: MediaInput | undefined;
@@ -227,13 +228,19 @@ async function execute(id: string): Promise<string[]> {
         refs.push(await mediaInput(g.op.sourceAssetId));
       }
     } else {
-      for (const r of g.inputs.refs) refs.push(await mediaInput(r));
+      for (const r of g.inputs.refs) (get().assets[r]?.kind === 'video' ? refVideos : refs).push(await mediaInput(r));
       if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
       if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     }
     if (g.kind === 'image' && (schema.slots.images?.min ?? 0) > refs.length) throw new Error(`${model.name} needs an input image.`);
     if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
-    if (g.kind === 'video' && firstFrame && !schema.slots.firstFrame) throw new Error(`${model.name} cannot start from an image. Pick an image-to-video model.`);
+    if (g.kind === 'video' && !video) {
+      // A reference-to-video model has no start frame: an image given as one becomes a reference.
+      const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
+      ({ firstFrame, images: refs, videos: refVideos } = routed);
+      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), images: refs.length, videos: refVideos.length });
+      if (problem) throw new Error(`${model.name} ${problem}`);
+    }
     if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
 
     const total = Math.max(1, g.settings.count);
@@ -254,6 +261,7 @@ async function execute(id: string): Promise<string[]> {
         settings,
         count: n,
         refs,
+        refVideos,
         firstFrame,
         lastFrame,
         video,

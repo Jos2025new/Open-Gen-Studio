@@ -40,6 +40,10 @@ export interface InputSlots {
   lastFrame?: { key: string; format: ImageInputFormat };
   /** Source video for video-to-video models. */
   video?: { key: string; format: ImageInputFormat };
+  /** Reference videos (multi-reference models). */
+  refVideos?: { key: string; max: number; min: number; format: ImageInputFormat };
+  /** One list for every reference medium, each item `{ url, type }` (Atlas `refers`). Replaces `images` and `refVideos`. */
+  mixedRefs?: { key: string; max: number; min: number };
 }
 
 export interface PriceSku {
@@ -71,8 +75,10 @@ export interface ModelSummary {
   kind: MediaKind;
   acceptsText: boolean;
   acceptsImage: boolean;
-  /** Needs a source video (edit, upscale…); kept out of the ordinary model pickers. */
+  /** Takes a source video (edit, extend, upscale…); offered for video operations. */
   acceptsVideo?: boolean;
+  /** Cannot run without a source video; kept out of the ordinary model pickers. */
+  needsVideo?: boolean;
   tags: string[];
   description?: string;
   price?: PriceRule;
@@ -82,6 +88,8 @@ export interface ModelSchema {
   ref: string;
   params: ParamDef[];
   slots: InputSlots;
+  /** Values always sent: required fields with a default that the UI does not expose. */
+  fixed?: Record<string, unknown>;
   price?: PriceRule;
   /** Where the schema came from; 'derived' means reconstructed from catalog metadata. */
   source: 'catalog' | 'openapi' | 'derived' | 'builtin';

@@ -138,9 +138,12 @@ export function Composer() {
   const assets = useStore((s) => s.assets);
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;
-    const schema = s.catalog.schemas[s.composer[s.composer.mode].modelRef];
-    return s.composer.mode === 'image' ? Boolean(schema?.slots.images) : Boolean(schema?.slots.firstFrame);
+    const slots = s.catalog.schemas[s.composer[s.composer.mode].modelRef]?.slots;
+    return s.composer.mode === 'image' ? Boolean(slots?.images) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs);
   });
+  // Reference-to-video models: several references, and videos too when the model takes them.
+  const videoSlots = useStore((s) => (s.composer.mode === 'video' ? s.catalog.schemas[s.composer.video.modelRef]?.slots : undefined));
+  const videoRefs = { multiple: Boolean(videoSlots?.images || videoSlots?.mixedRefs), videos: Boolean(videoSlots?.refVideos || videoSlots?.mixedRefs) };
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -187,8 +190,8 @@ export function Composer() {
 
   const addAssets = (ids: string[]) => {
     const kinds = ids.map((id) => useStore.getState().assets[id]?.kind);
-    if (mode !== 'agent' && kinds.includes('video')) {
-      toast('Videos can only be attached in Agent mode. Extract a frame to use one as an image.', 'error');
+    if (mode !== 'agent' && !(mode === 'video' && videoRefs.videos) && kinds.includes('video')) {
+      toast('This model takes no reference videos. Extract a frame to use one as an image.', 'error');
       return;
     }
     setComposer((c) => ({ attachments: [...c.attachments, ...ids.filter((id) => !c.attachments.includes(id))] }));
@@ -282,7 +285,7 @@ export function Composer() {
           <div className="composer-end">
             <IconButton
               icon={Paperclip}
-              label={acceptsImages ? (mode === 'video' ? 'Start frame' : 'Attach images') : 'This model takes no input images'}
+              label={acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : 'Attach images') : 'This model takes no input images'}
               size="md"
               disabled={!acceptsImages}
               onClick={() => fileRef.current?.click()}
@@ -290,8 +293,8 @@ export function Composer() {
             <input
               ref={fileRef}
               type="file"
-              accept={mode === 'agent' ? 'image/png,image/jpeg,image/webp,video/mp4,video/webm' : 'image/png,image/jpeg,image/webp'}
-              multiple={mode !== 'video'}
+              accept={mode === 'agent' || (mode === 'video' && videoRefs.videos) ? 'image/png,image/jpeg,image/webp,video/mp4,video/webm' : 'image/png,image/jpeg,image/webp'}
+              multiple={mode !== 'video' || videoRefs.multiple}
               hidden
               onChange={(e) => {
                 onFiles(e.target.files);

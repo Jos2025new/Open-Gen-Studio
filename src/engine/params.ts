@@ -47,6 +47,8 @@ const SINGLE_IMAGE_KEYS = ['image_url', 'image', 'input_image', 'imagedataurl', 
 const FIRST_FRAME_KEYS = ['start_image_url', 'first_frame_image', 'start_image', 'first_frame', 'first_frame_url', 'image_url', 'image', 'imagedataurl', 'input_image'];
 // Source video for edit/upscale models (fal: video_url; Atlas: video or video_url).
 const VIDEO_KEYS = ['video_url', 'video', 'input_video', 'source_video', 'video_input'];
+// Lists of reference clips (Atlas: reference_videos; fal: video_urls, reference_video_urls).
+const REF_VIDEO_KEYS = ['reference_videos', 'reference_video_urls', 'video_urls'];
 const LAST_FRAME_KEYS = ['end_image_url', 'last_image', 'tail_image_url', 'end_image', 'last_frame_image', 'last_frame', 'last_frame_url', 'tail_image'];
 
 export function normKey(k: string): string {
@@ -183,6 +185,9 @@ export interface JsonProp {
   maxItems?: number;
   minItems?: number;
   maxLength?: number;
+  properties?: Record<string, JsonProp>;
+  /** Atlas marks options it does not accept yet. */
+  disabled?: boolean;
 }
 
 function flattenProp(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): JsonProp {
@@ -201,6 +206,14 @@ function flattenProp(p: JsonProp, resolve: (ref: string) => JsonProp | undefined
 function primaryType(p: JsonProp): string | undefined {
   if (Array.isArray(p.type)) return p.type.find((t) => t !== 'null');
   return p.type;
+}
+
+/** An array of `{ url, type: 'image' | 'video' | … }` items (Atlas `refers`). */
+function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): boolean {
+  if (primaryType(p) !== 'array' || !p.items) return false;
+  const item = flattenProp(p.items, resolve);
+  const type = item.properties?.type;
+  return Boolean(item.properties?.url && type?.enum?.includes('image'));
 }
 
 export function schemaFromJson(opts: {
@@ -252,6 +265,18 @@ export function schemaFromJson(opts: {
       slots.images = { key: refs, max: p.maxItems ?? 4, min: required.includes(refs) ? Math.max(1, p.minItems ?? 1) : 0, multiple: true, format: imageFormat };
       used.add(refs);
     }
+    const refVideos = REF_VIDEO_KEYS.map((k) => lower.get(k)).find((k) => k && !used.has(k));
+    if (refVideos) {
+      const p = flattenProp(properties[refVideos], resolve);
+      slots.refVideos = { key: refVideos, max: p.maxItems ?? 3, min: required.includes(refVideos) ? Math.max(1, p.minItems ?? 1) : 0, format: imageFormat };
+      used.add(refVideos);
+    }
+    const mixed = keys.find((k) => !used.has(k) && isMixedRefList(flattenProp(properties[k], resolve), resolve));
+    if (mixed) {
+      const p = flattenProp(properties[mixed], resolve);
+      slots.mixedRefs = { key: mixed, max: p.maxItems ?? 9, min: required.includes(mixed) ? Math.max(1, p.minItems ?? 1) : 0 };
+      used.add(mixed);
+    }
   } else {
     const multi = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).find(Boolean);
     if (multi) {
@@ -278,9 +303,12 @@ export function schemaFromJson(opts: {
     if (/mask|video_url|videourl|audio_url|audiourl|lora|loras|embedding|control/.test(nk)) used.add(k);
   }
 
+  const fixed: Record<string, unknown> = {};
   for (const key of keys) {
     if (used.has(key) || isHiddenKey(key)) continue;
     const p = flattenProp(properties[key], resolve);
+    if (p.disabled) continue;
+    const before = params.length;
     const t = primaryType(p);
     const options = (p.enum ?? []).filter((v): v is string | number => typeof v === 'string' || typeof v === 'number');
     const role = roleForKey(key, options);
@@ -298,8 +326,10 @@ export function schemaFromJson(opts: {
       // Of the free-text params only the negative prompt is surfaced.
       params.push({ ...base, type: 'string', default: typeof p.default === 'string' ? p.default : undefined });
     }
+    // A required field we do not surface (e.g. fal's prompt_expansion_mode) still has to be sent.
+    if (params.length === before && required.includes(key) && p.default !== undefined) fixed[key] = p.default;
   }
-  return { ref: opts.ref, params, slots, source: opts.source };
+  return { ref: opts.ref, params, slots, fixed: Object.keys(fixed).length ? fixed : undefined, source: opts.source };
 }
 
 // ---------------------------------------------------------------------------
@@ -407,7 +437,7 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
 
 /** Wire parameters for one request (count is applied separately by the job runner). */
 export function wireParams(schema: ModelSchema, settings: GenSettings, countForRequest: number): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+  const out: Record<string, unknown> = { ...schema.fixed };
   for (const p of schema.params) {
     switch (p.role) {
       case 'aspect':
@@ -453,4 +483,41 @@ function castOption(p: ParamDef, value: string): string | number {
   if (match != null) return match;
   if (p.type === 'integer' || p.type === 'number') return Number(value);
   return value;
+}
+
+// ---------------------------------------------------------------------------
+// Video inputs
+
+/**
+ * Where a video model's inputs go. The first image is the start frame when the model has one; the other
+ * images are references (all of them when there is no start frame). Videos are always references.
+ */
+export function routeVideoInputs<T>(slots: InputSlots, images: T[], videos: T[], firstFrame?: T): { firstFrame?: T; images: T[]; videos: T[] } {
+  const rest = [...images];
+  let first = firstFrame;
+  if (!first && slots.firstFrame && rest.length) first = rest.shift();
+  if (first && !slots.firstFrame && (slots.images || slots.mixedRefs)) {
+    rest.unshift(first);
+    first = undefined;
+  }
+  return { firstFrame: first, images: rest, videos };
+}
+
+/** Why a video model cannot take these routed inputs, or null. Sentence without subject ("needs …"). */
+export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; images: number; videos: number }): string | null {
+  if (n.firstFrame && !slots.firstFrame) return 'cannot start from an image.';
+  const mixed = slots.mixedRefs;
+  if (mixed) {
+    const total = n.images + n.videos;
+    if (total > mixed.max) return `accepts up to ${mixed.max} references.`;
+    if (total < mixed.min) return 'needs at least one reference image or video.';
+    return null;
+  }
+  const imageMax = slots.images?.max ?? 0;
+  if (n.images > imageMax) return imageMax ? `accepts up to ${imageMax} reference images.` : slots.firstFrame ? 'takes one start image.' : 'does not accept reference images.';
+  if (slots.images && n.images < slots.images.min) return 'needs a reference image.';
+  const videoMax = slots.refVideos?.max ?? 0;
+  if (n.videos > videoMax) return videoMax ? `accepts up to ${videoMax} reference videos.` : 'does not accept reference videos (use Extract frame to start from a still).';
+  if (slots.refVideos && n.videos < slots.refVideos.min) return 'needs a reference video.';
+  return null;
 }

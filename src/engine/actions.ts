@@ -9,7 +9,7 @@ import { estimateMedia } from './costs';
 import { autoLayout, graphBounds } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
-import { paramByRole } from './params';
+import { paramByRole, routeVideoInputs, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
@@ -67,17 +67,19 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0);
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
   if (st.ui.workspace === 'designer' && kind === 'video') return { ok: false, reason: 'Designer layers cannot hold video.', estimate };
-  if (attachments.some((id) => st.assets[id]?.kind === 'video')) return { ok: false, reason: 'Remove the video attachment (use Extract frame first).', estimate };
   if (kind === 'image') {
+    if (attachments.some((id) => st.assets[id]?.kind === 'video')) return { ok: false, reason: 'Remove the video attachment (use Extract frame first).', estimate };
     const slot = schema.slots.images;
     if (imageAtt.length && !slot) return { ok: false, reason: 'This model does not accept reference images.', estimate };
     if (slot && imageAtt.length > slot.max) return { ok: false, reason: `This model accepts up to ${slot.max} images.`, estimate };
     if (slot && imageAtt.length < slot.min) return { ok: false, reason: 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
   } else {
-    if (imageAtt.length > 1) return { ok: false, reason: 'Video takes one start frame.', estimate };
-    if (imageAtt.length && !schema.slots.firstFrame) return { ok: false, reason: 'This model cannot start from an image.', estimate };
-    if (!text && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
+    const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
+    const routed = routeVideoInputs(schema.slots, imageAtt, videoAtt);
+    const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length });
+    if (problem) return { ok: false, reason: `This model ${problem}`, estimate };
+    if (!text && !attachments.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
   }
   const budget = budgetProblem(estimate);
@@ -97,6 +99,10 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   const { modelRef, settings } = st.composer[kind];
   const text = st.composer.text.trim();
   const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
+  const videoAttachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'video');
+  // Video: the first image is the start frame when the model has one; the rest are references.
+  const slots = st.catalog.schemas[modelRef]?.slots ?? {};
+  const routed = routeVideoInputs(slots, attachments, videoAttachments);
   const parentId = st.composer.editing?.generationId;
   const spec: GenerationSpec = {
     sessionId,
@@ -104,7 +110,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     prompt: text,
     modelRef,
     settings: { ...settings, seed: undefined },
-    inputs: kind === 'image' ? { refs: attachments } : { refs: [], firstFrame: attachments[0] },
+    inputs: kind === 'image' ? { refs: attachments } : { refs: [...routed.images, ...routed.videos], firstFrame: routed.firstFrame },
     origin: workspace === 'node' ? 'node' : workspace === 'designer' ? 'designer' : 'composer',
     parentId,
     estimate: check.estimate,
@@ -509,7 +515,9 @@ export function acceptsImages(kind: MediaKind): { accepts: boolean; max: number 
   const st = get();
   const schema = st.catalog.schemas[st.composer[kind].modelRef];
   if (kind === 'image') return { accepts: Boolean(schema?.slots.images), max: schema?.slots.images?.max ?? 0 };
-  return { accepts: Boolean(schema?.slots.firstFrame), max: schema?.slots.firstFrame ? 1 : 0 };
+  const slots = schema?.slots ?? {};
+  const refs = slots.mixedRefs?.max ?? slots.images?.max ?? 0;
+  return { accepts: Boolean(slots.firstFrame || refs), max: (slots.firstFrame ? 1 : 0) + refs };
 }
 
 export function hasParam(kind: MediaKind, role: Parameters<typeof paramByRole>[1]): boolean {

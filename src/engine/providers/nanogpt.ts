@@ -47,9 +47,24 @@ interface NanoVideoModel {
   supported_parameters?: { parameters?: Record<string, NanoVideoParam> };
 }
 
-/** Needs a source video (edit, upscale…), sent as `videoDataUrl` per NanoGPT's generate-video docs. */
+/** Takes a source video (edit, extend…), sent as `videoDataUrl` per NanoGPT's generate-video docs. */
 function takesVideo(m: NanoVideoModel): boolean {
   return Boolean(m.capabilities?.video_to_video && m.architecture?.input_modalities?.includes('video'));
+}
+
+/** Edit/extend endpoints cannot run without a clip; multi-mode models (Seedance 2.5, Wan 3.0 Prime…) only accept one. */
+function needsVideo(m: NanoVideoModel): boolean {
+  if (!takesVideo(m)) return false;
+  return /(edit|extend|motion-control)/.test(m.id) || (!m.capabilities?.text_to_video && !m.capabilities?.image_to_video);
+}
+
+/** NanoGPT documents a 4 MB limit for `videoDataUrl`. */
+const MAX_VIDEO_DATA_URL_BYTES = 4 * 1024 * 1024;
+
+/** "Up to 9 reference images" → 9. */
+function upTo(d: NanoVideoParam | undefined, fallback: number): number {
+  const m = /up to (\d+)/i.exec(d?.description ?? '');
+  return m ? Number(m[1]) : fallback;
 }
 
 const imageRaw = new Map<string, NanoImageModel>();
@@ -218,13 +233,24 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   }
   const i2v = Boolean(raw.capabilities?.image_to_video);
   const t2v = Boolean(raw.capabilities?.text_to_video);
+  const inputs = raw.architecture?.input_modalities ?? [];
+  // Reference lists: the catalog declares them as reference_images/_videos (URL fields); the video guide
+  // documents referenceImages/referenceVideos with URLs or data URLs, which is what we can send.
+  const modes = defs.mode?.options?.map((o) => String(o.value)) ?? [];
+  const refModel = /reference-to-video/.test(raw.id);
+  const takesRefs = refModel || 'reference_images' in defs || modes.includes('reference-to-video');
   return {
     ref: model.ref,
     params,
     slots: {
       prompt: 'prompt',
       promptRequired: t2v && !i2v && !takesVideo(raw),
-      firstFrame: i2v && !takesVideo(raw) ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
+      firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
+      lastFrame: 'last_image' in defs ? { key: 'last_image', format: 'data-url' } : undefined,
+      images: takesRefs && inputs.includes('image')
+        ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
+        : undefined,
+      refVideos: 'reference_videos' in defs ? { key: 'referenceVideos', max: upTo(defs.reference_videos, 3), min: 0, format: 'data-url' } : undefined,
       video: takesVideo(raw) ? { key: 'videoDataUrl', format: 'data-url' } : undefined,
     },
     price: model.price,
@@ -268,8 +294,9 @@ export const nanogpt: ProviderAdapter = {
         name: m.name ?? m.id,
         kind: 'video',
         acceptsText: Boolean(m.capabilities?.text_to_video) || (video && Boolean(m.architecture?.input_modalities?.includes('text'))),
-        acceptsImage: Boolean(m.capabilities?.image_to_video) && !video,
+        acceptsImage: Boolean(m.capabilities?.image_to_video) && !needsVideo(m),
         acceptsVideo: video,
+        needsVideo: needsVideo(m),
         tags: video ? (m.tags ?? []) : [],
         description: m.description,
         price: parseNanoVideoPrice(m.pricing),
@@ -310,8 +337,15 @@ export const nanogpt: ProviderAdapter = {
       return { outputs, costUsd: num(res.cost) };
     }
 
-    if (req.firstFrame && req.schema.slots.firstFrame) body.imageDataUrl = await encodeImage(req.firstFrame, 'data-url');
-    if (req.video && req.schema.slots.video) body[req.schema.slots.video.key] = await encodeVideo(req.video);
+    const { slots } = req.schema;
+    if (req.firstFrame && slots.firstFrame) body[slots.firstFrame.key] = await encodeImage(req.firstFrame, 'data-url');
+    if (req.lastFrame && slots.lastFrame) body[slots.lastFrame.key] = await encodeImage(req.lastFrame, 'data-url');
+    if (req.refs.length && slots.images) body[slots.images.key] = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
+    if (req.refVideos?.length && slots.refVideos) body[slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, slots.refVideos.max).map((v) => encodeVideo(v)));
+    if (req.video && slots.video) {
+      if (req.video.blob.size > MAX_VIDEO_DATA_URL_BYTES) throw new Error(`NanoGPT accepts source videos up to 4 MB (this one is ${(req.video.blob.size / 1048576).toFixed(1)} MB). Trim it or use Atlas Cloud.`);
+      body[slots.video.key] = await encodeVideo(req.video);
+    }
     // Some aspect params are orientation based; keep the ratio-derived value only when valid.
     if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto') delete body.aspect_ratio;
     req.onStatus('Submitting');

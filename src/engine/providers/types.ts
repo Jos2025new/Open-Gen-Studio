@@ -16,7 +16,10 @@ export interface GenRequest {
   settings: GenSettings;
   /** Outputs requested from this single provider call. */
   count: number;
+  /** Reference (or source) images. */
   refs: MediaInput[];
+  /** Reference videos, for models with `refVideos` or `mixedRefs`. */
+  refVideos?: MediaInput[];
   firstFrame?: MediaInput;
   lastFrame?: MediaInput;
   /** Source video for video-to-video models. */
