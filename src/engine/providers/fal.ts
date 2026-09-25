@@ -3,7 +3,7 @@ import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -189,6 +189,7 @@ export const fal: ProviderAdapter = {
       // fal accepts data URIs for file inputs; a storage upload would be needed for very large clips.
       if (req.video && schema.slots.video) body[schema.slots.video.key] = await encodeVideo(req.video);
     }
+    Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'data-url'), (v) => encodeVideo(v)));
     req.onStatus('Submitting');
     const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${req.model.id}`, {
       method: 'POST',

@@ -68,7 +68,17 @@ export const TOOLS: ToolSpec[] = [
                 count: { type: 'integer', minimum: 1, maximum: 4 },
                 duration: { type: 'number', description: 'video seconds.' },
                 audio: { type: 'boolean', description: 'video: generate audio when supported.' },
-                refs: { type: 'array', items: { type: 'string' }, description: 'image: reference/source images.' },
+                refs: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description:
+                    'image: reference/source images (and a video clip for clip models). video: reference images/videos for reference-to-video models, or the keyframe images (in order) for keyframe models.',
+                },
+                times: {
+                  type: 'array',
+                  items: { type: ['number', 'null'] },
+                  description: 'video keyframe models: second of each ref, parallel to refs; null = spread evenly. Needs an explicit duration.',
+                },
                 first_frame: { type: 'string', description: 'video: start image reference.' },
                 last_frame: { type: 'string', description: 'video: end image reference.' },
                 op: { type: 'string', enum: [...OP_IDS] },
@@ -126,6 +136,7 @@ const stepSchema = z
     audio: z.boolean().optional(),
     seed: num.optional(),
     refs: z.array(z.string()).optional(),
+    times: z.array(z.union([num, z.null()])).optional(),
     first_frame: z.string().optional(),
     last_frame: z.string().optional(),
     op: z.string().optional(),

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { atlas } from '../src/engine/providers/atlas';
 import { fal } from '../src/engine/providers/fal';
 import { nanogpt } from '../src/engine/providers/nanogpt';
+import { capabilityHints } from '../src/engine/params';
 import type { ProviderAdapter } from '../src/engine/providers/types';
 import type { ModelSchema, ModelSummary } from '../src/engine/types';
 import atlasSnapshot from './fixtures/live/atlas.json';
@@ -48,6 +49,7 @@ function describeModel(m: ModelSummary, s: ModelSchema | string): string {
     .map(([k, v]) => (k === 'prompt' ? `prompt=${v}${s.slots.promptRequired ? '*' : ''}` : k === 'promptRequired' ? null : slot(k, v)))
     .filter(Boolean);
   lines.push(`  slots: ${slots.join(' ') || '-'}`);
+  lines.push(`  inputs (as the agent reads them): ${capabilityHints(s, m.kind).join('; ')}`);
   for (const p of s.params) {
     const range = p.options ? `[${p.options.join(',')}]` : p.min != null || p.max != null ? `(${p.min ?? ''}..${p.max ?? ''})` : '';
     lines.push(`  ${p.key}: ${p.role} ${p.type}${range}${p.default !== undefined ? ` =${p.default}` : ''}${p.omit ? ` omit=${p.omit}` : ''}`);

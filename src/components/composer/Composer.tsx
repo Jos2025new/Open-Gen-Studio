@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, CircleStop, Layers, Paperclip, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
+import { clipTrim, paramByRole, placeKeyframes } from '../../engine/params';
 import type { MediaKind } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
@@ -14,6 +15,79 @@ import { ModeMenu } from './ModeMenu';
 import { AgentControls } from './AgentControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
+
+/** Keyframe second (keyframe models) or clip trim (clip models) of one attachment; click to change it. */
+function AttachTiming({ id }: { id: string }) {
+  const mode = useStore((s) => s.composer.mode);
+  const schema = useStore((s) => (s.composer.mode === 'agent' ? undefined : s.catalog.schemas[s.composer[s.composer.mode].modelRef]));
+  const attachments = useStore((s) => s.composer.attachments);
+  const assets = useStore((s) => s.assets);
+  const times = useStore((s) => s.composer.times);
+  const trims = useStore((s) => s.composer.trims);
+  const chosen = useStore((s) => s.composer.video.settings.duration);
+  const pop = usePopover();
+  const asset = assets[id];
+  const kf = mode === 'video' ? schema?.slots.keyframes : undefined;
+  const clips = schema?.slots.clips;
+  if (!asset || (!kf && !clips) || (kf && asset.kind !== 'image') || (clips && asset.kind !== 'video')) return null;
+
+  let label: string;
+  let body: ReactNode;
+  if (kf) {
+    // Same length rule as the job runner: the chosen duration, else the model default.
+    const def = Number(paramByRole(schema, 'duration')?.default);
+    const duration = chosen != null && chosen > 0 ? chosen : Number.isFinite(def) && def > 0 ? def : 5;
+    const images = attachments.filter((a) => assets[a]?.kind === 'image');
+    const frames = placeKeyframes(images.length, duration, kf.fps, images.map((a) => times?.[a]));
+    const at = frames[images.indexOf(id)] / kf.fps;
+    label = `${at.toFixed(1)}s`;
+    body = (
+      <div className="attach-timing">
+        <label>
+          At second
+          <input type="number" min={0} max={duration} step={0.1} value={Number(at.toFixed(2))} onChange={(e) => setComposer((c) => ({ times: { ...c.times, [id]: Number(e.target.value) } }))} />
+        </label>
+        <p className="faint">
+          Frame {frames[images.indexOf(id)]} of {Math.round(duration * kf.fps)} ({kf.fps} fps). One image opens the clip, two pin start and end, more are spread evenly unless set here.
+        </p>
+        <button type="button" className="link" onClick={() => setComposer((c) => ({ times: Object.fromEntries(Object.entries(c.times ?? {}).filter(([k]) => k !== id)) }))}>
+          Spread evenly
+        </button>
+      </div>
+    );
+  } else {
+    const [start, end] = clipTrim(clips!, asset.duration, trims?.[id]);
+    label = end === 0 ? 'Whole' : `${start}–${end}s`;
+    const set = (next: [number, number]) => setComposer((c) => ({ trims: { ...c.trims, [id]: next } }));
+    body = (
+      <div className="attach-timing">
+        <label>
+          From
+          <input type="number" min={0} step={clips!.integer ? 1 : 0.1} value={start} onChange={(e) => set([Number(e.target.value), end])} />
+        </label>
+        <label>
+          To
+          <input type="number" min={0} step={clips!.integer ? 1 : 0.1} value={end} onChange={(e) => set([start, Number(e.target.value)])} />
+        </label>
+        <p className="faint">
+          {clips!.maxSpan ? `At most ${clips!.maxSpan} s are used.` : clips!.wholeEnd === 0 ? 'To 0 uses the whole clip.' : ''}
+          {asset.duration ? ` Clip length ${asset.duration.toFixed(1)} s.` : ''}
+        </p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <button ref={pop.ref} type="button" className="attach-time" onClick={pop.toggle} data-tip={kf ? 'Keyframe position' : 'Clip trim'}>
+        {label}
+      </button>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={240} label={kf ? 'Keyframe' : 'Clip trim'}>
+        <PopoverHeader title={kf ? 'Keyframe' : 'Clip trim'} />
+        {body}
+      </Popover>
+    </>
+  );
+}
 
 const PLACEHOLDER = {
   agent: {
@@ -139,11 +213,15 @@ export function Composer() {
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;
     const slots = s.catalog.schemas[s.composer[s.composer.mode].modelRef]?.slots;
-    return s.composer.mode === 'image' ? Boolean(slots?.images) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs);
+    return s.composer.mode === 'image' ? Boolean(slots?.images || slots?.clips) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs || slots?.keyframes);
   });
   // Reference-to-video models: several references, and videos too when the model takes them.
-  const videoSlots = useStore((s) => (s.composer.mode === 'video' ? s.catalog.schemas[s.composer.video.modelRef]?.slots : undefined));
-  const videoRefs = { multiple: Boolean(videoSlots?.images || videoSlots?.mixedRefs), videos: Boolean(videoSlots?.refVideos || videoSlots?.mixedRefs) };
+  const mediaSlots = useStore((s) => (s.composer.mode === 'agent' ? undefined : s.catalog.schemas[s.composer[s.composer.mode].modelRef]?.slots));
+  // Reference-to-video, keyframe and clip models: several inputs, and videos where the model takes them.
+  const videoRefs =
+    mode === 'video'
+      ? { multiple: Boolean(mediaSlots?.images || mediaSlots?.mixedRefs || mediaSlots?.keyframes), videos: Boolean(mediaSlots?.refVideos || mediaSlots?.mixedRefs || mediaSlots?.clips) }
+      : { multiple: true, videos: Boolean(mediaSlots?.clips) };
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -190,7 +268,7 @@ export function Composer() {
 
   const addAssets = (ids: string[]) => {
     const kinds = ids.map((id) => useStore.getState().assets[id]?.kind);
-    if (mode !== 'agent' && !(mode === 'video' && videoRefs.videos) && kinds.includes('video')) {
+    if (mode !== 'agent' && !videoRefs.videos && kinds.includes('video')) {
       toast('This model takes no reference videos. Extract a frame to use one as an image.', 'error');
       return;
     }
@@ -247,6 +325,7 @@ export function Composer() {
             {liveAttachments.map((id) => (
               <span key={id} className="attach-thumb">
                 <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+                <AttachTiming id={id} />
                 <button type="button" aria-label="Remove attachment" onClick={() => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }))}>
                   <X size={11} />
                 </button>
@@ -293,7 +372,7 @@ export function Composer() {
             <input
               ref={fileRef}
               type="file"
-              accept={mode === 'agent' || (mode === 'video' && videoRefs.videos) ? 'image/png,image/jpeg,image/webp,video/mp4,video/webm' : 'image/png,image/jpeg,image/webp'}
+              accept={mode === 'agent' || videoRefs.videos ? 'image/png,image/jpeg,image/webp,video/mp4,video/webm' : 'image/png,image/jpeg,image/webp'}
               multiple={mode !== 'video' || videoRefs.multiple}
               hidden
               onChange={(e) => {

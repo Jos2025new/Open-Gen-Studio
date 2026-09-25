@@ -17,6 +17,30 @@ export function splitSource(slots: InputSlots, refs: MediaInput[]): { source?: M
   return slots.source && refs.length ? { source: refs[0], refs: refs.slice(1) } : { refs };
 }
 
+/**
+ * Keyframe and trimmed-clip lists (FLUX 3 `keyframes`, `video_clips`), built from the slot's field names.
+ * `image`/`video` encode one input the way the provider takes files (uploaded URL or data URL).
+ */
+export async function structuredInputs(
+  slots: InputSlots,
+  req: { keyframes?: Array<{ input: MediaInput; frame: number }>; clips?: Array<{ input: MediaInput; start: number; end: number }> },
+  image: (m: MediaInput) => Promise<unknown>,
+  video: (m: MediaInput) => Promise<string>,
+): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {};
+  const kf = slots.keyframes;
+  if (kf && req.keyframes?.length) {
+    out[kf.key] = await Promise.all(req.keyframes.slice(0, kf.max).map(async (k) => ({ [kf.imageKey]: await image(k.input), [kf.indexKey]: k.frame })));
+  }
+  const cl = slots.clips;
+  if (cl && req.clips?.length) {
+    out[cl.key] = await Promise.all(
+      req.clips.slice(0, cl.max).map(async (c) => ({ url: await video(c.input), start: c.start, ends: c.end, ...(cl.fps ? { [cl.fps.key]: cl.fps.value } : {}) })),
+    );
+  }
+  return out;
+}
+
 /** Encode a source video: an uploaded URL when the provider needs one, else a data URL (no re-encoding). */
 export async function encodeVideo(input: MediaInput, upload?: (blob: Blob) => Promise<string>): Promise<string> {
   return upload ? upload(input.blob) : blobToDataUrl(input.blob);

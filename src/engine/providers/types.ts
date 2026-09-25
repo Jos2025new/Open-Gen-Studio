@@ -20,6 +20,10 @@ export interface GenRequest {
   refs: MediaInput[];
   /** Reference videos, for models with `refVideos` or `mixedRefs`. */
   refVideos?: MediaInput[];
+  /** Keyframe images with their frame index, for models with a `keyframes` slot. */
+  keyframes?: Array<{ input: MediaInput; frame: number }>;
+  /** Reference clips with their trim in seconds, for models with a `clips` slot. */
+  clips?: Array<{ input: MediaInput; start: number; end: number }>;
   firstFrame?: MediaInput;
   lastFrame?: MediaInput;
   /** Source video for video-to-video models. */

@@ -3,7 +3,7 @@ import { extractErrorMessage, fetchJsonWithRelay, JobFailedError, requestJson } 
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -47,12 +47,12 @@ function atlasPrice(m: AtlasModel): PriceRule | undefined {
 /**
  * What an Atlas video endpoint takes. The catalog leaves some categories empty (FLUX 3, several
  * reference-to-video) and files others wrongly (Wan reference under VIDEO-TO-VIDEO, Grok extend under
- * IMAGE-TO-VIDEO), so an explicit task in the endpoint name wins. `video`: needs a source clip.
- * Null: inputs we do not build yet (keyframe lists, trimmed reference clips).
+ * IMAGE-TO-VIDEO), so an explicit task in the endpoint name wins. `video`: needs a source clip to edit.
+ * Keyframe and reference-developer endpoints take images / a trimmed clip through their own slots.
  */
 export function atlasVideoCaps(id: string, cats: string[]): { text: boolean; image: boolean; video: boolean } | null {
   const task = (id.split('/').pop() ?? '').replace(/-developer$/, '');
-  if (task === 'keyframes-to-video' || id.endsWith('/reference-to-video-developer')) return null;
+  if (task === 'keyframes-to-video') return { text: true, image: true, video: false };
   if (/(edit-video|video-edit|extend-video|video-extend|motion-control)$/.test(task)) return { text: true, image: false, video: true };
   if (task === 'reference-to-video') return { text: true, image: true, video: false };
   if (/(image|frame)-to-video$/.test(task)) return { text: cats.includes('TEXT-TO-VIDEO'), image: true, video: false };
@@ -171,6 +171,10 @@ export const atlas: ProviderAdapter = {
         req.onStatus('Uploading video');
         body[schema.slots.video.key] = await encodeVideo(req.video, upload);
       }
+    }
+    if (req.keyframes?.length || req.clips?.length) {
+      req.onStatus('Uploading inputs');
+      Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
     }
     req.onStatus('Submitting');
     const endpoint = req.kind === 'image' ? 'generateImage' : 'generateVideo';

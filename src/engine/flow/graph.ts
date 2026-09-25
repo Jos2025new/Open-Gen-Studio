@@ -42,12 +42,17 @@ export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortT
       return [
         { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
         { id: 'ref', type: 'image', label: 'References', multi: true },
+        // Clip models (Nano Banana 2 reference-to-image): a trimmed reference video.
+        { id: 'clip', type: 'video', label: 'Video clip', multi: true },
       ];
     case 'video':
       return [
         { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
         { id: 'first', type: 'image', label: 'First frame', multi: false },
         { id: 'last', type: 'image', label: 'Last frame', multi: false },
+        // Reference-to-video models take these as references; keyframe models pin them in order.
+        { id: 'ref', type: 'image', label: 'References / keyframes', multi: true },
+        { id: 'refVideo', type: 'video', label: 'Reference videos', multi: true },
       ];
     case 'tool':
       return [{ id: 'input', type: OPS[data.op].input, label: 'Input', multi: false }];
@@ -100,7 +105,8 @@ export function connect(graph: Graph, c: { source: string; target: string; targe
 // ---------------------------------------------------------------------------
 // Plan → graph
 
-export function planToGraph(plan: Plan): { nodes: GraphNode[]; edges: GraphEdge[] } {
+/** `kindOf` tells whether an asset ref is a video (it goes to the video ports); step outputs are known from the plan. */
+export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | undefined = () => undefined): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const nodeOf = new Map<string, string>();
@@ -136,16 +142,23 @@ export function planToGraph(plan: Plan): { nodes: GraphNode[]; edges: GraphEdge[
     if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle });
   };
 
+  const isVideo = (ref: string) => {
+    const p = parseRef(ref);
+    if (p?.type === 'asset') return kindOf(p.id) === 'video';
+    const step = p?.type === 'step' ? plan.steps.find((x) => x.id === p.id) : undefined;
+    return step?.kind === 'video' || (step?.kind === 'op' && OPS[step.op].output === 'video');
+  };
   for (const s of plan.steps) {
     const target = nodeOf.get(s.id);
     if (!target) continue;
     if (s.kind === 'image') {
       link(s.promptFrom, target, 'prompt');
-      s.refs.forEach((r) => link(r, target, 'ref'));
+      s.refs.forEach((r) => link(r, target, isVideo(r) ? 'clip' : 'ref'));
     } else if (s.kind === 'video') {
       link(s.promptFrom, target, 'prompt');
       link(s.firstFrame, target, 'first');
       link(s.lastFrame, target, 'last');
+      (s.refs ?? []).forEach((r) => link(r, target, isVideo(r) ? 'refVideo' : 'ref'));
     } else if (s.kind === 'op') {
       link(s.input, target, 'input');
     }
@@ -293,13 +306,17 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     }
     if (d.kind === 'image') {
       const refs = inEdges
-        .filter((e) => e.targetHandle === 'ref')
+        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
         .map((e) => refFor(e.source))
         .filter((r): r is string => Boolean(r));
       steps.push({ id, kind: 'image', title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep);
     } else if (d.kind === 'video') {
       const first = inEdges.find((e) => e.targetHandle === 'first');
       const last = inEdges.find((e) => e.targetHandle === 'last');
+      const refs = inEdges
+        .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo')
+        .map((e) => refFor(e.source))
+        .filter((r): r is string => Boolean(r));
       steps.push({
         id,
         kind: 'video',
@@ -310,6 +327,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
         settings: d.settings,
         firstFrame: first ? refFor(first.source) ?? undefined : undefined,
         lastFrame: last ? refFor(last.source) ?? undefined : undefined,
+        refs: refs.length ? refs : undefined,
       } satisfies VideoStep);
     } else if (d.kind === 'tool') {
       const input = inEdges.find((e) => e.targetHandle === 'input');
@@ -320,7 +338,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   }
   for (const s of steps) {
     if ((s.kind === 'image' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
-      const needsPrompt = s.kind === 'image' ? !s.refs.length : !s.firstFrame;
+      const needsPrompt = s.kind === 'image' ? !s.refs.length : !s.firstFrame && !s.refs?.length;
       if (needsPrompt) errors.push(`"${s.title}" needs a prompt.`);
     }
   }

@@ -63,8 +63,9 @@ describe('model classification', () => {
     expect(atlasVideoCaps('alibaba/wan-3.0/reference-to-video', ['VIDEO-TO-VIDEO'])).toEqual({ text: true, image: true, video: false });
     expect(atlasVideoCaps('xai/grok-imagine-video/extend-video', ['IMAGE-TO-VIDEO'])?.video).toBe(true);
     expect(atlasVideoCaps('google/gemini-omni-flash/image-to-video-developer', ['IMAGE-TO-VIDEO'])?.image).toBe(true);
-    expect(atlasVideoCaps('black-forest-labs/flux-3/keyframes-to-video', [])).toBeNull();
-    expect(atlasVideoCaps('google/gemini-omni-flash/reference-to-video-developer', ['VIDEO-TO-VIDEO'])).toBeNull();
+    // Keyframes and trimmed-clip endpoints are listed (phase 3): their inputs have their own slots.
+    expect(atlasVideoCaps('black-forest-labs/flux-3/keyframes-to-video', [])).toEqual({ text: true, image: true, video: false });
+    expect(atlasVideoCaps('google/gemini-omni-flash/reference-to-video-developer', ['VIDEO-TO-VIDEO'])).toEqual({ text: true, image: true, video: false });
   });
 
   it('keeps NanoGPT multi-mode models in the normal pickers and wires their references', async () => {

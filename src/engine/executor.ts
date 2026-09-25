@@ -62,7 +62,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       s.kind === 'image'
         ? [s.promptFrom, ...s.refs]
         : s.kind === 'video'
-          ? [s.promptFrom, s.firstFrame, s.lastFrame]
+          ? [s.promptFrom, s.firstFrame, s.lastFrame, ...(s.refs ?? [])]
           : s.kind === 'op'
             ? [s.input]
             : s.kind === 'layer'
@@ -120,7 +120,17 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       case 'video': {
         const firstFrame = (await resolveAsset(s.firstFrame)) ?? undefined;
         const lastFrame = (await resolveAsset(s.lastFrame)) ?? undefined;
-        const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs: [], firstFrame, lastFrame } });
+        const refs: string[] = [];
+        const times: Record<string, number> = {};
+        for (const [i, r] of (s.refs ?? []).entries()) {
+          const a = await resolveAsset(r);
+          if (!a) continue;
+          refs.push(a);
+          const t = s.times?.[i];
+          if (t != null) times[a] = t;
+        }
+        const inputs = { refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined };
+        const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }

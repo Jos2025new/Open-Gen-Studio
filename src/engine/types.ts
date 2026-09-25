@@ -48,6 +48,22 @@ export interface InputSlots {
   refVideos?: { key: string; max: number; min: number; format: ImageInputFormat };
   /** One list for every reference medium, each item `{ url, type }` (Atlas `refers`). Replaces `images` and `refVideos`. */
   mixedRefs?: { key: string; max: number; min: number };
+  /** Images pinned to frame positions (FLUX 3: `{ image_url, frame_index }`, 24 fps). Takes every input image. */
+  keyframes?: { key: string; max: number; min: number; imageKey: string; indexKey: string; fps: number };
+  /** Trimmed reference clips (`video_clips: { url, start, ends[, fps] }`). Takes the input videos. */
+  clips?: {
+    key: string;
+    max: number;
+    min: number;
+    /** Longest trimmed span the model accepts, in seconds. */
+    maxSpan?: number;
+    /** Whole seconds only (Gemini). */
+    integer: boolean;
+    /** `ends` default when it means "the whole clip" (Nano Banana: 0). */
+    wholeEnd?: number;
+    /** Sampling fps field and its default (Nano Banana). */
+    fps?: { key: string; value: number };
+  };
 }
 
 export interface PriceSku {
@@ -183,7 +199,15 @@ export interface Generation {
   modelName: string;
   provider: ProviderId;
   settings: GenSettings;
-  inputs: { refs: string[]; firstFrame?: string; lastFrame?: string };
+  inputs: {
+    refs: string[];
+    firstFrame?: string;
+    lastFrame?: string;
+    /** Keyframe position in seconds per input image (user override; default spread by `placeKeyframes`). */
+    times?: Record<string, number>;
+    /** Clip trim [start, end] in seconds per input video. */
+    trims?: Record<string, [number, number]>;
+  };
   op?: { id: OpId; params: Record<string, AdvancedValue>; sourceAssetId: string };
   origin: GenerationOrigin;
   status: GenerationStatus;
@@ -264,6 +288,10 @@ export interface VideoStep extends StepBase {
   settings: GenSettings;
   firstFrame?: StepRef;
   lastFrame?: StepRef;
+  /** Reference images or videos (reference-to-video, keyframes, clips). */
+  refs?: StepRef[];
+  /** Keyframe seconds, parallel to `refs` (FLUX 3 keyframes); missing entries are spread evenly. */
+  times?: Array<number | null>;
 }
 
 export interface OpStep extends StepBase {

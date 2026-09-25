@@ -47,6 +47,10 @@ export interface ComposerState {
   image: { modelRef: string; settings: GenSettings };
   video: { modelRef: string; settings: GenSettings };
   attachments: string[];
+  /** Keyframe second per attached image (keyframe models); unset ones are spread evenly. */
+  times?: Record<string, number>;
+  /** Trim [start, end] per attached video (clip models). */
+  trims?: Record<string, [number, number]>;
   editing: { generationId: string } | null;
   designerTarget: 'new' | 'replace';
 }

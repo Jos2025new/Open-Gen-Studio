@@ -38,7 +38,7 @@ Verificación: 35 tests, incluidos fragmentos de los esquemas reales en `tests/f
 
 - **Audio de referencia** (`reference_audios`, `audio_urls`, `refers` de tipo audio, lip-sync, talking avatar): la app no tiene assets de audio.
 - **Elementos de Kling** (`elements`/`element_list`, sujetos reutilizables), `multi_prompt` (multiplano) y `voice_ids` de Grok: requieren una interfaz propia.
-- **FLUX 3 keyframes-to-video** (`keyframes: [{image_url, frame_index}]`, obligatorio) y **Gemini reference-to-video-developer** (`video_clips: [{url, start, ends}]`, obligatorio): formatos propios; se ocultan hasta implementarlos.
+- ~~FLUX 3 keyframes-to-video y Gemini reference-to-video-developer~~: implementados (ver `TRAZABILIDAD.md`, fase 3).
 - **Seedance 2.5, edición y extensión explícitas** (un vídeo de 4–30 s, `ratio: adaptive`, `duration: -1`): con referencias se deja `omni_reference_task_type` sin fijar (modo automático del proveedor), como recomienda su documentación.
 - **Kling motion-control** necesita imagen y vídeo a la vez; se lista como "necesita vídeo", pero la operación Edit video no aporta la imagen.
 - NanoGPT no publica los nombres de sus campos de medios por modelo. `referenceImages`, `referenceVideos` y `last_image` con data URL siguen la guía, pero no se han probado con una generación real.

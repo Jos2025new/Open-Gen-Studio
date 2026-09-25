@@ -8,7 +8,7 @@ import { estimateMedia, estimateOp } from './costs';
 import { InputError } from './errors';
 import { sourceVideoRule } from './modelRules';
 import { OPS, opCount } from './ops';
-import { coerceSettings, dimsFor, durationChoices, isAutoOption, longEdgeFor, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { clipTrim, coerceSettings, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
@@ -258,6 +258,31 @@ async function execute(id: string): Promise<string[]> {
       if (problem) throw new Error(`${model.name} ${problem}`);
     }
     if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);
+    if (g.kind === 'image' && refVideos.length && !schema.slots.clips) throw new InputError('VIDEO_REF_UNSUPPORTED', `${model.name} does not take video references.`);
+    if (g.kind === 'image' && refVideos.length < (schema.slots.clips?.min ?? 0)) throw new InputError('VIDEO_REF_REQUIRED', `${model.name} needs a reference video clip.`);
+
+    // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
+    let genSettings = g.settings;
+    let keyframes: Array<{ input: MediaInput; frame: number }> | undefined;
+    let clips: Array<{ input: MediaInput; start: number; end: number }> | undefined;
+    if (schema.slots.keyframes && refs.length) {
+      // Positions need an explicit length (BFL): the chosen one, else the model's default, else its shortest.
+      const choices = durationChoices(schema).filter((d) => d > 0);
+      const def = Number(paramByRole(schema, 'duration')?.default);
+      const duration = genSettings.duration != null && genSettings.duration > 0 ? genSettings.duration : Number.isFinite(def) && def > 0 ? def : choices[0] ?? 5;
+      genSettings = { ...genSettings, duration };
+      const frames = placeKeyframes(refs.length, duration, schema.slots.keyframes.fps, refs.map((r) => g.inputs.times?.[r.assetId]));
+      keyframes = refs.map((input, i) => ({ input, frame: frames[i] }));
+      refs = [];
+    }
+    if (schema.slots.clips && refVideos.length) {
+      const slot = schema.slots.clips;
+      clips = refVideos.map((input) => {
+        const [start, end] = clipTrim(slot, get().assets[input.assetId]?.duration, g.inputs.trims?.[input.assetId]);
+        return { input, start, end };
+      });
+      refVideos = [];
+    }
 
     const total = Math.max(1, g.settings.count);
     const perRequest = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
@@ -268,7 +293,7 @@ async function execute(id: string): Promise<string[]> {
     let done = 0;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
-      const settings = { ...g.settings, seed: g.settings.seed != null ? g.settings.seed + done : undefined };
+      const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
       const result = await ADAPTERS[model.provider].generate({
         kind: g.kind,
         model,
@@ -278,6 +303,8 @@ async function execute(id: string): Promise<string[]> {
         count: n,
         refs,
         refVideos,
+        keyframes,
+        clips,
         firstFrame,
         lastFrame,
         video,

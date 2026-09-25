@@ -241,6 +241,34 @@ function sizeOptions(p: JsonProp): { options: string[]; default?: string; omit?:
   return def ? { options, default: def } : { options: ['auto', ...options], default: 'auto', omit: 'auto' };
 }
 
+/** An array of `{ image_url, frame_index }` items (FLUX 3 keyframes). */
+function keyframeList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): { imageKey: string; indexKey: string } | null {
+  if (primaryType(p) !== 'array' || !p.items) return null;
+  const props = flattenProp(p.items, resolve).properties ?? {};
+  const indexKey = Object.keys(props).find((k) => /^frame_?index$/i.test(k));
+  const imageKey = Object.keys(props).find((k) => /^image(_url)?$/i.test(k));
+  return indexKey && imageKey ? { imageKey, indexKey } : null;
+}
+
+/** An array of `{ url, start, ends }` trimmed clips (Gemini / Nano Banana `video_clips`). */
+function clipList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): NonNullable<InputSlots['clips']> | null {
+  if (primaryType(p) !== 'array' || !p.items) return null;
+  const props = flattenProp(p.items, resolve).properties ?? {};
+  if (!props.url || !props.start || !props.ends) return null;
+  const text = `${p.description ?? ''} ${props.ends.description ?? ''}`;
+  const span = /(?:must not exceed|at most|up to)\s*(\d+)\s*seconds/i.exec(text);
+  const fps = props.fps;
+  return {
+    key: '',
+    max: p.maxItems ?? 1,
+    min: 0,
+    maxSpan: span ? Number(span[1]) : undefined,
+    integer: primaryType(props.start) === 'integer',
+    wholeEnd: props.ends.default === 0 && /whole/i.test(props.ends.description ?? '') ? 0 : undefined,
+    fps: fps ? { key: 'fps', value: typeof fps.default === 'number' ? fps.default : 1 } : undefined,
+  };
+}
+
 /** An array of `{ url, type: 'image' | 'video' | … }` items (Atlas `refers`). */
 function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): boolean {
   if (primaryType(p) !== 'array' || !p.items) return false;
@@ -337,6 +365,24 @@ export function schemaFromJson(opts: {
         slots.images = { key: single, max: 1, min: required.includes(single) ? 1 : 0, multiple: false, format: imageFormat };
         used.add(single);
       }
+    }
+  }
+  // Structured inputs, for either kind: keyframe lists (FLUX 3) and trimmed clips (video_clips).
+  for (const k of keys) {
+    if (used.has(k)) continue;
+    const p = flattenProp(properties[k], resolve);
+    const min = required.includes(k) ? Math.max(1, p.minItems ?? 1) : 0;
+    const kf = keyframeList(p, resolve);
+    if (kf) {
+      const fps = /(\d+)\s*fps/i.exec(`${p.description ?? ''} ${JSON.stringify(p.items ?? {})}`);
+      slots.keyframes = { key: k, max: p.maxItems ?? 10, min, ...kf, fps: fps ? Number(fps[1]) : 24 };
+      used.add(k);
+      continue;
+    }
+    const clips = clipList(p, resolve);
+    if (clips) {
+      slots.clips = { ...clips, key: k, min };
+      used.add(k);
     }
   }
   // Mask inputs and other media we do not drive from the UI.
@@ -551,6 +597,8 @@ function castOption(p: ParamDef, value: string): string | number {
  * images are references (all of them when there is no start frame). Videos are always references.
  */
 export function routeVideoInputs<T>(slots: InputSlots, images: T[], videos: T[], firstFrame?: T): { firstFrame?: T; images: T[]; videos: T[] } {
+  // Keyframe models pin every image, the start frame first.
+  if (slots.keyframes) return { firstFrame: undefined, images: firstFrame ? [firstFrame, ...images] : [...images], videos };
   const rest = [...images];
   let first = firstFrame;
   if (!first && slots.firstFrame && rest.length) first = rest.shift();
@@ -571,11 +619,65 @@ export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; i
     if (total < mixed.min) return 'needs at least one reference image or video.';
     return null;
   }
-  const imageMax = slots.images?.max ?? 0;
-  if (n.images > imageMax) return imageMax ? `accepts up to ${imageMax} reference images.` : slots.firstFrame ? 'takes one start image.' : 'does not accept reference images.';
-  if (slots.images && n.images < slots.images.min) return 'needs a reference image.';
-  const videoMax = slots.refVideos?.max ?? 0;
-  if (n.videos > videoMax) return videoMax ? `accepts up to ${videoMax} reference videos.` : 'does not accept reference videos (use Extract frame to start from a still).';
-  if (slots.refVideos && n.videos < slots.refVideos.min) return 'needs a reference video.';
+  const kf = slots.keyframes;
+  const imageMax = kf?.max ?? slots.images?.max ?? 0;
+  const what = kf ? 'keyframe images' : 'reference images';
+  if (n.images > imageMax) return imageMax ? `accepts up to ${imageMax} ${what}.` : slots.firstFrame ? 'takes one start image.' : 'does not accept reference images.';
+  if (n.images < (kf?.min ?? slots.images?.min ?? 0)) return kf ? 'needs at least one keyframe image.' : 'needs a reference image.';
+  const videos = slots.clips ?? slots.refVideos;
+  const videoMax = videos?.max ?? 0;
+  if (n.videos > videoMax) return videoMax ? `accepts up to ${videoMax} reference ${slots.clips ? 'clip' : 'video'}${videoMax > 1 ? 's' : ''}.` : 'does not accept reference videos (use Extract frame to start from a still).';
+  if (videos && n.videos < videos.min) return slots.clips ? 'needs a reference video clip.' : 'needs a reference video.';
   return null;
+}
+
+/**
+ * Keyframe frame indices (BFL FLUX 3 guide): one image opens the clip, two pin start and end, three to ten are
+ * spread evenly. Seconds set by the user win. Indices are unique and within 0..duration × fps.
+ */
+export function placeKeyframes(count: number, duration: number, fps: number, seconds: Array<number | null | undefined> = []): number[] {
+  const last = Math.max(0, Math.round(duration * fps));
+  const frames: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const at = seconds[i];
+    let f = at != null && Number.isFinite(at) ? Math.round(Math.min(Math.max(at, 0), duration) * fps) : count === 1 ? 0 : Math.round((i * last) / (count - 1));
+    // Nudge collisions to the nearest free frame.
+    for (let d = 1; frames.includes(f) && d <= last; d++) f = !frames.includes(f + d) && f + d <= last ? f + d : f - d >= 0 && !frames.includes(f - d) ? f - d : f;
+    frames.push(f);
+  }
+  return frames;
+}
+
+/** Trim [start, end] for a reference clip: the user's, else the whole clip or the longest span the model takes. */
+export function clipTrim(slot: NonNullable<InputSlots['clips']>, seconds: number | undefined, override?: [number, number]): [number, number] {
+  let [start, end] = override ?? [0, slot.wholeEnd != null && !slot.maxSpan ? slot.wholeEnd : Math.min(seconds ?? slot.maxSpan ?? 10, slot.maxSpan ?? Infinity)];
+  if (slot.maxSpan && end - start > slot.maxSpan) end = start + slot.maxSpan;
+  if (slot.integer) {
+    start = Math.floor(start);
+    end = end === 0 ? 0 : Math.max(start + 1, Math.round(end));
+  }
+  return [start, end];
+}
+
+/** What a model takes as input, in the words the agent's plan uses (refs, first_frame, times…). */
+export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind): string[] {
+  if (!schema) return ['inputs unknown until the model loads'];
+  const s = schema.slots;
+  const out: string[] = [];
+  if (kind === 'video') {
+    if (s.firstFrame) out.push('first_frame');
+    if (s.lastFrame) out.push('last_frame');
+    if (s.keyframes) out.push(`keyframes: up to ${s.keyframes.max} image refs in order, optional times (seconds), ${s.keyframes.fps} fps`);
+    if (s.images) out.push(`up to ${s.images.max} reference image refs${s.images.min ? ' (required)' : ''}`);
+    if (s.refVideos) out.push(`up to ${s.refVideos.max} reference video refs`);
+    if (s.mixedRefs) out.push(`up to ${s.mixedRefs.max} image/video refs${s.mixedRefs.min ? ' (at least one required)' : ''}`);
+    if (s.clips) out.push(`${s.clips.max} reference video clip${s.clips.maxSpan ? ` (≤${s.clips.maxSpan} s used)` : ''}${s.clips.min ? ' (required)' : ''}`);
+    if (!out.length) out.push('text-to-video only');
+  } else {
+    if (s.source) out.push('source image first in refs, then references');
+    out.push(s.images ? `up to ${s.images.max + (s.source ? 1 : 0)} image refs${s.images.min ? ' (required)' : ''}` : 'no image input');
+    if (s.clips) out.push(`${s.clips.max} video clip ref${s.clips.min ? ' (required)' : ''}`);
+  }
+  if (schema.missing?.length) out.push(`cannot run from the app (needs ${schema.missing.join(', ')})`);
+  return out;
 }

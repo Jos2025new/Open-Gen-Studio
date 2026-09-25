@@ -1,5 +1,5 @@
 import { formatUsd, truncate } from '../../lib/format';
-import { aspectLabel, durationChoices, paramByRole } from '../params';
+import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
 import { skillById, workflowById, describeWorkflow } from '../skills';
 import { OPS, OP_IDS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
@@ -32,7 +32,7 @@ Writing prompts
 
 Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for layers)
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
-- video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?.
+- video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?, refs? (reference images/videos, or keyframe images in order), times? (keyframe seconds, parallel to refs).
 - op: op, input, params? — operations on an existing image or video:
 ${OP_LINES}
 - text: text — copy, or a shared prompt used by image/video steps through prompt_from.
@@ -46,7 +46,14 @@ ${OP_LINES}
 - Keep plans minimal: the fewest steps that fully deliver the request. count defaults to 1; use more only when asked or clearly useful (max 4).
 - In the Node workspace the plan becomes connected nodes: structure it as a clean left-to-right flow (use text steps + prompt_from when several steps share a prompt).
 - The app computes costs from provider prices; do not quote prices.
-- If the validator rejects a plan, fix exactly the reported problems and call propose_plan again.`;
+- If the validator rejects a plan, fix exactly the reported problems and call propose_plan again.
+
+Model-specific inputs (each model's accepted inputs are listed in the context; use only what it lists)
+- Reference-to-video models take refs (images, and videos where listed) instead of first_frame; describe in the prompt what each reference is for (character, style, setting).
+- Keyframe models (FLUX 3 keyframes-to-video): refs are the keyframe images in order. One image opens the clip; two pin start and end (works best when they share camera position, lighting and objects); 3–10 form an experimental storyboard spread evenly, reliable for simple transitions, weak for large subject motion. Set an explicit duration (5–20 s): it sets the pace, shorter is punchier. Use times only to pin a moment on purpose; positions must be unique. Keep the output aspect equal to the keyframes' aspect. The prompt describes the journey between frames ("starts as…, then…, ends as…"); write HARD CUT only when a cut is wanted.
+- Clip models (video_clips): a video ref is trimmed to the span the model takes; the app picks the whole clip or its first seconds.
+- Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
+Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 
 function describeModel(kind: 'image' | 'video'): string {
   const st = get();
@@ -60,12 +67,10 @@ function describeModel(kind: 'image' | 'video'): string {
   if (res?.options?.length) parts.push(`resolutions [${res.options.join(', ')}]`);
   if (kind === 'video') {
     const d = durationChoices(schema);
-    if (d.length) parts.push(`durations [${d.join(', ')}]s`);
-    parts.push(schema?.slots.firstFrame ? 'accepts first_frame' : 'text-to-video only');
+    if (d.length) parts.push(`durations [${d.map((x) => (x > 0 ? x : 'auto')).join(', ')}]s`);
     if (paramByRole(schema, 'audio')) parts.push('audio optional');
-  } else {
-    parts.push(schema?.slots.images ? `accepts up to ${schema.slots.images.max} refs` : 'no image input');
   }
+  parts.push(`inputs: ${capabilityHints(schema, kind).join('; ')}`);
   const cur = [
     settings.aspect ? `aspect ${aspectLabel(settings.aspect)}` : '',
     settings.resolution ? `resolution ${settings.resolution}` : '',
@@ -77,6 +82,7 @@ function describeModel(kind: 'image' | 'video'): string {
 }
 
 function alternatives(): string {
+  const st = get();
   const lines: string[] = [];
   for (const p of REMOTE_PROVIDERS) {
     if (!isConnected(p)) continue;
@@ -84,6 +90,12 @@ function alternatives(): string {
     for (const id of ids) {
       const m = modelSummary(`${p}::${id}`);
       if (m) lines.push(`${m.ref} — ${m.kind}${m.acceptsImage ? ', image input' : ''} — ${m.name}`);
+    }
+    // Models with special inputs, so the agent can pick one when the request needs it.
+    const special = Object.values(st.catalog.models).filter((m) => m.provider === p && /(keyframes|reference)-to-(video|image)/.test(m.id)).slice(0, 6);
+    for (const m of special) {
+      const schema = st.catalog.schemas[m.ref];
+      lines.push(`${m.ref} — ${m.kind} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}`);
     }
   }
   return lines.length ? lines.join('\n') : 'Only the local demo models are connected.';

@@ -308,7 +308,7 @@ async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan
 }
 
 function materializeNodes(sessionId: string, plan: Plan): void {
-  const { nodes, edges } = planToGraph(plan);
+  const { nodes, edges } = planToGraph(plan, (id) => get().assets[id]?.kind);
   const graph = session(sessionId).graph;
   const bounds = graphBounds(graph.nodes);
   const origin = bounds ? { x: bounds.x + bounds.w + 160, y: bounds.y } : { x: 0, y: 0 };

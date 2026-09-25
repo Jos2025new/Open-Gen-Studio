@@ -1,5 +1,5 @@
 import { OPS } from './ops';
-import { coerceSettings } from './params';
+import { coerceSettings, routeVideoInputs, videoInputProblem } from './params';
 import type {
   AdvancedValue,
   GenSettings,
@@ -40,6 +40,7 @@ export interface RawStep {
   audio?: boolean;
   seed?: number;
   refs?: string[];
+  times?: Array<number | null>;
   first_frame?: string;
   last_frame?: string;
   op?: string;
@@ -109,7 +110,7 @@ export function stepDeps(step: PlanStep): StepRef[] {
     case 'image':
       return [...(step.promptFrom ? [step.promptFrom] : []), ...step.refs];
     case 'video':
-      return [step.promptFrom, step.firstFrame, step.lastFrame].filter((r): r is string => Boolean(r));
+      return [step.promptFrom, step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r));
     case 'op':
       return [step.input];
     case 'layer':
@@ -266,12 +267,18 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       case 'image':
       case 'video': {
         const kind: MediaKind = s.kind;
-        const refs = kind === 'image' ? (s.refs ?? []).filter(Boolean) : [];
+        const refs = (s.refs ?? []).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
           if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step.`);
         }
-        refs.forEach((r) => expectImage(r, where));
+        // References are images, or videos for reference-video / clip models.
+        const refKinds = refs.map((r) => refKind(r, where));
+        refKinds.forEach((k, i) => {
+          if (k && k !== 'image' && k !== 'raster' && k !== 'video') errors.push(`${where}: ref "${refs[i]}" produces ${k}; refs must be images or videos.`);
+        });
+        const imageRefs = refs.filter((_, i) => refKinds[i] !== 'video');
+        const videoRefs = refs.filter((_, i) => refKinds[i] === 'video');
         if (kind === 'video') {
           expectImage(s.first_frame, `${where} first_frame`);
           expectImage(s.last_frame, `${where} last_frame`);
@@ -292,18 +299,24 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           continue;
         }
         const { schema } = resolved;
-        if (kind === 'image' && refs.length) {
+        if (schema.missing?.length) errors.push(`${where}: model "${modelRef}" needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
+        if (kind === 'image') {
           const slot = schema.slots.images;
-          if (!slot) errors.push(`${where}: model "${modelRef}" does not accept reference images.`);
-          else if (refs.length > slot.max) errors.push(`${where}: model "${modelRef}" accepts at most ${slot.max} reference image(s).`);
-        }
-        if (kind === 'image' && !refs.length && (schema.slots.images?.min ?? 0) > 0) {
-          errors.push(`${where}: model "${modelRef}" requires an input image (refs).`);
-        }
-        if (kind === 'video' && s.first_frame && !schema.slots.firstFrame) errors.push(`${where}: model "${modelRef}" cannot start from an image (first_frame).`);
-        if (kind === 'video' && s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame.`);
-        if (kind === 'video' && !s.first_frame && schema.slots.promptRequired === false && !resolved.model.acceptsText) {
-          errors.push(`${where}: model "${modelRef}" needs first_frame.`);
+          const extra = schema.slots.source ? 1 : 0;
+          if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images.`);
+          else if (slot && imageRefs.length > slot.max + extra) errors.push(`${where}: model "${modelRef}" accepts at most ${slot.max + extra} reference image(s).`);
+          if (imageRefs.length < (slot?.min ?? 0) + extra) errors.push(`${where}: model "${modelRef}" requires ${extra ? 'a source image first, then reference images' : 'an input image'} (refs).`);
+          const clips = schema.slots.clips;
+          if (videoRefs.length && !clips) errors.push(`${where}: model "${modelRef}" does not take video refs.`);
+          else if (clips && (videoRefs.length > clips.max || videoRefs.length < clips.min)) errors.push(`${where}: model "${modelRef}" takes ${clips.min}–${clips.max} video clip ref(s).`);
+        } else {
+          // Same routing as the composer and the job runner (params.routeVideoInputs).
+          const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
+          const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length });
+          if (problem) errors.push(`${where}: model "${modelRef}" ${problem}`);
+          if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame.`);
+          if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame.`);
+          if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
         const prompt = (s.prompt ?? '').trim();
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
@@ -332,6 +345,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             settings: { ...settings, count: Math.min(settings.count, 2) },
             firstFrame: s.first_frame,
             lastFrame: s.last_frame,
+            refs: refs.length ? refs : undefined,
+            times: s.times?.length ? s.times : undefined,
           } satisfies VideoStep);
         }
         break;
