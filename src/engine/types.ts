@@ -472,6 +472,8 @@ export interface PlanFeedItem extends FeedBase {
   stepGenerations: Record<string, string>;
   estimate: Estimate;
   error?: string;
+  /** This plan replaced the pending one after the user asked for a change. */
+  revised?: boolean;
 }
 
 export interface GenerationFeedItem extends FeedBase {
@@ -692,6 +694,8 @@ export interface AgentState {
   busy: boolean;
   /** What the agent is doing while busy, for the chat's status row (no model output is shown). */
   phase?: 'working' | 'drafting' | 'checking';
+  /** Plan card the user commented on instead of approving; replaced by a revision or closed at the end of the turn. */
+  revising?: string;
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
 }

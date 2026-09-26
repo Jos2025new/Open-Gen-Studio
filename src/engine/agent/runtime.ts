@@ -123,17 +123,22 @@ export async function sendAgentMessage(text: string): Promise<void> {
     await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
     return;
   }
-  // Typing while a plan waits for approval asks for changes.
+  // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
-    updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
-    removeDraftNodes(sessionId, pendingItem.plan.id);
     const engine = agentEngine();
     if (engine.kind === 'llm' && pending.toolCallId) {
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-      pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `The user did not approve this plan and asked for changes: ${clean}\n\n${ctx}` });
-      patchAgent(sessionId, { pending: undefined, notes: [] });
+      pushHistory(sessionId, {
+        role: 'tool',
+        tool_call_id: pending.toolCallId,
+        content: `The user replied instead of approving: ${clean}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
+      });
+      // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
+      patchAgent(sessionId, { pending: undefined, notes: [], revising: pendingItem.id });
       await llmTurn(sessionId, workspace);
     } else {
+      updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
+      removeDraftNodes(sessionId, pendingItem.plan.id);
       const draft = s.agent.draft;
       patchAgent(sessionId, { pending: undefined, draft: { request: `${draft?.request ?? ''} ${clean}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments] } });
       await offlineTurn(sessionId, workspace);
@@ -282,7 +287,7 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
 }
 
 /** Validate a raw plan and show it. Auto mode runs free plans immediately. */
-async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan, toolCallId: string | null): Promise<{ errors: string[]; itemId?: string }> {
+async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan, toolCallId: string | null, revision = false): Promise<{ errors: string[]; itemId?: string }> {
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
   if (!plan) return { errors };
@@ -298,6 +303,8 @@ async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan
     stepGenerations: {},
     estimate: total,
   };
+  const replaced = closeRevisedPlan(sessionId, revision);
+  if (replaced) item.revised = true;
   appendFeed(sessionId, item);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') materializeNodes(sessionId, plan);
@@ -307,6 +314,22 @@ async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan
     setThreadOpen(true);
   }
   return { errors: [], itemId: item.id };
+}
+
+/**
+ * The plan the user commented on: a revision replaces it (removed from the feed, the new card says "Revised");
+ * any other outcome closes it as canceled, so two plans never mix. Returns whether it was replaced.
+ */
+function closeRevisedPlan(sessionId: string, replace: boolean): boolean {
+  const id = session(sessionId).agent.revising;
+  if (!id) return false;
+  patchAgent(sessionId, { revising: undefined });
+  const old = session(sessionId).feed.find((f) => f.id === id);
+  if (old?.type !== 'plan' || old.status !== 'awaiting') return false;
+  removeDraftNodes(sessionId, old.plan.id);
+  if (replace) patchSession(sessionId, (s) => ({ ...s, feed: s.feed.filter((f) => f.id !== id) }));
+  else updateFeedItem<PlanFeedItem>(sessionId, id, { status: 'canceled' });
+  return replace;
 }
 
 function materializeNodes(sessionId: string, plan: Plan): void {
@@ -565,7 +588,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
             continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
-          const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id);
+          const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true);
           if (presented.errors.length) {
             planFailures++;
             respond(`Plan rejected by the validator. Fix these problems and call propose_plan again:\n- ${presented.errors.join('\n- ')}`);
@@ -586,6 +609,8 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
     }
     notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
   } finally {
+    // No revision came (text answer, questions, error or stop): the commented plan is closed.
+    closeRevisedPlan(sessionId, false);
     patchAgent(sessionId, { busy: false, phase: undefined });
     controller = null;
   }

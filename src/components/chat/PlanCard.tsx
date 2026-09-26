@@ -64,6 +64,8 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const generations = useStore((s) => s.generations);
   const remaining = useStore((s) => s.settings.budgetUsd - s.spentUsd);
   const workspace = useStore((s) => s.ui.workspace);
+  // While the agent revises this plan after a comment, it must not run in its old form.
+  const revising = useStore((s) => s.sessions[sessionId]?.agent.revising === item.id);
   const { plan } = item;
   // Prices may load after the plan was proposed; show the live estimate while it waits.
   const live = item.status === 'awaiting' ? estimateSteps(plan.steps) : null;
@@ -80,7 +82,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
       <header className="plan-head">
         <div>
           <div className="plan-kicker">
-            Plan · {WS_NAMES[plan.workspace]} · {item.style === 'auto' ? 'Auto' : 'Guided'}
+            Plan · {WS_NAMES[plan.workspace]} · {item.style === 'auto' ? 'Auto' : 'Guided'}{item.revised ? ' · Revised' : ''}{revising ? ' · Revising…' : ''}
           </div>
           <h4 className="plan-title">{plan.title}</h4>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
@@ -123,7 +125,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             <Button variant="ghost" onClick={() => cancelPlan(sessionId, item.id)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={Zap} disabled={over} onClick={() => void approvePlan(sessionId, item.id)} data-tip={over ? 'Over your remaining budget' : undefined}>
+            <Button variant="primary" icon={Zap} disabled={over || revising} onClick={() => void approvePlan(sessionId, item.id)} data-tip={over ? 'Over your remaining budget' : revising ? 'The agent is revising this plan' : undefined}>
               {free ? 'Run' : `Run · ${costLabel(total, { short: true })}`}
             </Button>
           </>

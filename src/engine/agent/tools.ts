@@ -66,6 +66,7 @@ export const TOOLS: ToolSpec[] = [
         properties: {
           title: { type: 'string', description: 'Short title, in the user\'s language.' },
           summary: { type: 'string', description: 'One sentence describing the result, in the user\'s language.' },
+          revision: { type: 'boolean', description: 'true when this plan changes the pending plan the user just commented on; false or omitted for a different request.' },
           steps: {
             type: 'array',
             minItems: 1,
@@ -184,6 +185,7 @@ const stepSchema = z
 export const proposePlanSchema = z.object({
   title: z.string().max(200).optional(),
   summary: z.string().max(600).optional(),
+  revision: z.boolean().optional(),
   steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
 });
 
