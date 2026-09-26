@@ -705,6 +705,45 @@ export interface AgentState {
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
 }
 
+/** What one agent request cost in calls, tokens and the agent's own time (not the user's), and how it ended. */
+export interface AgentRequestMetrics {
+  id: string;
+  startedAt: number;
+  /** First 120 characters of the request. */
+  request: string;
+  workspace: Workspace;
+  /** Model · provider. */
+  engine: string;
+  style: AgentStyle;
+  skillId?: string;
+  workflowId?: string;
+  attachments: number;
+  llmCalls: number;
+  inputTokens: number;
+  outputTokens: number;
+  llmUsd: number;
+  /** Time the agent was working (model calls and plan checks), all turns of the request. */
+  agentMs: number;
+  /** Agent time until the first streamed text or tool call. */
+  msToFirstOutput?: number;
+  /** Agent time until the first plan card. */
+  msToPlan?: number;
+  questionRounds: number;
+  /** Plans shown (the first one plus revisions and replacements). */
+  plans: number;
+  revisions: number;
+  /** Plans the validator sent back. */
+  rejectedPlans: number;
+  findModels: number;
+  /** Models of the latest plan. */
+  models: string[];
+  /** Estimate of the first plan and of the latest one. */
+  estimatedUsd?: number;
+  lastEstimatedUsd?: number;
+  approvedUsd?: number;
+  outcome?: 'approved' | 'canceled' | 'superseded';
+}
+
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
 export interface Subject {
   id: string;
@@ -742,6 +781,8 @@ export interface Session {
   activeDocId: string | null;
   agent: AgentState;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
+  /** Per-request agent counters (R0), newest last; see agent/metrics.ts. */
+  agentMetrics?: AgentRequestMetrics[];
   subjects?: Subject[];
   styles?: SavedStyle[];
 }

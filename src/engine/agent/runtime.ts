@@ -37,6 +37,7 @@ import { SYSTEM_PROMPT, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
+import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { TOOLS, findModelsSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
@@ -158,6 +159,7 @@ export async function sendAgentMessage(text: string): Promise<void> {
     await offlineTurn(sessionId, workspace);
     return;
   }
+  startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments);
   // A new request: images of earlier requests become a note instead of being sent again.
@@ -304,7 +306,15 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
 }
 
 /** Validate a raw plan and show it. Auto mode runs free plans immediately. */
-async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan, toolCallId: string | null, revision = false): Promise<{ errors: string[]; itemId?: string }> {
+async function presentPlan(
+  sessionId: string,
+  workspace: Workspace,
+  raw: RawPlan,
+  toolCallId: string | null,
+  revision = false,
+  /** Agent time so far, for the request's metrics (LLM turns only). */
+  agentMs?: number,
+): Promise<{ errors: string[]; itemId?: string }> {
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
   if (!plan) return { errors };
@@ -325,6 +335,11 @@ async function presentPlan(sessionId: string, workspace: Workspace, raw: RawPlan
   appendFeed(sessionId, item);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') materializeNodes(sessionId, plan);
+  // Recorded before an auto-approval closes the request.
+  if (agentMs != null) {
+    const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];
+    recordMetric(sessionId, { type: 'plan', ms: agentMs, revision: replaced, models, usd: total.usd });
+  }
   if (style === 'auto' && !needsSpendCheck(total)) {
     void approvePlan(sessionId, item.id);
   } else if (get().ui.workspace !== 'chat') {
@@ -400,6 +415,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (pending?.feedItemId === itemId) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note} The app is executing the plan now.` });
+    closeRequest(sessionId, 'approved', total.usd);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
@@ -487,6 +503,7 @@ export function cancelPlan(sessionId: string, itemId: string): void {
   const pending = s.agent.pending;
   if (pending?.feedItemId === itemId) {
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: 'The user canceled this plan.' });
+    closeRequest(sessionId, 'canceled');
     patchAgent(sessionId, { pending: undefined, questionRound: 0 });
   }
 }
@@ -501,6 +518,8 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
   patchAgent(sessionId, { busy: true, phase: 'working' });
   controller = new AbortController();
   const signal = controller.signal;
+  const clock = turnClock(sessionId);
+  const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
@@ -517,9 +536,13 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           tools: TOOLS,
           effort: get().settings.agent.effort,
           signal,
-          onToolCall: () => patchAgent(sessionId, { phase: 'drafting' }),
+          onToolCall: () => {
+            firstOutput();
+            patchAgent(sessionId, { phase: 'drafting' });
+          },
           onText: (_delta, full) => {
             if (!textItemId) {
+              firstOutput();
               const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel() };
               textItemId = item.id;
               appendFeed(sessionId, item);
@@ -538,6 +561,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
         return;
       }
       if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
+      recordMetric(sessionId, { type: 'call', inputTokens: result.usage?.inputTokens ?? 0, outputTokens: result.usage?.outputTokens ?? 0, usd: result.usage?.costUsd ?? 0 });
       if (result.usage) {
         const u = result.usage;
         patchSession(sessionId, (s) => ({
@@ -592,6 +616,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           // This call's result is sent later, with the user's answers.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
+          recordMetric(sessionId, { type: 'questions' });
           showQuestions(
             sessionId,
             workspace,
@@ -604,6 +629,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
         if (call.name === 'find_models') {
           // Local search in the app's refined catalog; the agent continues in the next round.
           const v = findModelsSchema.safeParse(parsed.value);
+          recordMetric(sessionId, { type: 'findModels' });
           respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
           continue;
         }
@@ -611,12 +637,14 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           const v = proposePlanSchema.safeParse(parsed.value);
           if (!v.success) {
             respond(`Invalid propose_plan input: ${formatZodError(v.error)}`);
+            recordMetric(sessionId, { type: 'rejected' });
             planFailures++;
             continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
-          const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true);
+          const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
           if (presented.errors.length) {
+            recordMetric(sessionId, { type: 'rejected' });
             planFailures++;
             respond(`Plan rejected by the validator. Fix these problems and call propose_plan again:\n- ${presented.errors.join('\n- ')}`);
             continue;
@@ -638,6 +666,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
   } finally {
     // No revision came (text answer, questions, error or stop): the commented plan is closed.
     closeRevisedPlan(sessionId, false);
+    clock.end();
     patchAgent(sessionId, { busy: false, phase: undefined });
     controller = null;
   }

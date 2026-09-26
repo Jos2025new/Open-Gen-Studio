@@ -5,9 +5,7 @@ import { nanogpt } from '../src/engine/providers/nanogpt';
 import { capabilityHints } from '../src/engine/params';
 import type { ProviderAdapter } from '../src/engine/providers/types';
 import type { ModelSchema, ModelSummary } from '../src/engine/types';
-import atlasSnapshot from './fixtures/live/atlas.json';
-import falSnapshot from './fixtures/live/fal.json';
-import nanoSnapshot from './fixtures/live/nanogpt.json';
+import { A, F, N, serve } from './fixtures/live/serve';
 
 /**
  * Regression net for provider parsing. tests/fixtures/live holds the real catalogs and input schemas of the
@@ -17,25 +15,6 @@ import nanoSnapshot from './fixtures/live/nanogpt.json';
  * `npx vitest run -u tests/live-snapshot.test.ts` only when the change is intended.
  */
 vi.mock('../src/lib/idb', () => ({ cacheDb: { get: async () => undefined, set: async () => undefined } }));
-
-// The snapshot files are raw provider JSON.
-type Loose = any;
-const A: Loose = atlasSnapshot;
-const F: Loose = falSnapshot;
-const N: Loose = nanoSnapshot;
-
-function serve(url: string): unknown {
-  const u = new URL(url);
-  if (u.host === 'api.atlascloud.ai' && u.pathname === '/api/v1/models') return { data: A.models };
-  const atlasDoc = A.models.find((m: { schema?: string }) => m.schema === url);
-  if (atlasDoc) return atlasDoc.schemaDoc;
-  if (u.host === 'api.fal.ai' && u.pathname === '/v1/models') return { models: F.models.filter((m: { category: string }) => m.category === u.searchParams.get('category')), has_more: false };
-  if (u.pathname.endsWith('/openapi.json')) return F.models.find((m: { endpoint_id: string }) => m.endpoint_id === u.searchParams.get('endpoint_id'))?.schemaDoc;
-  if (u.pathname.endsWith('/v1/video-models')) return { data: N.video };
-  if (u.pathname.endsWith('/v1/images/models')) return { data: N.image };
-  if (u.pathname.endsWith('/v1/audio-models')) return { data: N.audio ?? [] };
-  throw new Error(`unexpected fetch ${url}`);
-}
 
 function describeModel(m: ModelSummary, s: ModelSchema | string): string {
   const caps = [m.acceptsText && 'text', m.acceptsImage && 'image', m.acceptsVideo && 'video-in', m.needsVideo && 'NEEDS-VIDEO', m.textOutput && 'TEXT-OUT'].filter(Boolean).join(',');
