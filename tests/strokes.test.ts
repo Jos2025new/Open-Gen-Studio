@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bendStroke, DEFAULT_STROKE_STYLE, nearestPoint, newStroke, restyleStrokes, scaleStroke, strokeBox, strokePath, translateStroke } from '../src/engine/design/strokes';
 import { scaleLayer, translateLayer, cloneLayer } from '../src/engine/design/doc';
 import { docToSvg } from '../src/engine/design/export';
+import { MAX_STAMPS, stampPlacements, texturedStrokeSvg } from '../src/engine/design/brushTextures';
 import type { DesignDoc, Stroke, VectorLayer } from '../src/engine/types';
 
 const line = (): Stroke =>
@@ -65,5 +66,41 @@ describe('editable pressure strokes', () => {
     expect(svg).toContain(`<path d="${strokePath(a)}" fill="#123456"/>`);
     expect(svg).toContain('fill-opacity="0.5"');
     expect(svg).toContain('inkscape:label="Lineart 1"');
+  });
+});
+
+describe('textured strokes (stamps along the path)', () => {
+  const textured = (seed = 7, spacing = 0.5): Stroke => ({ ...line(), texture: { stamp: 'pencil', spacing, jitter: 0.4, seed } });
+
+  it('places stamps along the path, the same way for the same seed', () => {
+    const s = textured();
+    const a = stampPlacements(s);
+    expect(a.length).toBeGreaterThan(20);
+    expect(stampPlacements({ ...s })).toEqual(a);
+    expect(stampPlacements({ ...s, texture: { ...s.texture!, seed: 8 } })).not.toEqual(a);
+    // Spacing is a fraction of the size: half the spacing, about twice the stamps.
+    expect(stampPlacements(textured(7, 0.25)).length).toBeGreaterThan(a.length * 1.8);
+  });
+
+  it('follows the curve: bending the stroke turns the stamps', () => {
+    const s = textured(1, 0.5);
+    const straight = stampPlacements({ ...s, texture: { ...s.texture!, jitter: 0 } });
+    expect(straight.every((p) => Math.abs(p.angle) < 0.01)).toBe(true);
+    const bent = stampPlacements(bendStroke({ ...s, texture: { ...s.texture!, jitter: 0 } }, 10, 0, 60, 80));
+    expect(bent.some((p) => Math.abs(p.angle) > 0.3)).toBe(true);
+  });
+
+  it('caps the stamps of very long strokes', () => {
+    const long = newStroke(Array.from({ length: 400 }, (_, i) => [i * 50, 0, 0.5] as [number, number, number]), { ...DEFAULT_STROKE_STYLE, size: 4, texture: { stamp: 'chalk', spacing: 0.05, jitter: 0, seed: 1 } }, true);
+    expect(stampPlacements(long).length).toBeLessThanOrEqual(MAX_STAMPS + 1);
+  });
+
+  it('exports one embedded stamp per stroke reused by <use>', () => {
+    const s = textured();
+    const svg = texturedStrokeSvg(s, 'data:image/png;base64,QQ==');
+    expect(svg.match(/<image /g)).toHaveLength(1);
+    expect(svg.match(/<use /g)!.length).toBe(stampPlacements(s).length);
+    expect(svg).toContain(`<use href="#stamp-${s.id}" transform="translate(`);
+    expect(svg).not.toContain('blob:');
   });
 });

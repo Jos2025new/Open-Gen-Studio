@@ -9,7 +9,7 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 
 ## Plan — 3D prioritario, exportación y trazos editables (2026-09-25)
-Solicitud actual: implementar P1–P9 (usuario, 2026-09-25). Solo typecheck y tests específicos necesarios; las pruebas reales de proveedor, navegador e Inkscape las hará el usuario. Detalle y aceptación en `PLAN_3D_DESIGNER.md`; esta sección es la lista de ejecución, sin otro plan paralelo.
+Solicitud actual: implementar P1–P9 (usuario, 2026-09-25). Código de P1–P9 terminado el 2026-09-26 (Claude, continuando a GPT 6 Astra); faltan las pruebas reales del usuario. Solo typecheck y tests específicos necesarios; las pruebas reales de proveedor, navegador e Inkscape las hará el usuario. Detalle y aceptación en `PLAN_3D_DESIGNER.md`; esta sección es la lista de ejecución, sin otro plan paralelo.
 - [x] P0. Documentar contratos reales, archivos y fases; revisar y guardar el plan. *Razón: separar evidencia de propuestas antes de implementar.*
 - [x] P1. Fijar fixtures de los ocho endpoints elegidos y resolver contratos de envío, consulta, salida y precio. *Razón: no extrapolar versiones ni tipos de archivo.*
 - [x] P2. Incorporar asset 3D persistente y visor GLB bajo demanda con una muestra local. *Razón: probar almacenamiento y consumo antes de gastar.*
@@ -22,7 +22,8 @@ Solicitud actual: implementar P1–P9 (usuario, 2026-09-25). Solo typecheck y te
   Hecho: menú Export (PNG, JPG con fondo blanco, SVG, PDF). SVG por capas (`design/export.ts`): capas Inkscape con nombre, opacidad y `mix-blend-mode`, formas nativas, texto como `<text>`/`<tspan>` con la base del renderer, imágenes PNG incrustadas, recorte a la página. PDF = ese SVG con jsPDF + svg2pdf.js (carga diferida). Pendiente (usuario): abrir en Inkscape; el PDF usa fuentes estándar para el texto.
 - [x] P8. Añadir lineart editable con presión y contorno vectorial. *Razón: conservar el gesto para editarlo después.*
   Hecho: herramienta Lineart (P). Cada gesto es un `Stroke` (puntos `[x, y, presión]` + estilo) en una capa vectorial "Lineart N"; presión real con lápiz y simulada con ratón; contorno con perfect-freehand (caché por objeto). Un gesto = un paso de deshacer (el trazo en curso vive en el Stage, no en el documento). Después de dibujar: Alt-arrastrar dobla el trazo con caída suave; Propiedades reestiliza los trazos de la capa (grosor, color, adelgazamiento, suavizado, estabilización, afilado). SVG: cada trazo es un `<path>` relleno. Pendiente (usuario): tableta real e Inkscape.
-- [ ] P9. Añadir textura a lo largo del trazo, caché por trazo y exportación híbrida. *Razón: editar el pincel sin rasterizar todo el documento.*
+- [x] P9. Añadir textura a lo largo del trazo, caché por trazo y exportación híbrida. *Razón: editar el pincel sin rasterizar todo el documento.*
+  Hecho: `StrokeStyle.texture` (estampa, espaciado, jitter, semilla). Estampas generadas por código (lápiz, tiza, cerda seca; sin archivos de terceros) colocadas a lo largo de la línea central con dirección y presión (`stampPlacements`, determinista por semilla, tope `MAX_STAMPS` = 1500). Caché renderizada por objeto `Stroke` (WeakMap: se invalida al editar y se libera con el trazo); solo el trazo en curso se re-estampa en vivo. SVG: una imagen por trazo en `<defs>` reutilizada con `<use transform>`. Build: `model-viewer`, jsPDF y svg2pdf en chunks aparte. Pendiente (usuario): rendimiento con muchos trazos, Inkscape y tamaño del SVG.
 Las fases P7–P9 son propuestas técnicas, no conformidad ya demostrada con Inkscape. No se autorizan generaciones de pago por aprobar este plan documental.
 
 ## Tarea actual (en pausa tras la fase 7) — cobertura completa de las familias prioritarias (2026-09-25)
