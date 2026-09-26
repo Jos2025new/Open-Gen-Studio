@@ -8,6 +8,16 @@ import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 import { refMentionStyle } from '../src/engine/params';
 
+describe('FLUX 3 guide', () => {
+  it('covers the video routes (not the robotics model) with audio on and edit as a change instruction', () => {
+    expect(guideIndex()).toContain('  model:flux — how to write prompts for FLUX 3 Video and Video Edit');
+    for (const id of ['black-forest-labs/flux-3/keyframes-to-video', 'blackforestlabs/flux-3/edit-video', 'blackforestlabs/flux-3/text-to-video/draft', 'flux-3']) expect(guideForModel(id)?.id).toBe('flux');
+    expect(guideForModel('fal-ai/flux-3-action/so101')).toBeUndefined();
+    const t = readGuide('model:flux')!;
+    for (const rule of ['5–20 s', 'Audio is on by default', 'change instruction', 'on twos', 'do not describe the style again', '/draft']) expect(t).toContain(rule);
+  });
+});
+
 describe('Veo 3.1 guide', () => {
   it('covers every variant and states the 8 s limit, audio switch and moderation', () => {
     expect(guideIndex()).toContain('  model:veo — how to write prompts for Veo 3.1 (standard, Fast, Lite)');
