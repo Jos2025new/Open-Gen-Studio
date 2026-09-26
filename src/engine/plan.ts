@@ -387,6 +387,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const prompt = (s.prompt ?? '').trim();
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
+        if (schema.slots.promptMax && prompt.length > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${prompt.length}). Shorten it. [PROMPT_TOO_LONG]`);
         if (kind === 'model3d') {
           if (videoRefs.length || audioRefs.length) errors.push(`${where}: 3D models take only images in refs.`);
           // Sizes are checked by the job runner once the images exist.
@@ -454,6 +455,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (s.lyrics_from && !lyricsDef) errors.push(`${where}: model "${modelRef}" takes no lyrics.`);
         const prompt = (s.prompt ?? '').trim();
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
+        if (schema.slots.promptMax && prompt.length > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${prompt.length}). Shorten it. [PROMPT_TOO_LONG]`);
         const { settings, changes } = coerceSettings(schema, 'audio', { count: 1, extras: s.params, advanced: cleanParams(s.params) });
         changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));
         // Lyrics arriving from another step are only known at run time; the same rules then run in the job.

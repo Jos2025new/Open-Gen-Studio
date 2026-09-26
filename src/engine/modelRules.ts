@@ -76,3 +76,51 @@ export function model3dProblem(
   }
   return null;
 }
+
+/**
+ * How a family's prompt cites its references, when the endpoint's own schema does not say (a schema's
+ * `promptRefs` always wins: it is the most specific source). Rendered once in the agent's system prompt.
+ */
+export interface ReferenceProtocol {
+  family: string;
+  note: string;
+  source: string;
+}
+
+export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
+  {
+    family: 'Seedance 2.0 / 2.5',
+    note: '@Image1, @Image2… (@Video1, @Audio1), numbered per type in refs order; one job per reference plus what it must not bring ("@Image1 is the character; ignore its background").',
+    source: 'Atlas schema seedance-2.5/reference-to-video (prompt: "Cite reference inputs in submission order with @-syntax"); API DOC/bytedance seedance 2 5.md (example Odysseus@image2)',
+  },
+  {
+    family: 'Wan 3',
+    note: '@Image1 defines… ("@Image1 defines the character. Do not use the image background."); with first/last frame, leave free references out.',
+    source: 'ai-director guide wan3/prompting.md lines 88–123 (user machine); fal schema wan-3.0/reference-to-video ("Image 1 … Video 1")',
+  },
+  {
+    family: 'MiniMax H3',
+    note: '<Picture 1>, <Picture 2> (not @Image1), with timing when it helps ("<Picture 1> aligns with the 0.00-second mark"); with good references the prompt covers action, camera and sound, not appearance.',
+    source: 'MiniMax-H3 VIDEO_PROMPT_WRITING_GUIDE_ref_en.md; ai-director guide minimax-h3 lines 29–31, 104',
+  },
+];
+
+/** What a preferred model is best for and what to avoid it for: the user-approved purpose table (R1) and schema limits. */
+export interface ModelFit {
+  match: RegExp;
+  bestFor: string;
+  avoidFor?: string;
+  source: string;
+}
+
+export const MODEL_FITS: ModelFit[] = [
+  { match: /seedance[-/]?2[.-]0[-/]?(fast|mini)|seedance-2-0-(fast|mini)/i, bestFor: 'drafts and tests (fast, cheap)', avoidFor: 'final pieces', source: 'purpose table approved 2026-09-26' },
+  { match: /minimax[-/]h3-fast/i, bestFor: 'drafts and tests (fast, cheap)', avoidFor: 'final pieces', source: 'purpose table approved 2026-09-26' },
+  { match: /seedance[-/]?2[.-]5/i, bestFor: 'long takes (up to 30 s) and many references', avoidFor: 'cheap drafts', source: 'purpose table approved 2026-09-26; API DOC/bytedance seedance 2 5.md (duration up to 30 s)' },
+  { match: /wan-3\.0/i, bestFor: 'short clips and final pieces (default video model)', source: 'purpose table approved 2026-09-26' },
+];
+
+export function modelFit(modelId: string): string | undefined {
+  const f = MODEL_FITS.find((x) => x.match.test(modelId));
+  return f ? `best for ${f.bestFor}${f.avoidFor ? `; avoid for ${f.avoidFor}` : ''}` : undefined;
+}

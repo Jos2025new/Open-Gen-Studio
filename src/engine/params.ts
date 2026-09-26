@@ -422,6 +422,25 @@ function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefi
   return Boolean(item.properties?.url && type?.enum?.includes('image'));
 }
 
+/** Longest prompt from the schema: maxLength, or "up to / max(imum) N characters" in the description; recommendations do not count. */
+export function promptLimit(p: JsonProp | undefined): number | undefined {
+  const fromText = /(?:up to|max(?:imum)?(?: length)?(?: is| of)?)\s*([\d,]+)\s*characters/i.exec(p?.description ?? '');
+  const limits = [p?.maxLength, fromText ? Number(fromText[1].replace(/,/g, '')) : undefined].filter((n): n is number => Number.isFinite(n) && n! > 0);
+  return limits.length ? Math.min(...limits) : undefined;
+}
+
+/** The sentence of a prompt description that says how to cite the inputs (the provider's own syntax), if any. */
+export function promptCitation(description: string | undefined): string | undefined {
+  if (!description) return undefined;
+  const sentences = description.split(/(?<=[.!?])\s+/);
+  const hit = sentences.find((t) => /@(image|video|audio)\s?\d|<\s*image_?\d|<\s*picture|\bimage\s?\d\b|\bvideo\s?\d\b|character\s?\d|<<<element/i.test(t));
+  return hit ? truncateText(hit.trim(), 220) : undefined;
+}
+
+function truncateText(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n - 1)}…` : s;
+}
+
 export function schemaFromJson(opts: {
   ref: string;
   kind: MediaKind;
@@ -442,6 +461,10 @@ export function schemaFromJson(opts: {
     if (k) {
       slots.prompt = k;
       slots.promptRequired = required.includes(k);
+      const limit = promptLimit(properties[k]);
+      if (limit) slots.promptMax = limit;
+      const cites = promptCitation(properties[k]?.description);
+      if (cites) slots.promptRefs = cites;
       break;
     }
   }
@@ -998,6 +1021,8 @@ export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind
   if (s.audio) out.push(`an audio ref${s.audio.required ? ' (required: the speech or track to follow)' : ' (optional soundtrack)'}`);
   if (s.refAudios) out.push(`up to ${s.refAudios.max} reference audio refs`);
   if (s.mixedRefs) out.push('audio refs count among the references');
+  if (s.promptRefs) out.push(`prompt: ${s.promptRefs}`);
+  if (s.promptMax) out.push(`prompt ≤${s.promptMax} chars`);
   if (schema.missing?.length) out.push(`cannot run from the app (needs ${schema.missing.join(', ')})`);
   return out;
 }

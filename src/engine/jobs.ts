@@ -377,6 +377,8 @@ async function execute(id: string): Promise<string[]> {
         });
       }
     }
+    const promptMax = schema.slots.promptMax;
+    if (promptMax && prompt.length > promptMax) throw new InputError('PROMPT_TOO_LONG', `${model.name} takes prompts up to ${promptMax} characters (this one has ${prompt.length}).`);
     // Multi-shot storyboard: shots must add up to the clip; some providers take shots instead of the prompt.
     const shotProblem = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
     if (shotProblem) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotProblem}`);

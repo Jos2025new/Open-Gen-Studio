@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
-import { mediumResolution } from '../src/engine/params';
+import { mediumResolution, promptCitation, promptLimit } from '../src/engine/params';
+import { REFERENCE_PROTOCOLS, modelFit } from '../src/engine/modelRules';
+import { normalizePlan, type PlanContext } from '../src/engine/plan';
 import { SYSTEM_PROMPT } from '../src/engine/agent/context';
 
 describe('medium quality by default (R1)', () => {
@@ -25,5 +27,51 @@ describe('default route and prompting rules in the system prompt (R1, R2)', () =
       expect(SYSTEM_PROMPT).toContain(s);
     }
     expect(SYSTEM_PROMPT).not.toMatch(/Usually 40-120 words\. Write prompts/);
+  });
+});
+
+describe('reference protocols, model fit and prompt limits (R3)', () => {
+  it('reads the prompt limit from maxLength or the description, never from a recommendation', () => {
+    expect(promptLimit({ maxLength: 2500 })).toBe(2500);
+    expect(promptLimit({ description: 'Text prompt for generation. Maximum 20,000 characters.' })).toBe(20000);
+    expect(promptLimit({ description: 'The text prompt (up to 20000 characters).' })).toBe(20000);
+    expect(promptLimit({ description: 'Text instruction for editing. Max 800 characters.' })).toBe(800);
+    expect(promptLimit({ description: 'Maximum 2,500 characters.', maxLength: 2000 })).toBe(2000);
+    expect(promptLimit({ description: 'Recommended length: Chinese < 500 characters, English < 1000 words.' })).toBeUndefined();
+  });
+
+  it("keeps the provider's own citation syntax from the prompt description", () => {
+    expect(promptCitation('Text prompt describing the desired video. Cite reference inputs in submission order with @-syntax: @Image1, @Video1, @Audio1, etc. Prompts p')).toMatch(/^Cite reference inputs .*@Image1/);
+    expect(promptCitation('Editing instruction. When supplying multiple source images, cite them as <IMAGE_0>, <IMAGE_1>, <IMAGE_2>.')).toMatch(/<IMAGE_0>/);
+    expect(promptCitation('The text prompt describing the video you want to generate')).toBeUndefined();
+  });
+
+  it('the validator rejects a prompt over the limit before anything is sent', async () => {
+    const model = { ref: 'fal::m', provider: 'fal', id: 'm', name: 'M', kind: 'video', acceptsText: true, tags: [] } as never;
+    const ctx: PlanContext = {
+      workspace: 'chat',
+      getModel: async () => ({ model, schema: { ref: 'fal::m', params: [], slots: { prompt: 'prompt', promptMax: 20 }, source: 'openapi' } }),
+      defaultModel: () => 'fal::m',
+      defaultSettings: () => ({}),
+      asset: () => undefined,
+      layer: () => undefined,
+    };
+    const { errors } = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'x'.repeat(21) }] }, ctx, 'p');
+    expect(errors.join(' ')).toMatch(/up to 20 characters \(this one has 21\).*\[PROMPT_TOO_LONG\]/);
+  });
+
+  it('each preferred family gets its fit line, other models none', () => {
+    expect(modelFit('alibaba/wan-3.0/image-to-video')).toMatch(/short clips and final pieces/);
+    expect(modelFit('bytedance/seedance-2.5/reference-to-video')).toMatch(/long takes.*avoid for cheap drafts/);
+    expect(modelFit('bytedance-seedance-2-0-fast')).toMatch(/drafts/);
+    expect(modelFit('minimax/h3-fast/image-to-video')).toMatch(/drafts/);
+    expect(modelFit('kwaivgi/kling-v3.0-pro/text-to-video')).toBeUndefined();
+    expect(modelFit('minimax/h3/text-to-video')).toBeUndefined();
+  });
+
+  it('the system prompt carries each family protocol once, with MiniMax as <Picture N>', () => {
+    for (const p of REFERENCE_PROTOCOLS) expect(SYSTEM_PROMPT.split(p.note).length).toBe(2);
+    expect(SYSTEM_PROMPT).toContain('<Picture 1>');
+    expect(SYSTEM_PROMPT).toContain('use exactly that');
   });
 });

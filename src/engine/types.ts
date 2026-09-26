@@ -49,6 +49,10 @@ export interface InputSlots {
   /** Key for the text prompt (absent when the model takes no prompt). */
   prompt?: string;
   promptRequired?: boolean;
+  /** Longest prompt the provider takes, in characters (schema maxLength or "up to N characters"). */
+  promptMax?: number;
+  /** How the prompt field says to cite the references ("@Image1", "<IMAGE_0>", "Image 1"…), from the provider's schema. */
+  promptRefs?: string;
   /** Reference / source images. */
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
   /** Image models with a source image and a separate reference list (Ideogram Character remix): the first input image. */

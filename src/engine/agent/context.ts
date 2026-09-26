@@ -7,6 +7,7 @@ import { isConnected, modelSummary } from '../catalog';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
+import { REFERENCE_PROTOCOLS, modelFit } from '../modelRules';
 
 const get = useStore.getState;
 
@@ -39,6 +40,9 @@ Writing prompts
 - From text: a complete, specific description (subject, action, setting, shot size, lighting, style, palette), usually 40-120 words. Physical terms (lens, depth of field, light direction) instead of empty modifiers ("8k, masterpiece, best quality"). Write prompts in English unless the user asks otherwise.
 - Never bake long text into image prompts. In the Designer, headlines and copy go on text layers.
 - To the user, plain language: model names, not refs; never tool names, workflow names or ids.
+- Citing references: when a model's inputs give a "prompt:" syntax, use exactly that. Otherwise, by family:
+${REFERENCE_PROTOCOLS.map((p) => `  ${p.family}: ${p.note}`).join('\n')}
+  Numbering follows refs order per type; on a model with no start-frame input, first_frame counts as the first image.
 
 Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for layers)
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
@@ -92,6 +96,8 @@ function describeModel(kind: MediaKind): string {
     if (paramByRole(schema, 'audio')) parts.push('audio optional');
   }
   parts.push(`inputs: ${capabilityHints(schema, kind).join('; ')}`);
+  const fit = m && modelFit(m.id);
+  if (fit) parts.push(fit);
   const cur = [
     settings.aspect ? `aspect ${aspectLabel(settings.aspect)}` : '',
     settings.resolution ? `resolution ${settings.resolution}` : '',
@@ -119,7 +125,8 @@ function alternatives(): string {
       if (!m) continue;
       const schema = m.kind === 'audio' ? st.catalog.schemas[m.ref] : undefined;
       const what = m.textOutput ? 'audio model with text output (lyrics)' : m.kind;
-      lines.push(`${m.ref} — ${what}${m.acceptsImage ? ', image input' : ''} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}`);
+      const fit = modelFit(m.id);
+      lines.push(`${m.ref} — ${what}${m.acceptsImage ? ', image input' : ''} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}${fit ? ` — ${fit}` : ''}`);
     }
     // Models with special inputs, so the agent can pick one when the request needs it.
     const special = Object.values(st.catalog.models).filter((m) => m.provider === p && /(keyframes|reference)-to-(video|image)/.test(m.id)).slice(0, 6);

@@ -1,6 +1,7 @@
 import families from '../../../scripts/model-families.json';
 import { formatUsd } from '../../lib/format';
 import { isConnected } from '../catalog';
+import { modelFit } from '../modelRules';
 import type { MediaKind, ModelSchema, ModelSummary } from '../types';
 import { useStore } from '../../store/store';
 
@@ -86,7 +87,11 @@ export function describeIndexed(m: ModelSummary): string {
   const inputs = [m.acceptsText ? 'text' : '', m.acceptsImage ? 'image' : '', m.needsVideo ? 'needs a source video' : m.acceptsVideo ? 'video' : ''].filter(Boolean).join('+') || 'none';
   const sku = m.price?.skus[0];
   const price = sku ? `${m.price?.lowerBound ? '≥' : ''}${formatUsd(sku.usd)}/${sku.unit === 'output' ? 'run' : sku.unit}` : 'price not published';
-  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}`;
+  const schema = useStore.getState().catalog.schemas[m.ref];
+  const s = schema?.slots;
+  const prompt = [s?.promptRefs ? `prompt: ${s.promptRefs}` : '', s?.promptMax ? `prompt ≤${s.promptMax} chars` : ''].filter(Boolean).join('; ');
+  const fit = modelFit(m.id);
+  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}`;
 }
 
 /** find_models tool result: one line per match, or a short "nothing found" the agent can act on. */
