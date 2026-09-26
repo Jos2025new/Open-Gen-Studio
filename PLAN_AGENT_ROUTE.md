@@ -26,6 +26,7 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 - **Comprobado en esta app (2026-09-26):**
   - **Longitud del prompt:** de 166 esquemas de Atlas con prompt, 19 declaran `maxLength` y 10 solo lo dicen en la descripción ("up to N characters"). La app solo comprueba Tripo (`MODEL3D_RULES`).
   - **Coste de editar o extender:** las operaciones directas ya se estiman bien (editar o hacer upscale por la duración del clip de origen, extender por los segundos nuevos; `jobs.ts:700`). En los planes del agente, en cambio, un paso de operación de vídeo se estima con la duración del composer (`executor.ts:48`), así que la tarjeta puede no coincidir con el coste real. Seedance 2.5, al editar, exige `duration -1` y la salida sigue la duración del clip de entrada (4–30 s) (`API DOC/bytedance seedance 2 5.md`, líneas 107 y 111).
+- **Higgsfield, guion + 3 imágenes:** no describe las referencias, las cita por posición; necesita saber el papel de cada una (lo deduce viéndolas o pregunta); el guion decide planos y duración. Al contrastarlo se halló que **nuestro agente no veía las imágenes adjuntas** (solo su tamaño en texto); corregido como fallo (`AGENTS.md`, V1–V3).
 - **Otros agentes (ImagineArt, Buzzy AI), preguntados por el usuario.** Ambos dicen usar un índice ligero con carga bajo demanda, una ruta normal por defecto, una tarjeta única de configuración con opciones premarcadas y referencias con papeles por modelo. Es una **autodescripción, no una prueba**: Buzzy afirma usar `<<<image_1>>>` con Seedance, lo que contradice la documentación (`<<<element_N>>>` es Kling en Atlas). Las notas por modelo salen de la documentación del proveedor, no de otros agentes.
 - `guidedRounds` vale 2 por defecto (`store.ts`); `ask_questions` admite de 1 a 4 preguntas por ronda.
 - Variantes relevantes en el catálogo pulido (`tests/fixtures/live/expected.txt`): Wan 3 (`atlas::alibaba/wan-3.0/{image,reference,text}-to-video`, `nanogpt::alibaba/wan-3.0/…`, `fal::alibaba/wan-3.0/…`), Seedance 2.0 / Fast / 2.5, MiniMax H3 (`atlas::minimax/h3/…`, `nanogpt::minimax-h3`). NanoGPT incluye además variantes `-spicy` que hoy `find_models` devolvería (ver decisiones pendientes).
@@ -47,12 +48,13 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
   - Toma larga o muchas referencias → Seedance 2.5.
   - Edición o extensión de un clip → operaciones Edit/Extend video con su modelo preferido (hoy Wan 3.0 video-edit / video-extend en NanoGPT).
   Si una petición no encaja en ninguna fila, se usa Wan 3.
+**Número de clips y duración:** salen de la petición o del guion, nunca del número de referencias (tres imágenes no son tres clips). Un guion con personajes que reaparecen lleva al camino narrativo (workflow Storyboard, sujetos de Kling) en vez de clips sueltos.
 **Por qué:** hoy la estructura y el modelo se improvisan en cada petición.
 **Aceptación (banco):** en "animar este personaje" el plan usa Wan 3 con la imagen como referencia o primer fotograma, o pregunta una sola vez con esas opciones marcadas. Llamadas y tokens en peticiones claras: iguales que en R0.
 
 ### R2. Reglas universales de prompting
 **Dónde:** `SYSTEM_PROMPT` (reemplaza la regla de "Writing prompts"; mismo tamaño aproximado).
-**Qué:** en imagen→vídeo el prompt describe movimiento, física, cámara y qué debe conservarse, no la imagen otra vez; nada de modificadores vacíos ("8k masterpiece") sino descripciones físicas (lente, profundidad de campo, luz); en inglés.
+**Qué:** en imagen→vídeo el prompt describe movimiento, física, cámara y qué debe conservarse, no la imagen otra vez. En general, **ninguna referencia se parafrasea**: se cita con su papel (y lo que no debe aportar) y la apariencia la pone la referencia, que el agente ya ve (fallo V corregido en `a4c1eae`). Si el papel de una referencia no se deduce de la imagen ni del mensaje, se pregunta en la tarjeta única. Nada de modificadores vacíos ("8k masterpiece") sino descripciones físicas (lente, profundidad de campo, luz); en inglés.
 **Por qué:** volver a describir la imagen compite con ella.
 **Aceptación (banco):** los prompts de imagen→vídeo no repiten la apariencia de la referencia; mismo recuento de tokens de salida o menor.
 
