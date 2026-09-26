@@ -21,6 +21,7 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
   - Seedance 2.0 / 2.5: `@Image1`, `@Video1`, `@Audio1`; una función concreta por referencia, más lo que no debe aportar (guía seedance2-5, líneas 69–86; ejemplo oficial en `API DOC/bytedance seedance 2 5.md`, `Odysseus@image2`).
   - Wan 3: `@Image1 defines … Do not use the image background.`; primer y último fotograma suelen excluir las referencias libres (guía wan3, líneas 88–123).
   - MiniMax H3: **no** usa `@Image1`, sino `<Picture 1>` con alineación temporal ("aligns with the 0.00-second mark"); con buenas referencias, el prompt describe acción, cámara y sonido, no la apariencia (guía minimax-h3, líneas 29–31 y 104; fuente oficial: MiniMax-H3 `VIDEO_PROMPT_WRITING_GUIDE_ref_en.md`).
+- **Tercer testimonio (agente de la plataforma del usuario, 2026-09-26).** Antes de responder consultó su catálogo (`media_models`, solo lectura). Su conocimiento por modelo es **estructural**, no artístico: notas de sintaxis de referencias en la definición de la herramienta, más un catálogo con `best_for` / `avoid_for` por modelo que explica sus elecciones, y valores por defecto **por propósito** (borrador, pieza final o toma larga, texto o edición). Reconoce no tener una ruta por defecto fija ("dos trabajos parecidos pueden salir con modelos distintos"). Afirma que Google Omni Flash 1.1 cita `<IMAGE_REF_0>` / `<VIDEO_REF_0>`, contando desde cero (**sin verificar**). Sus modelos por defecto (MiniMax H3 Max, Z-Image Turbo) son decisiones de su producto, no de esta app.
 - **Otros agentes (ImagineArt, Buzzy AI), preguntados por el usuario.** Ambos dicen usar un índice ligero con carga bajo demanda, una ruta normal por defecto, una tarjeta única de configuración con opciones premarcadas y referencias con papeles por modelo. Es una **autodescripción, no una prueba**: Buzzy afirma usar `<<<image_1>>>` con Seedance, lo que contradice la documentación (`<<<element_N>>>` es Kling en Atlas). Las notas por modelo salen de la documentación del proveedor, no de otros agentes.
 - `guidedRounds` vale 2 por defecto (`store.ts`); `ask_questions` admite de 1 a 4 preguntas por ronda.
 - Variantes relevantes en el catálogo pulido (`tests/fixtures/live/expected.txt`): Wan 3 (`atlas::alibaba/wan-3.0/{image,reference,text}-to-video`, `nanogpt::alibaba/wan-3.0/…`, `fal::alibaba/wan-3.0/…`), Seedance 2.0 / Fast / 2.5, MiniMax H3 (`atlas::minimax/h3/…`, `nanogpt::minimax-h3`). NanoGPT incluye además variantes `-spicy` que hoy `find_models` devolvería (ver decisiones pendientes).
@@ -36,6 +37,7 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 ### R1. Ruta estándar como reglas por defecto
 **Dónde:** `agent/context.ts` (unas líneas en `SYSTEM_PROMPT`), `providers/registry.ts` (preferencias de vídeo por proveedor).
 **Qué:** cuando no hay skill ni workflow que encaje y la petición es vaga: Direct (usar la imagen dada), un clip, calidad media y modelo Wan 3, con Seedance 2.0/2.5 y MiniMax H3 como sugerencias. Lo que pida el usuario manda siempre sobre estos valores; si la petición ya es clara, no se pregunta nada.
+**Tabla por propósito (decisión pendiente 5):** en lugar de un único modelo, una tabla corta dentro de las mismas reglas, por ejemplo: borrador o prueba → variante rápida o barata; pieza final → Wan 3 (preferido); toma larga o muchas referencias → Seedance 2.5; texto sobre el vídeo o editar un clip → modelo de edición. Unas 4–5 líneas fijas; cero llamadas. Si el usuario prefiere un único valor por defecto, queda Wan 3 para todo.
 **Por qué:** hoy la estructura y el modelo se improvisan en cada petición.
 **Aceptación (banco):** en "animar este personaje" el plan usa Wan 3 con la imagen como referencia o primer fotograma, o pregunta una sola vez con esas opciones marcadas. Llamadas y tokens en peticiones claras: iguales que en R0.
 
@@ -48,8 +50,10 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 ### R3. Protocolo de referencias por familia, en línea
 **Dónde:** `modelRules.ts` (`REFERENCE_PROTOCOLS`, cada uno con su fuente), `agent/context.ts` (línea del modelo seleccionado), `agent/modelIndex.ts` (resultados de `find_models`).
 **Qué:** 1–3 líneas por familia, visibles solo junto al modelo en uso: Seedance y Wan `@Image1…` con función y exclusiones; MiniMax H3 `<Picture 1>` con alineación temporal. **Comprobar primero** que el orden de las referencias que envía la app coincide con la numeración (`reference_images` y `refers` en Atlas; imágenes, luego vídeos, luego audio).
+**Para qué es mejor / qué evitar (`best_for` / `avoid_for`):** una línea por modelo preferido, con fuente (documentación del proveedor y límites del esquema; por ejemplo "Seedance 2.5: tomas de hasta 30 s y muchas referencias; evitar para borradores baratos"). Se muestra en la lista corta del contexto y en los resultados de `find_models`, para que el agente pueda justificar y elegir alternativas. Solo para modelos con dato verificable; el resto sin línea.
+**Gemini Omni Flash 1.1:** nota de protocolo (`<IMAGE_REF_0>`, desde cero) **solo tras verificarla** en la documentación de Google o del proveedor; hasta entonces, sin nota.
 **Por qué:** cada modelo nombra las referencias a su manera; hoy el agente escribe referencias genéricas.
-**Aceptación:** test de que cada familia recibe su nota y ninguna otra; banco: prompts con la etiqueta correcta. Ninguna llamada extra.
+**Aceptación:** test de que cada familia recibe su nota y su `best_for` / `avoid_for`, y ninguna otra; banco: prompts con la etiqueta correcta y modelo coherente con el propósito. Ninguna llamada extra.
 
 ### R4. Índice de skills, workflows y guías + `read_guide`
 **Dónde:** `SYSTEM_PROMPT` (índice: una línea por elemento), `agent/tools.ts` y `runtime.ts` (herramienta `read_guide`), `engine/guides/` (guías condensadas de Wan 3, Seedance 2.0, Seedance 2.5 y MiniMax H3, de 300–500 palabras, con fuente).
@@ -81,7 +85,10 @@ Mismo banco de pruebas en el commit final. Tabla por petición y en total: llama
 2. **Multi-stage (R1):** varias referencias generadas a partir de la imagen. ¿Un conjunto fijo (frente, perfil, ¾, como "Character sheet") o que el agente decida según la petición?
 3. **Variantes `-spicy` de NanoGPT:** ¿se excluyen del índice de `find_models` y de la ruta estándar?
 4. **Banco de pruebas (R0/R8):** permiso para ejecutarlo con la clave del LLM (solo planes, sin generación).
+5. **Tabla por propósito (R1):** ¿se adopta (borrador / final / toma larga / texto o edición, con Wan 3 como preferido) o se mantiene Wan 3 como único valor por defecto?
 
 ## Fuera de alcance
+
+- **Revisar el resultado** (detectar que un vídeo perdió el estilo o la paleta, como hace el agente citado): requiere que un modelo con visión revise cada resultado, es decir, una llamada extra por generación. Choca con la restricción de latencia; sería una fase aparte y opcional.
 
 Guías para Kling, Veo, FLUX 3 y otras familias (siguen las reglas actuales hasta tener fuentes verificadas); cargar las guías por defecto en el contexto; cambios en el validador de coste o de entradas.

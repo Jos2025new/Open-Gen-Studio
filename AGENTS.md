@@ -9,11 +9,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 
 ## Plan — ruta estándar del agente, prompting por modelo y medición (2026-09-26)
-Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: hay decisiones pendientes del usuario (calidad, multi-stage, variantes `-spicy`, permiso para el banco de pruebas).
+Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: hay decisiones pendientes del usuario (calidad, multi-stage, variantes `-spicy`, permiso para el banco de pruebas, tabla por propósito).
 - [ ] R0. Registro de métricas por turno y banco de pruebas: medir el antes.
-- [ ] R1. Ruta estándar como reglas por defecto (Direct, un clip, calidad media, Wan 3; Seedance 2.0/2.5 y MiniMax H3 como sugerencias).
+- [ ] R1. Ruta estándar como reglas por defecto (Direct, un clip, calidad media, Wan 3; Seedance 2.0/2.5 y MiniMax H3 como sugerencias), con tabla por propósito si el usuario la aprueba.
 - [ ] R2. Reglas universales de prompting (imagen→vídeo: movimiento, cámara, qué conservar; sin modificadores vacíos).
-- [ ] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3).
+- [ ] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3), más `best_for` / `avoid_for` por modelo preferido; Omni Flash solo tras verificar.
 - [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda.
 - [ ] R5. Skill recomendada por workflow.
 - [ ] R6. Preguntas con opción por defecto marcada.
