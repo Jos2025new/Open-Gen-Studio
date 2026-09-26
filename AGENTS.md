@@ -13,11 +13,12 @@ Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **R
 - [ ] R0. Registro de métricas por turno y banco de pruebas: medir el antes.
 - [ ] R1. Ruta estándar como reglas por defecto (Direct, un clip, calidad media, Wan 3; Seedance 2.0/2.5 y MiniMax H3 como sugerencias), con tabla de sugerencias por propósito (borrador, corto o final, toma larga, edición).
 - [ ] R2. Reglas universales de prompting (imagen→vídeo: movimiento, cámara, qué conservar; sin modificadores vacíos).
-- [ ] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3), más `best_for` / `avoid_for` por modelo preferido; Omni Flash solo tras verificar.
-- [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda.
+- [ ] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3), más `best_for` / `avoid_for` por modelo preferido y límite de longitud del prompt desde el esquema; Omni Flash solo tras verificar.
+- [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda; el workflow gana a la ruta genérica y sus entradas necesarias entran en la tarjeta única.
 - [ ] R5. Skill recomendada por workflow.
 - [ ] R6. Preguntas con opción por defecto marcada.
 - [ ] R7. Proporción heredada de la imagen de entrada (validador).
+- [ ] R9. Coste de los pasos de operación de vídeo en planes igual al de la operación directa (duración del clip).
 - [ ] R8. Medir el después y comparar con R0.
 
 ## Plan — agente: búsqueda de modelos, indicador, revisión y selección de pasos (2026-09-26)
