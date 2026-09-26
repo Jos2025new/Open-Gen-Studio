@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownUp, AudioLines, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X } from 'lucide-react';
+import { ArrowDownUp, AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import { formatDuration, groupByDate } from '../../lib/format';
@@ -8,7 +8,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Asset } from '../../engine/types';
 
-type KindFilter = 'all' | 'image' | 'video' | 'audio';
+type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
 type Scope = 'session' | 'all';
 
 export function GalleryPanel() {
@@ -90,6 +90,7 @@ export function GalleryPanel() {
               { value: 'image', label: 'Images' },
               { value: 'video', label: 'Videos' },
               { value: 'audio', label: 'Audio' },
+              { value: 'model3d', label: '3D' },
             ]}
           />
           <Segmented
@@ -186,10 +187,10 @@ function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; sel
       <button ref={ref} type="button" className="g-open" onClick={onOpen} aria-label="Open">
         <AssetMedia assetId={asset.id} />
       </button>
-      {asset.kind === 'video' || asset.kind === 'audio' ? (
+      {asset.kind === 'video' || asset.kind === 'audio' || asset.kind === 'model3d' ? (
         <span className="g-badge num">
-          {asset.kind === 'audio' ? <AudioLines size={11} /> : <Film size={11} />}
-          {asset.duration ? formatDuration(asset.duration * 1000) : ''}
+          {asset.kind === 'audio' ? <AudioLines size={11} /> : asset.kind === 'model3d' ? <Box size={11} /> : <Film size={11} />}
+          {asset.kind === 'model3d' ? '3D' : asset.duration ? formatDuration(asset.duration * 1000) : ''}
         </span>
       ) : null}
       {asset.favorite ? <Star size={12} className="g-fav" fill="currentColor" /> : null}

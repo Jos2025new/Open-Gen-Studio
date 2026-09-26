@@ -207,6 +207,12 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function extensionForMime(mime: string): string {
+  if (mime === 'model/gltf-binary') return 'glb';
+  if (mime === 'application/zip') return 'zip';
+  if (mime === 'application/vnd.autodesk.fbx') return 'fbx';
+  if (mime === 'model/obj') return 'obj';
+  if (mime === 'model/vnd.usdz+zip') return 'usdz';
+  if (mime === 'model/vnd.usd') return 'usd';
   if (mime.startsWith('audio/')) {
     if (mime.includes('mpeg') || mime.includes('mp3')) return 'mp3';
     if (mime.includes('wav')) return 'wav';
@@ -226,7 +232,7 @@ export function extensionForMime(mime: string): string {
   return 'bin';
 }
 
-export function guessMimeFromUrl(url: string, kind: 'image' | 'video' | 'audio'): string {
+export function guessMimeFromUrl(url: string, kind: 'image' | 'video' | 'audio' | 'model3d'): string {
   const path = url.split('?')[0].toLowerCase();
   if (path.endsWith('.png')) return 'image/png';
   if (path.endsWith('.jpg') || path.endsWith('.jpeg')) return 'image/jpeg';
@@ -240,7 +246,7 @@ export function guessMimeFromUrl(url: string, kind: 'image' | 'video' | 'audio')
   if (path.endsWith('.flac')) return 'audio/flac';
   if (path.endsWith('.ogg')) return 'audio/ogg';
   if (path.endsWith('.m4a') || path.endsWith('.aac')) return 'audio/aac';
-  return kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4';
+  return kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : kind === 'model3d' ? 'model/gltf-binary' : 'video/mp4';
 }
 
 /**

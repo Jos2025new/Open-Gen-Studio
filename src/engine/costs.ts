@@ -4,6 +4,8 @@ import { OPS, opCount } from './ops';
 import { opModelFor } from './catalog';
 import type { AdvancedValue, Asset, Estimate, GenSettings, MediaKind, OpId, PriceRule } from './types';
 import { useStore } from '../store/store';
+import { parseModelRef } from './providers/types';
+import { variant3dKey } from '../lib/model3d';
 
 const get = useStore.getState;
 
@@ -29,6 +31,13 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
   if (ref.startsWith('local::')) return FREE;
   const price = priceOf(ref);
   if (!price) return UNKNOWN;
+  if (kind === 'model3d') {
+    const parsed = parseModelRef(ref);
+    const key = price.variants && parsed ? variant3dKey(parsed.id, { ...settings.advanced, ...(settings.resolution ? { resolution: settings.resolution } : {}) }) : undefined;
+    const usd = key != null ? price.variants?.[key] : undefined;
+    if (usd != null) return { usd: usd * Math.max(1, settings.count), approximate: false, note: price.note };
+    return estimate(price, { count: settings.count, mode: withImage ? 'image' : 'text' });
+  }
   if (kind === 'image') {
     return estimate(price, { count: settings.count, resolution: settings.resolution, mode: withImage ? 'image' : 'text', megapixels: megapixels(settings) });
   }

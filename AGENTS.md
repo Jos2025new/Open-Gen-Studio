@@ -9,14 +9,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 
 ## Plan — 3D prioritario, exportación y trazos editables (2026-09-25)
-Solicitud actual: solo planificación. Detalle y aceptación en `PLAN_3D_DESIGNER.md`; esta sección es la lista de ejecución, sin otro plan paralelo.
+Solicitud actual: implementar P1–P9 (usuario, 2026-09-25). Solo typecheck y tests específicos necesarios; las pruebas reales de proveedor, navegador e Inkscape las hará el usuario. Detalle y aceptación en `PLAN_3D_DESIGNER.md`; esta sección es la lista de ejecución, sin otro plan paralelo.
 - [x] P0. Documentar contratos reales, archivos y fases; revisar y guardar el plan. *Razón: separar evidencia de propuestas antes de implementar.*
-- [ ] P1. Fijar fixtures de los ocho endpoints elegidos y resolver contratos de envío, consulta, salida y precio. *Razón: no extrapolar versiones ni tipos de archivo.*
-- [ ] P2. Incorporar asset 3D persistente y visor GLB bajo demanda con una muestra local. *Razón: probar almacenamiento y consumo antes de gastar.*
-- [ ] P3. Completar generación TRELLIS.2 en NanoGPT por composer, agente y nodos. *Razón: primera ruta completa reutilizable.*
-- [ ] P4. Completar Tripo H3.1 en Atlas (texto e imagen). *Razón: distinguir archivos de modelo y miniaturas.*
-- [ ] P5. Completar Seed3D 2.0 en ambos proveedores y extracción acotada del ZIP de Atlas. *Razón: preservar el archivo y consultar la ruta correcta.*
-- [ ] P6. Completar Meshy 7.1 en NanoGPT (texto, imagen y multivista). *Razón: no confundirlo con Meshy v7 de Atlas.*
+- [x] P1. Fijar fixtures de los ocho endpoints elegidos y resolver contratos de envío, consulta, salida y precio. *Razón: no extrapolar versiones ni tipos de archivo.*
+- [x] P2. Incorporar asset 3D persistente y visor GLB bajo demanda con una muestra local. *Razón: probar almacenamiento y consumo antes de gastar.*
+- [x] P3. Completar generación TRELLIS.2 en NanoGPT por composer, agente y nodos. *Razón: primera ruta completa reutilizable.*
+- [x] P4. Completar Tripo H3.1 en Atlas (texto e imagen). *Razón: distinguir archivos de modelo y miniaturas.*
+- [x] P5. Completar Seed3D 2.0 en ambos proveedores y extracción acotada del ZIP de Atlas. *Razón: preservar el archivo y consultar la ruta correcta.*
+- [x] P6. Completar Meshy 7.1 en NanoGPT (texto, imagen y multivista). *Razón: no confundirlo con Meshy v7 de Atlas.*
+  Hecho P1–P6 (Claude, 2026-09-26, continuando el trabajo de GPT 6 Astra): ver fila en `TRAZABILIDAD.md`. Límites: salida y multivista de NanoGPT sin documentar (se clasifica por bytes); CORS de hosts 3D de Atlas sin probar; solo GLB (y GLB dentro de ZIP) se previsualiza.
 - [ ] P7. Exponer exportación PNG/JPG y añadir SVG/PDF con pruebas de fidelidad. *Razón: reutilizar el renderer y comprobar interoperabilidad.*
 - [ ] P8. Añadir lineart editable con presión y contorno vectorial. *Razón: conservar el gesto para editarlo después.*
 - [ ] P9. Añadir textura a lo largo del trazo, caché por trazo y exportación híbrida. *Razón: editar el pincel sin rasterizar todo el documento.*

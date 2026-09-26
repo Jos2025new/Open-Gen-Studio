@@ -39,6 +39,7 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
   const videoSettings = get().composer.video.settings;
   for (const s of steps) {
     if (s.kind === 'image') perStep[s.id] = estimateMedia(s.modelRef, 'image', s.settings, s.refs.length > 0);
+    else if (s.kind === 'model3d') perStep[s.id] = estimateMedia(s.modelRef, 'model3d', s.settings, s.refs.length > 0);
     else if (s.kind === 'video') perStep[s.id] = estimateMedia(s.modelRef, 'video', s.settings, Boolean(s.firstFrame));
     else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false);
     else if (s.kind === 'op') {
@@ -62,7 +63,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
 
   const deps = (s: PlanStep): string[] => {
     const refs: Array<string | undefined> =
-      s.kind === 'image'
+      s.kind === 'image' || s.kind === 'model3d'
         ? [s.promptFrom, ...s.refs]
         : s.kind === 'video'
           ? [s.promptFrom, s.firstFrame, s.lastFrame, ...(s.refs ?? [])]
@@ -119,6 +120,16 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           if (a) refs.push(a);
         }
         const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs } });
+        ctx.onState(s.id, 'running', { generationId: g.id });
+        return { assetIds: await runGeneration(g.id) };
+      }
+      case 'model3d': {
+        const refs: string[] = [];
+        for (const r of s.refs) {
+          const a = await resolveAsset(r);
+          if (a) refs.push(a);
+        }
+        const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs } });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }

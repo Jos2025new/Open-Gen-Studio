@@ -1,3 +1,4 @@
+import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
 import { audioInputProblem, coerceSettings, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
@@ -10,6 +11,7 @@ import type {
   LayerType,
   MediaKind,
   ModelSchema,
+  Model3dStep,
   ModelSummary,
   OpId,
   OpStep,
@@ -99,6 +101,8 @@ export function stepOutputKind(step: PlanStep): OutputKind {
       return 'text';
     case 'image':
       return 'image';
+    case 'model3d':
+      return 'model3d';
     case 'video':
       return 'video';
     case 'audio':
@@ -115,6 +119,7 @@ export function stepDeps(step: PlanStep): StepRef[] {
     case 'text':
       return [];
     case 'image':
+    case 'model3d':
       return [...(step.promptFrom ? [step.promptFrom] : []), ...step.refs];
     case 'video':
       return [step.promptFrom, step.firstFrame, step.lastFrame, ...(step.refs ?? [])].filter((r): r is string => Boolean(r));
@@ -225,7 +230,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   for (const s of rawSteps) {
     const k = s.kind;
     if (k === 'text') kindById.set(s.id!, 'text');
-    else if (k === 'image' || k === 'video') kindById.set(s.id!, k);
+    else if (k === 'image' || k === 'video' || k === 'model3d') kindById.set(s.id!, k);
     else if (k === 'audio') {
       // A lyrics model answers with text: later steps read it through prompt_from / lyrics_from.
       const ref = s.model?.trim() || ctx.defaultModel('audio', false);
@@ -279,6 +284,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         break;
       }
       case 'image':
+      case 'model3d':
       case 'video': {
         const kind: MediaKind = s.kind;
         const refs = (s.refs ?? []).filter(Boolean);
@@ -315,7 +321,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const { schema } = resolved;
         if (schema.missing?.length) errors.push(`${where}: model "${modelRef}" needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
-        if (kind === 'image') {
+        if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;
           const extra = schema.slots.source ? 1 : 0;
           if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images.`);
@@ -337,6 +343,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const prompt = (s.prompt ?? '').trim();
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
+        if (kind === 'model3d') {
+          if (videoRefs.length || audioRefs.length) errors.push(`${where}: 3D models take only images in refs.`);
+          // Sizes are checked by the job runner once the images exist.
+          const problem = model3dProblem(resolved.model.id, resolved.model, prompt || (s.prompt_from ? '…' : ''), imageRefs.map(() => ({ size: 0, width: 0, height: 0 })));
+          if (problem) errors.push(`${where}: model "${modelRef}" ${problem.message}`);
+        }
         const defaults = ctx.defaultSettings(kind);
         const { settings, changes } = coerceSettings(schema, kind, {
           ...defaults,
@@ -344,7 +356,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           resolution: s.resolution ?? defaults.resolution,
           duration: s.duration ?? defaults.duration,
           audio: s.audio ?? defaults.audio,
-          count: s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
+          count: kind === 'model3d' ? 1 : s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
           seed: s.seed,
           shots: kind === 'video' ? s.shots : undefined,
           // Structured params (colors as hex, palettes, style codes, ids): coerceSettings keeps only what the model takes.
@@ -354,8 +366,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));
         const shotProblem = kind === 'video' && schema.slots.shots ? shotsProblem(settings.shots, settings.duration) : null;
         if (shotProblem) errors.push(`${where}: ${shotProblem}`);
-        if (kind === 'image') {
-          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings, refs } satisfies ImageStep);
+        if (kind === 'image' || kind === 'model3d') {
+          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings, refs } satisfies ImageStep | Model3dStep);
         } else {
           steps.push({
             id: s.id!,

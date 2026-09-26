@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { AudioLines, ImageOff } from 'lucide-react';
+import { AudioLines, ImageOff, Box } from 'lucide-react';
 import { useStore } from '../../store/store';
 import { formatDuration } from '../../lib/format';
 import { useAssetUrl } from './hooks';
@@ -21,7 +21,7 @@ export function AssetMedia({
   draggable?: boolean;
 }) {
   const asset = useStore((s) => s.assets[assetId]);
-  const url = useAssetUrl(assetId);
+  const url = useAssetUrl(asset?.kind === 'model3d' ? null : assetId);
   const [failed, setFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   if (!asset) {
@@ -32,6 +32,9 @@ export function AssetMedia({
       </div>
     );
   }
+  if (asset.kind === 'model3d') return <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={(e) => { e.dataTransfer.setData('application/x-ogs-asset', assetId); e.dataTransfer.effectAllowed = 'copy'; }}>
+    {asset.thumbnailUrl ? <img src={asset.thumbnailUrl} alt="3D preview" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} /> : <Box size={32} />}<span>3D</span>
+  </div>;
   if (!url || failed) {
     return (
       <div className={`media media-loading ${failed ? 'is-failed' : ''} ${className ?? ''}`} style={{ aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : '1' }}>

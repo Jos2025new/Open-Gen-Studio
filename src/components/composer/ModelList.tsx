@@ -12,7 +12,7 @@ export function priceHint(m: ModelSummary): string {
   if (m.provider === 'local') return 'Free';
   const sku = m.price?.skus[0];
   if (!sku) return '';
-  const per = sku.unit === 'second' ? '/s' : sku.unit === 'megapixel' ? '/MP' : m.kind === 'image' ? '/img' : m.kind === 'audio' ? (m.textOutput ? '/text' : '/song') : '/clip';
+  const per = sku.unit === 'second' ? '/s' : sku.unit === 'megapixel' ? '/MP' : m.kind === 'image' ? '/img' : m.kind === 'audio' ? (m.textOutput ? '/text' : '/song') : m.kind === 'model3d' ? '/model' : '/clip';
   return `${formatUsd(sku.usd)}${per}`;
 }
 
@@ -23,6 +23,7 @@ function badges(m: ModelSummary): string[] {
   if (m.tags.includes('background-removal')) out.push('Cutout');
   if (m.tags.includes('vector')) out.push('SVG');
   if (m.kind === 'image' && m.acceptsImage && !m.tags.length) out.push(m.acceptsText ? 'Edit' : 'Image in');
+  if (m.kind === 'model3d') out.push(m.acceptsText && m.acceptsImage ? 'Text/Image' : m.acceptsImage ? 'Image in' : 'Text');
   if (m.kind === 'video' && m.needsVideo) out.push('Video in');
   else if (m.kind === 'video' && m.acceptsImage) out.push(m.acceptsText ? 'I2V' : 'I2V only');
   if (m.textOutput) out.push('Text out');

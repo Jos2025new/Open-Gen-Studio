@@ -483,7 +483,7 @@ export function schemaFromJson(opts: {
       slots.mixedRefs = { key: mixed, max: p.maxItems ?? 9, min: required.includes(mixed) ? Math.max(1, p.minItems ?? 1) : 0 };
       used.add(mixed);
     }
-  } else if (kind === 'image') {
+  } else if (kind === 'image' || kind === 'model3d') {
     const multiKeys = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).filter((k): k is string => Boolean(k));
     let multi: string | undefined = multiKeys.find((k) => required.includes(k)) ?? multiKeys[0];
     const required1 = SINGLE_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && required.includes(k));

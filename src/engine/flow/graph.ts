@@ -12,6 +12,7 @@ import type {
   GraphNode,
   GraphNodeData,
   ImageStep,
+  Model3dStep,
   OpStep,
   Plan,
   PlanStep,
@@ -26,7 +27,7 @@ export const NODE_WIDTH = 260;
 
 /** Nodes that run a generation (and so hold a `generationId`). */
 export function runsGeneration(d: GraphNodeData): d is GenNodeData | ToolNodeData {
-  return d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'tool';
+  return d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' || d.kind === 'tool';
 }
 
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
@@ -35,6 +36,8 @@ export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): 
       return 'text';
     case 'image':
       return 'image';
+    case 'model3d':
+      return 'model3d';
     case 'video':
       return 'video';
     case 'audio':
@@ -54,6 +57,11 @@ export function inputPorts(data: GraphNodeData): Array<{ id: string; type: PortT
         { id: 'ref', type: 'image', label: 'References', multi: true },
         // Clip models (Nano Banana 2 reference-to-image): a trimmed reference video.
         { id: 'clip', type: 'video', label: 'Video clip', multi: true },
+      ];
+    case 'model3d':
+      return [
+        { id: 'prompt', type: 'text', label: 'Prompt', multi: false },
+        { id: 'ref', type: 'image', label: 'Reference images', multi: true },
       ];
     case 'video':
       return [
@@ -134,7 +142,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
   for (const s of plan.steps) {
     let data: GraphNodeData | null = null;
     if (s.kind === 'text') data = { kind: 'text', title: s.title, text: s.text };
-    else if (s.kind === 'image' || s.kind === 'video')
+    else if (s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video')
       data = { kind: s.kind, title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0 };
     else if (s.kind === 'audio')
       data = { kind: 'audio', title: s.title, prompt: s.prompt, modelRef: s.modelRef, settings: s.settings, outputIndex: 0, ...(s.textOutput ? { textOutput: true } : {}) };
@@ -172,7 +180,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
   for (const s of plan.steps) {
     const target = nodeOf.get(s.id);
     if (!target) continue;
-    if (s.kind === 'image') {
+    if (s.kind === 'image' || s.kind === 'model3d') {
       link(s.promptFrom, target, 'prompt');
       s.refs.forEach((r) => link(r, target, isVideo(r) ? 'clip' : 'ref'));
     } else if (s.kind === 'video') {
@@ -196,6 +204,7 @@ export function estimatedHeight(data: GraphNodeData): number {
     case 'text':
       return 170;
     case 'image':
+    case 'model3d':
     case 'video':
     case 'audio':
     case 'tool':
@@ -349,12 +358,12 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       return src.id;
     };
     const promptFrom = textFrom('prompt');
-    if (d.kind === 'image') {
+    if (d.kind === 'image' || d.kind === 'model3d') {
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
         .map((e) => refFor(e.source))
         .filter((r): r is string => Boolean(r));
-      steps.push({ id, kind: 'image', title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep);
+      steps.push({ id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep);
     } else if (d.kind === 'video') {
       const first = inEdges.find((e) => e.targetHandle === 'first');
       const last = inEdges.find((e) => e.targetHandle === 'last');
@@ -394,8 +403,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     }
   }
   for (const s of steps) {
-    if ((s.kind === 'image' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
-      const needsPrompt = s.kind === 'image' ? !s.refs.length : !s.firstFrame && !s.refs?.length;
+    if ((s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
+      const needsPrompt = s.kind === 'image' || s.kind === 'model3d' ? !s.refs.length : !s.firstFrame && !s.refs?.length;
       if (needsPrompt) errors.push(`"${s.title}" needs a prompt.`);
     }
   }

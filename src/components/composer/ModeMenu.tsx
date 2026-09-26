@@ -1,4 +1,4 @@
-import { Bot, Check, ChevronDown, Film, Image, Music } from 'lucide-react';
+import { Bot, Box, Check, ChevronDown, Film, Image, Music } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ComposerMode } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';
@@ -9,6 +9,7 @@ export const MODES: Array<{ id: ComposerMode; label: string; icon: LucideIcon; d
   { id: 'image', label: 'Image', icon: Image, desc: 'Generate images directly with a chosen model' },
   { id: 'video', label: 'Video', icon: Film, desc: 'Generate video directly with a chosen model' },
   { id: 'audio', label: 'Audio', icon: Music, desc: 'Music and song lyrics with a chosen model' },
+  { id: 'model3d', label: '3D', icon: Box, desc: 'Generate GLB models from text or reference images' },
 ];
 
 export function ModeMenu() {
@@ -26,7 +27,7 @@ export function ModeMenu() {
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={270} label="Mode">
         <div className="menu" role="menu">
           {MODES.map((m) => {
-            const disabled = workspace === 'designer' && (m.id === 'video' || m.id === 'audio');
+            const disabled = workspace === 'designer' && (m.id === 'video' || m.id === 'audio' || m.id === 'model3d');
             return (
               <button
                 key={m.id}

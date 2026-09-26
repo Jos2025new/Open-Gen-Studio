@@ -1,0 +1,150 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AtlasCloud API",
+    "version": "1.0.0",
+    "description": "The AtlasCloud API."
+  },
+  "servers": [
+    {
+      "url": "https://api.atlascloud.ai"
+    }
+  ],
+  "paths": {
+    "/api/v1/model/generateImage": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "The request status."
+          }
+        },
+        "x-api-name": "model_run"
+      }
+    },
+    "/api/v1/model/result/{request_id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "description": "Request ID",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "Result of the request."
+          }
+        },
+        "x-api-name": "model_result"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Input": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "model name",
+            "default": "bytedance/seed3d-v2.0/image-to-3d"
+          },
+          "image": {
+            "type": "string",
+            "description": "Source image (URL or base64 data URI). Constraints: total pixels < 4096x4096, size <= 10 MB, aspect ratio in (0.4, 2.5), formats: jpg, jpeg, png, webp, bmp."
+          },
+          "subdivision_level": {
+            "type": "string",
+            "description": "Subdivision level for the generated 3D mesh. high=1,000,000 / medium=500,000 / low=100,000 polygon faces.",
+            "enum": ["high", "medium", "low"],
+            "default": "medium"
+          },
+          "file_format": {
+            "type": "string",
+            "description": "Output 3D file format. The result is delivered as a .zip archive containing a single file in the chosen format.",
+            "enum": ["glb", "obj", "usd", "usdz"],
+            "default": "glb"
+          },
+          "enable_base64_output": {
+            "type": "boolean",
+            "description": "If enabled, the output will be encoded into a BASE64 string instead of a URL. This property is only available through the API.",
+            "default": false,
+            "disabled": true
+          }
+        },
+        "required": [
+          "model",
+          "image"
+        ],
+        "x-order-properties": [
+          "model",
+          "image",
+          "subdivision_level",
+          "file_format",
+          "enable_base64_output"
+        ]
+      },
+      "PredictionResponse": {
+        "type": "object",
+        "properties": {
+          "created_at": {
+            "description": "ISO timestamp of when the request was created (e.g., \"2023-04-01T12:34:56.789Z\").",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique identifier for the prediction, the ID of the prediction to get.",
+            "type": "string"
+          },
+          "model": {
+            "description": "Model ID used for the prediction.",
+            "type": "string"
+          },
+          "outputs": {
+            "description": "Array containing one URL pointing to the generated 3D file .zip archive (empty when status is not completed). The URL is valid for 24 hours.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "description": "Status of the task: created, processing, completed, or failed.",
+            "type": "string"
+          },
+          "urls": {
+            "description": "Object containing related API endpoints.",
+            "type": "object"
+          }
+        }
+      }
+    }
+  }
+}

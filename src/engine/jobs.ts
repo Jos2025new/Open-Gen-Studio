@@ -1,12 +1,13 @@
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError } from '../lib/http';
 import { getAssetBlob, putAssetBlob } from '../lib/idb';
-import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
+import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { InputError } from './errors';
-import { sourceVideoRule } from './modelRules';
+import { model3dProblem, sourceVideoRule } from './modelRules';
+import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
@@ -116,7 +117,7 @@ async function frameInput(assetId: string, which: 'first' | 'last' | number): Pr
   }
 }
 
-async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallback: MediaInfo): Promise<Asset> {
+async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallback: MediaInfo, thumbnailUrl?: string): Promise<Asset> {
   const id = uid('ast');
   let blob = o.blob;
   if (!blob && o.url) {
@@ -129,12 +130,14 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
   let info: MediaInfo = fallback;
   if (blob) {
     await putAssetBlob(id, blob);
-    info = await probeMedia(blob).catch(() => fallback);
+    // A 3D file is never decoded here: probing would load the mesh into an image/video element.
+    if (kind !== 'model3d') info = await probeMedia(blob).catch(() => fallback);
   }
   return {
     id,
     kind,
-    mime: blob?.type || o.mime || (kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : 'video/mp4'),
+    ...(thumbnailUrl ? { thumbnailUrl } : {}),
+    mime: blob?.type || o.mime || (kind === 'image' ? 'image/png' : kind === 'audio' ? 'audio/mpeg' : kind === 'model3d' ? 'model/gltf-binary' : 'video/mp4'),
     width: info.width || fallback.width,
     height: info.height || fallback.height,
     duration: info.duration ?? fallback.duration,
@@ -148,8 +151,40 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
   };
 }
 
+/**
+ * A 3D result is a set of files: the model (GLB, a ZIP with it, FBX with quads…) and often a preview render.
+ * The bytes are downloaded right away (Atlas links expire in 24 h) and typed by content; each model file
+ * becomes an asset and the render becomes their small thumbnail, never a separate model or image.
+ */
+export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Promise<Asset[]> {
+  const files = await Promise.all(
+    outputs.map(async (o) => {
+      let blob = o.blob;
+      if (!blob && o.url) blob = await fetchBlob(o.url).catch(() => undefined);
+      const mime = blob ? await sniffModelMime(blob, o.mime) : (o.mime ?? modelMime(o.url ?? '') ?? 'application/octet-stream');
+      return { o, blob: blob && blob.type !== mime ? new Blob([blob], { type: mime }) : blob, mime };
+    }),
+  );
+  const isImage = (f: { mime: string }) => f.mime.startsWith('image/');
+  // A turntable/preview clip is not the model either; it is dropped.
+  const models = files.filter((f) => !isImage(f) && !f.mime.startsWith('video/'));
+  if (!models.length) throw new JobFailedError('The provider finished without a 3D file (only a preview image).');
+  const thumb = files.find(isImage);
+  const thumbnailUrl = thumb?.blob ? await thumbnailDataUrl(thumb.blob).catch(() => undefined) : undefined;
+  return Promise.all(models.map((f) => storeOutput({ blob: f.blob, url: f.o.url, mime: f.mime }, g, 'model3d', { width: 0, height: 0 }, thumbnailUrl)));
+}
+
+/** A small JPEG kept in the asset itself: the provider's render link expires, and lists never load the mesh. */
+async function thumbnailDataUrl(blob: Blob): Promise<string> {
+  const src = await blobToCanvas(blob);
+  const scale = Math.min(1, 320 / Math.max(src.width, src.height));
+  const c = createCanvas(Math.max(1, Math.round(src.width * scale)), Math.max(1, Math.round(src.height * scale)));
+  ctx2d(c).drawImage(src, 0, 0, c.width, c.height);
+  return blobToDataUrl(await canvasToBlob(c, 'image/jpeg', 0.8));
+}
+
 function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
-  if (kind === 'audio') return { width: 0, height: 0 };
+  if (kind === 'audio' || kind === 'model3d') return { width: 0, height: 0 };
   const ratio = ratioOf(s.aspect) ?? (kind === 'video' ? 16 / 9 : 1);
   return { ...dimsFor(ratio, longEdgeFor(s.resolution ?? s.aspect)), duration: kind === 'video' && s.duration != null && s.duration > 0 ? s.duration : undefined };
 }
@@ -290,6 +325,12 @@ async function execute(id: string): Promise<string[]> {
     if (g.kind === 'image' && (schema.slots.images?.min ?? 0) + (schema.slots.source ? 1 : 0) > refs.length) {
       throw new Error(`${model.name} needs ${schema.slots.source ? 'a source image plus reference images' : 'an input image'}.`);
     }
+    if (kind === 'model3d') {
+      if (refVideos.length || audios.length || firstFrame || lastFrame) throw new InputError('MODEL3D_MEDIA_INPUT', `${model.name} takes only images.`);
+      if (refs.length && !schema.slots.images) throw new InputError('MODEL3D_NO_IMAGE_INPUT', `${model.name} takes text only.`);
+      const problem = model3dProblem(model.id, model, g.prompt, refs.map((r) => ({ size: r.blob.size, width: r.width, height: r.height })));
+      if (problem) throw new InputError(problem.code, `${model.name} ${problem.message}`);
+    }
     if (g.kind === 'image' && refs.length && !schema.slots.images) throw new Error(`${model.name} does not accept input images.`);
     if (g.kind === 'video' && !video && !(g.op && refVideos.length)) {
       // A reference-to-video model has no start frame: an image given as one becomes a reference.
@@ -404,7 +445,7 @@ async function execute(id: string): Promise<string[]> {
         finishText(id, result.text ?? '', result.costUsd);
         return [];
       }
-      const assets = await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
+      const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       assetIds.push(...assets.map((a) => a.id));
       patchGeneration(id, { assetIds: [...assetIds] });
@@ -580,7 +621,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       }
       const kind = g.kind;
       const fallback = expectedDims(kind, g.settings);
-      const assets = await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
+      const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
       finish(id, assets.map((a) => a.id), result.costUsd);
       return assets.map((a) => a.id);

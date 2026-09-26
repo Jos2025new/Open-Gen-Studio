@@ -5,7 +5,7 @@ import { AGENT_OP_IDS } from '../ops';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
-const stepKinds = ['image', 'video', 'audio', 'op', 'text', 'layer'] as const;
+const stepKinds = ['image', 'video', 'audio', 'model3d', 'op', 'text', 'layer'] as const;
 
 export const TOOLS: ToolSpec[] = [
   {
@@ -60,7 +60,7 @@ export const TOOLS: ToolSpec[] = [
                 id: { type: 'string', description: 'Unique id: s1, s2, … (l1… for layers).' },
                 kind: { type: 'string', enum: [...stepKinds] },
                 title: { type: 'string', description: 'Short label shown on the card or node.' },
-                prompt: { type: 'string', description: 'image/video: full generation prompt (English works best). audio: the music description, or the lyrics theme for a lyrics model.' },
+                prompt: { type: 'string', description: 'image/video: full generation prompt (English works best). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
                 prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
                 lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
                 model: { type: 'string', description: 'Model ref "provider::id". Omit to use the user\'s selected model.' },
@@ -73,7 +73,7 @@ export const TOOLS: ToolSpec[] = [
                   type: 'array',
                   items: { type: 'string' },
                   description:
-                    'image: reference/source images (and a video clip for clip models). video: reference images/videos/audio for reference-to-video models, the keyframe images (in order) for keyframe models, or the audio track for lip-sync / soundtrack models.',
+                    'image: reference/source images (and a video clip for clip models). model3d: the object image (multi-view models: 1–4 views of the same object). video: reference images/videos/audio for reference-to-video models, the keyframe images (in order) for keyframe models, or the audio track for lip-sync / soundtrack models.',
                 },
                 shots: {
                   type: 'array',
@@ -89,7 +89,7 @@ export const TOOLS: ToolSpec[] = [
                 last_frame: { type: 'string', description: 'video: end image reference.' },
                 op: { type: 'string', enum: [...AGENT_OP_IDS] },
                 input: { type: 'string', description: 'op: the image or video to transform.' },
-                params: { type: 'object', description: 'op parameters; for image/video/audio steps, model parameters listed in the context (style values; audio: lyrics, is_instrumental, lyrics_optimizer, mode, title).' },
+                params: { type: 'object', description: 'op parameters; for image/video/audio/model3d steps, model parameters listed in the context (style values; audio: lyrics, is_instrumental, lyrics_optimizer, mode, title).' },
                 text: { type: 'string', description: 'text step content, or the text of a text layer.' },
                 layer_type: { type: 'string', enum: ['raster', 'text', 'vector'] },
                 source: { type: 'string', description: 'raster layer: image reference.' },

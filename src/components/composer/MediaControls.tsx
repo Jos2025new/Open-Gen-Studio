@@ -25,7 +25,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
   const model = useStore((s) => s.catalog.models[ref]);
   const loading = useStore((s) => !s.catalog.schemas[ref]);
   const pop = usePopover();
-  const name = !ref ? 'No audio model' : model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
+  const name = !ref ? (kind === 'model3d' ? 'No 3D model' : 'No audio model') : model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
   return (
     <>
       <Chip ref={pop.ref} icon={Box} active={pop.open} onClick={pop.toggle} data-tip={loading ? 'Loading model parameters…' : `Model${model ? ` · ${priceHint(model)}` : ''}`} className="model-chip">
@@ -716,7 +716,7 @@ function LyricsChip({ kind }: { kind: MediaKind }) {
   );
 }
 
-/** Contextual controls for image / video / audio mode. */
+/** Contextual controls for image / video / audio / 3D mode. */
 export function MediaControls({ kind }: { kind: MediaKind }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const [, force] = useState(0);

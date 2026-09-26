@@ -21,7 +21,7 @@ import { OP_ICONS } from '../assets/AssetActions';
 export type FlowNodeData = { node: GraphNode; solo: boolean };
 export type FlowNode = Node<FlowNodeData>;
 
-const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, tool: Wand, asset: FileImage } as const;
+const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage } as const;
 
 function PortHandle({ id, type, side, top, label, portType }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null }) {
   return (
@@ -43,7 +43,7 @@ function useSessionId() {
 /** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
 export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void }) {
   const [tools, setTools] = useState(false);
-  const takes = (kind: 'image' | 'video' | 'audio') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
+  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
   const toolIds = OP_IDS.filter((id) => !accepts || OPS[id].input === accepts);
   if (tools) {
     return (
@@ -63,6 +63,7 @@ export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType 
       {takes('image') ? <MenuItem icon={ImageIcon} label="Image" detail={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} onClick={() => onPick(newNodeData('image'))} /> : null}
       {takes('video') ? <MenuItem icon={Film} label="Video" detail={accepts === 'image' ? 'Use it as the first frame' : accepts === 'audio' ? 'Use it as speech or soundtrack' : 'Generate video'} onClick={() => onPick(newNodeData('video'))} /> : null}
       {takes('audio') ? <MenuItem icon={Music} label="Audio" detail={accepts === 'text' ? 'Use it as the prompt of a song' : 'Generate music or song lyrics'} onClick={() => onPick(newNodeData('audio'))} /> : null}
+      {takes('model3d') ? <MenuItem icon={Box} label="3D model" detail="Generate a GLB model from text or image" onClick={() => onPick(newNodeData('model3d'))} /> : null}
       {toolIds.length ? <MenuItem icon={Wand} label="Tool" detail="Relight, angle, upscale, animate…" right={<ChevronRight size={14} />} onClick={() => setTools(true)} /> : null}
       {onAsset ? <MenuItem icon={FileImage} label="Asset" detail="Drag one from the gallery onto the canvas" onClick={onAsset} /> : null}
     </div>
@@ -190,7 +191,7 @@ function Preview({ node }: { node: GraphNode }) {
   // Transcribe: the text is the output (it can feed a Prompt port).
   if (g?.status === 'done' && g.kind === 'text') return <div className="nc-text">{g.text || <span className="faint">No speech was found.</span>}</div>;
   if (!assetId) {
-    const hint = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
+    const hint = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? d.prompt : d.kind === 'asset' ? 'Drop an asset from the gallery' : d.kind === 'tool' ? OPS[d.op].description : '';
     return (
       <div className="nc-empty">
         <Icon size={18} />
@@ -543,7 +544,7 @@ function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
         rows={3}
         value={d.prompt}
         placeholder={
-          hasPromptEdge ? 'Extra prompt (added after the connected text)' : d.kind === 'image' ? 'Describe the image…' : d.kind === 'audio' ? 'Describe the music (or the song theme)…' : 'Describe the shot and motion…'
+          hasPromptEdge ? 'Extra prompt (added after the connected text)' : d.kind === 'image' ? 'Describe the image…' : d.kind === 'model3d' ? 'Describe the model…' : d.kind === 'audio' ? 'Describe the music (or the song theme)…' : 'Describe the shot and motion…'
         }
         onChange={(e) => patchNodeData(sessionId, node.id, { prompt: e.target.value })}
       />
@@ -691,7 +692,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
   const Icon = KIND_ICON[d.kind];
   const genId = runsGeneration(d) ? d.generationId : undefined;
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
-  const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
+  const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
   const showTools = Boolean(selected) && solo;
   return (
     <>

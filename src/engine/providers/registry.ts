@@ -29,12 +29,13 @@ export const PROVIDER_SITES: Record<Exclude<ProviderId, 'local'>, { keys: string
  */
 export const PREFERRED: Record<
   Exclude<ProviderId, 'local'>,
-  { image: string[]; video: string[]; audio: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[]; videoExtend: string[]; transcribe: string[]; inpaint: string[]; removeObject: string[] }
+  { image: string[]; video: string[]; audio: string[]; model3d: string[]; edit: string[]; upscale: string[]; removeBg: string[]; videoUpscale: string[]; videoEdit: string[]; videoExtend: string[]; transcribe: string[]; inpaint: string[]; removeObject: string[] }
 > = {
   openrouter: {
     image: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'bytedance-seed/seedream-4.5', 'openai/gpt-image-2'],
     video: ['google/veo-3.1-fast', 'kwaivgi/kling-v3.0-pro', 'bytedance/seedance-2.0'],
     audio: [],
+    model3d: [],
     edit: ['google/gemini-3-pro-image', 'google/gemini-3.1-flash-image', 'openai/gpt-image-2'],
     upscale: [],
     removeBg: [],
@@ -49,6 +50,7 @@ export const PREFERRED: Record<
     image: ['fal-ai/nano-banana-pro', 'fal-ai/nano-banana-2', 'fal-ai/bytedance/seedream/v4/text-to-image'],
     video: ['fal-ai/veo3.1/fast', 'fal-ai/kling-video/v3/pro/text-to-video', 'fal-ai/kling-video/v2.6/pro/text-to-video'],
     audio: [],
+    model3d: [],
     edit: ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-2/edit', 'fal-ai/nano-banana/edit'],
     upscale: ['fal-ai/clarity-upscaler', 'fal-ai/seedvr/upscale/image'],
     removeBg: ['fal-ai/bria/background/remove', 'fal-ai/birefnet/v2'],
@@ -65,6 +67,7 @@ export const PREFERRED: Record<
     image: ['nano-banana-pro', 'nano-banana-2', 'seedream-4.5-alternative'],
     video: ['kling-v30-pro', 'bytedance/seedance-2.5', 'alibaba/wan-3.0/text-to-video'],
     audio: [],
+    model3d: ['wavespeed-ai/trellis-2/image-to-3d', 'meshy/v7.1/image-to-3d', 'meshy/v7.1/text-to-3d', 'bytedance/seed3d-2.0'],
     edit: ['nano-banana-pro-edit', 'nano-banana-pro', 'nano-banana-edit'],
     // Faithful first (SeedVR2 $0.01, P-Image $0.005), then Clarity creative ($0.05, adds detail).
     upscale: ['seedvr2-image', 'pruna-ai/p-image/upscale', 'clarity-ai-creative-upscaler'],
@@ -82,6 +85,7 @@ export const PREFERRED: Record<
     video: ['google/veo3.1-fast/text-to-video', 'kwaivgi/kling-v3.0-pro/text-to-video', 'bytedance/seedance-2.0/text-to-video'],
     // Music first; Lyrics answers with text (the user picks it for songwriting).
     audio: ['minimax/music-3.0', 'minimax/lyrics-generation'],
+    model3d: ['tripo-h3.1/image-to-3d', 'tripo-h3.1/text-to-3d', 'bytedance/seed3d-v2.0/image-to-3d'],
     edit: ['google/nano-banana-pro/edit', 'google/nano-banana-2/edit', 'black-forest-labs/flux-2-pro/edit'],
     upscale: ['atlascloud/image-upscaler', 'tencent/image/upscaler'],
     removeBg: ['youchuan/v8.2/remove-background'],

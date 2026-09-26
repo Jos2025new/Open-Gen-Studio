@@ -264,11 +264,11 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
   };
 }
 
-function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
-  const defs = raw.supported_parameters?.parameters ?? {};
+/** Catalog parameters (select/switch/number) as ParamDefs; `skip` drops keys handled as input slots. */
+function catalogParams(defs: Record<string, NanoVideoParam>, skip: RegExp): ParamDef[] {
   const params: ParamDef[] = [];
   for (const [key, d] of Object.entries(defs)) {
-    if (isHiddenKey(key) || /trajectory|keyframe|script|story|voice|character|lora/i.test(key)) continue;
+    if (isHiddenKey(key) || skip.test(key)) continue;
     const type = (d.type ?? '').toLowerCase();
     const role = roleForKey(key, d.options?.map((o) => o.value));
     const label = d.label ?? humanizeKey(key);
@@ -279,10 +279,16 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       params.push({ key, label, role, type: 'boolean', default: typeof d.default === 'boolean' ? d.default : undefined, description: d.description });
     } else if (type === 'number' || type === 'integer' || type === 'slider') {
       params.push({ key, label, role, type: type === 'integer' ? 'integer' : 'number', min: d.min, max: d.max, step: d.step, default: num(d.default), description: d.description });
-    } else if (role === 'negative') {
-      params.push({ key, label, role, type: 'string' });
+    } else if (role === 'negative' || type === 'text') {
+      params.push({ key, label, role, type: 'string', description: d.description });
     }
   }
+  return params;
+}
+
+function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
+  const defs = raw.supported_parameters?.parameters ?? {};
+  const params = catalogParams(defs, /trajectory|keyframe|script|story|voice|character|lora/i).filter((p) => p.role === 'negative' || p.type !== 'string');
   if (!params.some((p) => p.role === 'audio') && raw.capabilities?.audio_generation) {
     params.push({ key: 'generateAudio', label: 'Audio', role: 'audio', type: 'boolean', default: false });
   }
@@ -322,13 +328,84 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   };
 }
 
+interface Nano3dModel {
+  id: string;
+  name?: string;
+  description?: string;
+  pricing?: { per_run?: number; per_run_by_variant?: Record<string, number>; default_variant?: string };
+  capabilities?: { text_to_3d?: boolean; image_to_3d?: boolean };
+  supported_parameters?: { parameters?: Record<string, NanoVideoParam> };
+}
+
+/** 3D models chosen by the user (2026-09-25). Other catalog entries (Hunyuan, Meshy 6, Tripo P2…) stay hidden. */
+export const NANO_3D_MODELS = new Set(['wavespeed-ai/trellis-2/image-to-3d', 'bytedance/seed3d-2.0', 'meshy/v7.1/text-to-3d', 'meshy/v7.1/image-to-3d', 'meshy/v7.1/multi-image-to-3d']);
+
+const model3dRaw = new Map<string, Nano3dModel>();
+
+async function fetch3dModels(): Promise<Nano3dModel[]> {
+  const cached = await cacheDb.get<Nano3dModel[]>('nano:v1:3d', DAY / 2);
+  if (cached) return cached;
+  const res = await requestJson<{ data: Nano3dModel[] }>(`${BASE}/v1/3d-models?detailed=true`);
+  await cacheDb.set('nano:v1:3d', res.data);
+  return res.data;
+}
+
+export function parseNano3dPrice(p: Nano3dModel['pricing']): PriceRule | undefined {
+  const base = num(p?.per_run_by_variant?.[p?.default_variant ?? '']) ?? num(p?.per_run);
+  if (base == null) return undefined;
+  const variants = p?.per_run_by_variant;
+  const values = Object.values(variants ?? {});
+  const range = values.length > 1 ? `${Math.min(...values)}–${Math.max(...values)} USD per model depending on options` : undefined;
+  return { skus: [{ unit: 'output', usd: base }], ...(variants ? { variants } : {}), note: range };
+}
+
+/**
+ * NanoGPT 3D runs through /generate-video (documented example on each model page) with the image as
+ * `imageDataUrl`. Meshy multi-image: the first view in `imageDataUrl` (documented) and all views in
+ * `imageDataUrls` (unverified; same name as the images API).
+ */
+export function model3dSchema(model: ModelSummary, raw: Nano3dModel): ModelSchema {
+  const defs = raw.supported_parameters?.parameters ?? {};
+  const multi = /multi-image/.test(raw.id);
+  const t = Boolean(raw.capabilities?.text_to_3d);
+  const i = Boolean(raw.capabilities?.image_to_3d);
+  return {
+    ref: model.ref,
+    // texture_image is a URL field: not something the app can fill from a local asset.
+    params: catalogParams(defs, /^texture_image$/),
+    slots: {
+      prompt: t || 'prompt' in defs ? 'prompt' : undefined,
+      promptRequired: t && !i,
+      images: i ? (multi ? { key: 'imageDataUrls', max: 4, min: 1, multiple: true, format: 'data-url' } : { key: 'imageDataUrl', max: 1, min: 1, multiple: false, format: 'data-url' }) : undefined,
+    },
+    price: model.price,
+    source: 'catalog',
+  };
+}
+
 export const nanogpt: ProviderAdapter = {
   id: 'nanogpt',
   label: 'NanoGPT',
 
   async listModels() {
-    const [images, videos] = await Promise.all([fetchImages(), fetchVideos()]);
+    const [images, videos, models3d] = await Promise.all([fetchImages(), fetchVideos(), fetch3dModels().catch(() => [] as Nano3dModel[])]);
     const out: ModelSummary[] = [];
+    for (const m of models3d) {
+      if (!NANO_3D_MODELS.has(m.id)) continue;
+      model3dRaw.set(m.id, m);
+      out.push({
+        ref: modelRef('nanogpt', m.id),
+        provider: 'nanogpt',
+        id: m.id,
+        name: m.name ?? m.id,
+        kind: 'model3d',
+        acceptsText: Boolean(m.capabilities?.text_to_3d),
+        acceptsImage: Boolean(m.capabilities?.image_to_3d),
+        tags: [],
+        description: m.description,
+        price: parseNano3dPrice(m.pricing),
+      });
+    }
     for (const m of images) {
       imageRaw.set(m.id, m);
       const inputs = m.architecture?.input_modalities ?? ['text'];
@@ -370,7 +447,12 @@ export const nanogpt: ProviderAdapter = {
   },
 
   async loadSchema(model) {
-    if (!(model.kind === 'image' ? imageRaw : videoRaw).has(model.id)) await nanogpt.listModels(undefined);
+    if (!(model.kind === 'image' ? imageRaw : model.kind === 'model3d' ? model3dRaw : videoRaw).has(model.id)) await nanogpt.listModels(undefined);
+    if (model.kind === 'model3d') {
+      const raw = model3dRaw.get(model.id);
+      if (!raw) throw new Error(`Unknown NanoGPT 3D model ${model.id}`);
+      return model3dSchema(model, raw);
+    }
     if (model.kind === 'image') {
       const raw = imageRaw.get(model.id);
       if (!raw) throw new Error(`Unknown NanoGPT image model ${model.id}`);
@@ -402,6 +484,25 @@ export const nanogpt: ProviderAdapter = {
     }
 
     const { slots } = req.schema;
+    if (req.kind === 'model3d') {
+      if (req.refs.length && slots.images) {
+        const urls = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
+        body.imageDataUrl = urls[0];
+        if (slots.images.multiple) body[slots.images.key] = urls;
+      }
+      req.onStatus('Submitting');
+      const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
+        method: 'POST',
+        headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
+        body: JSON.stringify(body),
+        signal: req.signal,
+      });
+      const id = String(submit.runId ?? submit.id ?? submit.requestId ?? '');
+      if (!id) throw new Error('NanoGPT did not return a job id');
+      const job: RemoteJob = { provider: 'nanogpt', id, meta: { submitCost: String(submit.cost ?? '') } };
+      req.onRemoteJob(job);
+      return pollVideo(job, { kind: 'model3d', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
+    }
     if (req.firstFrame && slots.firstFrame) body[slots.firstFrame.key] = await encodeImage(req.firstFrame, 'data-url');
     if (req.lastFrame && slots.lastFrame) body[slots.lastFrame.key] = await encodeImage(req.lastFrame, 'data-url');
     if (req.refs.length && slots.images) body[slots.images.key] = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
@@ -496,8 +597,9 @@ function pollVideo(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
     const data = (res.data ?? res) as Loose;
     const status = String(data.status ?? '').toUpperCase();
     if (status === 'COMPLETED') {
-      const outputs = await materialize(extractOutputs(res, 'video'), ctx.signal);
-      if (!outputs.length) throw new JobFailedError('NanoGPT finished without a video URL');
+      const is3d = ctx.kind === 'model3d';
+      const outputs = await materialize(extractOutputs(res, is3d ? 'model3d' : 'video'), ctx.signal);
+      if (!outputs.length) throw new JobFailedError(is3d ? 'NanoGPT finished without a 3D file URL' : 'NanoGPT finished without a video URL');
       return { outputs, costUsd: num(data.cost) ?? num(job.meta.submitCost) };
     }
     if (status === 'FAILED' || status === 'CANCELED' || status === 'CANCELLED') {

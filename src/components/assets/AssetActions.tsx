@@ -118,7 +118,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
       <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="More actions">
         {view === 'menu' ? (
           <div className="menu">
-            {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : 'Video operations'}</div> : null}
+            {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
             {rest.map((o) => (
               <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} detail={o.description} onClick={() => setView(o.id)} />
             ))}

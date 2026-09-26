@@ -1,3 +1,5 @@
+import { model3dProblem } from './modelRules';
+import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
 import { formatUsd } from '../lib/format';
 import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../lib/idb';
@@ -143,6 +145,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const imageAtt = attachments.filter((id) => st.assets[id]?.kind === 'image');
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0);
   if (kind === 'audio' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud in Settings to generate music.', estimate };
+  if (kind === 'model3d' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud or NanoGPT in Settings to generate 3D models.', estimate };
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
   if (st.ui.workspace === 'designer' && kind !== 'image') return { ok: false, reason: `Designer layers cannot hold ${kind}.`, estimate };
   if (schema.missing?.length) return { ok: false, reason: `This model needs ${schema.missing.join(', ')}, which the app cannot send yet.`, estimate };
@@ -162,6 +165,13 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (slot && imageAtt.length > slot.max + extra) return { ok: false, reason: `This model accepts up to ${slot.max + extra} images.`, estimate };
     if (slot && imageAtt.length < slot.min + extra) return { ok: false, reason: extra ? 'This model needs a source image first, then reference images.' : 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
+  } else if (kind === 'model3d') {
+    if (attachments.length > imageAtt.length) return { ok: false, reason: '3D models take only reference images.', estimate };
+    const model = st.catalog.models[modelRef];
+    const problem = model ? model3dProblem(model.id, model, text, imageAtt.map((id) => ({ size: 0, width: st.assets[id].width, height: st.assets[id].height }))) : null;
+    if (problem) return { ok: false, reason: `This model ${problem.message}`, estimate };
+    const slot = schema.slots.images;
+    if (slot && imageAtt.length > slot.max) return { ok: false, reason: `This model accepts up to ${slot.max} image${slot.max > 1 ? 's' : ''}.`, estimate };
   } else if (kind === 'audio') {
     if (attachments.length > audioAtt.length) return { ok: false, reason: 'Music models take no images or videos.', estimate };
     const audioProblem = audioInputProblem(schema.slots, audioAtt.length);
@@ -225,6 +235,8 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
         ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] }
         : kind === 'audio'
           ? { refs: audioAttachments }
+          : kind === 'model3d'
+            ? { refs: attachments }
           : { refs: [...routed.images, ...routed.videos, ...audioAttachments], firstFrame: routed.firstFrame }),
       times: pick(st.composer.times, attachments),
       trims: pick(st.composer.trims, videoAttachments),
@@ -233,7 +245,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     parentId,
     estimate: check.estimate,
   };
-  autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'Music'));
+  autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
   setComposer({ text: '', attachments: [], times: {}, trims: {}, editing: null });
 
@@ -523,7 +535,8 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
   const sessionId = st.activeSessionId;
   const out: Asset[] = [];
   for (const f of files) {
-    if (!AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
+    const is3d = /\.glb$/i.test(f.name);
+    if (!is3d && !AUDIO_MIME.test(f.type) && !/^image\/(png|jpeg|webp|gif)$|^video\/(mp4|webm|quicktime)$/.test(f.type)) {
       toast(`${f.name}: unsupported file type`, 'error');
       continue;
     }
@@ -532,13 +545,14 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
       continue;
     }
     try {
-      const info = await probeMedia(f);
+      if (is3d) await validateGlb(f);
+      const info = is3d ? { width: 0, height: 0, duration: undefined } : await probeMedia(f);
       const id = uid('ast');
-      await putAssetBlob(id, f);
+      await putAssetBlob(id, is3d ? new Blob([f], { type: GLB_MIME }) : f);
       out.push({
         id,
-        kind: f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
-        mime: f.type,
+        kind: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
+        mime: is3d ? GLB_MIME : f.type,
         width: info.width,
         height: info.height,
         duration: info.duration,
@@ -558,7 +572,11 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
 
 export async function attachFiles(files: File[]): Promise<void> {
   const ids = await uploadFiles(files);
-  if (ids.length) setComposer((c) => ({ attachments: [...c.attachments, ...ids] }));
+  // A GLB is imported to the gallery (open it there); no model takes a 3D file as input.
+  const models = ids.filter((id) => get().assets[id]?.kind === 'model3d');
+  if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to the gallery.`, 'info');
+  const inputs = ids.filter((id) => !models.includes(id));
+  if (inputs.length) setComposer((c) => ({ attachments: [...c.attachments, ...inputs] }));
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ Writing prompts
 Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for layers)
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
 - video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?, refs? (reference images/videos, or keyframe images in order), times? (keyframe seconds, parallel to refs).
+- model3d: prompt, model?, params?, refs? — a 3D model (GLB) from text or from an image of one object.
 - audio: prompt, model?, params?, lyrics_from? — music (an audio asset) or, with a lyrics model, song lyrics (text).
 - op: op, input, params? — operations on an existing image or video:
 ${OP_LINES}
@@ -57,6 +58,7 @@ Model-specific inputs (each model's accepted inputs are listed in the context; u
 - Audio: an audio asset in refs is the speech for lip-sync / avatar models (required there), an optional soundtrack, or reference audio, as the model's inputs say.
 - Music (MiniMax Music): the prompt describes genre, mood, tempo (bpm), key, instrumentation, vocal timbre and delivery, production (≤2000 chars). Songs need lyrics: write them yourself in params.lyrics (≤3500 chars; one line per sung line, a blank line for a pause, section tags on their own line: [Intro], [Verse], [Pre Chorus], [Chorus], [Bridge], [Outro]…), or set params.lyrics_optimizer true with no lyrics to let the model write them, or take them from a lyrics step with lyrics_from. params.is_instrumental true makes music without vocals (the prompt is then required; lyrics are ignored). One song per step.
 - Lyrics (MiniMax Lyrics, text output): params.mode "write_full_song" writes a new song from the prompt (theme, style; no lyrics); "edit" rewrites or continues params.lyrics following the prompt. Its text feeds a music step through lyrics_from. Use it only when asked; otherwise write the lyrics yourself.
+- 3D (model3d steps): image-to-3D models need one clear image of a single object on a plain background (make it with an image step first when the user gives only text and the model takes no text); multi-view models take 1–4 views of the same object in refs. Text-to-3D models take only the prompt. A 3D result cannot feed image, video or layer steps. Options (face count, textures, PBR, quads, rigging) go in params only when asked: they change the price.
 - Music results are audio assets: a video step can take them in refs as a soundtrack or as the speech of lip-sync / avatar models.
 - Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
 - Subjects (Kling models listing "subjects"): mention a session subject as @Name in the prompt; the app sends its images as the model's element and keeps the identity. Use only subjects listed in the context.
@@ -66,7 +68,7 @@ Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 function describeModel(kind: MediaKind): string {
   const st = get();
   const { modelRef, settings } = st.composer[kind];
-  if (!modelRef) return 'none (connect Atlas Cloud for music)';
+  if (!modelRef) return kind === 'model3d' ? 'none (connect Atlas Cloud or NanoGPT for 3D)' : 'none (connect Atlas Cloud for music)';
   const m = modelSummary(modelRef);
   const schema = st.catalog.schemas[modelRef];
   const parts = [`${modelRef}${m ? ` (${m.name})` : ''}`];
@@ -101,7 +103,7 @@ function alternatives(): string {
   const lines: string[] = [];
   for (const p of REMOTE_PROVIDERS) {
     if (!isConnected(p)) continue;
-    const ids = [...PREFERRED[p].image.slice(0, 2), ...PREFERRED[p].edit.slice(0, 1), ...PREFERRED[p].video.slice(0, 2), ...PREFERRED[p].audio];
+    const ids = [...PREFERRED[p].image.slice(0, 2), ...PREFERRED[p].edit.slice(0, 1), ...PREFERRED[p].video.slice(0, 2), ...PREFERRED[p].audio, ...PREFERRED[p].model3d];
     for (const id of ids) {
       const m = modelSummary(`${p}::${id}`);
       if (!m) continue;
@@ -137,6 +139,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(`image model: ${describeModel('image')}`);
   lines.push(`video model: ${describeModel('video')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
+  lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);
   if (opts.attachments.length) {
     lines.push(

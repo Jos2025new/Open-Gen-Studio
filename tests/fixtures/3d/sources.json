@@ -1,0 +1,26 @@
+{
+  "date": "2026-09-25",
+  "sources": [
+    {
+      "file": "tripo-h3.1-text-to-3d.json",
+      "source": "https://static.atlascloud.ai/model/schema/tripo-h3.1-text-to-3d.json",
+      "sha256": "812c4486066577339eda64b444b175f08fe3683218643f15a365ae88eac86b82"
+    },
+    {
+      "file": "tripo-h3.1-image-to-3d.json",
+      "source": "https://static.atlascloud.ai/model/schema/tripo-h3.1-image-to-3d.json",
+      "sha256": "fc98e43772a84eca4de95bbe8bc5518997b3b76422ecd2a4c11417bf8bf8aee4"
+    },
+    {
+      "file": "bytedance-seed3d-v2.0-image-to-3d.json",
+      "source": "https://static.atlascloud.ai/model/schema/bytedance-seed3d-v2.0-image-to-3d.json",
+      "sha256": "8761963cb78db7c4518213aef705724f7edabaa251af70f7d48151c07d39ad15"
+    },
+    {
+      "file": "nanogpt.json",
+      "source": "https://nano-gpt.com/api/v1/3d-models?detailed=true",
+      "sha256": "04b5b82e54f6d3c436307d5c0b52db9a1c5ca264c73648ece7826cfdf15ab858",
+      "extracted": true
+    }
+  ]
+}

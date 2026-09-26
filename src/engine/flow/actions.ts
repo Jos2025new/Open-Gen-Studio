@@ -15,9 +15,10 @@ export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; asse
       return { kind: 'text', title: 'Prompt', text: '' };
     case 'image':
     case 'video':
-    case 'audio': {
+    case 'audio':
+    case 'model3d': {
       const c = st.composer[kind as MediaKind];
-      const title = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : 'Audio';
+      const title = kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'audio' ? 'Audio' : '3D model';
       const textOutput = kind === 'audio' && st.catalog.models[c.modelRef]?.textOutput;
       return { kind, title, prompt: '', modelRef: c.modelRef, settings: { ...c.settings, seed: undefined }, outputIndex: 0, ...(textOutput ? { textOutput: true } : {}) };
     }
@@ -67,7 +68,7 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
  */
 export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenNodeData, 'modelRef' | 'settings'>): void {
   const node = get().sessions[sessionId].graph.nodes.find((n) => n.id === nodeId);
-  if (!node || (node.data.kind !== 'image' && node.data.kind !== 'video' && node.data.kind !== 'audio')) return;
+  if (!node || (node.data.kind !== 'image' && node.data.kind !== 'video' && node.data.kind !== 'audio' && node.data.kind !== 'model3d')) return;
   const textOutput = node.data.kind === 'audio' && get().catalog.models[patch.modelRef]?.textOutput ? true : undefined;
   patchNodeData(sessionId, nodeId, { ...patch, textOutput });
   if (Boolean(textOutput) === Boolean(node.data.textOutput)) return;

@@ -1,3 +1,4 @@
+import { Model3DViewer } from './Model3DViewer';
 import { useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Download, Star, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
@@ -32,7 +33,7 @@ export function Lightbox() {
   return (
     <div className="lightbox" role="dialog" aria-label="Viewer">
       <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && setUi({ lightbox: null })}>
-        <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />
+        <>{asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}</>
         {index > 0 ? (
           <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { assetIds: ids, index: index - 1 } })}>
             <ChevronLeft size={20} />

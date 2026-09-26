@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight } from 'lucide-react';
+import { Box, Check, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight } from 'lucide-react';
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
@@ -18,6 +18,8 @@ function stepIcon(s: PlanStep) {
       return <Film size={13} />;
     case 'audio':
       return <Music size={13} />;
+    case 'model3d':
+      return <Box size={13} />;
     case 'op':
       return <Wand size={13} />;
     case 'text':
@@ -31,6 +33,8 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string): string {
   switch (s.kind) {
     case 'image':
       return [modelName(s.modelRef), s.settings.aspect ? aspectLabel(s.settings.aspect) : '', s.settings.count > 1 ? `×${s.settings.count}` : '', s.refs.length ? `${s.refs.length} ref` : ''].filter(Boolean).join(' · ');
+    case 'model3d':
+      return [modelName(s.modelRef), s.refs.length ? `${s.refs.length} ref` : 'from text'].join(' · ');
     case 'video':
       return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${s.firstFrame}` : ''].filter(Boolean).join(' · ');
     case 'audio':

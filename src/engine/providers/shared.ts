@@ -98,7 +98,7 @@ export function extractOutputs(json: unknown, kind: MediaKind): GenOutput[] {
       push({ blob: base64ToBlob(o.b64_json, mime), mime });
       return;
     }
-    const url = (o.url ?? o.image_url ?? o.video_url ?? o.uri) as unknown;
+    const url = (o.url ?? o.image_url ?? o.video_url ?? o.model_url ?? o.modelUrl ?? o.glb_url ?? o.uri) as unknown;
     if (typeof url === 'string') {
       const mime = typeof o.content_type === 'string' ? o.content_type : undefined;
       if (url.startsWith('data:')) push({ blob: base64ToBlob(url, url.slice(5, url.indexOf(';')) || mime || 'image/png') });
@@ -124,6 +124,10 @@ export function extractOutputs(json: unknown, kind: MediaKind): GenOutput[] {
     data.videoUrl,
     data.video_url,
     root.videoUrl,
+    // 3D results: model file fields (the bytes decide the final type).
+    ...(kind === 'model3d'
+      ? [root.files, data.files, root.model, data.model_url, data.modelUrl, root.model_url, (data.output as Record<string, unknown> | undefined)?.model, data.thumbnail]
+      : []),
   ];
   for (const c of candidates) {
     if (Array.isArray(c)) c.forEach(visitFile);

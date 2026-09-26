@@ -130,7 +130,7 @@ export function ensureSchema(ref: string): Promise<ModelSchema | null> {
         slots: {
           prompt: model.acceptsText ? 'prompt' : undefined,
           promptRequired: model.acceptsText && !model.acceptsImage,
-          images: model.kind === 'image' && model.acceptsImage ? { key: 'image_urls', max: 1, min: model.acceptsText ? 0 : 1, multiple: true, format: 'data-url' } : undefined,
+          images: (model.kind === 'image' || model.kind === 'model3d') && model.acceptsImage ? { key: 'image_urls', max: 1, min: model.acceptsText ? 0 : 1, multiple: true, format: 'data-url' } : undefined,
           firstFrame: model.kind === 'video' && model.acceptsImage ? { key: 'image_url', format: 'data-url' } : undefined,
         },
         price: model.price,
@@ -183,8 +183,9 @@ export function preferredModel(kind: MediaKind): string {
     const hit = firstAvailable(p, PREFERRED[p][kind]);
     if (hit) return hit;
   }
-  // No local audio model: any connected one that makes sound, else none ('').
+  // No local audio or 3D model: either needs a connected provider.
   if (kind === 'audio') return modelsOf('audio').find((m) => !m.textOutput)?.ref ?? '';
+  if (kind === 'model3d') return modelsOf('model3d')[0]?.ref ?? '';
   return kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF;
 }
 
@@ -194,7 +195,7 @@ export function preferredModel(kind: MediaKind): string {
  */
 export function ensureComposerModels(preferRemote = false): void {
   const st = get();
-  for (const kind of ['image', 'video', 'audio'] as const) {
+  for (const kind of ['image', 'video', 'audio', 'model3d'] as const) {
     const ref = st.composer[kind].modelRef;
     const parsed = parseModelRef(ref);
     // A model is only replaced once its provider catalog loaded and it is missing from it.
@@ -227,23 +228,23 @@ export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
   if (!needsImage) return current;
   if (cur?.acceptsImage) {
     const schema = get().catalog.schemas[current];
-    const ok = kind === 'image' ? schema?.slots.images != null || !schema : schema?.slots.firstFrame != null || !schema;
+    const ok = kind === 'image' || kind === 'model3d' ? schema?.slots.images != null || !schema : schema?.slots.firstFrame != null || !schema;
     if (ok) return current;
   }
   const parsed = parseModelRef(current);
   if (parsed) {
-    const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : i2vCounterpart(parsed.provider, parsed.id);
+    const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : kind === 'model3d' ? null : i2vCounterpart(parsed.provider, parsed.id);
     if (counterpart && modelSummary(`${parsed.provider}::${counterpart}`)) return `${parsed.provider}::${counterpart}`;
   }
   for (const p of providerOrder(kind)) {
-    const list = kind === 'image' ? PREFERRED[p].edit : PREFERRED[p].video.map((id) => i2vCounterpart(p, id) ?? id);
+    const list = kind === 'image' ? PREFERRED[p].edit : kind === 'model3d' ? PREFERRED[p].model3d : PREFERRED[p].video.map((id) => i2vCounterpart(p, id) ?? id);
     for (const id of list) {
       const m = modelSummary(`${p}::${id}`);
       if (m?.acceptsImage) return m.ref;
     }
   }
   const any = modelsOf(kind).find((m) => m.acceptsImage && m.provider !== 'local' && !m.tags.length);
-  return any?.ref ?? (kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF);
+  return any?.ref ?? (kind === 'image' ? LOCAL_IMAGE_REF : kind === 'video' ? LOCAL_VIDEO_REF : '');
 }
 
 /** fal endpoint that creates Kling custom voices (the only provider that exposes it). */

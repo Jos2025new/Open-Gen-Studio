@@ -7,6 +7,7 @@ import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefin
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
+import { modelMime } from '../../lib/model3d';
 
 const BASE = 'https://api.atlascloud.ai';
 const STATIC = 'https://static.atlascloud.ai';
@@ -26,21 +27,31 @@ interface AtlasModel {
 const raws = new Map<string, AtlasModel>();
 
 async function fetchCatalog(): Promise<AtlasModel[]> {
-  // v2: audio models too.
-  const cached = await cacheDb.get<AtlasModel[]>('atlas:models:v2', DAY / 2);
+  // v3: the chosen 3D models too (listed by Atlas as type Image).
+  const cached = await cacheDb.get<AtlasModel[]>('atlas:models:v3', DAY / 2);
   if (cached) return cached;
   const res = await requestJson<{ data: AtlasModel[] }>(`${BASE}/api/v1/models`);
   const media = res.data.filter((m) => m.type === 'Image' || m.type === 'Video' || (m.type === 'Audio' && AUDIO_FAMILIES.test(m.model)));
-  await cacheDb.set('atlas:models:v2', media);
+  await cacheDb.set('atlas:models:v3', media);
   return media;
 }
 
 /** Audio families confirmed by the user (2026-09-25): MiniMax Music and MiniMax Lyrics. Others wait for a decision. */
 const AUDIO_FAMILIES = /^minimax\/(music|lyrics)/;
 
+/**
+ * 3D models chosen by the user (2026-09-25): Tripo H3.1 and Seed3D 2.0. Meshy v7 and older Tripo versions are
+ * not substitutes. Seed3D answers at /model/result/{id} with a ZIP; Tripo at /model/prediction/{id} with files.
+ */
+export const MODEL3D_FAMILIES = /^(tripo-h3\.1\/(text|image)-to-3d|bytedance\/seed3d-v2\.0\/image-to-3d)$/;
+
 function atlasPrice(m: AtlasModel): PriceRule | undefined {
   const base = numberOrUndefined(m.price?.actual?.base_price);
   if (base == null) return undefined;
+  if ((m.categories ?? []).some((c) => /-TO-3D$/i.test(c))) {
+    // base_price is the default configuration; face count, quads or detailed quality may cost more.
+    return { skus: [{ unit: 'output', usd: base }], approximate: true, lowerBound: true, note: 'Atlas base price per model (default options); detailed quality or extras may cost more' };
+  }
   if (m.type === 'Video') {
     // Atlas publishes only the cheapest tier (lowest resolution, no audio); real runs at 720p cost ~2× (seen: 0.055 → 0.122 USD).
     return { skus: [{ unit: 'second', usd: base }], approximate: true, lowerBound: true, note: 'Atlas base price per second (lowest tier); higher resolution or audio cost more' };
@@ -88,6 +99,23 @@ export const atlas: ProviderAdapter = {
           acceptsImage: false,
           tags: [],
           ...(/lyrics/.test(m.model) ? { textOutput: true } : {}),
+          description: m.profile,
+          price: atlasPrice(m),
+        });
+        continue;
+      }
+      if (cats.some((c) => c.endsWith('-TO-3D'))) {
+        if (!MODEL3D_FAMILIES.test(m.model)) continue;
+        raws.set(m.model, m);
+        out.push({
+          ref: modelRef('atlas', m.model),
+          provider: 'atlas',
+          id: m.model,
+          name: m.displayName ?? m.model,
+          kind: 'model3d',
+          acceptsText: cats.includes('TEXT-TO-3D'),
+          acceptsImage: cats.includes('IMAGE-TO-3D'),
+          tags: [],
           description: m.profile,
           price: atlasPrice(m),
         });
@@ -168,7 +196,11 @@ export const atlas: ProviderAdapter = {
       const urls = await Promise.all(inputs.slice(0, slot.max ?? 1).map((i) => encodeImage(i, 'url', upload)));
       body[slot.key] = slot.multiple ? urls : urls[0];
     };
-    if (req.kind === 'image') {
+    if (req.kind === 'model3d') {
+      await put(schema.slots.images, req.refs);
+      // Seed3D: ask for GLB inside its ZIP (the only format the preview reads) and plain URLs, not base64.
+      if ('file_format' in body || /seed3d/.test(req.model.id)) body.file_format ??= 'glb';
+    } else if (req.kind === 'image') {
       const { source, refs } = splitSource(schema.slots, req.refs);
       if (source && schema.slots.source) body[schema.slots.source.key] = await encodeImage(source, 'url', upload);
       await put(schema.slots.images, refs);
@@ -205,7 +237,7 @@ export const atlas: ProviderAdapter = {
       Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'url', upload), (v) => encodeVideo(v, upload)));
     }
     req.onStatus('Submitting');
-    const endpoint = req.kind === 'image' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
+    const endpoint = req.kind === 'image' || req.kind === 'model3d' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
     const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(`${BASE}/api/v1/model/${endpoint}`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${req.apiKey}` },
@@ -216,7 +248,8 @@ export const atlas: ProviderAdapter = {
     if (!id) throw new Error('Atlas Cloud did not return a prediction id');
     // Poll where Atlas says (OmniHuman answers at /model/result/{id}, most models at /model/prediction/{id}).
     const get = submit.data?.urls?.get;
-    const job: RemoteJob = { provider: 'atlas', id, meta: get?.startsWith(`${BASE}/`) ? { pollUrl: get } : {} };
+    const pollUrl = get?.startsWith(`${BASE}/`) ? get : /seed3d/.test(req.model.id) ? `${BASE}/api/v1/model/result/${encodeURIComponent(id)}` : undefined;
+    const job: RemoteJob = { provider: 'atlas', id, meta: pollUrl ? { pollUrl } : {} };
     req.onRemoteJob(job);
     return poll(job, { kind: req.model.textOutput ? 'text' : req.kind, apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
@@ -251,7 +284,7 @@ async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Pro
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'audio' : ctx.kind; // text jobs are lyrics (audio models)
   return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' || ctx.kind === 'text' ? 2000 : 5000, async () => {
-    const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[]; lyrics_result?: LyricsResult | null } }>(
+    const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] | null; files?: AtlasFile[]; thumbnail?: string; lyrics_result?: LyricsResult | null } }>(
       job.meta.pollUrl ?? `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
       { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal, timeoutMs: POLL_TIMEOUT_MS },
     );
@@ -262,8 +295,9 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
         if (!lyrics?.lyrics) throw new JobFailedError('Atlas Cloud finished without lyrics');
         return { outputs: [], text: lyricsText(lyrics) };
       }
+      const found = kind === 'model3d' ? atlasModelOutputs(res.data ?? {}) : extractOutputs(res, kind);
       const outputs = await Promise.all(
-        extractOutputs(res, kind).map(async (o): Promise<GenOutput> => {
+        found.map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
           try {
             return { blob: await fetchBlob(o.url, { signal: ctx.signal }), mime: o.mime };
@@ -280,6 +314,32 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
     }
     return status === 'processing' ? 'Rendering' : 'Queued';
   });
+}
+
+interface AtlasFile {
+  url?: string;
+  type?: string;
+  content_type?: string;
+  file_name?: string;
+}
+
+/**
+ * Tripo lists model files (GLB, FBX with quads, variants) in `files` and a preview render in `thumbnail`
+ * (also last in `outputs`); Seed3D has only `outputs` with one ZIP. The render is marked as an image so it
+ * becomes the model's thumbnail, never a model. The bytes decide the final type (`sniffModelMime`).
+ */
+export function atlasModelOutputs(data: { outputs?: string[] | null; files?: AtlasFile[]; thumbnail?: string }): GenOutput[] {
+  const out: GenOutput[] = [];
+  const seen = new Set<string>();
+  const add = (url: string | undefined, mime: string | undefined) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    out.push({ url, mime });
+  };
+  for (const f of data.files ?? []) add(f.url, f.content_type || modelMime(f.file_name ?? f.url ?? '') || (/^(image|preview|thumbnail)$/i.test(f.type ?? '') ? 'image/png' : undefined));
+  if (data.thumbnail) add(data.thumbnail, 'image/png');
+  for (const u of data.outputs ?? []) add(u, modelMime(u) ?? (/\.(png|jpe?g|webp)(\?|$)/i.test(u) ? 'image/png' : undefined));
+  return out;
 }
 
 interface LyricsResult {

@@ -1,10 +1,10 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
 export type Workspace = 'chat' | 'node' | 'designer';
-export type ComposerMode = 'agent' | 'image' | 'video' | 'audio';
+export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 export type AgentStyle = 'auto' | 'guided';
-export type MediaKind = 'image' | 'video' | 'audio';
-/** Every asset kind is also a generation kind (audio: music models). */
+/** Every generated media type is also a persistable asset type. */
+export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
 export type AssetKind = MediaKind;
 
 export type ProviderId = 'local' | 'openrouter' | 'fal' | 'nanogpt' | 'atlas';
@@ -131,6 +131,8 @@ export interface PriceRule {
   approximate?: boolean;
   /** The published price is the cheapest configuration; higher resolution or audio cost more. Shown as "≥". */
   lowerBound?: boolean;
+  /** Price per run for each option set (NanoGPT 3D); the key comes from `variant3dKey`. */
+  variants?: Record<string, number>;
 }
 
 /** A speech-to-text model (audio → text); kept apart from the image/video catalog. */
@@ -227,6 +229,7 @@ export interface Asset {
   origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask';
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
+  thumbnailUrl?: string;
   stored: boolean;
   favorite: boolean;
   createdAt: number;
@@ -356,6 +359,16 @@ export interface ImageStep extends StepBase {
   refs: StepRef[];
 }
 
+/** A 3D model generated from text or one or more reference images. */
+export interface Model3dStep extends StepBase {
+  kind: 'model3d';
+  prompt: string;
+  promptFrom?: StepRef;
+  modelRef: string;
+  settings: GenSettings;
+  refs: StepRef[];
+}
+
 export interface VideoStep extends StepBase {
   kind: 'video';
   prompt: string;
@@ -404,7 +417,7 @@ export interface LayerStep extends StepBase {
   shapes?: ShapeSpec[];
 }
 
-export type PlanStep = TextStep | ImageStep | VideoStep | AudioStep | OpStep | LayerStep;
+export type PlanStep = TextStep | ImageStep | Model3dStep | VideoStep | AudioStep | OpStep | LayerStep;
 
 export interface Plan {
   id: string;
@@ -483,8 +496,8 @@ export type FeedItem =
 // ---------------------------------------------------------------------------
 // Node graph
 
-export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'tool' | 'asset';
-export type PortType = 'text' | 'image' | 'video' | 'audio';
+export type NodeKind = 'text' | 'image' | 'video' | 'audio' | 'model3d' | 'tool' | 'asset';
+export type PortType = 'text' | 'image' | 'video' | 'audio' | 'model3d';
 
 export interface TextNodeData {
   kind: 'text';
@@ -493,7 +506,7 @@ export interface TextNodeData {
 }
 
 export interface GenNodeData {
-  kind: 'image' | 'video' | 'audio';
+  kind: 'image' | 'video' | 'audio' | 'model3d';
   title: string;
   prompt: string;
   modelRef: string;

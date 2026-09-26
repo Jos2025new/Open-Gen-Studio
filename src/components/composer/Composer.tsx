@@ -98,6 +98,7 @@ const PLACEHOLDER = {
   image: 'Describe the image…',
   video: 'Describe the shot and the motion…',
   audio: 'Describe the music: genre, mood, tempo, instruments, voice…',
+  model3d: 'Describe the object, material and shape…',
 };
 
 function DesignerTargetChip() {
@@ -214,7 +215,7 @@ export function Composer() {
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;
     const slots = s.catalog.schemas[s.composer[s.composer.mode].modelRef]?.slots;
-    return s.composer.mode === 'image' ? Boolean(slots?.images || slots?.clips) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs || slots?.keyframes);
+    return s.composer.mode === 'image' || s.composer.mode === 'model3d' ? Boolean(slots?.images || slots?.clips) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs || slots?.keyframes);
   });
   // Reference-to-video models: several references, and videos too when the model takes them.
   const mediaSlots = useStore((s) => (s.composer.mode === 'agent' ? undefined : s.catalog.schemas[s.composer[s.composer.mode].modelRef]?.slots));
@@ -235,7 +236,7 @@ export function Composer() {
 
   // Video cannot live on designer layers: switch the composer to image there.
   useEffect(() => {
-    if (workspace === 'designer' && (mode === 'video' || mode === 'audio')) {
+    if (workspace === 'designer' && (mode === 'video' || mode === 'audio' || mode === 'model3d')) {
       setComposer({ mode: 'image' });
       toast('Designer layers hold images, text and shapes — switched to Image.', 'info');
     }
@@ -378,16 +379,16 @@ export function Composer() {
             <IconButton
               icon={Paperclip}
               label={
-                acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
+                acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
               }
               size="md"
-              disabled={!acceptsImages && !takesAudio}
+              disabled={!acceptsImages && !takesAudio && mode !== 'model3d'}
               onClick={() => fileRef.current?.click()}
             />
             <input
               ref={fileRef}
               type="file"
-              accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : ''].filter(Boolean).join(',')}
+              accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
               multiple={mode !== 'video' || videoRefs.multiple}
               hidden
               onChange={(e) => {

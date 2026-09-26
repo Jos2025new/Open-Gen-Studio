@@ -5,6 +5,12 @@ import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/
 import { dirname, join } from 'node:path';
 
 const MIME_EXT = {
+  'model/gltf-binary': 'glb',
+  'application/zip': 'zip',
+  'application/vnd.autodesk.fbx': 'fbx',
+  'model/obj': 'obj',
+  'model/vnd.usdz+zip': 'usdz',
+  'model/vnd.usd': 'usd',
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/webp': 'webp',

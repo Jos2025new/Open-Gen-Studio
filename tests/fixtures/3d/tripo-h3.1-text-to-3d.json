@@ -1,0 +1,231 @@
+{
+  "info": {
+    "description": "The AtlasCloud API.",
+    "title": "AtlasCloud API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/model/generateImage": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "The request status."
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Input"
+              }
+            }
+          }
+        }
+      },
+      "x-api-name": "model_run"
+    },
+    "/api/v1/model/prediction/{request_id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            },
+            "description": "Result of the request."
+          }
+        },
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "schema": {
+              "type": "string",
+              "description": "Request ID"
+            },
+            "required": true
+          }
+        ]
+      },
+      "x-api-name": "model_result"
+    }
+  },
+  "openapi": "3.0.0",
+  "servers": [
+    {
+      "url": "https://api.atlascloud.ai"
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Input": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "model name",
+            "default": "tripo-h3.1/text-to-3d"
+          },
+          "prompt": {
+            "description": "Text description of the 3D object to generate. Maximum 1024 characters.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "negative_prompt": {
+            "description": "Features to avoid in the generated model.",
+            "type": "string"
+          },
+          "face_limit": {
+            "description": "Target mesh face count. If unset, the model determines it adaptively.",
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 2000000
+          },
+          "texture": {
+            "description": "Generate textures for the model.",
+            "type": "boolean",
+            "default": true
+          },
+          "pbr": {
+            "description": "Generate PBR (Physically Based Rendering) materials.",
+            "type": "boolean",
+            "default": true
+          },
+          "texture_quality": {
+            "description": "Texture resolution level.",
+            "type": "string",
+            "default": "standard",
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "x-ui-component": "select"
+          },
+          "geometry_quality": {
+            "description": "Geometry quality level.",
+            "type": "string",
+            "default": "standard",
+            "enum": [
+              "standard",
+              "detailed"
+            ],
+            "x-ui-component": "select"
+          },
+          "model_seed": {
+            "description": "Seed for geometry generation reproducibility.",
+            "type": "integer"
+          },
+          "image_seed": {
+            "description": "Seed for the text-to-image step reproducibility.",
+            "type": "integer"
+          },
+          "texture_seed": {
+            "description": "Seed for texture generation reproducibility.",
+            "type": "integer"
+          },
+          "auto_size": {
+            "description": "Auto-scale the model to real-world dimensions (meters).",
+            "type": "boolean",
+            "default": false
+          },
+          "quad": {
+            "description": "Generate a quad mesh instead of triangles. Outputs FBX when enabled.",
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "model",
+          "prompt"
+        ],
+        "type": "object",
+        "x-order-properties": [
+          "model",
+          "prompt",
+          "negative_prompt",
+          "texture",
+          "pbr",
+          "texture_quality",
+          "geometry_quality",
+          "face_limit",
+          "model_seed",
+          "image_seed",
+          "texture_seed",
+          "auto_size",
+          "quad"
+        ]
+      },
+      "PredictionResponse": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "model name",
+            "default": "tripo-h3.1/text-to-3d"
+          },
+          "created_at": {
+            "description": "ISO timestamp of when the request was created (e.g., \"2023-04-01T12:34:56.789Z\").",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique identifier for the prediction.",
+            "type": "string"
+          },
+          "outputs": {
+            "description": "Array of URLs to the generated 3D model files (GLB/FBX and variants), preview image last. Null when status is not completed.",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true,
+            "type": "array"
+          },
+          "files": {
+            "description": "Structured per-output metadata (URL, type, content_type, file_name, file_size) for each generated 3D file.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": { "type": "string" },
+                "type": { "type": "string" },
+                "content_type": { "type": "string" },
+                "file_name": { "type": "string" },
+                "file_size": { "type": "integer" }
+              }
+            }
+          },
+          "thumbnail": {
+            "description": "Preview render image URL of the generated 3D model.",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status of the task: created, processing, completed, or failed.",
+            "type": "string"
+          },
+          "urls": {
+            "description": "Object containing related API endpoints.",
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "apiKeyAuth": {
+        "in": "header",
+        "name": "Authorization",
+        "type": "apiKey"
+      }
+    }
+  }
+}
