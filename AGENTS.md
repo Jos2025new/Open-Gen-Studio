@@ -8,6 +8,18 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Plan — ruta estándar del agente, prompting por modelo y medición (2026-09-26)
+Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: hay decisiones pendientes del usuario (calidad, multi-stage, variantes `-spicy`, permiso para el banco de pruebas).
+- [ ] R0. Registro de métricas por turno y banco de pruebas: medir el antes.
+- [ ] R1. Ruta estándar como reglas por defecto (Direct, un clip, calidad media, Wan 3; Seedance 2.0/2.5 y MiniMax H3 como sugerencias).
+- [ ] R2. Reglas universales de prompting (imagen→vídeo: movimiento, cámara, qué conservar; sin modificadores vacíos).
+- [ ] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3).
+- [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda.
+- [ ] R5. Skill recomendada por workflow.
+- [ ] R6. Preguntas con opción por defecto marcada.
+- [ ] R7. Proporción heredada de la imagen de entrada (validador).
+- [ ] R8. Medir el después y comparar con R0.
+
 ## Plan — agente: búsqueda de modelos, indicador, revisión y selección de pasos (2026-09-26)
 Origen: prueba real del usuario (Kling ×3 → "prefiero Seedance 2.0 Fast" → el agente dijo que no existía y propuso Seedance 2.5 por 5,40 USD). **Restricción del usuario: no añadir latencia ni carga al modelo.** Cada paso se mide contra esto: nada de llamadas extra al LLM, nada de texto extra en cada mensaje, nada de renderizar el razonamiento. Si un paso no puede cumplirlo, se para y se pregunta. Un commit por paso, con tests; la suite completa debe seguir pasando.
 - [x] A1. `find_models` (herramienta del agente) + sugerencia en el validador. *Dónde:* `engine/agent/modelIndex.ts` (nuevo), `agent/tools.ts`, `agent/runtime.ts`, `agent/context.ts`, `plan.ts`. *Qué:* índice solo del catálogo pulido (familias de `scripts/model-families.json`, proveedores conectados, esquema sin `missing`); búsqueda por palabras ("seedance 2.0 fast") que devuelve ≤8 refs con entradas y precio. El validador, ante un modelo desconocido, sugiere la coincidencia más cercana del mismo índice. La lista corta del contexto no cambia. *Por qué:* el agente solo veía 2 modelos de vídeo por proveedor y el prompt le prohibía otros; Seedance 2.0 Fast existe (`nanogpt::bytedance-seedance-2-0-fast`). *Latencia:* una vuelta extra solo cuando el usuario pide un modelo fuera de la lista corta; cero en el resto. *Se espera:* que el agente enrute al modelo pedido dentro de lo admitido, nunca a uno sin pulir.
