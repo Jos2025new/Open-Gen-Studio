@@ -8,6 +8,16 @@ import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 import { refMentionStyle } from '../src/engine/params';
 
+describe('Kling 3.0 guide', () => {
+  it('covers V3 tiers (not O3), structured shots and subjects as elements', () => {
+    expect(guideIndex()).toContain('  model:kling — how to write prompts for Kling 3.0 (std, pro, 4K, turbo)');
+    for (const id of ['kwaivgi/kling-v3.0-pro/text-to-video', 'kwaivgi/kling-v3.0-std/image-to-video', 'fal-ai/kling-video/v3/pro/text-to-video', 'kling-v30-pro']) expect(guideForModel(id)?.id).toBe('kling');
+    expect(guideForModel('fal-ai/kling-video/o3/pro/text-to-video')).toBeUndefined();
+    const t = readGuide('model:kling')!;
+    for (const rule of ['3–15 s', '2 500 characters', '`shots`', 'ONE clip', '@Name', 'At 0s, Ana (left)', 'number-one failure']) expect(t).toContain(rule);
+  });
+});
+
 describe('FLUX 3 guide', () => {
   it('covers the video routes (not the robotics model) with audio on and edit as a change instruction', () => {
     expect(guideIndex()).toContain('  model:flux — how to write prompts for FLUX 3 Video and Video Edit');
@@ -89,7 +99,7 @@ describe('model prompting guides', () => {
 
   it('matches every Seedance variant and points find_models results to the guide', () => {
     for (const id of ['bytedance/seedance-2.5/reference-to-video', 'bytedance-seedance-2-0-fast', 'bytedance/seedance-2.0/fast/image-to-video']) expect(guideForModel(id)?.id).toBe('seedance');
-    expect(guideForModel('kwaivgi/kling-v3.0-pro/text-to-video')).toBeUndefined();
+    expect(guideForModel('kwaivgi/kling-video-o3-pro/text-to-video')).toBeUndefined();
     const line = describeIndexed({ ref: 'nanogpt::bytedance-seedance-2-0-fast', provider: 'nanogpt', id: 'bytedance-seedance-2-0-fast', name: 'Seedance 2.0 Fast', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] });
     expect(line).toContain('prompting guide: model:seedance');
   });
