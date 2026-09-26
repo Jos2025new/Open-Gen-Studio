@@ -8,6 +8,15 @@ import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 import { refMentionStyle } from '../src/engine/params';
 
+describe('HappyHorse guide', () => {
+  it('covers 1.0, 1.1 and fal, one continuous shot, audio only where the variant makes it', () => {
+    expect(guideIndex()).toContain('  model:happyhorse — how to write prompts for HappyHorse 1.0 / 1.1');
+    for (const id of ['alibaba/happyhorse-1.1/reference-to-video', 'alibaba/happyhorse-1.0/text-to-video', 'alibaba/happy-horse/image-to-video']) expect(guideForModel(id)?.id).toBe('happyhorse');
+    const t = readGuide('model:happyhorse')!;
+    for (const rule of ['1–9 reference images', '2 500 characters', 'native on fal', 'One continuous shot', 'do not invent one', 'no CGI']) expect(t).toContain(rule);
+  });
+});
+
 describe('Grok Imagine Video guide', () => {
   it('covers v1 and 1.5, cites <IMAGE_0> from zero unless the schema says otherwise', () => {
     expect(guideIndex()).toContain('  model:grok — how to write prompts for Grok Imagine Video (v1 and 1.5)');
