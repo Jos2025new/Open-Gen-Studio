@@ -474,6 +474,8 @@ export interface PlanFeedItem extends FeedBase {
   error?: string;
   /** This plan replaced the pending one after the user asked for a change. */
   revised?: boolean;
+  /** Steps the user unchecked before running; they are not run. */
+  skipped?: string[];
 }
 
 export interface GenerationFeedItem extends FeedBase {

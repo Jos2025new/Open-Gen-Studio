@@ -8,3 +8,5 @@
 .k-audio .kind-icon { color: var(--type-audio); }
 
 .agent-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0 4px 30px; }
+.plan-step .step-check { margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
+.plan-step.is-off .step-text, .plan-step.is-off .step-id, .plan-step.is-off .step-cost { opacity: 0.4; text-decoration: line-through; }

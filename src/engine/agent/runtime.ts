@@ -370,26 +370,35 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   const { plan } = item;
+  const off = new Set(item.skipped ?? []);
+  const chosen = plan.steps.filter((st) => !off.has(st.id));
+  if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
-  const { total } = estimateSteps(plan.steps);
+  const { total } = estimateSteps(chosen);
   if (total.usd != null && total.usd > remainingBudget() + 1e-9) {
     toast(`This plan (${formatUsd(total.usd)}) exceeds the remaining budget (${formatUsd(Math.max(0, remainingBudget()))}). Raise it in Settings.`, 'error');
     return;
   }
   const pending = s.agent.pending;
   if (pending?.feedItemId === itemId) {
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: 'Approved by the user. The app is executing the plan now.' });
+    const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note} The app is executing the plan now.` });
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
-  updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'running', estimate: total });
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
+    ...it,
+    status: 'running',
+    estimate: total,
+    stepStates: { ...it.stepStates, ...Object.fromEntries([...off].map((sid) => [sid, 'skipped' as StepState])) },
+  }));
 
   const workspace = plan.workspace;
-  let steps = plan.steps;
+  let steps = chosen;
   const nodeOf = (stepId: string) => `${plan.id}_${stepId}`;
   if (workspace === 'node') {
     // Run what is on the canvas now (the user may have edited the drafted nodes).
     const graph = session(sessionId).graph;
-    const ids = graph.nodes.filter((n) => n.planId === plan.id).map((n) => n.id);
+    const ids = graph.nodes.filter((n) => n.planId === plan.id && !off.has(n.id.replace(`${plan.id}_`, ''))).map((n) => n.id);
     const run = graphToSteps(graph, ids, get().generations);
     if (run.errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: run.errors.join(' ') });
@@ -439,6 +448,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
       const out = result.outputs.get(key);
       const fail = result.failed.find((f) => f.stepId === key);
       if (fail) return `${st.id} failed (${fail.error})`;
+      if (off.has(st.id)) return `${st.id} not run (unchecked by the user)`;
       if (!out) return `${st.id} skipped`;
       if (out.assetIds.length) return `${st.id} → ${out.assetIds.map((a) => `asset:${a}`).join(', ')}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;

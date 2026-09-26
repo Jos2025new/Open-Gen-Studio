@@ -1,12 +1,13 @@
 import { Box, Check, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight } from 'lucide-react';
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
+import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
 import type { PlanFeedItem, PlanStep, StepState } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
-import { setUi, useStore } from '../../store/store';
+import { setUi, updateFeedItem, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, CostTag, costLabel } from '../ui/primitives';
 
@@ -67,8 +68,14 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   // While the agent revises this plan after a comment, it must not run in its old form.
   const revising = useStore((s) => s.sessions[sessionId]?.agent.revising === item.id);
   const { plan } = item;
-  // Prices may load after the plan was proposed; show the live estimate while it waits.
-  const live = item.status === 'awaiting' ? estimateSteps(plan.steps) : null;
+  const awaiting = item.status === 'awaiting';
+  const off = new Set(item.skipped ?? []);
+  // Checkboxes only when there is a choice to make.
+  const selectable = awaiting && plan.steps.length > 1;
+  const toggle = (id: string) => updateFeedItem<PlanFeedItem>(sessionId, item.id, { skipped: toggleStep(plan.steps, item.skipped ?? [], id) });
+  // Prices may load after the plan was proposed; show the live estimate (of the checked steps) while it waits.
+  const live = awaiting ? estimateSteps(plan.steps.filter((s) => !off.has(s.id))) : null;
+  const none = awaiting && off.size === plan.steps.length;
   void schemas;
   const total = live?.total ?? item.estimate;
   const perStep = live?.perStep;
@@ -95,7 +102,10 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           const gen = genId ? generations[genId] : undefined;
           const state = item.stepStates[s.id] ?? 'pending';
           return (
-            <li key={s.id} className={`plan-step st-${state}`}>
+            <li key={s.id} className={`plan-step st-${state}${awaiting && off.has(s.id) ? ' is-off' : ''}`}>
+              {selectable ? (
+                <input type="checkbox" className="step-check" checked={!off.has(s.id)} onChange={() => toggle(s.id)} aria-label={`Run ${s.id} · ${s.title}`} />
+              ) : null}
               <span className="step-id num">{s.id}</span>
               <span className={`kind-icon k-${s.kind === 'op' ? OPS[s.op].output : s.kind}`}>{stepIcon(s)}</span>
               <span className="step-text">
@@ -125,7 +135,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             <Button variant="ghost" onClick={() => cancelPlan(sessionId, item.id)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={Zap} disabled={over || revising} onClick={() => void approvePlan(sessionId, item.id)} data-tip={over ? 'Over your remaining budget' : revising ? 'The agent is revising this plan' : undefined}>
+            <Button variant="primary" icon={Zap} disabled={over || revising || none} onClick={() => void approvePlan(sessionId, item.id)} data-tip={over ? 'Over your remaining budget' : revising ? 'The agent is revising this plan' : undefined}>
               {free ? 'Run' : `Run · ${costLabel(total, { short: true })}`}
             </Button>
           </>

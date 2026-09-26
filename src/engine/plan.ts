@@ -139,6 +139,30 @@ export function stepDeps(step: PlanStep): StepRef[] {
   }
 }
 
+/**
+ * Plan card checkboxes: unchecking a step also unchecks every step that needs its output; checking a step
+ * also checks what it needs. Returns the new list of unchecked step ids (in plan order).
+ */
+export function toggleStep(steps: PlanStep[], skipped: string[], id: string): string[] {
+  const ids = new Set(steps.map((s) => s.id));
+  const deps = new Map(steps.map((s) => [s.id, stepDeps(s).map((r) => r.split('#')[0]).filter((r) => ids.has(r))]));
+  const off = new Set(skipped);
+  const walk = (start: string, next: (id: string) => string[], apply: (id: string) => void) => {
+    const stack = [start];
+    const seen = new Set<string>();
+    while (stack.length) {
+      const cur = stack.pop()!;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      apply(cur);
+      stack.push(...next(cur));
+    }
+  };
+  if (off.has(id)) walk(id, (cur) => deps.get(cur) ?? [], (cur) => off.delete(cur));
+  else walk(id, (cur) => steps.filter((s) => deps.get(s.id)?.includes(cur)).map((s) => s.id), (cur) => off.add(cur));
+  return steps.map((s) => s.id).filter((sid) => off.has(sid));
+}
+
 /** Topological order of step ids; throws on cycles or unknown step references. */
 export function topoOrder(steps: PlanStep[]): string[] {
   const byId = new Map(steps.map((s) => [s.id, s]));

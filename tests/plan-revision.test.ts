@@ -8,7 +8,10 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { approvePlan, sendAgentMessage } from '../src/engine/agent/runtime';
+import { toggleStep } from '../src/engine/plan';
+import { updateFeedItem } from '../src/store/store';
+import type { PlanStep } from '../src/engine/types';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
@@ -80,5 +83,35 @@ describe('commenting on a pending plan', () => {
     await sendAgentMessage('use the other one');
     expect(plans().map((p) => p.status)).toEqual(['canceled']);
     expect(useStore.getState().sessions[useStore.getState().activeSessionId].agent.revising).toBeUndefined();
+  });
+});
+
+describe('choosing which steps run', () => {
+  const steps = [
+    { id: 's1', kind: 'text', title: 'p', text: 'prompt' },
+    { id: 's2', kind: 'image', title: 'a', prompt: '', promptFrom: 's1', modelRef: 'x', settings: { count: 1, advanced: {} }, refs: [] },
+    { id: 's3', kind: 'op', title: 'b', op: 'upscale', input: 's2#1', params: {} },
+    { id: 's4', kind: 'text', title: 'c', text: 'other' },
+  ] as unknown as PlanStep[];
+
+  it('unchecking a step unchecks what needs it; checking one brings back what it needs', () => {
+    expect(toggleStep(steps, [], 's2')).toEqual(['s2', 's3']);
+    expect(toggleStep(steps, [], 's1')).toEqual(['s1', 's2', 's3']);
+    expect(toggleStep(steps, ['s1', 's2', 's3'], 's3')).toEqual([]);
+    expect(toggleStep(steps, ['s1', 's2', 's3', 's4'], 's4')).toEqual(['s1', 's2', 's3']);
+  });
+
+  it('runs only the checked steps and tells the agent which were left out', async () => {
+    replies = [{ plan: { title: 'Three', texts: ['a', 'b', 'c'] } }];
+    await sendAgentMessage('three');
+    const [item] = plans();
+    updateFeedItem(useStore.getState().activeSessionId, item.id, { skipped: ['s2', 's3'] });
+    await approvePlan(useStore.getState().activeSessionId, item.id);
+    const done = plans()[0];
+    expect(done.stepStates).toEqual({ s1: 'done', s2: 'skipped', s3: 'skipped' });
+    expect(done.status).toBe('done');
+    const history = useStore.getState().sessions[useStore.getState().activeSessionId].agent.history;
+    expect(history.some((m) => m.role === 'tool' && /unchecked s2, s3/.test(m.content ?? ''))).toBe(true);
+    expect(chatCalls).toBe(1);
   });
 });
