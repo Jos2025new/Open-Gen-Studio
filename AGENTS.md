@@ -16,7 +16,7 @@ Hallado al analizar el flujo de Higgsfield: Ajustes exige un LLM con visión, pe
   Hecho: `agent/attachments.ts` (reducción a 768 px JPEG, primer fotograma en vídeos, etiqueta `asset:id (image W×H)`), `LlmMessage.content` con partes, `stripImages` al empezar una petición nueva, aviso si el modelo no tiene visión. `tests/agent-vision.test.ts` (4). Pendiente (usuario): comprobar con su LLM real que acepta imágenes (NanoGPT/OpenRouter usan el formato OpenAI `image_url`).
 
 ## Plan — ruta estándar del agente, prompting por modelo y medición (2026-09-26)
-Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: hay decisiones pendientes del usuario (calidad, multi-stage, variantes `-spicy`, permiso para el banco de pruebas). Decidido: tabla por propósito como sugerencias recomendadas.
+Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: decisiones pendientes del usuario (calidad = ¿solo resolución?, variantes `-spicy`, permiso para el banco de pruebas). Decidido: tablas por propósito como sugerencias; multi-stage lo decide el agente (historia, serie o personajes que reaparecen); calidad media por defecto y nunca 1080p fija, por coste.
 - [ ] R0. Registro de métricas por turno y banco de pruebas: medir el antes.
 - [ ] R1. Ruta estándar como reglas por defecto (Direct, un clip, calidad media, Wan 3; Seedance 2.0/2.5 y MiniMax H3 como sugerencias), con tablas de sugerencias por propósito: vídeo (borrador, corto o final, toma larga, edición) e imagen (general, héroe, ilustración, personaje, vectorial, tipografía).
 - [ ] R2. Reglas universales de prompting (imagen→vídeo: movimiento, cámara, qué conservar; sin modificadores vacíos).
@@ -25,6 +25,7 @@ Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **R
 - [ ] R5. Skill recomendada por workflow.
 - [ ] R6. Preguntas con opción por defecto marcada.
 - [ ] R7. Proporción heredada de la imagen de entrada (validador).
+- [ ] R10. Sujetos (`@Nombre`) con cualquier modelo: imágenes como referencias y mención con la sintaxis del modelo; "Save as subject" sobre un resultado.
 - [ ] R9. Coste de los pasos de operación de vídeo en planes igual al de la operación directa (duración del clip).
 - [ ] R8. Medir el después y comparar con R0.
 
