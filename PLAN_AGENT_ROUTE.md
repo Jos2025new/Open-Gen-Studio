@@ -37,7 +37,12 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 ### R1. Ruta estándar como reglas por defecto
 **Dónde:** `agent/context.ts` (unas líneas en `SYSTEM_PROMPT`), `providers/registry.ts` (preferencias de vídeo por proveedor).
 **Qué:** cuando no hay skill ni workflow que encaje y la petición es vaga: Direct (usar la imagen dada), un clip, calidad media y modelo Wan 3, con Seedance 2.0/2.5 y MiniMax H3 como sugerencias. Lo que pida el usuario manda siempre sobre estos valores; si la petición ya es clara, no se pregunta nada.
-**Tabla por propósito (decisión pendiente 5):** en lugar de un único modelo, una tabla corta dentro de las mismas reglas, por ejemplo: borrador o prueba → variante rápida o barata; pieza final → Wan 3 (preferido); toma larga o muchas referencias → Seedance 2.5; texto sobre el vídeo o editar un clip → modelo de edición. Unas 4–5 líneas fijas; cero llamadas. Si el usuario prefiere un único valor por defecto, queda Wan 3 para todo.
+**Tabla por propósito (aprobada por el usuario, 2026-09-26, como sugerencias recomendadas):** unas 4–5 líneas fijas en las mismas reglas; cero llamadas. Son recomendaciones, no obligaciones: lo que pida el usuario manda, y el agente puede proponer otra con motivo. Propuesta inicial, a confirmar en R1 con duraciones y precios de los esquemas reales:
+  - Borrador o prueba → variante rápida o barata (Seedance 2.0 Fast, MiniMax H3 Fast).
+  - Clip corto o pieza final → Wan 3 (preferido).
+  - Toma larga o muchas referencias → Seedance 2.5.
+  - Edición o extensión de un clip → operaciones Edit/Extend video con su modelo preferido (hoy Wan 3.0 video-edit / video-extend en NanoGPT).
+  Si una petición no encaja en ninguna fila, se usa Wan 3.
 **Por qué:** hoy la estructura y el modelo se improvisan en cada petición.
 **Aceptación (banco):** en "animar este personaje" el plan usa Wan 3 con la imagen como referencia o primer fotograma, o pregunta una sola vez con esas opciones marcadas. Llamadas y tokens en peticiones claras: iguales que en R0.
 
@@ -85,7 +90,7 @@ Mismo banco de pruebas en el commit final. Tabla por petición y en total: llama
 2. **Multi-stage (R1):** varias referencias generadas a partir de la imagen. ¿Un conjunto fijo (frente, perfil, ¾, como "Character sheet") o que el agente decida según la petición?
 3. **Variantes `-spicy` de NanoGPT:** ¿se excluyen del índice de `find_models` y de la ruta estándar?
 4. **Banco de pruebas (R0/R8):** permiso para ejecutarlo con la clave del LLM (solo planes, sin generación).
-5. **Tabla por propósito (R1):** ¿se adopta (borrador / final / toma larga / texto o edición, con Wan 3 como preferido) o se mantiene Wan 3 como único valor por defecto?
+5. ~~Tabla por propósito (R1)~~ **Decidido (2026-09-26):** se adopta como sugerencias recomendadas (borrador, clip corto o final, toma larga, edición).
 
 ## Fuera de alcance
 
