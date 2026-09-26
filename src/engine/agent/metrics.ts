@@ -77,6 +77,7 @@ type Event =
   | { type: 'call'; inputTokens: number; outputTokens: number; usd: number }
   | { type: 'questions' }
   | { type: 'findModels' }
+  | { type: 'guide'; id: string }
   | { type: 'rejected' }
   | { type: 'plan'; ms: number; revision: boolean; models: string[]; usd: number | null };
 
@@ -91,6 +92,8 @@ export function recordMetric(sessionId: string, e: Event): void {
         return { questionRounds: m.questionRounds + 1 };
       case 'findModels':
         return { findModels: m.findModels + 1 };
+      case 'guide':
+        return { guides: [...(m.guides ?? []), e.id] };
       case 'rejected':
         return { rejectedPlans: m.rejectedPlans + 1 };
       case 'plan':

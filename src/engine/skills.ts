@@ -35,6 +35,14 @@ export interface Workflow {
   workspaces: Workspace[];
   /** Skill applied with this workflow when the user picked none. */
   skill?: string;
+  /** Values the workflow decides and does not ask. Never the resolution: it follows the chosen quality (cost). */
+  fixed?: { model?: string; aspect?: string; audio?: boolean };
+  /** Inputs the workflow needs; missing ones are asked in the one questions card. */
+  needs?: string[];
+  /** Formats of the same workflow; only the chosen one is loaded. */
+  variants?: Array<{ id: string; name: string; description: string; steps?: WorkflowStepTemplate[] }>;
+  /** How steps chain: what an approved result feeds next, and the one identity kept throughout. */
+  continuity?: string;
   steps: WorkflowStepTemplate[];
 }
 
@@ -118,6 +126,8 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Design the key still, then animate it.',
     workspaces: ['chat', 'node'],
     skill: 'cinematic',
+    needs: ['a start image or a description of the subject'],
+    continuity: 'The key frame is the first frame of the clip.',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Animate', prompt: '{prompt}, subtle natural motion, slow camera push-in', firstFrame: 's1', aspect: '16:9' },
@@ -129,6 +139,8 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Hero shot, relit variant, vertical cut and a short clip.',
     workspaces: ['chat', 'node'],
     skill: 'product',
+    needs: ['the product (photo or description)'],
+    continuity: 'One product identity: every step derives from the hero shot.',
     steps: [
       { id: 's1', kind: 'image', title: 'Hero shot', prompt: '{prompt}, hero product shot, studio lighting', aspect: '1:1' },
       { id: 's2', kind: 'op', title: 'Golden relight', op: 'relight', input: 's1', params: { preset: 'golden-hour', direction: 'left', intensity: 'medium' } },
@@ -142,6 +154,8 @@ export const WORKFLOWS: Workflow[] = [
     description: 'One character from four angles.',
     workspaces: ['chat', 'node'],
     skill: 'character',
+    needs: ['the character (image or description)'],
+    continuity: 'Every view derives from the front view; one identity throughout.',
     steps: [
       { id: 's1', kind: 'image', title: 'Front view', prompt: '{prompt}, full body, front view, neutral background', aspect: '3:4' },
       { id: 's2', kind: 'op', title: '3/4 view', op: 'angle', input: 's1', params: { angle: 'three-quarter-left' } },
@@ -155,6 +169,9 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Four continuous frames of one scene.',
     workspaces: ['chat', 'node'],
     skill: 'storyboard',
+    needs: ['the story or scene'],
+    fixed: { aspect: '16:9' },
+    continuity: 'Shots 2–4 use shot 1 as reference; neighboring shots change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Shot 1 · establishing', prompt: '{prompt}, establishing wide shot', aspect: '16:9' },
       { id: 's2', kind: 'image', title: 'Shot 2 · medium', prompt: '{prompt}, medium shot, same scene and style', refs: ['s1'], aspect: '16:9' },
@@ -168,6 +185,8 @@ export const WORKFLOWS: Workflow[] = [
     description: 'One visual adapted to 1:1, 4:5 and 9:16.',
     workspaces: ['chat', 'node'],
     skill: 'social',
+    needs: ['the subject or message'],
+    continuity: 'Every format reframes the master.',
     steps: [
       { id: 's1', kind: 'image', title: 'Master', prompt: '{prompt}', aspect: '1:1' },
       { id: 's2', kind: 'op', title: 'Feed 4:5', op: 'reframe', input: 's1', params: { aspect: '4:5' } },
@@ -180,6 +199,9 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Key frame, first clip and a continuation.',
     workspaces: ['chat', 'node'],
     skill: 'cinematic',
+    needs: ['the scene or a start image', 'total duration'],
+    fixed: { aspect: '16:9' },
+    continuity: 'Each clip continues from the last frame of the previous one; neighboring clips change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Clip 1', prompt: '{prompt}', firstFrame: 's1', aspect: '16:9' },
@@ -192,6 +214,7 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Background on layer 1, headline and accent layers on top.',
     workspaces: ['designer'],
     skill: 'poster',
+    needs: ['the headline', 'date or details'],
     steps: [
       { id: 's1', kind: 'image', title: 'Background', prompt: '{prompt}, poster background with negative space for a headline' },
       { id: 'l1', kind: 'layer', title: 'Background', layerType: 'raster', source: 's1' },
@@ -224,5 +247,37 @@ export function describeWorkflow(w: Workflow): string {
     if (s.aspect) parts.push(`aspect ${s.aspect}`);
     return `  - ${parts.join(', ')}`;
   });
-  return `${w.name}: ${w.description}\n${lines.join('\n')}`;
+  const extra = [
+    w.fixed ? `fixed (do not ask): ${Object.entries(w.fixed).map(([k, v]) => `${k} ${v}`).join(', ')}` : '',
+    w.needs?.length ? `needs (ask the missing ones in the one questions card): ${w.needs.join('; ')}` : '',
+    w.continuity ? `continuity: ${w.continuity}` : '',
+    w.variants?.length ? `variants: ${w.variants.map((v) => `${v.id} (${v.description})`).join('; ')}` : '',
+  ].filter(Boolean);
+  return [`${w.name}: ${w.description}`, ...lines, ...extra.map((e) => `  ${e}`)].join('\n');
+}
+
+/** One line per workflow and skill, for the agent's system prompt: name and when to use it. */
+export function guideIndex(): string {
+  return [
+    ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}`),
+    ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
+  ].join('\n');
+}
+
+/** The full text of a skill or workflow for read_guide ("skill:product", "workflow:storyboard", "workflow:ugc/unboxing"). */
+export function readGuide(id: string): string | undefined {
+  const [type, rest = ''] = id.trim().split(':');
+  if (type === 'skill') {
+    const k = skillById(rest);
+    return k ? `${k.name}: ${k.guidance}` : undefined;
+  }
+  if (type !== 'workflow') return undefined;
+  const [wid, variant] = rest.split('/');
+  const w = workflowById(wid);
+  if (!w) return undefined;
+  const v = variant ? w.variants?.find((x) => x.id === variant) : undefined;
+  if (variant && !v) return undefined;
+  const chosen: Workflow = v ? { ...w, name: `${w.name} · ${v.name}`, description: v.description, steps: v.steps ?? w.steps, variants: undefined } : w;
+  const skill = skillById(w.skill);
+  return `workflow (follow this structure, adapt prompts to the request):\n${describeWorkflow(chosen)}${skill ? `\nskill ${skill.name}: ${skill.guidance}` : ''}`;
 }

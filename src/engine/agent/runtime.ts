@@ -38,7 +38,8 @@ import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
-import { TOOLS, findModelsSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { readGuide } from '../skills';
+import { TOOLS, findModelsSchema, readGuideSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -638,6 +639,14 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           const v = findModelsSchema.safeParse(parsed.value);
           recordMetric(sessionId, { type: 'findModels' });
           respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
+          continue;
+        }
+        if (call.name === 'read_guide') {
+          // Loaded on demand from the index in the system prompt; the agent continues in the next round.
+          const v = readGuideSchema.safeParse(parsed.value);
+          const text = v.success ? readGuide(v.data.id) : undefined;
+          if (v.success && text) recordMetric(sessionId, { type: 'guide', id: v.data.id });
+          respond(text ?? (v.success ? `No guide "${v.data.id}". Use an id from the index.` : `Invalid read_guide input: ${formatZodError(v.error)}`));
           continue;
         }
         if (call.name === 'propose_plan') {

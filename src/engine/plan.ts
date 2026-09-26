@@ -65,6 +65,8 @@ export interface RawStep {
 export interface RawPlan {
   title?: string;
   summary?: string;
+  /** Seconds the video steps add up to; split over the video steps without their own duration. */
+  total_duration?: number;
   steps?: RawStep[];
 }
 
@@ -261,6 +263,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
+  // A total length is split evenly over the video steps that set none (each share then snaps to the model's lengths).
+  const total = Number(raw.total_duration);
+  const unset = rawSteps.filter((s) => s.kind === 'video' && s.duration == null);
+  const setSecs = rawSteps.reduce((sum, s) => sum + (s.kind === 'video' && s.duration != null ? Number(s.duration) || 0 : 0), 0);
+  const share = Number.isFinite(total) && total > 0 && unset.length ? Math.max(1, Math.round((total - setSecs) / unset.length)) : undefined;
+  if (share) adjustments.push(`total ${total}s: about ${share}s for each of ${unset.map((s) => s.id).join(', ')}`);
   if (rawSteps.length > maxSteps) errors.push(`Too many steps (${rawSteps.length}); the limit is ${maxSteps}.`);
 
   const ids = new Set<string>();
@@ -417,7 +425,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           ...defaults,
           aspect: s.aspect ?? inherited ?? defaults.aspect,
           resolution: s.resolution ?? defaults.resolution,
-          duration: s.duration ?? defaults.duration,
+          duration: s.duration ?? share ?? defaults.duration,
           audio: s.audio ?? defaults.audio,
           count: kind === 'model3d' ? 1 : s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
           seed: s.seed,

@@ -27,6 +27,19 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'read_guide',
+      description:
+        'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
+      parameters: {
+        type: 'object',
+        properties: { id: { type: 'string', description: 'An index id, e.g. "workflow:storyboard", "skill:product"; a workflow variant as "workflow:<id>/<variant>".' } },
+        required: ['id'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'ask_questions',
       description:
         'Guided mode only. Ask 1-4 short, decisive questions that remove real ambiguity before planning, all needed ones together in one card. Each question has 2-5 concrete options and a default: the option you recommend, preselected so one click continues. Never ask about details you can settle with a sensible choice or the user already settled.',
@@ -68,6 +81,7 @@ export const TOOLS: ToolSpec[] = [
           title: { type: 'string', description: 'Short title, in the user\'s language.' },
           summary: { type: 'string', description: 'One sentence describing the result, in the user\'s language.' },
           revision: { type: 'boolean', description: 'true when this plan changes the pending plan the user just commented on; false or omitted for a different request.' },
+          total_duration: { type: 'number', description: 'Seconds the video steps add up to when the user gave a total; the app splits it over the video steps that set no duration.' },
           steps: {
             type: 'array',
             minItems: 1,
@@ -81,7 +95,7 @@ export const TOOLS: ToolSpec[] = [
                 prompt: { type: 'string', description: 'image/video: full generation prompt (English works best). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
                 prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
                 lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
-                model: { type: 'string', description: 'Model ref "provider::id". Omit to use the user\'s selected model.' },
+                model: { type: 'string', description: 'Model ref "provider::id" or a default-route family ("Wan 3", "Seedance 2.5"). Omit to use the user\'s selected model.' },
                 aspect: { type: 'string', description: 'e.g. "16:9", "9:16", "1:1", "4:5".' },
                 resolution: { type: 'string', description: 'A value from the model options (e.g. "2K", "1080p").' },
                 count: { type: 'integer', minimum: 1, maximum: 4 },
@@ -144,6 +158,8 @@ export const findModelsSchema = z.object({
   kind: z.enum(['image', 'video', 'audio', 'model3d']).optional(),
 });
 
+export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
+
 export const askQuestionsSchema = z.object({
   intro: z.string().max(400).optional(),
   questions: z.array(questionSchema).min(1).max(4),
@@ -188,6 +204,7 @@ export const proposePlanSchema = z.object({
   title: z.string().max(200).optional(),
   summary: z.string().max(600).optional(),
   revision: z.boolean().optional(),
+  total_duration: num.optional(),
   steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
 });
 

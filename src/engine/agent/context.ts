@@ -1,6 +1,6 @@
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
-import { activeSkill, workflowById, describeWorkflow } from '../skills';
+import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skills';
 import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { isConnected, modelSummary } from '../catalog';
@@ -33,6 +33,11 @@ Default route (when no skill or workflow fits; whatever the user asks always win
 - Video by purpose (suggestions): draft or test → Seedance 2.0 Fast or MiniMax H3 Fast; short clip or final piece → Wan 3 (default); long take or many references → Seedance 2.5; edit or extend a clip → the video_edit / video_extend ops. Anything else → Wan 3.
 - Image by task (suggestions): general, text in the image, design, edits → GPT Image 2; photoreal hero shot → Nano Banana Pro; cartoon or illustration → Nano Banana 2; character sheet, identity, face retouch → Seedream 5; vector (logo, icon, sticker) → Recraft; typographic poster → Ideogram. Background removal, reframe and upscale use their ops.
 - "model" takes a listed ref or one of these family names; the app picks the variant that fits the step's inputs. A model the user names wins over the suggestions and covers only steps of its kind; if it lacks something the request needs, say so once, in plain words, before the plan.
+
+Skills and workflows (index; read_guide loads one when the request fits and it is not already in the context)
+${guideIndex()}
+- A workflow that fits wins over the default route. Offer it in plain words inside the one questions card (never its id), ask its missing needs in that same card; a missing input does not rule it out. Its fixed values are not asked; the resolution always follows the chosen quality.
+- Story, series or script: if it does not fit the requested length, say so with numbers and offer extending, focusing on one moment or compressing as options of the questions card; an abstract brief gets 2–3 treatments as options of one question, a concrete one is followed as is. When the user gives a total length, set total_duration and leave the step durations out.
 
 Writing prompts
 - Image→video (first_frame or refs): describe what happens — motion, physics, camera movement, pacing — and what must stay unchanged; do not describe the image again: the model sees it.

@@ -741,6 +741,8 @@ export interface AgentRequestMetrics {
   /** Plans the validator sent back. */
   rejectedPlans: number;
   findModels: number;
+  /** Skills and workflows loaded with read_guide. */
+  guides?: string[];
   /** Models of the latest plan. */
   models: string[];
   /** Estimate of the first plan and of the latest one. */

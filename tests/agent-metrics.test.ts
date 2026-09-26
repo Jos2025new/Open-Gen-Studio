@@ -12,13 +12,14 @@ import { approvePlan, cancelPlan, sendAgentMessage } from '../src/engine/agent/r
 import { useStore } from '../src/store/store';
 import type { AgentStyle, PlanFeedItem } from '../src/engine/types';
 
-type Reply = { plan?: { texts: string[]; revision?: boolean }; questions?: boolean | { default: string }; text?: string };
+type Reply = { plan?: { texts: string[]; revision?: boolean }; questions?: boolean | { default: string }; text?: string; guide?: string };
 
 const sse = (r: Reply) => {
   const chunks: unknown[] = [];
   if (r.text) chunks.push({ choices: [{ delta: { content: r.text } }] });
   const call = (name: string, args: unknown) => ({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] });
   if (r.plan) chunks.push(call('propose_plan', { title: 'P', revision: r.plan.revision, steps: r.plan.texts.map((t, i) => ({ id: `s${i + 1}`, kind: 'text', text: t })) }));
+  if (r.guide) chunks.push(call('read_guide', { id: r.guide }));
   if (r.questions) chunks.push(call('ask_questions', { questions: [{ id: 'q1', question: 'Style?', options: ['A', 'B'], ...(typeof r.questions === 'object' ? r.questions : {}) }] }));
   chunks.push({ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 50, cost: 0.001 } });
   const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n';
@@ -134,5 +135,24 @@ describe('questions with a recommended option (R6)', () => {
     replies = [{ questions: { default: 'C' } }];
     await sendAgentMessage('animate');
     expect(card()!.questions[0].default).toBeUndefined();
+  });
+});
+
+describe('guides on demand (R4)', () => {
+  beforeEach(() => setup('guided'));
+
+  it('read_guide answers locally and costs one more model round, recorded in the metrics', async () => {
+    const bodies: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+      bodies.push(body);
+      return sse(replies.shift() ?? { text: 'ok' });
+    });
+    replies = [{ guide: 'workflow:storyboard' }, { plan: { texts: ['a'] } }];
+    await sendAgentMessage('a four-shot storyboard of a heist');
+    expect(metrics()[0]).toMatchObject({ llmCalls: 2, guides: ['workflow:storyboard'], plans: 1 });
+    const toolAnswer = bodies[1].messages.find((m) => m.role === 'tool');
+    expect(String(toolAnswer?.content)).toMatch(/Storyboard · 4 shots[\s\S]*continuity:/);
   });
 });
