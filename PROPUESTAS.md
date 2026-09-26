@@ -49,5 +49,5 @@ Hecho: copia en disco vía `/x/store` (ver `PROGRESS.md`). Posibles mejoras, sol
 ## 5. Herramientas pendientes (sin decidir)
 
 - **Trim / quitar audio de vídeo:** ningún proveedor lo ofrece (salvo una utilidad de pago en fal). Opción ligera en el navegador: remuxar sin recodificar con una librería tipo Mediabunny (revisar licencia y peso antes). ffmpeg.wasm descartado por peso (~30 MB).
-- **Quitar fondo de vídeo** (`pixelcut/video-background-removal` en NanoGPT) y **audio** (transcripción, TTS, música: catálogo `nano-gpt.com/api/v1/audio-models`): IDs verificados, sin implementar; el audio necesitaría un tipo de medio nuevo en la app.
+- **Quitar fondo de vídeo** (`pixelcut/video-background-removal` en NanoGPT): ID verificado, sin implementar. **Audio:** el tipo de medio ya existe (transcripción y MiniMax Music/Lyrics hechos, fase 4); otras familias (TTS, efectos, música de otros proveedores) esperan decisión del usuario.
 - **Descartado por el usuario:** "Analysis" (describir imagen/vídeo con el LLM para sacar un prompt).

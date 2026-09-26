@@ -1,6 +1,6 @@
 # Comparación con los ejemplos aportados
 
-> **Estado (2026-09-24):** los puntos 1–6 están corregidos (ver `PROGRESS.md` y `MODEL_VALIDATION.md`). Pendiente: `/generate-video/recover`, audio de referencia y las restricciones explícitas de edición/extensión de Seedance 2.5.
+> **Estado (2026-09-26):** los puntos 1–6 están corregidos (ver `PROGRESS.md` y `MODEL_VALIDATION.md`); el audio de referencia (fase 4a) y las reglas de edición/extensión de Seedance 2.5 (fase 2) también. Pendiente: `/generate-video/recover`.
 
 Revisión: GPT 6 ASTRA, 2026-09-25. Fuentes: `/home/samuel/Descargas/API DOC`. Comparación estática del código actual; ninguna generación ni consulta autenticada. Los ejemplos se tratan como contratos documentados, no como prueba de disponibilidad actual de esos modelos.
 
