@@ -118,7 +118,7 @@ describe('subject mentions in each model syntax (R10)', () => {
     const { refMentionStyle, mentionSubjects } = await import('../src/engine/params');
     expect(refMentionStyle('xai/grok-imagine-image/edit', 'For multi-image references, cite each input as <IMAGE_0>, <IMAGE_1>, ...')).toEqual({ template: '<IMAGE_{n}>', zeroBased: true });
     expect(refMentionStyle('alibaba/wan-3.0/reference-to-video', "'the subject in Image 1 walks past Video 1'.")?.template).toBe('Image {n}');
-    expect(refMentionStyle('alibaba/wan-3.0/reference-to-video')?.template).toBe('@Image{n}');
+    expect(refMentionStyle('alibaba/wan-3.0/reference-to-video')?.template).toBe('Image {n}');
     expect(refMentionStyle('minimax-h3/reference-to-video')?.template).toBe('<Picture {n}>');
     expect(refMentionStyle('some/other-model')).toBeUndefined();
     const subjects = [{ id: 'a', name: 'Ana' }];

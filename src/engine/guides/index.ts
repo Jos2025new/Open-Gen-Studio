@@ -1,4 +1,5 @@
 import seedance from './seedance.md?raw';
+import wan from './wan.md?raw';
 
 /*
  * Prompting guides per model family: how to write for that model (style), next to the schema the app already
@@ -13,7 +14,10 @@ export interface ModelGuide {
   text: string;
 }
 
-export const MODEL_GUIDES: ModelGuide[] = [{ id: 'seedance', name: 'Seedance 2.0 / 2.5', match: /seedance/i, text: seedance }];
+export const MODEL_GUIDES: ModelGuide[] = [
+  { id: 'seedance', name: 'Seedance 2.0 / 2.5', match: /seedance/i, text: seedance },
+  { id: 'wan', name: 'Wan 3.0 / Wan 3.0 Prime', match: /wan-3/i, text: wan },
+];
 
 export function modelGuide(id: string): ModelGuide | undefined {
   return MODEL_GUIDES.find((g) => g.id === id);

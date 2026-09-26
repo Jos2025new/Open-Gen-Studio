@@ -1064,7 +1064,9 @@ export function refMentionStyle(modelId: string, promptRefs?: string): { templat
   if (/<\s*image_?0/i.test(said)) return { template: '<IMAGE_{n}>', zeroBased: true };
   if (/character\s?1/i.test(said)) return { template: 'character{n}', zeroBased: false };
   if (/\bimage\s?1\b/i.test(said)) return { template: 'Image {n}', zeroBased: false };
-  if (/seedance|wan-3/i.test(modelId)) return { template: '@Image{n}', zeroBased: false };
+  if (/seedance/i.test(modelId)) return { template: '@Image{n}', zeroBased: false };
+  // Wan 3: positional words without "@" (fal schema: "the subject in Image 1 walks past Video 1").
+  if (/wan-3/i.test(modelId)) return { template: 'Image {n}', zeroBased: false };
   if (/minimax[-/]h3/i.test(modelId)) return { template: '<Picture {n}>', zeroBased: false };
   return undefined;
 }

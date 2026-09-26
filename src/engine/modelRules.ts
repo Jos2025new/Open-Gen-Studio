@@ -95,8 +95,8 @@ export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
   },
   {
     family: 'Wan 3',
-    note: '@Image1 defines… ("@Image1 defines the character. Do not use the image background."); with first/last frame, leave free references out.',
-    source: 'ai-director guide wan3/prompting.md lines 88–123 (user machine); fal schema wan-3.0/reference-to-video ("Image 1 … Video 1")',
+    note: 'positional words without "@": Image 1, Image 2, Video 1, Audio 1 ("the subject in Image 1 walks past Video 1"; "Image 1 is the character; do not use its background"); start/end frames and references are exclusive.',
+    source: 'fal schema wan-3.0/reference-to-video prompt ("Reference media can be addressed positionally, e.g. \'the subject in Image 1 walks past Video 1\'"); user production source 2026-09-26 (Wan does not use @Image1)',
   },
   {
     family: 'MiniMax H3',
