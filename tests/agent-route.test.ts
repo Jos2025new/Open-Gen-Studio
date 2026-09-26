@@ -75,3 +75,30 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(SYSTEM_PROMPT).toContain('use exactly that');
   });
 });
+
+describe('aspect from the input image (R7)', () => {
+  const model = { ref: 'fal::v', provider: 'fal', id: 'v', name: 'V', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } as never;
+  const schema = { ref: 'fal::v', params: [{ key: 'aspect_ratio', role: 'aspect', type: 'enum', options: ['16:9', '9:16', '1:1'], default: '16:9' }], slots: { prompt: 'prompt', firstFrame: { key: 'image_url', format: 'url' } }, source: 'openapi' } as never;
+  const ctx: PlanContext = {
+    workspace: 'chat',
+    getModel: async (r) => (r === 'fal::v' ? { model, schema } : null),
+    defaultModel: () => 'fal::v',
+    defaultSettings: () => ({ aspect: '16:9' }),
+    asset: (id) => (id === 'tall' ? { kind: 'image', width: 720, height: 1280 } : undefined),
+    layer: () => undefined,
+  };
+  const aspect = (plan: Awaited<ReturnType<typeof normalizePlan>>['plan']) => (plan!.steps[0] as { settings: { aspect?: string } }).settings.aspect;
+
+  it('a portrait start image gives a portrait clip, noted as an adjustment', async () => {
+    const r = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'walk', first_frame: 'asset:tall' }] }, ctx, 'p');
+    expect(aspect(r.plan)).toBe('9:16');
+    expect(r.plan!.adjustments.join(' ')).toMatch(/aspect 9:16 from the input image/);
+  });
+
+  it('an aspect set by the step wins; without an image the default stays', async () => {
+    const a = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'walk', first_frame: 'asset:tall', aspect: '1:1' }] }, ctx, 'p');
+    expect(aspect(a.plan)).toBe('1:1');
+    const b = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a city' }] }, ctx, 'p');
+    expect(aspect(b.plan)).toBe('16:9');
+  });
+});

@@ -30,7 +30,8 @@ Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **R
 - [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda; el workflow gana a la ruta genérica; workflows con `fixed`, `needs`, `variants` y `continuity`, y reparto de duración sin llamadas.
 - [ ] R5. Skill recomendada por workflow.
 - [ ] R6. Preguntas con opción por defecto marcada.
-- [ ] R7. Proporción heredada de la imagen de entrada (validador).
+- [x] R7. Proporción heredada de la imagen de entrada (validador).
+  Hecho: `inputAspect` en `plan.ts`; la proporción se ajusta a la opción más cercana del modelo y se anota.
 - [ ] R10. Sujetos (`@Nombre`) con cualquier modelo: imágenes como referencias y mención con la sintaxis del modelo; "Save as subject" sobre un resultado.
 - [ ] R9. Coste de los pasos de operación de vídeo en planes igual al de la operación directa (duración del clip).
 - [ ] R8. Medir el después y comparar con R0.

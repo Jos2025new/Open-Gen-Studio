@@ -1,6 +1,6 @@
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { audioInputProblem, coerceSettings, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
+import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
   AdvancedValue,
   AssetKind,
@@ -93,7 +93,7 @@ export interface PlanContext {
   getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
   defaultModel: (kind: MediaKind, needsImage: boolean) => string | null;
   defaultSettings: (kind: MediaKind) => Partial<GenSettings>;
-  asset: (id: string) => { kind: AssetKind } | undefined;
+  asset: (id: string) => { kind: AssetKind; width?: number; height?: number } | undefined;
   layer: (id: string) => { type: LayerType } | undefined;
   maxSteps?: number;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
@@ -318,6 +318,19 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   };
 
   const steps: PlanStep[] = [];
+  /** Shape of an input image: an asset's pixels, or the aspect of the image step that makes it. */
+  const inputAspect = (ref: string | undefined): string | undefined => {
+    const p = ref ? parseRef(ref) : null;
+    if (p?.type === 'asset') {
+      const a = ctx.asset(p.id);
+      return a?.kind === 'image' && a.width && a.height ? `${a.width}:${a.height}` : undefined;
+    }
+    if (p?.type === 'step') {
+      const st = steps.find((x) => x.id === p.id);
+      return st?.kind === 'image' ? st.settings.aspect : undefined;
+    }
+    return undefined;
+  };
   for (const s of rawSteps) {
     const where = `Step ${s.id}`;
     const title = (s.title ?? '').trim() || s.id!;
@@ -395,9 +408,14 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (problem) errors.push(`${where}: model "${modelRef}" ${problem.message}`);
         }
         const defaults = ctx.defaultSettings(kind);
+        // R7: a clip made from an image keeps the image's shape unless the step sets one.
+        const shape = kind === 'video' && !s.aspect ? inputAspect(s.first_frame ?? imageRefs[0]) : undefined;
+        const aspectOptions = paramByRole(schema, 'aspect')?.options?.filter((o) => !isAutoOption(o)) ?? [];
+        const inherited = shape && aspectOptions.length ? nearestAspect(aspectOptions, shape) : undefined;
+        if (inherited) adjustments.push(`${s.id}: aspect ${aspectLabel(inherited)} from the input image`);
         const { settings, changes } = coerceSettings(schema, kind, {
           ...defaults,
-          aspect: s.aspect ?? defaults.aspect,
+          aspect: s.aspect ?? inherited ?? defaults.aspect,
           resolution: s.resolution ?? defaults.resolution,
           duration: s.duration ?? defaults.duration,
           audio: s.audio ?? defaults.audio,
