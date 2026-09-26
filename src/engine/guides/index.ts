@@ -3,6 +3,7 @@ import wan from './wan.md?raw';
 import minimax from './minimax.md?raw';
 import grok from './grok.md?raw';
 import happyhorse from './happyhorse.md?raw';
+import veo from './veo.md?raw';
 
 /*
  * Prompting guides per model family: how to write for that model (style), next to the schema the app already
@@ -23,6 +24,7 @@ export const MODEL_GUIDES: ModelGuide[] = [
   { id: 'minimax', name: 'MiniMax H3 (all tiers)', match: /minimax[-/]h3/i, text: minimax },
   { id: 'grok', name: 'Grok Imagine Video (v1 and 1.5)', match: /grok-imagine-video/i, text: grok },
   { id: 'happyhorse', name: 'HappyHorse 1.0 / 1.1', match: /happy-?horse/i, text: happyhorse },
+  { id: 'veo', name: 'Veo 3.1 (standard, Fast, Lite)', match: /veo[-_ .]?3[-_ .]?1|veo3[.-]1/i, text: veo },
 ];
 
 export function modelGuide(id: string): ModelGuide | undefined {

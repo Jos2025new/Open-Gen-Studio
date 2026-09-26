@@ -8,6 +8,15 @@ import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 import { refMentionStyle } from '../src/engine/params';
 
+describe('Veo 3.1 guide', () => {
+  it('covers every variant and states the 8 s limit, audio switch and moderation', () => {
+    expect(guideIndex()).toContain('  model:veo — how to write prompts for Veo 3.1 (standard, Fast, Lite)');
+    for (const id of ['google/veo3.1/reference-to-video', 'google/veo3.1-fast/text-to-video', 'fal-ai/veo3.1/lite/image-to-video', 'google/veo-3.1-fast']) expect(guideForModel(id)?.id).toBe('veo');
+    const t = readGuide('model:veo')!;
+    for (const rule of ['4 / 6 / 8 s', 'always 8 s', 'off by default on Atlas', 'Strict moderation', 'photoreal by default', 'repeat it at the end']) expect(t).toContain(rule);
+  });
+});
+
 describe('HappyHorse guide', () => {
   it('covers 1.0, 1.1 and fal, one continuous shot, audio only where the variant makes it', () => {
     expect(guideIndex()).toContain('  model:happyhorse — how to write prompts for HappyHorse 1.0 / 1.1');
