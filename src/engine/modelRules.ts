@@ -89,6 +89,11 @@ export interface ReferenceProtocol {
 
 export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
   {
+    family: 'Grok Imagine Video',
+    note: '<IMAGE_0>, <IMAGE_1>… counted from zero, in refs order (unless the model\'s inputs give another syntax); say what each brings ("same person as <IMAGE_0>, colour style of <IMAGE_1>").',
+    source: 'Atlas schema grok-imagine-video-v1.5/reference-to-video ("Referenced in the prompt as <IMAGE_0> … <IMAGE_N>"); fal v1.5 ("Tag references as <IMAGE_0>, <IMAGE_1>"); fal v1 uses @Image1',
+  },
+  {
     family: 'Seedance 2.0 / 2.5',
     note: '@Image1, @Image2… (@Video1, @Audio1), numbered per type in refs order; one job per reference plus what it must not bring ("@Image1 is the character; ignore its background").',
     source: 'Atlas schema seedance-2.5/reference-to-video (prompt: "Cite reference inputs in submission order with @-syntax"); API DOC/bytedance seedance 2 5.md (example Odysseus@image2)',

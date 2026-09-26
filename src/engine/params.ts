@@ -1068,6 +1068,8 @@ export function refMentionStyle(modelId: string, promptRefs?: string): { templat
   // Wan 3: positional words without "@" (fal schema: "the subject in Image 1 walks past Video 1").
   if (/wan-3/i.test(modelId)) return { template: 'Image {n}', zeroBased: false };
   if (/minimax[-/]h3/i.test(modelId)) return { template: '<Picture {n}>', zeroBased: false };
+  // Grok Imagine Video: <IMAGE_0>, <IMAGE_1>… from zero (Atlas v1.5 and fal v1.5 schemas); fal v1 says @Image1 and wins above.
+  if (/grok-imagine-video/i.test(modelId)) return { template: '<IMAGE_{n}>', zeroBased: true };
   return undefined;
 }
 

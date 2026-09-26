@@ -6,6 +6,19 @@ vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: a
 import { guideIndex, readGuide } from '../src/engine/skills';
 import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
+import { refMentionStyle } from '../src/engine/params';
+
+describe('Grok Imagine Video guide', () => {
+  it('covers v1 and 1.5, cites <IMAGE_0> from zero unless the schema says otherwise', () => {
+    expect(guideIndex()).toContain('  model:grok — how to write prompts for Grok Imagine Video (v1 and 1.5)');
+    for (const id of ['xai/grok-imagine-video/reference-to-video', 'xai/grok-imagine-video-v1.5/text-to-video', 'grok-imagine-video']) expect(guideForModel(id)?.id).toBe('grok');
+    const t = readGuide('model:grok')!;
+    for (const rule of ['best instruction following', '<IMAGE_0>', 'Audio:', 'keep the composition and motion', 'first sentence', 'no three-dimensional volume']) expect(t).toContain(rule);
+    expect(refMentionStyle('xai/grok-imagine-video/reference-to-video')).toEqual({ template: '<IMAGE_{n}>', zeroBased: true });
+    // fal v1 declares @Image1 in its schema: the schema wins.
+    expect(refMentionStyle('xai/grok-imagine-video/reference-to-video', 'Use @Image1, @Image2')?.template).toBe('@Image{n}');
+  });
+});
 
 describe('MiniMax H3 guide', () => {
   it('covers every tier on our providers, with MiniMax reference labels and a declared style', () => {
