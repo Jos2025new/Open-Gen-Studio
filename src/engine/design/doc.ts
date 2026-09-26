@@ -1,4 +1,5 @@
 import { uid } from '../../lib/id';
+import { scaleStroke, translateStroke } from './strokes';
 import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
 
 /* Pure document/layer operations for the Designer. Layers are ordered bottom → top. */
@@ -121,12 +122,12 @@ export function reorderLayer(doc: DesignDoc, id: string, toIndex: number): Desig
 
 export function cloneLayer(layer: Layer): Layer {
   const id = uid('lyr');
-  if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })) };
+  if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => ({ ...s, id: uid('stk') })) } : {}) };
   return { ...layer, id, name: `${layer.name} copy` };
 }
 
 export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
-  if (layer.type === 'vector') return { ...layer, shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })) };
+  if (layer.type === 'vector') return { ...layer, shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => translateStroke(s, dx, dy)) } : {}) };
   return { ...layer, x: layer.x + dx, y: layer.y + dy };
 }
 
@@ -165,6 +166,7 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
     return {
       ...layer,
       shapes: layer.shapes.map((s: VectorShape) => ({ ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, radius: s.radius * k })),
+      ...(layer.strokes ? { strokes: layer.strokes.map((s) => scaleStroke(s, sx, sy, ax, ay)) } : {}),
     };
   }
   const k = Math.max(0.05, Math.sqrt(Math.abs(sx * sy)));

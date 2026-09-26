@@ -7,6 +7,8 @@ import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
+import { DEFAULT_STROKE_STYLE } from '../engine/design/strokes';
+import type { StrokeStyle } from '../engine/types';
 import type {
   AgentStyle,
   Asset,
@@ -90,6 +92,8 @@ export interface UiState {
   toasts: Toast[];
   tool: DesignTool;
   brush: { size: number; color: string; opacity: number };
+  /** Style of new Lineart strokes (editable afterwards per layer). */
+  lineart: StrokeStyle;
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
   text: TextStyle;
   threadOpen: boolean;
@@ -184,6 +188,7 @@ const initial: AppState = {
     toasts: [],
     tool: 'move',
     brush: { size: 24, color: '#ffffff', opacity: 1 },
+    lineart: { ...DEFAULT_STROKE_STYLE },
     shape: { fill: '#d4f25a', stroke: null, strokeWidth: 4, radius: 0 },
     text: { ...DEFAULT_TEXT_STYLE },
     threadOpen: false,
@@ -226,7 +231,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'sessions' | 'activeSessionId' | 'generations' | 'assets'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'shape' | 'text' | 'tool'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool'>;
 };
 
 export const useStore = create<AppState>()(
@@ -242,7 +247,7 @@ export const useStore = create<AppState>()(
       generations: s.generations,
       assets: s.assets,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;

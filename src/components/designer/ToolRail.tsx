@@ -1,4 +1,5 @@
-import { Brush, Circle, Eraser, Hand, Minus, MousePointer2, SlidersHorizontal, Square, Type, type LucideIcon } from 'lucide-react';
+import { Brush, Circle, Eraser, Hand, Minus, MousePointer2, PenTool, SlidersHorizontal, Square, Type, type LucideIcon } from 'lucide-react';
+import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -8,7 +9,7 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Move (V)' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
-  { id: 'brush', icon: Brush, label: 'Brush (B)' }, { id: 'eraser', icon: Eraser, label: 'Eraser (E)' },
+  { id: 'brush', icon: Brush, label: 'Brush (B)' }, { id: 'lineart', icon: PenTool, label: 'Lineart (P) · editable pressure strokes; Alt-drag bends a stroke' }, { id: 'eraser', icon: Eraser, label: 'Eraser (E)' },
   { id: 'rect', icon: Square, label: 'Rectangle (R)' }, { id: 'ellipse', icon: Circle, label: 'Ellipse (O)' },
   { id: 'line', icon: Minus, label: 'Line (L)' }, { id: 'text', icon: Type, label: 'Text (T)' },
 ];
@@ -16,6 +17,7 @@ const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
 export function ToolRail({ doc }: { doc: DesignDoc }) {
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
+  const lineart = useStore((s) => s.ui.lineart);
   const shape = useStore((s) => s.ui.shape);
   const pop = usePopover();
   const paint = tool === 'brush' || tool === 'eraser';
@@ -24,9 +26,9 @@ export function ToolRail({ doc }: { doc: DesignDoc }) {
     <div className="side-sep" />
     <IconButton ref={pop.ref} icon={SlidersHorizontal} label="Tool settings" onClick={pop.toggle} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="top-start" label="Tool settings" width={260}>
-      <PopoverHeader title={paint ? 'Brush settings' : 'Shape settings'} />
+      <PopoverHeader title={tool === 'lineart' ? 'Lineart settings' : paint ? 'Brush settings' : 'Shape settings'} />
       <div className="form-stack">
-        {paint ? <>
+        {tool === 'lineart' ? <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} /> : paint ? <>
           <Field label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></Field>
           <Field label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></Field>
           <Field label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></Field>

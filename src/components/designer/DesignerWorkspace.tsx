@@ -13,7 +13,7 @@ import { Stage } from './Stage';
 import { ToolRail } from './ToolRail';
 import { LayersPanel } from './LayersPanel';
 
-const SHORTCUTS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
+const SHORTCUTS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string; detail: string }> = [
   { id: 'png', label: 'PNG', detail: 'Image, keeps transparency' },

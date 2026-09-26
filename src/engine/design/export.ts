@@ -1,5 +1,6 @@
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
+import { strokeSvg } from './brushTextures';
 
 /*
  * Vector export. Each layer stays an editable object: shapes as SVG shapes, text as <text> (editable when the
@@ -16,8 +17,6 @@ export interface SvgDeps {
   layout: (layer: TextLayer) => { lines: string[]; width: number; lineHeightPx: number };
   /** Distance from the top of the em box to the baseline, in px (canvas 'top' baseline → SVG alphabetic). */
   ascent: (layer: TextLayer) => number;
-  /** Extra layer markup, keyed by layer id (editable strokes), or undefined for the default serializer. */
-  custom?: (layer: Layer) => Promise<string | undefined>;
 }
 
 export function xmlEscape(s: string): string {
@@ -63,17 +62,17 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
   for (const l of doc.layers) {
     if (!l.visible || l.opacity <= 0) continue;
-    let inner = deps.custom ? await deps.custom(l) : undefined;
-    if (inner == null) {
-      if (l.type === 'raster') {
-        const href = await deps.rasterHref(l);
-        if (!href) continue;
-        inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${href}"/>`;
-      } else if (l.type === 'vector') {
-        inner = l.shapes.map(shapeSvg).join('');
-      } else {
-        inner = textSvg(l, deps.layout(l), deps.ascent(l));
-      }
+    let inner: string;
+    if (l.type === 'raster') {
+      const href = await deps.rasterHref(l);
+      if (!href) continue;
+      inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${href}"/>`;
+    } else if (l.type === 'vector') {
+      // Pressure strokes become their filled outline: an editable path, not the original gesture.
+      const strokes = await Promise.all((l.strokes ?? []).map((s) => strokeSvg(s)));
+      inner = l.shapes.map(shapeSvg).join('') + strokes.join('');
+    } else {
+      inner = textSvg(l, deps.layout(l), deps.ascent(l));
     }
     const style = l.blend !== 'normal' ? ` style="mix-blend-mode:${l.blend}"` : '';
     const opacity = l.opacity < 1 ? ` opacity="${n(l.opacity)}"` : '';

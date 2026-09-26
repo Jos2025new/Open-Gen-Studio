@@ -2,6 +2,8 @@ import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { getBuffer } from './raster';
+import { drawStroke } from './brushTextures';
+import { strokeBox } from './strokes';
 
 /* One renderer for both the editor view and exports, so what you see is what you export. */
 
@@ -84,7 +86,7 @@ export function layerBox(l: Layer): Box | null {
     case 'raster':
       return { x: l.x, y: l.y, w: l.width, h: l.height };
     case 'vector':
-      return unionBox(l.shapes.map(shapeBox));
+      return unionBox([...l.shapes.map(shapeBox), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
     case 'text': {
       const t = layoutText(l);
       return { x: l.x, y: l.y, w: t.width, h: t.height };
@@ -146,6 +148,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer): void {
     }
   } else if (l.type === 'vector') {
     l.shapes.forEach((s) => drawShape(ctx, s));
+    l.strokes?.forEach((s) => drawStroke(ctx, s));
   } else {
     drawText(ctx, l);
   }
