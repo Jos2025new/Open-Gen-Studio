@@ -23,15 +23,16 @@ import {
   Star,
   Sun,
   WandSparkles,
+  UserPlus,
   Workflow,
 } from 'lucide-react';
 import { OPS, opsFor } from '../../engine/ops';
-import { downloadAsset, sendToNodes, toggleFavorite, useAsReference } from '../../engine/actions';
+import { downloadAsset, sendToNodes, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { Chip, IconButton, MenuItem } from '../ui/primitives';
+import { Button, Chip, IconButton, MenuItem } from '../ui/primitives';
 import { OpForm } from './OpForm';
 
 export const OP_ICONS: Record<OpId, LucideIcon> = {
@@ -88,7 +89,8 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
   const asset = useStore((s) => s.assets[assetId]);
   const sessionId = useStore((s) => s.activeSessionId);
   const more = usePopover();
-  const [view, setView] = useState<'menu' | OpId>('menu');
+  const [view, setView] = useState<'menu' | 'subject' | OpId>('menu');
+  const [subjectName, setSubjectName] = useState('');
   if (!asset) return null;
   const ops = opsFor(asset.kind);
   const quick = showQuick ? ops.filter((o) => o.quick) : [];
@@ -153,6 +155,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
                     useAsReference(assetId);
                   }}
                 />
+                <MenuItem icon={UserPlus} label="Save as subject" detail="Keep this character or object as @Name" onClick={() => setView('subject')} />
               </>
             ) : null}
             <MenuItem
@@ -173,6 +176,23 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
             />
             <MenuItem icon={Star} label={asset.favorite ? 'Remove favorite' : 'Favorite'} onClick={() => toggleFavorite(assetId)} active={asset.favorite} />
           </div>
+        ) : view === 'subject' ? (
+          <form
+            className="subject-new"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (subjectFromAsset(sessionId, assetId, subjectName)) {
+                setSubjectName('');
+                close();
+              }
+            }}
+          >
+            <input autoFocus placeholder="Name, e.g. Mia" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
+            <Button size="sm" icon={UserPlus} type="submit" disabled={!subjectName.trim()}>
+              Save as subject
+            </Button>
+            <p className="faint">This image becomes the subject's frontal view. Mention it as @Name in any prompt.</p>
+          </form>
         ) : (
           <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />
         )}

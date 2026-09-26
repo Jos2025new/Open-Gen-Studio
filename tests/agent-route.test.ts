@@ -112,3 +112,18 @@ describe('recommended skill per workflow (R5)', () => {
     expect(activeSkill(null, null)).toBeUndefined();
   });
 });
+
+describe('subject mentions in each model syntax (R10)', () => {
+  it('the schema syntax wins, then the family; zero-based syntaxes count from 0', async () => {
+    const { refMentionStyle, mentionSubjects } = await import('../src/engine/params');
+    expect(refMentionStyle('xai/grok-imagine-image/edit', 'For multi-image references, cite each input as <IMAGE_0>, <IMAGE_1>, ...')).toEqual({ template: '<IMAGE_{n}>', zeroBased: true });
+    expect(refMentionStyle('alibaba/wan-3.0/reference-to-video', "'the subject in Image 1 walks past Video 1'.")?.template).toBe('Image {n}');
+    expect(refMentionStyle('alibaba/wan-3.0/reference-to-video')?.template).toBe('@Image{n}');
+    expect(refMentionStyle('minimax-h3/reference-to-video')?.template).toBe('<Picture {n}>');
+    expect(refMentionStyle('some/other-model')).toBeUndefined();
+    const subjects = [{ id: 'a', name: 'Ana' }];
+    // One image already in the step: Ana is the second image, <IMAGE_1> when counting from 0.
+    expect(mentionSubjects('@Ana smiles', subjects, '<IMAGE_{n}>', 1 - 1).prompt).toBe('<IMAGE_1> smiles');
+    expect(mentionSubjects('@Ana smiles', subjects, '@Image{n}', 1).prompt).toBe('@Image2 smiles');
+  });
+});

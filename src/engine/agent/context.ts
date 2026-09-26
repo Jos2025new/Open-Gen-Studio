@@ -75,7 +75,7 @@ Model-specific inputs (each model's accepted inputs are listed in the context; u
 - 3D (model3d steps): image-to-3D models need one clear image of a single object on a plain background (make it with an image step first when the user gives only text and the model takes no text); multi-view models take 1–4 views of the same object in refs. Text-to-3D models take only the prompt. A 3D result cannot feed image, video or layer steps. Options (face count, textures, PBR, quads, rigging) go in params only when asked: they change the price.
 - Music results are audio assets: a video step can take them in refs as a soundtrack or as the speech of lip-sync / avatar models.
 - Seedance 2.5 edits or extends a clip through the video_edit / video_extend ops (edit: clips of 4–30 s; extend: 2–30 s).
-- Subjects (Kling models listing "subjects"): mention a session subject as @Name in the prompt; the app sends its images as the model's element and keeps the identity. Use only subjects listed in the context.
+- Subjects: mention a session subject as @Name in the prompt of any model that takes reference images; the app sends its images (Kling: as elements) and rewrites the mention in the model's syntax (@ImageN, <Picture N>…), numbered after the step's own refs. Do not also put its images in refs. Use only subjects listed in the context.
 - Multi-shot (models listing "multi-shot"): shots [{prompt, duration}] whose seconds add up to the step duration; one clear action per shot.
 Sources: docs.bfl.ai/flux_3/flux3_video, runware.ai FLUX 3 keyframes guide.`;
 

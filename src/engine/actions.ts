@@ -51,6 +51,16 @@ export function deleteSubject(sessionId: string, id: string): void {
   patchSession(sessionId, (s) => ({ ...s, subjects: (s.subjects ?? []).filter((x) => x.id !== id) }));
 }
 
+/** "Save as subject" on an image: that image is the frontal view of a new subject of the session. */
+export function subjectFromAsset(sessionId: string, assetId: string, name: string): Subject | null {
+  const clean = name.trim().replace(/^@/, '');
+  if (!clean || get().assets[assetId]?.kind !== 'image') return null;
+  const subject: Subject = { id: uid('sub'), name: clean, frontalAssetId: assetId, refAssetIds: [] };
+  saveSubject(sessionId, subject);
+  toast(`Saved as @${clean}: mention it in any prompt`, 'success');
+  return subject;
+}
+
 /** A new subject from the composer attachments: the first image is the frontal view, up to 3 more are views; or a video. */
 export function subjectFromAttachments(name: string): Subject | null {
   const st = get();

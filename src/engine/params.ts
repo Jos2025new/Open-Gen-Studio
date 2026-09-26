@@ -1031,7 +1031,7 @@ export function capabilityHints(schema: ModelSchema | undefined, kind: MediaKind
  * Subject mentions: "@Name" in the prompt, in order of first appearance. With a template ("@Element{n}",
  * "<<<element_{n}>>>") each mention becomes the provider's element reference; without one, the plain name.
  */
-export function mentionSubjects(prompt: string, subjects: Array<{ id: string; name: string }>, template?: string): { prompt: string; ids: string[] } {
+export function mentionSubjects(prompt: string, subjects: Array<{ id: string; name: string }>, template?: string, offset = 0): { prompt: string; ids: string[] } {
   const esc = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   // Longest names claim their text first, so "@Ana Maria" is never also read as "@Ana".
   const hits: Array<{ start: number; end: number; id: string; name: string }> = [];
@@ -1047,10 +1047,26 @@ export function mentionSubjects(prompt: string, subjects: Array<{ id: string; na
   let out = '';
   let at = 0;
   for (const h of hits) {
-    out += prompt.slice(at, h.start) + (template ? template.replace('{n}', String(ids.indexOf(h.id) + 1)) : h.name);
+    out += prompt.slice(at, h.start) + (template ? template.replace('{n}', String(ids.indexOf(h.id) + 1 + offset)) : h.name);
     at = h.end;
   }
   return { prompt: out + prompt.slice(at), ids };
+}
+
+/**
+ * How a model's prompt names its n-th reference image, for subjects sent as references (R10): the syntax the
+ * endpoint's schema states first, else its family's protocol (modelRules REFERENCE_PROTOCOLS). `zeroBased`
+ * marks syntaxes that count from 0 (<IMAGE_0>). Undefined: no known syntax, the plain name is kept.
+ */
+export function refMentionStyle(modelId: string, promptRefs?: string): { template: string; zeroBased: boolean } | undefined {
+  const said = promptRefs ?? '';
+  if (/@image\s?\d/i.test(said)) return { template: '@Image{n}', zeroBased: false };
+  if (/<\s*image_?0/i.test(said)) return { template: '<IMAGE_{n}>', zeroBased: true };
+  if (/character\s?1/i.test(said)) return { template: 'character{n}', zeroBased: false };
+  if (/\bimage\s?1\b/i.test(said)) return { template: 'Image {n}', zeroBased: false };
+  if (/seedance|wan-3/i.test(modelId)) return { template: '@Image{n}', zeroBased: false };
+  if (/minimax[-/]h3/i.test(modelId)) return { template: '<Picture {n}>', zeroBased: false };
+  return undefined;
 }
 
 /** Why a storyboard does not fit the clip, or null: shots must add up to the duration. */

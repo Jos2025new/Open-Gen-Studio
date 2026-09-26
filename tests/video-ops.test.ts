@@ -25,6 +25,9 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async (id: string, b: Blob) => (blobs.set(id, b), id),
 }));
 
+// No image decoding in node: uploads take the bytes as they are.
+vi.mock('../src/lib/media', async (orig) => ({ ...(await orig<typeof import('../src/lib/media')>()), prepareImageForUpload: async (b: Blob) => b }));
+
 type Loose = any;
 const SEEDANCE_ATLAS = 'bytedance/seedance-2.5/reference-to-video';
 
@@ -114,5 +117,45 @@ describe('video edit / extend operations', () => {
     // Edit is billed on the 12 s clip, extend on its 5 new seconds.
     expect(estimateSteps([{ id: 's1', kind: 'op', title: 'e', op: 'video_edit', input: 'asset:clip', params: {} }]).perStep.s1.usd).toBeCloseTo(1.2);
     expect(estimateSteps([{ id: 's1', kind: 'op', title: 'e', op: 'video_extend', input: 'asset:clip', params: {} }]).perStep.s1.usd).toBeCloseTo(0.5);
+  });
+
+  describe('subjects with any model (R10)', () => {
+    const img = (id: string): Asset => ({ id, kind: 'image', mime: 'image/png', width: 64, height: 64, sessionId: 's', origin: 'upload', stored: true, favorite: false, createdAt: 0 }) as Asset;
+    async function run(id: string, prompt: string, refs: string[]) {
+      install(`atlas::${id}`, { provider: 'atlas' }, atlasSchema(id), 8);
+      for (const a of ['r1', 'ana', 'ana2', 'leo']) blobs.set(a, new Blob([new Uint8Array(8)], { type: 'image/png' }));
+      const st = useStore.getState();
+      const base = st.sessions[st.activeSessionId];
+      useStore.setState({
+        assets: { ...st.assets, r1: img('r1'), ana: img('ana'), ana2: img('ana2'), leo: img('leo') },
+        sessions: { ...st.sessions, s: { ...base, id: 's', subjects: [{ id: 'A', name: 'Ana', frontalAssetId: 'ana', refAssetIds: ['ana2'] }, { id: 'L', name: 'Leo', frontalAssetId: 'leo', refAssetIds: [] }] } },
+      });
+      let n = 0;
+      let body: Record<string, unknown> = {};
+      vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+        if (url.includes('uploadMedia')) return new Response(JSON.stringify({ data: { download_url: `https://cdn.test/${++n}.png` } }));
+        if (url.includes('generateVideo')) {
+          body = JSON.parse(String(init?.body));
+          return new Response(JSON.stringify({ message: 'stop here' }), { status: 400 });
+        }
+        throw new Error(`unexpected ${url}`);
+      });
+      const g = createGeneration({ sessionId: 's', kind: 'video', prompt, modelRef: `atlas::${id}`, settings: { count: 1, advanced: {} }, inputs: { refs }, origin: 'agent' });
+      await expect(runGeneration(g.id)).rejects.toThrow('stop here');
+      return body;
+    }
+
+    it('Seedance: subject images follow the step refs and the mention is numbered from them', async () => {
+      const body = await run(SEEDANCE_ATLAS, '@Ana waves at @Leo in the rain', ['r1']);
+      expect(body.prompt).toBe('@Image2 waves at @Image3 in the rain');
+      // r1, Ana frontal, Leo frontal, then Ana's extra view.
+      expect(body.reference_images).toEqual(['https://cdn.test/1.png', 'https://cdn.test/2.png', 'https://cdn.test/3.png', 'https://cdn.test/4.png']);
+    });
+
+    it('MiniMax H3: <Picture N> in the mixed reference list', async () => {
+      const body = await run('minimax/h3/reference-to-video', '<Picture 1> style. @Ana dances', ['r1']);
+      expect(body.prompt).toBe('<Picture 1> style. <Picture 2> dances');
+      expect((body.refers as unknown[]).length).toBe(3);
+    });
   });
 });

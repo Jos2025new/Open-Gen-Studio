@@ -9,7 +9,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
@@ -375,6 +375,26 @@ async function execute(id: string): Promise<string[]> {
           video,
           voiceId: s.voiceId,
         });
+      }
+    }
+    // Subjects on models without elements (R10): their images join the references and the mention becomes the
+    // model's own syntax, numbered by the app from the step's real references (frontal views first, extra views after).
+    if (!elSlot && !schema.slots.keyframes && (schema.slots.images || schema.slots.mixedRefs)) {
+      const again = mentionSubjects(g.prompt, subjects);
+      if (again.ids.length) {
+        const chosen = again.ids.map((id) => subjects.find((x) => x.id === id)!);
+        const incomplete = chosen.find((s) => !s.frontalAssetId);
+        if (incomplete) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${incomplete.name}" needs a frontal image to be used with ${model.name}.`);
+        const used = schema.slots.mixedRefs ? refs.length + refVideos.length + refAudios.length : refs.length;
+        const max = schema.slots.mixedRefs?.max ?? schema.slots.images!.max;
+        const room = max - used;
+        if (chosen.length > room) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
+        const style = refMentionStyle(model.id, schema.slots.promptRefs);
+        const start = refs.length;
+        prompt = style ? mentionSubjects(g.prompt, subjects, style.template, start - (style.zeroBased ? 1 : 0)).prompt : again.prompt;
+        const frontals = await Promise.all(chosen.map((s) => mediaInput(s.frontalAssetId!)));
+        const views = chosen.flatMap((s) => s.refAssetIds).slice(0, room - chosen.length);
+        refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
       }
     }
     const promptMax = schema.slots.promptMax;

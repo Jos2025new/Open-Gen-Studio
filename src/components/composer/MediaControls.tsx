@@ -516,6 +516,8 @@ const NO_SUBJECTS: Subject[] = [];
 function SubjectsChip() {
   const ref = useStore((s) => s.composer.video.modelRef);
   const slot = useStore((s) => s.catalog.schemas[ref]?.slots.elements);
+  // Without elements (Kling), subjects go as reference images (R10): any model that takes them.
+  const takesRefs = useStore((s) => Boolean(s.catalog.schemas[ref]?.slots.images || s.catalog.schemas[ref]?.slots.mixedRefs));
   const sessionId = useStore((s) => s.activeSessionId);
   const subjects = useStore((s) => s.sessions[s.activeSessionId]?.subjects) ?? NO_SUBJECTS;
   const attachments = useStore((s) => s.composer.attachments);
@@ -523,9 +525,9 @@ function SubjectsChip() {
   const [name, setName] = useState('');
   const [voiceFor, setVoiceFor] = useState<string | null>(null);
   const pop = usePopover();
-  if (!slot) return null;
+  if (!slot && !takesRefs) return null;
   const audio = attachments.find((id) => assets[id]?.kind === 'audio');
-  const usable = attachments.some((id) => assets[id]?.kind === 'image' || (slot.video && assets[id]?.kind === 'video'));
+  const usable = attachments.some((id) => assets[id]?.kind === 'image' || (slot?.video && assets[id]?.kind === 'video'));
   const insert = (n: string) => setComposer((c) => ({ text: `${c.text}${c.text && !c.text.endsWith(' ') ? ' ' : ''}@${n} ` }));
   return (
     <>
@@ -533,7 +535,7 @@ function SubjectsChip() {
         {subjects.length ? <span className="num">{subjects.length}</span> : null}
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={330} label="Subjects" className="pop-scroll">
-        <PopoverHeader title="Subjects" sub={`Mention as @Name · up to ${slot.max} per video`} />
+        <PopoverHeader title="Subjects" sub={slot ? `Mention as @Name · up to ${slot.max} per video` : 'Mention as @Name · sent as reference images'} />
         <div className="subjects">
           {subjects.map((s) => (
             <div key={s.id} className="subject-row">
@@ -543,7 +545,7 @@ function SubjectsChip() {
                   @{s.name}
                 </button>
                 <span className="faint">{s.videoAssetId && !s.frontalAssetId ? 'video' : `${1 + s.refAssetIds.length} view${s.refAssetIds.length ? 's' : ''}`}</span>
-                {slot.voice ? (
+                {slot?.voice ? (
                   <div className="subject-voice-row">
                     <input className="subject-voice" placeholder="Voice ID (optional)" value={s.voiceId ?? ''} onChange={(e) => saveSubject(sessionId, { ...s, voiceId: e.target.value.trim() || undefined })} />
                     <button type="button" className="link-btn" disabled={!audio} data-tip={audio ? 'Create a Kling voice from the attached audio' : 'Attach 5–30 s of speech first'} onClick={() => setVoiceFor(s.id)}>
@@ -584,7 +586,7 @@ function SubjectsChip() {
             >
               From attachments
             </Button>
-            <p className="faint">Attach a frontal image first (plus up to {slot.refMax} more views{slot.video ? ', or a short video' : ''}).</p>
+            <p className="faint">Attach a frontal image first (plus up to {slot?.refMax ?? 3} more views{slot?.video ? ', or a short video' : ''}).</p>
           </div>
         </div>
       </Popover>

@@ -34,7 +34,8 @@ Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **R
   Hecho: campo `default` en `ask_questions`, validado contra las opciones y premarcado en `QuestionsCard`.
 - [x] R7. Proporción heredada de la imagen de entrada (validador).
   Hecho: `inputAspect` en `plan.ts`; la proporción se ajusta a la opción más cercana del modelo y se anota.
-- [ ] R10. Sujetos (`@Nombre`) con cualquier modelo: imágenes como referencias y mención con la sintaxis del modelo; "Save as subject" sobre un resultado.
+- [x] R10. Sujetos (`@Nombre`) con cualquier modelo: imágenes como referencias y mención con la sintaxis del modelo; "Save as subject" sobre un resultado.
+  Hecho: ver fila R10 en `TRAZABILIDAD.md`. Falta (decisión de alcance): paso del agente para crear un sujeto; hoy se hace con "Save as subject".
 - [x] R9. Coste de los pasos de operación de vídeo en planes igual al de la operación directa (duración del clip).
   Hecho: `videoOpSettings`/`videoOpSeconds` compartidos por la operación directa y el plan.
 - [ ] R8. Medir el después y comparar con R0.
