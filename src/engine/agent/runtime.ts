@@ -7,7 +7,7 @@ import { normalizePlan, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps } from '../executor';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
-import { skillById, workflowById } from '../skills';
+import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
@@ -272,7 +272,7 @@ async function offlineTurn(sessionId: string, workspace: Workspace): Promise<voi
     style: st.composer.agentStyle,
     workspace,
     attachments: draft.attachments.map((id) => ({ id, kind: st.assets[id]?.kind ?? 'image' })).filter((a) => st.assets[a.id]),
-    skillHint: skillById(st.composer.skillId)?.promptHint,
+    skillHint: activeSkill(st.composer.skillId, st.composer.workflowId)?.promptHint,
     workflow: workflowById(st.composer.workflowId),
     doc: docDims ? { width: docDims.width, height: docDims.height } : undefined,
   });

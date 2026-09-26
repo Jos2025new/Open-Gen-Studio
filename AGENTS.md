@@ -28,7 +28,8 @@ Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **R
 - [x] R3. Protocolo de referencias por familia en línea, con fuente (`@Image1` en Seedance/Wan, `<Picture 1>` en MiniMax H3), más `best_for` / `avoid_for` por modelo preferido y límite de longitud del prompt desde el esquema; Omni Flash solo tras verificar.
   Hecho: ver fila R3 en `TRAZABILIDAD.md`. La sintaxis que declara el esquema de cada endpoint gana a la de la familia (p. ej. fal MiniMax H3 dice "Image 1"). Omni Flash sin nota.
 - [ ] R4. Índice de skills, workflows y guías + `read_guide` bajo demanda; el workflow gana a la ruta genérica; workflows con `fixed`, `needs`, `variants` y `continuity`, y reparto de duración sin llamadas.
-- [ ] R5. Skill recomendada por workflow.
+- [x] R5. Skill recomendada por workflow.
+  Hecho: `Workflow.skill` + `activeSkill`.
 - [x] R6. Preguntas con opción por defecto marcada.
   Hecho: campo `default` en `ask_questions`, validado contra las opciones y premarcado en `QuestionsCard`.
 - [x] R7. Proporción heredada de la imagen de entrada (validador).

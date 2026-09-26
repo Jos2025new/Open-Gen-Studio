@@ -33,6 +33,8 @@ export interface Workflow {
   name: string;
   description: string;
   workspaces: Workspace[];
+  /** Skill applied with this workflow when the user picked none. */
+  skill?: string;
   steps: WorkflowStepTemplate[];
 }
 
@@ -115,6 +117,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Image → Video',
     description: 'Design the key still, then animate it.',
     workspaces: ['chat', 'node'],
+    skill: 'cinematic',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Animate', prompt: '{prompt}, subtle natural motion, slow camera push-in', firstFrame: 's1', aspect: '16:9' },
@@ -125,6 +128,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Product ad pack',
     description: 'Hero shot, relit variant, vertical cut and a short clip.',
     workspaces: ['chat', 'node'],
+    skill: 'product',
     steps: [
       { id: 's1', kind: 'image', title: 'Hero shot', prompt: '{prompt}, hero product shot, studio lighting', aspect: '1:1' },
       { id: 's2', kind: 'op', title: 'Golden relight', op: 'relight', input: 's1', params: { preset: 'golden-hour', direction: 'left', intensity: 'medium' } },
@@ -137,6 +141,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Character sheet',
     description: 'One character from four angles.',
     workspaces: ['chat', 'node'],
+    skill: 'character',
     steps: [
       { id: 's1', kind: 'image', title: 'Front view', prompt: '{prompt}, full body, front view, neutral background', aspect: '3:4' },
       { id: 's2', kind: 'op', title: '3/4 view', op: 'angle', input: 's1', params: { angle: 'three-quarter-left' } },
@@ -149,6 +154,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Storyboard · 4 shots',
     description: 'Four continuous frames of one scene.',
     workspaces: ['chat', 'node'],
+    skill: 'storyboard',
     steps: [
       { id: 's1', kind: 'image', title: 'Shot 1 · establishing', prompt: '{prompt}, establishing wide shot', aspect: '16:9' },
       { id: 's2', kind: 'image', title: 'Shot 2 · medium', prompt: '{prompt}, medium shot, same scene and style', refs: ['s1'], aspect: '16:9' },
@@ -161,6 +167,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Social format set',
     description: 'One visual adapted to 1:1, 4:5 and 9:16.',
     workspaces: ['chat', 'node'],
+    skill: 'social',
     steps: [
       { id: 's1', kind: 'image', title: 'Master', prompt: '{prompt}', aspect: '1:1' },
       { id: 's2', kind: 'op', title: 'Feed 4:5', op: 'reframe', input: 's1', params: { aspect: '4:5' } },
@@ -172,6 +179,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Shot sequence',
     description: 'Key frame, first clip and a continuation.',
     workspaces: ['chat', 'node'],
+    skill: 'cinematic',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Clip 1', prompt: '{prompt}', firstFrame: 's1', aspect: '16:9' },
@@ -183,6 +191,7 @@ export const WORKFLOWS: Workflow[] = [
     name: 'Poster layout',
     description: 'Background on layer 1, headline and accent layers on top.',
     workspaces: ['designer'],
+    skill: 'poster',
     steps: [
       { id: 's1', kind: 'image', title: 'Background', prompt: '{prompt}, poster background with negative space for a headline' },
       { id: 'l1', kind: 'layer', title: 'Background', layerType: 'raster', source: 's1' },
@@ -198,6 +207,11 @@ export function workflowById(id: string | null | undefined): Workflow | undefine
 
 export function skillById(id: string | null | undefined): Skill | undefined {
   return SKILLS.find((s) => s.id === id);
+}
+
+/** The skill in effect: the one the user picked, else the one the workflow recommends. */
+export function activeSkill(skillId: string | null | undefined, workflowId: string | null | undefined): Skill | undefined {
+  return skillById(skillId) ?? skillById(workflowById(workflowId)?.skill);
 }
 
 export function describeWorkflow(w: Workflow): string {

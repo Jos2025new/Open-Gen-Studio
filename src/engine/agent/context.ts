@@ -1,6 +1,6 @@
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
-import { skillById, workflowById, describeWorkflow } from '../skills';
+import { activeSkill, workflowById, describeWorkflow } from '../skills';
 import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { isConnected, modelSummary } from '../catalog';
@@ -147,7 +147,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
       ? 'mode: auto (one shot: do not ask questions)'
       : `mode: guided (question rounds used ${opts.round} of ${opts.maxRounds}${opts.round >= opts.maxRounds ? ' — propose the plan now' : ''})`,
   );
-  const skill = skillById(st.composer.skillId);
+  const skill = activeSkill(st.composer.skillId, st.composer.workflowId);
   if (skill) lines.push(`skill: ${skill.name} — ${skill.guidance}`);
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (follow this structure, adapt prompts to the request):\n${describeWorkflow(wf)}`);

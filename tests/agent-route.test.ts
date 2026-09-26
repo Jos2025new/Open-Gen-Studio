@@ -102,3 +102,13 @@ describe('aspect from the input image (R7)', () => {
     expect(aspect(b.plan)).toBe('16:9');
   });
 });
+
+describe('recommended skill per workflow (R5)', () => {
+  it('every workflow names an existing skill; the user pick wins', async () => {
+    const { WORKFLOWS, activeSkill, skillById } = await import('../src/engine/skills');
+    for (const w of WORKFLOWS) expect(skillById(w.skill), w.id).toBeDefined();
+    expect(activeSkill(null, 'character-sheet')?.id).toBe('character');
+    expect(activeSkill('poster', 'character-sheet')?.id).toBe('poster');
+    expect(activeSkill(null, null)).toBeUndefined();
+  });
+});
