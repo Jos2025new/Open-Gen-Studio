@@ -1,6 +1,6 @@
 # Plan: ruta estándar del agente, prompting por modelo y medición
 
-Fecha: 2026-09-26. Estado: propuesta; ninguna fase de código ejecutada.
+Fecha: 2026-09-26. Estado: fases R0–R7, R9 y R10 implementadas (ver `TRAZABILIDAD.md`); falta medir con el banco (R0d y R8).
 Lista de seguimiento: sección R0–R8 de `AGENTS.md`. Una fase por commit, con tests; la suite completa debe seguir pasando.
 
 ## Objetivo y restricción
