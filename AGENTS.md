@@ -15,6 +15,14 @@ Hallado al analizar el flujo de Higgsfield: Ajustes exige un LLM con visión, pe
 - [x] V3. Tests (mensaje con partes de imagen y su id, retirada al pedir algo nuevo, modelo sin visión), typecheck, suite; commit.
   Hecho: `agent/attachments.ts` (reducción a 768 px JPEG, primer fotograma en vídeos, etiqueta `asset:id (image W×H)`), `LlmMessage.content` con partes, `stripImages` al empezar una petición nueva, aviso si el modelo no tiene visión. `tests/agent-vision.test.ts` (4). Pendiente (usuario): comprobar con su LLM real que acepta imágenes (NanoGPT/OpenRouter usan el formato OpenAI `image_url`).
 
+## Tarea — guardado raster del Designer (2026-09-26, punto 1 de `REMEDIATION_PLAN_AUDITED.md`)
+Hoy `design/raster.ts` guarda cada capa 700 ms después del último cambio, en silencio: un fallo se pierde y cerrar la pestaña antes pierde los trazos.
+- [x] D1. Cambios pendientes por capa y escrituras en orden (una cola por capa). *Por qué:* una escritura vieja no puede pisar a una nueva.
+- [x] D2. `flushRaster()`: guardar ya todo lo pendiente al ocultar o cerrar la pestaña; aviso del navegador al cerrar con cambios sin guardar. *Por qué:* cerrar justo después de pintar perdía el trazo.
+- [x] D3. Fallo de guardado: se conserva como pendiente, se reintenta con el siguiente cambio o al ocultar, y un aviso (una vez) dice que no se pudo guardar. *Por qué:* hoy el error se tragaba.
+- [x] D4. Tests (orden, flush, fallo y reintento), typecheck, suite; commit. Límite a documentar: un cierre abrupto (proceso matado) antes de terminar la escritura sigue pudiendo perder el último trazo.
+  Hecho: `design/raster.ts` (`pending`, cola por capa, `flushRaster`, `pendingRaster`, aviso único, `beforeunload`); el borrado espera a las escrituras en curso. `tests/raster-persist.test.ts` (5). Pendiente (usuario): navegador (pintar y cerrar la pestaña enseguida). Puntos 4 y 5 del plan auditado siguen sin hacer.
+
 ## Plan — gasto visible, límite que avisa y modelo del agente con visión (2026-09-26)
 Origen: revisión de DeepSeek sobre el catálogo; decisiones del usuario. **Nunca se interrumpe algo en curso por el gasto; el límite avisa y pregunta, no bloquea.** Sin llamadas ni texto extra al modelo.
 - [x] G1. Registro de gasto (`spendLog`, últimas 5000 entradas: fecha, importe, estimado o real, categoría agente/imagen/vídeo/audio/3D/texto, proveedor, modelo, sesión). El gasto del LLM del agente (todos los tiers) cuenta: coste del proveedor o, si no lo da, tokens × precio del catálogo (marcado estimado). *Por qué:* hoy el presupuesto solo ve medios y el gasto del agente no aparece en ningún sitio.
