@@ -15,6 +15,9 @@ Hallado al analizar el flujo de Higgsfield: Ajustes exige un LLM con visión, pe
 - [x] V3. Tests (mensaje con partes de imagen y su id, retirada al pedir algo nuevo, modelo sin visión), typecheck, suite; commit.
   Hecho: `agent/attachments.ts` (reducción a 768 px JPEG, primer fotograma en vídeos, etiqueta `asset:id (image W×H)`), `LlmMessage.content` con partes, `stripImages` al empezar una petición nueva, aviso si el modelo no tiene visión. `tests/agent-vision.test.ts` (4). Pendiente (usuario): comprobar con su LLM real que acepta imágenes (NanoGPT/OpenRouter usan el formato OpenAI `image_url`).
 
+## Plan — prompting de imagen (2026-09-26) · PENDIENTE DE REVISIÓN
+Síntesis de dos perspectivas (usuario y Qwen) en `PLAN_PROMPTING.md`. Ronda sin fuentes ni contraste con APIs o esquemas reales en vivo; no se vieron los archivos fuente. **No implementar hasta que el usuario lo revise y aporte las fuentes.**
+
 ## Tarea — guardado raster del Designer (2026-09-26, punto 1 de `REMEDIATION_PLAN_AUDITED.md`)
 Hoy `design/raster.ts` guarda cada capa 700 ms después del último cambio, en silencio: un fallo se pierde y cerrar la pestaña antes pierde los trazos.
 - [x] D1. Cambios pendientes por capa y escrituras en orden (una cola por capa). *Por qué:* una escritura vieja no puede pisar a una nueva.
