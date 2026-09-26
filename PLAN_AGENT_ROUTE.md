@@ -27,6 +27,7 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
   - **Longitud del prompt:** de 166 esquemas de Atlas con prompt, 19 declaran `maxLength` y 10 solo lo dicen en la descripción ("up to N characters"). La app solo comprueba Tripo (`MODEL3D_RULES`).
   - **Coste de editar o extender:** las operaciones directas ya se estiman bien (editar o hacer upscale por la duración del clip de origen, extender por los segundos nuevos; `jobs.ts:700`). En los planes del agente, en cambio, un paso de operación de vídeo se estima con la duración del composer (`executor.ts:48`), así que la tarjeta puede no coincidir con el coste real. Seedance 2.5, al editar, exige `duration -1` y la salida sigue la duración del clip de entrada (4–30 s) (`API DOC/bytedance seedance 2 5.md`, líneas 107 y 111).
 - **Higgsfield, guion + 3 imágenes:** no describe las referencias, las cita por posición; necesita saber el papel de cada una (lo deduce viéndolas o pregunta); el guion decide planos y duración. Al contrastarlo se halló que **nuestro agente no veía las imágenes adjuntas** (solo su tamaño en texto); corregido como fallo (`AGENTS.md`, V1–V3).
+- **Higgsfield, workflow UGC y modelos de imagen:** su workflow es un flujo de producción, no una plantilla: valores fijos que no pregunta (modelo, 9:16, 1080p, audio), entradas necesarias en una sola pregunta, variantes de formato (review, unboxing, try-on…) de las que carga solo una, continuidad (el fotograma aprobado anterior es referencia del siguiente; una sola identidad de producto y creador), un adaptador por modelo compartido, planificador de duración antes de gastar, inspección visual entre pasos y postproducción (unir clips, subtítulos). En imagen tiene dos niveles: por defecto según la tarea, y el resto solo si el usuario lo nombra (aquí: lista corta de preferidos y `find_models`). Sus modelos "Soul" son propios de Higgsfield y no existen aquí.
 - **Otros agentes (ImagineArt, Buzzy AI), preguntados por el usuario.** Ambos dicen usar un índice ligero con carga bajo demanda, una ruta normal por defecto, una tarjeta única de configuración con opciones premarcadas y referencias con papeles por modelo. Es una **autodescripción, no una prueba**: Buzzy afirma usar `<<<image_1>>>` con Seedance, lo que contradice la documentación (`<<<element_N>>>` es Kling en Atlas). Las notas por modelo salen de la documentación del proveedor, no de otros agentes.
 - `guidedRounds` vale 2 por defecto (`store.ts`); `ask_questions` admite de 1 a 4 preguntas por ronda.
 - Variantes relevantes en el catálogo pulido (`tests/fixtures/live/expected.txt`): Wan 3 (`atlas::alibaba/wan-3.0/{image,reference,text}-to-video`, `nanogpt::alibaba/wan-3.0/…`, `fal::alibaba/wan-3.0/…`), Seedance 2.0 / Fast / 2.5, MiniMax H3 (`atlas::minimax/h3/…`, `nanogpt::minimax-h3`). NanoGPT incluye además variantes `-spicy` que hoy `find_models` devolvería (ver decisiones pendientes).
@@ -48,6 +49,14 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
   - Toma larga o muchas referencias → Seedance 2.5.
   - Edición o extensión de un clip → operaciones Edit/Extend video con su modelo preferido (hoy Wan 3.0 video-edit / video-extend en NanoGPT).
   Si una petición no encaja en ninguna fila, se usa Wan 3.
+**Tabla de imagen por tarea (aprobada por el usuario, 2026-09-26, como sugerencias recomendadas):** mismo mecanismo que la de vídeo, con las familias de la app. Propuesta inicial, a confirmar en R1 con los IDs reales de cada proveedor conectado:
+  - General, texto dentro de la imagen, diseño, edición → GPT Image 2 / 2.5.
+  - Foto héroe, fotorrealismo → Nano Banana Pro.
+  - Cartoon o ilustración → Nano Banana 2.
+  - Hoja de personaje, identidad, retoque de caras → Seedream 5.
+  - Vectorial (logo, icono, sticker) → Recraft.
+  - Póster con tipografía → Ideogram (o GPT Image).
+  Lo que no es generación (quitar fondo, ampliar el encuadre, upscale) sigue yendo por las operaciones dedicadas (Remove BG, Reframe, Upscale).
 **Número de clips y duración:** salen de la petición o del guion, nunca del número de referencias (tres imágenes no son tres clips). Un guion con personajes que reaparecen lleva al camino narrativo (workflow Storyboard, sujetos de Kling) en vez de clips sueltos.
 **Por qué:** hoy la estructura y el modelo se improvisan en cada petición.
 **Aceptación (banco):** en "animar este personaje" el plan usa Wan 3 con la imagen como referencia o primer fotograma, o pregunta una sola vez con esas opciones marcadas. Llamadas y tokens en peticiones claras: iguales que en R0.
@@ -70,6 +79,13 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 ### R4. Índice de skills, workflows y guías + `read_guide`
 **Dónde:** `SYSTEM_PROMPT` (índice: una línea por elemento), `agent/tools.ts` y `runtime.ts` (herramienta `read_guide`), `engine/guides/` (guías condensadas de Wan 3, Seedance 2.0, Seedance 2.5 y MiniMax H3, de 300–500 palabras, con fuente).
 **Qué:** el agente ve nombre y "cuándo usarla"; carga el contenido solo cuando la tarea lo pide. Una skill o workflow elegido a mano sigue funcionando como hoy.
+**Workflows como flujos de producción (aprobado por el usuario, 2026-09-26):** además de sus pasos, cada workflow puede declarar:
+  - `fixed`: valores que el workflow decide (modelo, proporción, resolución, audio). El agente no los pregunta.
+  - `needs`: entradas necesarias (foto del producto, personaje, duración). Si faltan, se preguntan en la tarjeta única.
+  - `variants`: formatos del mismo workflow (p. ej. review, unboxing, try-on). En el índice solo aparece una línea; se carga solo la variante elegida.
+  - `continuity`: regla de encadenado (el resultado aprobado de un paso es referencia del siguiente; una sola identidad de sujeto o producto en todo el flujo). Los planes ya encadenan referencias entre pasos; aquí se vuelve regla del workflow.
+  - Reparto de la duración total entre clips antes de cotizar: función de la app (`plan.ts`), sin llamadas.
+  Las notas de protocolo por modelo (R3) son compartidas por todos los workflows, no se repiten en cada uno.
 **Workflow antes que ruta genérica:** si la petición encaja en un workflow, ese gana sobre R1. Se ofrece dentro de la misma tarjeta de preguntas, en lenguaje llano y sin nombres internos. Cada workflow declara las entradas que necesita (`Workflow.needs`: p. ej. foto del producto, personaje, duración); si falta una, la pregunta entra en esa misma tarjeta, sin ronda extra, y la falta no descarta el workflow.
 **Por qué:** el agente no sabía que existen, y meterlas todas en el contexto añadiría texto a cada mensaje.
 **Latencia:** +1 llamada, solo cuando se carga una guía. El banco medirá con qué frecuencia ocurre en peticiones normales; si es alta, se revisa el índice.
@@ -107,6 +123,9 @@ Mismo banco de pruebas en el commit final. Tabla por petición y en total: llama
 5. ~~Tabla por propósito (R1)~~ **Decidido (2026-09-26):** se adopta como sugerencias recomendadas (borrador, clip corto o final, toma larga, edición).
 
 ## Fuera de alcance
+
+- **Inspección visual entre pasos y revisión final** (como en el workflow UGC de Higgsfield): una llamada con visión por paso. Si se añade, será **opcional y apagada por defecto**, por decisión del usuario, porque choca con la restricción de latencia; en flujos caros podría ahorrar dinero al no animar un fotograma defectuoso.
+- **Unir clips y subtítulos (postproducción):** la app no une vídeos hoy. Sería una operación local nueva, sin proveedor; es un trabajo aparte y más grande.
 
 - **Revisar el resultado** (detectar que un vídeo perdió el estilo o la paleta, como hace el agente citado): requiere que un modelo con visión revise cada resultado, es decir, una llamada extra por generación. Choca con la restricción de latencia; sería una fase aparte y opcional.
 
