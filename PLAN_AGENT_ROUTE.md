@@ -129,6 +129,16 @@ El agente es un **operador**: sigue reglas por defecto salvo que el usuario pida
 Mismo banco de pruebas en el commit final. Tabla por petición y en total: llamadas, tokens, segundos hasta el plan, preguntas, revisiones, modelo elegido frente al esperado, etiqueta de referencia correcta y coste. Se registra en `TRAZABILIDAD.md`.
 **Éxito:** en peticiones claras, llamadas y tiempo no suben; en peticiones vagas o con modelo pedido, bajan las revisiones y aciertan el modelo y el protocolo.
 
+## Cambios respecto al plan al implementarlo (2026-09-26)
+- **R1, nombres de familia:** el agente puede escribir "Wan 3" en `model` y la app elige la variante (`familyRef`, índice local). *Por qué:* sin esto la ruta estándar exigía una vuelta de `find_models` en cada petición, contra la restricción de latencia.
+- **R1, calidad media en código:** en vídeo la resolución por defecto es la intermedia del modelo, o la suya si es menor (`mediumResolution`); el prompt no decide la resolución. *Por qué:* algunos modelos traen 1080p o 2K por defecto; así nunca sube el coste.
+- **R3, fuente más específica primero:** 24 endpoints declaran en su esquema cómo citar referencias; esa sintaxis gana a la de la familia (p. ej. fal MiniMax H3 dice "Image 1"). *Por qué:* el esquema del endpoint es la fuente más concreta.
+- **R4, sin guías por modelo:** sus fuentes están en la máquina del usuario; el mecanismo (`read_guide`) está listo. Sin variantes aún en los workflows.
+- **R4, `total_duration`:** el reparto de la duración lo hace la app si el agente da el total. *Por qué:* cero llamadas.
+- **R10, sin paso del agente para crear sujetos:** se crean con "Save as subject".
+- **Coste en contexto:** el prompt fijo pasó de 9.620 a 14.768 caracteres y las herramientas de 5.760 a 6.764. Si el banco muestra peor tiempo o tokens en peticiones claras, se recortan primero R1–R3.
+- **Aceptación de R5 y R7 (no estaba escrita):** R5, un workflow elegido sin skill aplica la suya en el contexto del agente; R7, un paso de vídeo desde una imagen vertical sale vertical con la nota "aspect … from the input image".
+
 ## Decisiones pendientes del usuario (antes de la fase que las usa)
 
 **Provisional (2026-09-26, Claude, a petición de avanzar):** 1 → calidad = solo resolución; 3 → `-spicy` excluidas salvo que se nombren. Ambas se cambian en una línea (`mediumResolution` en `params.ts`, filtro en `searchIndex`).

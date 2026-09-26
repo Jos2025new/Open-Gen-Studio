@@ -1,6 +1,6 @@
 # Open Gen Studio — estado del trabajo (handoff)
 
-Última sesión: 2026-09-25. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
+Última sesión: 2026-09-26. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
 Proveedores: **OpenRouter, fal.ai, NanoGPT, Atlas Cloud** (+ "Local demo" procedural para usar sin claves).
 Sin backend: corre en el navegador; el servidor de Vite solo la sirve en local y aporta rutas `/x/*` (relays y copia en disco). Opciones de despliegue discutidas en `PROPUESTAS.md`.
 El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas (sin SDK de Anthropic; se desinstaló `@anthropic-ai/sdk`).
@@ -13,6 +13,13 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - `engine/agent/`: tools.ts (ask_questions, propose_plan + zod), context.ts (system prompt + contexto), offline.ts (planificador local bilingüe), runtime.ts (auto/guiado con límite de rondas, validación de coste antes de gastar, aprobación, ejecución por workspace).
 - `src/store/store.ts` (zustand + persistencia IndexedDB debounced, wipeAllData).
 - UI escrita: App, main, shell (Sidebar, TopBar+slot, SettingsPanel, SidePanel, SessionsPanel), gallery/GalleryPanel, ui (Popover arriba-derecha, TooltipLayer, primitives, SpendConfirm, AssetMedia, Toasts, hooks), assets (OpForm, GenerationInfo, AssetActions, Lightbox), composer (Composer, ModeMenu, AgentControls, MediaControls, ModelList, ThreadPeek), chat (ChatWorkspace, FeedList, GenerationCard, PlanCard, QuestionsCard), node (NodeWorkspace, nodes), designer/Stage.tsx.
+
+## Agente, ruta estándar y gasto — 2026-09-26 (Claude, sesión en la nube; rama `claude/stoic-davinci-xt7o4z`)
+Detalle por cambio en `TRAZABILIDAD.md` (qué, dónde, verificación, límites y qué se espera ver); plan y porqués en `PLAN_AGENT_ROUTE.md` y `AGENTS.md`.
+- R0: métricas por petición del agente (`agent/metrics.ts`) y banco de pruebas (`tests/bench/`), sin cambiar el comportamiento.
+- R1–R10: ruta estándar (Wan 3, un clip, calidad media), tablas por propósito, reglas de prompting, citas de referencias por modelo, límite del prompt, índice de skills/workflows con `read_guide`, preguntas con opción marcada, proporción desde la imagen, coste de editar/extender vídeo igual en plan y operación, sujetos `@Nombre` con cualquier modelo.
+- G1–G4: registro de gasto (incluye el LLM), límite que avisa y deja continuar, panel Spending, modelo del agente siempre con visión (o pregunta).
+- Estado: 174 tests y build correctos. Sin navegador ni banco real (los ejecuta el usuario; ver `HANDOFF.md`). El prompt fijo del agente pasó de 9.620 a 14.768 caracteres: medir con el banco.
 
 ## Cierre de pendientes — 2026-09-24
 - Completados `DesignerWorkspace.tsx`, `ToolRail.tsx` y `LayersPanel.tsx`: presets/documentos, zoom, historial, exportación PNG, galería, atajos, herramientas, propiedades y operaciones sobre raster.
