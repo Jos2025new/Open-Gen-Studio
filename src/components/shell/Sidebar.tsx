@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FolderClock, Images, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
+import { FolderClock, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
@@ -19,7 +19,8 @@ export function Sidebar() {
   const workspace = useStore((s) => s.ui.workspace);
   const panel = useStore((s) => s.ui.panel);
   const settingsOpen = useStore((s) => s.ui.settingsOpen);
-  const remaining = useStore((s) => s.settings.budgetUsd - s.spentUsd);
+  const remaining = useStore((s) => (s.settings.budgetOn ? s.settings.budgetUsd - s.spentUsd : null));
+  const spent = useStore((s) => s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const settingsRef = useRef<HTMLButtonElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
@@ -29,7 +30,7 @@ export function Sidebar() {
     document.documentElement.classList.toggle('sidebar-wide', wide);
   }, [wide]);
 
-  const togglePanel = (p: 'gallery' | 'sessions') => setUi((u) => ({ panel: u.panel === p ? null : p }));
+  const togglePanel = (p: 'gallery' | 'sessions' | 'spending') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
     <nav className="sidebar" aria-label="Main">
@@ -91,6 +92,19 @@ export function Sidebar() {
           <FolderClock size={18} strokeWidth={1.7} />
           <span className="side-label">Sessions</span>
         </button>
+        <button
+          type="button"
+          className={`side-btn ${panel === 'spending' ? 'is-open' : ''}`}
+          data-tip={`Spending — ${formatUsd(spent)} spent${remaining == null ? '' : remaining < 0 ? ', over the limit' : `, ${formatUsd(remaining)} left`}`}
+          data-tip-side="right"
+          aria-label="Spending"
+          aria-expanded={panel === 'spending'}
+          onClick={() => togglePanel('spending')}
+        >
+          <Wallet size={18} strokeWidth={1.7} />
+          <span className="side-label">Spending</span>
+          {remaining != null && remaining < 0 ? <span className="side-badge is-warn" aria-label="Over the limit">!</span> : null}
+        </button>
       </div>
       <div className="side-spacer" />
       <div className="side-group">
@@ -103,7 +117,7 @@ export function Sidebar() {
           ref={settingsRef}
           type="button"
           className={`side-btn ${settingsOpen ? 'is-open' : ''}`}
-          data-tip={`Settings · budget left ${formatUsd(Math.max(0, remaining))}`}
+          data-tip={remaining == null ? 'Settings' : `Settings · budget left ${formatUsd(Math.max(0, remaining))}`}
           data-tip-side="right"
           aria-label="Settings"
           aria-expanded={settingsOpen}

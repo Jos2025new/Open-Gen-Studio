@@ -1,5 +1,4 @@
 import { uid } from '../../lib/id';
-import { formatUsd } from '../../lib/format';
 import { isAbort } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
@@ -15,6 +14,7 @@ import type {
   AgentState,
   FeedItem,
   LlmMessage,
+  LlmProviderId,
   MediaKind,
   Plan,
   PlanFeedItem,
@@ -24,6 +24,7 @@ import type {
   Workspace,
 } from '../types';
 import {
+  addSpend,
   appendFeed,
   autoTitleSession,
   patchSession,
@@ -38,6 +39,7 @@ import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
+import { overLimit, overLimitText } from '../budget';
 import { readGuide } from '../skills';
 import { TOOLS, findModelsSchema, readGuideSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
@@ -157,6 +159,11 @@ export async function sendAgentMessage(text: string): Promise<void> {
   patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments } });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
+    const { agent, keys } = get().settings;
+    if (agent.provider !== 'offline') {
+      const why = keys[agent.provider]?.trim() ? `No agent model is chosen for ${LLM_LABELS[agent.provider]}` : `There is no ${LLM_LABELS[agent.provider]} key`;
+      notice(sessionId, workspace, `${why}, so the local planner answers. Fix it in Settings → Agent.`, 'info');
+    }
     await offlineTurn(sessionId, workspace);
     return;
   }
@@ -393,10 +400,6 @@ function removeDraftNodes(sessionId: string, planId: string): void {
 // ---------------------------------------------------------------------------
 // Plan approval & execution
 
-export function remainingBudget(): number {
-  const st = get();
-  return st.settings.budgetUsd - st.spentUsd;
-}
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
   const s = session(sessionId);
@@ -408,8 +411,9 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
   const { total } = estimateSteps(chosen);
-  if (total.usd != null && total.usd > remainingBudget() + 1e-9) {
-    toast(`This plan (${formatUsd(total.usd)}) exceeds the remaining budget (${formatUsd(Math.max(0, remainingBudget()))}). Raise it in Settings.`, 'error');
+  // Over an active limit, the card asks first ("Continue anyway"); approving without that stops here.
+  if (overLimit(total)) {
+    toast(overLimitText(total), 'error');
     return;
   }
   const pending = s.agent.pending;
@@ -562,12 +566,15 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
         return;
       }
       if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
-      recordMetric(sessionId, { type: 'call', inputTokens: result.usage?.inputTokens ?? 0, outputTokens: result.usage?.outputTokens ?? 0, usd: result.usage?.costUsd ?? 0 });
+      // Every tier counts: the provider's reported cost, else tokens × the catalog price (marked estimated). Never blocks.
+      const llmUsd = llmCallUsd(engine.provider, engine.model, result.usage);
+      recordMetric(sessionId, { type: 'call', inputTokens: result.usage?.inputTokens ?? 0, outputTokens: result.usage?.outputTokens ?? 0, usd: llmUsd });
+      addSpend(llmUsd, { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
       if (result.usage) {
         const u = result.usage;
         patchSession(sessionId, (s) => ({
           ...s,
-          usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + (u.costUsd ?? 0) },
+          usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + llmUsd },
         }));
       }
       pushHistory(sessionId, {
@@ -686,6 +693,14 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
     patchAgent(sessionId, { busy: false, phase: undefined });
     controller = null;
   }
+}
+
+/** Cost of one model call: what the provider reported, else tokens at the catalog's per-million prices. */
+export function llmCallUsd(provider: LlmProviderId, model: string, usage: ChatResult['usage']): number {
+  if (!usage) return 0;
+  if (usage.costUsd != null) return usage.costUsd;
+  const m = get().catalog.llm[provider]?.find((x) => x.id === model);
+  return ((m?.inputPrice ?? 0) * usage.inputTokens + (m?.outputPrice ?? 0) * usage.outputTokens) / 1_000_000;
 }
 
 function flushToolResults(sessionId: string, results: LlmMessage[]): void {

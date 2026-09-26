@@ -1,7 +1,6 @@
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
-import { formatUsd } from '../lib/format';
 import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../lib/idb';
 import { downloadBlob, extensionForMime, fetchBlob, probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
@@ -13,6 +12,7 @@ import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
+import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
 import { designerDims } from './agent/runtime';
@@ -125,13 +125,9 @@ export async function createSubjectVoice(sessionId: string, subjectId: string): 
 // ---------------------------------------------------------------------------
 // Budget
 
+/** Why a run cannot start without asking: it goes over a limit the user has not accepted going past. */
 export function budgetProblem(e: Estimate): string | null {
-  const st = get();
-  const remaining = st.settings.budgetUsd - st.spentUsd;
-  if (e.usd != null && e.usd > remaining + 1e-9) {
-    return `Needs ${formatUsd(e.usd)} but only ${formatUsd(Math.max(0, remaining))} of your budget is left. Raise it in Settings.`;
-  }
-  return null;
+  return overLimit(e) ? overLimitText(e) : null;
 }
 
 export { needsSpendCheck };
@@ -143,6 +139,8 @@ export interface DirectCheck {
   ok: boolean;
   reason?: string;
   estimate: Estimate;
+  /** Goes over the spending limit: ask before running (not a block). */
+  overLimit?: boolean;
 }
 
 /** Validate the composer for image/video mode (used for the button state and before running). */
@@ -204,9 +202,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (!text && !attachments.length && !settings.shots?.length) return { ok: false, reason: 'Write a prompt.', estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
   }
-  const budget = budgetProblem(estimate);
-  if (budget) return { ok: false, reason: budget, estimate };
-  return { ok: true, estimate };
+  return { ok: true, estimate, overLimit: overLimit(estimate) };
 }
 
 /** The entries of `map` for these ids, or undefined when there are none. */

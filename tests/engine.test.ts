@@ -7,7 +7,7 @@ import { estimate, needsSpendCheck, sumEstimates, UNKNOWN, FREE } from '../src/e
 import { coerceSettings, schemaFromJson, wireParams } from '../src/engine/params';
 import { MAX_PLAN_STEPS, normalizePlan, topoOrder, type PlanContext } from '../src/engine/plan';
 import { proposePlanSchema } from '../src/engine/agent/tools';
-import { pickDefaultLlm, type LlmModel } from '../src/engine/providers/llm';
+import { limitedLlmFallback, pickDefaultLlm, type LlmModel } from '../src/engine/providers/llm';
 import { connect, connectionError, graphToSteps, planToGraph } from '../src/engine/flow/graph';
 import { offlinePlan, type OfflineInput } from '../src/engine/agent/offline';
 import { createDoc, insertLayer, moveLayer, newRasterLayer, newTextLayer, newVectorLayer, removeLayer, scaleLayer } from '../src/engine/design/doc';
@@ -113,9 +113,19 @@ describe('agent model policy', () => {
     const noTools = [llm('openai/gpt-5.6-sol', false), llm('anthropic/claude-opus-5.5', true, false), llm('zai-org/glm-5.3-flash')];
     expect(pickDefaultLlm(noTools, 'top')).toBe('zai-org/glm-5.3-flash');
   });
-  it('falls back to any capable model, then to any model with tools', () => {
+  it('falls back to the cheapest model with tools and vision, never silently to one without vision', () => {
+    const priced = (id: string, usd: number, vision?: boolean): LlmModel => ({ id, name: id, tools: true, vision, inputPrice: usd, outputPrice: usd });
     expect(pickDefaultLlm([llm('a', false), llm('b', true, false), llm('c')])).toBe('c');
-    expect(pickDefaultLlm([llm('a', false), llm('b', true, false)])).toBe('b');
+    expect(pickDefaultLlm([priced('dear', 9, true), priced('cheap', 1, true), priced('blind', 0.1, false)])).toBe('cheap');
+    expect(pickDefaultLlm([llm('a', false), llm('b', true, false)])).toBeUndefined();
+    expect(pickDefaultLlm([priced('unknown', 1, undefined)])).toBeUndefined();
+  });
+
+  it('offers the limited model (unknown vision first, then none) only when nothing has tools and vision', () => {
+    const priced = (id: string, usd: number, vision?: boolean): LlmModel => ({ id, name: id, tools: true, vision, inputPrice: usd, outputPrice: usd });
+    expect(limitedLlmFallback([priced('blind', 0.1, false), priced('unknown', 2, undefined)])?.id).toBe('unknown');
+    expect(limitedLlmFallback([priced('blind', 1, false), priced('blind2', 0.5, false)])?.id).toBe('blind2');
+    expect(limitedLlmFallback([priced('ok', 1, true), priced('blind', 0.1, false)])).toBeUndefined();
   });
 });
 

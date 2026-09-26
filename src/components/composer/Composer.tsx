@@ -157,7 +157,7 @@ function SendDirect({ kind }: { kind: MediaKind }) {
   const schema = useStore((s) => s.catalog.schemas[s.composer[kind].modelRef]);
   const assets = useStore((s) => s.assets);
   const spent = useStore((s) => s.spentUsd);
-  const budget = useStore((s) => s.settings.budgetUsd);
+  const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}`);
   const workspace = useStore((s) => s.ui.workspace);
   const models = useStore((s) => s.catalog.models);
   // Recompute whenever any input of the check changes.
@@ -169,7 +169,8 @@ function SendDirect({ kind }: { kind: MediaKind }) {
       toast(check.reason ?? 'Not ready', 'error');
       return;
     }
-    if (unknown) pop.toggle();
+    // Unknown price or over the spending limit: confirm in the cost popover first.
+    if (unknown || check.overLimit) pop.toggle();
     else void generateDirect(kind);
   };
   return (
@@ -180,7 +181,7 @@ function SendDirect({ kind }: { kind: MediaKind }) {
         className={`send-btn is-generate ${check.ok ? '' : 'is-blocked'}`}
         onClick={onClick}
         aria-disabled={!check.ok}
-        data-tip={check.ok ? (unknown ? 'Price not published: you will confirm first' : 'Generate (Enter)') : check.reason}
+        data-tip={check.ok ? (unknown ? 'Price not published: you will confirm first' : check.overLimit ? 'Over your spending limit: you will confirm first' : 'Generate (Enter)') : check.reason}
       >
         <Zap size={14} strokeWidth={2} />
         <span>Generate</span>
@@ -262,8 +263,8 @@ export function Composer() {
       toast(check.reason ?? 'Not ready', 'error');
       return;
     }
-    // Unknown prices always go through the confirmation popover on the button.
-    if (check.estimate.usd == null) {
+    // Unknown prices and runs over the spending limit go through the confirmation popover on the button.
+    if (check.estimate.usd == null || check.overLimit) {
       (document.querySelector('.send-btn.is-generate') as HTMLButtonElement | null)?.click();
       return;
     }

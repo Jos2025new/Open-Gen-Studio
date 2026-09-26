@@ -5,6 +5,7 @@ import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
+import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import type { PlanFeedItem, PlanStep, StepState } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
@@ -63,7 +64,9 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const generations = useStore((s) => s.generations);
-  const remaining = useStore((s) => s.settings.budgetUsd - s.spentUsd);
+  useStore((s) => s.spentUsd);
+  useStore((s) => s.settings);
+  const remaining = remainingBudget();
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.
   const revising = useStore((s) => s.sessions[sessionId]?.agent.revising === item.id);
@@ -81,7 +84,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const perStep = live?.perStep;
   const name = (ref: string) => models[ref]?.name ?? (ref.startsWith('local::') ? (ref.endsWith('video') ? 'Local Motion' : 'Local Sketch') : ref.split('::')[1] ?? ref);
   const doneCount = Object.values(item.stepStates).filter((s) => s === 'done').length;
-  const over = total.usd != null && total.usd > remaining + 1e-9;
+  const over = awaiting && overLimit(total);
   const free = !needsSpendCheck(total);
 
   return (
@@ -130,13 +133,22 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         {item.status === 'awaiting' ? (
           <>
             <span className="plan-budget faint num">
-              {total.usd == null ? 'Price not published — billed at actual cost' : free ? 'Nothing to pay' : `Budget left ${formatUsd(Math.max(0, remaining))}`}
+              {total.usd == null ? 'Price not published — billed at actual cost' : free ? 'Nothing to pay' : remaining == null ? 'No spending limit' : `Budget left ${formatUsd(Math.max(0, remaining))}`}
             </span>
             <Button variant="ghost" onClick={() => cancelPlan(sessionId, item.id)}>
               Cancel
             </Button>
-            <Button variant="primary" icon={Zap} disabled={over || revising || none} onClick={() => void approvePlan(sessionId, item.id)} data-tip={over ? 'Over your remaining budget' : revising ? 'The agent is revising this plan' : undefined}>
-              {free ? 'Run' : `Run · ${costLabel(total, { short: true })}`}
+            <Button
+              variant="primary"
+              icon={Zap}
+              disabled={revising || none}
+              onClick={() => {
+                if (over) acceptOverLimit();
+                void approvePlan(sessionId, item.id);
+              }}
+              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : undefined}
+            >
+              {free ? 'Run' : `${over ? 'Run anyway' : 'Run'} · ${costLabel(total, { short: true })}`}
             </Button>
           </>
         ) : item.status === 'running' ? (

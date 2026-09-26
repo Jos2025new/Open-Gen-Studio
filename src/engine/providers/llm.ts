@@ -124,11 +124,27 @@ export const capable = (m: LlmModel) => m.tools && m.vision !== false;
 /** Priority lists by tier; the model picker shows these first. */
 export const LLM_TIERS: Record<AgentTier, string[]> = { normal: NORMAL_LLM, top: TOP_LLM };
 
-/** Default agent model: the tier's priority list (top falls back to normal), then any capable model. */
+/** Cheapest by input + output price per million tokens; unpriced models last. */
+function cheapest(models: LlmModel[]): LlmModel | undefined {
+  const cost = (m: LlmModel) => (m.inputPrice ?? Infinity) + (m.outputPrice ?? Infinity);
+  return [...models].sort((a, b) => cost(a) - cost(b))[0];
+}
+
+/**
+ * Default agent model: the tier's priority list (top falls back to normal), then the cheapest model with tool
+ * calling and confirmed image input. Never a model that cannot see images: that one the user must accept
+ * (see limitedLlmFallback).
+ */
 export function pickDefaultLlm(models: LlmModel[], tier: AgentTier = 'normal'): string | undefined {
   const order = tier === 'top' ? [...TOP_LLM, ...NORMAL_LLM] : NORMAL_LLM;
   for (const id of order) if (models.some((m) => m.id === id && capable(m))) return id;
-  return (models.find(capable) ?? models.find((m) => m.tools))?.id;
+  return cheapest(models.filter((m) => m.tools && m.vision === true))?.id;
+}
+
+/** When no model has tools and vision: the cheapest with tools whose vision is unknown, else none, for the user to accept or not. */
+export function limitedLlmFallback(models: LlmModel[]): LlmModel | undefined {
+  if (pickDefaultLlm(models)) return undefined;
+  return cheapest(models.filter((m) => m.tools && m.vision === undefined)) ?? cheapest(models.filter((m) => m.tools && m.vision === false));
 }
 
 /** Stream a chat completion, reporting text deltas. */

@@ -3,6 +3,7 @@ import { Zap } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import type { Estimate } from '../../engine/types';
 import { useStore } from '../../store/store';
+import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
 import { Button, CostTag, costLabel } from './primitives';
 
 /** The one cost checkpoint: shown right before anything that spends money. */
@@ -25,8 +26,11 @@ export function SpendConfirm({
   children?: ReactNode;
   blocked?: string | null;
 }) {
-  const remaining = useStore((s) => s.settings.budgetUsd - s.spentUsd);
-  const over = estimate.usd != null && estimate.usd > remaining + 1e-9;
+  // Re-render when spending or the limit change.
+  useStore((s) => s.spentUsd);
+  useStore((s) => s.settings);
+  const remaining = remainingBudget();
+  const over = overLimit(estimate);
   return (
     <div className="spend">
       <div className="spend-head">
@@ -49,15 +53,24 @@ export function SpendConfirm({
         ) : (
           <span>Estimated from provider prices.</span>
         )}
-        <span className="num">Budget left {formatUsd(Math.max(0, remaining))}</span>
+        <span className="num">{remaining == null ? 'No spending limit' : `Budget left ${formatUsd(Math.max(0, remaining))}`}</span>
       </div>
-      {blocked || over ? <div className="spend-warn">{blocked ?? 'Over your remaining budget. Raise it in Settings.'}</div> : null}
+      {blocked || over ? <div className="spend-warn">{blocked ?? overLimitText(estimate)}</div> : null}
       <div className="spend-actions">
         <Button variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
-        <Button variant="primary" icon={Zap} disabled={Boolean(blocked) || over} onClick={onConfirm} autoFocus>
-          {confirmLabel} · {costLabel(estimate, { short: true })}
+        <Button
+          variant="primary"
+          icon={Zap}
+          disabled={Boolean(blocked)}
+          onClick={() => {
+            if (over) acceptOverLimit();
+            onConfirm();
+          }}
+          autoFocus
+        >
+          {over ? 'Continue anyway' : confirmLabel} · {costLabel(estimate, { short: true })}
         </Button>
       </div>
     </div>

@@ -68,6 +68,12 @@ describe('agent metrics per request (R0)', () => {
 
     await approvePlan(sid(), plans()[0].id);
     expect(metrics()[0].outcome).toBe('approved');
+    // Each model call is itemized as agent spending (G1).
+    const agentSpend = useStore.getState().spendLog.filter((e) => e.category === 'agent' && e.sessionId === sid());
+    expect(agentSpend.slice(-2).map((e) => [e.usd, e.provider, e.model, e.estimated])).toEqual([
+      [0.001, 'nanogpt', 'm', false],
+      [0.001, 'nanogpt', 'm', false],
+    ]);
   });
 
   it('answering questions stays in the same request and counts the round', async () => {

@@ -4,6 +4,7 @@ import { uid } from '../lib/id';
 import { stateDb } from '../lib/idb';
 import { disk } from '../lib/disk';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
+import { formatUsd } from '../lib/format';
 import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
@@ -26,6 +27,7 @@ import type {
   RemoteProviderId,
   TranscriberSummary,
   Session,
+  SpendEntry,
   TextStyle,
   Workspace,
 } from '../engine/types';
@@ -38,6 +40,10 @@ export interface Settings {
   agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
   guidedRounds: number;
   budgetUsd: number;
+  /** false: no spending limit, spending is only shown. */
+  budgetOn: boolean;
+  /** The limit the user chose to go past ("Continue anyway"); valid while budgetUsd stays the same. */
+  budgetAccepted?: number | null;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 
@@ -83,7 +89,7 @@ export interface Toast {
 
 export interface UiState {
   workspace: Workspace;
-  panel: 'gallery' | 'sessions' | null;
+  panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   lightbox: { assetIds: string[]; index: number } | null;
   /** Sketch editor over a node's image; saving sets that node's painted-over copy. */
@@ -105,6 +111,8 @@ export interface AppState {
   hydrated: boolean;
   settings: Settings;
   spentUsd: number;
+  /** Itemized spending, newest last (capped at MAX_SPEND_LOG). */
+  spendLog: SpendEntry[];
   sessions: Record<string, Session>;
   activeSessionId: string;
   generations: Record<string, Generation>;
@@ -146,6 +154,8 @@ export const DEFAULT_SETTINGS: Settings = {
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
+  budgetOn: true,
+  budgetAccepted: null,
   ops: { edit: null, upscale: null, removeBg: null, video: null, videoUpscale: null, videoEdit: null, videoExtend: null, transcribe: null, editRegion: null, removeObject: null },
 };
 
@@ -153,6 +163,7 @@ const initial: AppState = {
   hydrated: false,
   settings: DEFAULT_SETTINGS,
   spentUsd: 0,
+  spendLog: [],
   sessions: { [firstSession.id]: firstSession },
   activeSessionId: firstSession.id,
   generations: {},
@@ -229,7 +240,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'sessions' | 'activeSessionId' | 'generations' | 'assets'> & {
+type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets'> & {
   composer: Omit<ComposerState, 'editing'>;
   ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool'>;
 };
@@ -242,6 +253,7 @@ export const useStore = create<AppState>()(
     partialize: (s): Persisted => ({
       settings: s.settings,
       spentUsd: s.spentUsd,
+      spendLog: s.spendLog,
       sessions: s.sessions,
       activeSessionId: s.activeSessionId,
       generations: s.generations,
@@ -265,6 +277,7 @@ export const useStore = create<AppState>()(
           ops: { ...DEFAULT_SETTINGS.ops, ...p.settings?.ops },
         },
         spentUsd: p.spentUsd ?? 0,
+        spendLog: p.spendLog ?? [],
         sessions,
         activeSessionId,
         generations: p.generations ?? {},
@@ -366,9 +379,23 @@ export function setCatalog(patch: Partial<CatalogState> | ((c: CatalogState) => 
   set((st) => ({ catalog: { ...st.catalog, ...(typeof patch === 'function' ? patch(st.catalog) : patch) } }));
 }
 
-export function addSpend(usd: number): void {
+export const MAX_SPEND_LOG = 5000;
+
+/**
+ * Count money spent (never blocks: what is running keeps running). With `entry` it is itemized for the Spending
+ * panel. Crossing an active, not accepted limit shows one notice; the next paid run asks before going on.
+ */
+export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): void {
   if (!Number.isFinite(usd) || usd <= 0) return;
-  set((st) => ({ spentUsd: Math.round((st.spentUsd + usd) * 10000) / 10000 }));
+  const before = get().spentUsd;
+  set((st) => ({
+    spentUsd: Math.round((st.spentUsd + usd) * 10000) / 10000,
+    spendLog: entry ? [...st.spendLog, { ...entry, at: Date.now(), usd }].slice(-MAX_SPEND_LOG) : st.spendLog,
+  }));
+  const { budgetOn, budgetUsd, budgetAccepted } = get().settings;
+  if (budgetOn && budgetAccepted !== budgetUsd && before <= budgetUsd && get().spentUsd > budgetUsd) {
+    toast(`You passed your spending limit (${formatUsd(budgetUsd)}). What is running continues; new paid runs will ask first.`, 'error');
+  }
 }
 
 export function toast(text: string, level: Toast['level'] = 'info'): void {

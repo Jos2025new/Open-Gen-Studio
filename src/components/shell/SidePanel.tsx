@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { setUi, useStore } from '../../store/store';
 import { GalleryPanel } from '../gallery/GalleryPanel';
 import { SessionsPanel } from './SessionsPanel';
+import { SpendingPanel } from './SpendingPanel';
 
 /* Drawers anchored to the sidebar. No scrim: assets can be dragged from the gallery onto canvases. */
 export function SidePanel() {
@@ -20,8 +21,8 @@ export function SidePanel() {
 
   if (!panel) return null;
   return (
-    <aside className={`side-panel panel-${panel} ${expanded ? 'is-expanded' : ''}`} aria-label={panel === 'gallery' ? 'Gallery' : 'Sessions'}>
-      {panel === 'gallery' ? <GalleryPanel /> : <SessionsPanel />}
+    <aside className={`side-panel panel-${panel} ${expanded ? 'is-expanded' : ''}`} aria-label={panel === 'gallery' ? 'Gallery' : panel === 'spending' ? 'Spending' : 'Sessions'}>
+      {panel === 'gallery' ? <GalleryPanel /> : panel === 'spending' ? <SpendingPanel /> : <SessionsPanel />}
     </aside>
   );
 }

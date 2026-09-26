@@ -3,11 +3,11 @@ import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lu
 import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel, transcriberFor } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
-import { LLM_LABELS, LLM_TIERS, type LlmModel } from '../../engine/providers/llm';
+import { LLM_LABELS, LLM_TIERS, limitedLlmFallback, type LlmModel } from '../../engine/providers/llm';
 import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
 import type { OpEngine } from '../../engine/ops';
 import { formatUsd } from '../../lib/format';
-import { setCatalog, setSettings, toast, useStore, wipeAllData, type Settings } from '../../store/store';
+import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Settings } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
@@ -154,6 +154,41 @@ function LlmModelPicker() {
   );
 }
 
+/**
+ * The agent needs tool calling and image input. When the provider has no such model the app does not pick a
+ * limited one by itself: it explains what is lost and asks. A model chosen by hand that cannot see images gets a note.
+ */
+function AgentVisionNotice() {
+  const agent = useStore((s) => s.settings.agent);
+  const provider = agent.provider === 'offline' ? null : agent.provider;
+  const models = useStore((s) => (provider ? s.catalog.llm[provider] : undefined));
+  if (!provider || !models?.length) return null;
+  const limits =
+    "it will not see your attachments or its own results, so it cannot describe a character from a photo, give each reference its role or check a framing; it only gets each image's size and type. Text-only requests work normally.";
+  const current = models.find((m) => m.id === agent.model);
+  if (current) {
+    if (current.vision !== false && current.vision !== undefined) return null;
+    return <p className="set-note is-warn">{current.vision === false ? 'This model cannot see images:' : 'This provider does not say whether this model sees images. If it does not,'} {limits}</p>;
+  }
+  if (agent.model) return null;
+  const candidate = limitedLlmFallback(models);
+  if (!candidate) return null;
+  return (
+    <div className="set-warn">
+      <p>
+        {LLM_LABELS[provider]} has no model with tool calling and image input. {candidate.name} can plan, but{' '}
+        {candidate.vision === false ? 'cannot see images' : 'does not say whether it sees images'}: {limits}
+      </p>
+      <p className="faint">Until you choose, the agent uses the local planner.</p>
+      <div className="set-warn-actions">
+        <Button size="sm" variant="primary" onClick={() => setSettings((s) => ({ agent: { ...s.agent, model: candidate.id } }))}>
+          Use {candidate.name} anyway
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** Models that take an inpainting mask: known from the loaded schema, else from the endpoint name. */
 function takesMask(m: ModelSummary): boolean {
   const schema = useStore.getState().catalog.schemas[m.ref];
@@ -284,6 +319,7 @@ export function SettingsPanel() {
               <span className="set-label">Model</span>
               <LlmModelPicker />
             </div>
+            <AgentVisionNotice />
           </>
         ) : (
           <p className="set-note">The local planner handles common requests without an LLM. Connect a provider for the full agent.</p>
@@ -337,28 +373,59 @@ export function SettingsPanel() {
       <section className="set-section">
         <h3>Budget</h3>
         <div className="set-row">
-          <span className="set-label">Limit (USD)</span>
-          <input
-            className="num-input num"
-            inputMode="decimal"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-            onBlur={() => {
-              const v = Number.parseFloat(budget);
-              if (Number.isFinite(v) && v >= 0) setSettings({ budgetUsd: Math.round(v * 100) / 100 });
-              else setBudget(String(settings.budgetUsd));
-            }}
-            aria-label="Budget limit in USD"
+          <span className="set-label" data-tip="With a limit, a run that goes over it asks first. Nothing running is ever stopped for its cost.">
+            Spending limit
+          </span>
+          <Segmented
+            value={settings.budgetOn ? 'on' : 'off'}
+            options={[
+              { value: 'on', label: 'On' },
+              { value: 'off', label: 'Off' },
+            ]}
+            onChange={(v) => setSettings({ budgetOn: v === 'on' })}
+            size="sm"
           />
         </div>
+        {settings.budgetOn ? (
+          <div className="set-row">
+            <span className="set-label">Limit (USD)</span>
+            <input
+              className="num-input num"
+              inputMode="decimal"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              onBlur={() => {
+                const v = Number.parseFloat(budget);
+                if (Number.isFinite(v) && v >= 0) setSettings({ budgetUsd: Math.round(v * 100) / 100 });
+                else setBudget(String(settings.budgetUsd));
+              }}
+              aria-label="Budget limit in USD"
+            />
+          </div>
+        ) : null}
         <div className="set-row">
           <span className="set-label">Spent</span>
           <span className="num">{formatUsd(spent)}</span>
-          <Button size="sm" variant="ghost" onClick={() => useStore.setState({ spentUsd: 0 })}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              useStore.setState({ spentUsd: 0 });
+              setSettings({ budgetAccepted: null });
+            }}
+            data-tip="Start counting against the limit again. The Spending panel keeps the history."
+          >
             Reset
           </Button>
         </div>
-        <p className="set-note">Every run shows its estimated cost before spending. Runs above the remaining budget are blocked.</p>
+        {settings.budgetOn && settings.budgetAccepted === settings.budgetUsd ? <p className="set-note">You chose to continue past this limit: runs no longer ask. Change the limit or reset to be asked again.</p> : null}
+        <p className="set-note">
+          Every paid run shows its estimated cost first. {settings.budgetOn ? 'A run over the limit asks before it starts.' : 'Without a limit, spending is only shown.'} Agent (LLM) calls count too. Details:{' '}
+          <button type="button" className="link-btn" onClick={() => setUi({ panel: 'spending', settingsOpen: false })}>
+            Spending
+          </button>
+          .
+        </p>
       </section>
 
       <section className="set-section">

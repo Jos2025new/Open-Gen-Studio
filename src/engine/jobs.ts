@@ -557,7 +557,7 @@ function finishText(id: string, text: string, actualUsd: number | undefined): vo
   const g = get().generations[id];
   if (!g) return;
   patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, remoteJob: undefined });
-  addSpend(actualUsd ?? g.estimate.usd ?? 0);
+  addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
 }
 
 function finish(id: string, assetIds: string[], actualUsd: number | undefined): void {
@@ -572,12 +572,17 @@ function finish(id: string, assetIds: string[], actualUsd: number | undefined): 
     actualUsd,
     remoteJob: undefined,
   });
-  addSpend(actualUsd ?? g.estimate.usd ?? 0);
+  addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
 }
 
 function chargePartial(g: Generation): void {
   const per = g.estimate.usd != null ? g.estimate.usd / Math.max(1, g.settings.count) : 0;
-  addSpend(per * g.assetIds.length);
+  addSpend(per * g.assetIds.length, spendEntry(g, true));
+}
+
+/** How a generation shows in the Spending panel. */
+function spendEntry(g: Generation, estimated: boolean) {
+  return { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated };
 }
 
 export function cancelGeneration(id: string): void {

@@ -17,7 +17,8 @@ Fecha: 2026-09-26. Escrito por Claude en la sesión local, antes de pasar a Clau
 
 ## Estado (2026-09-26, sesión en la nube, rama `claude/stoic-davinci-xt7o4z`)
 - `PLAN_AGENT_ROUTE.md` implementado en código: R0 (métricas + banco), R1+R2, R3, R4, R5, R6, R7, R9 y R10. Un commit por fase; detalle y límites en `TRAZABILIDAD.md`. 166 tests + banco (se salta sin clave).
-- **Falta, lo ejecuta el usuario:** R0d/R8 = el banco antes y después (comandos abajo); pruebas de navegador (tarjeta de preguntas con opción marcada, "Save as subject", chip Subjects con modelos no Kling).
+- **Falta, lo ejecuta el usuario:** R0d/R8 = el banco antes y después (comandos abajo); pruebas de navegador (tarjeta de preguntas con opción marcada, "Save as subject", chip Subjects con modelos no Kling, panel Spending, "Continue anyway" al pasar el límite, aviso de modelo sin visión en Ajustes).
+- **Gasto (G1–G4, hecho):** el límite avisa y deja continuar, nunca corta algo en curso; el LLM cuenta en todos los tiers; panel Spending en la barra lateral; el agente nunca cae solo a un modelo sin visión.
 - **Coste de contexto (a revisar con el banco):** el prompt del sistema pasó de 9.620 a 14.768 caracteres (~1.300 tokens más por llamada) y las herramientas de 5.760 a 6.764. Es texto fijo (no crece con la conversación), pero es más que "pocas líneas". Si el banco muestra más tiempo o tokens en peticiones claras, recortar primero las reglas de R1–R3.
 - **Sin hacer por falta de fuentes:** guías por modelo de R4 (Wan 3, Seedance, MiniMax H3; estaban en `~/.claude/skills/ai-director/` del usuario). Paso del agente para crear sujetos (R10; se usa "Save as subject").
 

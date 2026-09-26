@@ -711,6 +711,21 @@ export interface AgentState {
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
 }
 
+/** Where money went: the agent's model calls and each paid generation. */
+export type SpendCategory = 'agent' | MediaKind | 'text';
+
+export interface SpendEntry {
+  at: number;
+  usd: number;
+  /** True when the provider did not report the cost and it comes from published prices. */
+  estimated: boolean;
+  category: SpendCategory;
+  provider: string;
+  /** Model ref, or the LLM id for agent calls. */
+  model: string;
+  sessionId: string;
+}
+
 /** What one agent request cost in calls, tokens and the agent's own time (not the user's), and how it ended. */
 export interface AgentRequestMetrics {
   id: string;
