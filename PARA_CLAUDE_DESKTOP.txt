@@ -1,0 +1,115 @@
+Para ti, Claude Desktop:
+
+Soy Claude, de la sesión en la nube del 2026-09-26. Samuel pasa a trabajar contigo. Esto es lo que hice y dónde lo dejé.
+
+=====================================================================
+0. LO PRIMERO
+=====================================================================
+- Todo está en la rama `claude/stoic-davinci-xt7o4z`, subida a GitHub. NO está en `main`.
+  Para verlo:  git fetch origin && git checkout claude/stoic-davinci-xt7o4z
+  Samuel decide si se fusiona con `main` (no se ha abierto ninguna PR).
+- Estado: 179 tests pasan (1 omitido: el banco, sin clave), typecheck y build correctos.
+  Nada se ha probado en el navegador ni contra proveedores reales: eso lo hace Samuel.
+- Lee en este orden: AGENTS.md (reglas y planes con casillas), HANDOFF.md (qué le toca
+  ejecutar a Samuel), TRAZABILIDAD.md (cada cambio: qué, dónde, verificación, límites y
+  la tabla "Qué se espera ver al probar"), PLAN_AGENT_ROUTE.md y PLAN_PROMPTING.md.
+
+=====================================================================
+1. CÓMO TRABAJA SAMUEL (recordatorio)
+=====================================================================
+- Español, claro, sin jerga. Cuando pide brevedad, sé breve.
+- Restricción principal: no añadir latencia ni carga al modelo del agente (ni llamadas
+  extra al LLM ni texto que crezca en cada mensaje).
+- Coste: calidad media por defecto; nunca 1080p o calidad alta fija. Las generaciones de
+  pago necesitan su permiso.
+- Antes de programar, plan en AGENTS.md; un commit por tarea; typecheck + tests.
+- Trae análisis de otros agentes (DeepSeek, Qwen, Higgsfield...): contrástalos con el
+  código y con los esquemas guardados (tests/fixtures/live/expected.txt) antes de adoptarlos.
+- No quiere que yo use el navegador; las pruebas visuales son suyas.
+
+=====================================================================
+2. LO QUE HICE (commits, del más antiguo al más reciente)
+=====================================================================
+Plan del agente (PLAN_AGENT_ROUTE.md):
+- 3604d48 R0: métricas por petición del agente (src/engine/agent/metrics.ts,
+  Session.agentMetrics) y banco de pruebas (tests/bench/agent-bench.test.ts; solo llega
+  al plan, nunca genera medios; se salta sin BENCH_LLM_KEY).
+- bee0dd7 R1+R2: ruta por defecto (un clip, calidad media, Wan 3), tablas por propósito,
+  reglas de prompting. El agente puede escribir una familia ("Wan 3") y la app elige la
+  variante (familyRef en plan.ts). Resolución intermedia por defecto en vídeo
+  (mediumResolution en params.ts). Variantes -spicy fuera salvo que se nombren.
+- acd506a R3: sintaxis de citas por familia (modelRules.ts REFERENCE_PROTOCOLS; la del
+  esquema del endpoint gana), best_for/avoid_for (MODEL_FITS), límite de longitud del
+  prompt leído del esquema y validado (PROMPT_TOO_LONG).
+- 4fdb39a R7: un vídeo hecho desde una imagen hereda su proporción.
+- e1c2cb4 R9: editar/extender vídeo cuesta lo mismo en el plan que en la operación directa.
+- 9c5c466 R6: preguntas con opción recomendada ya marcada.
+- ea0bfe1 R5: cada workflow recomienda una skill.
+- 74c647a R10: sujetos @Nombre con cualquier modelo con referencias (Seedance @ImageN,
+  MiniMax <Picture N>...), "Save as subject" en el menú de una imagen.
+- b3bc912 R4: índice de skills/workflows en el prompt + herramienta read_guide;
+  workflows con fixed/needs/variants/continuity; total_duration repartido por la app.
+
+Gasto (plan G en AGENTS.md):
+- 76fa9dc: registro de gasto (spendLog) que incluye al LLM del agente en todos los tiers;
+  el límite ya no bloquea: avisa y ofrece "Continue anyway"; nada en curso se detiene;
+  panel "Spending" en la barra lateral (src/components/shell/SpendingPanel.tsx);
+  el modelo del agente nunca cae solo a uno sin visión (Ajustes pregunta "Use ... anyway").
+  Núcleo: src/engine/budget.ts, src/engine/spending.ts, store.addSpend.
+
+Designer:
+- 4a4d613: guardado raster fiable (src/engine/design/raster.ts): cola por capa, guardar al
+  ocultar/cerrar, aviso del navegador si queda algo sin guardar, fallos avisados y
+  reintentados. Punto 1 de REMEDIATION_PLAN_AUDITED.md.
+
+Documentación:
+- 7e81a1f, 142a4ba: HANDOFF.md, PROGRESS.md (entrada del 26), desviaciones del plan,
+  tabla "Qué se espera ver al probar" en TRAZABILIDAD.md.
+- 3724e59: notas desactualizadas corregidas en API_DOC_REVIEW.md y PROPUESTAS.md.
+- 74754c8, 2d1c43d: PLAN_PROMPTING.md (rondas 1 y 2), PENDIENTE DE REVISIÓN.
+
+=====================================================================
+3. ARCHIVOS NUEVOS DE ESTA SESIÓN
+=====================================================================
+src/engine/agent/metrics.ts        métricas por petición
+src/engine/budget.ts               límite que avisa
+src/engine/spending.ts             agregados del panel de gasto
+src/components/shell/SpendingPanel.tsx
+tests/agent-metrics.test.ts, tests/agent-route.test.ts, tests/spending.test.ts,
+tests/raster-persist.test.ts, tests/bench/agent-bench.test.ts, tests/bench/node.d.ts,
+tests/fixtures/live/serve.ts       (servidor del catálogo guardado, compartido)
+PLAN_PROMPTING.md                  plan de prompting, pendiente de revisión
+PARA_CLAUDE_DESKTOP.txt            este archivo
+
+=====================================================================
+4. PENDIENTE
+=====================================================================
+Lo ejecuta Samuel (desde la nube nano-gpt.com estaba bloqueado):
+- Banco antes/después (R0d, R8). Comandos en HANDOFF.md. Antes = commit 3604d48.
+  Imagen del personaje en bench/fixtures/character.jpg. Con los dos JSON, compara (R8).
+- Navegador: preguntas con opción marcada, "Save as subject", chip Subjects con modelos
+  no Kling, panel Spending, "Continue anyway", aviso de modelo sin visión, pintar y cerrar
+  la pestaña enseguida en el Designer.
+- Comprobar que su LLM acepta imágenes adjuntas; Inkscape (SVG/PDF); 3D real.
+
+Decisiones de Samuel por confirmar:
+- Calidad = solo resolución; -spicy fuera salvo que se nombren (aplicadas provisionalmente).
+- El prompt fijo del agente pasó de 9.620 a 14.768 caracteres: si el banco muestra peor
+  tiempo o tokens en peticiones claras, recortar primero R1–R3.
+
+Decidido en la última conversación:
+- Idioma: Samuel escribe en cualquier idioma; el agente redacta los prompts en inglés,
+  salvo el texto literal que debe aparecer en la imagen (va tal cual).
+
+Planes sin empezar:
+- PLAN_PROMPTING.md: NO implementar hasta que Samuel lo revise y dé sus fuentes. Solo se
+  contrastó con la copia de esquemas del repo (2026-09-25), no con APIs en vivo.
+- Fases 8 (LoRA, ControlNet, tiling) y 9 (Kling motion-control) del plan de cobertura.
+- REMEDIATION_PLAN_AUDITED.md puntos 4 (memoria del historial) y 5 (proveedores).
+- Guías por modelo para read_guide: faltan las fuentes (~/.claude/skills/ai-director/
+  en la máquina de Samuel).
+- Paso del agente para crear sujetos; variantes en workflows.
+- Futuro anotado: unir clips y subtítulos (siguiente candidato), revisión visual opcional,
+  ideas de PROPUESTAS.md (despliegue, acceso, persistencia, herramientas de vídeo).
+
+Suerte. — Claude (nube)
