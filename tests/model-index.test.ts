@@ -72,4 +72,38 @@ describe('find_models index', () => {
     const { errors } = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'walk', model: 'nanogpt::seedance-2.0-fast', first_frame: 'asset:a' }] }, ctx, 'p');
     expect(errors.join(' ')).toMatch(/Did you mean "[^"]*seedance[^"]*2[-.]0[^"]*fast[^"]*"\?/);
   });
+
+  it('leaves out "-spicy" variants unless they are asked for by name', () => {
+    expect(searchIndex(models, 'seedance 2.5', { kind: 'video', limit: 50 }).some((m) => /spicy/.test(m.id))).toBe(false);
+    expect(searchIndex(models, 'seedance 2.5 spicy', { kind: 'video' })[0].id).toMatch(/spicy/);
+  });
+});
+
+describe('default route: family names resolve locally (R1)', () => {
+  const { models } = snapshotModels();
+  const byRef = new Map(models.map((m) => [m.ref, m]));
+  const ctx = (provider: string): PlanContext => ({
+    workspace: 'chat',
+    getModel: async (r) => (byRef.has(r) ? { model: byRef.get(r)!, schema: { ref: r, params: [], slots: { prompt: 'prompt', firstFrame: { key: 'image', format: 'url' } }, source: 'catalog' } } : null),
+    defaultModel: () => null,
+    defaultSettings: () => ({}),
+    asset: () => ({ kind: 'image' }),
+    layer: () => undefined,
+    suggestModel: (ref, kind, needsImage) => searchIndex(models, ref, { kind, needsImage, limit: 1, provider })[0]?.ref,
+  });
+
+  it('"Wan 3" with a start image becomes the image-to-video variant of the selected provider, noted as an adjustment', async () => {
+    const { plan, errors } = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'walk', model: 'Wan 3', first_frame: 'asset:a' }] }, ctx('nanogpt'), 'p');
+    expect(errors).toEqual([]);
+    const step = plan!.steps[0] as { modelRef: string };
+    expect(step.modelRef).toBe('nanogpt::alibaba/wan-3.0/image-to-video');
+    expect(plan!.adjustments?.join(' ') ?? '').toMatch(/"Wan 3" → nanogpt::alibaba\/wan-3\.0\/image-to-video/);
+  });
+
+  it('without an image it is the text-to-video variant; a full ref passes as given', async () => {
+    const a = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a city', model: 'wan 3' }] }, ctx('atlas'), 'p');
+    expect((a.plan!.steps[0] as { modelRef: string }).modelRef).toBe('atlas::alibaba/wan-3.0/text-to-video');
+    const b = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a city', model: 'fal::minimax/h3/text-to-video' }] }, ctx('atlas'), 'p');
+    expect((b.plan!.steps[0] as { modelRef: string }).modelRef).toBe('fal::minimax/h3/text-to-video');
+  });
 });

@@ -664,6 +664,26 @@ export function durationLabel(seconds: number): string {
   return seconds > 0 ? `${seconds}s` : 'Auto';
 }
 
+/** "720p" → 720, "2K" → 2000; NaN when the option is not a size ("auto", "standard"). */
+function resolutionRank(o: unknown): number {
+  const m = /^(\d+(?:\.\d+)?)\s*(p|k)?$/i.exec(String(o).trim());
+  if (!m) return NaN;
+  return m[2]?.toLowerCase() === 'k' ? parseFloat(m[1]) * 1000 : parseFloat(m[1]);
+}
+
+/**
+ * Medium quality (PLAN_AGENT_ROUTE.md R1): the middle size the model offers (720p among 480p/720p/1080p), or the
+ * model's own default when that is smaller. Never the highest by default: resolution can multiply the price.
+ */
+export function mediumResolution(options: Array<string | number>, def?: unknown): string {
+  const sized = options.filter((o) => Number.isFinite(resolutionRank(o))).sort((a, b) => resolutionRank(a) - resolutionRank(b));
+  const fallback = String(def ?? options[0]);
+  if (sized.length < 2) return fallback;
+  const mid = sized[Math.floor((sized.length - 1) / 2)];
+  const d = resolutionRank(def);
+  return Number.isFinite(d) && d <= resolutionRank(mid) ? fallback : String(mid);
+}
+
 export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind): GenSettings {
   const s: GenSettings = { count: 1, advanced: {} };
   if (!schema) return s;
@@ -674,7 +694,7 @@ export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind
     s.aspect = nearestAspect(aspect.options.filter((o) => !isAutoOption(o)), preferred, def) ?? String(aspect.default ?? aspect.options[0]);
   }
   const res = paramByRole(schema, 'resolution');
-  if (res?.options?.length) s.resolution = String(res.default ?? res.options[0]);
+  if (res?.options?.length) s.resolution = kind === 'video' ? mediumResolution(res.options, res.default) : String(res.default ?? res.options[0]);
   const dur = paramByRole(schema, 'duration');
   if (dur) {
     const choices = durationOptions(dur);

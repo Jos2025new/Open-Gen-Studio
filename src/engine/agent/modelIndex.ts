@@ -43,6 +43,8 @@ export interface SearchOptions {
   kind?: MediaKind;
   /** Prefer variants that take an input image (image-to-video) when the step has one. */
   needsImage?: boolean;
+  /** Among equal matches, prefer this provider (the one of the user's selected model). */
+  provider?: string;
   limit?: number;
 }
 
@@ -52,21 +54,24 @@ export function searchIndex(models: ModelSummary[], query: string, opts: SearchO
   // Generic words ("video", "to") match half the catalog; they only count when nothing else was given.
   const q = all.some((t) => !GENERIC.has(t)) ? all.filter((t) => !GENERIC.has(t)) : all;
   if (!q.length) return [];
-  const scored: Array<{ m: ModelSummary; hits: number; extra: number; fit: number }> = [];
+  // Uncensored "-spicy" variants only when asked for by name (provisional choice, PLAN_AGENT_ROUTE.md decision 3).
+  const spicy = q.includes('spicy');
+  const scored: Array<{ m: ModelSummary; hits: number; extra: number; fit: number; away: number }> = [];
   for (const m of models) {
     if (opts.kind && m.kind !== opts.kind) continue;
+    if (!spicy && /spicy/i.test(m.id)) continue;
     const have = new Set([...tokens(m.id), ...tokens(m.name)]);
     const hits = q.filter((t) => have.has(t)).length;
     if (!hits) continue;
     const fit = opts.needsImage == null ? 0 : opts.needsImage === Boolean(m.acceptsImage) ? 0 : 1;
-    scored.push({ m, hits, extra: tokens(m.id).filter((t) => !q.includes(t)).length, fit });
+    scored.push({ m, hits, extra: tokens(m.id).filter((t) => !q.includes(t) && !GENERIC.has(t)).length, fit, away: opts.provider && m.provider !== opts.provider ? 1 : 0 });
   }
   const best = Math.max(0, ...scored.map((s) => s.hits));
   // With several words, a single stray match ("2") is noise: at least half of them must match.
   const floor = Math.max(1, best - 1, Math.ceil(q.length / 2));
   return scored
     .filter((s) => s.hits >= floor)
-    .sort((a, b) => b.hits - a.hits || a.fit - b.fit || a.extra - b.extra || a.m.ref.localeCompare(b.m.ref))
+    .sort((a, b) => b.hits - a.hits || a.fit - b.fit || a.away - b.away || a.extra - b.extra || a.m.ref.localeCompare(b.m.ref))
     .slice(0, opts.limit ?? 8)
     .map((s) => s.m);
 }
@@ -93,5 +98,6 @@ export function findModelsResult(query: string, kind: MediaKind | undefined): st
 
 /** Closest indexed ref for a wrong model id, for the validator's "did you mean" (same kind, fitting inputs). */
 export function suggestModel(ref: string, kind: MediaKind, needsImage: boolean): string | undefined {
-  return searchIndex(indexedModels(), ref, { kind, needsImage, limit: 1 })[0]?.ref;
+  const selected = useStore.getState().composer[kind]?.modelRef;
+  return searchIndex(indexedModels(), ref, { kind, needsImage, limit: 1, provider: selected?.split('::')[0] })[0]?.ref;
 }

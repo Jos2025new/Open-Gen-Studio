@@ -70,6 +70,19 @@ export interface RawPlan {
 
 export type OutputKind = AssetKind | 'text' | 'layer';
 
+/**
+ * A family name instead of a ref ("Wan 3", "Seedance 2.5") resolves to the closest supported model, locally:
+ * the agent can follow the default route without a find_models round. Full refs ("provider::id") pass as given.
+ */
+function familyRef(ctx: PlanContext, model: string | undefined, kind: MediaKind, needsImage: boolean, stepId: string, adjustments: string[]): string | undefined {
+  const raw = model?.trim();
+  if (!raw || raw.includes('::')) return raw;
+  const ref = ctx.suggestModel?.(raw, kind, needsImage);
+  if (!ref) return raw;
+  adjustments.push(`${stepId}: model "${raw}" → ${ref}`);
+  return ref;
+}
+
 function didYouMean(ctx: PlanContext, ref: string, kind: MediaKind, needsImage: boolean): string {
   const near = ctx.suggestModel?.(ref, kind, needsImage);
   return near ? ` Did you mean "${near}"?` : ' Use a listed model ref, one returned by find_models, or omit "model".';
@@ -336,7 +349,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           expectImage(s.last_frame, `${where} last_frame`);
         }
         const needsImage = refs.length > 0 || Boolean(s.first_frame);
-        const modelRef = s.model?.trim() || ctx.defaultModel(kind, needsImage);
+        const modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, adjustments) || ctx.defaultModel(kind, needsImage);
         if (!modelRef) {
           errors.push(`${where}: no ${kind} model is available. Ask the user to connect a provider.`);
           continue;
@@ -417,7 +430,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         break;
       }
       case 'audio': {
-        const modelRef = s.model?.trim() || ctx.defaultModel('audio', false);
+        const modelRef = familyRef(ctx, s.model, 'audio', false, s.id!, adjustments) || ctx.defaultModel('audio', false);
         if (!modelRef) {
           errors.push(`${where}: no audio model is available. Ask the user to connect Atlas Cloud.`);
           continue;

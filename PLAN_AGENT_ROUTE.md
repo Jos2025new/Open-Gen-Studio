@@ -131,6 +131,8 @@ Mismo banco de pruebas en el commit final. Tabla por petición y en total: llama
 
 ## Decisiones pendientes del usuario (antes de la fase que las usa)
 
+**Provisional (2026-09-26, Claude, a petición de avanzar):** 1 → calidad = solo resolución; 3 → `-spicy` excluidas salvo que se nombren. Ambas se cambian en una línea (`mediumResolution` en `params.ts`, filtro en `searchIndex`).
+
 1. **Calidad alta / media / baja (R1):** decidido en parte: media por defecto y nunca alta fija por coste. Falta: ¿la calidad es solo resolución, o también variante del modelo (p. ej. Seedance 2.5 frente a 2.0 Fast)?
 2. ~~Multi-stage~~ **Decidido (2026-09-26):** lo decide el agente con la regla de R1.
 3. **Variantes `-spicy` de NanoGPT:** ¿se excluyen del índice de `find_models` y de la ruta estándar?
