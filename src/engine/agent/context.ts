@@ -44,7 +44,7 @@ ${OP_LINES}
   vector: shapes [{type: rect|ellipse|line, x, y, w, h, fill "#hex"|null, stroke "#hex"|null, stroke_width, radius}], target "new" or an existing vector layer id.
   Images only go on raster layers, text only on text layers, shapes only on vector layers. Video cannot be placed on layers.
 - References: "s1" (first output of step s1), "s1#2" (its second output), "asset:<id>" (an existing asset listed in the context), "layer:<id>" (pixels of a raster layer).
-- Omit "model" to use the user's selected model; the app switches to an image-capable variant when refs or first_frame are used. Set "model" only to a ref listed in the context when it is clearly a better fit.
+- Omit "model" to use the user's selected model; the app switches to an image-capable variant when refs or first_frame are used. Set "model" only to a ref listed in the context when it is clearly a better fit. When the user names a model that is not listed, call find_models first and use the ref that fits the step's inputs (image-to-video when there is a start image); never say a model is unavailable without searching.
 - Keep plans minimal: the fewest steps that fully deliver the request. count defaults to 1; use more only when asked or clearly useful (max 4).
 - In the Node workspace the plan becomes connected nodes: structure it as a clean left-to-right flow (use text steps + prompt_from when several steps share a prompt).
 - The app computes costs from provider prices; do not quote prices.

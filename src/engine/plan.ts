@@ -70,6 +70,11 @@ export interface RawPlan {
 
 export type OutputKind = AssetKind | 'text' | 'layer';
 
+function didYouMean(ctx: PlanContext, ref: string, kind: MediaKind, needsImage: boolean): string {
+  const near = ctx.suggestModel?.(ref, kind, needsImage);
+  return near ? ` Did you mean "${near}"?` : ' Use a listed model ref, one returned by find_models, or omit "model".';
+}
+
 export interface PlanContext {
   workspace: Workspace;
   getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
@@ -78,6 +83,8 @@ export interface PlanContext {
   asset: (id: string) => { kind: AssetKind } | undefined;
   layer: (id: string) => { type: LayerType } | undefined;
   maxSteps?: number;
+  /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
+  suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
 }
 
 export interface ParsedRef {
@@ -312,7 +319,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const resolved = await ctx.getModel(modelRef);
         if (!resolved) {
-          errors.push(`${where}: model "${modelRef}" was not found in the catalog. Use one of the listed model refs or omit "model".`);
+          errors.push(`${where}: model "${modelRef}" was not found in the catalog.${didYouMean(ctx, modelRef, kind, needsImage)}`);
           continue;
         }
         if (resolved.model.kind !== kind) {
@@ -393,7 +400,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const resolved = await ctx.getModel(modelRef);
         if (!resolved) {
-          errors.push(`${where}: model "${modelRef}" was not found in the catalog. Use one of the listed model refs or omit "model".`);
+          errors.push(`${where}: model "${modelRef}" was not found in the catalog.${didYouMean(ctx, modelRef, 'audio', false)}`);
           continue;
         }
         if (resolved.model.kind !== 'audio') {

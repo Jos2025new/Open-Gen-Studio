@@ -35,7 +35,8 @@ import {
 } from '../../store/store';
 import { SYSTEM_PROMPT, buildContext } from './context';
 import { offlinePlan } from './offline';
-import { TOOLS, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { findModelsResult, suggestModel } from './modelIndex';
+import { TOOLS, findModelsSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -92,6 +93,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,
     asset: (id: string) => get().assets[id],
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
+    suggestModel,
   };
 }
 
@@ -546,6 +548,12 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
             call.id,
           );
           return;
+        }
+        if (call.name === 'find_models') {
+          // Local search in the app's refined catalog; the agent continues in the next round.
+          const v = findModelsSchema.safeParse(parsed.value);
+          respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
+          continue;
         }
         if (call.name === 'propose_plan') {
           const v = proposePlanSchema.safeParse(parsed.value);

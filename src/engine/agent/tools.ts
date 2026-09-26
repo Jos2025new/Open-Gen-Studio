@@ -11,6 +11,22 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'find_models',
+      description:
+        'Search the models supported by the app when the user names a model that is not in the context (e.g. "seedance 2.0 fast"). Returns up to 8 refs with inputs and price, only from the app\'s supported catalog. Do not call it when a listed model fits.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'The model name as the user said it, e.g. "seedance 2.0 fast".' },
+          kind: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'], description: 'Optional: only models that make this.' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'ask_questions',
       description:
         'Guided mode only. Ask 1-4 short, decisive questions that remove real ambiguity before planning. Each question has 2-5 concrete options. Never ask about details you can settle with a sensible choice.',
@@ -118,6 +134,11 @@ const questionSchema = z.object({
   options: z.array(z.string().min(1).max(120)).min(2).max(6),
   allow_custom: z.boolean().optional(),
   multi: z.boolean().optional(),
+});
+
+export const findModelsSchema = z.object({
+  query: z.string().min(1).max(120),
+  kind: z.enum(['image', 'video', 'audio', 'model3d']).optional(),
 });
 
 export const askQuestionsSchema = z.object({
