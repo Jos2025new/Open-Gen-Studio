@@ -12,7 +12,7 @@ import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
-import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, OpId, RemoteJob } from './types';
+import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -658,6 +658,31 @@ export interface OpSpecInput {
 }
 
 /** Build the generation spec for an operation on an asset (model, instruction and settings). */
+type VideoOpEngine = 'video_upscale' | 'video_edit' | 'video_extend';
+
+/** Settings a video operation runs with: the source's framing and, for edits and upscales, its length. */
+export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | undefined): GenSettings {
+  const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
+  const extend = engine === 'video_extend';
+  // Keep the source's framing: the model's "auto"/"adaptive" option, else nothing.
+  const auto = paramByRole(schema, 'aspect')?.options?.find(isAutoOption);
+  settings.aspect = auto != null ? String(auto) : undefined;
+  if (!extend) {
+    // Edits follow the source's length: -1 where the model has it (Seedance 2.5 edit requires it), else nothing.
+    settings.duration = durationChoices(schema).includes(-1) ? -1 : undefined;
+    settings.audio = undefined;
+  }
+  // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
+  const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
+  if (mode && engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
+  return settings;
+}
+
+/** Per-second prices: an edit or upscale is billed on the source clip, an extension on the new seconds. */
+export function videoOpSeconds(engine: VideoOpEngine, settings: GenSettings, clipSeconds: number | undefined): number | undefined {
+  return engine === 'video_extend' ? settings.duration : clipSeconds;
+}
+
 export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const def = OPS[input.op];
   const source: { width: number; height: number } | undefined = get().assets[input.sourceAssetId] ?? input.sourceDims;
@@ -684,24 +709,10 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
-    const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
-    const extend = def.engine === 'video_extend';
-    // Keep the source's framing: the model's "auto"/"adaptive" option, else nothing.
-    const auto = paramByRole(schema, 'aspect')?.options?.find(isAutoOption);
-    settings.aspect = auto != null ? String(auto) : undefined;
-    if (!extend) {
-      // Edits follow the source's length: -1 where the model has it (Seedance 2.5 edit requires it), else nothing.
-      settings.duration = durationChoices(schema).includes(-1) ? -1 : undefined;
-      settings.audio = undefined;
-    }
-    // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
-    const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
-    if (mode && def.engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
+    const settings = videoOpSettings(def.engine, schema);
     const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
     const clip = get().assets[input.sourceAssetId];
-    // Per-second prices: an edit or upscale is billed on the clip, an extension on the new seconds.
-    const seconds = extend ? settings.duration : clip?.duration;
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: seconds }) };
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }) };
   }
   if (def.engine === 'video') {
     const video = get().composer.video.settings;

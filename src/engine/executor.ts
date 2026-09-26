@@ -1,8 +1,8 @@
 import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
-import { ensureSchema } from './catalog';
-import { createGeneration, opSpec, runGeneration } from './jobs';
+import { ensureSchema, opModelFor } from './catalog';
+import { createGeneration, opSpec, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
 import { parseRef, topoOrder } from './plan';
@@ -45,7 +45,15 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
     else if (s.kind === 'op') {
       const p = parseRef(s.input);
       const src = p?.type === 'asset' ? get().assets[p.id] : undefined;
-      perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings);
+      const engine = OPS[s.op].engine;
+      if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
+        // Same estimate as the direct operation on that clip (jobs.opSpec). A clip still to be made: its step's duration.
+        const settings = videoOpSettings(engine, get().catalog.schemas[opModelFor(engine).ref]);
+        const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
+        const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
+        const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) });
+        perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
+      } else perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings);
     } else perStep[s.id] = { usd: 0, approximate: false };
   }
   return { total: sumEstimates(Object.values(perStep)), perStep };

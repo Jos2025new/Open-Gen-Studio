@@ -3,6 +3,7 @@ import atlasSnapshot from './fixtures/live/atlas.json';
 import nanoSnapshot from './fixtures/live/nanogpt.json';
 import { schemaFromJson, type JsonProp } from '../src/engine/params';
 import { createGeneration, opSpec, runGeneration } from '../src/engine/jobs';
+import { estimateSteps } from '../src/engine/executor';
 import { sourceVideoRule } from '../src/engine/modelRules';
 import { nanogpt } from '../src/engine/providers/nanogpt';
 import { useStore } from '../src/store/store';
@@ -100,5 +101,18 @@ describe('video edit / extend operations', () => {
     expect(extend.settings.advanced.mode).toBe('video-extend');
     const edit = await opSpec({ sessionId: 's', sourceAssetId: 'clip', op: 'video_edit', params: { instruction: 'x' }, origin: 'op' });
     expect(edit.settings.advanced.mode).toBe('video-edit');
+  });
+
+  it('a plan step that edits or extends a clip costs the same as the direct operation (R9)', async () => {
+    const ref = `atlas::${SEEDANCE_ATLAS}`;
+    install(ref, { provider: 'atlas', price: { skus: [{ usd: 0.1, unit: 'second' }] } }, atlasSchema(SEEDANCE_ATLAS), 12);
+    for (const op of ['video_edit', 'video_extend'] as const) {
+      const direct = await opSpec({ sessionId: 's', sourceAssetId: 'clip', op, params: { instruction: 'x' }, origin: 'op' });
+      const { perStep } = estimateSteps([{ id: 's1', kind: 'op', title: 'e', op, input: 'asset:clip', params: { instruction: 'x' } }]);
+      expect(perStep.s1.usd).toBeCloseTo(direct.estimate!.usd!);
+    }
+    // Edit is billed on the 12 s clip, extend on its 5 new seconds.
+    expect(estimateSteps([{ id: 's1', kind: 'op', title: 'e', op: 'video_edit', input: 'asset:clip', params: {} }]).perStep.s1.usd).toBeCloseTo(1.2);
+    expect(estimateSteps([{ id: 's1', kind: 'op', title: 'e', op: 'video_extend', input: 'asset:clip', params: {} }]).perStep.s1.usd).toBeCloseTo(0.5);
   });
 });
