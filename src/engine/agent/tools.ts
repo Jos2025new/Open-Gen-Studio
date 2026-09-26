@@ -29,7 +29,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'ask_questions',
       description:
-        'Guided mode only. Ask 1-4 short, decisive questions that remove real ambiguity before planning. Each question has 2-5 concrete options. Never ask about details you can settle with a sensible choice.',
+        'Guided mode only. Ask 1-4 short, decisive questions that remove real ambiguity before planning, all needed ones together in one card. Each question has 2-5 concrete options and a default: the option you recommend, preselected so one click continues. Never ask about details you can settle with a sensible choice or the user already settled.',
       parameters: {
         type: 'object',
         properties: {
@@ -46,6 +46,7 @@ export const TOOLS: ToolSpec[] = [
                 options: { type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 5 },
                 allow_custom: { type: 'boolean', description: 'Let the user type their own answer.' },
                 multi: { type: 'boolean', description: 'Allow several options.' },
+                default: { type: 'string', description: 'The recommended option, exactly as written in options; shown preselected.' },
               },
               required: ['id', 'question', 'options'],
             },
@@ -135,6 +136,7 @@ const questionSchema = z.object({
   options: z.array(z.string().min(1).max(120)).min(2).max(6),
   allow_custom: z.boolean().optional(),
   multi: z.boolean().optional(),
+  default: z.string().max(120).optional(),
 });
 
 export const findModelsSchema = z.object({

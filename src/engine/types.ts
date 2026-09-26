@@ -318,6 +318,8 @@ export interface AgentQuestion {
   options: string[];
   allowCustom: boolean;
   multi: boolean;
+  /** Recommended option, preselected in the card. */
+  default?: string;
 }
 
 export type StepRef = string; // "s1", "s1#2", "asset:<id>", "layer:<id>"

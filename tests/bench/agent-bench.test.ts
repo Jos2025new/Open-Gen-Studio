@@ -101,11 +101,11 @@ async function runCase(c: Case) {
   for (const [i, text] of c.turns.entries()) {
     useStore.setState((s) => ({ composer: { ...s.composer, agentStyle: STYLE, attachments: i === 0 ? attachments : [] } }));
     await sendAgentMessage(text);
-    // Questions: take the first option of each (the user accepting what is offered), as many rounds as the app allows.
+    // Questions: take the recommended option of each, else the first (the user accepting what is offered), as many rounds as the app allows.
     for (let round = 0; round < 4; round++) {
       const q = feed().find((f): f is QuestionsFeedItem => f.type === 'questions' && f.status === 'pending');
       if (!q) break;
-      await submitAnswers(sid(), q.id, Object.fromEntries(q.questions.map((x) => [x.id, x.options[0] ?? 'default'])));
+      await submitAnswers(sid(), q.id, Object.fromEntries(q.questions.map((x) => [x.id, x.default ?? x.options[0] ?? 'default'])));
     }
   }
   const s = useStore.getState().sessions[sid()];

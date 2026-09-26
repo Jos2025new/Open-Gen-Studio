@@ -621,7 +621,14 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
             sessionId,
             workspace,
             v.data.intro,
-            v.data.questions.map((q) => ({ id: q.id, question: q.question, options: q.options, allowCustom: q.allow_custom ?? true, multi: q.multi ?? false })),
+            v.data.questions.map((q) => ({
+              id: q.id,
+              question: q.question,
+              options: q.options,
+              allowCustom: q.allow_custom ?? true,
+              multi: q.multi ?? false,
+              default: q.default && q.options.includes(q.default) ? q.default : undefined,
+            })),
             call.id,
           );
           return;

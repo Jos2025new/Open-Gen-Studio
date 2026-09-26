@@ -5,7 +5,8 @@ import type { QuestionsFeedItem } from '../../engine/types';
 import { Button } from '../ui/primitives';
 
 export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; sessionId: string }) {
-  const [answers, setAnswers] = useState<Record<string, string[]>>({});
+  // The agent's recommended options start selected: one click on Continue accepts them.
+  const [answers, setAnswers] = useState<Record<string, string[]>>(() => Object.fromEntries(item.questions.flatMap((q) => (q.default ? [[q.id, [q.default]]] : []))));
   const [custom, setCustom] = useState<Record<string, string>>({});
   const pending = item.status === 'pending';
 

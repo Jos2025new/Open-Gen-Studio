@@ -12,14 +12,14 @@ import { approvePlan, cancelPlan, sendAgentMessage } from '../src/engine/agent/r
 import { useStore } from '../src/store/store';
 import type { AgentStyle, PlanFeedItem } from '../src/engine/types';
 
-type Reply = { plan?: { texts: string[]; revision?: boolean }; questions?: boolean; text?: string };
+type Reply = { plan?: { texts: string[]; revision?: boolean }; questions?: boolean | { default: string }; text?: string };
 
 const sse = (r: Reply) => {
   const chunks: unknown[] = [];
   if (r.text) chunks.push({ choices: [{ delta: { content: r.text } }] });
   const call = (name: string, args: unknown) => ({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: 'tool_calls' }] });
   if (r.plan) chunks.push(call('propose_plan', { title: 'P', revision: r.plan.revision, steps: r.plan.texts.map((t, i) => ({ id: `s${i + 1}`, kind: 'text', text: t })) }));
-  if (r.questions) chunks.push(call('ask_questions', { questions: [{ id: 'q1', question: 'Style?', options: ['A', 'B'] }] }));
+  if (r.questions) chunks.push(call('ask_questions', { questions: [{ id: 'q1', question: 'Style?', options: ['A', 'B'], ...(typeof r.questions === 'object' ? r.questions : {}) }] }));
   chunks.push({ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 50, cost: 0.001 } });
   const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n';
   return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
@@ -117,5 +117,22 @@ describe('auto mode', () => {
     await vi.waitFor(() => expect(useStore.getState().sessions[sid()].agent.busy).toBe(false));
     expect(metrics()[0].agentMs).toBeGreaterThanOrEqual(metrics()[0].msToPlan!);
     expect(metrics()[0].msToPlan).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('questions with a recommended option (R6)', () => {
+  beforeEach(() => setup('guided'));
+  const card = () => useStore.getState().sessions[sid()].feed.find((f) => f.type === 'questions') as { questions: Array<{ default?: string }> } | undefined;
+
+  it('keeps the default when it is one of the options', async () => {
+    replies = [{ questions: { default: 'B' } }];
+    await sendAgentMessage('animate');
+    expect(card()!.questions[0].default).toBe('B');
+  });
+
+  it('drops a default that is not an option', async () => {
+    replies = [{ questions: { default: 'C' } }];
+    await sendAgentMessage('animate');
+    expect(card()!.questions[0].default).toBeUndefined();
   });
 });
