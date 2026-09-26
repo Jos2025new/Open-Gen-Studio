@@ -142,6 +142,8 @@ export async function chat(opts: {
   effort?: 'low' | 'medium' | 'high';
   signal: AbortSignal;
   onText?: (delta: string, full: string) => void;
+  /** Called once, when the first tool-call fragment arrives (the plan is being written). */
+  onToolCall?: () => void;
 }): Promise<ChatResult> {
   const body: Record<string, unknown> = {
     model: opts.model,
@@ -181,6 +183,7 @@ export async function chat(opts: {
   }
 
   let text = '';
+  let toolCallSeen = false;
   let finishReason: string | null = null;
   let usage: ChatResult['usage'];
   const calls = new Map<number, { id: string; name: string; arguments: string }>();
@@ -210,6 +213,10 @@ export async function chat(opts: {
       opts.onText?.(delta.content, text);
     }
     const tcs = delta.tool_calls as Array<Loose> | undefined;
+    if (tcs?.length && !toolCallSeen) {
+      toolCallSeen = true;
+      opts.onToolCall?.();
+    }
     for (const tc of tcs ?? []) {
       const idx = typeof tc.index === 'number' ? tc.index : calls.size;
       const fn = (tc.function ?? {}) as Loose;

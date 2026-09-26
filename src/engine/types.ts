@@ -690,6 +690,8 @@ export interface AgentState {
   /** Facts to hand to the model with the next user turn (e.g. execution results). */
   notes: string[];
   busy: boolean;
+  /** What the agent is doing while busy, for the chat's status row (no model output is shown). */
+  phase?: 'working' | 'drafting' | 'checking';
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
 }

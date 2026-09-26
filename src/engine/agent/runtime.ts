@@ -448,7 +448,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
   void loadLlmCatalog(engine.provider);
-  patchAgent(sessionId, { busy: true });
+  patchAgent(sessionId, { busy: true, phase: 'working' });
   controller = new AbortController();
   const signal = controller.signal;
   let planFailures = 0;
@@ -457,6 +457,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
       let textItemId: string | null = null;
       let result: ChatResult;
       try {
+        if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
         result = await chat({
           provider: engine.provider,
           apiKey: engine.key,
@@ -466,6 +467,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           tools: TOOLS,
           effort: get().settings.agent.effort,
           signal,
+          onToolCall: () => patchAgent(sessionId, { phase: 'drafting' }),
           onText: (_delta, full) => {
             if (!textItemId) {
               const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel() };
@@ -562,6 +564,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
             planFailures++;
             continue;
           }
+          patchAgent(sessionId, { phase: 'checking' });
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id);
           if (presented.errors.length) {
             planFailures++;
@@ -583,7 +586,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
     }
     notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
   } finally {
-    patchAgent(sessionId, { busy: false });
+    patchAgent(sessionId, { busy: false, phase: undefined });
     controller = null;
   }
 }

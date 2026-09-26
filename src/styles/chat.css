@@ -6,3 +6,5 @@
 @media (max-width: 767px) { .suggestions { flex-direction: column; }.suggestion { padding: 10px; }.suggestion > span { margin-bottom: 4px; }.chat-empty { padding: 30px 18px 260px; }.chat-column { padding: 18px 10px 270px; } }
 .gen-text { padding: 4px 14px 12px; }.gen-text p { margin: 0 0 10px; font-size: 13px; line-height: 1.6; white-space: pre-wrap; max-height: 280px; overflow: auto; }.gen-text-actions { display: flex; gap: 6px; justify-content: flex-end; }.k-text .kind-icon, .kind-icon.k-text { color: var(--type-text); }
 .k-audio .kind-icon { color: var(--type-audio); }
+
+.agent-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 4px 0 4px 30px; }

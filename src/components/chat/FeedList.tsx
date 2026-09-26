@@ -1,4 +1,4 @@
-import { CircleAlert, Info } from 'lucide-react';
+import { CircleAlert, Info, LoaderCircle } from 'lucide-react';
 import type { FeedItem } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -94,13 +94,24 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
 
 export function FeedList({ sessionId, compact }: { sessionId: string; compact?: boolean }) {
   const feed = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
+  const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
+  const last = feed[feed.length - 1];
+  // While text streams, its caret already shows activity.
+  const showStatus = phase && !(last?.type === 'assistant' && last.streaming);
   return (
     <div className={`feed ${compact ? 'is-compact' : ''}`}>
       {feed.map((item) => (
         <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} />
       ))}
+      {showStatus ? (
+        <div className="agent-status faint" role="status">
+          <LoaderCircle size={13} className="spin" />
+          <span>{PHASE_TEXT[phase]}</span>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 const EMPTY: FeedItem[] = [];
+const PHASE_TEXT = { working: 'Working on it…', drafting: 'Drafting the plan…', checking: 'Checking the plan…' } as const;

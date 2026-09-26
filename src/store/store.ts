@@ -253,7 +253,7 @@ export const useStore = create<AppState>()(
       const p = (persisted ?? {}) as Partial<Persisted>;
       const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
       // A reload interrupts any agent call in flight.
-      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false } }]));
+      const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false, phase: undefined } }]));
       const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] ? p.activeSessionId : Object.keys(sessions)[0];
       return {
         ...current,
