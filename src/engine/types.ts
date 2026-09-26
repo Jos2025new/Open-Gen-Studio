@@ -680,9 +680,12 @@ export interface DesignDoc {
 // ---------------------------------------------------------------------------
 // Session
 
+/** OpenAI-style content part: text, or an image the model looks at (data URL). */
+export type LlmContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+
 export interface LlmMessage {
   role: 'user' | 'assistant' | 'tool';
-  content: string | null;
+  content: string | null | LlmContentPart[];
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
   tool_call_id?: string;
 }

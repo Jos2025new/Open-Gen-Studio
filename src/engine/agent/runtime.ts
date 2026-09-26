@@ -36,6 +36,7 @@ import {
 import { SYSTEM_PROMPT, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
+import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { TOOLS, findModelsSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
@@ -133,6 +134,9 @@ export async function sendAgentMessage(text: string): Promise<void> {
         tool_call_id: pending.toolCallId,
         content: `The user replied instead of approving: ${clean}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
       });
+      // Images attached to the comment: a user message right after the tool result (tool results carry no images).
+      const parts = await visibleAttachments(sessionId, workspace, attachments);
+      if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, notes: [], revising: pendingItem.id });
       await llmTurn(sessionId, workspace);
@@ -155,9 +159,22 @@ export async function sendAgentMessage(text: string): Promise<void> {
     return;
   }
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-  pushHistory(sessionId, { role: 'user', content: `${clean || '(no text)'}\n\n${ctx}` });
+  const parts = await visibleAttachments(sessionId, workspace, attachments);
+  // A new request: images of earlier requests become a note instead of being sent again.
+  patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
+  pushHistory(sessionId, userMessage(`${clean || '(no text)'}\n\n${ctx}`, parts));
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);
+}
+
+/** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
+async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[]) {
+  if (!attachments.some((id) => ['image', 'video'].includes(get().assets[id]?.kind ?? ''))) return [];
+  if (!agentSeesImages()) {
+    notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info');
+    return [];
+  }
+  return attachmentParts(attachments);
 }
 
 function contextOpts(sessionId: string, workspace: Workspace, attachments: string[]) {

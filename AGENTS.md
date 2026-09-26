@@ -8,6 +8,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Fallo — el agente no veía las imágenes adjuntas (2026-09-26)
+Hallado al analizar el flujo de Higgsfield: Ajustes exige un LLM con visión, pero las imágenes adjuntas solo llegaban como texto (`asset:… — image W×H`, `context.ts:146`). El agente escribía prompts sobre personajes que no había visto y no podía deducir el papel de cada referencia. Decisión del usuario: el agente debe ver las referencias, sí o sí.
+- [x] V1. Enviar las imágenes adjuntas al LLM como partes de imagen del mensaje del usuario (formato OpenAI `image_url`, data URL JPEG reducida a ≤768 px), con su `asset:id` delante para que pueda citarlas. También en el comentario a un plan pendiente (mensaje de usuario tras el resultado de la herramienta). *Dónde:* `engine/types.ts` (`LlmMessage.content` admite partes), `agent/runtime.ts`, `agent/attachments.ts` (nuevo). *Por qué:* sin verlas no puede asignar papeles ni describir bien la acción.
+- [x] V2. Coste acotado: las imágenes viajan mientras dura esa petición (preguntas, plan y revisiones); al empezar una petición nueva se sustituyen en el historial por una línea de texto (`[image asset:… shown earlier]`), para no reenviarlas en cada mensaje ni engordar `data/state.json`. Vídeos: se envía su primer fotograma. Si el modelo elegido declara no tener visión, se mantiene el texto y se avisa. *Latencia:* solo en los mensajes que llevan adjuntos.
+- [x] V3. Tests (mensaje con partes de imagen y su id, retirada al pedir algo nuevo, modelo sin visión), typecheck, suite; commit.
+  Hecho: `agent/attachments.ts` (reducción a 768 px JPEG, primer fotograma en vídeos, etiqueta `asset:id (image W×H)`), `LlmMessage.content` con partes, `stripImages` al empezar una petición nueva, aviso si el modelo no tiene visión. `tests/agent-vision.test.ts` (4). Pendiente (usuario): comprobar con su LLM real que acepta imágenes (NanoGPT/OpenRouter usan el formato OpenAI `image_url`).
+
 ## Plan — ruta estándar del agente, prompting por modelo y medición (2026-09-26)
 Detalle, evidencia, dónde, por qué y aceptación en `PLAN_AGENT_ROUTE.md`. **Restricción del usuario: sin latencia ni carga añadida al modelo**; cada fase se mide con R0 y se revierte si empeora las peticiones claras. Solo propuesta: hay decisiones pendientes del usuario (calidad, multi-stage, variantes `-spicy`, permiso para el banco de pruebas). Decidido: tabla por propósito como sugerencias recomendadas.
 - [ ] R0. Registro de métricas por turno y banco de pruebas: medir el antes.

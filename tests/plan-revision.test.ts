@@ -111,7 +111,7 @@ describe('choosing which steps run', () => {
     expect(done.stepStates).toEqual({ s1: 'done', s2: 'skipped', s3: 'skipped' });
     expect(done.status).toBe('done');
     const history = useStore.getState().sessions[useStore.getState().activeSessionId].agent.history;
-    expect(history.some((m) => m.role === 'tool' && /unchecked s2, s3/.test(m.content ?? ''))).toBe(true);
+    expect(history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /unchecked s2, s3/.test(m.content))).toBe(true);
     expect(chatCalls).toBe(1);
   });
 });
