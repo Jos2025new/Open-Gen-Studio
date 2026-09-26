@@ -1061,6 +1061,7 @@ export function mentionSubjects(prompt: string, subjects: Array<{ id: string; na
 export function refMentionStyle(modelId: string, promptRefs?: string): { template: string; zeroBased: boolean } | undefined {
   const said = promptRefs ?? '';
   if (/@image\s?\d/i.test(said)) return { template: '@Image{n}', zeroBased: false };
+  if (/<\s*image_ref_/i.test(said)) return { template: '<IMAGE_REF_{n}>', zeroBased: true };
   if (/<\s*image_?0/i.test(said)) return { template: '<IMAGE_{n}>', zeroBased: true };
   if (/character\s?1/i.test(said)) return { template: 'character{n}', zeroBased: false };
   if (/\bimage\s?1\b/i.test(said)) return { template: 'Image {n}', zeroBased: false };
@@ -1069,6 +1070,8 @@ export function refMentionStyle(modelId: string, promptRefs?: string): { templat
   if (/wan-3/i.test(modelId)) return { template: 'Image {n}', zeroBased: false };
   if (/minimax[-/]h3/i.test(modelId)) return { template: '<Picture {n}>', zeroBased: false };
   // Grok Imagine Video: <IMAGE_0>, <IMAGE_1>… from zero (Atlas v1.5 and fal v1.5 schemas); fal v1 says @Image1 and wins above.
+  // Gemini Omni Flash: <IMAGE_REF_0>… from zero (Atlas video-edit schema: "the first reference image is <IMAGE_REF_0>").
+  if (/gemini-omni/i.test(modelId)) return { template: '<IMAGE_REF_{n}>', zeroBased: true };
   if (/grok-imagine-video/i.test(modelId)) return { template: '<IMAGE_{n}>', zeroBased: true };
   return undefined;
 }

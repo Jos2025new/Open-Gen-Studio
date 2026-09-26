@@ -8,6 +8,16 @@ import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 import { refMentionStyle } from '../src/engine/params';
 
+describe('video edit guidelines', () => {
+  it('is indexed for any model, with the three-layer rule and the edit model choice', () => {
+    expect(guideIndex()).toContain('  model:video-edit — how to write prompts for video edit and extend (any model)');
+    const t = readGuide('model:video-edit')!;
+    for (const rule of ['Imperative instruction', 'Say what stays the same', 'STYLE LOCK', 'Separate references by ROLE', 'Kling O3 edit', '<IMAGE_REF_0>', 'FLUX 3 Video Edit']) expect(t).toContain(rule);
+    expect(guideForModel('google/gemini-omni-1.1-flash/video-edit')?.id).not.toBe('video-edit');
+    expect(refMentionStyle('google/gemini-omni-1.1-flash/video-edit')).toEqual({ template: '<IMAGE_REF_{n}>', zeroBased: true });
+  });
+});
+
 describe('Kling 3.0 guide', () => {
   it('covers V3 tiers (not O3), structured shots and subjects as elements', () => {
     expect(guideIndex()).toContain('  model:kling — how to write prompts for Kling 3.0 (std, pro, 4K, turbo)');

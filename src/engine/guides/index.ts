@@ -6,6 +6,7 @@ import happyhorse from './happyhorse.md?raw';
 import veo from './veo.md?raw';
 import flux from './flux.md?raw';
 import kling from './kling.md?raw';
+import videoEdit from './video-edit.md?raw';
 
 /*
  * Prompting guides per model family: how to write for that model (style), next to the schema the app already
@@ -21,6 +22,8 @@ export interface ModelGuide {
 }
 
 export const MODEL_GUIDES: ModelGuide[] = [
+  // General, for any model doing an edit or extend (video_edit / video_extend ops); matched by no model id.
+  { id: 'video-edit', name: 'video edit and extend (any model)', match: /$^/, text: videoEdit },
   { id: 'seedance', name: 'Seedance 2.0 / 2.5', match: /seedance/i, text: seedance },
   { id: 'wan', name: 'Wan 3.0 / Wan 3.0 Prime', match: /wan-3/i, text: wan },
   { id: 'minimax', name: 'MiniMax H3 (all tiers)', match: /minimax[-/]h3/i, text: minimax },

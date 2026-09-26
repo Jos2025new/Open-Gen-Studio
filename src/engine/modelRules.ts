@@ -89,6 +89,11 @@ export interface ReferenceProtocol {
 
 export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
   {
+    family: 'Gemini Omni Flash',
+    note: '<IMAGE_REF_0>, <IMAGE_REF_1>… counted from zero; cite the image instead of describing it.',
+    source: 'Atlas schema gemini-omni-1.1-flash/video-edit ("<IMAGE_REF_N> is the Nth entry in reference_images (0-based)")',
+  },
+  {
     family: 'Grok Imagine Video',
     note: '<IMAGE_0>, <IMAGE_1>… counted from zero, in refs order (unless the model\'s inputs give another syntax); say what each brings ("same person as <IMAGE_0>, colour style of <IMAGE_1>").',
     source: 'Atlas schema grok-imagine-video-v1.5/reference-to-video ("Referenced in the prompt as <IMAGE_0> … <IMAGE_N>"); fal v1.5 ("Tag references as <IMAGE_0>, <IMAGE_1>"); fal v1 uses @Image1',
