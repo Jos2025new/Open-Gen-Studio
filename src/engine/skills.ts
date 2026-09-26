@@ -1,3 +1,4 @@
+import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
 
 /* Skills shape how the agent writes prompts; workflows give it a proven step structure. */
@@ -261,12 +262,14 @@ export function guideIndex(): string {
   return [
     ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}`),
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
+    ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}`),
   ].join('\n');
 }
 
 /** The full text of a skill or workflow for read_guide ("skill:product", "workflow:storyboard", "workflow:ugc/unboxing"). */
 export function readGuide(id: string): string | undefined {
   const [type, rest = ''] = id.trim().split(':');
+  if (type === 'model') return modelGuide(rest)?.text;
   if (type === 'skill') {
     const k = skillById(rest);
     return k ? `${k.name}: ${k.guidance}` : undefined;

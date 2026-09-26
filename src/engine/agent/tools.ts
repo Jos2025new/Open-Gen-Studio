@@ -32,7 +32,7 @@ export const TOOLS: ToolSpec[] = [
         'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
       parameters: {
         type: 'object',
-        properties: { id: { type: 'string', description: 'An index id, e.g. "workflow:storyboard", "skill:product"; a workflow variant as "workflow:<id>/<variant>".' } },
+        properties: { id: { type: 'string', description: 'An index id, e.g. "workflow:storyboard", "skill:product", "model:seedance"; a workflow variant as "workflow:<id>/<variant>".' } },
         required: ['id'],
       },
     },

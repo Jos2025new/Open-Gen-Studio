@@ -1,3 +1,4 @@
+import { guideForModel } from '../guides';
 import families from '../../../scripts/model-families.json';
 import { formatUsd } from '../../lib/format';
 import { isConnected } from '../catalog';
@@ -91,7 +92,8 @@ export function describeIndexed(m: ModelSummary): string {
   const s = schema?.slots;
   const prompt = [s?.promptRefs ? `prompt: ${s.promptRefs}` : '', s?.promptMax ? `prompt ≤${s.promptMax} chars` : ''].filter(Boolean).join('; ');
   const fit = modelFit(m.id);
-  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}`;
+  const guide = guideForModel(m.id);
+  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}${guide ? ` — prompting guide: model:${guide.id}` : ''}`;
 }
 
 /** find_models tool result: one line per match, or a short "nothing found" the agent can act on. */
