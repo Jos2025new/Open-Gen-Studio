@@ -47,6 +47,21 @@ El agente no los decide ni los memoriza.
 - Conservar la misma semilla al revisar o regenerar con un cambio: así se cumple el "un cambio a la vez".
 - Reescribir las instrucciones internas de Edit, Relight, Angle y Upscale con el patrón "cambia solo / conserva / no añadas".
 
+## Ronda 2 (2026-09-26) · también PENDIENTE DE REVISIÓN
+Tras la auditoría de DeepSeek sobre la versión de Qwen y la integración posterior de Qwen. Sin fuentes todavía.
+
+**Decidido (usuario):** el usuario escribe en cualquier idioma; el agente redacta los prompts en inglés (la regla actual). Excepción: el texto literal que debe aparecer en la imagen va tal cual, entre comillas y sin traducir.
+
+Cambios propuestos:
+1. Reglas universales nuevas (reescribiendo, sin alargar): repetir qué se conserva en cada iteración de edición (el drift es real); la referencia define estilo o identidad y el prompt define sujeto, composición y pose; describir relaciones espaciales y físicas, no objetos sueltos.
+2. El plan cubre también vídeo: las reglas de Grok (bloque `Sound:`, orden temporal, una acción por clip, extensión en segundos nuevos) van a la línea por familia, junto a Wan, Seedance y MiniMax.
+3. Modelos que se retiran: marca con fecha y fuente en `modelRules.ts` para no recomendarlos (Step Image Edit 2, 10 de octubre de 2026, sin verificar).
+4. Calidad media también para `quality` de GPT Image 2.5 (admite `xhigh` y `max`; por defecto `medium`), no solo la resolución.
+5. Upscalers en código: Clarity con `creativity` baja y `resemblance` alta por defecto (no redefinir el contenido).
+6. Plantillas y checklist: contenido de las guías por familia (`read_guide`), no del prompt fijo.
+
+Contrastado con la red de regresión guardada (no APIs en vivo): Grok reference-to-video 1–7 imágenes (NanoGPT ≤4); extensión de Grok 2–10 s nuevos; Grok v1 cita `@Image1` y v1.5 `<IMAGE_0>` (ya cubierto por R3); Nano Banana 2 hasta 14 imágenes al editar; Step Image Edit 2 en fal sí tiene `negative_prompt` (la auditoría dice que con CFG 1.0 no actúa: verificar antes de rellenarlo). `true_cfg_scale` y las resoluciones exactas de Qwen 2512 son del pipeline oficial, no de las APIs de los proveedores. No aparece el límite de 8,7 s de edición de Grok. La integración de Qwen repite errores ya corregidos por la auditoría (`text_mode`, `guidance_scale=0`, "Grok único vídeo con audio"): no usarla como referencia.
+
 ---
 
 ## Nota de Claude
