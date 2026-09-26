@@ -7,6 +7,16 @@ import { guideIndex, readGuide } from '../src/engine/skills';
 import { guideForModel } from '../src/engine/guides';
 import { describeIndexed } from '../src/engine/agent/modelIndex';
 
+describe('MiniMax H3 guide', () => {
+  it('covers every tier on our providers, with MiniMax reference labels and a declared style', () => {
+    expect(guideIndex()).toContain('  model:minimax — how to write prompts for MiniMax H3 (all tiers)');
+    for (const id of ['minimax/h3/reference-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-fast/text-to-video', 'minimax-h3']) expect(guideForModel(id)?.id).toBe('minimax');
+    const t = readGuide('model:minimax')!;
+    for (const rule of ['<Picture 1>', 'one continuous take', 'non_diegetic_music: N/A', 'leans strongly photoreal', 'H3 Developer', 'medium (768P)']) expect(t).toContain(rule);
+    expect(t).not.toMatch(/@Image/);
+  });
+});
+
 describe('Wan 3 guide', () => {
   it('is indexed, covers Wan 3.0 and Prime, and cites references without @', () => {
     expect(guideIndex()).toContain('  model:wan — how to write prompts for Wan 3.0 / Wan 3.0 Prime');
@@ -38,7 +48,7 @@ describe('model prompting guides', () => {
 
   it('matches every Seedance variant and points find_models results to the guide', () => {
     for (const id of ['bytedance/seedance-2.5/reference-to-video', 'bytedance-seedance-2-0-fast', 'bytedance/seedance-2.0/fast/image-to-video']) expect(guideForModel(id)?.id).toBe('seedance');
-    expect(guideForModel('minimax/h3/text-to-video')).toBeUndefined();
+    expect(guideForModel('kwaivgi/kling-v3.0-pro/text-to-video')).toBeUndefined();
     const line = describeIndexed({ ref: 'nanogpt::bytedance-seedance-2-0-fast', provider: 'nanogpt', id: 'bytedance-seedance-2-0-fast', name: 'Seedance 2.0 Fast', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] });
     expect(line).toContain('prompting guide: model:seedance');
   });
