@@ -70,6 +70,15 @@ export function layoutText(l: TextLayer): TextLayout {
   return { lines, width, height: Math.max(lineHeightPx, lines.length * lineHeightPx), lineHeightPx };
 }
 
+/** Top of the em box to the alphabetic baseline: where SVG places the baseline for the canvas 'top' layout. */
+export function textAscent(l: TextLayer): number {
+  const ctx = measurer();
+  ctx.font = fontFor(l);
+  ctx.textBaseline = 'alphabetic';
+  const m = ctx.measureText('Mg') as TextMetrics & { emHeightAscent?: number };
+  return m.emHeightAscent ?? m.fontBoundingBoxAscent ?? l.fontSize * 0.8;
+}
+
 export function layerBox(l: Layer): Box | null {
   switch (l.type) {
     case 'raster':

@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Download, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
+import type { ExportFormat } from '../../engine/design/export';
 import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, selectDoc, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, subscribeHistory } from '../../engine/design/history';
@@ -14,10 +15,18 @@ import { LayersPanel } from './LayersPanel';
 
 const SHORTCUTS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
+const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string; detail: string }> = [
+  { id: 'png', label: 'PNG', detail: 'Image, keeps transparency' },
+  { id: 'jpg', label: 'JPG', detail: 'Image, white background' },
+  { id: 'svg', label: 'SVG', detail: 'Editable layers, text and shapes' },
+  { id: 'pdf', label: 'PDF', detail: 'Vector; text in standard fonts' },
+];
+
 export function DesignerWorkspace() {
   const session = useStore((s) => s.sessions[s.activeSessionId]);
   const doc = session.docs.find((d) => d.id === session.activeDocId) ?? session.docs[0];
   const presets = usePopover();
+  const exportMenu = usePopover();
   const [zoom, setZoom] = useState(1);
   const [busy, setBusy] = useState(false);
   const undoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canUndo(doc.id));
@@ -50,10 +59,10 @@ export function DesignerWorkspace() {
     return () => window.removeEventListener('keydown', onKey);
   }, [doc, session.id]);
 
-  const output = async (gallery: boolean) => {
+  const output = async (gallery: boolean, format: ExportFormat = 'png') => {
     if (!doc || busy) return;
     setBusy(true);
-    try { await (gallery ? saveDocToGallery : exportDocFile)(session.id, doc.id); }
+    try { await (gallery ? saveDocToGallery(session.id, doc.id) : exportDocFile(session.id, doc.id, format)); }
     catch (err) { toast(err instanceof Error ? err.message : 'Export failed', 'error'); }
     finally { setBusy(false); }
   };
@@ -73,7 +82,10 @@ export function DesignerWorkspace() {
         <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
         <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
         <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
-        <Button icon={Download} size="sm" disabled={busy} onClick={() => void output(false)}>Export</Button>
+        <Button ref={exportMenu.ref} icon={Download} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
+        <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
+          {EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => { exportMenu.close(); void output(false, f.id); }} />)}
+        </Popover>
       </>}
     </TopbarActions>
     {doc ? <><ToolRail doc={doc} /><Stage key={doc.id} sessionId={session.id} doc={doc} /><LayersPanel sessionId={session.id} doc={doc} /></> :

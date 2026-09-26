@@ -1,12 +1,13 @@
 import { uid } from '../../lib/id';
 import { getAssetBlob, putAssetBlob } from '../../lib/idb';
-import { blobToCanvas, createCanvas, downloadBlob, fetchBlob } from '../../lib/media';
+import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, downloadBlob, fetchBlob } from '../../lib/media';
 import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, TextStyle } from '../types';
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
-import { exportDoc } from './render';
+import { exportDoc, layoutText, textAscent } from './render';
+import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 
 const get = useStore.getState;
@@ -305,12 +306,30 @@ export async function replaceLayerPixels(sessionId: string, docId: string, layer
   setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
 }
 
-export async function exportDocFile(sessionId: string, docId: string): Promise<void> {
+/** PNG/JPG through the editor renderer; SVG/PDF keep layers as vector objects (design/export.ts). */
+export async function exportDocFile(sessionId: string, docId: string, format: ExportFormat = 'png'): Promise<void> {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   await ensureBuffers(doc.layers.filter((l) => l.type === 'raster') as Extract<Layer, { type: 'raster' }>[]);
-  const blob = await exportDoc(doc);
-  downloadBlob(blob, `${doc.name.replace(/[^\w-]+/g, '_') || 'design'}.png`);
+  const base = doc.name.replace(/[^\w-]+/g, '_') || 'design';
+  if (format === 'png' || format === 'jpg') {
+    downloadBlob(await exportDoc(doc, format === 'jpg' ? 'image/jpeg' : 'image/png'), `${base}.${format}`);
+    return;
+  }
+  const svg = await docToSvg(doc, svgDeps());
+  if (format === 'svg') downloadBlob(new Blob([svg], { type: 'image/svg+xml' }), `${base}.svg`);
+  else downloadBlob(await svgToPdf(svg, doc.width, doc.height), `${base}.pdf`);
+}
+
+function svgDeps(): SvgDeps {
+  return {
+    rasterHref: async (l) => {
+      const buf = getBuffer(l.id);
+      return buf ? blobToDataUrl(await canvasToBlob(buf, 'image/png')) : null;
+    },
+    layout: layoutText,
+    ascent: textAscent,
+  };
 }
 
 export async function saveDocToGallery(sessionId: string, docId: string): Promise<Asset | null> {

@@ -18,7 +18,8 @@ Solicitud actual: implementar P1–P9 (usuario, 2026-09-25). Solo typecheck y te
 - [x] P5. Completar Seed3D 2.0 en ambos proveedores y extracción acotada del ZIP de Atlas. *Razón: preservar el archivo y consultar la ruta correcta.*
 - [x] P6. Completar Meshy 7.1 en NanoGPT (texto, imagen y multivista). *Razón: no confundirlo con Meshy v7 de Atlas.*
   Hecho P1–P6 (Claude, 2026-09-26, continuando el trabajo de GPT 6 Astra): ver fila en `TRAZABILIDAD.md`. Límites: salida y multivista de NanoGPT sin documentar (se clasifica por bytes); CORS de hosts 3D de Atlas sin probar; solo GLB (y GLB dentro de ZIP) se previsualiza.
-- [ ] P7. Exponer exportación PNG/JPG y añadir SVG/PDF con pruebas de fidelidad. *Razón: reutilizar el renderer y comprobar interoperabilidad.*
+- [x] P7. Exponer exportación PNG/JPG y añadir SVG/PDF con pruebas de fidelidad. *Razón: reutilizar el renderer y comprobar interoperabilidad.*
+  Hecho: menú Export (PNG, JPG con fondo blanco, SVG, PDF). SVG por capas (`design/export.ts`): capas Inkscape con nombre, opacidad y `mix-blend-mode`, formas nativas, texto como `<text>`/`<tspan>` con la base del renderer, imágenes PNG incrustadas, recorte a la página. PDF = ese SVG con jsPDF + svg2pdf.js (carga diferida). Pendiente (usuario): abrir en Inkscape; el PDF usa fuentes estándar para el texto.
 - [ ] P8. Añadir lineart editable con presión y contorno vectorial. *Razón: conservar el gesto para editarlo después.*
 - [ ] P9. Añadir textura a lo largo del trazo, caché por trazo y exportación híbrida. *Razón: editar el pincel sin rasterizar todo el documento.*
 Las fases P7–P9 son propuestas técnicas, no conformidad ya demostrada con Inkscape. No se autorizan generaciones de pago por aprobar este plan documental.
