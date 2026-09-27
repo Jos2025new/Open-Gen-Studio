@@ -11,3 +11,14 @@
 .plan-step .step-check { margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
 .plan-step.is-off .step-text, .plan-step.is-off .step-id, .plan-step.is-off .step-cost { opacity: 0.4; text-decoration: line-through; }
 .gen-billed { font-size: 10px; padding: 0 14px 10px; margin-top: -6px; }
+
+/* F5: each step shows its script on demand; title and model on separate lines; adjustments folded. */
+.plan-step { flex-wrap: wrap; }
+.step-text .step-title, .step-text .step-detail { display: block; }
+.step-toggle { text-align: left; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; font: inherit; }
+.step-toggle .step-title { display: flex; align-items: center; gap: 4px; }
+.step-script { flex-basis: 100%; margin: 2px 0 0 26px; padding: 8px 10px; font-size: 12px; line-height: 1.55; color: var(--text-2); background: var(--surface-2, rgba(255,255,255,.03)); border-radius: 6px; white-space: pre-wrap; }
+.plan-subjects { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 10px 16px 0; font-size: 12px; color: var(--text-2); }
+.plan-note { padding: 8px 16px 0; }
+.plan-adj-toggle { display: inline-flex; gap: 4px; align-items: center; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
+.plan-adj { margin: 6px 0 0 16px; padding: 0; list-style: disc; }

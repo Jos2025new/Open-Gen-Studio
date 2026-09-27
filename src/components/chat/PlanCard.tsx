@@ -1,4 +1,5 @@
-import { Box, Check, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight } from 'lucide-react';
+import { useState } from 'react';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound } from 'lucide-react';
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
@@ -50,6 +51,15 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string): string {
   }
 }
 
+/** The text a step sends to the model: its prompt, or the op's instruction. Shown as the step's script (F5). */
+function stepScript(s: PlanStep): string {
+  if (s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d') return s.prompt.trim();
+  if (s.kind === 'op') {
+    return Object.values(s.params).filter((v): v is string => typeof v === 'string' && v.trim().length > 12).join(' · ');
+  }
+  return '';
+}
+
 function StateIcon({ state }: { state: StepState }) {
   if (state === 'running') return <LoaderCircle size={13} className="spin accent" />;
   if (state === 'done') return <Check size={13} className="ok" />;
@@ -86,6 +96,16 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const name = (ref: string) => models[ref]?.name ?? (ref.startsWith('local::') ? (ref.endsWith('video') ? 'Local Motion' : 'Local Sketch') : ref.split('::')[1] ?? ref);
   const doneCount = Object.values(item.stepStates).filter((s) => s === 'done').length;
   const over = awaiting && overLimit(total);
+  // Scripts open while the plan waits for approval, so the user reads what each clip does before paying.
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const [showAdj, setShowAdj] = useState(false);
+  const flip = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const free = !needsSpendCheck(total);
 
   return (
@@ -105,6 +125,8 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           const genId = item.stepGenerations[s.id];
           const gen = genId ? generations[genId] : undefined;
           const state = item.stepStates[s.id] ?? 'pending';
+          const script = stepScript(s);
+          const shown = open.has(s.id);
           return (
             <li key={s.id} className={`plan-step st-${state}${awaiting && off.has(s.id) ? ' is-off' : ''}`}>
               {selectable ? (
@@ -112,10 +134,19 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               ) : null}
               <span className="step-id num">{s.id}</span>
               <span className={`kind-icon k-${s.kind === 'op' ? OPS[s.op].output : s.kind}`}>{stepIcon(s)}</span>
-              <span className="step-text">
-                <span className="step-title">{s.title}</span>
-                <span className="step-detail faint">{stepDetail(s, name)}</span>
-              </span>
+              {script ? (
+                <button type="button" className="step-text step-toggle" onClick={() => flip(s.id)} aria-expanded={shown}>
+                  <span className="step-title">
+                    {shown ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {s.title}
+                  </span>
+                  <span className="step-detail faint">{stepDetail(s, name)}</span>
+                </button>
+              ) : (
+                <span className="step-text">
+                  <span className="step-title">{s.title}</span>
+                  <span className="step-detail faint">{stepDetail(s, name)}</span>
+                </span>
+              )}
               {gen?.assetIds.length ? (
                 <button type="button" className="step-thumb" onClick={() => setUi({ lightbox: { assetIds: gen.assetIds, index: 0 } })} aria-label="Open result">
                   <AssetMedia assetId={gen.assetIds[0]} hoverPlay={false} draggable={false} />
@@ -124,11 +155,26 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                 <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span>
               ) : null}
               <StateIcon state={state} />
+              {script && shown ? <p className="step-script">{script}</p> : null}
             </li>
           );
         })}
       </ol>
-      {plan.adjustments.length ? <p className="plan-note faint">Adjusted to the model: {plan.adjustments.join('; ')}</p> : null}
+      {plan.subjects?.length ? (
+        <p className="plan-subjects">
+          <UserRound size={12} />
+          {plan.subjects.map((x) => `@${x.name} ← ${x.from.startsWith('asset:') ? 'your image' : x.from}`).join(' · ')}
+          <span className="faint"> — kept identical in every step that mentions it</span>
+        </p>
+      ) : null}
+      {plan.adjustments.length ? (
+        <div className="plan-note faint">
+          <button type="button" className="plan-adj-toggle" onClick={() => setShowAdj((v) => !v)} aria-expanded={showAdj}>
+            {showAdj ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {plan.adjustments.length} adjustment{plan.adjustments.length === 1 ? '' : 's'} to the models
+          </button>
+          {showAdj ? <ul className="plan-adj">{plan.adjustments.map((a, i) => <li key={i}>{a}</li>)}</ul> : null}
+        </div>
+      ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
       <footer className="plan-foot">
         {item.status === 'awaiting' ? (
