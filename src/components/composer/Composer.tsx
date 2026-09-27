@@ -160,8 +160,9 @@ function SendDirect({ kind }: { kind: MediaKind }) {
   const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}`);
   const workspace = useStore((s) => s.ui.workspace);
   const models = useStore((s) => s.catalog.models);
-  // Recompute whenever any input of the check changes.
-  const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, workspace, models]);
+  const quotes = useStore((s) => s.quotes);
+  // Recompute whenever any input of the check changes (an Atlas quote arriving included).
+  const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
   const onClick = () => {

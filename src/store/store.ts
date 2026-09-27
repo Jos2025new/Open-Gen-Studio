@@ -115,6 +115,8 @@ export interface AppState {
   spentUsd: number;
   /** Itemized spending, newest last (capped at MAX_SPEND_LOG). */
   spendLog: SpendEntry[];
+  /** Exact Atlas prices by request (engine/quotes.ts); null = no quote. Not persisted: prices change. */
+  quotes: Record<string, number | null>;
   sessions: Record<string, Session>;
   activeSessionId: string;
   generations: Record<string, Generation>;
@@ -166,6 +168,7 @@ const initial: AppState = {
   settings: DEFAULT_SETTINGS,
   spentUsd: 0,
   spendLog: [],
+  quotes: {},
   sessions: { [firstSession.id]: firstSession },
   activeSessionId: firstSession.id,
   generations: {},

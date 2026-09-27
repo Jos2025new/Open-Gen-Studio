@@ -50,6 +50,7 @@ function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
 
 function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
   const pop = usePopover();
+  useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
   const preview = pop.open ? previewRun(sessionId, ids) : null;
   return (
     <>

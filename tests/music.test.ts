@@ -123,6 +123,36 @@ describe('MiniMax music and lyrics (Atlas)', () => {
     expect(useStore.getState().assets[assetId]).toMatchObject({ kind: 'audio', mime: 'audio/mpeg', width: 0, height: 0, stored: true });
   });
 
+  it("asks Atlas for the exact price with the request's own body and records it as the real charge (C3)", async () => {
+    await install();
+    let body: Record<string, unknown> = {};
+    let quoteBody: Record<string, unknown> = {};
+    const order: string[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url.endsWith('/api/v1/model/calculate')) {
+        order.push('quote');
+        quoteBody = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ code: 200, data: { price: 0.12 } }));
+      }
+      if (url.endsWith('/api/v1/model/generateAudio')) {
+        order.push('generate');
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ data: { id: 'm2', urls: { get: 'https://api.atlascloud.ai/api/v1/model/prediction/m2' } } }));
+      }
+      if (url.endsWith('/prediction/m2')) return new Response(JSON.stringify({ data: { status: 'completed', outputs: ['https://cdn.test/q.mp3'] } }));
+      if (url === 'https://cdn.test/q.mp3') return new Response(new Uint8Array(8), { headers: { 'content-type': 'audio/mpeg' } });
+      throw new Error(`unexpected ${url}`);
+    });
+    const g = createGeneration({ sessionId: 's', kind: 'audio', prompt: 'lofi, 80bpm', modelRef: MUSIC, settings: song({ lyrics: '[Verse]\nrain' }), origin: 'composer' });
+    await runGeneration(g.id);
+    expect(order).toEqual(['quote', 'generate']);
+    // Same request, placeholder prompt: the price depends on the parameters, not on the words.
+    expect({ ...quoteBody, prompt: body.prompt }).toEqual(body);
+    expect(useStore.getState().generations[g.id].actualUsd).toBe(0.12);
+    const last = useStore.getState().spendLog.at(-1)!;
+    expect(last).toMatchObject({ usd: 0.12, estimated: false, provider: 'atlas' });
+  });
+
   it('writes lyrics as a text result, priced like the model', async () => {
     await install();
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {

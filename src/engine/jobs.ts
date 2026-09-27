@@ -5,6 +5,7 @@ import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extract
 import { randomSeed } from '../lib/rng';
 import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
+import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
@@ -437,6 +438,8 @@ async function execute(id: string): Promise<string[]> {
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
+      // Atlas reports no cost: its exact quote for this request (same body, no media) is the real charge (C3).
+      const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
       const result = await ADAPTERS[model.provider].generate({
         kind,
         model,
@@ -462,6 +465,7 @@ async function execute(id: string): Promise<string[]> {
         onRemoteJob: (job) => patchGeneration(id, { remoteJob: total === perRequest ? job : undefined }),
       });
       if (result.costUsd != null) cost += result.costUsd;
+      else if (quote != null) cost += quote;
       else costKnown = false;
       if (g.kind === 'text') {
         finishText(id, result.text ?? '', result.costUsd);

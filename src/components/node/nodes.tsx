@@ -74,6 +74,7 @@ export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType 
 function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
   const sessionId = useSessionId();
   const pop = usePopover();
+  useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
   const preview = pop.open || primary ? previewRun(sessionId, [node.id]) : null;
   return (
     <>

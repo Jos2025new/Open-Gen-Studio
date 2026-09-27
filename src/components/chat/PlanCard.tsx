@@ -66,6 +66,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const generations = useStore((s) => s.generations);
   useStore((s) => s.spentUsd);
   useStore((s) => s.settings);
+  useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
   const remaining = remainingBudget();
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.

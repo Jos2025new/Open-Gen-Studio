@@ -214,6 +214,8 @@ export interface Estimate {
   /** true when some parts are unknown and `usd` only covers the known ones. */
   lowerBound?: boolean;
   note?: string;
+  /** The provider's own price for this exact request (Atlas quote), not an estimate from catalog prices. */
+  exact?: boolean;
 }
 
 // ---------------------------------------------------------------------------

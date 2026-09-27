@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Music, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
+import { formatUsd } from '../../lib/format';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
@@ -94,6 +95,11 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         <span className="truncate">{metaLine(g)}</span>
         <CostTag estimate={g.actualUsd != null ? { usd: g.actualUsd, approximate: false } : g.estimate} />
       </div>
+      {billedDiffers(g) ? (
+        <div className="gen-billed faint num">
+          est {formatUsd(g.estimate.usd)} · charged {formatUsd(g.actualUsd)}
+        </div>
+      ) : null}
 
       {g.status === 'error' || (g.status === 'canceled' && !outputs.length) ? (
         <div className={`gen-error ${g.status === 'canceled' ? 'is-canceled' : ''}`}>
@@ -226,4 +232,9 @@ export function GenerationCard({ generationId, compact = false }: { generationId
       </Popover>
     </article>
   );
+}
+
+/** The provider charged something other than the estimate shown before running (NanoGPT, OpenRouter): show both. */
+function billedDiffers(g: { estimate: { usd: number | null }; actualUsd?: number }): boolean {
+  return g.actualUsd != null && g.estimate.usd != null && Math.abs(g.actualUsd - g.estimate.usd) > Math.max(0.0005, g.estimate.usd * 0.01);
 }
