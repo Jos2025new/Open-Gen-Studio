@@ -29,6 +29,15 @@ function metaLine(g: Generation): string {
     .join(' · ');
 }
 
+/** Results of a chat's generations, oldest first. */
+function chatResults(sessionId: string): string[] {
+  const st = useStore.getState();
+  return Object.values(st.generations)
+    .filter((x) => x.sessionId === sessionId && x.assetIds.length)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .flatMap((x) => x.assetIds.filter((id) => st.assets[id]));
+}
+
 function tileRatio(id: string): React.CSSProperties | undefined {
   const a = useStore.getState().assets[id];
   return a?.width && a.height ? ({ ['--ratio' as string]: a.width / a.height } as React.CSSProperties) : undefined;
@@ -77,7 +86,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const pendingSlots = busy ? Math.max(0, (g.op ? 1 : g.settings.count) - outputs.length) : 0;
   const sel = outputs[Math.min(selected, outputs.length - 1)];
   const title = generationTitle(g);
-  const openLightbox = (i: number) => setUi({ lightbox: { assetIds: outputs, index: i } });
+  // The viewer steps through every result of this chat (« »), starting at the one clicked.
+  const openLightbox = (i: number) => {
+    const all = chatResults(g.sessionId);
+    const at = all.indexOf(outputs[i]);
+    setUi({ lightbox: at >= 0 ? { assetIds: all, index: at } : { assetIds: outputs, index: i } });
+  };
   const regenEstimate = regenerateEstimate(g.id) ?? g.estimate;
   // One picture or clip: its own size, capped in height (audio and 3D keep the full-width strip).
   const single = outputs.length + pendingSlots === 1 && (g.kind === 'image' || g.kind === 'video');

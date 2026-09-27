@@ -1,6 +1,6 @@
 import { Model3DViewer } from './Model3DViewer';
 import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, Download, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { downloadAsset } from '../../engine/actions';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -36,12 +36,12 @@ export function Lightbox() {
         <>{asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}</>
         {index > 0 ? (
           <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { assetIds: ids, index: index - 1 } })}>
-            <ChevronLeft size={20} />
+            <ChevronsLeft size={20} />
           </button>
         ) : null}
         {index < ids.length - 1 ? (
           <button type="button" className="lb-nav lb-next" aria-label="Next" onClick={() => setUi({ lightbox: { assetIds: ids, index: index + 1 } })}>
-            <ChevronRight size={20} />
+            <ChevronsRight size={20} />
           </button>
         ) : null}
         {ids.length > 1 ? (

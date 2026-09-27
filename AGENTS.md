@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — « » en el visor para recorrer las imágenes del chat (2026-09-27)
+- [x] Abrir un resultado desde una tarjeta abre el visor con todos los resultados del chat (generaciones de la sesión por fecha, también las de planes) en el resultado pulsado; « » y las flechas del teclado los recorren; "N / total" arriba. Botones « » de 42×52 px con borde y texto claro. *Dónde:* `GenerationCard.tsx` (`chatResults`), `Lightbox.tsx`, `shell.css`. Navegador: 1/4 → » 2/4 → ← 1/4.
+
 ## Tarea — Tools solo con operaciones, "Send to", Favorito/Download visibles y Delete al extremo (2026-09-27) · punto de retorno: `859caea`
 Origen: el menú Tools mezcla operaciones con Designer / Use as reference / Save as subject / Node canvas / Download / Favorite; Delete queda pegado a los demás iconos. Referencia: "Open in" solo con operaciones, iconos propios para enviar, favorito y descarga, borrar aparte. Encaja con lo decidido (tarjeta ajustada a la imagen, iconos generales bajo ella, Tools sobre la imagen).
 - [x] S1. `AssetActions`: el menú (Tools en la tarjeta, "…" en el visor) solo lista operaciones (y Edit region). Nuevo `SendToMenu` (icono de avión de papel): Open in Designer, Use as reference, Save as subject (imágenes) y Add to Node canvas. *Dónde:* `AssetActions.tsx`.
