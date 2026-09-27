@@ -37,8 +37,8 @@ Origen: revisión de DeepSeek sobre el catálogo; decisiones del usuario. **Nunc
 Descartado (usuario): test de IDs preferidos (se actualizan cuando haga falta).
 
 ## Plan — modelo por propósito y precio exacto (2026-09-26)
-Detalle, datos y porqués en `PLAN_ROUTING_COST.md`; precios en `PRECIOS_VIDEO.md`. Decidido por el usuario; solo Atlas y NanoGPT; calidad media; variante más barata (`-developer`). Pendientes: borrador H3 Max o Max Turbo; puesto de H3 Developer.
-- [ ] C1. Tabla por propósito en código (`purpose: draft | normal | long`): borrador MiniMax H3 Max/Turbo; normal Seedance 2.0 Fast → Wan 3 → H3 Developer; largo Wan 3; el resto solo si se nombra.
+Detalle, datos y porqués en `PLAN_ROUTING_COST.md`; precios en `PRECIOS_VIDEO.md`. Decidido por el usuario; solo Atlas y NanoGPT; calidad media; variante más barata (`-developer`). Pendiente: puesto de H3 Developer. Decidido: borrador = H3 Max Turbo (el más barato).
+- [ ] C1. Tabla por propósito en código (`purpose: draft | normal | long`): borrador MiniMax H3 Max Turbo; normal Seedance 2.0 Fast → Wan 3 → H3 Developer; largo Wan 3; el resto solo si se nombra.
 - [ ] C2. El modelo del composer solo manda si el usuario lo eligió a mano (quita Kling por defecto).
 - [ ] C3. Presupuesto exacto de Atlas (`POST /api/v1/model/calculate`, sin coste) antes de generar y guardado como coste real; "estimado · cobrado" para NanoGPT.
 - [ ] C4. El contexto nombra el modelo por defecto y el agente carga su guía la primera vez.

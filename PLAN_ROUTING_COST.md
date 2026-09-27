@@ -20,7 +20,7 @@ Calidad media por defecto: 720p (768P en MiniMax).
 
 | Propósito | Modelo (orden) | 480p | 720p / 768P | Por qué |
 |---|---|---|---|---|
-| Borrador | MiniMax H3 Max **o** H3 Max Turbo (decisión pendiente 1) | 0,048 / 0,024 | 0,076 / 0,038 | Rapidez. Atlas describe Max Turbo como el más rápido y barato del H3; no hay dato duro de velocidad de Turbo |
+| Borrador | **MiniMax H3 Max Turbo** (decidido: el más barato) | 0,024 | 0,038 | El usuario elige el más barato; Atlas lo describe además como el más rápido del H3 |
 | Normal (por defecto) | 1. Seedance 2.0 Fast · 2. Wan 3.0 · 3. MiniMax H3 Developer (puesto pendiente, decisión 2) | 0,027 · 0,040 · 0,015 | 0,058 · 0,080 · 0,024 | Orden de calidad–precio del usuario; H3 Developer es el más barato de todos |
 | Toma larga (más de 15 s, hasta 30 s) | Wan 3.0 | — | 0,080 (30 s = 2,40 USD) | Seedance 2.0 Fast no pasa de 15 s; Seedance 2.5 cuesta 0,30/s |
 | Solo si el usuario lo pide | Seedance 2.5 (Atlas 0,303), Veo 3.1, HappyHorse 1.1 (NanoGPT 0,082 a 720p; Atlas 0,14), Grok 1.5 Developer (Atlas 0,049), Gemini Omni 1.1 (0,099), Kling V3 std (0,071 sin sonido, 0,107 con sonido) | | | |
@@ -38,7 +38,7 @@ Imagen: queda la tabla de imagen de `PLAN_AGENT_ROUTE.md` (R1) sin cambios, porq
 - **C4. Guías:** el contexto nombra el modelo por defecto de cada propósito, y el agente carga su guía (`read_guide`) la primera vez que lo usa en la conversación. *Por qué:* no añade texto a cada mensaje; cuesta una llamada solo la primera vez.
 
 ## Decisiones pendientes del usuario
-1. **Borrador:** ¿MiniMax H3 Max (0,076 a 768P) o H3 Max Turbo (0,038)?
+1. ~~Borrador~~ **Decidido (2026-09-26):** MiniMax H3 Max Turbo, el más barato.
 2. **MiniMax H3 Developer:** ¿tercero en la fila normal, o más arriba por precio? Su ficha dice que se sirve desde otra infraestructura ("self-hosted"); su calidad frente al H3 normal no está comprobada.
 
 ## Cómo se verifica
