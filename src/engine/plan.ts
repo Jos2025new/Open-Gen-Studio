@@ -18,6 +18,7 @@ import type {
   OpStep,
   Plan,
   PlanStep,
+  PlanSubject,
   ShapeSpec,
   StepRef,
   TextStep,
@@ -71,6 +72,8 @@ export interface RawPlan {
   /** Seconds the video steps add up to; split over the video steps without their own duration. */
   total_duration?: number;
   steps?: RawStep[];
+  /** Subjects to save: { name, from: an image step or asset:<id>, description? }. */
+  subjects?: Array<{ name?: string; from?: string; description?: string }>;
 }
 
 export type OutputKind = AssetKind | 'text' | 'layer';
@@ -108,6 +111,14 @@ export interface PlanContext {
   composerChosen?: (kind: MediaKind) => boolean;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
+  /** Names of the session's subjects: a plan subject with one of these names reuses it. */
+  subjectNames?: () => string[];
+}
+
+/** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
+export function mentions(prompt: string | undefined, name: string): boolean {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return Boolean(prompt) && new RegExp(`@${esc}(?![\\p{L}\\p{N}_-])`, 'iu').test(prompt!);
 }
 
 export interface ParsedRef {
@@ -145,6 +156,11 @@ export function stepOutputKind(step: PlanStep): OutputKind {
 }
 
 export function stepDeps(step: PlanStep): StepRef[] {
+  const own = ownDeps(step);
+  return step.kind === 'layer' ? own : [...own, ...(step.after ?? [])];
+}
+
+function ownDeps(step: PlanStep): StepRef[] {
   switch (step.kind) {
     case 'text':
       return [];
@@ -158,7 +174,7 @@ export function stepDeps(step: PlanStep): StepRef[] {
     case 'op':
       return [step.input];
     case 'layer':
-      return step.source ? [step.source] : [];
+      return [...(step.source ? [step.source] : []), ...(step.after ?? [])];
   }
 }
 
@@ -604,6 +620,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   }
 
   if (ctx.workspace === 'node' && steps.some((s) => s.kind === 'layer')) errors.push('Layer steps are not valid in the Node workspace.');
+  const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, ctx.subjectNames?.() ?? []);
   if (!errors.length) {
     try {
       topoOrder(steps);
@@ -619,8 +636,57 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       summary: (raw.summary ?? '').trim(),
       workspace: ctx.workspace,
       steps,
+      ...(subjects.length ? { subjects } : {}),
       adjustments,
     },
     errors: [],
   };
+}
+
+/**
+ * Plan subjects (F3): each names an image the plan saves as a session subject. Steps that mention @Name wait for
+ * the step that makes it (`after`), so the subject exists before their prompt is sent. An existing name is reused.
+ */
+function planSubjects(
+  raw: RawPlan['subjects'],
+  steps: PlanStep[],
+  refKind: (ref: string | undefined, where: string) => OutputKind | 'raster' | null,
+  errors: string[],
+  adjustments: string[],
+  existing: string[],
+): PlanSubject[] {
+  const out: PlanSubject[] = [];
+  for (const [i, r] of (Array.isArray(raw) ? raw : []).entries()) {
+    const where = `subject ${i + 1}`;
+    const name = String(r?.name ?? '').trim().replace(/^@/, '');
+    if (!/^[\p{L}\p{N}_-]{1,32}$/u.test(name)) {
+      errors.push(`${where}: "name" must be one word (letters, digits, _ or -), e.g. "Reto".`);
+      continue;
+    }
+    if (out.some((x) => x.name.toLowerCase() === name.toLowerCase())) {
+      errors.push(`${where}: duplicate subject name "${name}".`);
+      continue;
+    }
+    if (!r?.from) {
+      errors.push(`${where}: "from" is required (an image step id or asset:<id>).`);
+      continue;
+    }
+    const k = refKind(r.from, where);
+    if (k && k !== 'image' && k !== 'raster') {
+      errors.push(`${where}: "from" must be an image; "${r.from}" is ${k}.`);
+      continue;
+    }
+    if (existing.some((n) => n.toLowerCase() === name.toLowerCase())) adjustments.push(`@${name} already exists in this session: reused`);
+    out.push({ name, from: r.from.trim(), ...(r.description?.trim() ? { description: r.description.trim() } : {}) });
+  }
+  for (const subj of out) {
+    const p = parseRef(subj.from);
+    if (p?.type !== 'step') continue;
+    for (const st of steps) {
+      if (st.id === p.id) continue;
+      const text = st.kind === 'image' || st.kind === 'video' || st.kind === 'model3d' || st.kind === 'audio' ? st.prompt : st.kind === 'op' ? Object.values(st.params).join(' ') : undefined;
+      if (mentions(text, subj.name) && !(st.after ?? []).includes(p.id)) st.after = [...(st.after ?? []), p.id];
+    }
+  }
+  return out;
 }

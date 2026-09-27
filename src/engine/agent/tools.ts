@@ -82,6 +82,21 @@ export const TOOLS: ToolSpec[] = [
           summary: { type: 'string', description: 'One sentence describing the result, in the user\'s language.' },
           revision: { type: 'boolean', description: 'true when this plan changes the pending plan the user just commented on; false or omitted for a different request.' },
           total_duration: { type: 'number', description: 'Seconds the video steps add up to when the user gave a total; the app splits it over the video steps that set no duration.' },
+          subjects: {
+            type: 'array',
+            maxItems: 4,
+            description:
+              'Characters or objects to keep identical across steps. Each is saved as a session subject: from an existing image (asset:<id>, e.g. the attached character) when the plan runs, or from an image step when it ends. Later steps mention it as @Name in their prompt; the app sends its image with the right reference syntax and runs those steps after it.',
+            items: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'One word, e.g. "Reto".' },
+                from: { type: 'string', description: 'asset:<id> or an image step id.' },
+                description: { type: 'string', description: 'Short note, in the user\'s language.' },
+              },
+              required: ['name', 'from'],
+            },
+          },
           steps: {
             type: 'array',
             minItems: 1,
@@ -207,6 +222,7 @@ export const proposePlanSchema = z.object({
   summary: z.string().max(600).optional(),
   revision: z.boolean().optional(),
   total_duration: num.optional(),
+  subjects: z.array(z.object({ name: z.string().max(40), from: z.string().max(80), description: z.string().max(200).optional() })).max(4).optional(),
   steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
 });
 

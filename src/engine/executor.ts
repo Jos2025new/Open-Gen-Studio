@@ -7,8 +7,9 @@ import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
 import { parseRef, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
-import type { Estimate, GenerationOrigin, PlanStep, StepState, Workspace } from './types';
-import { useStore } from '../store/store';
+import { uid } from '../lib/id';
+import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Workspace } from './types';
+import { patchSession, useStore } from '../store/store';
 
 const get = useStore.getState;
 
@@ -25,6 +26,8 @@ export interface ExecContext {
   origin: GenerationOrigin;
   docId?: string;
   concurrency?: number;
+  /** Subjects the plan saves (F3): from an asset at the start, from a step when it ends. */
+  subjects?: PlanSubject[];
   onState: (stepId: string, state: StepState, info?: { generationId?: string; error?: string }) => void;
 }
 
@@ -87,6 +90,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       const p = r ? parseRef(r) : null;
       if (p?.type === 'step' && byId.has(p.id)) ids.push(p.id);
     }
+    for (const a of s.after ?? []) if (byId.has(a)) ids.push(a);
     // Layer steps apply in plan order so the stack matches the plan.
     if (s.kind === 'layer') {
       const idx = order.indexOf(s.id);
@@ -193,6 +197,20 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     }
   };
 
+  // Subjects from existing images are saved before anything runs; from steps, as soon as the step ends.
+  for (const subj of ctx.subjects ?? []) {
+    const p = parseRef(subj.from);
+    if (p?.type === 'asset') saveSubjectOnce(ctx.sessionId, subj, p.id);
+  }
+  const saveSubjectsOf = (stepId: string, out: StepOutput) => {
+    for (const subj of ctx.subjects ?? []) {
+      const p = parseRef(subj.from);
+      if (p?.type !== 'step' || p.id !== stepId) continue;
+      const asset = out.assetIds[p.index] ?? out.assetIds[0];
+      if (asset) saveSubjectOnce(ctx.sessionId, subj, asset);
+    }
+  };
+
   await new Promise<void>((resolve) => {
     let active = 0;
     const pump = () => {
@@ -218,6 +236,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         runStep(s)
           .then((out) => {
             outputs.set(id, out);
+            saveSubjectsOf(id, out);
             state.set(id, 'done');
             ctx.onState(id, 'done');
           })
@@ -239,4 +258,14 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   });
 
   return { outputs, failed, skipped };
+}
+
+/** Save a plan subject in the session, unless one with that name exists (it is reused, as the plan card said). */
+function saveSubjectOnce(sessionId: string, subj: PlanSubject, assetId: string): void {
+  if (get().assets[assetId]?.kind !== 'image') return;
+  patchSession(sessionId, (s) => {
+    const list = s.subjects ?? [];
+    if (list.some((x) => x.name.toLowerCase() === subj.name.toLowerCase())) return s;
+    return { ...s, subjects: [...list, { id: uid('sub'), name: subj.name, description: subj.description, frontalAssetId: assetId, refAssetIds: [] }] };
+  });
 }

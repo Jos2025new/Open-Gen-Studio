@@ -2,7 +2,7 @@ import { uid } from '../../lib/id';
 import { isAbort } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
-import { normalizePlan, type RawPlan } from '../plan';
+import { normalizePlan, parseRef, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps } from '../executor';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
@@ -100,6 +100,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
     suggestModel,
     composerChosen,
+    subjectNames: () => (session(sessionId).subjects ?? []).map((x) => x.name),
   };
 }
 
@@ -454,6 +455,8 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     workspace,
     origin: 'agent',
     docId,
+    // Node runs use node ids as step ids.
+    subjects: workspace === 'node' ? plan.subjects?.map((x) => (parseRef(x.from)?.type === 'step' ? { ...x, from: nodeOf(x.from) } : x)) : plan.subjects,
     onState: (stepId, state, info) => {
       // Node runs use node ids as step ids; map back to plan step ids for the card.
       const planStepId = workspace === 'node' ? stepId.replace(`${plan.id}_`, '') : stepId;

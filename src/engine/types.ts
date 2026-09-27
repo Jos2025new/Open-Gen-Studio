@@ -351,6 +351,8 @@ export interface ShapeSpec {
 interface StepBase {
   id: string;
   title: string;
+  /** Extra steps this one waits for without using their output (a @Name subject made by that step). */
+  after?: string[];
 }
 
 export interface TextStep extends StepBase {
@@ -427,12 +429,21 @@ export interface LayerStep extends StepBase {
 
 export type PlanStep = TextStep | ImageStep | Model3dStep | VideoStep | AudioStep | OpStep | LayerStep;
 
+/** A subject the plan saves: an existing image (saved when the plan runs) or an image step (saved when it ends). */
+export interface PlanSubject {
+  name: string;
+  from: StepRef;
+  description?: string;
+}
+
 export interface Plan {
   id: string;
   title: string;
   summary: string;
   workspace: Workspace;
   steps: PlanStep[];
+  /** Characters or objects saved as session subjects, mentioned as @Name by later steps (F3). */
+  subjects?: PlanSubject[];
   adjustments: string[];
 }
 
