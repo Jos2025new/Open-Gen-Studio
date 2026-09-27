@@ -48,7 +48,13 @@ function tileRatio(id: string): React.CSSProperties | undefined {
 
 function Placeholder({ g, index }: { g: Generation; index: number }) {
   // Sound and text have no frame: a flat strip while they run.
-  const ratio = g.kind === 'audio' || g.kind === 'text' ? 4 : ratioOf(g.settings.aspect) ?? (g.kind === 'video' ? 16 / 9 : 1);
+  // With "Auto" (operations, image-to-video) the result keeps the input's shape: use it while waiting.
+  const inputRatio = useStore((s) => {
+    const a = s.assets[g.op?.sourceAssetId ?? g.inputs.firstFrame ?? g.inputs.refs[0] ?? ''];
+    return a?.width && a.height ? a.width / a.height : undefined;
+  });
+  const asked = g.op?.id === 'reframe' ? ratioOf(String(g.op.params.aspect)) : ratioOf(g.settings.aspect);
+  const ratio = g.kind === 'audio' || g.kind === 'text' ? 4 : asked ?? inputRatio ?? (g.kind === 'video' ? 16 / 9 : 1);
   const now = useNow(1000, g.status === 'running' || g.status === 'queued');
   const elapsed = g.startedAt ? formatDuration(now - g.startedAt) : '';
   return (
