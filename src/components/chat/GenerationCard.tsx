@@ -13,7 +13,7 @@ import { useNow } from '../ui/hooks';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, CostTag, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { AssetActions } from '../assets/AssetActions';
+import { AssetActions, DownloadButton, FavoriteButton, SendToMenu } from '../assets/AssetActions';
 import { GenerationInfo, generationTitle } from '../assets/GenerationInfo';
 
 function metaLine(g: Generation): string {
@@ -188,8 +188,17 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         ) : (
           <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
         )}
-        <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} onClick={del.toggle} />
         <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
+        <span className="spacer" />
+        {sel && g.status === 'done' ? (
+          <>
+            <SendToMenu assetId={sel} />
+            <FavoriteButton assetId={sel} />
+            <DownloadButton assetId={sel} />
+          </>
+        ) : null}
+        {/* Delete stands apart, at the far end. */}
+        <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} className="gen-delete" onClick={del.toggle} />
       </footer>
 
       <Popover open={regen.open} anchor={regen.ref} onClose={regen.close} width={300} label="Regenerate">

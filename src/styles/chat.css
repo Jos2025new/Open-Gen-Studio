@@ -56,3 +56,6 @@
 /* One picture or clip: the card is as wide as the picture (360px at least); prompt and meta wrap to that width instead of widening it. */
 .gen-card.is-fit { align-self: flex-start; width: fit-content; min-width: min(100%, 360px); max-width: 100%; }
 .gen-card.is-fit > .gen-head, .gen-card.is-fit > .gen-meta, .gen-card.is-fit > .gen-billed { width: 0; min-width: 100%; }
+.gen-foot .spacer { flex: 1; }
+.gen-foot .gen-delete { margin-left: 10px; }
+.fav-btn.is-active svg { fill: currentColor; }

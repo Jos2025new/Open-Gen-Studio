@@ -20,6 +20,7 @@ import {
   PenTool,
   Rotate3d,
   Scissors,
+  Send,
   Shuffle,
   SkipForward,
   Star,
@@ -87,18 +88,18 @@ function OpChip({ assetId, op, parentId, compact }: { assetId: string; op: OpId;
   );
 }
 
-/** Operations available for an asset, by type, plus a "more" menu. */
+/** Operations available for an asset, by type: quick chips plus a menu with the rest. */
 /** `menuOnly`: no quick chips, every operation in the menu behind one "Tools ▾" button (overlaid on a card's picture). */
 export function AssetActions({ assetId, parentId, compact = false, showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
   const asset = useStore((s) => s.assets[assetId]);
-  const sessionId = useStore((s) => s.activeSessionId);
   const more = usePopover();
-  const [view, setView] = useState<'menu' | 'subject' | OpId>('menu');
-  const [subjectName, setSubjectName] = useState('');
+  const [view, setView] = useState<'menu' | OpId>('menu');
   if (!asset) return null;
   const ops = opsFor(asset.kind);
   const quick = showQuick && !menuOnly ? ops.filter((o) => o.quick) : [];
   const rest = ops.filter((o) => !quick.includes(o));
+  // Only operations live here; sending, favorite and download have their own buttons (SendToMenu, card and viewer).
+  const hasMenu = rest.length > 0 || asset.kind === 'image';
 
   const close = () => {
     more.close();
@@ -125,7 +126,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
           Tools
           <ChevronDown size={13} />
         </Chip>
-      ) : (
+      ) : hasMenu ? (
         <IconButton
           ref={more.ref}
           icon={Ellipsis}
@@ -137,8 +138,8 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
             more.toggle();
           }}
         />
-      )}
-      <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="More actions">
+      ) : null}
+      <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="Operations">
         {view === 'menu' ? (
           <div className="menu">
             {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
@@ -158,48 +159,42 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
                 }}
               />
             ) : null}
-            {rest.length ? <div className="menu-sep" /> : null}
-            {asset.kind === 'image' ? (
-              <>
-                <MenuItem
-                  icon={PenTool}
-                  label="Open in Designer"
-                  detail="As layer 1 of a new design"
-                  onClick={() => {
-                    close();
-                    void openAssetInDesigner(sessionId, assetId);
-                  }}
-                />
-                <MenuItem
-                  icon={Paperclip}
-                  label="Use as reference"
-                  onClick={() => {
-                    close();
-                    useAsReference(assetId);
-                  }}
-                />
-                <MenuItem icon={UserPlus} label="Save as subject" detail="Keep this character or object as @Name" onClick={() => setView('subject')} />
-              </>
-            ) : null}
-            <MenuItem
-              icon={Workflow}
-              label="Add to Node canvas"
-              onClick={() => {
-                close();
-                sendToNodes(assetId);
-              }}
-            />
-            <MenuItem
-              icon={Download}
-              label="Download"
-              onClick={() => {
-                close();
-                void downloadAsset(assetId);
-              }}
-            />
-            <MenuItem icon={Star} label={asset.favorite ? 'Remove favorite' : 'Favorite'} onClick={() => toggleFavorite(assetId)} active={asset.favorite} />
           </div>
-        ) : view === 'subject' ? (
+        ) : (
+          <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />
+        )}
+      </Popover>
+    </div>
+  );
+}
+
+/** Where else an asset can go: Designer, the composer (reference), the subject library, the Node canvas. */
+export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
+  const asset = useStore((s) => s.assets[assetId]);
+  const sessionId = useStore((s) => s.activeSessionId);
+  const pop = usePopover();
+  const [subject, setSubject] = useState(false);
+  const [subjectName, setSubjectName] = useState('');
+  if (!asset) return null;
+  const close = () => {
+    pop.close();
+    setSubject(false);
+  };
+  return (
+    <>
+      <IconButton
+        ref={pop.ref}
+        icon={Send}
+        label="Send to"
+        size={size}
+        active={pop.open}
+        onClick={() => {
+          setSubject(false);
+          pop.toggle();
+        }}
+      />
+      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={subject ? 320 : 240} label="Send to">
+        {subject ? (
           <form
             className="subject-new"
             onSubmit={(e) => {
@@ -217,9 +212,51 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
             <p className="faint">This image becomes the subject's frontal view. Mention it as @Name in any prompt.</p>
           </form>
         ) : (
-          <OpForm op={view} target={{ kind: 'asset', assetId, parentId }} onClose={close} onBack={() => setView('menu')} />
+          <div className="menu">
+            <div className="menu-sep-label">Send to</div>
+            {asset.kind === 'image' ? (
+              <>
+                <MenuItem
+                  icon={PenTool}
+                  label="Open in Designer"
+                  tip="As layer 1 of a new design"
+                  onClick={() => {
+                    close();
+                    void openAssetInDesigner(sessionId, assetId);
+                  }}
+                />
+                <MenuItem
+                  icon={Paperclip}
+                  label="Use as reference"
+                  onClick={() => {
+                    close();
+                    useAsReference(assetId);
+                  }}
+                />
+                <MenuItem icon={UserPlus} label="Save as subject" tip="Keep this character or object as @Name" onClick={() => setSubject(true)} />
+              </>
+            ) : null}
+            <MenuItem
+              icon={Workflow}
+              label="Add to Node canvas"
+              onClick={() => {
+                close();
+                sendToNodes(assetId);
+              }}
+            />
+          </div>
         )}
       </Popover>
-    </div>
+    </>
   );
+}
+
+/** Favorite and download as their own buttons. */
+export function FavoriteButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
+  const favorite = useStore((s) => Boolean(s.assets[assetId]?.favorite));
+  return <IconButton icon={Star} label={favorite ? 'Remove favorite' : 'Favorite'} size={size} active={favorite} className="fav-btn" onClick={() => toggleFavorite(assetId)} />;
+}
+
+export function DownloadButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
+  return <IconButton icon={Download} label="Download" size={size} onClick={() => void downloadAsset(assetId)} />;
 }

@@ -1,11 +1,11 @@
 import { Model3DViewer } from './Model3DViewer';
 import { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Download, Star, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
-import { downloadAsset, toggleFavorite } from '../../engine/actions';
+import { downloadAsset } from '../../engine/actions';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, IconButton } from '../ui/primitives';
-import { AssetActions } from './AssetActions';
+import { AssetActions, FavoriteButton, SendToMenu } from './AssetActions';
 import { GenerationInfo } from './GenerationInfo';
 
 export function Lightbox() {
@@ -59,7 +59,8 @@ export function Lightbox() {
           <Button size="sm" icon={Download} onClick={() => void downloadAsset(assetId)}>
             Download
           </Button>
-          <IconButton icon={Star} label={asset.favorite ? 'Remove favorite' : 'Favorite'} size="sm" active={asset.favorite} onClick={() => toggleFavorite(assetId)} />
+          <FavoriteButton assetId={assetId} />
+          <SendToMenu assetId={assetId} />
           <span className="spacer" />
           <IconButton icon={X} label="Close (Esc)" size="sm" onClick={() => setUi({ lightbox: null })} />
         </div>
