@@ -125,6 +125,12 @@ export function aspectLabel(value: string | number | undefined): string {
 }
 
 /** Options that mean "let the model decide" (P Image: match_input_image; Seedance: adaptive). */
+/** An option that explicitly keeps the input's shape ("match_input_image", "adaptive"); plain "auto" lets the model choose. */
+export function matchInputOption(options: Array<string | number>): string | undefined {
+  const o = options.find((x) => /^(match_input_image|adaptive)$/.test(String(x)));
+  return o == null ? undefined : String(o);
+}
+
 export function isAutoOption(o: string | number): boolean {
   return /^(auto|match_input_image|adaptive)$/.test(String(o));
 }

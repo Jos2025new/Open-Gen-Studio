@@ -73,4 +73,16 @@ describe('operation model follows the source', () => {
     ] as unknown as PlanStep[];
     expect(estimateSteps(steps).perStep.s2.usd).toBeCloseTo(0.08);
   });
+
+  it('keeps a portrait source portrait: an explicit size, not "auto" (GPT Image chose landscape with auto)', async () => {
+    install();
+    const size = { key: 'size', label: 'Size', role: 'aspect', type: 'enum', default: '1024x1024', options: ['auto', '1024x1024', '1024x768', '768x1024', '1024x1536', '1536x1024'] } as never;
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [EDIT2]: { ...st.catalog.schemas[EDIT2], params: [size] } } } });
+    const spec = await opSpec({ sessionId: 's', sourceAssetId: 'made', op: 'angle', params: { view: 'three_quarter_right' }, origin: 'op' });
+    expect(spec.settings.aspect).toBe('1024x1536');
+    // A model with an explicit "match input" option keeps using it.
+    useStore.setState({ catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [EDIT2]: { ...st.catalog.schemas[EDIT2], params: [{ ...(size as object), options: ['match_input_image', '1:1', '16:9'] } as never] } } } });
+    expect((await opSpec({ sessionId: 's', sourceAssetId: 'made', op: 'relight', params: {}, origin: 'op' })).settings.aspect).toBe('match_input_image');
+  });
 });

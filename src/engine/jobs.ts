@@ -11,7 +11,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
@@ -780,8 +780,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });
     if (source && paramByRole(schema, 'aspect')?.options) {
       const opts = paramByRole(schema, 'aspect')!.options!;
+      // Keep the source's shape: an explicit "match input" option, else the nearest ratio ("auto" may pick another).
       const auto = opts.find(isAutoOption);
-      settings.aspect = auto != null ? String(auto) : nearestAspect(opts, source.width / source.height, settings.aspect) ?? settings.aspect;
+      settings.aspect = matchInputOption(opts) ?? nearestAspect(opts, source.width / source.height, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
     }
     const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: choice.ref, settings, op };
     return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, choice.ref) };
@@ -792,8 +793,11 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const aspectParam = paramByRole(schema, 'aspect');
   if (aspectParam?.options?.length) {
     const target = input.op === 'reframe' ? String(input.params.aspect) : source ? source.width / source.height : undefined;
+    // Keep the source's shape (Reframe: the chosen format). "auto" lets some models pick another shape (GPT Image turned a
+    // portrait into a landscape), so only an explicit "match input" option is used, else the nearest ratio.
     const auto = aspectParam.options.find(isAutoOption);
-    settings.aspect = input.op !== 'reframe' && auto != null ? String(auto) : nearestAspect(aspectParam.options, target, settings.aspect) ?? settings.aspect;
+    const keep = input.op !== 'reframe' ? matchInputOption(aspectParam.options) : undefined;
+    settings.aspect = keep ?? nearestAspect(aspectParam.options, target, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
   }
   if (input.op === 'upscale') {
     const res = paramByRole(schema, 'resolution');
