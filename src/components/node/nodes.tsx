@@ -44,7 +44,7 @@ function useSessionId() {
 export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void }) {
   const [tools, setTools] = useState(false);
   const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
-  const toolIds = OP_IDS.filter((id) => !accepts || OPS[id].input === accepts);
+  const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || OPS[id].input === accepts));
   if (tools) {
     return (
       <div className="menu">
@@ -254,7 +254,7 @@ function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: 
     const data = newNodeData('tool', { op }) as ToolNodeData;
     addConnected(sessionId, node.id, { ...data, ...patch, params: { ...data.params, ...patch.params } });
   };
-  const rest = OP_IDS.filter((id) => OPS[id].input === out && !skip.includes(id));
+  const rest = OP_IDS.filter((id) => !OPS[id].multiInput && OPS[id].input === out && !skip.includes(id));
   return (
     <>
       <button ref={pop.ref} type="button" className={`nt-btn nt-icon nodrag ${pop.open ? 'is-open' : ''}`} aria-label="More tools" data-tip="More tools" onClick={pop.toggle}>
@@ -602,7 +602,7 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
       </Chip>
       <Popover open={opPop.open} anchor={opPop.ref} onClose={opPop.close} width={260} label="Operation">
         <div className="menu">
-          {OP_IDS.map((id) => (
+          {OP_IDS.filter((id) => !OPS[id].multiInput).map((id) => (
             <MenuItem
               key={id}
               icon={OP_ICONS[id]}

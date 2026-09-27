@@ -10,6 +10,7 @@ import {
   Ellipsis,
   FastForward,
   FileText,
+  Film,
   Frame,
   Grid3x3,
   LayoutGrid,
@@ -55,6 +56,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   create_voice: AudioLines,
   edit_region: Brush,
   remove_object: Eraser,
+  join_clips: Film,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

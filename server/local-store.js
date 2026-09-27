@@ -1,8 +1,51 @@
 // Local disk copy of the app's saved state and media, served by the Vite dev/preview server at /x/store.
 // The app has no backend: this only exists while `npm run dev` / `npm run preview` runs. Files live in
 // <project>/data (git-ignored): state.json (contains API keys, mode 600) and <ns>/<id>.<ext> media files.
+import { execFile } from 'node:child_process';
 import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { promisify } from 'node:util';
+
+const run = promisify(execFile);
+
+/**
+ * ffmpeg arguments that join clips in order into one MP4 (join_clips). Every clip is scaled and padded to the
+ * first clip's size at 30 fps; a clip without sound gets silence of its length, so the audio stays in sync.
+ * @param {Array<{ path: string, audio: boolean, duration: number }>} clips
+ * @param {{ width: number, height: number }} size
+ */
+export function joinArgs(clips, size, out) {
+  const w = size.width + (size.width % 2);
+  const h = size.height + (size.height % 2);
+  const inputs = [];
+  const filters = [];
+  clips.forEach((c, i) => {
+    inputs.push('-i', c.path);
+    filters.push(`[${i}:v]scale=${w}:${h}:force_original_aspect_ratio=decrease,pad=${w}:${h}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v${i}]`);
+    filters.push(
+      c.audio
+        ? `[${i}:a]aresample=48000,aformat=channel_layouts=stereo[a${i}]`
+        : `anullsrc=r=48000:cl=stereo,atrim=0:${Math.max(0.1, c.duration).toFixed(3)}[a${i}]`,
+    );
+  });
+  const pairs = clips.map((_, i) => `[v${i}][a${i}]`).join('');
+  filters.push(`${pairs}concat=n=${clips.length}:v=1:a=1[v][a]`);
+  return [
+    '-y', '-loglevel', 'error', ...inputs,
+    '-filter_complex', filters.join(';'),
+    '-map', '[v]', '-map', '[a]',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart',
+    out,
+  ];
+}
+
+/** Size, length and whether the clip has sound, from ffprobe. */
+async function probe(path) {
+  const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,width,height:format=duration', '-of', 'json', path]);
+  const j = JSON.parse(stdout);
+  const v = j.streams?.find((s) => s.codec_type === 'video');
+  return { width: v?.width ?? 0, height: v?.height ?? 0, audio: Boolean(j.streams?.some((s) => s.codec_type === 'audio')), duration: Number(j.format?.duration) || 0 };
+}
 
 const MIME_EXT = {
   'model/gltf-binary': 'glb',
@@ -115,6 +158,31 @@ export function localStore(root = process.cwd()) {
       if (req.method === 'DELETE') {
         if (existing) await rm(existing, { force: true });
         return send(204);
+      }
+    }
+
+    // join_clips: the clips are already in data/ (the app writes them first); the joined MP4 is returned, not kept.
+    if (path === '/join' && req.method === 'POST') {
+      const { keys } = JSON.parse(String(await body(req)) || '{}');
+      if (!Array.isArray(keys) || keys.length < 2 || keys.length > 20) return send(400, 'join needs 2 to 20 clips');
+      const clips = [];
+      for (const k of keys) {
+        const key = parseKey(String(k));
+        const file = key && (await findBlob(key.ns, key.id));
+        if (!file) return send(404, `clip ${k} is not on disk`);
+        clips.push({ path: file, ...(await probe(file).catch(() => null)) });
+      }
+      if (clips.some((c) => !c.width)) return send(422, 'a clip has no video stream');
+      const out = join(dir, 'tmp', `join-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
+      await mkdir(dirname(out), { recursive: true });
+      try {
+        await run('ffmpeg', joinArgs(clips, clips[0], out), { maxBuffer: 1 << 24 });
+        return send(200, await readFile(out), 'video/mp4');
+      } catch (err) {
+        if (err?.code === 'ENOENT') return send(501, 'ffmpeg is not installed on this computer');
+        return send(500, `ffmpeg failed: ${String(err?.stderr || err?.message || err).slice(0, 400)}`);
+      } finally {
+        await rm(out, { force: true });
       }
     }
 

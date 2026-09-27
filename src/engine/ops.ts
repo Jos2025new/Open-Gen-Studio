@@ -26,6 +26,8 @@ export interface OpDef {
   quick: boolean;
   /** Needs a mask drawn in Sketch: launched from there, not from menus, nodes or the agent. */
   viaSketch?: boolean;
+  /** Takes several clips (join_clips): planned by the agent in chat, not offered on a single asset. */
+  multiInput?: boolean;
   /** Returns the instruction prompt sent to the model (edit / video engines). */
   instruction?: (p: Record<string, AdvancedValue>) => string;
 }
@@ -262,6 +264,17 @@ export const OPS: Record<OpId, OpDef> = {
     quick: false,
     fields: [{ key: 'grid', label: 'Grid', type: 'choice', default: '3', options: opt(['2', '2×2'], ['3', '3×3']) }],
   },
+  join_clips: {
+    id: 'join_clips',
+    label: 'Join clips',
+    description: 'Join clips in order into one video: input is the first clip, more the rest (free, on this computer).',
+    input: 'video',
+    output: 'video',
+    engine: 'local',
+    quick: false,
+    multiInput: true,
+    fields: [],
+  },
   video_upscale: {
     id: 'video_upscale',
     label: 'Upscale video',
@@ -356,7 +369,7 @@ function note(p: Record<string, AdvancedValue>): string {
 
 /** Operations offered in menus and nodes; mask operations start from Sketch. */
 export function opsFor(kind: AssetKind): OpDef[] {
-  return Object.values(OPS).filter((o) => o.input === kind && !o.viaSketch);
+  return Object.values(OPS).filter((o) => o.input === kind && !o.viaSketch && !o.multiInput);
 }
 
 export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {

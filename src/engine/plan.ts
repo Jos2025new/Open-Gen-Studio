@@ -56,6 +56,8 @@ export interface RawStep {
   last_frame?: string;
   op?: string;
   input?: string;
+  /** join_clips: the clips after `input`, in order. */
+  more?: string[];
   params?: Record<string, unknown>;
   text?: string;
   layer_type?: string;
@@ -172,7 +174,7 @@ function ownDeps(step: PlanStep): StepRef[] {
     case 'audio':
       return [step.promptFrom, step.lyricsFrom].filter((r): r is string => Boolean(r));
     case 'op':
-      return [step.input];
+      return [step.input, ...(step.more ?? [])];
     case 'layer':
       return [...(step.source ? [step.source] : []), ...(step.after ?? [])];
   }
@@ -567,7 +569,18 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else errors.push(`${where}: op "edit" needs params.instruction.`);
         }
         if ((opId === 'animate' || opId === 'continue') && !String(params.motion ?? '').trim() && s.prompt?.trim()) params.motion = s.prompt.trim();
-        steps.push({ id: s.id!, kind: 'op', title, op: opId, input: s.input ?? '', params } satisfies OpStep);
+        let more: string[] | undefined;
+        if (def.multiInput) {
+          more = (Array.isArray(s.more) ? s.more : []).map((r) => String(r).trim()).filter(Boolean);
+          if (ctx.workspace === 'node') errors.push(`${where}: "${opId}" is not available in the Node workspace yet.`);
+          if (!more.length) errors.push(`${where}: "${opId}" needs "more": the clips after "input", in order.`);
+          if (more.length > 19) errors.push(`${where}: "${opId}" joins at most 20 clips.`);
+          for (const r of more) {
+            const k = refKind(r, where);
+            if (k && k !== 'video') errors.push(`${where}: "${opId}" joins videos; "${r}" is ${k}.`);
+          }
+        }
+        steps.push({ id: s.id!, kind: 'op', title, op: opId, input: s.input ?? '', ...(more ? { more } : {}), params } satisfies OpStep);
         break;
       }
       case 'layer': {

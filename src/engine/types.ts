@@ -260,7 +260,8 @@ export type OpId =
   | 'transcribe'
   | 'create_voice'
   | 'edit_region'
-  | 'remove_object';
+  | 'remove_object'
+  | 'join_clips';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';
@@ -410,6 +411,8 @@ export interface OpStep extends StepBase {
   kind: 'op';
   op: OpId;
   input: StepRef;
+  /** join_clips: the clips after `input`, in order. */
+  more?: StepRef[];
   params: Record<string, AdvancedValue>;
   note?: string;
 }

@@ -57,7 +57,7 @@ Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for lay
 - video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?, refs? (reference images/videos, or keyframe images in order), times? (keyframe seconds, parallel to refs).
 - model3d: prompt, model?, params?, refs? — a 3D model (GLB) from text or from an image of one object.
 - audio: prompt, model?, params?, lyrics_from? — music (an audio asset) or, with a lyrics model, song lyrics (text).
-- op: op, input, params? — operations on an existing image or video:
+- op: op, input, more?, params? — operations on an existing image or video (join_clips: input = first clip, more = the rest in order):
 ${OP_LINES}
 - text: text — copy, or a shared prompt used by image/video/audio steps through prompt_from (or as lyrics through lyrics_from).
 - layer (Designer workspace only): layer_type raster|text|vector.

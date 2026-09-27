@@ -81,7 +81,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           : s.kind === 'audio'
             ? [s.promptFrom, s.lyricsFrom]
             : s.kind === 'op'
-            ? [s.input]
+            ? [s.input, ...(s.more ?? [])]
             : s.kind === 'layer'
               ? [s.source]
               : [];
@@ -181,7 +181,16 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       case 'op': {
         const source = await resolveAsset(s.input);
         if (!source) throw new Error(`No input for ${OPS[s.op].label}.`);
-        const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params: s.params });
+        let params = s.params;
+        if (s.more?.length) {
+          const rest: string[] = [];
+          for (const r of s.more) {
+            const a = await resolveAsset(r);
+            if (a) rest.push(a);
+          }
+          params = { ...params, clips: rest.join(',') };
+        }
+        const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
         const assetIds = await runGeneration(g.id);
