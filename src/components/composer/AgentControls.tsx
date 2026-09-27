@@ -103,7 +103,7 @@ export function AgentControls() {
         size="sm"
         onChange={(v) => setComposer({ agentStyle: v })}
         options={[
-          { value: 'auto', label: 'Auto', tip: 'One shot: the agent decides and only stops to confirm the cost' },
+          { value: 'auto', label: 'Auto', tip: 'The agent decides; it asks one card only when something that changes the result is missing, and stops to confirm the cost' },
           { value: 'guided', label: 'Guided', tip: 'The agent asks a few questions (max rounds in Settings), then shows the plan' },
         ]}
       />

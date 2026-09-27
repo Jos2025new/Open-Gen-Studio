@@ -42,7 +42,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'ask_questions',
       description:
-        'Guided mode only. Ask 1-4 short, decisive questions that remove real ambiguity before planning, all needed ones together in one card. Each question has 2-5 concrete options and a default: the option you recommend, preselected so one click continues. Never ask about details you can settle with a sensible choice or the user already settled.',
+        'Ask 1-4 short, decisive questions that remove real ambiguity before planning, all needed ones together in one card. Each question has 2-5 concrete options and a default: the option you recommend, preselected so one click continues. Never ask about details you can settle with a sensible choice or the user already settled. Auto mode: at most one card, only when a missing answer changes the result or the cost.',
       parameters: {
         type: 'object',
         properties: {

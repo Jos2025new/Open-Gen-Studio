@@ -306,7 +306,7 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
     intro,
     questions,
     round,
-    maxRounds: get().settings.guidedRounds,
+    maxRounds: get().composer.agentStyle === 'auto' ? 1 : get().settings.guidedRounds,
     status: 'pending',
   };
   appendFeed(sessionId, item);
@@ -609,11 +609,8 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
         if (call.name === 'ask_questions') {
           const style = get().composer.agentStyle;
           const s = session(sessionId);
-          if (style === 'auto') {
-            respond('Auto mode: do not ask questions. Decide the details yourself and call propose_plan now.');
-            continue;
-          }
-          if (s.agent.questionRound >= get().settings.guidedRounds) {
+          // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
+          if (s.agent.questionRound >= (style === 'auto' ? 1 : get().settings.guidedRounds)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
