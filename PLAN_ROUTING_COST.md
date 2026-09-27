@@ -1,6 +1,6 @@
 # Plan: elección de modelo por propósito y precio exacto
 
-Fecha: 2026-09-26. Estado: **decidido, sin implementar**. Rama: `claude/stoic-davinci-xt7o4z`.
+Fecha: 2026-09-26. Estado: **decidido por completo, sin implementar**. Rama: `claude/stoic-davinci-xt7o4z`.
 Lista de seguimiento: sección C1–C4 de `AGENTS.md`. Datos de precios: `PRECIOS_VIDEO.md`.
 
 ## Por qué hace falta
@@ -13,7 +13,8 @@ Lista de seguimiento: sección C1–C4 de `AGENTS.md`. Datos de precios: `PRECIO
 - **Favoritos:** Seedance 2.5, Wan 3, Seedance 2.0, MiniMax H3, HappyHorse 1.1, Veo 3.1 y Grok Imagine Video. Pero la tabla se ordena por **calidad–precio**, sin las variantes Mini. Seedance 2.5 solo para pruebas puntuales.
 - **Orden calidad–precio:** Seedance 2.0 Fast > Wan 3 > MiniMax H3.
 - **Siempre la opción más barata:** las variantes `-developer` de Atlas van primero cuando existan.
-- **Borrador:** MiniMax H3 Max (el usuario lo considera el más rápido).
+- **Borrador:** el más barato → MiniMax H3 Max Turbo.
+- **Orden de cada fila: siempre por precio** (de más barato a más caro), a calidad media.
 
 ## Tabla (USD por segundo, precio exacto de Atlas por `POST /api/v1/model/calculate`)
 Calidad media por defecto: 720p (768P en MiniMax).
@@ -21,7 +22,7 @@ Calidad media por defecto: 720p (768P en MiniMax).
 | Propósito | Modelo (orden) | 480p | 720p / 768P | Por qué |
 |---|---|---|---|---|
 | Borrador | **MiniMax H3 Max Turbo** (decidido: el más barato) | 0,024 | 0,038 | El usuario elige el más barato; Atlas lo describe además como el más rápido del H3 |
-| Normal (por defecto) | 1. Seedance 2.0 Fast · 2. Wan 3.0 · 3. MiniMax H3 Developer (puesto pendiente, decisión 2) | 0,027 · 0,040 · 0,015 | 0,058 · 0,080 · 0,024 | Orden de calidad–precio del usuario; H3 Developer es el más barato de todos |
+| Normal (por defecto) | 1. MiniMax H3 Developer · 2. Seedance 2.0 Fast · 3. Wan 3.0 | 0,015 · 0,027 · 0,040 | 0,024 · 0,058 · 0,080 | Decidido: siempre por precio |
 | Toma larga (más de 15 s, hasta 30 s) | Wan 3.0 | — | 0,080 (30 s = 2,40 USD) | Seedance 2.0 Fast no pasa de 15 s; Seedance 2.5 cuesta 0,30/s |
 | Solo si el usuario lo pide | Seedance 2.5 (Atlas 0,303), Veo 3.1, HappyHorse 1.1 (NanoGPT 0,082 a 720p; Atlas 0,14), Grok 1.5 Developer (Atlas 0,049), Gemini Omni 1.1 (0,099), Kling V3 std (0,071 sin sonido, 0,107 con sonido) | | | |
 | Editar o extender | Operaciones Edit/Extend video con su modelo preferido en Ajustes | | | Sin cambios |
@@ -39,7 +40,9 @@ Imagen: queda la tabla de imagen de `PLAN_AGENT_ROUTE.md` (R1) sin cambios, porq
 
 ## Decisiones pendientes del usuario
 1. ~~Borrador~~ **Decidido (2026-09-26):** MiniMax H3 Max Turbo, el más barato.
-2. **MiniMax H3 Developer:** ¿tercero en la fila normal, o más arriba por precio? Su ficha dice que se sirve desde otra infraestructura ("self-hosted"); su calidad frente al H3 normal no está comprobada.
+2. ~~Puesto de H3 Developer~~ **Decidido (2026-09-26):** siempre por precio, así que va primero en la fila normal. Su calidad frente al H3 normal no está comprobada (la ficha dice "self-hosted"): si el usuario la ve peor, se reordena.
+
+Ninguna decisión pendiente: el plan está listo para implementar.
 
 ## Cómo se verifica
 Tests: la tabla elige el modelo esperado según el propósito, las entradas y los proveedores conectados; el presupuesto de Atlas se pide con el mismo cuerpo que el envío (fetch simulado); la marca del composer. El usuario prueba en el navegador: el agente ya no elige Kling y la tarjeta muestra el precio exacto de Atlas.
