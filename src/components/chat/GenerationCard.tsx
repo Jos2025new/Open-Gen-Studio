@@ -79,7 +79,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
-    <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''}`}>
+    <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''}`}>
       <header className="gen-head">
         <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'audio' ? <Music size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
         <div className="gen-title">
@@ -95,17 +95,6 @@ export function GenerationCard({ generationId, compact = false }: { generationId
       </header>
       <div className="gen-meta faint">
         <span className="truncate">{metaLine(g)}</span>
-        <div className="gen-meta-actions">
-          <IconButton icon={Copy} label="Copy prompt" size="sm" disabled={!g.prompt} onClick={() => void copyText(g.prompt)} />
-          <IconButton icon={Pencil} label="Edit in composer" size="sm" disabled={Boolean(g.op)} onClick={() => void editInComposer(g.id)} />
-          {busy ? (
-            <IconButton icon={CircleStop} label="Cancel" size="sm" onClick={() => cancelGeneration(g.id)} />
-          ) : (
-            <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
-          )}
-          <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} onClick={del.toggle} />
-          <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
-        </div>
         <CostTag estimate={g.actualUsd != null ? { usd: g.actualUsd, approximate: false } : g.estimate} />
       </div>
       {billedDiffers(g) ? (
@@ -190,6 +179,18 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         </div>
       )}
 
+
+      <footer className="gen-foot">
+        <IconButton icon={Copy} label="Copy prompt" size="sm" disabled={!g.prompt} onClick={() => void copyText(g.prompt)} />
+        <IconButton icon={Pencil} label="Edit in composer" size="sm" disabled={Boolean(g.op)} onClick={() => void editInComposer(g.id)} />
+        {busy ? (
+          <IconButton icon={CircleStop} label="Cancel" size="sm" onClick={() => cancelGeneration(g.id)} />
+        ) : (
+          <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
+        )}
+        <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} onClick={del.toggle} />
+        <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
+      </footer>
 
       <Popover open={regen.open} anchor={regen.ref} onClose={regen.close} width={300} label="Regenerate">
         <SpendConfirm

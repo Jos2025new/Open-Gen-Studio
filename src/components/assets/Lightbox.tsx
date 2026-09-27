@@ -44,26 +44,27 @@ export function Lightbox() {
             <ChevronRight size={20} />
           </button>
         ) : null}
-        <span className="lb-count num">
-          {index + 1} / {ids.length}
-        </span>
+        {ids.length > 1 ? (
+          <span className="lb-count num">
+            {index + 1} / {ids.length}
+          </span>
+        ) : null}
+        {/* Operations under the picture, as a floating bar. */}
+        <div className="lb-dock">
+          <AssetActions assetId={assetId} parentId={generation?.id} />
+        </div>
       </div>
       <aside className="lb-side">
         <div className="lb-head">
+          <Button size="sm" icon={Download} onClick={() => void downloadAsset(assetId)}>
+            Download
+          </Button>
+          <IconButton icon={Star} label={asset.favorite ? 'Remove favorite' : 'Favorite'} size="sm" active={asset.favorite} onClick={() => toggleFavorite(assetId)} />
           <span className="spacer" />
           <IconButton icon={X} label="Close (Esc)" size="sm" onClick={() => setUi({ lightbox: null })} />
         </div>
         <div className="lb-body">
           <GenerationInfo key={assetId} generation={generation} asset={asset} />
-        </div>
-        <div className="lb-actions">
-          <AssetActions assetId={assetId} parentId={generation?.id} />
-        </div>
-        <div className="lb-foot">
-          <Button icon={Star} className={`lb-fav ${asset.favorite ? 'is-active' : ''}`} aria-label={asset.favorite ? 'Remove favorite' : 'Favorite'} data-tip={asset.favorite ? 'Remove favorite' : 'Favorite'} onClick={() => toggleFavorite(assetId)} />
-          <Button icon={Download} className="lb-download" onClick={() => void downloadAsset(assetId)}>
-            Download
-          </Button>
         </div>
       </aside>
     </div>
