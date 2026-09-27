@@ -8,6 +8,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — panel lateral del visor ordenado (2026-09-27) · punto de retorno: `b2470ef`
+Inspiración (captura del usuario): secciones con título pequeño en mayúsculas ("PROMPT" con Copy, "DETAILS"), cada una en una caja redondeada; entradas como miniaturas sobre el prompt; prompt recortado con "See all"; barra inferior con Favorito y Download. Sin funciones nuevas: se reordena lo que ya hay.
+- [ ] V1. `GenerationInfo.tsx`: sección Prompt (miniaturas de origen/referencias en vez de las filas "References"/"Start frame"; la operación va aquí en vez de la fila "Operation"; Copy con texto) y sección Details (filas sin bordes dentro de una caja). *También se ve en el popover "Details" de la tarjeta.*
+- [ ] V2. `Lightbox.tsx`: cabecera solo con cerrar; Favorito + Download al pie, bajo las acciones.
+- [ ] V3. CSS `lb-*`/`info-*` en `shell.css`; typecheck, suite, navegador (visor y popover Details antes/después); commit.
+
 ## Tarea — tarjetas más pequeñas y modelo de las operaciones según el origen (2026-09-27)
 Origen: captura del usuario (tarjeta 2:3 con un hueco negro enorme mientras genera; imagen con bandas negras) y "Relight / Change angle usan siempre Nano Banana Pro".
 - [x] T1. Tarjetas de generación: un solo resultado se muestra a su tamaño con alto máximo (sin bandas), el hueco de espera con la proporción real y el mismo alto máximo; en rejilla, alto máximo menor. *Dónde:* `GenerationCard.tsx`, `chat.css`. *Por qué:* 2:3 a todo el ancho medía ~1500 px.
