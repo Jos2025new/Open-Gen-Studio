@@ -7,8 +7,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Cambios mínimos: un detalle de 1–2 líneas (color, espaciado) no requiere leer todo el código.
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
+- **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
 ## Tarea — la tarjeta del plan tarda unos segundos tras terminar de pensar (2026-09-27) · PENDIENTE DE MEDIR EN VIVO
+> ⚠️ **FRÁGIL · BAJO SUPERVISIÓN** (usuario, 2026-09-27). El cambio de guardado de `feffc15` (`store.ts`: `PersistStorage` propio, estado convertido a JSON solo en la escritura diferida) toca cómo se guarda **todo** el estado. Si algo empeora sin razón aparente —datos que no se guardan o no sobreviven a recargar, cambios que se pierden al cerrar la pestaña, estado viejo que reaparece, `data/state.json` desfasado, lentitud nueva— **es lo primero que hay que probar**: `git revert feffc15` (vuelve a `createJSONStorage`) y repetir. Puede no ser frágil, y quizá era justo la causa de la lentitud, pero hay que tenerlo presente hasta confirmarlo en uso real.
+
 Origen: el usuario nota 5–7 s entre que el agente termina de pensar y aparece la tarjeta (antes casi instantáneo); no hay cuota para probar en vivo ahora.
 Hallado en el código (sin confirmar que sea toda la causa):
 - [x] Guardado: zustand convertía **todo** el estado a JSON en cada cambio del store (solo la escritura estaba diferida). Entre el fin de la llamada y la tarjeta hay ~13 cambios (medido con el LLM simulado); con un estado grande (historial, razonamiento guardado, `spendLog`, varias sesiones) cada conversión cuesta decenas de ms y crece con el uso. Ahora el estado se guarda como objeto y se convierte una vez, en la escritura diferida de 350 ms. *Dónde:* `store.ts`. Navegador: un elemento añadido sobrevive a la recarga y al disco.
