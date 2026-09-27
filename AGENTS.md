@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — lista de modelos con el aspecto de la referencia (2026-09-27)
+- [x] Cada fila: monograma de la marca (letras con un tono suave por fabricante, deducido del id o el nombre; sin logos de terceros) · nombre en 13 px sobre una línea tenue con la descripción del proveedor (o "Text or image to image" si no hay) · a la derecha las mismas etiquetas (Edit, I2V, Upscale…) como chips con borde y el precio. Filas de 8 px de radio con fondo al pasar el ratón y al estar elegidas. Popover del composer de 420 a 480 px. Mismo componente en composer, Ajustes y "via Modelo ▾". *Dónde:* `ModelList.tsx`, `composer.css`, `MediaControls.tsx`.
+
 ## Tarea — las operaciones conservan la proporción del origen (2026-09-27)
 Origen: Change angle con GPT Image 2.5 Sunburst Edit sobre una imagen vertical devolvió una horizontal. Causa: para las operaciones (salvo Reframe) la app enviaba la opción "auto" si el modelo la tenía; en GPT Image "auto" = el modelo elige.
 - [x] `matchInputOption` (`params.ts`): solo `match_input_image` / `adaptive` significan "igual que la entrada". Operaciones de imagen y Animate/Continue: esa opción si existe; si no, la proporción más cercana a la imagen de origen (`nearestAspect`); "auto" solo si no hay ninguna medible. Reframe sigue con el formato elegido. *Dónde:* `jobs.ts`, `params.ts`. Test en `tests/op-source-model.test.ts` (retrato 2:3 → `1024x1536`; modelo con `match_input_image` lo mantiene).

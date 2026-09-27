@@ -32,7 +32,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
         <span className="truncate">{name}</span>
         <ChevronDown size={12} />
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={420} label={`${kind} model`}>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={480} label={`${kind} model`}>
         <ModelList
           kind={kind}
           value={ref}

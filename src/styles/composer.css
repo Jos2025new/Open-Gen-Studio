@@ -17,3 +17,16 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .subject-voice-row { display: flex; gap: 6px; align-items: center; }.subject-voice-row input { flex: 1; min-width: 0; }
 .color-field { display: flex; align-items: center; gap: 8px; }.swatch-list { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }.swatch-edit { display: inline-flex; align-items: center; gap: 3px; }.swatch-edit input[type=color] { width: 26px; height: 22px; padding: 0; }.swatch-edit .num-input { width: 52px; }.text-input { width: 100%; }.field-error { font-size: 10px; color: var(--danger); }.saved-styles { display: grid; gap: 6px; margin-top: 6px; }
 .lyrics-editor { display: grid; gap: 8px; padding: 0 12px 12px; }.lyrics-tags { display: flex; flex-wrap: wrap; gap: 4px; }.lyrics-tags .option { font-size: 10.5px; padding: 3px 6px; }.lyrics-text { min-height: 220px; font-family: var(--mono); font-size: 12px; line-height: 1.45; resize: vertical; }.lyrics-count { justify-self: end; font-size: 10px; }
+
+/* Model list rows: monogram · name over a one-line description · capabilities and price. */
+.ml-row { gap: 11px; padding: 8px 10px; border-radius: 8px; }
+.ml-row:hover { background: var(--surface-2); }
+.ml-row.is-selected { background: var(--surface-3); }
+.ml-mono { flex-shrink: 0; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: var(--surface-3); color: var(--text-2); font-size: 11px; font-weight: 650; letter-spacing: 0.02em; }
+.ml-mono.is-tinted { background: hsl(var(--hue) 22% 17%); color: hsl(var(--hue) 45% 72%); }
+.ml-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ml-main .ml-name { font-size: 13px; font-weight: 550; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ml-sub { font-size: 11px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ml-side { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.ml-side .badge { padding: 2px 7px; border-radius: 6px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); font-size: 10px; }
+.ml-side .ml-price { min-width: 52px; text-align: right; }

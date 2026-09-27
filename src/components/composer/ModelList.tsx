@@ -30,6 +30,47 @@ function badges(m: ModelSummary): string[] {
   return out;
 }
 
+// Who makes a model, read from its id or name: a small monogram tile (no third-party logos).
+const VENDORS: Array<[RegExp, string, number]> = [
+  [/gpt|openai|dall-?e|sora/, 'AI', 160],
+  [/nano-?banana|gemini|imagen|veo|google/, 'G', 215],
+  [/seedream|seedance|seed3d|bytedance|omnihuman/, 'BD', 250],
+  [/flux|black-?forest|bfl/, 'FL', 30],
+  [/recraft/, 'R', 350],
+  [/ideogram/, 'ID', 280],
+  [/kling/, 'K', 190],
+  [/wan|qwen|alibaba|happyhorse/, 'Q', 265],
+  [/minimax|hailuo/, 'MM', 330],
+  [/grok|xai/, 'X', 0],
+  [/z-?image|tongyi/, 'Z', 120],
+  [/hunyuan|tencent/, 'HY', 200],
+  [/runway/, 'RW', 90],
+  [/luma|ray-?2/, 'L', 300],
+  [/pixverse/, 'PV', 45],
+  [/meshy|tripo|trellis/, '3D', 75],
+  [/whisper|elevenlabs/, 'AU', 170],
+];
+
+function Monogram({ m }: { m: ModelSummary }) {
+  const text = `${m.id} ${m.name}`.toLowerCase();
+  const hit = VENDORS.find(([re]) => re.test(text));
+  const label = hit?.[1] ?? (m.provider === 'local' ? '⌂' : m.name.trim().charAt(0).toUpperCase());
+  const style = hit ? ({ ['--hue' as string]: hit[2] } as React.CSSProperties) : undefined;
+  return (
+    <span className={`ml-mono ${hit ? 'is-tinted' : ''}`} style={style} aria-hidden>
+      {label}
+    </span>
+  );
+}
+
+/** One quiet line under the name: the provider's short description, else what goes in and out. */
+function subtitle(m: ModelSummary): string {
+  const d = m.description?.replace(/\s+/g, ' ').trim();
+  if (d) return d;
+  const input = m.acceptsImage ? (m.acceptsText ? 'Text or image' : 'Image') : m.acceptsVideo ? 'Video' : 'Text';
+  return `${input} to ${m.textOutput ? 'text' : m.kind === 'model3d' ? '3D' : m.kind}`;
+}
+
 /** Model list grouped by provider: recommended models first, the full catalog on demand or when searching. Popover content. */
 export function ModelList({
   kind,
@@ -117,15 +158,19 @@ export function ModelList({
             </div>
             {ms.map((m) => (
               <button key={m.ref} type="button" className={`ml-row ${value === m.ref ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
-                <span className="ml-name">{m.name}</span>
-                <span className="ml-badges">
+                <Monogram m={m} />
+                <span className="ml-main">
+                  <span className="ml-name">{m.name}</span>
+                  <span className="ml-sub">{subtitle(m)}</span>
+                </span>
+                <span className="ml-side">
                   {badges(m).map((b) => (
                     <span key={b} className="badge">
                       {b}
                     </span>
                   ))}
+                  <span className="ml-price num">{priceHint(m)}</span>
                 </span>
-                <span className="ml-price num">{priceHint(m)}</span>
                 {value === m.ref ? <Check size={14} className="ml-check" /> : null}
               </button>
             ))}
