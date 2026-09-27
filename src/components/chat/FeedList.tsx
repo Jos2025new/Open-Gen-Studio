@@ -1,5 +1,6 @@
-import { CircleAlert, Info, LoaderCircle } from 'lucide-react';
-import type { FeedItem } from '../../engine/types';
+import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
+import type { FeedItem, NoticeFeedItem } from '../../engine/types';
+import { retryAgentTurn } from '../../engine/agent/runtime';
 import { useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
@@ -38,6 +39,24 @@ function RichText({ text }: { text: string }) {
         return <p key={i}>{lines.map((l, j) => (j ? [<br key={`b${j}`} />, inline(l, j)] : inline(l, j)))}</p>;
       })}
     </>
+  );
+}
+
+function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: string }) {
+  // Retry only on the latest item: after a new message it would answer out of order.
+  const isLast = useStore((s) => s.sessions[sessionId]?.feed.at(-1)?.id === item.id);
+  const busy = useStore((s) => Boolean(s.sessions[sessionId]?.agent.busy));
+  return (
+    <div className={`notice notice-${item.level}`}>
+      {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}
+      <span>{item.text}</span>
+      {item.retry && isLast ? (
+        <button type="button" className="notice-retry" disabled={busy} onClick={() => void retryAgentTurn(sessionId, item.id)}>
+          <RotateCw size={13} />
+          Retry
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -86,12 +105,7 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
     case 'generation':
       return <GenerationCard generationId={item.generationId} compact={compact} />;
     case 'notice':
-      return (
-        <div className={`notice notice-${item.level}`}>
-          {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}
-          <span>{item.text}</span>
-        </div>
-      );
+      return <NoticeView item={item} sessionId={sessionId} />;
   }
 }
 

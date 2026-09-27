@@ -1,5 +1,5 @@
 import { uid } from '../../lib/id';
-import { isAbort } from '../../lib/http';
+import { isAbort, isTransient } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
@@ -18,6 +18,7 @@ import type {
   LlmMessage,
   LlmProviderId,
   MediaKind,
+  NoticeFeedItem,
   Plan,
   PlanFeedItem,
   QuestionsFeedItem,
@@ -30,6 +31,7 @@ import {
   appendFeed,
   autoTitleSession,
   patchSession,
+  removeFeedItem,
   setComposer,
   setGraph,
   toast,
@@ -64,8 +66,8 @@ function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace };
 }
 
-function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error'): void {
-  appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level, text });
+function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error', retry?: NoticeFeedItem['retry']): void {
+  appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level, text, ...(retry ? { retry } : {}) });
   if (level === 'error' && get().ui.workspace !== 'chat') setThreadOpen(true);
 }
 
@@ -263,6 +265,20 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
     return;
   }
   await offlineTurn(sessionId, item.workspace);
+}
+
+/**
+ * Retry after a transient failure (the connection dropped, the provider was busy). A streamed answer cannot be
+ * resumed mid-way, so the failed call runs again with the same history: steps that had finished (a guide read,
+ * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
+ */
+export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
+  const s = session(sessionId);
+  const item = s?.feed.find((f) => f.id === noticeId);
+  if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine().kind !== 'llm') return;
+  if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
+  removeFeedItem(sessionId, noticeId);
+  await llmTurn(sessionId, item.workspace);
 }
 
 export function stopAgent(): void {
@@ -636,7 +652,9 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           notice(sessionId, workspace, 'Stopped.', 'info');
           return;
         }
-        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`);
+        // History only grows with completed calls, so a retry repeats just the call that failed.
+        const retry = isTransient(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
+        notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry);
         return;
       }
       log.callEnded(result.timing.reasoningMs, result.timing.outputMs ?? result.timing.totalMs);

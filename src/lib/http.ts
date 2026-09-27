@@ -156,7 +156,15 @@ export async function* readSse(body: ReadableStream<Uint8Array>, signal?: AbortS
   try {
     while (true) {
       if (signal?.aborted) throw new AbortedError();
-      const { value, done } = await reader.read();
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch (err) {
+        // The browser's "network error": the connection dropped while the response was streaming.
+        if (signal?.aborted || isAbort(err)) throw new AbortedError();
+        throw new NetworkError(`connection lost mid-response (${(err as Error).message || 'network error'})`);
+      }
+      const { value, done } = chunk;
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let idx: number;

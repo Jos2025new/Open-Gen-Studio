@@ -1,5 +1,5 @@
 import { cacheDb } from '../../lib/idb';
-import { AbortedError, HttpError, extractErrorMessage, isAbort, readSse, requestJson } from '../../lib/http';
+import { AbortedError, HttpError, NetworkError, extractErrorMessage, isAbort, readSse, requestJson } from '../../lib/http';
 import type { LlmMessage, LlmProviderId } from '../types';
 import { NANO_BASE } from './nanogpt';
 import { orHeaders } from './openrouter';
@@ -206,7 +206,7 @@ export async function chat(opts: {
       });
     } catch (err) {
       if (isAbort(err)) throw new AbortedError();
-      throw new Error(`Could not reach ${LLM_LABELS[opts.provider]}. Check your connection.`);
+      throw new NetworkError(`Could not reach ${LLM_LABELS[opts.provider]}. Check your connection.`);
     }
   };
   const failure = async (r: Response) => {

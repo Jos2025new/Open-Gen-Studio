@@ -8,6 +8,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — Retry cuando se corta la conexión con el agente (2026-09-27)
+Origen: captura del usuario ("NanoGPT: network error" tras 137 s, con la respuesta a medio escribir). Comprobado en el código: el texto venía del navegador al fallar la lectura del stream a mitad de respuesta (no de la app ni del proveedor); el usuario confirmó después que su internet iba y venía.
+- [x] `readSse` convierte ese fallo en `NetworkError` ("connection lost mid-response (network error)"); no poder conectar también es `NetworkError`. Errores pasajeros (red, 408/429/5xx) dejan el aviso con **Retry** (icono ↻), solo en el último elemento del chat. Retry quita la respuesta a medias y el aviso y repite solo la llamada que falló: el historial solo guarda llamadas terminadas, así que lo ya hecho (guía leída, búsqueda) no se repite. Un stream no se puede retomar a mitad, así que la respuesta se regenera. Errores que no se arreglan reintentando (clave inválida) no lo muestran. *Dónde:* `lib/http.ts`, `providers/llm.ts`, `agent/runtime.ts` (`retryAgentTurn`), `FeedList.tsx`, `chat.css`, `types.ts`. Test: `tests/agent-retry.test.ts` (2). Navegador: aviso con Retry.
+
 ## Tarea — lista de modelos por familias, sin duplicados entre proveedores, y prompting de imagen (2026-09-27)
 Origen: la vista recomendada mostraba modelos "raros" (upscalers, Seedream 4.5 Alternative, FLUX.2 Pro) porque mezclaba las listas de respaldo de todas las operaciones de `PREFERRED`; cada proveedor salía aparte con el mismo modelo repetido. El usuario pide aplicar `PLAN_PROMPTING.md`.
 - [x] M1. Recomendados de imagen = las familias elegidas por el usuario, en su orden: Nano Banana, GPT Image 2.x, Seedream, Grok Imagine Image · Recraft, Ideogram, P-Image, Z-Image · Upscalers, quitar fondo. Agrupados por familia. "Browse all models" sin cambios de contenido. Otros tipos (vídeo, audio, 3D) siguen con su lista. *Dónde:* `ModelList.tsx`.

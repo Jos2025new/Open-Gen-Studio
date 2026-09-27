@@ -509,6 +509,8 @@ export interface NoticeFeedItem extends FeedBase {
   type: 'notice';
   level: 'info' | 'error';
   text: string;
+  /** A transient agent failure (connection lost, provider busy): Retry runs the turn again from the last completed step. */
+  retry?: { partialItemId?: string };
 }
 
 /** One thing the agent did during a turn, shown in its activity block (L3). */
