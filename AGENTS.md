@@ -36,6 +36,13 @@ Origen: revisión de DeepSeek sobre el catálogo; decisiones del usuario. **Nunc
   Hecho G1–G5 (un commit: comparten store, Ajustes y runtime): `spendLog` + `addSpend(usd, entry)`; `engine/budget.ts` (`overLimit`, `acceptOverLimit`, `remainingBudget`); confirmaciones con "Continue anyway"/"Run anyway"; `engine/spending.ts` + `components/shell/SpendingPanel.tsx` (botón Spending en la barra lateral); `pickDefaultLlm` sin caída silenciosa a un modelo sin visión y `limitedLlmFallback` con aviso y "Use … anyway" en Ajustes; aviso en el chat si el agente queda sin modelo o sin clave. Tests: `tests/spending.test.ts` (7), `engine.test.ts`, `agent-metrics.test.ts`. Pendiente (usuario): navegador.
 Descartado (usuario): test de IDs preferidos (se actualizan cuando haga falta).
 
+## Plan — modelo por propósito y precio exacto (2026-09-26)
+Detalle, datos y porqués en `PLAN_ROUTING_COST.md`; precios en `PRECIOS_VIDEO.md`. Decidido por el usuario; solo Atlas y NanoGPT; calidad media; variante más barata (`-developer`). Pendientes: borrador H3 Max o Max Turbo; puesto de H3 Developer.
+- [ ] C1. Tabla por propósito en código (`purpose: draft | normal | long`): borrador MiniMax H3 Max/Turbo; normal Seedance 2.0 Fast → Wan 3 → H3 Developer; largo Wan 3; el resto solo si se nombra.
+- [ ] C2. El modelo del composer solo manda si el usuario lo eligió a mano (quita Kling por defecto).
+- [ ] C3. Presupuesto exacto de Atlas (`POST /api/v1/model/calculate`, sin coste) antes de generar y guardado como coste real; "estimado · cobrado" para NanoGPT.
+- [ ] C4. El contexto nombra el modelo por defecto y el agente carga su guía la primera vez.
+
 ## Guías de prompting por modelo (2026-09-26)
 Fuente: producción de alto nivel aportada por el usuario (Seedance), adaptada a Atlas/NanoGPT y contrastada con `API DOC/bytedance seedance 2 5.md`. Referencias no copiadas: `open-generation-studio/skills/prompting` y `director/workflows` (solo para adaptar).
 - [x] M1. Mecanismo: guías de modelo en `src/engine/guides/*.md` (texto del archivo), índice `model:<id>` junto a skills y workflows, `read_guide("model:seedance")`. Regla del prompt: antes de escribir el prompt para una familia con guía, cárgala una vez por conversación (queda en el historial). *Latencia:* una llamada solo la primera vez que se usa esa familia en la conversación.

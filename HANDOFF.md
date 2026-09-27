@@ -40,3 +40,10 @@ Imagen del personaje en `bench/fixtures/character.jpg` (o `BENCH_IMAGE=ruta`). P
 - `npm install`, `npx tsc --noEmit -p .`, `npm test`, `npm run build`, `npm run dev` (puerto 5173).
 - Guías de prompting por modelo: estaban en la máquina local del usuario (`~/.claude/skills/ai-director/references/models/`), no en el repo. Si hacen falta para R3/R4, pídeselas o usa la documentación oficial de cada proveedor.
 - Documentación de proveedores usada hasta ahora: `/home/samuel/Descargas/API DOC` (local, no en el repo). Pídesela al usuario si hace falta.
+
+## Actualización 2026-09-26 (Claude Desktop, rama `claude/stoic-davinci-xt7o4z`)
+- **Guías de prompting por modelo** en `src/engine/guides/` (Seedance, Wan, MiniMax H3, Grok, HappyHorse, Veo 3.1, FLUX 3, Kling 3.0 y edición de vídeo). El agente las ve en su índice como `model:<id>` y las carga con `read_guide`. Fuentes: producción del usuario, contrastada con los esquemas; las diferencias con cada fuente están en `AGENTS.md` (M1–M10).
+- **Citas de referencias corregidas:** Wan `Image 1` (sin @), Grok `<IMAGE_0>`, Gemini Omni `<IMAGE_REF_0>` (ambas desde cero), MiniMax `<Picture 1>` (sin confirmar en una prueba real).
+- **Precios:** `PRECIOS_VIDEO.md` (catálogos en vivo, cobros reales del proyecto anterior y presupuesto exacto de Atlas `POST /api/v1/model/calculate`, que funciona sin clave).
+- **Siguiente trabajo:** `PLAN_ROUTING_COST.md` (C1–C4). Explica por qué el agente sigue eligiendo Kling y cómo se arregla. Antes, preguntar al usuario las dos decisiones pendientes que lista ese plan.
+- Referencias en la máquina del usuario, no en el repo: `~/Documentos/Projects/AI/My Apps/open-generation-studio/` (skills de prompting, 13 workflows de director, catálogo curado y `data/studio.db` con cobros reales).
