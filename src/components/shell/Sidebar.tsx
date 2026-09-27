@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FolderClock, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
+import { Folder, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
@@ -49,6 +49,11 @@ export function Sidebar() {
         </button>
       </div>
       <div className="side-group">
+        {/* New session first and accented: the quickest thing to find. */}
+        <button type="button" className="side-btn side-new" data-tip="New session" data-tip-side="right" aria-label="New session" onClick={() => newSession()}>
+          <Plus size={18} strokeWidth={2} />
+          <span className="side-label wide-only">New session</span>
+        </button>
         {WORKSPACES.map((w) => (
           <button
             key={w.id}
@@ -69,6 +74,18 @@ export function Sidebar() {
       <div className="side-group">
         <button
           type="button"
+          className={`side-btn ${panel === 'sessions' ? 'is-open' : ''}`}
+          data-tip="Sessions"
+          data-tip-side="right"
+          aria-label="Sessions"
+          aria-expanded={panel === 'sessions'}
+          onClick={() => togglePanel('sessions')}
+        >
+          <Folder size={18} strokeWidth={1.7} />
+          <span className="side-label">Sessions</span>
+        </button>
+        <button
+          type="button"
           className={`side-btn ${panel === 'gallery' ? 'is-open' : ''}`}
           data-tip="Gallery — every image and video"
           data-tip-side="right"
@@ -79,18 +96,6 @@ export function Sidebar() {
           <Images size={18} strokeWidth={1.7} />
           <span className="side-label">Gallery</span>
           {running ? <span className="side-badge num">{running}</span> : null}
-        </button>
-        <button
-          type="button"
-          className={`side-btn ${panel === 'sessions' ? 'is-open' : ''}`}
-          data-tip="Sessions"
-          data-tip-side="right"
-          aria-label="Sessions"
-          aria-expanded={panel === 'sessions'}
-          onClick={() => togglePanel('sessions')}
-        >
-          <FolderClock size={18} strokeWidth={1.7} />
-          <span className="side-label">Sessions</span>
         </button>
         <button
           type="button"
@@ -108,10 +113,6 @@ export function Sidebar() {
       </div>
       <div className="side-spacer" />
       <div className="side-group">
-        <button type="button" className="side-btn" data-tip="New session" data-tip-side="right" aria-label="New session" onClick={() => newSession()}>
-          <Plus size={18} strokeWidth={1.7} />
-          <span className="side-label wide-only">New session</span>
-        </button>
         <ProviderPool wide={wide} />
         <button
           ref={settingsRef}

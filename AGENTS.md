@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — barra lateral: New session arriba y destacado, Sessions sobre Gallery, saldo en verde (2026-09-27)
+- [x] "+ New session" pasa al principio (sobre Chat) con el acento (fondo, borde fino y color); Sessions va antes que Gallery con icono de carpeta (`Folder`); el saldo del pool de proveedores en verde (`--ok`) en la barra estrecha y en la ancha (en rojo si está vacío, como antes). Sin borde en el icono del monedero (el usuario prefirió no añadir borde). *Dónde:* `Sidebar.tsx`, `shell.css`. Navegador: barra estrecha y ancha.
+
 ## Tarea — « » en el visor para recorrer las imágenes del chat (2026-09-27)
 - [x] Abrir un resultado desde una tarjeta abre el visor con todos los resultados del chat (generaciones de la sesión por fecha, también las de planes) en el resultado pulsado; « » y las flechas del teclado los recorren; "N / total" arriba. Botones « » de 42×52 px con borde y texto claro. *Dónde:* `GenerationCard.tsx` (`chatResults`), `Lightbox.tsx`, `shell.css`. Navegador: 1/4 → » 2/4 → ← 1/4.
 

@@ -87,3 +87,9 @@
 .set-warn { border: 1px solid var(--warn); border-radius: var(--radius-s); background: rgba(239, 184, 90, 0.08); padding: 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
 .set-warn p { margin: 0; }
 .set-warn-actions { display: flex; gap: 6px; }
+
+/* New session: accented so it is found at a glance. */
+.side-btn.side-new { height: 40px; margin-bottom: 6px; color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.side-btn.side-new:hover { background: rgba(212, 242, 90, 0.2); }
+/* Money left with the providers, in green so it is noticed. */
+.side-budget, .pool-total { color: var(--ok); }
