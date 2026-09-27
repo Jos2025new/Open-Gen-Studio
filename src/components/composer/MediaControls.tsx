@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Box, ChevronDown, Clapperboard, Clock, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
+import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
@@ -46,119 +46,98 @@ function ModelChip({ kind }: { kind: MediaKind }) {
   );
 }
 
-function OptionPopover({
-  kind,
-  role,
-  icon,
-  format,
-  render,
-}: {
-  kind: MediaKind;
-  role: 'aspect' | 'resolution';
-  icon?: typeof Box;
-  format?: (v: string) => string;
-  render?: (v: string) => React.ReactNode;
-}) {
+/** One pill button in a format section; the active one is raised. */
+function FmtOption({ active, onClick, children, tip }: { active: boolean; onClick: () => void; children: React.ReactNode; tip?: string }) {
+  return (
+    <button type="button" className={`fmt-opt ${active ? 'is-active' : ''}`} onClick={onClick} data-tip={tip}>
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Format of the result in one chip ("▢ 1:1 · 1k · 1"): aspect ratio, resolution and, for images, how many, or for
+ * video, how long. The panel shows only the sections the model has and stays open while choosing.
+ */
+function FormatChip({ kind }: { kind: MediaKind }) {
   const ref = useStore((s) => s.composer[kind].modelRef);
   const schema = useStore((s) => s.catalog.schemas[ref]);
-  const value = useStore((s) => (role === 'aspect' ? s.composer[kind].settings.aspect : s.composer[kind].settings.resolution));
+  const settings = useStore((s) => s.composer[kind].settings);
   const pop = usePopover();
-  const param = paramByRole(schema, role);
-  if (!param?.options?.length) return null;
-  const fmt = format ?? ((v: string) => v);
-  const set = (v: string) => {
-    const cur = useStore.getState().composer[kind].settings;
-    setComposerMedia(kind, { settings: { ...cur, [role]: v } });
-    pop.close();
-  };
-  return (
-    <>
-      <Chip ref={pop.ref} icon={icon} active={pop.open} onClick={pop.toggle} data-tip={param.label}>
-        {role === 'aspect' && value ? <AspectGlyph value={value} /> : null}
-        {value ? fmt(value) : param.label}
-      </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={role === 'aspect' ? 300 : 220} label={param.label}>
-        <PopoverHeader title={param.label} />
-        <div className={role === 'aspect' ? 'aspect-grid' : 'option-list'}>
-          {param.options.map((o) => {
-            const v = String(o);
-            return (
-              <button key={v} type="button" className={`option ${v === value ? 'is-active' : ''}`} onClick={() => set(v)}>
-                {render ? render(v) : null}
-                <span>{fmt(v)}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Popover>
-    </>
-  );
-}
-
-function CountChip() {
-  const ref = useStore((s) => s.composer.image.modelRef);
-  const schema = useStore((s) => s.catalog.schemas[ref]);
-  const count = useStore((s) => s.composer.image.settings.count);
-  const pop = usePopover();
+  const aspect = paramByRole(schema, 'aspect');
+  const resolution = paramByRole(schema, 'resolution');
+  const durations = kind === 'video' ? durationChoices(schema) : [];
+  const counts = kind === 'image' ? [1, 2, 3, 4] : [];
   const perRequest = maxCountPerRequest(schema);
-  const options = [1, 2, 3, 4];
+  if (!aspect?.options?.length && !resolution?.options?.length && !durations.length && !counts.length) return null;
+  const set = (patch: Partial<typeof settings>) => setComposerMedia(kind, { settings: { ...useStore.getState().composer[kind].settings, ...patch } });
+  const summary = [
+    aspect?.options?.length && settings.aspect ? aspectLabel(settings.aspect) : null,
+    resolution?.options?.length ? settings.resolution : null,
+    kind === 'image' ? String(settings.count) : null,
+    durations.length ? durationLabel(settings.duration ?? durations[0]) : null,
+  ].filter(Boolean);
   return (
     <>
-      <Chip ref={pop.ref} icon={Layers} active={pop.open} onClick={pop.toggle} data-tip="Number of images">
-        {count}
+      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" className="fmt-chip">
+        {aspect?.options?.length ? <AspectGlyph value={settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
+        <span>{summary.join(' · ')}</span>
+        <ChevronDown size={12} />
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={240} label="Images">
-        <PopoverHeader title="Images" sub={perRequest < 4 ? `This model returns ${perRequest} per request; extra images run as separate requests.` : undefined} />
-        <div className="count-row">
-          {options.map((n) => (
-            <button
-              key={n}
-              type="button"
-              className={`option ${n === count ? 'is-active' : ''}`}
-              onClick={() => {
-                const cur = useStore.getState().composer.image.settings;
-                setComposerMedia('image', { settings: { ...cur, count: n } });
-                pop.close();
-              }}
-            >
-              {n}
-            </button>
-          ))}
-        </div>
-      </Popover>
-    </>
-  );
-}
-
-function DurationChip() {
-  const ref = useStore((s) => s.composer.video.modelRef);
-  const schema = useStore((s) => s.catalog.schemas[ref]);
-  const duration = useStore((s) => s.composer.video.settings.duration);
-  const pop = usePopover();
-  const choices = durationChoices(schema);
-  if (!choices.length) return null;
-  return (
-    <>
-      <Chip ref={pop.ref} icon={Clock} active={pop.open} onClick={pop.toggle} data-tip="Duration">
-        {durationLabel(duration ?? choices[0])}
-      </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="Duration">
-        <PopoverHeader title="Duration" />
-        <div className="count-row wrap">
-          {choices.map((d) => (
-            <button
-              key={d}
-              type="button"
-              className={`option ${d === duration ? 'is-active' : ''}`}
-              onClick={() => {
-                const cur = useStore.getState().composer.video.settings;
-                setComposerMedia('video', { settings: { ...cur, duration: d } });
-                pop.close();
-              }}
-            >
-              {durationLabel(d)}
-            </button>
-          ))}
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={430} label="Format">
+        <div className="fmt-pop">
+          {aspect?.options?.length ? (
+            <section className="fmt-sect">
+              <div className="fmt-label">{aspect.label || 'Aspect ratio'}</div>
+              <div className="fmt-row fmt-aspects">
+                {aspect.options.map((o) => {
+                  const v = String(o);
+                  return (
+                    <FmtOption key={v} active={v === settings.aspect} onClick={() => set({ aspect: v })}>
+                      <AspectGlyph value={v} />
+                      <span>{aspectLabel(v)}</span>
+                    </FmtOption>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+          {resolution?.options?.length ? (
+            <section className="fmt-sect">
+              <div className="fmt-label">{resolution.label || 'Resolution'}</div>
+              <div className="fmt-row">
+                {resolution.options.map((o) => (
+                  <FmtOption key={String(o)} active={String(o) === settings.resolution} onClick={() => set({ resolution: String(o) })}>
+                    {String(o)}
+                  </FmtOption>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {counts.length ? (
+            <section className="fmt-sect">
+              <div className="fmt-label">Images to generate</div>
+              <div className="fmt-row">
+                {counts.map((n) => (
+                  <FmtOption key={n} active={n === settings.count} onClick={() => set({ count: n })} tip={n > perRequest ? `This model returns ${perRequest} per request; the rest run as separate requests.` : undefined}>
+                    {n}
+                  </FmtOption>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {durations.length ? (
+            <section className="fmt-sect">
+              <div className="fmt-label">Duration</div>
+              <div className="fmt-row">
+                {durations.map((d) => (
+                  <FmtOption key={d} active={d === (settings.duration ?? durations[0])} onClick={() => set({ duration: d })}>
+                    {durationLabel(d)}
+                  </FmtOption>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       </Popover>
     </>
@@ -728,9 +707,8 @@ export function MediaControls({ kind }: { kind: MediaKind }) {
   return (
     <>
       <ModelChip kind={kind} />
-      <OptionPopover kind={kind} role="aspect" format={aspectLabel} render={(v) => <AspectGlyph value={v} />} />
-      <OptionPopover kind={kind} role="resolution" />
-      {kind === 'image' ? <CountChip /> : kind === 'video' ? <DurationChip /> : <LyricsChip kind={kind} />}
+      <FormatChip kind={kind} />
+      {kind === 'audio' || kind === 'model3d' ? <LyricsChip kind={kind} /> : null}
       {kind === 'video' ? <AudioChip /> : null}
       {kind === 'video' ? <SubjectsChip /> : null}
       {kind === 'video' ? <ShotsChip /> : null}

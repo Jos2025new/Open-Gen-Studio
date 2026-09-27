@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — formato en un solo chip (2026-09-27)
+- [x] Los chips sueltos de proporción, resolución y cantidad (imagen) o duración (vídeo) pasan a uno solo, `FormatChip` ("▢ 9:16 · 2k · 3"), con un panel de secciones como la referencia: *Aspect ratio* (fila de glifos con su etiqueta; Auto = cuadrado discontinuo), *Resolution*, *Images to generate* (1–4; aviso si el modelo devuelve menos por petición) o *Duration*. Opciones en una pista hundida, la elegida resaltada; el panel no se cierra al elegir. Solo salen las secciones que el esquema del modelo tiene. Audio, Subjects, Shots, Lyrics y Advanced (parámetros extra de cada modelo) siguen igual. *Dónde:* `MediaControls.tsx`, `composer.css`. Navegador: imagen (9:16 · 2k · 3) y vídeo (16:9 · 720p · 5s).
+
 ## Tarea — lista de modelos con el aspecto de la referencia (2026-09-27)
 - [x] Cada fila: monograma de la marca (letras con un tono suave por fabricante, deducido del id o el nombre; sin logos de terceros) · nombre en 13 px sobre una línea tenue con la descripción del proveedor (o "Text or image to image" si no hay) · a la derecha las mismas etiquetas (Edit, I2V, Upscale…) como chips con borde y el precio. Filas de 8 px de radio con fondo al pasar el ratón y al estar elegidas. Popover del composer de 420 a 480 px. Después (usuario: "con los iconos"): logos reales de LobeHub Icons (MIT, 22 SVG copiados en `src/assets/brands/` con su LICENSE y atribución en `NOTICE`; monocromos rellenados con #ECECEF), mostrados como `<img>` para que los degradados no choquen; sin logo conocido → inicial. Mismo componente en composer, Ajustes y "via Modelo ▾". *Dónde:* `ModelList.tsx`, `composer.css`, `MediaControls.tsx`.
 
