@@ -11,6 +11,7 @@ import type { PlanFeedItem, PlanStep, StepState } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
+import { PlanRecoveryChips } from './RecoveryActions';
 import { Button, CostTag, costLabel } from '../ui/primitives';
 
 function stepIcon(s: PlanStep) {
@@ -176,6 +177,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         </div>
       ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
+      {item.status === 'error' || item.status === 'partial' ? <PlanRecoveryChips sessionId={sessionId} item={item} /> : null}
       <footer className="plan-foot">
         {item.status === 'awaiting' ? (
           <>

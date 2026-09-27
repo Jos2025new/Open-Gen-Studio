@@ -640,6 +640,16 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
+/**
+ * Run a failed or canceled generation again, in its own card (same request, same seed). A job that was submitted
+ * may still finish at the provider: Check status is the way to fetch it; Retry submits again (and is charged again).
+ */
+export function retryGeneration(id: string): Promise<string[]> {
+  const g = get().generations[id];
+  if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
+  return runGeneration(id);
+}
+
 /** True when a stopped generation still has a submitted job whose result can be fetched. */
 export function canRecheck(g: Generation): boolean {
   return Boolean(g.remoteJob && ADAPTERS[g.remoteJob.provider]?.resume && g.status !== 'running' && g.status !== 'queued' && g.status !== 'done');

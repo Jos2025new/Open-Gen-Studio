@@ -28,6 +28,10 @@ export interface ExecContext {
   concurrency?: number;
   /** Subjects the plan saves (F3): from an asset at the start, from a step when it ends. */
   subjects?: PlanSubject[];
+  /** Resuming a plan: steps already done (their outputs are reused, they do not run again). */
+  prior?: Map<string, StepOutput>;
+  /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
+  blocked?: Map<string, string>;
   onState: (stepId: string, state: StepState, info?: { generationId?: string; error?: string }) => void;
 }
 
@@ -225,6 +229,17 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       if (asset) saveSubjectOnce(ctx.sessionId, subj, asset);
     }
   };
+
+  for (const [id, out] of ctx.prior ?? []) {
+    if (!state.has(id)) continue;
+    state.set(id, 'done');
+    outputs.set(id, out);
+  }
+  for (const [id, error] of ctx.blocked ?? []) {
+    if (!state.has(id)) continue;
+    state.set(id, 'error');
+    failed.push({ stepId: id, error });
+  }
 
   await new Promise<void>((resolve) => {
     let active = 0;

@@ -27,6 +27,19 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'recover_plan',
+      description:
+        'Resume the latest plan that failed or finished with errors, in the same card. check_status asks the providers again about the jobs they received (only steps with a job id; no new charge for them); retry runs the failed steps again (charged again). Steps that waited for them run afterwards. Only when the user asks to check or retry; never propose a new plan for a failed one.',
+      parameters: {
+        type: 'object',
+        properties: { action: { type: 'string', enum: ['check_status', 'retry'] } },
+        required: ['action'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'read_guide',
       description:
         'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
@@ -176,6 +189,8 @@ export const findModelsSchema = z.object({
 });
 
 export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
+
+export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'retry']) });
 
 export const askQuestionsSchema = z.object({
   intro: z.string().max(400).optional(),

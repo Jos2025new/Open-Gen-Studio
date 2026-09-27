@@ -51,6 +51,7 @@ Writing prompts
 - Text in an image: short literal text in "double quotes", never translated, with its position and typeface ("the headline "OPEN LATE" in bold condensed sans at the top"). Never bake long text into image prompts. In the Designer, headlines and copy go on text layers.
 - Edits (edit op, edit models, a revision of a result): "Change only X; keep A, B and C; do not add Z"; repeat what is kept at every iteration (models drift); one change at a time. Upscale never redefines content: only sharpness and detail.
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
+- A failed or half-finished plan (its note says failed): when the user asks to check it or try again, call recover_plan (check_status when a job may still be at the provider, retry to run it again); do not propose a new plan for it.
 - To the user, plain language: model names, not refs; never tool names, workflow names or ids.
 - Citing references: when a model's inputs give a "prompt:" syntax, use exactly that. Otherwise, by family:
 ${REFERENCE_PROTOCOLS.map((p) => `  ${p.family}: ${p.note}`).join('\n')}

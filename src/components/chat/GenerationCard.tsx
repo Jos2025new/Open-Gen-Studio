@@ -3,7 +3,7 @@ import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Music, Pencil, R
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
-import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
+import { cancelGeneration } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
 import { canvasIndex } from '../../engine/canvas';
@@ -16,6 +16,7 @@ import { Button, CostTag, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AssetActions, DownloadButton, FavoriteButton, SendToMenu } from '../assets/AssetActions';
 import { GenerationInfo, generationTitle } from '../assets/GenerationInfo';
+import { GenerationRecovery } from './RecoveryActions';
 
 function metaLine(g: Generation): string {
   const s = g.settings;
@@ -137,11 +138,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         <div className={`gen-error ${g.status === 'canceled' ? 'is-canceled' : ''}`}>
           <CircleAlert size={15} />
           <span>{g.status === 'canceled' ? 'Canceled' : g.error}</span>
-          {canRecheck(g) ? (
-            <Button size="sm" variant="secondary" icon={RefreshCw} className="gen-recheck" data-tip="The job was submitted and may still finish at the provider" onClick={() => void recheckGeneration(g.id)}>
-              Check again
-            </Button>
-          ) : null}
+          <GenerationRecovery g={g} />
         </div>
       ) : g.kind === 'text' && g.status === 'done' ? (
         // Transcription or lyrics: the text, ready to copy, to use as a prompt or as the lyrics of a song.

@@ -3,7 +3,8 @@ import { isAbort, isTransient } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
-import { executeSteps, estimateSteps } from '../executor';
+import { executeSteps, estimateSteps, type StepOutput } from '../executor';
+import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
@@ -19,8 +20,10 @@ import type {
   LlmProviderId,
   MediaKind,
   NoticeFeedItem,
+  Estimate,
   Plan,
   PlanFeedItem,
+  PlanStep,
   QuestionsFeedItem,
   Session,
   StepState,
@@ -46,7 +49,7 @@ import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, skillById } from '../skills';
 import { modelGuide } from '../guides';
-import { TOOLS, findModelsSchema, readGuideSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, findModelsSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -455,6 +458,23 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     stepStates: { ...it.stepStates, ...Object.fromEntries([...off].map((sid) => [sid, 'skipped' as StepState])) },
   }));
 
+  await runPlanItem(sessionId, itemId, chosen, off);
+}
+
+/**
+ * Execute a plan card's steps and report back to the card and the agent. Resuming (Check status / Retry failed):
+ * `resume.prior` holds the steps already done, `resume.blocked` the ones that failed again.
+ */
+async function runPlanItem(
+  sessionId: string,
+  itemId: string,
+  chosen: PlanStep[],
+  off: Set<string>,
+  resume?: { prior: Map<string, StepOutput>; blocked: Map<string, string> },
+): Promise<void> {
+  const item = session(sessionId).feed.find((f) => f.id === itemId);
+  if (!item || item.type !== 'plan') return;
+  const { plan } = item;
   const workspace = plan.workspace;
   let steps = chosen;
   const nodeOf = (stepId: string) => `${plan.id}_${stepId}`;
@@ -473,6 +493,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (workspace === 'designer') docId = ensureDoc(sessionId, designerDims()).id;
 
   const result = await executeSteps(steps, {
+    ...(resume ? { prior: resume.prior, blocked: resume.blocked } : {}),
     sessionId,
     planId: plan.id,
     workspace,
@@ -524,6 +545,104 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else toast(`${plan.title} failed`, 'error');
+}
+
+// ---------------------------------------------------------------------------
+// Recovering a plan with failed steps (Check status / Retry failed)
+
+export type PlanRecoveryMode = 'check' | 'retry';
+
+/** The steps a plan card would run again, as approved (unchecked steps and the joins they dropped stay out). */
+function approvedSteps(item: PlanFeedItem): { chosen: PlanStep[]; off: Set<string> } {
+  const off = new Set(item.skipped ?? []);
+  const pruned = pruneJoins(item.plan.steps.filter((st) => !off.has(st.id)), off);
+  for (const id of pruned.dropped) off.add(id);
+  return { chosen: pruned.steps, off };
+}
+
+/**
+ * What a failed plan can do now: failed steps whose submitted job can still be fetched (Check status), and the
+ * price of running the failed steps and the ones that waited for them again (Retry failed). Null when nothing applies.
+ */
+export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate } | null {
+  if ((item.status !== 'error' && item.status !== 'partial') || item.plan.workspace === 'node') return null;
+  const gens = get().generations;
+  const { chosen } = approvedSteps(item);
+  const retry = chosen.filter((st) => item.stepStates[st.id] === 'error' || item.stepStates[st.id] === 'skipped' || item.stepStates[st.id] === 'pending');
+  if (!retry.length) return null;
+  const checkable = retry.filter((st) => {
+    const g = gens[item.stepGenerations[st.id] ?? ''];
+    return item.stepStates[st.id] === 'error' && g && canRecheck(g);
+  }).map((st) => st.id);
+  return { checkable, retry, estimate: estimateSteps(retry).total };
+}
+
+/** Why a recovery cannot start, in words for the user or the agent; null when it can. */
+export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode): string | null {
+  const r = planRecovery(item);
+  if (!r) return item.plan.workspace === 'node' ? 'Plans on the Node canvas are rerun from their nodes.' : 'This plan has no failed steps.';
+  if (mode === 'check' && !r.checkable.length) {
+    return 'No failed step has a submitted job to check: the provider gave no job id (NanoGPT returns images in the same request, so a dropped connection leaves nothing to ask for). Retry runs them again.';
+  }
+  if (overLimit(r.estimate)) return overLimitText(r.estimate);
+  return null;
+}
+
+/**
+ * Resume a plan with failed steps, in the same card. "check" asks the providers again about the jobs they received
+ * (no new charge for those); "retry" runs the failed steps again (charged again). Failed generations run again in
+ * their own chat cards; steps done before are reused; the steps that waited for the failed ones run afterwards.
+ * Returns a short summary for the agent.
+ */
+export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
+  const item = session(sessionId)?.feed.find((f) => f.id === itemId);
+  if (!item || item.type !== 'plan') return 'No such plan.';
+  const problem = planRecoveryProblem(item, mode);
+  if (problem) return problem;
+  const { chosen, off } = approvedSteps(item);
+  const failedIds = chosen.filter((st) => item.stepStates[st.id] === 'error').map((st) => st.id);
+  const genOf = (id: string) => get().generations[item.stepGenerations[id] ?? ''];
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
+    ...it,
+    status: 'running',
+    error: undefined,
+    stepStates: { ...it.stepStates, ...Object.fromEntries(failedIds.filter((id) => mode === 'retry' || (genOf(id) && canRecheck(genOf(id)))).map((id) => [id, 'running' as StepState])) },
+  }));
+  // The failed generations first, in their own cards: fetched again (check) or run again (retry).
+  const blocked = new Map<string, string>();
+  const recovered = new Set<string>();
+  await Promise.all(
+    failedIds.map(async (id) => {
+      const g = genOf(id);
+      if (!g) {
+        // Failed before it could start a generation: a retry runs the step again; a check has nothing to ask.
+        if (mode === 'check') blocked.set(id, item.error?.split(' · ').find((e) => e.startsWith(`${id}:`))?.slice(id.length + 2) ?? 'Failed');
+        return;
+      }
+      if (mode === 'check' && !canRecheck(g)) {
+        blocked.set(id, g.error ?? 'Failed');
+        return;
+      }
+      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id));
+      const after = get().generations[g.id];
+      if (after?.status === 'done') recovered.add(id);
+      else blocked.set(id, after?.error ?? 'Failed');
+    }),
+  );
+  const prior = new Map<string, StepOutput>();
+  for (const st of chosen) {
+    if (item.stepStates[st.id] !== 'done' && !recovered.has(st.id)) continue;
+    const g = genOf(st.id);
+    prior.set(st.id, g ? { assetIds: g.assetIds, text: g.text } : st.kind === 'text' ? { assetIds: [], text: st.text } : { assetIds: [], layerId: null });
+  }
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
+    ...it,
+    stepStates: { ...it.stepStates, ...Object.fromEntries([...recovered].map((id) => [id, 'done' as StepState])), ...Object.fromEntries([...blocked.keys()].map((id) => [id, 'error' as StepState])) },
+  }));
+  await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked });
+  const done = session(sessionId).feed.find((f) => f.id === itemId);
+  const status = done?.type === 'plan' ? done.status : 'error';
+  return `${mode === 'check' ? 'Checked' : 'Retried'} "${item.plan.title}": ${status === 'done' ? 'all steps done' : status === 'partial' ? `finished with errors (${done?.type === 'plan' ? done.error : ''})` : `still failing (${done?.type === 'plan' ? done.error : ''})`}.`;
 }
 
 export function cancelPlan(sessionId: string, itemId: string): void {
@@ -745,6 +864,23 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           recordMetric(sessionId, { type: 'findModels' });
           if (v.success) log.action({ icon: 'search', label: 'Explored models', detail: v.data.query });
           respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
+          continue;
+        }
+        if (call.name === 'recover_plan') {
+          // Starts in the background: the plan card shows progress; the agent answers in the next round.
+          const v = recoverPlanSchema.safeParse(parsed.value);
+          if (!v.success) {
+            respond(`Invalid recover_plan input: ${formatZodError(v.error)}`);
+            continue;
+          }
+          const mode = v.data.action === 'check_status' ? 'check' : 'retry';
+          const target = [...session(sessionId).feed].reverse().find((f): f is PlanFeedItem => f.type === 'plan' && (f.status === 'error' || f.status === 'partial'));
+          const problem = target ? planRecoveryProblem(target, mode) : 'There is no failed plan in this chat.';
+          if (target && !problem) {
+            log.action({ icon: 'fix', label: mode === 'check' ? 'Checked the status of the failed steps' : 'Retried the failed steps', detail: target.plan.title });
+            void resumePlan(sessionId, target.id, mode);
+          }
+          respond(problem ?? `${mode === 'check' ? 'Checking the providers' : 'Running the failed steps again'} for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
           continue;
         }
         if (call.name === 'read_guide') {
