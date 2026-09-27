@@ -30,35 +30,48 @@ function badges(m: ModelSummary): string[] {
   return out;
 }
 
-// Who makes a model, read from its id or name: a small monogram tile (no third-party logos).
-const VENDORS: Array<[RegExp, string, number]> = [
-  [/gpt|openai|dall-?e|sora/, 'AI', 160],
-  [/nano-?banana|gemini|imagen|veo|google/, 'G', 215],
-  [/seedream|seedance|seed3d|bytedance|omnihuman/, 'BD', 250],
-  [/flux|black-?forest|bfl/, 'FL', 30],
-  [/recraft/, 'R', 350],
-  [/ideogram/, 'ID', 280],
-  [/kling/, 'K', 190],
-  [/wan|qwen|alibaba|happyhorse/, 'Q', 265],
-  [/minimax|hailuo/, 'MM', 330],
-  [/grok|xai/, 'X', 0],
-  [/z-?image|tongyi/, 'Z', 120],
-  [/hunyuan|tencent/, 'HY', 200],
-  [/runway/, 'RW', 90],
-  [/luma|ray-?2/, 'L', 300],
-  [/pixverse/, 'PV', 45],
-  [/meshy|tripo|trellis/, '3D', 75],
-  [/whisper|elevenlabs/, 'AU', 170],
+// Who makes a model, read from its id or name: the maker's logo (LobeHub icons, MIT; see NOTICE), else a monogram.
+const logos = import.meta.glob('../../assets/brands/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const logo = (name: string) => logos[`../../assets/brands/${name}.svg`];
+const VENDORS: Array<[RegExp, string, string]> = [
+  [/gpt|openai|dall-?e|sora|whisper/, 'openai', 'OpenAI'],
+  [/nano-?banana|gemini/, 'gemini-color', 'Google Gemini'],
+  [/imagen|veo|google/, 'google-color', 'Google'],
+  [/seedream|seedance|seed3d|seedvr|bytedance|omnihuman|dreamina/, 'bytedance-color', 'ByteDance'],
+  [/flux|black-?forest|bfl/, 'bfl', 'Black Forest Labs'],
+  [/recraft/, 'recraft', 'Recraft'],
+  [/ideogram/, 'ideogram', 'Ideogram'],
+  [/kling/, 'kling-color', 'Kling'],
+  [/qwen/, 'qwen-color', 'Qwen'],
+  [/\bwan\b|wan-?\d|wan2|alibaba|z-?image|tongyi/, 'alibaba-color', 'Alibaba'],
+  [/hailuo/, 'hailuo-color', 'Hailuo'],
+  [/minimax/, 'minimax-color', 'MiniMax'],
+  [/grok|xai/, 'xai', 'xAI'],
+  [/hunyuan|tencent/, 'hunyuan-color', 'Hunyuan'],
+  [/runway|gen-?4/, 'runway', 'Runway'],
+  [/luma|ray-?2|photon/, 'luma-color', 'Luma'],
+  [/pixverse/, 'pixverse-color', 'PixVerse'],
+  [/meshy/, 'meshy-color', 'Meshy'],
+  [/tripo/, 'tripo-color', 'Tripo'],
+  [/elevenlabs/, 'elevenlabs', 'ElevenLabs'],
+  [/stable-?diffusion|stability|sdxl|sd3/, 'stability-color', 'Stability AI'],
+  [/vidu/, 'vidu-color', 'Vidu'],
 ];
 
 function Monogram({ m }: { m: ModelSummary }) {
   const text = `${m.id} ${m.name}`.toLowerCase();
   const hit = VENDORS.find(([re]) => re.test(text));
-  const label = hit?.[1] ?? (m.provider === 'local' ? '⌂' : m.name.trim().charAt(0).toUpperCase());
-  const style = hit ? ({ ['--hue' as string]: hit[2] } as React.CSSProperties) : undefined;
+  const src = hit ? logo(hit[1]) : undefined;
+  if (src) {
+    return (
+      <span className="ml-mono" title={hit![2]}>
+        <img src={src} alt="" draggable={false} />
+      </span>
+    );
+  }
   return (
-    <span className={`ml-mono ${hit ? 'is-tinted' : ''}`} style={style} aria-hidden>
-      {label}
+    <span className="ml-mono" aria-hidden>
+      {m.provider === 'local' ? '⌂' : m.name.trim().charAt(0).toUpperCase()}
     </span>
   );
 }
