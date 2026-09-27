@@ -20,7 +20,7 @@ const proxy = {
 
 // Some providers hand back results on storage without CORS (Atlas/BytePlus: *.volces.com), so the browser can
 // neither save nor read them. The dev/preview servers relay downloads from these hosts only (not an open proxy).
-const MEDIA_HOSTS = /(^|\.)(volces\.com|bytepluses\.com|atlascloud\.ai)$/;
+const MEDIA_HOSTS = /(^|\.)(volces\.com|bytepluses\.com|atlascloud\.ai|aliyuncs\.com)$/;
 function mediaRelay(): Plugin {
   // Node's http types are not installed in this browser project; only these members are used.
   type Res = { statusCode: number; setHeader(name: string, value: string): void; end(body?: string | Uint8Array): void };
