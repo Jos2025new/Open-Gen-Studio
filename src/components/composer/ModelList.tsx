@@ -3,6 +3,7 @@ import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lu
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
+import { groupVariants, type VariantGroup } from '../../engine/variants';
 import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -60,9 +61,41 @@ const VENDORS: Array<[RegExp, string, string]> = [
   [/vidu/, 'vidu-color', 'Vidu'],
 ];
 
-function Monogram({ m }: { m: ModelSummary }) {
+function vendorOf(m: ModelSummary) {
   const text = `${m.id} ${m.name}`.toLowerCase();
-  const hit = VENDORS.find(([re]) => re.test(text));
+  return VENDORS.find(([re]) => re.test(text));
+}
+
+// Recommended image models (user, 2026-09-27): these families, in this order; tools last. The rest is under "Browse all".
+const FAMILIES: Array<[string, RegExp]> = [
+  ['Nano Banana', /nano-?banana/],
+  ['GPT Image', /gpt-?image-?2/],
+  ['Seedream', /seedream/],
+  ['Grok Imagine', /grok-?imagine-?image/],
+  ['Recraft', /recraft/],
+  ['Ideogram', /ideogram/],
+  ['P-Image', /p-image|prunaai/],
+  ['Z-Image', /z-?image/],
+];
+const FAMILY_ORDER = ['Selected', ...FAMILIES.map(([f]) => f), 'Upscalers', 'Background removal', 'Local demo'];
+
+function familyOf(m: ModelSummary): string | undefined {
+  if (m.tags.includes('upscale')) return 'Upscalers';
+  if (m.tags.includes('background-removal')) return 'Background removal';
+  const text = `${m.id} ${m.name}`.toLowerCase();
+  return FAMILIES.find(([, re]) => re.test(text))?.[0];
+}
+
+/** Where a variant is served: each provider once, with its price when there is more than one. */
+function where(members: ModelSummary[]): string {
+  const seen = new Map<ProviderId, ModelSummary>();
+  for (const x of members) if (!seen.has(x.provider)) seen.set(x.provider, x);
+  if (seen.size < 2) return PROVIDER_LABELS[members[0].provider];
+  return [...seen.values()].map((x) => `${PROVIDER_LABELS[x.provider]}${x.price?.skus[0] ? ` ${formatUsd(x.price.skus[0].usd)}` : ''}`).join(' · ');
+}
+
+function Monogram({ m }: { m: ModelSummary }) {
+  const hit = vendorOf(m);
   const src = hit ? logo(hit[1]) : undefined;
   if (src) {
     return (
@@ -120,7 +153,7 @@ function FilterMenu<T extends string>({ label, icon, value, options, onChange, a
   );
 }
 
-/** Model list grouped by provider: recommended models first, the full catalog on demand or when searching. Popover content. */
+/** Model list: recommended models first, the full catalog on demand or when searching; one row per variant across providers. Popover content. */
 export function ModelList({
   kind,
   value,
@@ -150,46 +183,56 @@ export function ModelList({
       Object.values(models)
         .filter((m) => m.kind === kind && providers.includes(m.provider))
         // Models that need a source video only appear where a picker asks for them (operations).
-        .filter((m) => (filter ? filter(m) : !m.needsVideo))
-        .sort((a, b) => (a.provider === b.provider ? a.name.localeCompare(b.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider))),
+        .filter((m) => (filter ? filter(m) : !m.needsVideo)),
     [models, kind, filter, providers],
   );
   const recommended = useMemo(() => {
+    if (kind === 'image') return all.filter((m) => m.provider === 'local' || familyOf(m) || m.ref === value);
     const rec = recommendedRefs();
     return all.filter((m) => m.provider === 'local' || rec.has(m.ref) || m.ref === value);
-  }, [all, value]);
+  }, [all, value, kind]);
   const needle = q.trim().toLowerCase();
   // Searching always covers the whole catalog; with no recommendations there is nothing to curate.
   const full = browseAll || Boolean(needle) || !recommended.length;
   const features = useMemo(() => [...new Set(all.flatMap(badges))].sort(), [all]);
-  const list = useMemo(() => {
-    const out = (full ? all : recommended)
-      .filter((m) => provider === 'all' || m.provider === provider)
-      .filter((m) => feature === 'all' || badges(m).includes(feature))
-      .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle));
-    if (sort === 'za') return [...out].sort((a, b) => (a.provider === b.provider ? b.name.localeCompare(a.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider)));
+  const allCount = useMemo(() => groupVariants(all, providers).length, [all, providers]);
+  // One entry per variant: every provider's copy of it, the cheapest selected on click.
+  const entries = useMemo(() => {
+    const out = groupVariants(
+      (full ? all : recommended)
+        .filter((m) => provider === 'all' || m.provider === provider)
+        .filter((m) => feature === 'all' || badges(m).includes(feature))
+        .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
+      providers,
+    );
+    const byName = (a: VariantGroup, b: VariantGroup) => a.best.name.localeCompare(b.best.name);
+    if (sort === 'za') return out.sort((a, b) => byName(b, a));
     if (sort === 'price-asc' || sort === 'price-desc') {
       const dir = sort === 'price-asc' ? 1 : -1;
-      return [...out].sort((a, b) => {
-        const pa = priceOf(a);
-        const pb = priceOf(b);
-        if (pa == null || pb == null) return pa == null ? (pb == null ? a.name.localeCompare(b.name) : 1) : -1;
-        return (pa - pb) * dir || a.name.localeCompare(b.name);
+      return out.sort((a, b) => {
+        const pa = priceOf(a.best);
+        const pb = priceOf(b.best);
+        if (pa == null || pb == null) return pa == null ? (pb == null ? byName(a, b) : 1) : -1;
+        return (pa - pb) * dir || byName(a, b);
       });
     }
-    return out;
+    return out.sort(byName);
   }, [full, all, recommended, provider, feature, needle, sort, providers]);
 
-  // Name sorts keep the provider groups; price sorts are one flat list across providers.
+  // Price sorts: one flat list. Recommended images: by family, in the chosen order. Otherwise: by maker.
   const byPrice = sort === 'price-asc' || sort === 'price-desc';
   const groups = useMemo(() => {
-    const g = new Map<string, ModelSummary[]>();
-    for (const m of list.slice(0, 400)) {
-      const key = byPrice ? 'By price' : PROVIDER_LABELS[m.provider];
-      g.set(key, [...(g.get(key) ?? []), m]);
+    const byFamily = kind === 'image' && !full;
+    const g = new Map<string, VariantGroup[]>();
+    for (const e of entries.slice(0, 400)) {
+      const m = e.best;
+      const key = byPrice ? 'By price' : m.provider === 'local' ? 'Local demo' : byFamily ? (familyOf(m) ?? 'Selected') : (vendorOf(m)?.[2] ?? 'Other');
+      g.set(key, [...(g.get(key) ?? []), e]);
     }
-    return [...g.entries()];
-  }, [list, byPrice]);
+    const rank = (k: string) => (byFamily ? FAMILY_ORDER.indexOf(k) : k === 'Other' || k === 'Local demo' ? 1 : 0);
+    const dir = sort === 'za' ? -1 : 1;
+    return [...g.entries()].sort(([a], [b]) => (byFamily ? rank(a) - rank(b) : rank(a) - rank(b) || a.localeCompare(b) * dir));
+  }, [entries, byPrice, kind, full, sort]);
 
   const remoteConnected = providers.length > 1;
 
@@ -231,33 +274,39 @@ export function ModelList({
             {value == null ? <Check size={14} className="ml-check" /> : null}
           </button>
         ) : null}
-        {groups.map(([label, ms]) => (
+        {groups.map(([label, es]) => (
           <div key={label} className="ml-group">
             <div className="ml-group-head">
               {label}
-              <span className="faint num">{ms.length}</span>
+              <span className="faint num">{es.length}</span>
             </div>
-            {ms.map((m) => (
-              <button key={m.ref} type="button" className={`ml-row ${value === m.ref ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
-                <Monogram m={m} />
-                <span className="ml-main">
-                  <span className="ml-name">{m.name}</span>
-                  <span className="ml-sub">{subtitle(m)}</span>
-                </span>
-                <span className="ml-side">
-                  {badges(m).map((b) => (
-                    <span key={b} className="badge">
-                      {b}
+            {es.map(({ key, members, best: m }) => {
+              const selected = members.some((x) => x.ref === value);
+              return (
+                <button key={key} type="button" className={`ml-row ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
+                  <Monogram m={m} />
+                  <span className="ml-main">
+                    <span className="ml-name">{m.name}</span>
+                    <span className="ml-sub">
+                      {m.provider !== 'local' ? <span className="ml-where">{where(members)}</span> : null}
+                      {subtitle(m)}
                     </span>
-                  ))}
-                  <span className="ml-price num">{priceHint(m)}</span>
-                </span>
-                {value === m.ref ? <Check size={14} className="ml-check" /> : null}
-              </button>
-            ))}
+                  </span>
+                  <span className="ml-side">
+                    {badges(m).map((b) => (
+                      <span key={b} className="badge">
+                        {b}
+                      </span>
+                    ))}
+                    <span className="ml-price num">{priceHint(m)}</span>
+                  </span>
+                  {selected ? <Check size={14} className="ml-check" /> : null}
+                </button>
+              );
+            })}
           </div>
         ))}
-        {!list.length ? (
+        {!entries.length ? (
           <div className="ml-empty">
             {providers.some((p) => status[p] === 'loading') ? (
               <>
@@ -278,10 +327,10 @@ export function ModelList({
         <div className="ml-foot">
           {recommended.length && !needle ? (
             <button type="button" className="ml-foot-main" onClick={() => setBrowseAll((v) => !v)}>
-              {browseAll ? 'Show recommended' : `Browse all models (${all.length})`}
+              {browseAll ? 'Show recommended' : `Browse all models (${allCount})`}
             </button>
           ) : (
-            <span className="ml-foot-main faint">{needle ? `${list.length} of ${all.length}` : `${all.length} models`}</span>
+            <span className="ml-foot-main faint">{needle ? `${entries.length} of ${allCount}` : `${allCount} models`}</span>
           )}
           <button type="button" className="ml-foot-icon" aria-label="Manage providers" data-tip="Manage providers" onClick={() => setUi({ settingsOpen: true })}>
             <Settings2 size={14} />
