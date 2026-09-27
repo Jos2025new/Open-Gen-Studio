@@ -1,6 +1,6 @@
 # Plan: elección de modelo por propósito y precio exacto
 
-Fecha: 2026-09-26. Estado: **decidido por completo, sin implementar**. Rama: `claude/stoic-davinci-xt7o4z`.
+Fecha: 2026-09-26. Estado: **implementado (C1–C4, 2026-09-27, Claude en la nube)**; falta la prueba del usuario en el navegador. Detalle y límites en `TRAZABILIDAD.md`. Rama: `claude/stoic-davinci-xt7o4z`.
 Lista de seguimiento: sección C1–C4 de `AGENTS.md`. Datos de precios: `PRECIOS_VIDEO.md`.
 
 ## Por qué hace falta
@@ -46,3 +46,9 @@ Ninguna decisión pendiente: el plan está listo para implementar.
 
 ## Cómo se verifica
 Tests: la tabla elige el modelo esperado según el propósito, las entradas y los proveedores conectados; el presupuesto de Atlas se pide con el mismo cuerpo que el envío (fetch simulado); la marca del composer. El usuario prueba en el navegador: el agente ya no elige Kling y la tarjeta muestra el precio exacto de Atlas.
+
+## Al implementarlo (2026-09-27)
+- C3: la forma exacta del cuerpo de `model/calculate` no se pudo comprobar desde la nube (Atlas bloqueado por su red). Se envía el mismo cuerpo que la generación, sin medios y con un prompt de relleno. Si Atlas espera otra forma, el presupuesto falla en silencio y queda la estimación con "≥": comprobar en el navegador que el precio pasa a exacto.
+- C4: una guía ya leída en la conversación no se reenvía entera (recordatorio corto).
+- Las líneas `best_for` (R3) se alinearon con esta tabla; la regla "Video by purpose" del prompt fijo se sustituyó por "set purpose on each video step" (mismo tamaño).
+

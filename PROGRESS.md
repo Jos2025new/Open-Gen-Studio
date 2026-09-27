@@ -14,6 +14,9 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - `src/store/store.ts` (zustand + persistencia IndexedDB debounced, wipeAllData).
 - UI escrita: App, main, shell (Sidebar, TopBar+slot, SettingsPanel, SidePanel, SessionsPanel), gallery/GalleryPanel, ui (Popover arriba-derecha, TooltipLayer, primitives, SpendConfirm, AssetMedia, Toasts, hooks), assets (OpForm, GenerationInfo, AssetActions, Lightbox), composer (Composer, ModeMenu, AgentControls, MediaControls, ModelList, ThreadPeek), chat (ChatWorkspace, FeedList, GenerationCard, PlanCard, QuestionsCard), node (NodeWorkspace, nodes), designer/Stage.tsx.
 
+## Modelo por propósito y precio exacto — 2026-09-27 (Claude, nube; rama `claude/stoic-davinci-xt7o4z`)
+- C1–C4 de `PLAN_ROUTING_COST.md`: la app elige el modelo de vídeo por propósito y precio (H3 Max Turbo, H3 Developer, Seedance 2.0 Fast, Wan 3); el modelo del composer solo manda si lo eligió el usuario; precio exacto de Atlas antes de generar y guardado como coste real; el contexto nombra el modelo por defecto y su guía. 207 tests, typecheck y build correctos. Sin navegador. Límite: el cuerpo de `model/calculate` sin verificar desde la nube.
+
 ## Agente, ruta estándar y gasto — 2026-09-26 (Claude, sesión en la nube; rama `claude/stoic-davinci-xt7o4z`)
 Detalle por cambio en `TRAZABILIDAD.md` (qué, dónde, verificación, límites y qué se espera ver); plan y porqués en `PLAN_AGENT_ROUTE.md` y `AGENTS.md`.
 - R0: métricas por petición del agente (`agent/metrics.ts`) y banco de pruebas (`tests/bench/`), sin cambiar el comportamiento.
