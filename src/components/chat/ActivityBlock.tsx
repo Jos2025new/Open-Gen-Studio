@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, ChevronDown, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
+import { BookOpen, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
 import type { ActivityEntry, ActivityFeedItem } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { useNow } from '../ui/hooks';
@@ -33,13 +33,11 @@ export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; ses
   const running = !item.endedAt && busy;
   const now = useNow(1000, running);
   const [open, setOpen] = useState(true);
-  // A finished turn with nothing to show (a plain answer, thinking off) leaves no block behind.
-  if (!running && !item.entries.length) return null;
   const elapsed = (item.endedAt ?? now) - item.startedAt;
   return (
     <section className={`activity ${running ? 'is-running' : ''}`} aria-live="polite">
       <button type="button" className="act-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        {running ? <LoaderCircle size={13} className="spin" /> : open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+        {running ? <LoaderCircle size={13} className="spin" /> : !item.entries.length ? <Clock size={13} /> : open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <span>{running ? `${PHASE[phase]}… ${seconds(elapsed)}` : item.endedAt ? `Worked for ${seconds(elapsed)}` : 'Worked'}</span>
       </button>
       {open && item.entries.length ? (

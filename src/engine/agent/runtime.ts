@@ -503,7 +503,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
       return `${st.id} done`;
     })
     .join('; ');
-  patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" ${status}: ${summary}`].slice(-6) }));
+  patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`].slice(-6) }));
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else toast(`${plan.title} failed`, 'error');

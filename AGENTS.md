@@ -8,6 +8,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — el agente solo ve el lienzo activo; "Worked for Ns" siempre visible (2026-09-27)
+Origen: en el chat, el agente listó como suyos resultados del Node canvas (vídeo, hoja de poses, relight). Causa: el contexto listaba los 10 assets más recientes de toda la sesión. Y el bloque de actividad desaparecía en las respuestas simples (se ocultaba a propósito si no había razonamiento ni acciones).
+- [x] `engine/canvas.ts` (`canvasIndex`): lienzo de cada resultado por el elemento del feed que lo muestra (cada uno guarda su `workspace`), el plan que lo creó (`plan.workspace`) o el origen (`node`/`designer`; `composer`/`op` → chat); subidas por el mensaje que las adjuntó o por un nodo asset del grafo; sin lienzo conocido (subida sin usar) → visible en todos. El contexto del agente lista solo los del lienzo activo ("recent assets on the chat canvas…"); las notas de planes dicen en qué lienzo corrió. El agente sigue operando en cualquier lienzo al cambiar de pestaña. El visor « » del chat recorre solo resultados del chat. *Dónde:* `canvas.ts`, `agent/context.ts`, `agent/runtime.ts`, `GenerationCard.tsx`. Test: `tests/canvas-scope.test.ts` (2).
+- [x] `ActivityBlock`: el turno terminado siempre deja "Worked for Ns" (con reloj si no hay nada que desplegar). Navegador: respuesta simple → "Worked for 2s".
+
 ## Tarea — barra lateral: New session arriba y destacado, Sessions sobre Gallery, saldo en verde (2026-09-27)
 - [x] "+ New session" pasa al principio (sobre Chat) con el acento (fondo, borde fino y color); Sessions va antes que Gallery con icono de carpeta (`Folder`); el saldo del pool de proveedores en verde (`--ok`) en la barra estrecha y en la ancha (en rojo si está vacío, como antes). Sin borde en el icono del monedero (el usuario prefirió no añadir borde). *Dónde:* `Sidebar.tsx`, `shell.css`. Navegador: barra estrecha y ancha.
 

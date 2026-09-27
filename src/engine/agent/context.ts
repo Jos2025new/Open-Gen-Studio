@@ -1,3 +1,4 @@
+import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
 import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skills';
@@ -197,13 +198,15 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
         .join(', ')}`,
     );
   }
+  // Only this canvas's results: the chat, the node canvas and the designer keep separate assets.
+  const canvas = canvasIndex(session, st.generations);
   const recent = Object.values(st.assets)
-    .filter((a) => a.sessionId === session.id)
+    .filter((a) => a.sessionId === session.id && canvas.visible(a, opts.workspace))
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 10);
   if (recent.length) {
     lines.push(
-      `recent assets (newest first):\n${recent
+      `recent assets on the ${opts.workspace} canvas (newest first; other canvases are not listed):\n${recent
         .map((a) => {
           const g = a.generationId ? st.generations[a.generationId] : undefined;
           const what = g ? (g.op ? OPS[g.op.id].label : truncate(g.prompt, 70)) : a.origin;

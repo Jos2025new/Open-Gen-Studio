@@ -6,6 +6,7 @@ import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, re
 import { canRecheck, cancelGeneration, recheckGeneration } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
+import { canvasIndex } from '../../engine/canvas';
 import { formatDuration } from '../../lib/format';
 import type { Generation } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -29,11 +30,13 @@ function metaLine(g: Generation): string {
     .join(' · ');
 }
 
-/** Results of a chat's generations, oldest first. */
+/** Results of this chat's generations, oldest first (not those of the node canvas or the designer). */
 function chatResults(sessionId: string): string[] {
   const st = useStore.getState();
+  const session = st.sessions[sessionId];
+  const canvas = session ? canvasIndex(session, st.generations) : undefined;
   return Object.values(st.generations)
-    .filter((x) => x.sessionId === sessionId && x.assetIds.length)
+    .filter((x) => x.sessionId === sessionId && x.assetIds.length && (!canvas || (canvas.generation(x) ?? 'chat') === 'chat'))
     .sort((a, b) => a.createdAt - b.createdAt)
     .flatMap((x) => x.assetIds.filter((id) => st.assets[id]));
 }
