@@ -56,8 +56,15 @@
 /* General actions: a short row under the result. */
 .gen-foot { display: flex; align-items: center; gap: 1px; padding: 2px 9px 7px; }
 /* One picture or clip: the card is as wide as the picture (360px at least); prompt and meta wrap to that width instead of widening it. */
-.gen-card.is-fit { align-self: flex-start; width: fit-content; min-width: min(100%, 300px); max-width: 100%; }
+.gen-card.is-fit { align-self: flex-start; width: fit-content; min-width: min(100%, 240px); max-width: 100%; }
 .gen-card.is-fit > .gen-head, .gen-card.is-fit > .gen-meta, .gen-card.is-fit > .gen-billed { width: 0; min-width: 100%; }
 .gen-foot .spacer { flex: 1; }
 .gen-foot .gen-delete { margin-left: 10px; }
 .fav-btn.is-active svg { fill: currentColor; }
+/* Single result: the picture almost fills the card (5px inset); prompt, meta and actions hug it. */
+.gen-card.is-fit .gen-head { padding: 9px 10px 2px; }
+.gen-card.is-fit .gen-meta { padding: 0 10px 7px; }
+.gen-card.is-fit .tiles.is-single { padding: 0 5px; }
+.gen-card.is-fit .tiles.is-single .tile { border-radius: 7px; }
+.gen-card.is-fit .tile-bar { right: 6px; bottom: 6px; }
+.gen-card.is-fit .gen-foot { padding: 3px 4px 4px; }
