@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { uid } from '../lib/id';
 import { stateDb } from '../lib/idb';
 import { disk } from '../lib/disk';
@@ -217,18 +217,24 @@ const initial: AppState = {
 // Persistence (IndexedDB, debounced)
 
 let writeTimer: number | undefined;
-let pendingWrite: { name: string; value: string } | null = null;
+// The latest state to save. Held as the (immutable) object and turned into JSON only when the debounced write runs:
+// stringifying the whole state on every change cost a full serialization per store update, which grows with the
+// history and piled up where many updates come together (the end of an agent turn, when its card appears).
+let pendingWrite: { name: string; value: StorageValue<Persisted> } | null = null;
 let wiping = false;
 
 function flushWrite(): void {
   if (!pendingWrite || wiping) return;
   const { name, value } = pendingWrite;
   pendingWrite = null;
-  stateDb.set(name, value).catch((err) => console.error('Could not save state', err));
+  stateDb.set(name, JSON.stringify(value)).catch((err) => console.error('Could not save state', err));
 }
 
-const idbStorage: StateStorage = {
-  getItem: async (name) => (await stateDb.get(name)) ?? null,
+const idbStorage: PersistStorage<Persisted> = {
+  getItem: async (name) => {
+    const raw = await stateDb.get(name);
+    return raw ? (JSON.parse(raw) as StorageValue<Persisted>) : null;
+  },
   setItem: (name, value) => {
     if (wiping) return;
     pendingWrite = { name, value };
@@ -254,7 +260,7 @@ export const useStore = create<AppState>()(
   persist(() => initial, {
     name: 'ogs-app',
     version: 1,
-    storage: createJSONStorage(() => idbStorage),
+    storage: idbStorage,
     partialize: (s): Persisted => ({
       settings: s.settings,
       spentUsd: s.spentUsd,

@@ -29,7 +29,7 @@ export interface ChatResult {
   finishReason: string | null;
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number; reasoningTokens?: number; cachedTokens?: number };
   /** Milliseconds from sending: first byte of the response, first reasoning fragment, first text or tool call (L4). */
-  timing: { ttfbMs: number; reasoningMs?: number; outputMs?: number; totalMs: number };
+  timing: { ttfbMs: number; reasoningMs?: number; outputMs?: number; /** First fragment of a tool call (the plan starts being written). */ toolMs?: number; totalMs: number };
 }
 
 export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
@@ -230,6 +230,7 @@ export async function chat(opts: {
   const ttfbMs = Date.now() - t0;
   let reasoningMs: number | undefined;
   let outputMs: number | undefined;
+  let toolMs: number | undefined;
   let thought = '';
 
   let text = '';
@@ -276,6 +277,7 @@ export async function chat(opts: {
     const tcs = delta.tool_calls as Array<Loose> | undefined;
     if (tcs?.length && !toolCallSeen) {
       outputMs ??= Date.now() - t0;
+      toolMs = Date.now() - t0;
       toolCallSeen = true;
       opts.onToolCall?.();
     }
@@ -293,5 +295,5 @@ export async function chat(opts: {
     .sort((a, b) => a[0] - b[0])
     .map(([i, c]) => ({ ...c, id: c.id || `call_${Date.now().toString(36)}_${i}` }))
     .filter((c) => c.name);
-  return { text, toolCalls, finishReason, usage, timing: { ttfbMs, reasoningMs, outputMs, totalMs: Date.now() - t0 } };
+  return { text, toolCalls, finishReason, usage, timing: { ttfbMs, reasoningMs, outputMs, toolMs, totalMs: Date.now() - t0 } };
 }

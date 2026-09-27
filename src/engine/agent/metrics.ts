@@ -79,7 +79,7 @@ type Event =
   | { type: 'findModels' }
   | { type: 'guide'; id: string }
   | { type: 'rejected' }
-  | { type: 'plan'; ms: number; revision: boolean; models: string[]; usd: number | null };
+  | { type: 'plan'; ms: number; revision: boolean; models: string[]; usd: number | null; checkMs?: number };
 
 export function recordMetric(sessionId: string, e: Event): void {
   patchOpen(sessionId, (m) => {
@@ -110,6 +110,7 @@ export function recordMetric(sessionId: string, e: Event): void {
           models: e.models,
           estimatedUsd: m.estimatedUsd ?? e.usd ?? undefined,
           lastEstimatedUsd: e.usd ?? undefined,
+          ...(e.checkMs != null ? { planCheckMs: [...(m.planCheckMs ?? []), e.checkMs].slice(-12) } : {}),
         };
     }
   });

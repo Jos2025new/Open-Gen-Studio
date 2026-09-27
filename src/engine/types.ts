@@ -783,7 +783,9 @@ export interface AgentRequestMetrics {
    * Per model call (L4), in ms from sending: first byte from the provider, first reasoning fragment, first text or
    * tool call, and the end; plus reasoning tokens and prompt tokens served from the provider's cache.
    */
-  callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
+  callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; toolMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
+  /** App time per plan card: from the end of the model call to the card in the chat (validation, model schemas, estimate). */
+  planCheckMs?: number[];
   /** Agent time until the first plan card. */
   msToPlan?: number;
   questionRounds: number;

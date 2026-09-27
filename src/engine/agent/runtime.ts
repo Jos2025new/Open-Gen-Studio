@@ -344,6 +344,7 @@ async function presentPlan(
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
 ): Promise<{ errors: string[]; itemId?: string }> {
+  const started = Date.now();
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
   if (!plan) return { errors };
@@ -367,7 +368,7 @@ async function presentPlan(
   // Recorded before an auto-approval closes the request.
   if (agentMs != null) {
     const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];
-    recordMetric(sessionId, { type: 'plan', ms: agentMs, revision: replaced, models, usd: total.usd });
+    recordMetric(sessionId, { type: 'plan', ms: agentMs, revision: replaced, models, usd: total.usd, checkMs: Date.now() - started });
   }
   if (style === 'auto' && !needsSpendCheck(total)) {
     void approvePlan(sessionId, item.id);
