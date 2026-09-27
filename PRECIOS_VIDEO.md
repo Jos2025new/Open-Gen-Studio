@@ -15,7 +15,7 @@ Fuentes, consultadas por terminal el 2026-09-26, sin clave y sin coste:
 | Wan 3.0 Prime | **0,061** | 0,068 | 0,14 | 0,0625 | 0,125 | Atlas en el tramo mínimo; a 720p NanoGPT (0,125) |
 | Seedance 2.0 Fast | **0,027** | 0,040 | 0,091 | — | 0,071 | Atlas en el tramo mínimo; a 720p NanoGPT (0,071) frente a OpenRouter (0,091); Atlas a 720p sin publicar |
 | MiniMax H3 (standard) | **0,038** | 0,13 (tarifa única) | 0,13 | 0,13 | 0,13 | Atlas, aunque se duplique a 768P |
-| HappyHorse 1.1 | **0,070** (720P es su mínimo) | — | 0,0988 | — | 0,082 | Atlas (0,070 a 720p: dato comparable) |
+| HappyHorse 1.1 | 0,070 (480p) | — | 0,0988 (720p) | — | 0,082 (720p) | Ver comparación a 720p: NanoGPT |
 | Grok Imagine Video 1.5 | **0,028** (Developer) / 0,08 | 0,08 | 0,14 | 0,08 | 0,14 | Atlas v1.5 Developer |
 
 ## Cobros reales de Atlas por resolución (dato duro)
@@ -29,13 +29,34 @@ Fuente: `open-generation-studio/data/studio.db` (tabla `jobs`: `actual_cost`, du
 
 El precio base de la API de Atlas es el de 480p. Seedance escala con los píxeles (×2,2, igual que sus tokens de vídeo: 720p ≈ 2,25 × 480p); Wan ×2. El audio no cambió el precio de Seedance 2.0 Mini.
 
+### Presupuesto exacto de Atlas (`POST /api/v1/model/calculate`, 2026-09-26)
+Atlas calcula el precio de una petición concreta **sin ejecutarla y sin clave**; devuelve `price`, `origin_price` y `discount`. Coincide con los cobros reales (Wan 3.0 720p 5 s = 0,40 USD = 0,08/s; Seedance 2.0 Fast 720p = 0,0585/s). Es el método que usaba `open-generation-studio` (regla "nada gasta sin quote").
+
+| Atlas | 480p (USD/s) | 720p / 768P (USD/s) |
+|---|---|---|
+| Wan 3.0 | 0,040 | **0,080** |
+| Wan 3.0 Prime | — | **0,126** |
+| Seedance 2.0 Fast | 0,027 | **0,0585** |
+| Seedance 2.5 | 0,141 | **0,303** |
+| MiniMax H3 (standard) | 0,038 | **0,080** (768P) |
+| MiniMax H3 Developer | — | **0,024** (768P) |
+| MiniMax H3 Max Turbo | — | **0,038** (768P) |
+| HappyHorse 1.1 | 0,070 | **0,140** |
+| Grok Imagine Video 1.5 Developer | 0,028 | **0,049** |
+| Kling V3 std (sin resolución) | — | 0,071 sin sonido / **0,107** con sonido |
+| Veo 3.1 Lite | — | **0,050** (8 s) |
+| Gemini Omni 1.1 Flash | — | **0,099** |
+
 ### Comparación a 720p (resolución media por defecto de la app)
-| Modelo | Atlas 720p | OpenRouter 720p | NanoGPT 720p | Más barato |
+| Modelo | Atlas 720p (exacto) | OpenRouter 720p | NanoGPT 720p | Más barato |
 |---|---|---|---|---|
-| Wan 3.0 | **0,080** (medido) | 0,10 | 0,13 | Atlas |
-| Seedance 2.0 Fast | **0,0585** (medido) | 0,091 | 0,071 | Atlas |
-| Seedance 2.5 | ≈ 0,30 (estimado: 0,134 × 2,25; sin medir) | **0,231** | 0,36 | OpenRouter (salvo medición de Atlas) |
-| HappyHorse 1.1 | **0,070** (su mínimo es 720p) | 0,0988 | 0,082 | Atlas |
+| Wan 3.0 | **0,080** | 0,10 | 0,13 | Atlas |
+| Wan 3.0 Prime | 0,126 | 0,14 | **0,125** | Empate Atlas / NanoGPT |
+| Seedance 2.0 Fast | **0,0585** | 0,091 | 0,071 | Atlas |
+| Seedance 2.5 | 0,303 | **0,231** | 0,36 | OpenRouter |
+| MiniMax H3 (768P) | **0,080** | 0,13 | 0,13 | Atlas (y H3 Developer 0,024) |
+| HappyHorse 1.1 | 0,140 | 0,0988 | **0,082** | **NanoGPT** (corrige la versión anterior de este documento) |
+| Grok 1.5 | **0,049** (Developer) | 0,14 | 0,14 | Atlas |
 
 ## Discrepancias con las capturas de la web de Atlas
 - MiniMax H3: web 0,08/s frente a API 0,038/s (~2,1×) → la web parece mostrar la resolución por defecto (768P), la API el mínimo (480P).
@@ -49,5 +70,5 @@ Conclusión: el precio de la web de Atlas no siempre es el de la API; ninguno de
 - Kling V3 std: Atlas 0,071, OpenRouter 0,084 (0,126 con audio), NanoGPT 0,084/s (×1,5 con audio).
 
 ## Límites de este análisis
-- Atlas a 720p no está publicado; está medido para Wan 3.0 y Seedance 2.0 Fast/Mini (arriba). Seedance 2.5, MiniMax H3 y Grok a 720p en Atlas siguen sin medir.
+- Atlas a 720p no aparece en el catálogo, pero su endpoint de presupuesto lo da exacto (arriba). NanoGPT no tiene presupuesto: su precio sale del catálogo y solo el cobro real lo confirma.
 - Precios de catálogo a esta fecha; cambian.
