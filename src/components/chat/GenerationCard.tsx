@@ -96,8 +96,10 @@ export function GenerationCard({ generationId, compact = false }: { generationId
     setUi({ lightbox: at >= 0 ? { assetIds: all, index: at } : { assetIds: outputs, index: i } });
   };
   const regenEstimate = regenerateEstimate(g.id) ?? g.estimate;
-  // One picture or clip: its own size, capped in height (audio and 3D keep the full-width strip).
-  const single = outputs.length + pendingSlots === 1 && (g.kind === 'image' || g.kind === 'video');
+  // Pictures and clips, one or several: each at its own shape and a shared height, the card as wide as they are
+  // (audio and 3D keep the full-width strip). Several results use a lower height and wrap.
+  const shown = outputs.length + pendingSlots;
+  const single = shown >= 1 && (g.kind === 'image' || g.kind === 'video');
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
@@ -163,12 +165,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           </div>
         </div>
       ) : (
-        <div className={`tiles ${single ? 'is-single' : ''}`} style={{ ['--cols' as string]: cols }}>
+        <div className={`tiles ${single ? 'is-single' : ''} ${single && shown > 1 ? 'is-multi' : ''}`} style={{ ['--cols' as string]: cols }}>
           {outputs.map((id, i) => (
             <div
               key={id}
               className={`tile ${outputs.length > 1 && i === selected ? 'is-selected' : ''}`}
-              // Its own shape, so a single result is sized from the file's dimensions rather than the loaded picture.
+              // Its own shape, so results are sized from the file's dimensions rather than the loaded picture.
               style={tileRatio(id)}
               role="button"
               tabIndex={0}

@@ -8,6 +8,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — varios resultados con la misma regla que uno (2026-09-27)
+Origen: Variations ×2 salía en la rejilla antigua (tarjeta a todo el ancho, columnas iguales, imagen encajada con bandas negras). Causa: la tarjeta tenía dos reglas y solo se había pulido la de un resultado.
+- [x] **Regla única de la tarjeta de imagen o vídeo (uno o varios resultados, terminados o en curso):** cada resultado con su propia proporción (del archivo) y un alto común, sin bandas; la tarjeta mide lo que ellos (mínimo 240 px). Un resultado: alto `min(400px, 55vh)`. Varios: `min(260px, 40vh)`, separados 5 px y pasan a otra fila si no caben. Audio, 3D, texto y errores siguen a todo el ancho. Anchos con `calc(alto × proporción)` + `max-width: 100%` (un porcentaje dentro de `min()` rompía el cálculo del ancho de la tarjeta y apilaba los huecos de espera). *Dónde:* `GenerationCard.tsx`, `chat.css`. Navegador: uno, dos terminados, dos en curso.
+
 ## Tarea — Relight y Reframe no deben cambiar más de lo pedido (2026-09-27)
 Origen: prueba real (GPT Image 2.5 edit): Relight añadió un foco visible y Reframe inventó suelo y cielo más detallados. Causa: la instrucción de Reframe pedía "continue the environment… naturally" y la de Relight no prohibía añadir fuentes de luz ni escenario.
 - [x] Relight: "Relighting edit only. Change only the lighting…", solo sombras/luces/reflejos/temperatura; mismo sujeto, encuadre, fondo y estilo; sin fuentes de luz visibles (sol, lámparas, destellos) ni objetos o escenario nuevos; intensidad Subtle explicada. Reframe: "Outpainting only", el original intacto y centrado; los márgenes continúan lo que ya hay en los bordes (fondo liso → liso); nada nuevo salvo lo que pida la nota ("In the new area, add only this: …"). *Dónde:* `ops.ts`. Test: `tests/op-instructions.test.ts` (2). Límite: es una instrucción al modelo; algunos modelos pueden seguir tomándose libertades (probar en la próxima prueba real).

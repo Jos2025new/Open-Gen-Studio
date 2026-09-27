@@ -38,11 +38,11 @@
 /* One result: shown at its own size under the prompt, capped in height, no letterbox bars. */
 .tiles.is-single { --tile-h: min(400px, 55vh); display: flex; padding: 0 14px 4px; }
 .tiles.is-single .tile { width: fit-content; max-width: 100%; border-radius: 6px; }
-.tiles.is-single .tile[style*='--ratio'] { width: min(100%, calc(var(--tile-h) * var(--ratio))); }
+.tiles.is-single .tile[style*='--ratio'] { width: calc(var(--tile-h) * var(--ratio)); max-width: 100%; }
 .tiles.is-single .tile[style*='--ratio'] > .media { width: 100%; height: auto; }
 .tiles.is-single .tile > .media { display: block; width: auto; height: auto; max-width: 100%; }
 .tiles.is-single .tile > .media-loading { height: var(--tile-h); }
-.tiles.is-single .tile-pending { width: min(100%, calc(var(--tile-h) * var(--ratio))); min-height: 0; }
+.tiles.is-single .tile-pending { width: calc(var(--tile-h) * var(--ratio)); max-width: 100%; min-height: 0; }
 .tiles:not(.is-single) .tile-pending { max-height: var(--tile-h); }
 
 /* Operations over the picture: bottom right, shown on hover, focus or while their menu is open (always on touch screens). */
@@ -68,3 +68,7 @@
 .gen-card.is-fit .tiles.is-single .tile { border-radius: 7px; }
 .gen-card.is-fit .tile-bar { right: 6px; bottom: 6px; }
 .gen-card.is-fit .gen-foot { padding: 3px 4px 4px; }
+
+/* Several results: same rule as one (own shape, no bars), a lower shared height, wrapping with a small gap. */
+.tiles.is-single.is-multi { --tile-h: min(260px, 40vh); flex-wrap: wrap; gap: 5px; }
+.tiles.is-single.is-multi .tile.is-selected { outline-offset: -2px; }
