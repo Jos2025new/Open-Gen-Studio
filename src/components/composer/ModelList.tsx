@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
-import { Check, KeyRound, Search, Settings2 } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lucide-react';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
 import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
-import { Spinner } from '../ui/primitives';
+import { MenuItem, Spinner } from '../ui/primitives';
+import { Popover, usePopover } from '../ui/Popover';
+import { usePref } from '../ui/hooks';
 
 export function priceHint(m: ModelSummary): string {
   if (m.provider === 'local') return 'Free';
@@ -84,6 +86,40 @@ function subtitle(m: ModelSummary): string {
   return `${input} to ${m.textOutput ? 'text' : m.kind === 'model3d' ? '3D' : m.kind}`;
 }
 
+type SortId = 'az' | 'za' | 'price-asc' | 'price-desc';
+const SORTS: Array<[SortId, string]> = [
+  ['az', 'Name A–Z'],
+  ['za', 'Name Z–A'],
+  ['price-asc', 'Price: low to high'],
+  ['price-desc', 'Price: high to low'],
+];
+
+/** Listed price for sorting; local models are free, unknown prices go last. */
+function priceOf(m: ModelSummary): number | undefined {
+  return m.provider === 'local' ? 0 : m.price?.skus[0]?.usd;
+}
+
+/** A small "Label ▾" chip in the filter row that opens a menu of choices. */
+function FilterMenu<T extends string>({ label, icon, value, options, onChange, active }: { label: string; icon?: ReactNode; value: T; options: Array<[T, ReactNode]>; onChange: (v: T) => void; active?: boolean }) {
+  const pop = usePopover();
+  return (
+    <>
+      <button ref={pop.ref} type="button" className={`ml-filter ${active ? 'is-active' : ''} ${pop.open ? 'is-open' : ''}`} onClick={pop.toggle} aria-haspopup="menu" aria-expanded={pop.open}>
+        {icon}
+        <span className="ml-filter-label">{label}</span>
+        <ChevronDown size={12} />
+      </button>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={200} label={label}>
+        <div className="menu">
+          {options.map(([id, text]) => (
+            <MenuItem key={id} label={text} active={id === value} right={id === value ? <Check size={13} /> : null} onClick={() => { onChange(id); pop.close(); }} />
+          ))}
+        </div>
+      </Popover>
+    </>
+  );
+}
+
 /** Model list grouped by provider: recommended models first, the full catalog on demand or when searching. Popover content. */
 export function ModelList({
   kind,
@@ -104,6 +140,8 @@ export function ModelList({
   useStore((s) => s.settings.keys);
   const [q, setQ] = useState('');
   const [provider, setProvider] = useState<ProviderId | 'all'>('all');
+  const [feature, setFeature] = useState('all');
+  const [sort, setSort] = usePref<SortId>('ogs.modelSort', 'az');
   const [browseAll, setBrowseAll] = useState(false);
   const providers = connectedProviders();
 
@@ -123,19 +161,35 @@ export function ModelList({
   const needle = q.trim().toLowerCase();
   // Searching always covers the whole catalog; with no recommendations there is nothing to curate.
   const full = browseAll || Boolean(needle) || !recommended.length;
-  const list = useMemo(
-    () =>
-      (full ? all : recommended)
-        .filter((m) => !full || provider === 'all' || m.provider === provider)
-        .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
-    [full, all, recommended, provider, needle],
-  );
+  const features = useMemo(() => [...new Set(all.flatMap(badges))].sort(), [all]);
+  const list = useMemo(() => {
+    const out = (full ? all : recommended)
+      .filter((m) => provider === 'all' || m.provider === provider)
+      .filter((m) => feature === 'all' || badges(m).includes(feature))
+      .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle));
+    if (sort === 'za') return [...out].sort((a, b) => (a.provider === b.provider ? b.name.localeCompare(a.name) : providers.indexOf(a.provider) - providers.indexOf(b.provider)));
+    if (sort === 'price-asc' || sort === 'price-desc') {
+      const dir = sort === 'price-asc' ? 1 : -1;
+      return [...out].sort((a, b) => {
+        const pa = priceOf(a);
+        const pb = priceOf(b);
+        if (pa == null || pb == null) return pa == null ? (pb == null ? a.name.localeCompare(b.name) : 1) : -1;
+        return (pa - pb) * dir || a.name.localeCompare(b.name);
+      });
+    }
+    return out;
+  }, [full, all, recommended, provider, feature, needle, sort, providers]);
 
+  // Name sorts keep the provider groups; price sorts are one flat list across providers.
+  const byPrice = sort === 'price-asc' || sort === 'price-desc';
   const groups = useMemo(() => {
-    const g = new Map<ProviderId, ModelSummary[]>();
-    for (const m of list.slice(0, 400)) g.set(m.provider, [...(g.get(m.provider) ?? []), m]);
+    const g = new Map<string, ModelSummary[]>();
+    for (const m of list.slice(0, 400)) {
+      const key = byPrice ? 'By price' : PROVIDER_LABELS[m.provider];
+      g.set(key, [...(g.get(key) ?? []), m]);
+    }
     return [...g.entries()];
-  }, [list]);
+  }, [list, byPrice]);
 
   const remoteConnected = providers.length > 1;
 
@@ -145,16 +199,30 @@ export function ModelList({
         <Search size={14} />
         <input autoFocus placeholder={`Search ${kind} models`} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search models" />
       </div>
-      {remoteConnected && full ? (
-        <div className="ml-providers">
-          {(['all', ...providers] as Array<ProviderId | 'all'>).map((p) => (
-            <button key={p} type="button" className={`ml-prov ${provider === p ? 'is-active' : ''}`} onClick={() => setProvider(p)}>
-              {p === 'all' ? 'All' : PROVIDER_LABELS[p]}
-              {p !== 'all' && status[p] === 'loading' ? <Spinner size={11} /> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div className="ml-filters">
+        {remoteConnected ? (
+          <FilterMenu
+            label={provider === 'all' ? 'All providers' : PROVIDER_LABELS[provider]}
+            value={provider}
+            active={provider !== 'all'}
+            onChange={setProvider}
+            options={(['all', ...providers] as Array<ProviderId | 'all'>).map((p) => [
+              p,
+              p === 'all' ? 'All providers' : (
+                <span className="ml-filter-opt">
+                  {PROVIDER_LABELS[p]}
+                  {status[p] === 'loading' ? <Spinner size={11} /> : null}
+                </span>
+              ),
+            ])}
+          />
+        ) : null}
+        {features.length ? (
+          <FilterMenu label={feature === 'all' ? 'All features' : feature} value={feature} active={feature !== 'all'} onChange={setFeature} options={[['all', 'All features'], ...features.map((f): [string, string] => [f, f])]} />
+        ) : null}
+        <span className="ml-filters-gap" />
+        <FilterMenu label={SORTS.find(([id]) => id === sort)?.[1] ?? 'Sort'} icon={<ArrowDownUp size={12} />} value={sort} onChange={setSort} options={SORTS} />
+      </div>
       <div className="ml-scroll">
         {autoOption ? (
           <button type="button" className={`ml-row ${value == null ? 'is-selected' : ''}`} onClick={() => onSelect(null)}>
@@ -163,10 +231,10 @@ export function ModelList({
             {value == null ? <Check size={14} className="ml-check" /> : null}
           </button>
         ) : null}
-        {groups.map(([p, ms]) => (
-          <div key={p} className="ml-group">
+        {groups.map(([label, ms]) => (
+          <div key={label} className="ml-group">
             <div className="ml-group-head">
-              {PROVIDER_LABELS[p]}
+              {label}
               <span className="faint num">{ms.length}</span>
             </div>
             {ms.map((m) => (

@@ -8,6 +8,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — filtrar y ordenar la lista de modelos (2026-09-27)
+- [x] Fila bajo la búsqueda con tres desplegables como la referencia: *All providers* (proveedor), *All features* (las etiquetas de los modelos listados: Edit, Upscale, I2V…) y orden (Name A–Z, Name Z–A, Price low→high, high→low; el orden se recuerda). Los filtros valen también en la vista recomendada. Por nombre se agrupa por proveedor; por precio es una sola lista ("By price"), precio desconocido al final. Límite: el precio compara la cifra publicada, que puede ser por imagen, por segundo o por MP. *Dónde:* `ModelList.tsx`, `composer.css`. Navegador: Edit + precio de mayor a menor.
+
 ## Tarea — formato en un solo chip (2026-09-27)
 - [x] Los chips sueltos de proporción, resolución y cantidad (imagen) o duración (vídeo) pasan a uno solo, `FormatChip` ("▢ 9:16 · 2k · 3"), con un panel de secciones como la referencia: *Aspect ratio* (fila de glifos con su etiqueta; Auto = cuadrado discontinuo), *Resolution*, *Images to generate* (1–4; aviso si el modelo devuelve menos por petición) o *Duration*. Opciones en una pista hundida, la elegida resaltada; el panel no se cierra al elegir. Solo salen las secciones que el esquema del modelo tiene. Audio, Subjects, Shots, Lyrics y Advanced (parámetros extra de cada modelo) siguen igual. *Dónde:* `MediaControls.tsx`, `composer.css`. Navegador: imagen (9:16 · 2k · 3) y vídeo (16:9 · 720p · 5s).
 
