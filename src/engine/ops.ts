@@ -90,7 +90,18 @@ export const OPS: Record<OpId, OpDef> = {
         chiaroscuro: 'dramatic chiaroscuro lighting with deep shadows',
       };
       const light = names[String(p.preset)] ?? String(p.preset);
-      return `Relight this image with ${light} coming from the ${p.direction}, ${p.intensity} intensity. Adapt shadows, highlights and color temperature consistently. ${PRESERVE}${note(p)}`;
+      const strength: Record<string, string> = {
+        subtle: 'subtle intensity: a gentle shift, the original look stays recognizable',
+        medium: 'medium intensity',
+        strong: 'strong intensity',
+      };
+      // Lighting only: the model must not redraw, restyle or add anything (it tended to add suns, flares and scenery).
+      return [
+        `Relighting edit only. Change only the lighting: ${light} coming from the ${p.direction}, ${strength[String(p.intensity)] ?? `${p.intensity} intensity`}.`,
+        'Recompute shadows, highlights, reflections and color temperature so they match this light, and nothing else.',
+        'Keep everything else exactly as it is: the same subject, face, hair, pose, clothing, proportions, framing, crop, camera angle, background and art style.',
+        'Do not add or remove anything: no visible light sources (sun, lamps, lens flares, glows, bokeh), no new objects, scenery, floor, sky or background detail.',
+      ].join(' ') + note(p);
     },
   },
   angle: {
@@ -180,7 +191,16 @@ export const OPS: Record<OpId, OpDef> = {
       },
       { key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'What to reveal in the new area' },
     ],
-    instruction: (p) => `Extend this scene naturally to fill a ${p.aspect} frame (outpainting). Keep the original content intact and centered; continue the environment, lighting and style seamlessly.${note(p)}`,
+    // Outpainting only: the original stays untouched and the margins continue what is already at the edges.
+    instruction: (p) => {
+      const n = typeof p.note === 'string' ? p.note.trim() : '';
+      return [
+        `Outpainting only: extend the canvas to a ${p.aspect} frame.`,
+        'The original image stays exactly as it is, whole and centered: do not redraw, restyle, relight, move, resize or crop anything in it.',
+        'Fill only the new margins by continuing what is already at its edges, with the same background, color, texture, level of detail, lighting and style. A plain or flat background continues as the same plain background.',
+        n ? `In the new area, add only this: ${n}.` : 'Do not add anything that is not already there: no new objects, scenery, floor, ground, sky, horizon or extra detail.',
+      ].join(' ');
+    },
   },
   variations: {
     id: 'variations',
