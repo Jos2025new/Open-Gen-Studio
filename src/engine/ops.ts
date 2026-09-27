@@ -148,7 +148,7 @@ export const OPS: Record<OpId, OpDef> = {
         'close-up': 'a tighter close-up framing',
         wide: 'a wider establishing shot',
       };
-      return `Show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}. Re-render perspective and occlusion consistently; keep identity, outfit, materials, lighting and style.${note(p)}`;
+      return `Change only the camera viewpoint: show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}, re-rendering perspective and occlusion consistently. Keep identity, face, outfit, materials, colors, lighting and style. Do not add new objects, people or scenery.${note(p)}`;
     },
   },
   upscale: {
@@ -160,7 +160,7 @@ export const OPS: Record<OpId, OpDef> = {
     engine: 'upscale',
     quick: true,
     fields: [{ key: 'factor', label: 'Scale', type: 'choice', default: '2', options: opt(['2', '2×'], ['4', '4×']) }],
-    instruction: (p) => `Upscale this image ${p.factor}x. Recover fine texture and sharp detail without changing content, colors or composition.`,
+    instruction: (p) => `Upscale this image ${p.factor}x. Only sharpen and recover fine texture and detail. Keep content, composition, colors, faces and any text exactly as they are; do not add, remove or reinterpret anything.`,
   },
   remove_bg: {
     id: 'remove_bg',
@@ -214,7 +214,7 @@ export const OPS: Record<OpId, OpDef> = {
       { key: 'strength', label: 'Change', type: 'choice', default: 'medium', options: opt(['subtle', 'Subtle'], ['medium', 'Medium'], ['strong', 'Strong']) },
       { key: 'count', label: 'Images', type: 'choice', default: '2', options: opt(['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']) },
     ],
-    instruction: (p) => `Create a ${p.strength} variation of this image: same subject, style and palette, with a different composition, pose or details.`,
+    instruction: (p) => `Create a ${p.strength} variation of this image. Change only the composition, pose or details. Keep the same subject and identity, style and palette. Do not add new subjects, text or logos.`,
   },
   edit: {
     id: 'edit',
@@ -225,7 +225,7 @@ export const OPS: Record<OpId, OpDef> = {
     engine: 'edit',
     quick: false,
     fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. make the jacket red', required: true }],
-    instruction: (p) => `${String(p.instruction).trim()}. Apply only this change; keep everything else identical.`,
+    instruction: (p) => `Change only this: ${String(p.instruction).trim().replace(/\.$/, '')}. Keep everything else identical: subject and identity, composition and framing, lighting, colors and style. Do not add anything else.`,
   },
   animate: {
     id: 'animate',

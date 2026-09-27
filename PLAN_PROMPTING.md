@@ -1,6 +1,6 @@
 # Plan: prompting de imagen (síntesis de dos perspectivas)
 
-Fecha: 2026-09-26. **Estado: PENDIENTE DE REVISIÓN. No implementar todavía.**
+Fecha: 2026-09-26. **Estado: APLICADO el 2026-09-27 a petición del usuario** (§1–4 y ronda 2 puntos 1 y 4; detalle en `AGENTS.md`). Siguen fuera las afirmaciones sin fuente de la nota final, las marcas de retirada y Clarity.
 Ronda sin fuentes: no se contrastó con las APIs reales ni con los esquemas reales de los proveedores, y no se vieron los archivos fuente de los que salieron las dos perspectivas (la curada por el usuario y la de Qwen). Todo lo de abajo es propuesta hasta tener esas fuentes.
 
 ## 1. Reglas universales (en el prompt del agente, sustituyendo el bloque actual sin alargarlo)

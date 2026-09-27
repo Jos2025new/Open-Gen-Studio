@@ -1,7 +1,7 @@
 import { cacheDb } from '../../lib/idb';
 import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
-import { schemaFromJson, wireParams, type JsonProp } from '../params';
+import { schemaFromJson, wireParams, promptExpansion, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
@@ -169,6 +169,7 @@ export const fal: ProviderAdapter = {
     const { schema } = req;
     const body: Record<string, unknown> = wireParams(schema, req.settings, req.count);
     if (req.prompt && schema.slots.prompt) body[schema.slots.prompt] = req.prompt;
+    Object.assign(body, promptExpansion(schema, req.settings, req.prompt));
     const put = async (slot: { key: string; multiple?: boolean; max?: number } | undefined, inputs: MediaInput[]) => {
       if (!slot || !inputs.length) return;
       const encoded = await Promise.all(inputs.slice(0, slot.max ?? 1).map((i) => encodeImage(i, 'data-url')));

@@ -466,6 +466,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           audio: s.audio ?? defaults.audio,
           count: kind === 'model3d' ? 1 : s.count ?? (kind === 'video' ? 1 : defaults.count ?? 1),
           seed: s.seed,
+          // Only models with a negative prompt field take it (coerceSettings); others get constraints in the prompt.
+          negative: typeof s.params?.negative_prompt === 'string' ? s.params.negative_prompt : undefined,
           shots: kind === 'video' ? s.shots : undefined,
           // Structured params (colors as hex, palettes, style codes, ids): coerceSettings keeps only what the model takes.
           extras: s.params,

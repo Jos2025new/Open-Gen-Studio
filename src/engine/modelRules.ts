@@ -120,6 +120,8 @@ export interface ModelFit {
   match: RegExp;
   bestFor: string;
   avoidFor?: string;
+  /** How to shape the prompt for this family (image families, PLAN_PROMPTING.md §2). */
+  prompt?: string;
   source: string;
 }
 
@@ -130,9 +132,21 @@ export const MODEL_FITS: ModelFit[] = [
   { match: /seedance[-/]?2[.-]0[-/]?fast|seedance-2-0-fast/i, bestFor: 'normal clips (best quality for the price, up to 15 s)', source: 'PLAN_ROUTING_COST.md, normal row' },
   { match: /seedance[-/]?2[.-]5/i, bestFor: 'only when the user asks for it', avoidFor: 'default use (about 0.30 USD/s at 720p)', source: 'PLAN_ROUTING_COST.md; PRECIOS_VIDEO.md (Atlas quote 0.303 USD/s at 720p)' },
   { match: /wan-3\.0(?!-prime)/i, bestFor: 'long takes over 15 s (up to 30 s) and normal clips', source: 'PLAN_ROUTING_COST.md, normal and long rows' },
+  // Image families (PLAN_PROMPTING.md §2 and the image table of PLAN_AGENT_ROUTE.md R1; user-approved, 2026-09-27).
+  // Only the structure and the purpose: claims the plan marks as unsourced are left out.
+  { match: /gpt-?image-?2/i, bestFor: 'text in the image, design, edits, transparent backgrounds (params.background)', prompt: 'scene → subject → details → constraints', source: 'PLAN_PROMPTING.md §2' },
+  { match: /seedream/i, bestFor: 'character sheets, identity, face retouch', prompt: 'subject > setting > style > light > technique', source: 'PLAN_PROMPTING.md §2' },
+  { match: /nano-?banana-?pro/i, bestFor: 'photoreal hero shots', prompt: 'subject + action + context + composition + style', source: 'PLAN_PROMPTING.md §2' },
+  { match: /nano-?banana/i, bestFor: 'cartoon and illustration', prompt: 'subject + action + context + composition + style', source: 'PLAN_PROMPTING.md §2' },
+  { match: /recraft/i, bestFor: 'vector: logos, icons, stickers', prompt: 'short = the model interprets, long = control of the layout; flat vector: "flat colors, no gradients"', source: 'PLAN_PROMPTING.md §2' },
+  { match: /ideogram/i, bestFor: 'posters and typography', prompt: 'free text with the literal text in quotes (the app turns Magic Prompt off for quoted text or JSON)', source: 'PLAN_PROMPTING.md §2; fal ideogram schemas (expand_prompt)' },
+  { match: /z-?image[-/]?turbo/i, bestFor: 'fast, cheap images', prompt: 'long and structured; constraints stated positively (no negative prompt field)', source: 'PLAN_PROMPTING.md §2–3; live snapshot (no negative_prompt on Turbo)' },
+  { match: /qwen-?image/i, bestFor: 'realistic, detailed portraits', source: 'PLAN_PROMPTING.md §2' },
+  { match: /p-image|prunaai/i, bestFor: 'fast iteration', prompt: 'subject, behaviour, style, setting', source: 'PLAN_PROMPTING.md §2' },
+  { match: /step-?image-?edit/i, bestFor: 'quick edits', prompt: 'short and direct', source: 'PLAN_PROMPTING.md §2' },
 ];
 
 export function modelFit(modelId: string): string | undefined {
   const f = MODEL_FITS.find((x) => x.match.test(modelId));
-  return f ? `best for ${f.bestFor}${f.avoidFor ? `; avoid for ${f.avoidFor}` : ''}` : undefined;
+  return f ? `best for ${f.bestFor}${f.avoidFor ? `; avoid for ${f.avoidFor}` : ''}${f.prompt ? `; prompt shape: ${f.prompt}` : ''}` : undefined;
 }

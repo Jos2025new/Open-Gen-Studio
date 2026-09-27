@@ -235,7 +235,8 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     kind: kind === 'audio' && st.catalog.models[modelRef]?.textOutput ? 'text' : kind,
     prompt: text,
     modelRef,
-    settings: { ...settings, seed: undefined },
+    // Editing a result keeps its seed, so the edited prompt is the only change (PLAN_PROMPTING.md §4).
+    settings: { ...settings, seed: parentId ? settings.seed : undefined },
     inputs: {
       ...(kind === 'image'
         ? { refs: [...attachments, ...videoAttachments, ...audioAttachments] }
@@ -440,7 +441,7 @@ export async function editInComposer(generationId: string): Promise<void> {
     text: g.prompt,
     attachments: kind === 'image' || kind === 'audio' ? g.inputs.refs.filter((id) => get().assets[id]) : g.inputs.firstFrame && get().assets[g.inputs.firstFrame] ? [g.inputs.firstFrame] : [],
     editing: { generationId },
-    [kind]: { ...c[kind], modelRef: g.modelRef, settings: { ...g.settings, seed: undefined } },
+    [kind]: { ...c[kind], modelRef: g.modelRef, settings: { ...g.settings } },
   }));
   setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
 }

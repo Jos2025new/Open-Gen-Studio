@@ -713,9 +713,36 @@ export function mediumResolution(options: Array<string | number>, def?: unknown)
   return Number.isFinite(d) && d <= resolutionRank(mid) ? fallback : String(mid);
 }
 
+// Quality values above "medium" that a model may default to (fal GPT Image defaults to "high").
+const ABOVE_MEDIUM = new Set(['auto', 'high', 'xhigh', 'max']);
+
+/**
+ * Medium quality by default (PLAN_PROMPTING.md §3, like resolution in R1): an image model whose `quality` enum
+ * offers "medium" but defaults higher gets "medium" (GPT Image on fal, Grok Imagine quality edit). Quality can
+ * multiply the price; the user can still raise it in Advanced.
+ */
+export function mediumQuality(schema: ModelSchema, kind: MediaKind): Record<string, AdvancedValue> {
+  if (kind !== 'image') return {};
+  const p = schema.params.find((x) => x.key === 'quality' && x.role === 'other' && x.type === 'enum');
+  if (!p?.options?.includes('medium')) return {};
+  return ABOVE_MEDIUM.has(String(p.default ?? 'auto')) ? { quality: 'medium' } : {};
+}
+
+/**
+ * Ideogram's Magic Prompt (`expand_prompt`, on by default on fal) rewrites the prompt. Off when the prompt is JSON or
+ * carries literal text in quotes, which must reach the model as written (PLAN_PROMPTING.md §3), unless the user set it.
+ */
+export function promptExpansion(schema: ModelSchema, settings: GenSettings, prompt: string | undefined): Record<string, boolean> {
+  const p = schema.params.find((x) => x.key === 'expand_prompt' && x.type === 'boolean');
+  if (!p || p.default === false || settings.advanced.expand_prompt !== undefined || !prompt) return {};
+  const t = prompt.trim();
+  return t.startsWith('{') || /["“][^"”\n]+["”]/.test(t) ? { expand_prompt: false } : {};
+}
+
 export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind): GenSettings {
   const s: GenSettings = { count: 1, advanced: {} };
   if (!schema) return s;
+  s.advanced = mediumQuality(schema, kind);
   const aspect = paramByRole(schema, 'aspect');
   if (aspect?.options?.length) {
     const preferred = kind === 'video' ? '16:9' : '1:1';
@@ -739,7 +766,7 @@ export function defaultSettings(schema: ModelSchema | undefined, kind: MediaKind
 export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind, input: Partial<GenSettings>): { settings: GenSettings; changes: string[] } {
   const base = defaultSettings(schema, kind);
   const changes: string[] = [];
-  const out: GenSettings = { ...base, count: Math.max(1, Math.min(8, Math.round(input.count ?? 1))), advanced: {} };
+  const out: GenSettings = { ...base, count: Math.max(1, Math.min(8, Math.round(input.count ?? 1))), advanced: { ...base.advanced } };
   if (!schema) return { settings: { ...out, seed: input.seed }, changes };
 
   const aspect = paramByRole(schema, 'aspect');
