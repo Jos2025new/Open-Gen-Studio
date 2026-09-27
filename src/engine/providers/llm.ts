@@ -27,7 +27,25 @@ export interface ChatResult {
   text: string;
   toolCalls: Array<{ id: string; name: string; arguments: string }>;
   finishReason: string | null;
-  usage?: { inputTokens: number; outputTokens: number; costUsd?: number };
+  usage?: { inputTokens: number; outputTokens: number; costUsd?: number; reasoningTokens?: number; cachedTokens?: number };
+  /** Milliseconds from sending: first byte of the response, first reasoning fragment, first text or tool call (L4). */
+  timing: { ttfbMs: number; reasoningMs?: number; outputMs?: number; totalMs: number };
+}
+
+export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high';
+
+/**
+ * Reasoning fields per provider (L1–L2). NanoGPT documents `reasoning_effort` (none…high) and `reasoning.exclude`;
+ * OpenRouter the `reasoning` object. Atlas documents neither, so nothing is sent there.
+ */
+export function reasoningBody(provider: LlmProviderId, effort: ReasoningEffort | undefined, show: boolean): Record<string, unknown> {
+  // Nothing asked when nothing is set: the request stays as it was before these options existed.
+  if (provider === 'nanogpt') return { ...(effort ? { reasoning_effort: effort } : {}), ...(show ? { reasoning: { exclude: false } } : {}) };
+  if (provider === 'openrouter') {
+    if (effort === 'none') return { reasoning: { enabled: false, exclude: true } };
+    return { reasoning: { ...(effort ? { effort } : {}), exclude: !show } };
+  }
+  return {};
 }
 
 const ENDPOINTS: Record<LlmProviderId, { chat: string; models: string }> = {
@@ -155,9 +173,13 @@ export async function chat(opts: {
   system: string;
   messages: LlmMessage[];
   tools: ToolSpec[];
-  effort?: 'low' | 'medium' | 'high';
+  effort?: ReasoningEffort;
+  /** Ask the provider to stream the model's reasoning instead of hiding it (it thinks the same either way). */
+  showReasoning?: boolean;
   signal: AbortSignal;
   onText?: (delta: string, full: string) => void;
+  /** Reasoning fragments, when the provider streams them. */
+  onReasoning?: (delta: string, full: string) => void;
   /** Called once, when the first tool-call fragment arrives (the plan is being written). */
   onToolCall?: () => void;
 }): Promise<ChatResult> {
@@ -169,34 +191,46 @@ export async function chat(opts: {
     stream: true,
     max_tokens: 16000,
   };
-  if (opts.provider === 'openrouter') {
-    if (opts.effort) body.reasoning = { effort: opts.effort, exclude: true };
-    body.usage = { include: true };
-  }
+  if (opts.provider === 'openrouter') body.usage = { include: true };
   if (opts.provider !== 'openrouter') body.stream_options = { include_usage: true };
+  const reasoning = reasoningBody(opts.provider, opts.effort, opts.showReasoning === true);
 
-  let res: Response;
-  try {
-    res = await fetch(ENDPOINTS[opts.provider].chat, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...headers(opts.provider, opts.apiKey) },
-      body: JSON.stringify(body),
-      signal: opts.signal,
-    });
-  } catch (err) {
-    if (isAbort(err)) throw new AbortedError();
-    throw new Error(`Could not reach ${LLM_LABELS[opts.provider]}. Check your connection.`);
-  }
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => '');
+  const t0 = Date.now();
+  const send = async (withReasoning: boolean): Promise<Response> => {
+    try {
+      return await fetch(ENDPOINTS[opts.provider].chat, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...headers(opts.provider, opts.apiKey) },
+        body: JSON.stringify(withReasoning ? { ...body, ...reasoning } : body),
+        signal: opts.signal,
+      });
+    } catch (err) {
+      if (isAbort(err)) throw new AbortedError();
+      throw new Error(`Could not reach ${LLM_LABELS[opts.provider]}. Check your connection.`);
+    }
+  };
+  const failure = async (r: Response) => {
+    const text = await r.text().catch(() => '');
     let parsed: unknown = text;
     try {
       parsed = JSON.parse(text);
     } catch {
       /* raw text */
     }
-    throw new HttpError(res.status, extractErrorMessage(parsed, `${LLM_LABELS[opts.provider]} error ${res.status}`), parsed);
+    return new HttpError(r.status, extractErrorMessage(parsed, `${LLM_LABELS[opts.provider]} error ${r.status}`), parsed);
+  };
+  let res = await send(Object.keys(reasoning).length > 0);
+  if (!res.ok && res.status === 400 && Object.keys(reasoning).length) {
+    // A model that refuses the reasoning fields still answers without them (one retry, same request otherwise).
+    const err = await failure(res);
+    if (!/reason|effort|think/i.test(err.message)) throw err;
+    res = await send(false);
   }
+  if (!res.ok || !res.body) throw await failure(res);
+  const ttfbMs = Date.now() - t0;
+  let reasoningMs: number | undefined;
+  let outputMs: number | undefined;
+  let thought = '';
 
   let text = '';
   let toolCallSeen = false;
@@ -214,22 +248,34 @@ export async function chat(opts: {
     if (chunk.error) throw new HttpError(500, extractErrorMessage(chunk, 'Model error'), chunk);
     const u = chunk.usage as Loose | undefined;
     if (u) {
+      const out = u.completion_tokens_details as Loose | undefined;
+      const inp = u.prompt_tokens_details as Loose | undefined;
       usage = {
         inputTokens: Number(u.prompt_tokens ?? 0),
         outputTokens: Number(u.completion_tokens ?? 0),
         costUsd: typeof u.cost === 'number' ? u.cost : undefined,
+        reasoningTokens: typeof out?.reasoning_tokens === 'number' ? out.reasoning_tokens : undefined,
+        cachedTokens: typeof inp?.cached_tokens === 'number' ? inp.cached_tokens : undefined,
       };
     }
     const choice = (chunk.choices as Loose[] | undefined)?.[0];
     if (!choice) continue;
     if (choice.finish_reason) finishReason = String(choice.finish_reason);
     const delta = (choice.delta ?? {}) as Loose;
+    const r = typeof delta.reasoning === 'string' ? delta.reasoning : typeof delta.reasoning_content === 'string' ? delta.reasoning_content : '';
+    if (r) {
+      reasoningMs ??= Date.now() - t0;
+      thought += r;
+      opts.onReasoning?.(r, thought);
+    }
     if (typeof delta.content === 'string' && delta.content) {
+      outputMs ??= Date.now() - t0;
       text += delta.content;
       opts.onText?.(delta.content, text);
     }
     const tcs = delta.tool_calls as Array<Loose> | undefined;
     if (tcs?.length && !toolCallSeen) {
+      outputMs ??= Date.now() - t0;
       toolCallSeen = true;
       opts.onToolCall?.();
     }
@@ -247,5 +293,5 @@ export async function chat(opts: {
     .sort((a, b) => a[0] - b[0])
     .map(([i, c]) => ({ ...c, id: c.id || `call_${Date.now().toString(36)}_${i}` }))
     .filter((c) => c.name);
-  return { text, toolCalls, finishReason, usage };
+  return { text, toolCalls, finishReason, usage, timing: { ttfbMs, reasoningMs, outputMs, totalMs: Date.now() - t0 } };
 }

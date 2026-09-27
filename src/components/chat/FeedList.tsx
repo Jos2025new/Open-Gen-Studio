@@ -4,6 +4,7 @@ import { useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
+import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
 
 const WS = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
@@ -76,6 +77,8 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
           </div>
         </div>
       );
+    case 'activity':
+      return <ActivityBlock item={item} sessionId={sessionId} />;
     case 'questions':
       return <QuestionsCard item={item} sessionId={sessionId} />;
     case 'plan':
@@ -96,8 +99,9 @@ export function FeedList({ sessionId, compact }: { sessionId: string; compact?: 
   const feed = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
-  // While text streams, its caret already shows activity.
-  const showStatus = phase && !(last?.type === 'assistant' && last.streaming);
+  // While text streams, its caret already shows activity; an open activity block shows its own progress (L3).
+  const liveActivity = feed.some((f) => f.type === 'activity' && !f.endedAt);
+  const showStatus = phase && !liveActivity && !(last?.type === 'assistant' && last.streaming);
   return (
     <div className={`feed ${compact ? 'is-compact' : ''}`}>
       {feed.map((item) => (

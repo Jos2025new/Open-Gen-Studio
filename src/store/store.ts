@@ -37,7 +37,7 @@ import type {
 
 export interface Settings {
   keys: Record<RemoteProviderId, string>;
-  agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'low' | 'medium' | 'high' };
+  agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; /** Stream the model's reasoning into the activity block (default on). */ showThinking?: boolean };
   guidedRounds: number;
   budgetUsd: number;
   /** false: no spending limit, spending is only shown. */

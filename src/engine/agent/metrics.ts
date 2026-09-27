@@ -74,7 +74,7 @@ export function openMetrics(sessionId: string): AgentRequestMetrics | undefined 
 
 type Event =
   | { type: 'output'; ms: number }
-  | { type: 'call'; inputTokens: number; outputTokens: number; usd: number }
+  | { type: 'call'; inputTokens: number; outputTokens: number; usd: number; timing?: NonNullable<AgentRequestMetrics['callTimings']>[number] }
   | { type: 'questions' }
   | { type: 'findModels' }
   | { type: 'guide'; id: string }
@@ -87,7 +87,13 @@ export function recordMetric(sessionId: string, e: Event): void {
       case 'output':
         return m.msToFirstOutput == null ? { msToFirstOutput: e.ms } : {};
       case 'call':
-        return { llmCalls: m.llmCalls + 1, inputTokens: m.inputTokens + e.inputTokens, outputTokens: m.outputTokens + e.outputTokens, llmUsd: m.llmUsd + e.usd };
+        return {
+          llmCalls: m.llmCalls + 1,
+          inputTokens: m.inputTokens + e.inputTokens,
+          outputTokens: m.outputTokens + e.outputTokens,
+          llmUsd: m.llmUsd + e.usd,
+          ...(e.timing ? { callTimings: [...(m.callTimings ?? []), e.timing].slice(-12) } : {}),
+        };
       case 'questions':
         return { questionRounds: m.questionRounds + 1 };
       case 'findModels':

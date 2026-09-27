@@ -324,12 +324,16 @@ export function SettingsPanel() {
         ) : (
           <p className="set-note">The local planner handles common requests without an LLM. Connect a provider for the full agent.</p>
         )}
-        {settings.agent.provider === 'openrouter' ? (
+        {settings.agent.provider === 'openrouter' || settings.agent.provider === 'nanogpt' ? (
+          <>
           <div className="set-row">
-            <span className="set-label">Reasoning</span>
+            <span className="set-label" data-tip="How long the model thinks before answering. Lower answers sooner; None skips thinking on models that allow it">
+              Reasoning
+            </span>
             <Segmented
               value={settings.agent.effort}
               options={[
+                { value: 'none', label: 'None' },
                 { value: 'low', label: 'Low' },
                 { value: 'medium', label: 'Medium' },
                 { value: 'high', label: 'High' },
@@ -338,6 +342,21 @@ export function SettingsPanel() {
               size="sm"
             />
           </div>
+          <div className="set-row">
+            <span className="set-label" data-tip="Show the model's reasoning while it works, in the activity block of each turn. It costs nothing extra: the model thinks the same either way">
+              Show thinking
+            </span>
+            <Segmented
+              value={settings.agent.showThinking === false ? 'off' : 'on'}
+              options={[
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' },
+              ]}
+              onChange={(v) => setSettings((s) => ({ agent: { ...s.agent, showThinking: v === 'on' } }))}
+              size="sm"
+            />
+          </div>
+          </>
         ) : null}
         <div className="set-row">
           <span className="set-label" data-tip="Guided mode asks at most this many rounds of questions before proposing the plan">

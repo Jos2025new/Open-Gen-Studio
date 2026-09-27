@@ -511,9 +511,23 @@ export interface NoticeFeedItem extends FeedBase {
   text: string;
 }
 
+/** One thing the agent did during a turn, shown in its activity block (L3). */
+export type ActivityEntry =
+  | { kind: 'thinking'; text: string; ms?: number }
+  | { kind: 'action'; icon: 'guide' | 'search' | 'questions' | 'plan' | 'fix'; label: string; detail?: string };
+
+/** What the agent is doing in one turn: its reasoning (when streamed) and its actions, with the time it took. */
+export interface ActivityFeedItem extends FeedBase {
+  type: 'activity';
+  startedAt: number;
+  endedAt?: number;
+  entries: ActivityEntry[];
+}
+
 export type FeedItem =
   | UserFeedItem
   | AssistantFeedItem
+  | ActivityFeedItem
   | QuestionsFeedItem
   | PlanFeedItem
   | GenerationFeedItem
@@ -763,6 +777,11 @@ export interface AgentRequestMetrics {
   agentMs: number;
   /** Agent time until the first streamed text or tool call. */
   msToFirstOutput?: number;
+  /**
+   * Per model call (L4), in ms from sending: first byte from the provider, first reasoning fragment, first text or
+   * tool call, and the end; plus reasoning tokens and prompt tokens served from the provider's cache.
+   */
+  callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
   /** Agent time until the first plan card. */
   msToPlan?: number;
   questionRounds: number;

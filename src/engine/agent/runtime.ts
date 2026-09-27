@@ -10,6 +10,8 @@ import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
+  ActivityEntry,
+  ActivityFeedItem,
   AgentQuestion,
   AgentState,
   FeedItem,
@@ -40,7 +42,8 @@ import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide } from '../skills';
+import { readGuide, skillById } from '../skills';
+import { modelGuide } from '../guides';
 import { TOOLS, findModelsSchema, readGuideSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
@@ -523,11 +526,73 @@ export function cancelPlan(sessionId: string, itemId: string): void {
 // ---------------------------------------------------------------------------
 // LLM loop
 
+/** Plain name of a guide for the activity block ("Seedance prompting guide", "Story / series workflow"). */
+function guideLabel(id: string): string {
+  const [type, rest = ''] = id.split(':');
+  if (type === 'model') return rest === 'video-edit' ? 'Video edit and extend guide' : `${modelGuide(rest)?.name ?? rest} prompting guide`;
+  if (type === 'workflow') return `${workflowById(rest.split('/')[0])?.name ?? rest} workflow`;
+  if (type === 'skill') return `${skillById(rest)?.name ?? rest} skill`;
+  return id;
+}
+
+/**
+ * The turn's activity block (L3): created when the turn starts, it collects the streamed reasoning (store updates
+ * throttled) and each action, and records when the turn ended.
+ */
+function activityLog(sessionId: string, workspace: Workspace) {
+  const item: ActivityFeedItem = { ...feedBase(workspace), type: 'activity', startedAt: Date.now(), entries: [] };
+  appendFeed(sessionId, item);
+  const patch = (fn: (entries: ActivityEntry[]) => ActivityEntry[]) =>
+    updateFeedItem<ActivityFeedItem>(sessionId, item.id, (it) => ({ ...it, entries: fn(it.entries) }));
+  let thinking = -1;
+  let latest = '';
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const flush = () => {
+    if (timer) clearTimeout(timer);
+    timer = null;
+    const text = latest.length > 6000 ? `…${latest.slice(-6000)}` : latest;
+    const at = thinking;
+    if (at >= 0) patch((e) => e.map((x, i) => (i === at && x.kind === 'thinking' ? { ...x, text } : x)));
+  };
+  return {
+    id: item.id,
+    thinking(full: string) {
+      if (thinking < 0) {
+        patch((e) => {
+          thinking = e.length;
+          return [...e, { kind: 'thinking', text: '' }];
+        });
+      }
+      latest = full;
+      timer ??= setTimeout(flush, 150);
+    },
+    /** A model call ended: its reasoning (if any) gets its duration; the next call starts a new one. */
+    callEnded(reasoningMs: number | undefined, totalMs: number) {
+      if (thinking < 0) return;
+      flush();
+      const at = thinking;
+      const ms = reasoningMs != null ? totalMs - reasoningMs : undefined;
+      patch((e) => e.map((x, i) => (i === at && x.kind === 'thinking' ? { ...x, ms } : x)));
+      thinking = -1;
+      latest = '';
+    },
+    action(entry: Omit<Extract<ActivityEntry, { kind: 'action' }>, 'kind'>) {
+      patch((e) => [...e, { kind: 'action', ...entry }]);
+    },
+    end() {
+      flush();
+      updateFeedItem<ActivityFeedItem>(sessionId, item.id, { endedAt: Date.now() });
+    },
+  };
+}
+
 async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
   void loadLlmCatalog(engine.provider);
   patchAgent(sessionId, { busy: true, phase: 'working' });
+  const log = activityLog(sessionId, workspace);
+  const showThinking = get().settings.agent.showThinking !== false;
   controller = new AbortController();
   const signal = controller.signal;
   const clock = turnClock(sessionId);
@@ -547,6 +612,8 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           messages: repairHistory(session(sessionId).agent.history),
           tools: TOOLS,
           effort: get().settings.agent.effort,
+          showReasoning: showThinking,
+          onReasoning: showThinking ? (_d, full) => log.thinking(full) : undefined,
           signal,
           onToolCall: () => {
             firstOutput();
@@ -572,10 +639,17 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
         notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`);
         return;
       }
+      log.callEnded(result.timing.reasoningMs, result.timing.outputMs ?? result.timing.totalMs);
       if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
       // Every tier counts: the provider's reported cost, else tokens × the catalog price (marked estimated). Never blocks.
       const llmUsd = llmCallUsd(engine.provider, engine.model, result.usage);
-      recordMetric(sessionId, { type: 'call', inputTokens: result.usage?.inputTokens ?? 0, outputTokens: result.usage?.outputTokens ?? 0, usd: llmUsd });
+      recordMetric(sessionId, {
+        type: 'call',
+        inputTokens: result.usage?.inputTokens ?? 0,
+        outputTokens: result.usage?.outputTokens ?? 0,
+        usd: llmUsd,
+        timing: { ...result.timing, reasoningTokens: result.usage?.reasoningTokens, cachedTokens: result.usage?.cachedTokens },
+      });
       addSpend(llmUsd, { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
       if (result.usage) {
         const u = result.usage;
@@ -625,6 +699,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
             respond(`Invalid ask_questions input: ${formatZodError(v.error)}`);
             continue;
           }
+          log.action({ icon: 'questions', label: `Asked ${v.data.questions.length} question${v.data.questions.length === 1 ? '' : 's'}` });
           // This call's result is sent later, with the user's answers.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
@@ -649,6 +724,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           // Local search in the app's refined catalog; the agent continues in the next round.
           const v = findModelsSchema.safeParse(parsed.value);
           recordMetric(sessionId, { type: 'findModels' });
+          if (v.success) log.action({ icon: 'search', label: 'Explored models', detail: v.data.query });
           respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
           continue;
         }
@@ -658,7 +734,10 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           const text = v.success ? readGuide(v.data.id) : undefined;
           // Once per conversation: a guide already in the history is not sent again (C4).
           const seen = text != null && session(sessionId).agent.history.some((m) => m.role === 'tool' && m.content === text);
-          if (v.success && text && !seen) recordMetric(sessionId, { type: 'guide', id: v.data.id });
+          if (v.success && text && !seen) {
+            recordMetric(sessionId, { type: 'guide', id: v.data.id });
+            log.action({ icon: 'guide', label: `Read the ${guideLabel(v.data.id)}` });
+          }
           respond(
             seen
               ? `Guide "${v.data?.id}" is already loaded earlier in this conversation; follow it.`
@@ -678,10 +757,12 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
           if (presented.errors.length) {
             recordMetric(sessionId, { type: 'rejected' });
+            log.action({ icon: 'fix', label: `Checked the plan: ${presented.errors.length} problem${presented.errors.length === 1 ? '' : 's'} to fix`, detail: presented.errors[0] });
             planFailures++;
             respond(`Plan rejected by the validator. Fix these problems and call propose_plan again:\n- ${presented.errors.join('\n- ')}`);
             continue;
           }
+          log.action({ icon: 'plan', label: v.data.revision ? 'Revised the plan' : 'Drafted the plan', detail: v.data.title });
           // This call's result is sent when the user approves or cancels.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
@@ -699,6 +780,7 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
   } finally {
     // No revision came (text answer, questions, error or stop): the commented plan is closed.
     closeRevisedPlan(sessionId, false);
+    log.end();
     clock.end();
     patchAgent(sessionId, { busy: false, phase: undefined });
     controller = null;
