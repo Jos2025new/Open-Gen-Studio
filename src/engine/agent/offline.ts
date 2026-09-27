@@ -247,6 +247,7 @@ export function offlinePlan(input: OfflineInput): OfflineAction {
         prompt: s.prompt ? s.prompt.replace('{prompt}', prompt) : undefined,
         op: s.op,
         input: s.input,
+        more: s.more,
         params: s.params,
         refs: s.refs,
         first_frame: s.firstFrame,

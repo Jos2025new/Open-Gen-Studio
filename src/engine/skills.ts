@@ -21,6 +21,8 @@ export interface WorkflowStepTemplate {
   prompt?: string;
   op?: string;
   input?: string;
+  /** join_clips: the clips after `input`, in order. */
+  more?: string[];
   params?: Record<string, string>;
   refs?: string[];
   firstFrame?: string;
@@ -210,6 +212,29 @@ export const WORKFLOWS: Workflow[] = [
     ],
   },
   {
+    // F2: the agreed story flow (brief in one card → subject → one plan with every clip → join), built from the
+    // Higgsfield and ImagineArt comparisons. The clip count and length come from the request, never from the refs.
+    id: 'story',
+    name: 'Story / series',
+    description: 'A short story, a series episode or several clips with a recurring character: brief, one identity, closed beats, one joined video.',
+    workspaces: ['chat'],
+    skill: 'cinematic',
+    needs: [
+      'tone or genre (offer 2–3 treatments as options when the brief is abstract or the user has no idea; recommend the one that fits the image)',
+      'sound: dialogue or voice-over, music and ambience, or silent (only for models with audio)',
+      'format: the attached image\'s aspect (recommended) or another',
+      'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (a cheap first plan; the user picks one, then the clips)',
+    ],
+    continuity:
+      'One identity: save the character as a subject in propose_plan.subjects (from the attached image, or from the character-sheet image the user picked) and mention it as @Name in every clip — never describe her look again. Each clip is one closed beat with a start and an end (hook → conflict → payoff), written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
+    steps: [
+      { id: 's1', kind: 'video', title: 'Clip 1 · hook', prompt: '{prompt}' },
+      { id: 's2', kind: 'video', title: 'Clip 2 · conflict', prompt: '{prompt}' },
+      { id: 's3', kind: 'video', title: 'Clip 3 · payoff', prompt: '{prompt}' },
+      { id: 's4', kind: 'op', title: 'Join clips', op: 'join_clips', input: 's1', more: ['s2', 's3'] },
+    ],
+  },
+  {
     id: 'poster',
     name: 'Poster layout',
     description: 'Background on layer 1, headline and accent layers on top.',
@@ -242,6 +267,7 @@ export function describeWorkflow(w: Workflow): string {
   const lines = w.steps.map((s) => {
     const parts = [`${s.id}: ${s.kind}${s.op ? `(${s.op})` : ''}${s.layerType ? `(${s.layerType})` : ''} "${s.title}"`];
     if (s.input) parts.push(`input ${s.input}`);
+    if (s.more?.length) parts.push(`more ${s.more.join(',')}`);
     if (s.firstFrame) parts.push(`first_frame ${s.firstFrame}`);
     if (s.refs?.length) parts.push(`refs ${s.refs.join(',')}`);
     if (s.source) parts.push(`source ${s.source}`);
