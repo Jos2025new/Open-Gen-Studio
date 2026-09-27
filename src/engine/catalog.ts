@@ -276,6 +276,41 @@ export function transcriberFor(): TranscriberSummary | undefined {
   return Object.values(all).find((m) => isConnected(m.provider));
 }
 
+/** Engines whose model follows the source (the model that made it) and can be picked per run. */
+export function opFollowsSource(engine: OpEngine): engine is 'edit' | 'video' {
+  return engine === 'edit' || engine === 'video';
+}
+
+/**
+ * A model that made a source, reused for an operation on it: the same model when it takes an input
+ * image of the right kind, else its edit / image-to-video counterpart on the same provider.
+ */
+export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video'): string | null {
+  const parsed = ref ? parseModelRef(ref) : null;
+  if (!ref || !parsed || parsed.provider === 'local' || !isConnected(parsed.provider)) return null;
+  const takesImage = (r: string) => {
+    const m = modelSummary(r);
+    if (!m || m.kind !== kind || !m.acceptsImage || m.needsVideo || m.textOutput) return false;
+    const schema = get().catalog.schemas[r];
+    return !schema || (kind === 'image' ? schema.slots.images != null : schema.slots.firstFrame != null || schema.slots.images != null);
+  };
+  if (takesImage(ref)) return ref;
+  const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : i2vCounterpart(parsed.provider, parsed.id);
+  const alt = counterpart ? `${parsed.provider}::${counterpart}` : null;
+  return alt && takesImage(alt) ? alt : null;
+}
+
+/** Model for an operation on an asset: the one that made it for edit / video engines, else the engine's model. */
+export function opModelForAsset(engine: OpEngine, assetId: string | undefined): { ref: string; viaEdit: boolean } {
+  if (opFollowsSource(engine) && assetId) {
+    const genId = get().assets[assetId]?.generationId;
+    const made = genId ? get().generations[genId]?.modelRef : undefined;
+    const ref = opModelFromRef(made, engine === 'edit' ? 'image' : 'video');
+    if (ref) return { ref, viaEdit: false };
+  }
+  return opModelFor(engine);
+}
+
 /** Which model runs an operation engine. */
 export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } {
   const ops = get().settings.ops;

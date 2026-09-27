@@ -50,7 +50,10 @@ svg { flex-shrink: 0; }
 .cost-tag.is-unknown { color: var(--warn); }
 .spend, .confirm { padding: 12px; }
 .spend-head, .spend-actions, .spend-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.spend-title { font-weight: 600; }
+.spend-title { flex: 1; font-weight: 600; min-width: 0; }
+.via-pick { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 3px 7px; margin-left: -7px; border-radius: 5px; font-weight: 600; color: inherit; }
+.via-pick:hover, .via-pick.is-open { background: var(--surface-2); }
+.via-pick svg { flex-shrink: 0; color: var(--text-2); }
 .spend-lines, .spend-meta { color: var(--text-2); font-size: 12px; margin: 10px 0; }
 .spend-warn { color: var(--warn); margin: 10px 0; font-size: 12px; }
 .spend-actions { justify-content: flex-end; margin-top: 12px; }

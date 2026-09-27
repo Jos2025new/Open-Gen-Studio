@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
+import { opFollowsSource } from '../../engine/catalog';
 import { OPS, defaultOpParams } from '../../engine/ops';
 import { opEstimate, layerOpEstimate, runAssetOp, runLayerOp } from '../../engine/actions';
 import type { AdvancedValue, Estimate, OpId } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Segmented } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
+import { Popover, usePopover } from '../ui/Popover';
+import { ModelList } from '../composer/ModelList';
 
 export type OpTarget = { kind: 'asset'; assetId: string; parentId?: string } | { kind: 'layer'; sessionId: string; docId: string; layerId: string };
 
@@ -18,6 +21,10 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
   const [params, setParams] = useState<Record<string, AdvancedValue>>(() => defaultOpParams(def));
   const [estimate, setEstimate] = useState<Estimate>({ usd: null, approximate: true, note: 'Calculating…' });
   const [via, setVia] = useState<string>('');
+  // Model for this run only; null = the model that made the source (or the Settings default).
+  const [picked, setPicked] = useState<string | null>(null);
+  const pickable = target.kind === 'asset' && opFollowsSource(def.engine);
+  const modelPop = usePopover();
   const opsSettings = useStore((s) => s.settings.ops);
   const videoSettings = useStore((s) => s.composer.video.settings);
 
@@ -25,7 +32,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
     let alive = true;
     const t = window.setTimeout(async () => {
       if (target.kind === 'asset') {
-        const r = await opEstimate(target.assetId, op, params);
+        const r = await opEstimate(target.assetId, op, params, picked ?? undefined);
         if (!alive) return;
         setEstimate(r.estimate);
         setVia(r.modelName);
@@ -38,13 +45,13 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
       alive = false;
       window.clearTimeout(t);
     };
-  }, [op, params, target, opsSettings, videoSettings]);
+  }, [op, params, target, opsSettings, videoSettings, picked]);
 
   const missing = def.fields.find((f) => f.required && !String(params[f.key] ?? '').trim());
 
   const run = () => {
     onClose();
-    if (target.kind === 'asset') void runAssetOp(target.assetId, op, params, target.parentId);
+    if (target.kind === 'asset') void runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined);
     else void runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
   };
 
@@ -92,13 +99,38 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
         ),
       )}
       <SpendConfirm
-        title={via ? `via ${via}` : 'Cost'}
+        title={
+          pickable && via ? (
+            <button ref={modelPop.ref} type="button" className={`via-pick ${modelPop.open ? 'is-open' : ''}`} onClick={modelPop.toggle} data-tip="Model for this run">
+              <span className="truncate">via {via}</span>
+              <ChevronDown size={13} />
+            </button>
+          ) : via ? (
+            `via ${via}`
+          ) : (
+            'Cost'
+          )
+        }
         estimate={estimate}
         confirmLabel={def.engine === 'local' ? 'Run (free)' : 'Apply'}
         onConfirm={run}
         onCancel={onClose}
         blocked={missing ? `Fill in “${missing.label}”.` : null}
       />
+      {pickable ? (
+        <Popover open={modelPop.open} anchor={modelPop.ref} onClose={modelPop.close} width={380} label="Model">
+          <ModelList
+            kind={def.output === 'video' ? 'video' : 'image'}
+            value={picked}
+            filter={(m) => m.acceptsImage && !m.needsVideo && (def.output === 'video' || !m.tags.length)}
+            autoOption={`Same model that made the ${def.input}, else the Settings default`}
+            onSelect={(ref) => {
+              setPicked(ref);
+              modelPop.close();
+            }}
+          />
+        </Popover>
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
-import { ensureSchema, opModelFor } from './catalog';
+import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
 import { createGeneration, opSpec, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
@@ -56,7 +56,13 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
         const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
         const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) });
         perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
-      } else perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings);
+      } else {
+        // Edit / video operations run on the model that made their input (jobs.opSpec); a step still to run: its model.
+        const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
+        const kind = engine === 'edit' ? 'image' : 'video';
+        const ref = opFollowsSource(engine) ? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, kind) : null) ?? opModelFor(engine).ref) : undefined;
+        perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings, ref);
+      }
     } else perStep[s.id] = { usd: 0, approximate: false };
   }
   return { total: sumEstimates(Object.values(perStep)), perStep };

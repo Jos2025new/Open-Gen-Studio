@@ -35,7 +35,7 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
   const now = useNow(1000, g.status === 'running' || g.status === 'queued');
   const elapsed = g.startedAt ? formatDuration(now - g.startedAt) : '';
   return (
-    <div className="tile tile-pending" style={{ aspectRatio: `${ratio}` }}>
+    <div className="tile tile-pending" style={{ aspectRatio: `${ratio}`, ['--ratio' as string]: ratio }}>
       <div className="shimmer" />
       {index === 0 ? (
         <div className="tile-status">
@@ -74,6 +74,8 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const title = generationTitle(g);
   const openLightbox = (i: number) => setUi({ lightbox: { assetIds: outputs, index: i } });
   const regenEstimate = regenerateEstimate(g.id) ?? g.estimate;
+  // One picture or clip: its own size, capped in height (audio and 3D keep the full-width strip).
+  const single = outputs.length + pendingSlots === 1 && (g.kind === 'image' || g.kind === 'video');
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
@@ -139,7 +141,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           </div>
         </div>
       ) : (
-        <div className="tiles" style={{ ['--cols' as string]: cols }}>
+        <div className={`tiles ${single ? 'is-single' : ''}`} style={{ ['--cols' as string]: cols }}>
           {outputs.map((id, i) => (
             <div
               key={id}

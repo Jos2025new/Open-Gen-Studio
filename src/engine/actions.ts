@@ -589,15 +589,15 @@ export async function attachFiles(files: File[]): Promise<void> {
 // ---------------------------------------------------------------------------
 // Operations on assets and layers
 
-export async function opEstimate(assetId: string, op: OpId, params: Record<string, AdvancedValue>): Promise<{ estimate: Estimate; modelName: string; viaNote?: string }> {
-  const spec = await opSpec({ sessionId: get().activeSessionId, sourceAssetId: assetId, op, params, origin: 'op' });
+export async function opEstimate(assetId: string, op: OpId, params: Record<string, AdvancedValue>, modelRef?: string): Promise<{ estimate: Estimate; modelName: string; modelRef: string; viaNote?: string }> {
+  const spec = await opSpec({ sessionId: get().activeSessionId, sourceAssetId: assetId, op, params, origin: 'op', modelRef });
   const ref = spec.modelRef;
   const name = ref === 'local::frame' ? 'Local, free' : modelSummary(ref)?.name ?? get().catalog.transcribers?.[ref]?.name ?? (ref.startsWith('local::') ? 'Local demo' : ref);
-  return { estimate: spec.estimate ?? { usd: null, approximate: true }, modelName: name };
+  return { estimate: spec.estimate ?? { usd: null, approximate: true }, modelName: name, modelRef: ref };
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -607,7 +607,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     return [];
   }
   const sessionId = asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
-  const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId });
+  const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef });
   const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true });
   if (problem) {
     toast(problem, 'error');

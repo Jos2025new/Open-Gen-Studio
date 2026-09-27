@@ -4,7 +4,7 @@ import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isConnected, KLING_VOICE_REF, opModelFor, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { InputError } from './errors';
@@ -45,7 +45,7 @@ export function modelName(ref: string): string {
 export function estimateSpec(spec: GenerationSpec): Estimate {
   if (spec.op) {
     const src = get().assets[spec.op.sourceAssetId];
-    return estimateOp(spec.op.id, spec.op.params, src, spec.settings);
+    return estimateOp(spec.op.id, spec.op.params, src, spec.settings, spec.modelRef);
   }
   if (spec.kind === 'text') {
     // Text from a model (MiniMax Lyrics) is priced like its media kind; other text results are not predictable.
@@ -710,6 +710,8 @@ export interface OpSpecInput {
   stepId?: string;
   /** Dimensions of the source when it is not an asset yet (designer layers). */
   sourceDims?: { width: number; height: number };
+  /** Model picked for this run (edit / video engines); by default the source's model or the engine's. */
+  modelRef?: string;
 }
 
 /** Build the generation spec for an operation on an asset (model, instruction and settings). */
@@ -763,7 +765,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
-  const choice = opModelFor(def.engine);
+  const choice = input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId);
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
@@ -771,7 +773,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const settings = videoOpSettings(def.engine, schema);
     const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
     const clip = get().assets[input.sourceAssetId];
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }) };
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, choice.ref) };
   }
   if (def.engine === 'video') {
     const video = get().composer.video.settings;
@@ -782,7 +784,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
       settings.aspect = auto != null ? String(auto) : nearestAspect(opts, source.width / source.height, settings.aspect) ?? settings.aspect;
     }
     const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: choice.ref, settings, op };
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, settings) };
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, choice.ref) };
   }
   const count = opCount(def, input.params);
   const dedicated = !choice.viaEdit && (def.engine === 'upscale' || def.engine === 'remove_bg');
@@ -803,7 +805,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     }
   }
   const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: choice.ref, settings, op };
-  return { ...spec, estimate: estimateOp(input.op, input.params, source, settings) };
+  return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, choice.ref) };
 }
 
 export function inputKindOf(assetId: string): AssetKind | undefined {

@@ -64,10 +64,11 @@ export function estimateTranscribe(usdPerMinute: number | undefined, seconds: nu
   return { usd: shown, approximate: seconds == null || shown > usd, note: `${usdPerMinute} USD per minute` };
 }
 
-export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, source: Pick<Asset, 'width' | 'height'> | undefined, videoSettings: GenSettings): Estimate {
+/** `modelRef`: the model that runs it (a per-run pick or the source's model); by default the engine's model. */
+export function estimateOp(opId: OpId, params: Record<string, AdvancedValue>, source: Pick<Asset, 'width' | 'height'> | undefined, videoSettings: GenSettings, modelRef?: string): Estimate {
   const def = OPS[opId];
   if (def.engine === 'local') return FREE;
-  const { ref } = opModelFor(def.engine);
+  const ref = modelRef || opModelFor(def.engine).ref;
   if (ref.startsWith('local::')) return FREE;
   const price = priceOf(ref);
   if (!price) return UNKNOWN;
