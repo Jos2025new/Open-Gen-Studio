@@ -86,7 +86,11 @@ async function ensureAssetBlob(assetId: string): Promise<Blob> {
   const asset = get().assets[assetId];
   if (!asset) throw new Error('An input asset was deleted.');
   const stored = await getAssetBlob(assetId);
-  if (stored) return stored;
+  if (stored) {
+    // Bytes saved by an earlier attempt whose flag never landed: show the local copy, not the remote link.
+    if (!asset.stored) patchAsset(assetId, { stored: true, remoteUrl: undefined });
+    return stored;
+  }
   if (!asset.remoteUrl) throw new Error('An input asset is not available offline.');
   const blob = await fetchBlob(asset.remoteUrl);
   await putAssetBlob(assetId, blob);

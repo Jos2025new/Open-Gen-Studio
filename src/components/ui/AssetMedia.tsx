@@ -22,7 +22,10 @@ export function AssetMedia({
 }) {
   const asset = useStore((s) => s.assets[assetId]);
   const url = useAssetUrl(asset?.kind === 'model3d' ? null : assetId);
-  const [failed, setFailed] = useState(false);
+  // Failure belongs to one URL: when the local copy replaces a blocked remote link, try again.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const failed = !!url && failedUrl === url;
+  const setFailed = (f: boolean) => setFailedUrl(f ? url : null);
   const videoRef = useRef<HTMLVideoElement>(null);
   if (!asset) {
     return (
