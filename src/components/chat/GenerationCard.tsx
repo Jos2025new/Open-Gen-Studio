@@ -95,6 +95,17 @@ export function GenerationCard({ generationId, compact = false }: { generationId
       </header>
       <div className="gen-meta faint">
         <span className="truncate">{metaLine(g)}</span>
+        <div className="gen-meta-actions">
+          <IconButton icon={Copy} label="Copy prompt" size="sm" disabled={!g.prompt} onClick={() => void copyText(g.prompt)} />
+          <IconButton icon={Pencil} label="Edit in composer" size="sm" disabled={Boolean(g.op)} onClick={() => void editInComposer(g.id)} />
+          {busy ? (
+            <IconButton icon={CircleStop} label="Cancel" size="sm" onClick={() => cancelGeneration(g.id)} />
+          ) : (
+            <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
+          )}
+          <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} onClick={del.toggle} />
+          <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
+        </div>
         <CostTag estimate={g.actualUsd != null ? { usd: g.actualUsd, approximate: false } : g.estimate} />
       </div>
       {billedDiffers(g) ? (
@@ -165,6 +176,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
               >
                 <Expand size={13} />
               </button>
+              {id === sel && g.status === 'done' ? (
+                // Operations on this result, over the picture; clicks and keys inside (its menu and forms too) stay out of the tile.
+                <div className="tile-bar" onClick={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                  <AssetActions assetId={sel} parentId={g.id} menuOnly />
+                </div>
+              ) : null}
             </div>
           ))}
           {Array.from({ length: pendingSlots }, (_, i) => (
@@ -173,25 +190,6 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         </div>
       )}
 
-      <footer className="gen-actions">
-        <div className="gen-actions-main">
-          <IconButton icon={Copy} label="Copy prompt" size="sm" disabled={!g.prompt} onClick={() => void copyText(g.prompt)} />
-          <IconButton icon={Pencil} label="Edit in composer" size="sm" disabled={Boolean(g.op)} onClick={() => void editInComposer(g.id)} />
-          {busy ? (
-            <IconButton icon={CircleStop} label="Cancel" size="sm" onClick={() => cancelGeneration(g.id)} />
-          ) : (
-            <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
-          )}
-          <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} onClick={del.toggle} />
-          <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
-        </div>
-        {sel && g.status === 'done' ? (
-          <div className="gen-actions-ops">
-            {outputs.length > 1 ? <span className="sel-label num faint">#{selected + 1}</span> : null}
-            <AssetActions assetId={sel} parentId={g.id} compact={compact} />
-          </div>
-        ) : null}
-      </footer>
 
       <Popover open={regen.open} anchor={regen.ref} onClose={regen.close} width={300} label="Regenerate">
         <SpendConfirm

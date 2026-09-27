@@ -8,6 +8,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Verifica con `npx tsc --noEmit -p .`, `npm test` y navegador (`npm run dev`, puerto 5173).
 - Un commit por tarea terminada.
 
+## Tarea — acciones de la tarjeta sin franja inferior (2026-09-27) · punto de retorno: `43524d9`
+Origen: captura del usuario (la fila Copy/Edit/Regenerate/Delete/Details + Relight/Angle/Upscale/Remove BG/Animate añade una franja alta bajo cada resultado) y referencias (botones sobre la imagen y un desplegable "Open in" con las operaciones). Sin funciones nuevas: se reubica lo que ya hay.
+- [x] B1. Las cinco acciones generales (copiar, editar, regenerar/cancelar, borrar, detalles) pasan a la fila del modelo y el precio, a la derecha; desaparece el `<footer>`. *Dónde:* `GenerationCard.tsx`, `chat.css`.
+- [x] B2. Las operaciones del resultado seleccionado van en un botón "Tools ▾" sobre la imagen (abajo a la derecha, visible al pasar el ratón, con foco o con su menú abierto; siempre en pantallas táctiles) que abre el menú existente con todas las operaciones (`AssetActions` sin atajos). El visor mantiene sus chips. *Dónde:* `AssetActions.tsx` (prop del disparador), `GenerationCard.tsx`, `chat.css`.
+- [x] B3. Typecheck, suite, navegador (antes/después: resultado único, rejilla, en curso, error; abrir Tools → Relight → formulario); commit.
+  Hecho: fila del modelo = texto · 5 iconos · precio; "Tools ▾" (`AssetActions menuOnly`) en la esquina inferior derecha del resultado seleccionado, con el menú solo con nombres (la descripción queda como tooltip y en el formulario). Los clics y teclas dentro de Tools, su menú y sus formularios no llegan a la tarjeta (antes de aislarlo, Enter abría el visor). El visor (Lightbox) sigue con los chips. Navegador: resultado único, en curso, rejilla (Tools se mueve al seleccionado), error, Tools → Relight → "via Nano Banana 2 Edit". Si algo empeora: `git revert` de este commit (vuelve a `43524d9`).
+
 ## Tarea — panel lateral del visor ordenado (2026-09-27) · punto de retorno: `b2470ef`
 Inspiración (captura del usuario): secciones con título pequeño en mayúsculas ("PROMPT" con Copy, "DETAILS"), cada una en una caja redondeada; entradas como miniaturas sobre el prompt; prompt recortado con "See all"; barra inferior con Favorito y Download. Sin funciones nuevas: se reordena lo que ya hay.
 - [x] V1. `GenerationInfo.tsx`: sección Prompt (miniaturas de origen/referencias en vez de las filas "References"/"Start frame"; la operación va aquí en vez de la fila "Operation"; Copy con texto) y sección Details (filas sin bordes dentro de una caja). *También se ve en el popover "Details" de la tarjeta.*

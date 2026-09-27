@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   AudioLines,
+  ChevronDown,
   Brush,
   Eraser,
   Clapperboard,
@@ -87,7 +88,8 @@ function OpChip({ assetId, op, parentId, compact }: { assetId: string; op: OpId;
 }
 
 /** Operations available for an asset, by type, plus a "more" menu. */
-export function AssetActions({ assetId, parentId, compact = false, showQuick = true }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean }) {
+/** `menuOnly`: no quick chips, every operation in the menu behind one "Tools ▾" button (overlaid on a card's picture). */
+export function AssetActions({ assetId, parentId, compact = false, showQuick = true, menuOnly = false }: { assetId: string; parentId?: string; compact?: boolean; showQuick?: boolean; menuOnly?: boolean }) {
   const asset = useStore((s) => s.assets[assetId]);
   const sessionId = useStore((s) => s.activeSessionId);
   const more = usePopover();
@@ -95,7 +97,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
   const [subjectName, setSubjectName] = useState('');
   if (!asset) return null;
   const ops = opsFor(asset.kind);
-  const quick = showQuick ? ops.filter((o) => o.quick) : [];
+  const quick = showQuick && !menuOnly ? ops.filter((o) => o.quick) : [];
   const rest = ops.filter((o) => !quick.includes(o));
 
   const close = () => {
@@ -108,29 +110,48 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
       {quick.map((o) => (
         <OpChip key={o.id} assetId={assetId} op={o.id} parentId={parentId} compact={compact} />
       ))}
-      <IconButton
-        ref={more.ref}
-        icon={Ellipsis}
-        label="More"
-        size="sm"
-        active={more.open}
-        onClick={() => {
-          setView('menu');
-          more.toggle();
-        }}
-      />
+      {menuOnly ? (
+        <Chip
+          ref={more.ref}
+          icon={WandSparkles}
+          className="tools-chip"
+          active={more.open}
+          data-tip="Operations"
+          onClick={() => {
+            setView('menu');
+            more.toggle();
+          }}
+        >
+          Tools
+          <ChevronDown size={13} />
+        </Chip>
+      ) : (
+        <IconButton
+          ref={more.ref}
+          icon={Ellipsis}
+          label="More"
+          size="sm"
+          active={more.open}
+          onClick={() => {
+            setView('menu');
+            more.toggle();
+          }}
+        />
+      )}
       <Popover open={more.open} anchor={more.ref} onClose={close} width={view === 'menu' ? 250 : 320} label="More actions">
         {view === 'menu' ? (
           <div className="menu">
             {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
             {rest.map((o) => (
-              <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} detail={o.description} onClick={() => setView(o.id)} />
+              // The short "Tools" menu lists names only; the form repeats the description.
+              <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} detail={menuOnly ? undefined : o.description} tip={menuOnly ? o.description : undefined} onClick={() => setView(o.id)} />
             ))}
             {asset.kind === 'image' ? (
               <MenuItem
                 icon={Brush}
                 label="Edit region / Remove object"
-                detail="Paint the area in Sketch, then describe the change"
+                detail={menuOnly ? undefined : 'Paint the area in Sketch, then describe the change'}
+                tip={menuOnly ? 'Paint the area in Sketch, then describe the change' : undefined}
                 onClick={() => {
                   close();
                   setUi({ sketch: { assetId, mode: 'mask' } });
