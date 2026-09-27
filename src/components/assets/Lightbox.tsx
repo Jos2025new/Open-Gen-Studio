@@ -33,17 +33,20 @@ export function Lightbox() {
   return (
     <div className="lightbox" role="dialog" aria-label="Viewer">
       <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && setUi({ lightbox: null })}>
-        <>{asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}</>
-        {index > 0 ? (
-          <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { assetIds: ids, index: index - 1 } })}>
-            <ChevronsLeft size={20} />
-          </button>
-        ) : null}
-        {index < ids.length - 1 ? (
-          <button type="button" className="lb-nav lb-next" aria-label="Next" onClick={() => setUi({ lightbox: { assetIds: ids, index: index + 1 } })}>
-            <ChevronsRight size={20} />
-          </button>
-        ) : null}
+        {/* The frame is as big as the picture, so « » sit right beside it. */}
+        <div className={`lb-frame ${asset.kind === 'model3d' ? 'is-3d' : ''}`}>
+          {asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}
+          {index > 0 ? (
+            <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { assetIds: ids, index: index - 1 } })}>
+              <ChevronsLeft size={20} />
+            </button>
+          ) : null}
+          {index < ids.length - 1 ? (
+            <button type="button" className="lb-nav lb-next" aria-label="Next" onClick={() => setUi({ lightbox: { assetIds: ids, index: index + 1 } })}>
+              <ChevronsRight size={20} />
+            </button>
+          ) : null}
+        </div>
         {ids.length > 1 ? (
           <span className="lb-count num">
             {index + 1} / {ids.length}
