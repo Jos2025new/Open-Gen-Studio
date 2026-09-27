@@ -60,6 +60,8 @@ export interface ComposerState {
   /** 3D stays separate from image settings: resolutions/face counts are model-specific. */
   model3d: { modelRef: string; settings: GenSettings };
   attachments: string[];
+  /** Kinds whose model the user picked by hand in the model selector (C2); unset: an app default. */
+  userPicked?: Partial<Record<MediaKind, boolean>>;
   /** Keyframe second per attached image (keyframe models); unset ones are spread evenly. */
   times?: Record<string, number>;
   /** Trim [start, end] per attached video (clip models). */

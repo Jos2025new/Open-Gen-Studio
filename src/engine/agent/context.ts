@@ -3,7 +3,7 @@ import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../p
 import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skills';
 import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
-import { isConnected, modelSummary } from '../catalog';
+import { composerChosen, isConnected, modelSummary } from '../catalog';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
@@ -114,6 +114,11 @@ function describeModel(kind: MediaKind): string {
   return parts.join(' · ');
 }
 
+/** Which model each video purpose resolves to with the connected providers. */
+function videoRouteLine(): string {
+  return 'video steps follow their purpose (the app picks the cheapest fitting model)';
+}
+
 /** "image 1024×768", "video 1280×720 5.0s", "audio 12.4s". */
 function assetShape(a: { kind: string; width: number; height: number; duration?: number }): string {
   const secs = a.duration ? ` ${a.duration.toFixed(1)}s` : '';
@@ -160,7 +165,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const subjects = session.subjects ?? [];
   if (subjects.length) lines.push(`subjects (mention as @Name): ${subjects.map((s) => `@${s.name}${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(`image model: ${describeModel('image')}`);
-  lines.push(`video model: ${describeModel('video')}`);
+  // A video model the user never picked is only an app default: steps follow the purpose table instead (C2).
+  lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);

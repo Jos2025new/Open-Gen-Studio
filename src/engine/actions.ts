@@ -5,7 +5,7 @@ import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../l
 import { downloadBlob, extensionForMime, fetchBlob, probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
-import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, selectComposerModel } from './catalog';
+import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, pickComposerModel, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
 import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
 import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
@@ -433,7 +433,8 @@ export async function editInComposer(generationId: string): Promise<void> {
     return;
   }
   const kind = g.kind === 'text' ? 'audio' : g.kind;
-  await selectComposerModel(kind, g.modelRef);
+  // Editing a result in the composer is a choice of its model.
+  await pickComposerModel(kind, g.modelRef);
   setComposer((c) => ({
     mode: kind,
     text: g.prompt,

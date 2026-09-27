@@ -5,7 +5,7 @@ import { listLlmModels, pickDefaultLlm } from './providers/llm';
 import { parseModelRef } from './providers/types';
 import type { OpEngine } from './ops';
 import type { LlmProviderId, MediaKind, ModelSchema, ModelSummary, ProviderId, RemoteProviderId, TranscriberSummary } from './types';
-import { setCatalog, setComposerMedia, setSettings, useStore } from '../store/store';
+import { setCatalog, setComposer, setComposerMedia, setSettings, useStore } from '../store/store';
 
 const get = useStore.getState;
 
@@ -202,11 +202,25 @@ export function ensureComposerModels(preferRemote = false): void {
     const valid =
       parsed && isConnected(parsed.provider) && (parsed.provider === 'local' || st.catalog.status[parsed.provider] !== 'ready' || modelSummary(ref));
     const remoteReady = REMOTE_PROVIDERS.some((p) => isConnected(p) && st.catalog.status[p] === 'ready');
-    if (!valid || (preferRemote && parsed?.provider === 'local' && remoteReady)) {
+    // A video model the user never picked is only an app default: it follows the current preference (C2),
+    // so an old default (Kling V3 Pro) does not stay forever.
+    const staleDefault = kind === 'video' && !st.composer.userPicked?.video && remoteReady && parsed?.provider !== 'local';
+    if (!valid || (preferRemote && parsed?.provider === 'local' && remoteReady) || (staleDefault && preferredModel(kind) !== ref)) {
       const pick = preferredModel(kind);
       if (pick !== ref) void selectComposerModel(kind, pick);
     }
   }
+}
+
+/** The user picks a model in the selector: from now on it is their choice, and the agent's default for that kind (C2). */
+export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
+  setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
+  return selectComposerModel(kind, ref);
+}
+
+/** Whether the composer's model for this kind was picked by the user (not an app default). */
+export function composerChosen(kind: MediaKind): boolean {
+  return Boolean(get().composer.userPicked?.[kind]);
 }
 
 export async function selectComposerModel(kind: MediaKind, ref: string): Promise<void> {

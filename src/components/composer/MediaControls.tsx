@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, ChevronDown, Clapperboard, Clock, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
-import { ensureSchema, modelSummary, selectComposerModel } from '../../engine/catalog';
+import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
 import type { AdvancedValue, MediaKind, ParamDef, SavedStyle, Subject } from '../../engine/types';
@@ -37,7 +37,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
           kind={kind}
           value={ref}
           onSelect={(r) => {
-            if (r) void selectComposerModel(kind, r);
+            if (r) void pickComposerModel(kind, r);
             pop.close();
           }}
         />

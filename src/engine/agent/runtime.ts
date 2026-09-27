@@ -8,7 +8,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } fr
 import { activeDoc, ensureDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
+import { composerChosen, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
   AgentQuestion,
   AgentState,
@@ -99,6 +99,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     asset: (id: string) => get().assets[id],
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
     suggestModel,
+    composerChosen,
   };
 }
 
