@@ -162,3 +162,23 @@ describe('guides on demand (R4)', () => {
     expect(String(toolAnswer?.content)).toMatch(/Storyboard · 4 shots[\s\S]*continuity:/);
   });
 });
+
+describe('a guide is sent once per conversation (C4)', () => {
+  beforeEach(() => setup('guided'));
+
+  it('asking again for a guide already in the history gets a short reminder, not the full text', async () => {
+    const tools: string[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+      for (const m of body.messages) if (m.role === 'tool') tools.push(String(m.content));
+      return sse(replies.shift() ?? { text: 'ok' });
+    });
+    replies = [{ guide: 'workflow:storyboard' }, { guide: 'workflow:storyboard' }, { plan: { texts: ['a'] } }];
+    await sendAgentMessage('a storyboard');
+    const last = tools.at(-1)!;
+    expect(last).toMatch(/already loaded earlier in this conversation/);
+    expect(metrics()[0].guides).toEqual(['workflow:storyboard']);
+  });
+});
+

@@ -124,10 +124,12 @@ export interface ModelFit {
 }
 
 export const MODEL_FITS: ModelFit[] = [
-  { match: /seedance[-/]?2[.-]0[-/]?(fast|mini)|seedance-2-0-(fast|mini)/i, bestFor: 'drafts and tests (fast, cheap)', avoidFor: 'final pieces', source: 'purpose table approved 2026-09-26' },
-  { match: /minimax[-/]h3-fast/i, bestFor: 'drafts and tests (fast, cheap)', avoidFor: 'final pieces', source: 'purpose table approved 2026-09-26' },
-  { match: /seedance[-/]?2[.-]5/i, bestFor: 'long takes (up to 30 s) and many references', avoidFor: 'cheap drafts', source: 'purpose table approved 2026-09-26; API DOC/bytedance seedance 2 5.md (duration up to 30 s)' },
-  { match: /wan-3\.0/i, bestFor: 'short clips and final pieces (default video model)', source: 'purpose table approved 2026-09-26' },
+  // The purpose table decided 2026-09-26 (routing.ts, PLAN_ROUTING_COST.md; prices in PRECIOS_VIDEO.md).
+  { match: /minimax[-/]h3-max-turbo/i, bestFor: 'drafts and tests (cheapest draft row)', avoidFor: 'final pieces', source: 'PLAN_ROUTING_COST.md, draft row' },
+  { match: /minimax[-/]h3-developer/i, bestFor: 'normal clips (cheapest of the normal row)', source: 'PLAN_ROUTING_COST.md, normal row; Atlas quote 0.024 USD/s at 768P' },
+  { match: /seedance[-/]?2[.-]0[-/]?fast|seedance-2-0-fast/i, bestFor: 'normal clips (best quality for the price, up to 15 s)', source: 'PLAN_ROUTING_COST.md, normal row' },
+  { match: /seedance[-/]?2[.-]5/i, bestFor: 'only when the user asks for it', avoidFor: 'default use (about 0.30 USD/s at 720p)', source: 'PLAN_ROUTING_COST.md; PRECIOS_VIDEO.md (Atlas quote 0.303 USD/s at 720p)' },
+  { match: /wan-3\.0(?!-prime)/i, bestFor: 'long takes over 15 s (up to 30 s) and normal clips', source: 'PLAN_ROUTING_COST.md, normal and long rows' },
 ];
 
 export function modelFit(modelId: string): string | undefined {

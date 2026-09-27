@@ -60,13 +60,15 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(errors.join(' ')).toMatch(/up to 20 characters \(this one has 21\).*\[PROMPT_TOO_LONG\]/);
   });
 
-  it('each preferred family gets its fit line, other models none', () => {
-    expect(modelFit('alibaba/wan-3.0/image-to-video')).toMatch(/short clips and final pieces/);
-    expect(modelFit('bytedance/seedance-2.5/reference-to-video')).toMatch(/long takes.*avoid for cheap drafts/);
-    expect(modelFit('bytedance-seedance-2-0-fast')).toMatch(/drafts/);
-    expect(modelFit('minimax/h3-fast/image-to-video')).toMatch(/drafts/);
+  it('each model of the purpose table gets its fit line, other models none', () => {
+    expect(modelFit('minimax/h3-max-turbo/text-to-video')).toMatch(/drafts/);
+    expect(modelFit('minimax/h3-developer/image-to-video')).toMatch(/normal clips \(cheapest/);
+    expect(modelFit('bytedance-seedance-2-0-fast')).toMatch(/best quality for the price/);
+    expect(modelFit('bytedance/seedance-2.5/reference-to-video')).toMatch(/only when the user asks.*avoid for default use/);
+    expect(modelFit('alibaba/wan-3.0/image-to-video')).toMatch(/long takes over 15 s/);
     expect(modelFit('kwaivgi/kling-v3.0-pro/text-to-video')).toBeUndefined();
     expect(modelFit('minimax/h3/text-to-video')).toBeUndefined();
+    expect(modelFit('bytedance/seedance-2.0-mini/text-to-video')).toBeUndefined();
   });
 
   it('the system prompt carries each family protocol once, with MiniMax as <Picture N>', () => {

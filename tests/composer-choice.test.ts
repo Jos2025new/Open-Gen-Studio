@@ -8,15 +8,17 @@ import { buildContext } from '../src/engine/agent/context';
 import { useStore } from '../src/store/store';
 import type { ModelSummary } from '../src/engine/types';
 
-const video = (ref: string): ModelSummary => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref.split('::')[1], kind: 'video', acceptsText: true, tags: [] });
+const video = (ref: string): ModelSummary => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref.split('::')[1], kind: 'video', acceptsText: true, acceptsImage: false, tags: [] });
 const KLING = 'atlas::kwaivgi/kling-v3.0-pro/text-to-video';
 const H3DEV = 'atlas::minimax/h3-developer/text-to-video';
+const TURBO = 'atlas::minimax/h3-max-turbo/text-to-video';
+const WAN = 'atlas::alibaba/wan-3.0/text-to-video';
 
 beforeEach(() => {
   const st = useStore.getState();
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } },
-    catalog: { ...st.catalog, models: { [KLING]: video(KLING), [H3DEV]: video(H3DEV) }, status: { ...st.catalog.status, atlas: 'ready' } },
+    catalog: { ...st.catalog, models: { [KLING]: video(KLING), [H3DEV]: video(H3DEV), [TURBO]: video(TURBO), [WAN]: video(WAN) }, status: { ...st.catalog.status, atlas: 'ready' } },
     composer: { ...st.composer, userPicked: {}, video: { ...st.composer.video, modelRef: KLING } },
   });
 });
@@ -38,5 +40,19 @@ describe('the composer model only rules when the user picked it (C2)', () => {
     ensureComposerModels();
     expect(videoRef()).toBe(KLING);
     expect(ctx()).toMatch(/video model \(picked by the user\): atlas::kwaivgi\/kling-v3\.0-pro/);
+  });
+});
+
+describe("the context names each purpose's default model and its guide (C4)", () => {
+  it('draft, normal and long resolve with the connected catalog, with the guide to load once', () => {
+    const c = ctx();
+    expect(c).toMatch(/draft → MiniMax H3 Max Turbo, normal → MiniMax H3 Developer, long → Wan 3\.0/);
+    expect(c).toMatch(/load its guide once: model:minimax \(draft, normal\), model:wan \(long\)/);
+  });
+
+  it("without the table's providers it says so instead of naming a model", () => {
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, models: { [KLING]: video(KLING) } } });
+    expect(ctx()).toMatch(/no provider of the table \(Atlas, NanoGPT\) is connected/);
   });
 });

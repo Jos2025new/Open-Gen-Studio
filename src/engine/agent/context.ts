@@ -4,6 +4,8 @@ import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skil
 import { AGENT_OP_IDS, OPS } from '../ops';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
 import { composerChosen, isConnected, modelSummary } from '../catalog';
+import { routeHead, VIDEO_PURPOSES } from '../routing';
+import { guideForModel } from '../guides';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
@@ -116,7 +118,19 @@ function describeModel(kind: MediaKind): string {
 
 /** Which model each video purpose resolves to with the connected providers. */
 function videoRouteLine(): string {
-  return 'video steps follow their purpose (the app picks the cheapest fitting model)';
+  const models = get().catalog.models;
+  const picks = VIDEO_PURPOSES.map((p) => {
+    const head = routeHead(p, (ref) => Boolean(models[ref]));
+    const ref = head && Object.values(head.refs).find((r) => r && models[r]);
+    return { p, head, guide: ref ? guideForModel(ref.split('::')[1])?.id : undefined };
+  });
+  if (!picks.some((x) => x.head)) return 'video steps follow their purpose, but no provider of the table (Atlas, NanoGPT) is connected';
+  const list = picks.map((x) => `${x.p} → ${x.head?.name ?? 'none connected'}`).join(', ');
+  // C4: the agent knows which family it is writing for and loads that guide the first time.
+  const byGuide = new Map<string, string[]>();
+  for (const x of picks) if (x.guide) byGuide.set(x.guide, [...(byGuide.get(x.guide) ?? []), x.p]);
+  const guides = [...byGuide].map(([g, ps]) => `model:${g} (${ps.join(', ')})`).join(', ');
+  return `video by purpose (the app picks the cheapest fitting variant): ${list}${guides ? `; before a video prompt, load its guide once: ${guides}` : ''}`;
 }
 
 /** "image 1024×768", "video 1280×720 5.0s", "audio 12.4s". */

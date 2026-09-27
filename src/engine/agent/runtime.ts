@@ -653,8 +653,14 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
           // Loaded on demand from the index in the system prompt; the agent continues in the next round.
           const v = readGuideSchema.safeParse(parsed.value);
           const text = v.success ? readGuide(v.data.id) : undefined;
-          if (v.success && text) recordMetric(sessionId, { type: 'guide', id: v.data.id });
-          respond(text ?? (v.success ? `No guide "${v.data.id}". Use an id from the index.` : `Invalid read_guide input: ${formatZodError(v.error)}`));
+          // Once per conversation: a guide already in the history is not sent again (C4).
+          const seen = text != null && session(sessionId).agent.history.some((m) => m.role === 'tool' && m.content === text);
+          if (v.success && text && !seen) recordMetric(sessionId, { type: 'guide', id: v.data.id });
+          respond(
+            seen
+              ? `Guide "${v.data?.id}" is already loaded earlier in this conversation; follow it.`
+              : (text ?? (v.success ? `No guide "${v.data.id}". Use an id from the index.` : `Invalid read_guide input: ${formatZodError(v.error)}`)),
+          );
           continue;
         }
         if (call.name === 'propose_plan') {
