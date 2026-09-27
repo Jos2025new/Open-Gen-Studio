@@ -29,6 +29,11 @@ function metaLine(g: Generation): string {
     .join(' · ');
 }
 
+function tileRatio(id: string): React.CSSProperties | undefined {
+  const a = useStore.getState().assets[id];
+  return a?.width && a.height ? ({ ['--ratio' as string]: a.width / a.height } as React.CSSProperties) : undefined;
+}
+
 function Placeholder({ g, index }: { g: Generation; index: number }) {
   // Sound and text have no frame: a flat strip while they run.
   const ratio = g.kind === 'audio' || g.kind === 'text' ? 4 : ratioOf(g.settings.aspect) ?? (g.kind === 'video' ? 16 / 9 : 1);
@@ -146,6 +151,8 @@ export function GenerationCard({ generationId, compact = false }: { generationId
             <div
               key={id}
               className={`tile ${outputs.length > 1 && i === selected ? 'is-selected' : ''}`}
+              // Its own shape, so a single result is sized from the file's dimensions rather than the loaded picture.
+              style={tileRatio(id)}
               role="button"
               tabIndex={0}
               onClick={() => (outputs.length > 1 ? setSelected(i) : openLightbox(i))}
