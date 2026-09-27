@@ -186,7 +186,8 @@ function ownDeps(step: PlanStep): StepRef[] {
  */
 export function toggleStep(steps: PlanStep[], skipped: string[], id: string): string[] {
   const ids = new Set(steps.map((s) => s.id));
-  const deps = new Map(steps.map((s) => [s.id, stepDeps(s).map((r) => r.split('#')[0]).filter((r) => ids.has(r))]));
+  // Joining clips never forces a clip on or off: it joins whichever clips run (pruneJoins).
+  const deps = new Map(steps.map((s) => [s.id, isJoin(s) ? [] : stepDeps(s).map((r) => r.split('#')[0]).filter((r) => ids.has(r))]));
   const off = new Set(skipped);
   const walk = (start: string, next: (id: string) => string[], apply: (id: string) => void) => {
     const stack = [start];
@@ -702,4 +703,30 @@ function planSubjects(
     }
   }
   return out;
+}
+
+function isJoin(s: PlanStep): s is OpStep {
+  return s.kind === 'op' && OPS[s.op].multiInput === true;
+}
+
+/**
+ * Before a plan runs: a join keeps only the clips that run (the user may have unchecked some). With fewer than
+ * two left there is nothing to join and the step is dropped.
+ */
+export function pruneJoins(steps: PlanStep[], off: Set<string>): { steps: PlanStep[]; dropped: string[] } {
+  const dropped: string[] = [];
+  const out: PlanStep[] = [];
+  for (const s of steps) {
+    if (!isJoin(s)) {
+      out.push(s);
+      continue;
+    }
+    const clips = [s.input, ...(s.more ?? [])].filter((r) => {
+      const p = parseRef(r);
+      return !(p?.type === 'step' && off.has(p.id));
+    });
+    if (clips.length < 2) dropped.push(s.id);
+    else out.push({ ...s, input: clips[0], more: clips.slice(1) });
+  }
+  return { steps: out, dropped };
 }

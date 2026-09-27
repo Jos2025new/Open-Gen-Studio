@@ -2,7 +2,7 @@ import { uid } from '../../lib/id';
 import { isAbort } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
-import { normalizePlan, parseRef, type RawPlan } from '../plan';
+import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps } from '../executor';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
@@ -409,7 +409,10 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
   const { plan } = item;
   const off = new Set(item.skipped ?? []);
-  const chosen = plan.steps.filter((st) => !off.has(st.id));
+  // A join over clips the user unchecked joins only the clips that run (or is dropped when fewer than two remain).
+  const pruned = pruneJoins(plan.steps.filter((st) => !off.has(st.id)), off);
+  for (const id of pruned.dropped) off.add(id);
+  const chosen = pruned.steps;
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
   const { total } = estimateSteps(chosen);

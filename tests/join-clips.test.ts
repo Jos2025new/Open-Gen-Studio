@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 // @ts-expect-error plain JS server module without types
 import { joinArgs } from '../server/local-store.js';
 import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
-import { normalizePlan, stepDeps, type PlanContext } from '../src/engine/plan';
+import { normalizePlan, pruneJoins, stepDeps, toggleStep, type PlanContext } from '../src/engine/plan';
 import { opsFor } from '../src/engine/ops';
 import type { MediaKind } from '../src/engine/types';
 
@@ -77,6 +77,16 @@ describe('join_clips in plans (F4)', () => {
     expect(image.errors.join(' ')).toMatch(/joins videos; "i" is image/);
     const node = await normalizePlan({ title: 't', steps: [...clips, { id: 's4', kind: 'op', op: 'join_clips', input: 's1', more: ['s2'] }] }, ctx('node'), 'p');
     expect(node.errors.join(' ')).toMatch(/not available in the Node workspace/);
+  });
+
+  it('unchecking a clip keeps the join, which joins the clips that run; under two clips it is dropped', async () => {
+    const { plan } = await normalizePlan({ title: 't', steps: [...clips, { id: 's4', kind: 'op', op: 'join_clips', input: 's1', more: ['s2', 's3'] }] }, ctx(), 'p');
+    const off = toggleStep(plan!.steps, [], 's1');
+    expect(off).toEqual(['s1']);
+    const two = pruneJoins(plan!.steps.filter((s) => !off.includes(s.id)), new Set(off));
+    expect(two.steps.find((s) => s.id === 's4')).toMatchObject({ input: 's2', more: ['s3'] });
+    const one = pruneJoins(plan!.steps.filter((s) => s.id === 's3' || s.id === 's4'), new Set(['s1', 's2']));
+    expect(one.dropped).toEqual(['s4']);
   });
 
   it('is not offered on a single video in menus', () => {
