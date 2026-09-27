@@ -18,6 +18,25 @@ Fuentes, consultadas por terminal el 2026-09-26, sin clave y sin coste:
 | HappyHorse 1.1 | **0,070** (720P es su mínimo) | — | 0,0988 | — | 0,082 | Atlas (0,070 a 720p: dato comparable) |
 | Grok Imagine Video 1.5 | **0,028** (Developer) / 0,08 | 0,08 | 0,14 | 0,08 | 0,14 | Atlas v1.5 Developer |
 
+## Cobros reales de Atlas por resolución (dato duro)
+Fuente: `open-generation-studio/data/studio.db` (tabla `jobs`: `actual_cost`, duración y resolución de cada trabajo ejecutado), leída en solo lectura el 2026-09-26.
+
+| Atlas | 480p (USD/s) | 720p (USD/s) | 720p / 480p |
+|---|---|---|---|
+| Wan 3.0 (i2v, r2v) | 0,040 (1 trabajo, 12 s) | **0,080** (2 trabajos, 5 s) | ×2,0 |
+| Seedance 2.0 Fast (i2v, r2v) | 0,027 (3 trabajos) | **0,0585** (2 trabajos) | ×2,2 |
+| Seedance 2.0 Mini (r2v, t2v) | 0,0113 (2 trabajos) | **0,0244** (19 trabajos, con y sin audio) | ×2,2 |
+
+El precio base de la API de Atlas es el de 480p. Seedance escala con los píxeles (×2,2, igual que sus tokens de vídeo: 720p ≈ 2,25 × 480p); Wan ×2. El audio no cambió el precio de Seedance 2.0 Mini.
+
+### Comparación a 720p (resolución media por defecto de la app)
+| Modelo | Atlas 720p | OpenRouter 720p | NanoGPT 720p | Más barato |
+|---|---|---|---|---|
+| Wan 3.0 | **0,080** (medido) | 0,10 | 0,13 | Atlas |
+| Seedance 2.0 Fast | **0,0585** (medido) | 0,091 | 0,071 | Atlas |
+| Seedance 2.5 | ≈ 0,30 (estimado: 0,134 × 2,25; sin medir) | **0,231** | 0,36 | OpenRouter (salvo medición de Atlas) |
+| HappyHorse 1.1 | **0,070** (su mínimo es 720p) | 0,0988 | 0,082 | Atlas |
+
 ## Discrepancias con las capturas de la web de Atlas
 - MiniMax H3: web 0,08/s frente a API 0,038/s (~2,1×) → la web parece mostrar la resolución por defecto (768P), la API el mínimo (480P).
 - Gemini Omni 1.1 Flash: web 0,099/s frente a API 0,037/s.
@@ -30,5 +49,5 @@ Conclusión: el precio de la web de Atlas no siempre es el de la API; ninguno de
 - Kling V3 std: Atlas 0,071, OpenRouter 0,084 (0,126 con audio), NanoGPT 0,084/s (×1,5 con audio).
 
 ## Límites de este análisis
-- Atlas a 720p no está publicado: solo una generación real (de pago) lo mide. La comparación justa a 720p hoy solo se puede hacer entre OpenRouter y NanoGPT.
+- Atlas a 720p no está publicado; está medido para Wan 3.0 y Seedance 2.0 Fast/Mini (arriba). Seedance 2.5, MiniMax H3 y Grok a 720p en Atlas siguen sin medir.
 - Precios de catálogo a esta fecha; cambian.
