@@ -10,9 +10,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 
 ## Tarea — panel lateral del visor ordenado (2026-09-27) · punto de retorno: `b2470ef`
 Inspiración (captura del usuario): secciones con título pequeño en mayúsculas ("PROMPT" con Copy, "DETAILS"), cada una en una caja redondeada; entradas como miniaturas sobre el prompt; prompt recortado con "See all"; barra inferior con Favorito y Download. Sin funciones nuevas: se reordena lo que ya hay.
-- [ ] V1. `GenerationInfo.tsx`: sección Prompt (miniaturas de origen/referencias en vez de las filas "References"/"Start frame"; la operación va aquí en vez de la fila "Operation"; Copy con texto) y sección Details (filas sin bordes dentro de una caja). *También se ve en el popover "Details" de la tarjeta.*
-- [ ] V2. `Lightbox.tsx`: cabecera solo con cerrar; Favorito + Download al pie, bajo las acciones.
-- [ ] V3. CSS `lb-*`/`info-*` en `shell.css`; typecheck, suite, navegador (visor y popover Details antes/después); commit.
+- [x] V1. `GenerationInfo.tsx`: sección Prompt (miniaturas de origen/referencias en vez de las filas "References"/"Start frame"; la operación va aquí en vez de la fila "Operation"; Copy con texto) y sección Details (filas sin bordes dentro de una caja). *También se ve en el popover "Details" de la tarjeta.*
+- [x] V2. `Lightbox.tsx`: cabecera solo con cerrar; Favorito + Download al pie, bajo las acciones.
+- [x] V3. CSS `lb-*`/`info-*` en `shell.css`; typecheck, suite, navegador (visor y popover Details antes/después); commit.
+  Hecho: prompt plegado a 7 líneas si pasa de 280 caracteres; miniaturas de 56 px; filas de Details sin bordes (etiqueta tenue a la izquierda); panel lateral de 320 px con el contenido desplazable y las acciones + Favorito/Download fijas abajo. En móvil (≤ 540 px) Favorito, Download y cerrar en una sola fila. Navegador: See all ↔ Show less, Favorito activo, popover Details de la tarjeta con el mismo formato. Si algo empeora: `git revert f738456` (vuelve a `b2470ef`).
 
 ## Tarea — tarjetas más pequeñas y modelo de las operaciones según el origen (2026-09-27)
 Origen: captura del usuario (tarjeta 2:3 con un hueco negro enorme mientras genera; imagen con bandas negras) y "Relight / Change angle usan siempre Nano Banana Pro".
