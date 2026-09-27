@@ -1,5 +1,6 @@
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
+import { routeVideo, VIDEO_PURPOSES, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
   AdvancedValue,
@@ -39,6 +40,8 @@ export interface RawStep {
   /** Audio steps: the text of an earlier step used as song lyrics. */
   lyrics_from?: string;
   model?: string;
+  /** Video steps: what the clip is for; the app picks the model by price (routing.ts). */
+  purpose?: string;
   aspect?: string;
   resolution?: string;
   count?: number;
@@ -98,6 +101,11 @@ export interface PlanContext {
   asset: (id: string) => { kind: AssetKind; width?: number; height?: number } | undefined;
   layer: (id: string) => { type: LayerType } | undefined;
   maxSteps?: number;
+  /**
+   * Whether the user picked the composer's model by hand (C2). When false, video steps without a model follow
+   * the purpose table; when true, or when not given, the composer's model is the default as before.
+   */
+  composerChosen?: (kind: MediaKind) => boolean;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
 }
@@ -370,7 +378,17 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           expectImage(s.last_frame, `${where} last_frame`);
         }
         const needsImage = refs.length > 0 || Boolean(s.first_frame);
-        const modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, adjustments) || ctx.defaultModel(kind, needsImage);
+        let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, adjustments);
+        // No model named: a video step follows the purpose table unless the user picked the composer's model (C1, C2).
+        if (!modelRef && kind === 'video' && ctx.composerChosen && !ctx.composerChosen('video')) {
+          const purpose: VideoPurpose = VIDEO_PURPOSES.includes(s.purpose as VideoPurpose) ? (s.purpose as VideoPurpose) : 'normal';
+          const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0), duration: s.duration }, ctx.getModel);
+          if (routed) {
+            modelRef = routed.ref;
+            adjustments.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
+          }
+        }
+        modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
         if (!modelRef) {
           errors.push(`${where}: no ${kind} model is available. Ask the user to connect a provider.`);
           continue;
