@@ -51,7 +51,7 @@ describe('Check status for a NanoGPT video whose job id was lost', () => {
     const st = useStore.getState();
     const g: Generation = {
       id: 'gen_lost', sessionId: st.activeSessionId, kind: 'video', prompt: 'she shows the dress', modelRef: 'nanogpt::bytedance-seedance-2-0-fast', modelName: 'Seedance 2.0 Fast', provider: 'nanogpt',
-      settings: { count: 1, advanced: {} }, inputs: { refs: [] }, status: 'error', error: 'Network error reaching nano-gpt.com. Check your connection.', lostJob: true,
+      settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer', status: 'error', error: 'Network error reaching nano-gpt.com. Check your connection.', lostJob: true,
       assetIds: [], createdAt: T0, startedAt: T0, finishedAt: T0 + 30_000, estimate: { usd: 0.6, approximate: false },
     } as Generation;
     useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' } }, generations: { ...st.generations, gen_lost: g } });
