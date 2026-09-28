@@ -1,5 +1,6 @@
 import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
+import productGuide from './guides/product.md?raw';
 
 /* Skills shape how the agent writes prompts; workflows give it a proven step structure. */
 
@@ -9,6 +10,8 @@ export interface Skill {
   description: string;
   /** Guidance appended to the agent context while the skill is active. */
   guidance: string;
+  /** Full guide, returned only by read_guide (never injected in every message like `guidance`). */
+  guide?: string;
   /** Short suffix the offline planner appends to prompts. */
   promptHint: string;
 }
@@ -54,7 +57,8 @@ export const SKILLS: Skill[] = [
     id: 'product',
     name: 'Product photography',
     description: 'Commercial product shots: studio light, clean sets, hero angles.',
-    guidance: 'Write prompts like a commercial product photographer: hero angle, controlled studio or lifestyle lighting, lens (e.g. 85mm, macro), surface and reflections, clean negative space for copy. Keep the product exact across steps by passing it as a reference.',
+    guidance: 'Write prompts like a commercial product photographer: one product sheet repeated in every prompt, the product photo as a reference in every step, light with direction and color temperature, lens and aperture per shot, a grounded contact shadow, negative space where copy goes. Load skill:product for the full guide before writing prompts.',
+    guide: productGuide,
     promptHint: 'commercial product photography, studio lighting, crisp detail, clean background',
   },
   {
@@ -137,18 +141,70 @@ export const WORKFLOWS: Workflow[] = [
     ],
   },
   {
+    // Default set from Buzzy Agent (the shots that sell); formats from Higgsfield as variants.
     id: 'product-pack',
-    name: 'Product ad pack',
-    description: 'Hero shot, relit variant, vertical cut and a short clip.',
+    name: 'Product photoshoot',
+    description: 'Product set that sells: hero, lifestyle, detail and features shot; or one format (packshot, banner, carousel, ad pack, try-on, CGI, restyle).',
     workspaces: ['chat', 'node'],
     skill: 'product',
-    needs: ['the product (photo or description)'],
-    continuity: 'One product identity: every step derives from the hero shot.',
+    needs: [
+      'the product (photo, or a description with shape, materials and colors)',
+      'destination: marketplace 1:1, feed 4:5, stories 9:16, Pinterest 2:3 or web banner 16:9 (sets the aspect)',
+      'style: clean studio white, minimal, dramatic luxury or lifestyle',
+      'brand colors (hex), if any',
+      'how many variants per shot',
+      'a short video of the hero? "No" (recommended) or 360° turn / slow orbit',
+      'a second refining pass (label, edges, reflections; costs one edit per image)? "No" (recommended) or "Yes"',
+    ],
+    continuity:
+      'One product identity: write the product sheet once and repeat it in every prompt; pass the product photo as a reference in every step and the hero (s1) in later ones. Never change the product between shots. Video and second pass only when the user said yes: an animate step from the approved hero, an edit step per chosen image.',
+    variants: [
+      { id: 'packshot', name: 'Packshot', description: 'Catalog: neutral or white background, three clean angles.', steps: [
+        { id: 's1', kind: 'image', title: 'Front', prompt: '{prompt}, packshot on seamless white, soft studio light', aspect: '1:1' },
+        { id: 's2', kind: 'op', title: '3/4 view', op: 'angle', input: 's1', params: { angle: 'three-quarter-left' } },
+        { id: 's3', kind: 'op', title: 'Top view', op: 'angle', input: 's1', params: { angle: 'top-down' } },
+      ] },
+      { id: 'lifestyle', name: 'Lifestyle', description: 'The product in real use: three scenes with hands or action.', steps: [
+        { id: 's1', kind: 'image', title: 'Scene 1', prompt: '{prompt}, lifestyle, product in use, natural light', aspect: '4:5' },
+        { id: 's2', kind: 'image', title: 'Scene 2', prompt: '{prompt}, lifestyle, another moment of use', refs: ['s1'], aspect: '4:5' },
+        { id: 's3', kind: 'image', title: 'Scene 3', prompt: '{prompt}, lifestyle, hands interacting with the product', refs: ['s1'], aspect: '4:5' },
+      ] },
+      { id: 'closeup', name: 'Close-up with a person', description: 'Hands, face and product: application or demo.', steps: [
+        { id: 's1', kind: 'image', title: 'Close-up', prompt: '{prompt}, close-up, hands and face with the product, application', aspect: '4:5' },
+      ] },
+      { id: 'pinterest', name: 'Pinterest', description: 'Vertical 2:3 moodboard aesthetic.', steps: [
+        { id: 's1', kind: 'image', title: 'Pin', prompt: '{prompt}, editorial moodboard styling, vertical', aspect: '2:3' },
+      ] },
+      { id: 'hero-banner', name: 'Hero banner', description: 'Wide web, email or campaign header with copy space.', steps: [
+        { id: 's1', kind: 'image', title: 'Banner', prompt: '{prompt}, wide hero banner, product on the left third, empty space on the right for copy', aspect: '16:9' },
+      ] },
+      { id: 'carousel', name: 'Social carousel', description: '3–10 connected slides with one visual system.', steps: [
+        { id: 's1', kind: 'image', title: 'Slide 1 · cover', prompt: '{prompt}, carousel cover', aspect: '4:5' },
+        { id: 's2', kind: 'image', title: 'Slide 2', prompt: '{prompt}, same set and light, next idea', refs: ['s1'], aspect: '4:5' },
+        { id: 's3', kind: 'image', title: 'Slide 3', prompt: '{prompt}, same set and light, closing idea', refs: ['s1'], aspect: '4:5' },
+      ] },
+      { id: 'ad-pack', name: 'Ad pack', description: 'One master adapted to Meta, TikTok, Pinterest and Google ratios.', steps: [
+        { id: 's1', kind: 'image', title: 'Master 1:1', prompt: '{prompt}, ad creative, clear focal product, space for a headline', aspect: '1:1' },
+        { id: 's2', kind: 'op', title: 'Feed 4:5', op: 'reframe', input: 's1', params: { aspect: '4:5' } },
+        { id: 's3', kind: 'op', title: 'Stories 9:16', op: 'reframe', input: 's1', params: { aspect: '9:16' } },
+        { id: 's4', kind: 'op', title: 'Pinterest 2:3', op: 'reframe', input: 's1', params: { aspect: '2:3' } },
+        { id: 's5', kind: 'op', title: 'Display 16:9', op: 'reframe', input: 's1', params: { aspect: '16:9' } },
+      ] },
+      { id: 'try-on', name: 'Virtual try-on', description: 'A generated model wearing or using the product.', steps: [
+        { id: 's1', kind: 'image', title: 'Try-on', prompt: '{prompt}, a model wearing or using the product, the product unchanged', aspect: '4:5' },
+      ] },
+      { id: 'conceptual', name: 'Conceptual / CGI', description: 'Levitation, splashes, sculptural or surreal sets for premium brands.', steps: [
+        { id: 's1', kind: 'image', title: 'Concept', prompt: '{prompt}, conceptual product shot, levitating, dramatic studio light', aspect: '4:5' },
+      ] },
+      { id: 'restyle', name: 'Restyle', description: 'New look, mood or season for an existing image; subject and composition kept. The input is the user image.', steps: [
+        { id: 's1', kind: 'op', title: 'Restyle', op: 'edit', params: { instruction: '{prompt}; keep the product and composition exactly' } },
+      ] },
+    ],
     steps: [
-      { id: 's1', kind: 'image', title: 'Hero shot', prompt: '{prompt}, hero product shot, studio lighting', aspect: '1:1' },
-      { id: 's2', kind: 'op', title: 'Golden relight', op: 'relight', input: 's1', params: { preset: 'golden-hour', direction: 'left', intensity: 'medium' } },
-      { id: 's3', kind: 'op', title: 'Vertical 9:16', op: 'reframe', input: 's1', params: { aspect: '9:16' } },
-      { id: 's4', kind: 'op', title: 'Product clip', op: 'animate', input: 's1', params: { motion: 'slow orbit around the product, soft reflections' } },
+      { id: 's1', kind: 'image', title: 'Hero shot', prompt: '{prompt}, hero product shot, clean studio light, neutral background', aspect: '1:1' },
+      { id: 's2', kind: 'image', title: 'Lifestyle', prompt: '{prompt}, lifestyle, the product in a real setting of use', refs: ['s1'], aspect: '1:1' },
+      { id: 's3', kind: 'image', title: 'Macro detail', prompt: '{prompt}, macro close-up of the material and finish', refs: ['s1'], aspect: '1:1' },
+      { id: 's4', kind: 'image', title: 'Features shot', prompt: '{prompt}, clean product shot with empty areas for feature callouts, no text', refs: ['s1'], aspect: '1:1' },
     ],
   },
   {
@@ -298,7 +354,7 @@ export function readGuide(id: string): string | undefined {
   if (type === 'model') return modelGuide(rest)?.text;
   if (type === 'skill') {
     const k = skillById(rest);
-    return k ? `${k.name}: ${k.guidance}` : undefined;
+    return k ? `${k.name}: ${k.guidance}${k.guide ? `\n\n${k.guide}` : ''}` : undefined;
   }
   if (type !== 'workflow') return undefined;
   const [wid, variant] = rest.split('/');
