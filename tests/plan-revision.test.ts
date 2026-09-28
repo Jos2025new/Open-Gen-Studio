@@ -112,6 +112,8 @@ describe('choosing which steps run', () => {
     expect(done.status).toBe('done');
     const history = useStore.getState().sessions[useStore.getState().activeSessionId].agent.history;
     expect(history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /unchecked s2, s3/.test(m.content))).toBe(true);
-    expect(chatCalls).toBe(1);
+    // The plan call plus the text-only wrap-up after it ran (S4), which reports the unchecked steps.
+    expect(chatCalls).toBe(2);
+    expect(history.some((m) => m.role === 'user' && typeof m.content === 'string' && /^\[app\] Plan "Three" finished \(done\).*s2 not run \(unchecked/.test(m.content))).toBe(true);
   });
 });

@@ -41,7 +41,7 @@ import {
   updateFeedItem,
   useStore,
 } from '../../store/store';
-import { SYSTEM_PROMPT, buildContext } from './context';
+import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
@@ -545,6 +545,24 @@ async function runPlanItem(
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else toast(`${plan.title} failed`, 'error');
+  await wrapUpPlan(sessionId, itemId, plan.title, status, summary);
+}
+
+/**
+ * S4 · After a plan runs, one short text-only call so the agent says it is ready and offers next steps.
+ * ⚠️ Traceable (AGENTS.md, "social ad" plan): if the chat stops answering right after a plan, an unrequested
+ * message appears, or agent spending rises, check this first. Skipped without an LLM, while the agent is busy,
+ * with a pending card, or when the user already wrote something after this plan.
+ */
+async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
+  const s = session(sessionId);
+  if (!s || agentEngine().kind !== 'llm' || s.agent.busy || s.agent.pending) return;
+  const at = s.feed.findIndex((f) => f.id === itemId);
+  if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
+  const item = s.feed[at];
+  pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
+${WRAPUP_RULE}`, []));
+  await llmTurn(sessionId, item.workspace, { textOnly: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -722,7 +740,7 @@ function activityLog(sessionId: string, workspace: Workspace) {
   };
 }
 
-async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
+async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
   void loadLlmCatalog(engine.provider);
@@ -803,6 +821,11 @@ async function llmTurn(sessionId: string, workspace: Workspace): Promise<void> {
       });
       if (!result.toolCalls.length) {
         if (!result.text.trim()) notice(sessionId, workspace, 'The model returned an empty answer. Try rephrasing.');
+        return;
+      }
+      // The wrap-up after a plan (S4) is text only: a tool call there is answered as ignored and nothing runs.
+      if (opts.textOnly) {
+        flushToolResults(sessionId, result.toolCalls.map((c) => ({ role: 'tool' as const, tool_call_id: c.id, content: 'Ignored: this reply is text only.' })));
         return;
       }
 

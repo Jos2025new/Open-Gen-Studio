@@ -1,6 +1,7 @@
 import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
 import productGuide from './guides/product.md?raw';
+import socialGuide from './guides/social.md?raw';
 
 /* Skills shape how the agent writes prompts; workflows give it a proven step structure. */
 
@@ -79,7 +80,8 @@ export const SKILLS: Skill[] = [
     id: 'social',
     name: 'Social ad',
     description: 'Scroll-stopping vertical creatives with room for copy.',
-    guidance: 'Default to 9:16 (stories/reels) or 4:5 (feed). Strong focal subject, high contrast, a clear hook, safe margins for UI, space for a headline.',
+    guidance: 'Default to 9:16 (stories/reels) or 4:5 (feed). Strong focal subject, high contrast, a clear hook, safe margins for UI, space for a headline. Claims only verified ones. Load skill:social for the full guide (brief, concepts, copy, which flow) before planning.',
+    guide: socialGuide,
     promptHint: 'bold social media ad, high contrast, clear focal point, space for headline',
   },
   {
@@ -250,6 +252,43 @@ export const WORKFLOWS: Workflow[] = [
       { id: 's1', kind: 'image', title: 'Master', prompt: '{prompt}', aspect: '1:1' },
       { id: 's2', kind: 'op', title: 'Feed 4:5', op: 'reframe', input: 's1', params: { aspect: '4:5' } },
       { id: 's3', kind: 'op', title: 'Story 9:16', op: 'reframe', input: 's1', params: { aspect: '9:16' } },
+    ],
+  },
+  {
+    // One UGC piece per plan (Higgsfield review): one creator and one product throughout; variants never mix.
+    id: 'ugc',
+    name: 'UGC video',
+    description: 'Creator-style vertical video: review, unboxing, try-on or tutorial; one creator and one product.',
+    // Chat only, like story: plan subjects and join_clips do not exist in Nodes.
+    workspaces: ['chat'],
+    skill: 'ugc',
+    needs: [
+      'the product (photo, or a description)',
+      'the creator: an attached photo, or a description (age range, style); generated once and kept',
+      'language of the spoken lines',
+      'total duration',
+      'claims to use: only benefits the user states or the product shows (none → neutral)',
+    ],
+    fixed: { aspect: '9:16' },
+    continuity:
+      'Save the creator and the product as subjects in propose_plan.subjects and mention them as @Name in every step; never describe them again. Claims only from the brief. One variant per piece: two formats are two plans. Spoken lines in the chosen language, quoted, short.',
+    variants: [
+      { id: 'review', name: 'Review', description: 'Creator talks to camera holding the product: hook, two benefits, verdict.' },
+      { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.', steps: [
+        { id: 's1', kind: 'image', title: 'Key frame · package', prompt: '{prompt}, hands holding the closed package, phone-shot, natural light', aspect: '9:16' },
+        { id: 's2', kind: 'video', title: 'Unboxing clip', prompt: '{prompt}, opening the package, reveal of the product, genuine reaction', firstFrame: 's1', aspect: '9:16' },
+      ] },
+      { id: 'try-on', name: 'Try-on', description: 'The creator wears or uses the product and shows it from two sides.' },
+      { id: 'tutorial', name: 'Tutorial', description: 'Step by step use, one clip per step, joined.', steps: [
+        { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}, creator with the product, ready to show how to use it', aspect: '9:16' },
+        { id: 's2', kind: 'video', title: 'Step 1', prompt: '{prompt}, step 1', firstFrame: 's1', aspect: '9:16' },
+        { id: 's3', kind: 'video', title: 'Step 2', prompt: '{prompt}, step 2', refs: ['s1'], aspect: '9:16' },
+        { id: 's4', kind: 'op', title: 'Join clips', op: 'join_clips', input: 's2', more: ['s3'] },
+      ] },
+    ],
+    steps: [
+      { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}, creator holding the product, phone-shot selfie framing, natural light', aspect: '9:16' },
+      { id: 's2', kind: 'video', title: 'UGC clip', prompt: '{prompt}, talking to camera about the product, handheld', firstFrame: 's1', aspect: '9:16' },
     ],
   },
   {

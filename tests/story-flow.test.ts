@@ -123,7 +123,9 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(videos.every((r) => r.subjects.includes('Reto'))).toBe(true);
     const join = runs.find((r) => r.clips)!;
     expect(join.clips!.split(',')).toHaveLength(3);
-    expect(sent).toHaveLength(3); // guide, questions, plan: no extra model calls
+    // guide, questions, plan, then the one text-only wrap-up after the plan ran (S4): no other model calls.
+    await vi.waitFor(() => expect(sent).toHaveLength(4));
+    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^\[app\] Plan "Turno de guardia" finished \(done\)/);
   });
 
   it('a clear request in Auto still goes straight to the plan: a second card is refused', async () => {
