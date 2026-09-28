@@ -4,7 +4,7 @@ import { extensionForMime, fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob, TranscriberSummary } from '../types';
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
-import type { GenOutput, GenRequest, GenResult, ProviderAdapter, ResumeContext, TranscribeRequest } from './types';
+import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext, TranscribeRequest } from './types';
 import { modelRef } from './types';
 
 // api.nano-gpt.com serves an outdated catalog (no GPT-6, Opus 5.5, Seedream 5 Flash...); the root host is current.
@@ -572,7 +572,38 @@ export const nanogpt: ProviderAdapter = {
   resume(job, ctx) {
     return job.meta.kind === 'transcribe' ? pollTranscription(job, ctx) : pollVideo(job, ctx);
   },
+
+  // GET /api/generate-video/recover (docs: model, limit ≤ 50, conversationUUID; data[] with runId, id, model, status,
+  // createdAt; 20 requests/min per IP). Video and 3D runs both go through generate-video.
+  async recover(q) {
+    const res = await requestJson<Loose>(`${BASE}/generate-video/recover?model=${encodeURIComponent(q.modelId)}&limit=20`, {
+      headers: nanoHeaders(q.apiKey),
+      signal: q.signal,
+      timeoutMs: POLL_TIMEOUT_MS,
+    });
+    const id = pickRecoveredRun(Array.isArray(res.data) ? (res.data as Loose[]) : [], q);
+    return id ? { provider: 'nanogpt', id, meta: { recovered: 'true' } } : null;
+  },
 };
+
+/**
+ * The run a lost request started: same model, created from shortly before the submit (the provider's clock may
+ * differ a little) until shortly after the failure, not owned by another generation; the closest to the submit.
+ */
+export function pickRecoveredRun(runs: Loose[], q: Pick<RecoverQuery, 'modelId' | 'since' | 'until' | 'taken'>): string | null {
+  const from = q.since - 30_000;
+  const to = q.until + 120_000;
+  let best: { id: string; gap: number } | null = null;
+  for (const r of runs) {
+    const id = String(r.runId ?? r.id ?? '');
+    const at = Date.parse(String(r.createdAt ?? ''));
+    if (!id || q.taken.has(id) || !Number.isFinite(at) || at < from || at > to) continue;
+    if (r.model != null && String(r.model) !== q.modelId) continue;
+    const gap = Math.abs(at - q.since);
+    if (!best || gap < best.gap) best = { id, gap };
+  }
+  return best?.id ?? null;
+}
 
 async function materialize(outputs: GenOutput[], signal: AbortSignal): Promise<GenOutput[]> {
   return Promise.all(

@@ -1,5 +1,5 @@
 import { uid } from '../lib/id';
-import { AbortedError, isAbort, JobFailedError } from '../lib/http';
+import { AbortedError, isAbort, JobFailedError, NetworkError } from '../lib/http';
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
@@ -264,7 +264,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined });
   const g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -488,7 +488,7 @@ async function execute(id: string): Promise<string[]> {
         apiKey,
         signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: total > 1 ? `${text} · ${done + 1}/${total}` : text, progress }),
-        onRemoteJob: (job) => patchGeneration(id, { remoteJob: total === perRequest ? job : undefined }),
+        onRemoteJob: (job) => patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id } : { remoteJob: undefined }),
       });
       if (result.costUsd != null) cost += result.costUsd;
       else if (quote != null) cost += quote;
@@ -514,7 +514,9 @@ async function execute(id: string): Promise<string[]> {
       if (cur?.assetIds.length) chargePartial(cur);
       throw new AbortedError();
     }
-    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
+    // The connection failed before any job id came back: the request may still have reached the provider.
+    const lostJob = !remoteJob && err instanceof NetworkError;
+    patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob });
     throw err;
   }
 }
@@ -546,7 +548,7 @@ async function runTranscribe(g: Generation, signal: AbortSignal): Promise<void> 
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -562,7 +564,7 @@ async function runCreateVoice(g: Generation, signal: AbortSignal): Promise<void>
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -578,7 +580,7 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
     apiKey,
     signal,
     onStatus: (text) => patchGeneration(g.id, { statusText: text }),
-    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job }),
+    onRemoteJob: (job) => patchGeneration(g.id, { remoteJob: job, jobId: job.id }),
   });
   finishText(g.id, result.text ?? '', result.costUsd);
 }
@@ -650,9 +652,26 @@ export function retryGeneration(id: string): Promise<string[]> {
   return runGeneration(id);
 }
 
-/** True when a stopped generation still has a submitted job whose result can be fetched. */
+/**
+ * True when a stopped generation still has a submitted job whose result can be fetched, or when its job id was lost
+ * but the provider can look it up among its recent runs (NanoGPT video and 3D: generate-video/recover).
+ */
 export function canRecheck(g: Generation): boolean {
-  return Boolean(g.remoteJob && ADAPTERS[g.remoteJob.provider]?.resume && g.status !== 'running' && g.status !== 'queued' && g.status !== 'done');
+  if (g.status === 'running' || g.status === 'queued' || g.status === 'done') return false;
+  if (g.remoteJob) return Boolean(ADAPTERS[g.remoteJob.provider]?.resume);
+  return canRecover(g);
+}
+
+function canRecover(g: Generation): boolean {
+  const parsed = parseModelRef(g.modelRef);
+  return Boolean(parsed && parsed.provider !== 'local' && ADAPTERS[parsed.provider]?.recover && (g.kind === 'video' || g.kind === 'model3d') && g.lostJob && g.startedAt && (g.settings.count ?? 1) <= 1 && !g.op?.id.startsWith('transcribe'));
+}
+
+/** Look the lost job up at the provider; adopt it (then it is followed like any job) or say it never arrived. */
+async function recoverJob(g: Generation): Promise<RemoteJob | null> {
+  const parsed = parseModelRef(g.modelRef)!;
+  const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id].filter((v): v is string => Boolean(v))));
+  return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
 }
 
 /** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
@@ -660,14 +679,44 @@ export function recheckGeneration(id: string): Promise<string[]> {
   const pending = running.get(id);
   if (pending) return pending;
   const g = get().generations[id];
-  const job = g?.remoteJob;
-  if (!g || !job || !canRecheck(g)) return Promise.resolve([]);
+  if (!g || !canRecheck(g)) return Promise.resolve([]);
+  if (!g.remoteJob) return recoverThenFollow(id);
+  const job = g.remoteJob;
   if (!isConnected(job.provider)) {
     patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[job.provider]} in Settings to check this job.` });
     return Promise.resolve([]);
   }
   patchGeneration(id, { status: 'running', error: undefined, statusText: 'Checking', progress: undefined, finishedAt: undefined });
   return followRemote(id, job);
+}
+
+function recoverThenFollow(id: string): Promise<string[]> {
+  const g = get().generations[id];
+  const provider = parseModelRef(g.modelRef)!.provider;
+  if (!isConnected(provider)) {
+    patchGeneration(id, { status: 'error', error: `Connect ${PROVIDER_LABELS[provider]} in Settings to check this job.` });
+    return Promise.resolve([]);
+  }
+  patchGeneration(id, { status: 'running', error: undefined, statusText: 'Looking for the job', progress: undefined, finishedAt: undefined });
+  const p = (async () => {
+    let job: RemoteJob | null;
+    try {
+      job = await recoverJob(g);
+    } catch (err) {
+      running.delete(id);
+      patchGeneration(id, { status: 'error', error: `Could not ask ${PROVIDER_LABELS[provider]} for recent jobs: ${(err as Error).message}`, statusText: undefined, finishedAt: Date.now() });
+      return [];
+    }
+    running.delete(id);
+    if (!job) {
+      patchGeneration(id, { status: 'error', error: `${PROVIDER_LABELS[provider]} has no recent job for this request from that time: it most likely never arrived. Retry runs it again.`, statusText: undefined, finishedAt: Date.now() });
+      return [];
+    }
+    patchGeneration(id, { remoteJob: job, jobId: job.id, lostJob: undefined, statusText: 'Checking' });
+    return followRemote(id, job);
+  })();
+  running.set(id, p);
+  return p;
 }
 
 function followRemote(id: string, job: RemoteJob): Promise<string[]> {

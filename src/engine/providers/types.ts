@@ -1,5 +1,16 @@
 import type { AdvancedValue, GenSettings, MediaKind, ModelSchema, ModelSummary, OpId, ProviderId, RemoteJob, TranscriberSummary } from '../types';
 
+export interface RecoverQuery {
+  modelId: string;
+  apiKey: string;
+  /** When the request was sent and when it failed (ms). */
+  since: number;
+  until: number;
+  /** Job ids other generations already own. */
+  taken: Set<string>;
+  signal?: AbortSignal;
+}
+
 export interface MediaInput {
   assetId: string;
   blob: Blob;
@@ -84,6 +95,11 @@ export interface ProviderAdapter {
   generate(req: GenRequest): Promise<GenResult>;
   /** Continue polling a job submitted before a reload. */
   resume?(job: RemoteJob, ctx: ResumeContext): Promise<GenResult>;
+  /**
+   * Find the job of a request whose id was lost (the connection dropped while submitting): the provider's recent
+   * runs of that model, created between the submit and the failure. Null when none matches (it never arrived).
+   */
+  recover?(q: RecoverQuery): Promise<RemoteJob | null>;
   /** Speech-to-text models, when the provider has them. */
   listTranscribers?(signal?: AbortSignal): Promise<TranscriberSummary[]>;
   /** Audio (or video) → text. Result in `text`. */

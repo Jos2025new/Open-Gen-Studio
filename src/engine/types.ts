@@ -307,6 +307,10 @@ export interface Generation {
   planId?: string;
   stepId?: string;
   remoteJob?: RemoteJob;
+  /** The provider's job id, kept after the job ends, so a recovered run is never adopted twice. */
+  jobId?: string;
+  /** The connection failed before a job id came back: the provider may have the job anyway (Check status looks it up). */
+  lostJob?: boolean;
   createdAt: number;
   startedAt?: number;
   finishedAt?: number;
