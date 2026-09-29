@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupVariants, variantKey } from '../src/engine/variants';
+import { groupVariants, modelFamily, variantKey } from '../src/engine/variants';
 import type { ModelSummary, ProviderId } from '../src/engine/types';
 
 const mk = (ref: string, usd?: number, unit: 'output' | 'megapixel' = 'output'): ModelSummary => {
@@ -34,5 +34,22 @@ describe('model variants across providers (ids from the live snapshot)', () => {
     // Different units cannot be compared: provider order decides.
     const [h] = groupVariants([mk('atlas::z-image/turbo', 0.02, 'megapixel'), mk('fal::fal-ai/z-image/turbo', 0.01)], order);
     expect(h.best.provider).toBe('atlas');
+  });
+
+  it('groups provider variants under a stable family without merging distinct families', () => {
+    const nanoBase = mk('atlas::google/nano-banana-pro/text-to-image');
+    const nanoEdit = mk('nanogpt::nano-banana-pro-edit');
+    const recraft = mk('fal::fal-ai/recraft/v4.1/pro/text-to-image');
+    expect(modelFamily(nanoBase)).toEqual(modelFamily(nanoEdit));
+    expect(modelFamily(nanoBase).label).toBe('Nano Banana');
+    expect(modelFamily(recraft).key).not.toBe(modelFamily(nanoBase).key);
+  });
+
+  it('keeps text, image and reference endpoints inside one video family', () => {
+    const text = { ...mk('atlas::alibaba/wan-3.0/text-to-video'), kind: 'video' } as ModelSummary;
+    const image = { ...mk('atlas::alibaba/wan-3.0/image-to-video'), kind: 'video' } as ModelSummary;
+    const reference = { ...mk('nanogpt::alibaba/wan-3.0/reference-to-video'), kind: 'video' } as ModelSummary;
+    expect(new Set([text, image, reference].map((m) => modelFamily(m).key)).size).toBe(1);
+    expect(modelFamily(text).label).toBe('Wan 3');
   });
 });

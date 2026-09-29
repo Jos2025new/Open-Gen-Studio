@@ -9,6 +9,44 @@ import type { ModelSummary, ProviderId } from './types';
 // Maker prefixes and words that name the host, not the model. "developer" is Atlas's cheaper tier of the same variant.
 const NOISE = new Set(['fal', 'ai', 'google', 'openai', 'bytedance', 'xai', 'alibaba', 'black', 'forest', 'labs', 'blackforestlabs', 'bfl', 'pruna', 'developer', 'v']);
 
+/** Stable, provider-neutral families shown by the compact Agent picker. This classifies; it does not route. */
+const FAMILIES: Array<[RegExp, string, string]> = [
+  [/nano[-_ .]?banana/i, 'nano-banana', 'Nano Banana'],
+  [/gpt[-_ .]?image/i, 'gpt-image', 'GPT Image'],
+  [/seedream/i, 'seedream', 'Seedream'],
+  [/grok.*imagine.*image/i, 'grok-image', 'Grok Imagine Image'],
+  [/recraft/i, 'recraft', 'Recraft'],
+  [/ideogram/i, 'ideogram', 'Ideogram'],
+  [/(?:p-image|prunaai)/i, 'p-image', 'P-Image'],
+  [/z[-_ .]?image/i, 'z-image', 'Z-Image'],
+  [/(?:\bwan\b|wan[-_ .]?3)/i, 'wan-3', 'Wan 3'],
+  [/(?:minimax.*h3|\bh3[-_ .]?(?:max|developer|turbo))/i, 'minimax-h3', 'MiniMax H3'],
+  [/seedance/i, 'seedance', 'Seedance'],
+  [/flux[-_ .]?3/i, 'flux-3', 'FLUX 3'],
+  [/veo[-_ .]?3/i, 'veo-3', 'Veo 3'],
+  [/kling/i, 'kling', 'Kling'],
+  [/grok.*imagine.*video/i, 'grok-video', 'Grok Imagine Video'],
+  [/gemini.*omni/i, 'gemini-omni', 'Gemini Omni'],
+  [/happy[-_ .]?horse/i, 'happyhorse', 'HappyHorse'],
+  [/trellis/i, 'trellis', 'TRELLIS'],
+  [/seed3d/i, 'seed3d', 'Seed3D'],
+  [/meshy/i, 'meshy', 'Meshy'],
+  [/tripo/i, 'tripo', 'Tripo'],
+  [/minimax.*music/i, 'minimax-music', 'MiniMax Music'],
+];
+
+export interface ModelFamily {
+  key: string;
+  label: string;
+}
+
+/** Family above a variant. Unknown models remain their own family rather than being merged by guesswork. */
+export function modelFamily(m: ModelSummary): ModelFamily {
+  const text = `${m.id} ${m.name}`;
+  const hit = FAMILIES.find(([re]) => re.test(text));
+  return hit ? { key: `${m.kind}|${hit[1]}`, label: hit[2] } : { key: variantKey(m), label: m.name };
+}
+
 /** A provider-independent key for a model variant: same key = same variant (or an equivalent one). */
 export function variantKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'ref'>): string {
   if (m.provider === 'local') return m.ref;

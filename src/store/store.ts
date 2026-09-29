@@ -37,7 +37,7 @@ import type {
 
 export interface Settings {
   keys: Record<RemoteProviderId, string>;
-  agent: { provider: LlmProviderId | 'offline'; model: string; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; /** Stream the model's reasoning into the activity block (default on). */ showThinking?: boolean };
+  agent: { provider: LlmProviderId | 'offline'; model: string; /** True only when the user pinned this exact director model. */ modelPinned?: boolean; tier: AgentTier; effort: 'none' | 'low' | 'medium' | 'high'; /** Stream the model's reasoning into the activity block (default on). */ showThinking?: boolean };
   guidedRounds: number;
   budgetUsd: number;
   /** false: no spending limit, spending is only shown. */
@@ -62,6 +62,8 @@ export interface ComposerState {
   attachments: string[];
   /** Kinds whose model the user picked by hand in the model selector (C2); unset: an app default. */
   userPicked?: Partial<Record<MediaKind, boolean>>;
+  /** Agent-only video overrides by input shape; absent routes keep the existing global/default routing. */
+  videoRoutes?: Partial<Record<'text' | 'image' | 'reference', string>>;
   /** Keyframe second per attached image (keyframe models); unset ones are spread evenly. */
   times?: Record<string, number>;
   /** Trim [start, end] per attached video (clip models). */

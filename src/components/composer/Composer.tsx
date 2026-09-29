@@ -13,6 +13,7 @@ import { Chip, costLabel, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { ModeMenu } from './ModeMenu';
 import { AgentControls } from './AgentControls';
+import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 
@@ -378,6 +379,7 @@ export function Composer() {
             {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
           </div>
           <div className="composer-end">
+            {mode === 'agent' ? <AgentModelControls /> : null}
             <IconButton
               icon={Paperclip}
               label={

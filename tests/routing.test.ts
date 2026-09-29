@@ -69,7 +69,7 @@ describe('video model by purpose (C1)', () => {
 });
 
 describe('the plan follows the table unless the user picked the composer model (C1, C2)', () => {
-  const ctx = (chosen: boolean): PlanContext => ({
+  const ctx = (chosen: boolean, routes: Partial<Record<'text' | 'image' | 'reference', string>> = {}): PlanContext => ({
     workspace: 'chat',
     getModel: catalog(['atlas', 'nanogpt']),
     defaultModel: () => 'atlas::kwaivgi/kling-v3.0-pro/text-to-video',
@@ -77,9 +77,10 @@ describe('the plan follows the table unless the user picked the composer model (
     asset: () => ({ kind: 'image', width: 1280, height: 720 }),
     layer: () => undefined,
     composerChosen: () => chosen,
+    routeModel: (mode) => routes[mode],
   });
-  const model = async (chosen: boolean, step: Record<string, unknown>) =>
-    ((await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', ...step }] }, ctx(chosen), 'p')).plan?.steps[0] as { modelRef?: string } | undefined)?.modelRef;
+  const model = async (chosen: boolean, step: Record<string, unknown>, routes: Partial<Record<'text' | 'image' | 'reference', string>> = {}) =>
+    ((await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', ...step }] }, ctx(chosen, routes), 'p')).plan?.steps[0] as { modelRef?: string } | undefined)?.modelRef;
 
   it('not picked by hand: the purpose row, noted on the card; a named model still wins', async () => {
     expect(await model(false, { purpose: 'draft' })).toBe('atlas::minimax/h3-max-turbo/text-to-video');
@@ -91,5 +92,30 @@ describe('the plan follows the table unless the user picked the composer model (
 
   it('picked by hand: the composer model, as before', async () => {
     expect(await model(true, { purpose: 'draft' })).toBe('atlas::kwaivgi/kling-v3.0-pro/text-to-video');
+  });
+
+  it('a model named in the plan still wins over a picked composer model', async () => {
+    expect(await model(true, { purpose: 'draft', model: 'atlas::alibaba/wan-3.0/text-to-video' })).toBe('atlas::alibaba/wan-3.0/text-to-video');
+  });
+
+  it('an exact route override wins over the global pick and only for its input route', async () => {
+    const text = 'atlas::alibaba/wan-3.0/text-to-video';
+    const image = 'atlas::minimax/h3-developer/image-to-video';
+    const reference = 'atlas::minimax/h3-developer/reference-to-video';
+    expect(await model(true, {}, { text })).toBe(text);
+    expect(await model(true, { first_frame: 'asset:a' }, { image })).toBe(image);
+    expect(await model(true, { refs: ['asset:a'] }, { reference })).toBe(reference);
+    // A text-only override must not leak into an image route; with no global pick, normal auto routing remains next.
+    expect(await model(false, { first_frame: 'asset:a' }, { text })).toBe('atlas::minimax/h3-developer/image-to-video');
+  });
+
+  it('rejects a route override that no longer fits instead of silently spending with it', async () => {
+    const wrong = 'atlas::alibaba/wan-3.0/text-to-video';
+    const result = await normalizePlan(
+      { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', first_frame: 'asset:a' }] },
+      ctx(false, { image: wrong }),
+      'p',
+    );
+    expect(result.errors.join(' ')).toMatch(/selected for image-to-video no longer fits/);
   });
 });

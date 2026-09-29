@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
-import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, repickAgentModel, transcriberFor } from '../../engine/catalog';
+import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pickAgentModel, repickAgentModel, transcriberFor } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS, LLM_TIERS, limitedLlmFallback, type LlmModel } from '../../engine/providers/llm';
@@ -102,7 +102,7 @@ function LlmModelPicker() {
       title={m.id}
       className={`ml-row ${m.id === agent.model ? 'is-selected' : ''}`}
       onClick={() => {
-        setSettings((s) => ({ agent: { ...s.agent, model: m.id } }));
+        pickAgentModel(m.id);
         pop.close();
       }}
     >
@@ -181,7 +181,7 @@ function AgentVisionNotice() {
       </p>
       <p className="faint">Until you choose, the agent uses the local planner.</p>
       <div className="set-warn-actions">
-        <Button size="sm" variant="primary" onClick={() => setSettings((s) => ({ agent: { ...s.agent, model: candidate.id } }))}>
+        <Button size="sm" variant="primary" onClick={() => pickAgentModel(candidate.id)}>
           Use {candidate.name} anyway
         </Button>
       </div>
@@ -275,7 +275,7 @@ export function SettingsPanel() {
       return;
     }
     const changed = v !== settings.agent.provider;
-    setSettings((s) => ({ agent: { ...s.agent, provider: v, model: changed ? '' : s.agent.model } }));
+    setSettings((s) => ({ agent: { ...s.agent, provider: v, model: changed ? '' : s.agent.model, modelPinned: false } }));
     if (changed || !settings.agent.model) void repickAgentModel();
   };
 
@@ -309,7 +309,7 @@ export function SettingsPanel() {
                   { value: 'top', label: 'Top' },
                 ]}
                 onChange={(v) => {
-                  setSettings((s) => ({ agent: { ...s.agent, tier: v } }));
+                  setSettings((s) => ({ agent: { ...s.agent, tier: v, modelPinned: false } }));
                   void repickAgentModel();
                 }}
                 size="sm"

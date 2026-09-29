@@ -108,6 +108,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
     suggestModel,
     composerChosen,
+    routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     subjectNames: () => (session(sessionId).subjects ?? []).map((x) => x.name),
   };
 }
@@ -1044,4 +1045,3 @@ export function settleInterruptedPlans(): void {
   const unsubscribe = useStore.subscribe(check);
   check();
 }
-

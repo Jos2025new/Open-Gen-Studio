@@ -80,7 +80,7 @@ export async function loadLlmCatalog(provider: LlmProviderId): Promise<void> {
     const agent = get().settings.agent;
     if (agent.provider === provider && (!agent.model || !models.some((m) => m.id === agent.model))) {
       const pick = pickDefaultLlm(models, agent.tier);
-      if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick } }));
+      if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick, modelPinned: false } }));
     }
   } catch {
     setCatalog((c) => ({ llmStatus: { ...c.llmStatus, [provider]: 'error' } }));
@@ -95,7 +95,17 @@ export async function repickAgentModel(): Promise<void> {
   const { agent } = get().settings;
   const models = get().catalog.llm[provider];
   const pick = agent.provider === provider && models ? pickDefaultLlm(models, agent.tier) : undefined;
-  if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick } }));
+  if (pick) setSettings((s) => ({ agent: { ...s.agent, model: pick, modelPinned: false } }));
+}
+
+/** Pin one director model, or return to the tier's automatic pick. */
+export function pickAgentModel(model: string): void {
+  setSettings((s) => ({ agent: { ...s.agent, model, modelPinned: true } }));
+}
+
+export async function resetAgentModel(): Promise<void> {
+  setSettings((s) => ({ agent: { ...s.agent, modelPinned: false } }));
+  await repickAgentModel();
 }
 
 export function modelSummary(ref: string): ModelSummary | undefined {
@@ -216,6 +226,12 @@ export function ensureComposerModels(preferRemote = false): void {
 export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
   setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
   return selectComposerModel(kind, ref);
+}
+
+/** Release a manual composer choice and restore the connected-provider default. */
+export function resetComposerModel(kind: MediaKind): Promise<void> {
+  setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: false } }));
+  return selectComposerModel(kind, preferredModel(kind));
 }
 
 /** Whether the composer's model for this kind was picked by the user (not an app default). */

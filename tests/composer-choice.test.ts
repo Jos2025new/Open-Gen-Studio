@@ -19,7 +19,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } },
     catalog: { ...st.catalog, models: { [KLING]: video(KLING), [H3DEV]: video(H3DEV), [TURBO]: video(TURBO), [WAN]: video(WAN) }, status: { ...st.catalog.status, atlas: 'ready' } },
-    composer: { ...st.composer, userPicked: {}, video: { ...st.composer.video, modelRef: KLING } },
+    composer: { ...st.composer, userPicked: {}, videoRoutes: undefined, video: { ...st.composer.video, modelRef: KLING } },
   });
 });
 
@@ -54,5 +54,12 @@ describe("the context names each purpose's default model and its guide (C4)", ()
     const st = useStore.getState();
     useStore.setState({ catalog: { ...st.catalog, models: { [KLING]: video(KLING) } } });
     expect(ctx()).toMatch(/no provider of the table \(Atlas, NanoGPT\) is connected/);
+  });
+
+  it('adds route choices to context only after the user overrides one', () => {
+    expect(ctx()).not.toMatch(/video route models picked by the user/);
+    const st = useStore.getState();
+    useStore.setState({ composer: { ...st.composer, videoRoutes: { image: 'atlas::minimax/h3-developer/image-to-video' } } });
+    expect(ctx()).toMatch(/video route models picked by the user: image → atlas::minimax\/h3-developer\/image-to-video/);
   });
 });

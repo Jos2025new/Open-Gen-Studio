@@ -1,6 +1,6 @@
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { routeVideo, VIDEO_PURPOSES, type VideoPurpose } from './routing';
+import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
   AdvancedValue,
@@ -111,6 +111,8 @@ export interface PlanContext {
    * the purpose table; when true, or when not given, the composer's model is the default as before.
    */
   composerChosen?: (kind: MediaKind) => boolean;
+  /** Optional Agent-composer override for one exact video input route. */
+  routeModel?: (mode: RouteMode) => string | undefined;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
   /** Names of the session's subjects: a plan subject with one of these names reuses it. */
@@ -398,13 +400,23 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const needsImage = refs.length > 0 || Boolean(s.first_frame);
         let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, adjustments);
-        // No model named: a video step follows the purpose table unless the user picked the composer's model (C1, C2).
-        if (!modelRef && kind === 'video' && ctx.composerChosen && !ctx.composerChosen('video')) {
-          const purpose: VideoPurpose = VIDEO_PURPOSES.includes(s.purpose as VideoPurpose) ? (s.purpose as VideoPurpose) : 'normal';
-          const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0), duration: s.duration }, ctx.getModel);
-          if (routed) {
-            modelRef = routed.ref;
-            adjustments.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
+        let pickedRoute: RouteMode | undefined;
+        const routeRefs = imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0);
+        if (!modelRef && kind === 'video') {
+          const route = routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
+          const override = ctx.routeModel?.(route);
+          if (override) {
+            modelRef = override;
+            pickedRoute = route;
+            adjustments.push(`${s.id}: ${route} video → user model (${override.split('::')[0]})`);
+          // No exact override: preserve C2. A global composer pick still wins; otherwise use the purpose table.
+          } else if (ctx.composerChosen && !ctx.composerChosen('video')) {
+            const purpose: VideoPurpose = VIDEO_PURPOSES.includes(s.purpose as VideoPurpose) ? (s.purpose as VideoPurpose) : 'normal';
+            const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: routeRefs, duration: s.duration }, ctx.getModel);
+            if (routed) {
+              modelRef = routed.ref;
+              adjustments.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
+            }
           }
         }
         modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
@@ -422,6 +434,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           continue;
         }
         const { schema } = resolved;
+        if (pickedRoute && !routeFits(resolved.model, schema, { mode: pickedRoute, refs: routeRefs, duration: s.duration })) {
+          errors.push(`${where}: the model selected for ${pickedRoute}-to-video no longer fits this step. Return that row to Auto or choose another model.`);
+        }
         if (schema.missing?.length) errors.push(`${where}: model "${modelRef}" needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;

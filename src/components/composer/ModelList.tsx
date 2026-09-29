@@ -3,7 +3,7 @@ import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lu
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
-import { groupVariants, type VariantGroup } from '../../engine/variants';
+import { groupVariants, modelFamily, type VariantGroup } from '../../engine/variants';
 import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -160,12 +160,15 @@ export function ModelList({
   onSelect,
   filter,
   autoOption,
+  familyTree = false,
 }: {
   kind: MediaKind;
   value: string | null;
   onSelect: (ref: string | null) => void;
   filter?: (m: ModelSummary) => boolean;
   autoOption?: string;
+  /** Compact Agent picker: families are collapsible; variants stay as the existing rows. */
+  familyTree?: boolean;
 }) {
   const models = useStore((s) => s.catalog.models);
   const status = useStore((s) => s.catalog.status);
@@ -176,6 +179,7 @@ export function ModelList({
   const [feature, setFeature] = useState('all');
   const [sort, setSort] = usePref<SortId>('ogs.modelSort', 'az');
   const [browseAll, setBrowseAll] = useState(false);
+  const [openFamilies, setOpenFamilies] = useState<string[]>([]);
   const providers = connectedProviders();
 
   const all = useMemo(
@@ -220,19 +224,19 @@ export function ModelList({
   }, [full, all, recommended, provider, feature, needle, sort, providers]);
 
   // Price sorts: one flat list. Recommended images: by family, in the chosen order. Otherwise: by maker.
-  const byPrice = sort === 'price-asc' || sort === 'price-desc';
+  const byPrice = !familyTree && (sort === 'price-asc' || sort === 'price-desc');
   const groups = useMemo(() => {
     const byFamily = kind === 'image' && !full;
     const g = new Map<string, VariantGroup[]>();
     for (const e of entries.slice(0, 400)) {
       const m = e.best;
-      const key = byPrice ? 'By price' : m.provider === 'local' ? 'Local demo' : byFamily ? (familyOf(m) ?? 'Selected') : (vendorOf(m)?.[2] ?? 'Other');
+      const key = familyTree ? modelFamily(m).label : byPrice ? 'By price' : m.provider === 'local' ? 'Local demo' : byFamily ? (familyOf(m) ?? 'Selected') : (vendorOf(m)?.[2] ?? 'Other');
       g.set(key, [...(g.get(key) ?? []), e]);
     }
     const rank = (k: string) => (byFamily ? FAMILY_ORDER.indexOf(k) : k === 'Other' || k === 'Local demo' ? 1 : 0);
     const dir = sort === 'za' ? -1 : 1;
-    return [...g.entries()].sort(([a], [b]) => (byFamily ? rank(a) - rank(b) : rank(a) - rank(b) || a.localeCompare(b) * dir));
-  }, [entries, byPrice, kind, full, sort]);
+    return [...g.entries()].sort(([a], [b]) => (familyTree ? a.localeCompare(b) * dir : byFamily ? rank(a) - rank(b) : rank(a) - rank(b) || a.localeCompare(b) * dir));
+  }, [entries, byPrice, kind, full, sort, familyTree]);
 
   const remoteConnected = providers.length > 1;
 
@@ -274,13 +278,29 @@ export function ModelList({
             {value == null ? <Check size={14} className="ml-check" /> : null}
           </button>
         ) : null}
-        {groups.map(([label, es]) => (
-          <div key={label} className="ml-group">
-            <div className="ml-group-head">
-              {label}
-              <span className="faint num">{es.length}</span>
-            </div>
-            {es.map(({ key, members, best: m }) => {
+        {groups.map(([label, es]) => {
+          const selectedFamily = es.some((e) => e.members.some((x) => x.ref === value));
+          const open = !familyTree || Boolean(needle) || selectedFamily || openFamilies.includes(label);
+          return (
+          <div key={label} className={`ml-group ${familyTree ? 'is-family' : ''}`}>
+            {familyTree ? (
+              <button
+                type="button"
+                className={`ml-family ${open ? 'is-open' : ''}`}
+                onClick={() => setOpenFamilies((xs) => (xs.includes(label) ? xs.filter((x) => x !== label) : [...xs, label]))}
+                aria-expanded={open}
+              >
+                <ChevronDown size={13} />
+                <span>{label}</span>
+                <span className="faint num">{es.length}</span>
+              </button>
+            ) : (
+              <div className="ml-group-head">
+                {label}
+                <span className="faint num">{es.length}</span>
+              </div>
+            )}
+            {open ? es.map(({ key, members, best: m }) => {
               const selected = members.some((x) => x.ref === value);
               return (
                 <button key={key} type="button" className={`ml-row ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
@@ -303,9 +323,9 @@ export function ModelList({
                   {selected ? <Check size={14} className="ml-check" /> : null}
                 </button>
               );
-            })}
+            }) : null}
           </div>
-        ))}
+        )})}
         {!entries.length ? (
           <div className="ml-empty">
             {providers.some((p) => status[p] === 'loading') ? (

@@ -191,6 +191,10 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(`image model: ${describeModel('image')}`);
   // A video model the user never picked is only an app default: steps follow the purpose table instead (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);
+  const videoOverrides = Object.entries(st.composer.videoRoutes ?? {});
+  if (videoOverrides.length) {
+    lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
+  }
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);
