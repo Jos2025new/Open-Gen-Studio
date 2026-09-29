@@ -16,7 +16,7 @@ import { Chip } from '../ui/primitives';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { ModelList } from './ModelList';
 
-type PickerId = 'director' | 'image' | 'imageEdit' | 'videoText' | 'videoImage' | 'videoReference' | 'videoEdit';
+type PickerId = 'director' | 'image' | 'imageEdit' | 'videoText' | 'videoImage' | 'videoReference' | 'videoEdit' | 'audio';
 
 const label: Record<PickerId, string> = {
   director: 'Director',
@@ -26,6 +26,7 @@ const label: Record<PickerId, string> = {
   videoImage: 'Image → video',
   videoReference: 'Reference → video',
   videoEdit: 'Video edit',
+  audio: 'Audio',
 };
 
 const modeOf: Partial<Record<PickerId, RouteMode>> = {
@@ -142,6 +143,7 @@ export function AgentModelControls() {
   const manualCount =
     Number(Boolean(agent.modelPinned)) +
     Number(Boolean(composer.userPicked?.image)) +
+    Number(Boolean(composer.userPicked?.audio)) +
     Number(Boolean(composer.userPicked?.video)) +
     Number(Boolean(ops.edit)) +
     Object.keys(routeManual).length +
@@ -158,15 +160,16 @@ export function AgentModelControls() {
         return { id, name: modelName(routeManual[mode] ?? routeDefault(mode)), state: routeManual[mode] ? 'manual' as const : globalVideo ? 'default' as const : 'auto' as const };
       }),
       { id: 'videoEdit' as const, name: modelName(ops.videoEdit || opModelFor('video_edit').ref), state: ops.videoEdit ? 'manual' as const : 'auto' as const },
+      { id: 'audio' as const, name: modelName(composer.audio.modelRef), state: composer.userPicked?.audio ? 'manual' as const : 'auto' as const },
     ];
-  }, [agent.model, agent.modelPinned, agent.provider, composer.image.modelRef, composer.userPicked, models, ops.edit, ops.videoEdit, routeManual]);
+  }, [agent.model, agent.modelPinned, agent.provider, composer.audio.modelRef, composer.image.modelRef, composer.userPicked, models, ops.edit, ops.videoEdit, routeManual]);
 
   const close = () => { setPicker(null); pop.close(); };
   const choose = (ref: string | null) => {
     if (!picker) return;
-    if (picker === 'image') {
-      if (ref) void pickComposerModel('image', ref);
-      else void resetComposerModel('image');
+    if (picker === 'image' || picker === 'audio') {
+      if (ref) void pickComposerModel(picker, ref);
+      else void resetComposerModel(picker);
     } else if (picker === 'imageEdit') setSettings((s) => ({ ops: { ...s.ops, edit: ref } }));
     else if (picker === 'videoEdit') setSettings((s) => ({ ops: { ...s.ops, videoEdit: ref } }));
     else {
@@ -178,6 +181,8 @@ export function AgentModelControls() {
 
   const pickerConfig = picker === 'image'
     ? { kind: 'image' as const, value: composer.userPicked?.image ? composer.image.modelRef : null, filter: plainImage, auto: `Connected default (${modelName(preferredModel('image'))})` }
+    : picker === 'audio'
+      ? { kind: 'audio' as const, value: composer.userPicked?.audio ? composer.audio.modelRef : null, filter: undefined, auto: `Connected default (${modelName(preferredModel('audio'))})` }
     : picker === 'imageEdit'
       ? { kind: 'image' as const, value: ops.edit, filter: imageEdit, auto: `Best connected edit model (${modelName(opModelFor('edit').ref)})` }
       : picker === 'videoEdit'
@@ -191,6 +196,7 @@ export function AgentModelControls() {
     setSettings((s) => ({ ops: { ...s.ops, edit: null, videoEdit: null } }));
     void resetAgentModel();
     if (composer.userPicked?.image) void resetComposerModel('image');
+    if (composer.userPicked?.audio) void resetComposerModel('audio');
     if (composer.userPicked?.video) void resetComposerModel('video');
   };
 
