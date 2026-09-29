@@ -1,6 +1,6 @@
 # Open Gen Studio — estado del trabajo (handoff)
 
-Última sesión: 2026-09-26. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
+Última sesión: 2026-09-28. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
 Proveedores: **OpenRouter, fal.ai, NanoGPT, Atlas Cloud** (+ "Local demo" procedural para usar sin claves).
 Sin backend: corre en el navegador; el servidor de Vite solo la sirve en local y aporta rutas `/x/*` (relays y copia en disco). Opciones de despliegue discutidas en `PROPUESTAS.md`.
 El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas (sin SDK de Anthropic; se desinstaló `@anthropic-ai/sdk`).
@@ -13,6 +13,12 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - `engine/agent/`: tools.ts (ask_questions, propose_plan + zod), context.ts (system prompt + contexto), offline.ts (planificador local bilingüe), runtime.ts (auto/guiado con límite de rondas, validación de coste antes de gastar, aprobación, ejecución por workspace).
 - `src/store/store.ts` (zustand + persistencia IndexedDB debounced, wipeAllData).
 - UI escrita: App, main, shell (Sidebar, TopBar+slot, SettingsPanel, SidePanel, SessionsPanel), gallery/GalleryPanel, ui (Popover arriba-derecha, TooltipLayer, primitives, SpendConfirm, AssetMedia, Toasts, hooks), assets (OpForm, GenerationInfo, AssetActions, Lightbox), composer (Composer, ModeMenu, AgentControls, MediaControls, ModelList, ThreadPeek), chat (ChatWorkspace, FeedList, GenerationCard, PlanCard, QuestionsCard), node (NodeWorkspace, nodes), designer/Stage.tsx.
+
+## Fotografía de producto, social ad y cierre del agente — 2026-09-28 (Claude, nube; rama `claude/stoic-davinci-xt7o4z`)
+Detalle, porqués, riesgos y pendientes en `AGENTS.md` (secciones "fotografía de producto" y "social ad"). Estado: 257 tests, typecheck y build correctos. Sin navegador ni LLM real.
+- `7371dfe` Producto: guía `guides/product.md` (se carga con `read_guide`, no en cada mensaje; campo `Skill.guide`), workflow `product-pack` → "Product photoshoot" (set por defecto héroe/lifestyle/macro/características + 10 variantes de formato, preguntas en una tarjeta). **Este estado funciona bien (usuario).**
+- `7a405ca` Social ad: guía `guides/social.md` como enrutador (brief, conceptos, claims, tres capas del copy, formato → un flujo), `workflow:ugc` (solo chat) y **cierre breve tras ejecutar un plan** (`wrapUpPlan` en `agent/runtime.ts`, `WRAPUP_RULE` en `agent/context.ts`: una llamada de texto, máx. 2 frases). ⚠️ Rastreable: si algo empeora tras un plan, `git revert 7a405ca` vuelve a `7371dfe`.
+- Pendientes declarados (no implementados): texto en pantalla como capa editable cuando llegue la edición de vídeo por código; subtítulos/doblaje/TTS; tour de web e investigación de anuncios (cuando haya acceso web); QC sobre el archivo final.
 
 ## Modelo por propósito y precio exacto — 2026-09-27 (Claude, nube; rama `claude/stoic-davinci-xt7o4z`)
 - C1–C4 de `PLAN_ROUTING_COST.md`: la app elige el modelo de vídeo por propósito y precio (H3 Max Turbo, H3 Developer, Seedance 2.0 Fast, Wan 3); el modelo del composer solo manda si lo eligió el usuario; precio exacto de Atlas antes de generar y guardado como coste real; el contexto nombra el modelo por defecto y su guía. 207 tests, typecheck y build correctos. Sin navegador. Límite: el cuerpo de `model/calculate` sin verificar desde la nube.
