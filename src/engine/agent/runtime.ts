@@ -47,7 +47,7 @@ import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, skillById } from '../skills';
+import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { modelGuide } from '../guides';
 import { TOOLS, findModelsSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
@@ -910,6 +910,12 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         if (call.name === 'read_guide') {
           // Loaded on demand from the index in the system prompt; the agent continues in the next round.
           const v = readGuideSchema.safeParse(parsed.value);
+          // A workflow made for another canvas is refused with what to do instead (the index marks it too).
+          const wrongCanvas = v.success ? guideWorkspaceProblem(v.data.id, workspace) : undefined;
+          if (wrongCanvas) {
+            respond(wrongCanvas);
+            continue;
+          }
           const text = v.success ? readGuide(v.data.id) : undefined;
           // Once per conversation: a guide already in the history is not sent again (C4).
           const seen = text != null && session(sessionId).agent.history.some((m) => m.role === 'tool' && m.content === text);
@@ -935,6 +941,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           patchAgent(sessionId, { phase: 'checking' });
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
           if (presented.errors.length) {
+            // What the agent wrote before a rejected plan promised it; the feed drops it (the history keeps it).
+            if (textItemId) removeFeedItem(sessionId, textItemId);
             recordMetric(sessionId, { type: 'rejected' });
             log.action({ icon: 'fix', label: `Checked the plan: ${presented.errors.length} problem${presented.errors.length === 1 ? '' : 's'} to fix`, detail: presented.errors[0] });
             planFailures++;

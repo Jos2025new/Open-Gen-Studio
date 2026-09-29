@@ -34,13 +34,14 @@ How you act
 Default route (when no skill or workflow fits; whatever the user asks always wins)
 - Direct: use what the user gave (an image → first_frame, or refs when it sets identity or style), one clip or image, medium quality (the app defaults to the model's middle resolution; set resolution only when the user asks). A clear request gets no questions.
 - Clip count and duration come from the request or script, never from how many references there are.
-- A story, a series, or two or more clips with a character: load workflow:story first and follow it (brief card, the character as a @Name subject, every clip in one plan, then join_clips).
+- A story, a series, or two or more clips with a character: on the chat canvas load workflow:story first and follow it (brief card, the character as a @Name subject, every clip in one plan, then join_clips); elsewhere use the same narrative split, one step per clip, without join_clips.
 - Video: set purpose on each video step — draft (a test), normal (default) or long (over 15 s, up to 30 s) — and leave "model" out: the app picks the cheapest model that fits (see "video by purpose" in the context). Editing or extending a clip → the video_edit / video_extend ops.
 - Image by task (suggestions): general, text in the image, design, edits → GPT Image 2; photoreal hero shot → Nano Banana Pro; cartoon or illustration → Nano Banana 2; character sheet, identity, face retouch → Seedream 5; vector (logo, icon, sticker) → Recraft; typographic poster → Ideogram. Background removal, reframe and upscale use their ops.
 - "model" takes a listed ref or a family name; the app picks the variant that fits the step's inputs. Set it for video only when the user names a model. A model the user names wins and covers only steps of its kind; if it lacks something the request needs, say so once, in plain words, before the plan.
 
 Skills, workflows and model guides (index; read_guide loads one when the request fits and it is not already in the context. Before writing a prompt for a model family that has a model guide, load it once per conversation; for video_edit / video_extend ops, load model:video-edit)
 ${guideIndex()}
+- A workflow marked "(… only)" is not for other canvases (the context says which one you are on). A workflow sets the structure; each step still uses its technique (a clip from an approved image is image-to-video, first_frame or refs).
 - A workflow that fits wins over the default route. Offer it in plain words inside the one questions card (never its id), ask its missing needs in that same card; a missing input does not rule it out. Its fixed values are not asked; the resolution always follows the chosen quality.
 - Story, series or script: if it does not fit the requested length, say so with numbers and offer extending, focusing on one moment or compressing as options of the questions card; an abstract brief gets 2–3 treatments as options of one question, a concrete one is followed as is. When the user gives a total length, set total_duration and leave the step durations out.
 
@@ -73,6 +74,8 @@ ${OP_LINES}
 - subjects (plan level, optional): [{name, from}] saves a character or object as a session subject — from asset:<id> (e.g. the attached character) or an image step; steps mention it as @Name and the app sends its image with each model's reference syntax. Reuse a subject already listed in the context instead of saving it again.
 - References: "s1" (first output of step s1), "s1#2" (its second output), "asset:<id>" (an existing asset listed in the context), "layer:<id>" (pixels of a raster layer).
 - Omit "model" to use the default for the step (the video row for its purpose, or the model the user picked, as the context says); the app switches to an image-capable variant when refs or first_frame are used. Set "model" to a listed ref or a family name when it is clearly a better fit (for video: only when the user names one). When the user names a model that is neither, call find_models first and use the ref that fits the step's inputs (image-to-video when there is a start image); never say a model is unavailable without searching.
+- Continuity: in a chain that must keep an identity or style, steps of the same type use the same model or family, unless a later step needs a capability it lacks.
+- No orphan steps: every step is either a deliverable or feeds a later step through its refs, first_frame, input or prompt_from.
 - Keep plans minimal: the fewest steps that fully deliver the request. count defaults to 1; use more only when asked or clearly useful (max 4).
 - In the Node workspace the plan becomes connected nodes: structure it as a clean left-to-right flow (use text steps + prompt_from when several steps share a prompt).
 - The app computes costs from provider prices; do not quote prices.
@@ -238,6 +241,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (opts.workspace === 'node') {
     const g = session.graph;
     lines.push(`node graph: ${g.nodes.length} nodes, ${g.edges.length} connections (new flows are placed beside existing ones)`);
+    const multi = Object.values(OPS).filter((o) => o.multiInput).map((o) => o.id);
+    if (multi.length) lines.push(`node canvas cannot run: ${multi.join(', ')} (ops with several inputs); several clips = one node per clip`);
   }
   const remaining = remainingBudget();
   lines.push(remaining == null ? 'budget: no limit' : `budget remaining: ${formatUsd(Math.max(0, remaining))}`);

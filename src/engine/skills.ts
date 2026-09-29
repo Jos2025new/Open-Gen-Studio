@@ -381,10 +381,27 @@ export function describeWorkflow(w: Workflow): string {
 /** One line per workflow and skill, for the agent's system prompt: name and when to use it. */
 export function guideIndex(): string {
   return [
-    ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}`),
+    ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}${canvasNote(w)}`),
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
     ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}`),
   ].join('\n');
+}
+
+const ALL_CANVASES: Workspace[] = ['chat', 'node', 'designer'];
+
+/** " (chat only)" when a workflow does not work on every canvas; the prompt stays the same on all of them. */
+function canvasNote(w: Workflow): string {
+  return ALL_CANVASES.every((c) => w.workspaces.includes(c)) ? '' : ` (${w.workspaces.join(', ')} only)`;
+}
+
+/** Why read_guide refuses a workflow on this canvas, with what to do instead; undefined when it fits. */
+export function guideWorkspaceProblem(id: string, workspace: Workspace): string | undefined {
+  const [type, rest = ''] = id.trim().split(':');
+  if (type !== 'workflow') return undefined;
+  const w = workflowById(rest.split('/')[0]);
+  if (!w || w.workspaces.includes(workspace)) return undefined;
+  const instead = workspace === 'node' ? ' For several clips keep the same narrative split, one node per clip, without join_clips.' : '';
+  return `Workflow "${w.id}" works only on the ${w.workspaces.join(' / ')} canvas; you are on the ${workspace} canvas. Plan the request directly with the steps this canvas supports.${instead}`;
 }
 
 /** The full text of a skill or workflow for read_guide ("skill:product", "workflow:storyboard", "workflow:ugc/unboxing"). */

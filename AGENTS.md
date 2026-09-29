@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — workflows del agente por lienzo, continuidad y promesas de planes rechazados (2026-09-29)
+Origen: revisión con GPT y Claude. El prompt mandaba cargar `workflow:story` sin mirar el lienzo (story es solo chat); en Nodos el agente no sabía qué no puede hacer; un plan con varios pasos de imagen cambiaba de modelo y perdía el estilo; y el texto escrito antes de un plan rechazado quedaba en el chat como promesa falsa. Cambio general (todos los workflows y lienzos), sin llamadas nuevas al modelo y sin variar el prompt fijo por lienzo (se conserva la caché del proveedor).
+- [x] W1. Índice de guías con los lienzos de cada workflow (`(chat only)`…) y `read_guide` rechaza un workflow fuera de su lienzo con la alternativa (en Nodos: mismo reparto, un nodo por clip, sin `join_clips`). *Por qué:* el índice solo no basta si el modelo lo ignora. *Dónde:* `skills.ts` (`guideIndex`, `guideWorkspaceProblem`), `agent/runtime.ts`.
+- [x] W2. Reglas generales en el prompt: la regla de historias pasa a depender del lienzo; el workflow da la estructura y cada paso su técnica (I2V, T2V…); continuidad (misma familia en una cadena que conserva identidad o estilo, salvo capacidad que falte); ningún paso huérfano. *Dónde:* `agent/context.ts` (`SYSTEM_PROMPT`).
+- [x] W3. Línea de capacidades en el contexto de Nodos, derivada de `OPS` (`multiInput`). *Dónde:* `agent/context.ts` (`buildContext`), solo en Nodos.
+- [x] W4. Plan rechazado por el validador: el texto escrito en esa llamada se retira del feed (el historial no cambia). Si al final no hay plan, queda el aviso de siempre. *Dónde:* `agent/runtime.ts`.
+- [x] W5. Tests (`tests/agent-workspace.test.ts`), typecheck, suite; un commit. Rollback: `git revert` de ese commit.
+
 ## Tarea — Audio en la tarjeta Models (2026-09-29)
 - [x] A1. Añadido Audio como una fila más de `AgentModelControls`, reutilizando `composer.audio`, `pickComposerModel` y `resetComposerModel`; Auto conserva `PREFERRED.audio`. Sin estado, router ni contexto nuevos.
 - [x] A2. Verificado en navegador: selección manual, contador `Models · 1`, persistencia tras recargar y reset individual a Auto; panel correcto a 390 px y sin errores. Typecheck y suite verdes (264 + 1 omitida); commit independiente.
