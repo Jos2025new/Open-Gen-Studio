@@ -9,6 +9,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — controles del prompt en una sola fila (2026-09-29)
+- [x] Q1. Quitado únicamente el wrap forzado del composer; controles en una línea y overflow horizontal limitado a la zona central en anchos extremos. *Por qué:* el breakpoint de 1024 px creaba la segunda fila aun cuando había espacio. *Dónde:* `src/styles/composer.css`.
+- [x] Q2. Typecheck y suite completos verdes (264 + 1 omitida). Navegador sin errores: 960/768 px alinean los tres bloques en la misma coordenada vertical; a 390 px continúa una sola fila y Models, adjuntos y envío quedan fijos. Commit independiente para revertir solo este ajuste.
+
 ## Tarea — modelos del agente desde la caja de prompt (2026-09-29) · APLICADO
 Origen: referencia visual del usuario (panel compacto "With what") y petición de exponer en el composer los selectores que ya gobiernan al agente. La captura es una referencia de interacción, no una especificación para copiar. Alcance: modo Agent; no rehacer Settings, el catálogo ni el router, y no tocar tareas pendientes de otros planes.
 
