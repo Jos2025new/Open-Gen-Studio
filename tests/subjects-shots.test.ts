@@ -98,7 +98,8 @@ describe('subjects and voices end to end (fal)', () => {
     const st = useStore.getState();
     useStore.setState({
       assets: { mia: img('mia'), mia2: img('mia2'), rex: img('rex') },
-      sessions: { ...st.sessions, s: { ...(Object.values(st.sessions)[0] as Loose), id: 's', subjects: [{ id: 'm', name: 'Mia', frontalAssetId: 'mia', refAssetIds: ['mia2'], voiceId: '829877809978941442' }, { id: 'r', name: 'Rex', refAssetIds: [] }] } },
+      sessions: { ...st.sessions, s: { ...(Object.values(st.sessions)[0] as Loose), id: 's' } },
+      library: [{ id: 'm', name: 'Mia', frontalAssetId: 'mia', refAssetIds: ['mia2'], voiceId: '829877809978941442' }, { id: 'r', name: 'Rex', refAssetIds: [] }],
       catalog: { ...st.catalog, models: { [ref]: { ref, provider: 'fal', id: ref.slice(5), name: 'Kling O3', kind: 'video', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary }, schemas: { [ref]: schema } },
       settings: { ...st.settings, keys: { ...st.settings.keys, fal: 'k' } },
     });

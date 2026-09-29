@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound } from 'lucide-react';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette } from 'lucide-react';
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
@@ -166,6 +166,12 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           <UserRound size={12} />
           {plan.subjects.map((x) => `@${x.name} ← ${x.from.startsWith('asset:') ? 'your image' : x.from}`).join(' · ')}
           <span className="faint"> — kept identical in every step that mentions it</span>
+        </p>
+      ) : null}
+      {plan.style ? (
+        <p className="plan-subjects">
+          <Palette size={12} />
+          <span>Style: {plan.style}</span>
         </p>
       ) : null}
       {plan.adjustments.length ? (

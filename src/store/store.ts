@@ -27,6 +27,7 @@ import type {
   RemoteProviderId,
   TranscriberSummary,
   Session,
+  Subject,
   SpendEntry,
   TextStyle,
   Workspace,
@@ -123,6 +124,8 @@ export interface AppState {
   activeSessionId: string;
   generations: Record<string, Generation>;
   assets: Record<string, Asset>;
+  /** Saved characters, objects, products and styles, shared by every session (@Name). */
+  library: Subject[];
   composer: ComposerState;
   catalog: CatalogState;
   ui: UiState;
@@ -175,6 +178,7 @@ const initial: AppState = {
   activeSessionId: firstSession.id,
   generations: {},
   assets: {},
+  library: [],
   composer: {
     mode: 'agent',
     agentStyle: 'auto',
@@ -253,7 +257,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets'> & {
+type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
   ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool'>;
 };
@@ -271,6 +275,7 @@ export const useStore = create<AppState>()(
       activeSessionId: s.activeSessionId,
       generations: s.generations,
       assets: s.assets,
+      library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
       ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool },
     }),
@@ -295,6 +300,7 @@ export const useStore = create<AppState>()(
         activeSessionId,
         generations: p.generations ?? {},
         assets: p.assets ?? {},
+        library: p.library ?? legacySubjects(restored),
         composer: { ...current.composer, ...p.composer, editing: null },
         ui: { ...current.ui, ...p.ui },
       };
@@ -305,6 +311,15 @@ export const useStore = create<AppState>()(
     },
   }),
 );
+
+/** Before the global library, subjects lived in each session: copied once (first name wins); sessions keep theirs. */
+export function legacySubjects(sessions: Record<string, Session>): Subject[] {
+  const out: Subject[] = [];
+  for (const s of Object.values(sessions)) {
+    for (const x of s.subjects ?? []) if (!out.some((y) => y.name.toLowerCase() === x.name.toLowerCase())) out.push(x);
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------------------
 // Mutators

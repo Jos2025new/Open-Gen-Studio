@@ -3,7 +3,7 @@ import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersH
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
-import type { AdvancedValue, MediaKind, ParamDef, SavedStyle, Subject } from '../../engine/types';
+import type { AdvancedValue, MediaKind, ParamDef, SavedStyle } from '../../engine/types';
 import { createRecraftStyle, createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { setComposer, setComposerMedia, useStore } from '../../store/store';
@@ -489,7 +489,6 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
   );
 }
 
-const NO_SUBJECTS: Subject[] = [];
 
 /** Session subjects for Kling elements: create from attachments, mention as @Name. */
 function SubjectsChip() {
@@ -498,7 +497,7 @@ function SubjectsChip() {
   // Without elements (Kling), subjects go as reference images (R10): any model that takes them.
   const takesRefs = useStore((s) => Boolean(s.catalog.schemas[ref]?.slots.images || s.catalog.schemas[ref]?.slots.mixedRefs));
   const sessionId = useStore((s) => s.activeSessionId);
-  const subjects = useStore((s) => s.sessions[s.activeSessionId]?.subjects) ?? NO_SUBJECTS;
+  const subjects = useStore((s) => s.library);
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const [name, setName] = useState('');
@@ -526,7 +525,7 @@ function SubjectsChip() {
                 <span className="faint">{s.videoAssetId && !s.frontalAssetId ? 'video' : `${1 + s.refAssetIds.length} view${s.refAssetIds.length ? 's' : ''}`}</span>
                 {slot?.voice ? (
                   <div className="subject-voice-row">
-                    <input className="subject-voice" placeholder="Voice ID (optional)" value={s.voiceId ?? ''} onChange={(e) => saveSubject(sessionId, { ...s, voiceId: e.target.value.trim() || undefined })} />
+                    <input className="subject-voice" placeholder="Voice ID (optional)" value={s.voiceId ?? ''} onChange={(e) => saveSubject({ ...s, voiceId: e.target.value.trim() || undefined })} />
                     <button type="button" className="link-btn" disabled={!audio} data-tip={audio ? 'Create a Kling voice from the attached audio' : 'Attach 5–30 s of speech first'} onClick={() => setVoiceFor(s.id)}>
                       From audio
                     </button>
@@ -546,7 +545,7 @@ function SubjectsChip() {
                   />
                 ) : null}
               </div>
-              <IconButton icon={Trash} label="Delete subject" size="sm" tone="danger" onClick={() => deleteSubject(sessionId, s.id)} />
+              <IconButton icon={Trash} label="Delete subject" size="sm" tone="danger" onClick={() => deleteSubject(s.id)} />
             </div>
           ))}
           <div className="subject-new">

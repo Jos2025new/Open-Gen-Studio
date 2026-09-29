@@ -87,14 +87,14 @@ export function Sidebar() {
         <button
           type="button"
           className={`side-btn ${panel === 'gallery' ? 'is-open' : ''}`}
-          data-tip="Gallery — every image and video"
+          data-tip="Assets — generations and your library"
           data-tip-side="right"
-          aria-label="Gallery"
+          aria-label="Assets"
           aria-expanded={panel === 'gallery'}
           onClick={() => togglePanel('gallery')}
         >
           <Images size={18} strokeWidth={1.7} />
-          <span className="side-label">Gallery</span>
+          <span className="side-label">Assets</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>
         <button

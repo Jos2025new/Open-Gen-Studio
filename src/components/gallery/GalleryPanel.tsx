@@ -1,17 +1,93 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDownUp, AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
-import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
+import { deleteAssets, deleteSubject, downloadAsset, SUBJECT_KINDS, useAsReference } from '../../engine/actions';
 import { formatDuration, groupByDate } from '../../lib/format';
 import { IconButton, Button, Segmented } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
-import type { Asset } from '../../engine/types';
+import type { Asset, Subject, SubjectKind } from '../../engine/types';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
 type Scope = 'session' | 'all';
 
+/** Assets: every generation and upload, and the library of saved characters, objects, products and styles. */
 export function GalleryPanel() {
+  const [tab, setTab] = useState<'generated' | 'library'>('generated');
+  const expanded = useStore((s) => s.ui.panelExpanded);
+  const libraryCount = useStore((s) => s.library.length);
+  return (
+    <div className="gallery">
+      <div className="panel-head">
+        <div className="panel-title">Assets</div>
+        <div className="panel-head-actions">
+          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+          <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+        </div>
+      </div>
+      <div className="assets-tabs">
+        <Segmented
+          value={tab}
+          size="sm"
+          onChange={setTab}
+          options={[
+            { value: 'generated', label: 'Generated' },
+            { value: 'library', label: `Library${libraryCount ? ` · ${libraryCount}` : ''}`, tip: 'Saved as @Name, for every session' },
+          ]}
+        />
+      </div>
+      {tab === 'generated' ? <GeneratedAssets /> : <LibraryAssets />}
+    </div>
+  );
+}
+
+function LibraryAssets() {
+  const library = useStore((s) => s.library);
+  const [kind, setKind] = useState<'all' | SubjectKind>('all');
+  const list = library.filter((x) => kind === 'all' || (x.kind ?? 'character') === kind);
+  return (
+    <>
+      <div className="gallery-controls">
+        <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, ...SUBJECT_KINDS.map((k) => ({ value: k.value, label: `${k.label}s` }))]} />
+      </div>
+      <div className="gallery-scroll">
+        {list.length ? (
+          <div className="gallery-grid" style={{ ['--cols' as string]: 3 }}>
+            {list.map((x) => (
+              <LibraryTile key={x.id} item={x} />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-block">
+            <p>Save a result with Send to → Save to library, or let the agent create references. Mention them as @Name in any prompt.</p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function LibraryTile({ item }: { item: Subject }) {
+  const cover = item.frontalAssetId ?? item.videoAssetId;
+  return (
+    <div className="g-tile lib-tile">
+      <button
+        type="button"
+        className="g-open"
+        aria-label={`Open @${item.name}`}
+        onClick={() => cover && setUi({ lightbox: { assetIds: [cover, ...item.refAssetIds], index: 0 } })}
+      >
+        {cover ? <AssetMedia assetId={cover} /> : null}
+      </button>
+      <span className="lib-name">@{item.name}</span>
+      <span className="lib-del">
+        <IconButton icon={Trash} label={`Remove @${item.name} from the library`} size="sm" tone="danger" onClick={() => deleteSubject(item.id)} />
+      </span>
+    </div>
+  );
+}
+
+function GeneratedAssets() {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -59,21 +135,15 @@ export function GalleryPanel() {
   const ids = [...selected].filter((id) => assets[id]);
 
   return (
-    <div className="gallery">
-      <div className="panel-head">
-        <div className="panel-title">
-          Gallery <span className="faint num">{list.length}</span>
+    <>
+      <div className="gallery-controls">
+        <div className="gallery-count faint num">
+          {list.length} {list.length === 1 ? 'asset' : 'assets'}
           {running ? <span className="running-pill num">{running} running</span> : null}
         </div>
-        <div className="panel-head-actions">
-          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
-          <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-        </div>
-      </div>
-      <div className="gallery-controls">
         <div className="search-input">
           <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search prompts and models" aria-label="Search gallery" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search prompts and models" aria-label="Search assets" />
           {q ? (
             <button type="button" aria-label="Clear search" onClick={() => setQ('')}>
               <X size={13} />
@@ -176,7 +246,7 @@ export function GalleryPanel() {
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }
 

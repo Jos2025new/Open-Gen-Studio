@@ -65,7 +65,7 @@ describe('plan subjects (F3)', () => {
     const sid = st.activeSessionId;
     useStore.setState({
       assets: { ...st.assets, char: { id: 'char', kind: 'image', mime: 'image/png', width: 384, height: 682, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 } },
-      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], subjects: [] } },
+      library: [],
     });
     const steps: PlanStep[] = [{ id: 't1', kind: 'text', title: 'note', text: 'hi' }];
     const seen: string[] = [];
@@ -75,10 +75,10 @@ describe('plan subjects (F3)', () => {
       origin: 'agent',
       subjects: [{ name: 'Reto', from: 'asset:char' }],
       onState: (id, state) => {
-        if (state === 'running') seen.push(`${id}:${useStore.getState().sessions[sid].subjects?.map((x) => x.name).join(',')}`);
+        if (state === 'running') seen.push(`${id}:${useStore.getState().library.map((x) => x.name).join(',')}`);
       },
     });
     expect(seen).toEqual(['t1:Reto']);
-    expect(useStore.getState().sessions[sid].subjects?.[0]).toMatchObject({ name: 'Reto', frontalAssetId: 'char' });
+    expect(useStore.getState().library[0]).toMatchObject({ name: 'Reto', frontalAssetId: 'char' });
   });
 });

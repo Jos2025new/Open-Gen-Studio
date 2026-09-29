@@ -232,7 +232,7 @@ export const WORKFLOWS: Workflow[] = [
     skill: 'storyboard',
     needs: ['the story or scene'],
     fixed: { aspect: '16:9' },
-    continuity: 'Shots 2–4 use shot 1 as reference; neighboring shots change at least one of shot size, subject or angle.',
+    continuity: 'Shots 2–4 use shot 1 as reference; a character or object in 2+ shots is a library subject (@Name) in each; neighboring shots change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Shot 1 · establishing', prompt: '{prompt}, establishing wide shot', aspect: '16:9' },
       { id: 's2', kind: 'image', title: 'Shot 2 · medium', prompt: '{prompt}, medium shot, same scene and style', refs: ['s1'], aspect: '16:9' },
@@ -299,7 +299,7 @@ export const WORKFLOWS: Workflow[] = [
     skill: 'cinematic',
     needs: ['the scene or a start image', 'total duration'],
     fixed: { aspect: '16:9' },
-    continuity: 'Each clip continues from the last frame of the previous one; neighboring clips change at least one of shot size, subject or angle.',
+    continuity: 'Each clip continues from the last frame of the previous one; a character or object in 2+ clips is a library subject (@Name) in each; neighboring clips change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Clip 1', prompt: '{prompt}', firstFrame: 's1', aspect: '16:9' },

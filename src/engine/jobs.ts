@@ -382,7 +382,7 @@ async function execute(id: string): Promise<string[]> {
     const { audio, refAudios } = routeAudio(schema.slots, audios);
 
     // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
-    const subjects = get().sessions[g.sessionId]?.subjects ?? [];
+    const subjects = get().library;
     const elSlot = schema.slots.elements;
     const mentioned = mentionSubjects(g.prompt, subjects, elSlot?.mention);
     let prompt = mentioned.prompt;

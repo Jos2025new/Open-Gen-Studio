@@ -30,12 +30,12 @@ import {
   Workflow,
 } from 'lucide-react';
 import { OPS, opsFor } from '../../engine/ops';
-import { downloadAsset, sendToNodes, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
+import { downloadAsset, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
 import { openAssetInDesigner } from '../../engine/design/actions';
-import type { OpId } from '../../engine/types';
+import type { OpId, SubjectKind } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { Button, Chip, IconButton, MenuItem } from '../ui/primitives';
+import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
 import { OpForm } from './OpForm';
 
 export const OP_ICONS: Record<OpId, LucideIcon> = {
@@ -175,6 +175,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const pop = usePopover();
   const [subject, setSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
+  const [subjectKind, setSubjectKind] = useState<SubjectKind>('character');
   if (!asset) return null;
   const close = () => {
     pop.close();
@@ -199,17 +200,18 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
             className="subject-new"
             onSubmit={(e) => {
               e.preventDefault();
-              if (subjectFromAsset(sessionId, assetId, subjectName)) {
+              if (subjectFromAsset(assetId, subjectName, subjectKind)) {
                 setSubjectName('');
                 close();
               }
             }}
           >
             <input autoFocus placeholder="Name, e.g. Mia" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
+            <Segmented size="sm" value={subjectKind} options={SUBJECT_KINDS} onChange={setSubjectKind} />
             <Button size="sm" icon={UserPlus} type="submit" disabled={!subjectName.trim()}>
-              Save as subject
+              Save to library
             </Button>
-            <p className="faint">This image becomes the subject's frontal view. Mention it as @Name in any prompt.</p>
+            <p className="faint">Kept in Assets for every session. Mention it as @Name in any prompt: its image goes as a reference.</p>
           </form>
         ) : (
           <div className="menu">
@@ -233,7 +235,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                     useAsReference(assetId);
                   }}
                 />
-                <MenuItem icon={UserPlus} label="Save as subject" tip="Keep this character or object as @Name" onClick={() => setSubject(true)} />
+                <MenuItem icon={UserPlus} label="Save to library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
               </>
             ) : null}
             <MenuItem

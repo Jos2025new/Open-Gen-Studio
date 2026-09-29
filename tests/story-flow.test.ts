@@ -40,7 +40,7 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
       runs.push({
         kind: spec.kind,
         prompt: spec.prompt,
-        subjects: (st.sessions[spec.sessionId].subjects ?? []).map((x) => x.name),
+        subjects: st.library.map((x) => x.name),
         clips: spec.op ? `${(spec.op as { sourceAssetId?: string }).sourceAssetId},${spec.op.params.clips}` : undefined,
       });
       const asset = `ast_${id}`;
@@ -78,7 +78,8 @@ beforeEach(() => {
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: ['char'] },
     assets: { ...st.assets, char: { id: 'char', kind: 'image', mime: 'image/png', width: 384, height: 682, sessionId: sid, origin: 'upload', stored: true, favorite: false, createdAt: 1 } },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
+    library: [],
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

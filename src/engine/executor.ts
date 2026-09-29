@@ -9,7 +9,7 @@ import { parseRef, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
 import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Workspace } from './types';
-import { patchSession, useStore } from '../store/store';
+import { useStore } from '../store/store';
 
 const get = useStore.getState;
 
@@ -219,14 +219,14 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   // Subjects from existing images are saved before anything runs; from steps, as soon as the step ends.
   for (const subj of ctx.subjects ?? []) {
     const p = parseRef(subj.from);
-    if (p?.type === 'asset') saveSubjectOnce(ctx.sessionId, subj, p.id);
+    if (p?.type === 'asset') saveSubjectOnce(subj, p.id);
   }
   const saveSubjectsOf = (stepId: string, out: StepOutput) => {
     for (const subj of ctx.subjects ?? []) {
       const p = parseRef(subj.from);
       if (p?.type !== 'step' || p.id !== stepId) continue;
       const asset = out.assetIds[p.index] ?? out.assetIds[0];
-      if (asset) saveSubjectOnce(ctx.sessionId, subj, asset);
+      if (asset) saveSubjectOnce(subj, asset);
     }
   };
 
@@ -290,12 +290,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   return { outputs, failed, skipped };
 }
 
-/** Save a plan subject in the session, unless one with that name exists (it is reused, as the plan card said). */
-function saveSubjectOnce(sessionId: string, subj: PlanSubject, assetId: string): void {
+/** Save a plan subject in the library, unless one with that name exists (it is reused, as the plan card said). */
+function saveSubjectOnce(subj: PlanSubject, assetId: string): void {
   if (get().assets[assetId]?.kind !== 'image') return;
-  patchSession(sessionId, (s) => {
-    const list = s.subjects ?? [];
-    if (list.some((x) => x.name.toLowerCase() === subj.name.toLowerCase())) return s;
-    return { ...s, subjects: [...list, { id: uid('sub'), name: subj.name, description: subj.description, frontalAssetId: assetId, refAssetIds: [] }] };
-  });
+  if (get().library.some((x) => x.name.toLowerCase() === subj.name.toLowerCase())) return;
+  useStore.setState((st) => ({ library: [...st.library, { id: uid('sub'), name: subj.name, kind: subj.kind ?? 'character', description: subj.description, frontalAssetId: assetId, refAssetIds: [] }] }));
 }

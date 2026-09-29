@@ -439,6 +439,7 @@ export type PlanStep = TextStep | ImageStep | Model3dStep | VideoStep | AudioSte
 /** A subject the plan saves: an existing image (saved when the plan runs) or an image step (saved when it ends). */
 export interface PlanSubject {
   name: string;
+  kind?: SubjectKind;
   from: StepRef;
   description?: string;
 }
@@ -451,6 +452,8 @@ export interface Plan {
   steps: PlanStep[];
   /** Characters or objects saved as session subjects, mentioned as @Name by later steps (F3). */
   subjects?: PlanSubject[];
+  /** Style block appended to every image and video prompt (already in the prompts). */
+  style?: string;
   adjustments: string[];
 }
 
@@ -811,9 +814,13 @@ export interface AgentRequestMetrics {
 }
 
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
+export type SubjectKind = 'character' | 'object' | 'product' | 'style';
+
 export interface Subject {
   id: string;
   name: string;
+  /** Library tab; older subjects without one are characters. */
+  kind?: SubjectKind;
   description?: string;
   /** Main (frontal) image. */
   frontalAssetId?: string;

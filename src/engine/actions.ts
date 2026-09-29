@@ -16,7 +16,7 @@ import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers } from './design/raster';
 import { designerDims } from './agent/runtime';
-import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, Workspace } from './types';
+import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
   addAssets,
   appendFeed,
@@ -38,25 +38,35 @@ function feedBase(workspace: Workspace) {
 }
 
 // ---------------------------------------------------------------------------
-// Subjects (Kling elements), per session
+// Library: characters, objects, products and styles saved as @Name, shared by every session
 
-export function saveSubject(sessionId: string, subject: Subject): void {
-  patchSession(sessionId, (s) => {
-    const list = s.subjects ?? [];
-    return { ...s, subjects: list.some((x) => x.id === subject.id) ? list.map((x) => (x.id === subject.id ? subject : x)) : [...list, subject] };
-  });
+export const SUBJECT_KINDS: Array<{ value: SubjectKind; label: string }> = [
+  { value: 'character', label: 'Character' },
+  { value: 'object', label: 'Object' },
+  { value: 'product', label: 'Product' },
+  { value: 'style', label: 'Style' },
+];
+
+export function saveSubject(subject: Subject): void {
+  useStore.setState((st) => ({
+    library: st.library.some((x) => x.id === subject.id) ? st.library.map((x) => (x.id === subject.id ? subject : x)) : [...st.library, subject],
+  }));
 }
 
-export function deleteSubject(sessionId: string, id: string): void {
-  patchSession(sessionId, (s) => ({ ...s, subjects: (s.subjects ?? []).filter((x) => x.id !== id) }));
+export function deleteSubject(id: string): void {
+  useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
 }
 
-/** "Save as subject" on an image: that image is the frontal view of a new subject of the session. */
-export function subjectFromAsset(sessionId: string, assetId: string, name: string): Subject | null {
+/** "Save to library" on an image: that image is the frontal view of a new library item. */
+export function subjectFromAsset(assetId: string, name: string, kind: SubjectKind = 'character'): Subject | null {
   const clean = name.trim().replace(/^@/, '');
   if (!clean || get().assets[assetId]?.kind !== 'image') return null;
-  const subject: Subject = { id: uid('sub'), name: clean, frontalAssetId: assetId, refAssetIds: [] };
-  saveSubject(sessionId, subject);
+  if (get().library.some((x) => x.name.toLowerCase() === clean.toLowerCase())) {
+    toast(`@${clean} already exists in the library.`, 'error');
+    return null;
+  }
+  const subject: Subject = { id: uid('sub'), name: clean, kind, frontalAssetId: assetId, refAssetIds: [] };
+  saveSubject(subject);
   toast(`Saved as @${clean}: mention it in any prompt`, 'success');
   return subject;
 }
@@ -69,7 +79,7 @@ export function subjectFromAttachments(name: string): Subject | null {
   const clean = name.trim().replace(/^@/, '');
   if (!clean || (!images.length && !video)) return null;
   const subject: Subject = { id: uid('sub'), name: clean, frontalAssetId: images[0], refAssetIds: images.slice(1, 4), videoAssetId: images.length ? undefined : video };
-  saveSubject(st.activeSessionId, subject);
+  saveSubject(subject);
   const used = new Set([subject.frontalAssetId, ...subject.refAssetIds, subject.videoAssetId]);
   setComposer((c) => ({ attachments: c.attachments.filter((a) => !used.has(a)) }));
   return subject;
@@ -112,9 +122,9 @@ export async function createSubjectVoice(sessionId: string, subjectId: string): 
     appendFeed(sessionId, { ...feedBase('chat'), type: 'generation', generationId: g.id });
     await runGeneration(g.id);
     const voiceId = get().generations[g.id]?.text;
-    const subject = get().sessions[sessionId]?.subjects?.find((x) => x.id === subjectId);
+    const subject = get().library.find((x) => x.id === subjectId);
     if (voiceId && subject) {
-      saveSubject(sessionId, { ...subject, voiceId });
+      saveSubject({ ...subject, voiceId });
       toast(`Voice bound to @${subject.name}.`, 'info');
     }
   } catch (err) {
@@ -681,7 +691,9 @@ export function deleteSession(sessionId: string): void {
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return;
-  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId).map((a) => a.id);
+  // Images of library items outlive the session that made them.
+  const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
+  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id)).map((a) => a.id);
   const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId).map((g) => g.id);
   const rasterIds = s.docs.flatMap((d) => d.layers.filter((l) => l.type === 'raster').map((l) => l.id));
   useStore.setState((cur) => {

@@ -109,7 +109,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     suggestModel,
     composerChosen,
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
-    subjectNames: () => (session(sessionId).subjects ?? []).map((x) => x.name),
+    subjectNames: () => get().library.map((x) => x.name),
   };
 }
 

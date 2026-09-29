@@ -25,6 +25,7 @@ import type {
   TextStyle,
   VideoStep,
   Workspace,
+  SubjectKind,
 } from './types';
 
 /** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
@@ -75,7 +76,9 @@ export interface RawPlan {
   total_duration?: number;
   steps?: RawStep[];
   /** Subjects to save: { name, from: an image step or asset:<id>, description? }. */
-  subjects?: Array<{ name?: string; from?: string; description?: string }>;
+  subjects?: Array<{ name?: string; kind?: SubjectKind; from?: string; description?: string }>;
+  /** One style block the app appends to every image and video prompt. */
+  style?: string;
 }
 
 export type OutputKind = AssetKind | 'text' | 'layer';
@@ -652,6 +655,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
 
   if (ctx.workspace === 'node' && steps.some((s) => s.kind === 'layer')) errors.push('Layer steps are not valid in the Node workspace.');
   const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, ctx.subjectNames?.() ?? []);
+  unknownMentions(steps, [...(ctx.subjectNames?.() ?? []), ...subjects.map((x) => x.name)], errors);
+  const style = raw.style?.trim();
+  if (style) {
+    for (const st of steps) if ((st.kind === 'image' || st.kind === 'video') && !st.prompt.includes(style)) st.prompt = `${st.prompt}\n\nStyle: ${style}`;
+  }
   if (!errors.length) {
     try {
       topoOrder(steps);
@@ -668,6 +676,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       workspace: ctx.workspace,
       steps,
       ...(subjects.length ? { subjects } : {}),
+      ...(style ? { style } : {}),
       adjustments,
     },
     errors: [],
@@ -708,7 +717,7 @@ function planSubjects(
       continue;
     }
     if (existing.some((n) => n.toLowerCase() === name.toLowerCase())) adjustments.push(`@${name} already exists in this session: reused`);
-    out.push({ name, from: r.from.trim(), ...(r.description?.trim() ? { description: r.description.trim() } : {}) });
+    out.push({ name, from: r.from.trim(), ...(r.kind ? { kind: r.kind } : {}), ...(r.description?.trim() ? { description: r.description.trim() } : {}) });
   }
   for (const subj of out) {
     const p = parseRef(subj.from);
@@ -720,6 +729,22 @@ function planSubjects(
     }
   }
   return out;
+}
+
+/** Reference syntaxes the agent writes itself (@Image1, @Video2, @Element1…): not library names. */
+const REF_SYNTAX = /^(image|video|audio|element)\d+$/i;
+
+/** A @Name that is neither in the library nor saved by this plan would reach the model with no image behind it. */
+function unknownMentions(steps: PlanStep[], known: string[], errors: string[]): void {
+  const names = new Set(known.map((n) => n.toLowerCase()));
+  for (const st of steps) {
+    if (st.kind !== 'image' && st.kind !== 'video') continue;
+    for (const m of st.prompt.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)) {
+      const n = m[1];
+      if (REF_SYNTAX.test(n) || names.has(n.toLowerCase())) continue;
+      errors.push(`step ${st.id}: @${n} is not in the library; add it to "subjects" (from an attached image or a reference step) or describe it without @.`);
+    }
+  }
 }
 
 function isJoin(s: PlanStep): s is OpStep {

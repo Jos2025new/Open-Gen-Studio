@@ -128,7 +128,8 @@ describe('video edit / extend operations', () => {
       const base = st.sessions[st.activeSessionId];
       useStore.setState({
         assets: { ...st.assets, r1: img('r1'), ana: img('ana'), ana2: img('ana2'), leo: img('leo') },
-        sessions: { ...st.sessions, s: { ...base, id: 's', subjects: [{ id: 'A', name: 'Ana', frontalAssetId: 'ana', refAssetIds: ['ana2'] }, { id: 'L', name: 'Leo', frontalAssetId: 'leo', refAssetIds: [] }] } },
+        sessions: { ...st.sessions, s: { ...base, id: 's' } },
+        library: [{ id: 'A', name: 'Ana', frontalAssetId: 'ana', refAssetIds: ['ana2'] }, { id: 'L', name: 'Leo', frontalAssetId: 'leo', refAssetIds: [] }],
       });
       let n = 0;
       let body: Record<string, unknown> = {};

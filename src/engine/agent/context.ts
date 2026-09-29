@@ -71,9 +71,12 @@ ${OP_LINES}
   text: text, style {font_family: Inter|Grotesk|Serif|Display|Condensed|Mono, font_size, font_weight, color "#hex", align left|center|right, line_height, letter_spacing}, box {x, y, width} in document pixels, target "new" or an existing text layer id.
   vector: shapes [{type: rect|ellipse|line, x, y, w, h, fill "#hex"|null, stroke "#hex"|null, stroke_width, radius}], target "new" or an existing vector layer id.
   Images only go on raster layers, text only on text layers, shapes only on vector layers. Video cannot be placed on layers.
-- subjects (plan level, optional): [{name, from}] saves a character or object as a session subject — from asset:<id> (e.g. the attached character) or an image step; steps mention it as @Name and the app sends its image with each model's reference syntax. Reuse a subject already listed in the context instead of saving it again.
+- subjects (plan level, optional): [{name, kind, from}] saves a character, object, product or style to the library — from asset:<id> (e.g. the attached character) or an image step; steps mention it as @Name and the app sends its image with each model's reference syntax. Reuse a library item listed in the context instead of saving it again; an @Name that is neither is rejected.
+- style (plan level, optional): one short style block appended to every image and video prompt.
 - References: "s1" (first output of step s1), "s1#2" (its second output), "asset:<id>" (an existing asset listed in the context), "layer:<id>" (pixels of a raster layer).
 - Omit "model" to use the default for the step (the video row for its purpose, or the model the user picked, as the context says); the app switches to an image-capable variant when refs or first_frame are used. Set "model" to a listed ref or a family name when it is clearly a better fit (for video: only when the user names one). When the user names a model that is neither, call find_models first and use the ref that fits the step's inputs (image-to-video when there is a start image); never say a model is unavailable without searching.
+- References first: every character, object or product that appears in 2+ steps comes from one source — an attached image, a library item, or a reference step (character sheet: front, side and back views on a neutral background; product: clean shot on a neutral background) made first. Save it in subjects with its kind and mention it as @Name in every step that shows it (the app sends its image; never describe its look again). A scene with several of them mentions them all (models take up to their listed reference count), each with its role. On every canvas, including Nodes.
+- One style: put the look of the whole plan in "style" (the app appends it to every image and video prompt); do not restate it per step.
 - Continuity: in a chain that must keep an identity or style, steps of the same type use the same model or family, unless a later step needs a capability it lacks.
 - No orphan steps: every step is either a deliverable or feeds a later step through its refs, first_frame, input or prompt_from.
 - Keep plans minimal: the fewest steps that fully deliver the request. count defaults to 1; use more only when asked or clearly useful (max 4).
@@ -189,8 +192,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (skill) lines.push(`skill: ${skill.name} — ${skill.guidance}`);
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (follow this structure, adapt prompts to the request):\n${describeWorkflow(wf)}`);
-  const subjects = session.subjects ?? [];
-  if (subjects.length) lines.push(`subjects (mention as @Name): ${subjects.map((s) => `@${s.name}${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
+  const subjects = st.library;
+  if (subjects.length) lines.push(`library (mention as @Name; the app sends its image): ${subjects.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(`image model: ${describeModel('image')}`);
   // A video model the user never picked is only an app default: steps follow the purpose table instead (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);
