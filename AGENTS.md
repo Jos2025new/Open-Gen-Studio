@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — importar imágenes al canvas de Nodos (2026-09-29)
+Base `59382e5`, árbol limpio. Mantener verificación eficiente sin navegador por indicación previa del usuario.
+- [x] P1. Inspeccionar paste/importación y menú existentes. Razón: `uploadFiles` ya valida y guarda imágenes; el canvas solo admite arrastre de assets de galería.
+- [x] P2. En `components/node/NodeWorkspace.tsx`, reutilizar `uploadFiles` para Ctrl+V fuera de campos editables y «Import images» en clic derecho sobre el canvas. Crear nodos asset en el centro o punto del menú. Sin cambios al guardado ni generaciones.
+- [x] P3. Typecheck y pruebas acotadas existentes; registrar límites y commit.
+
+  Verificado: typecheck verde y 38 pruebas existentes de engine/node-agent. Ctrl+V solo intercepta imágenes fuera de inputs/textarea/contenteditable; el composer conserva su pegado actual. El selector admite varias imágenes PNG/JPEG/WebP/GIF y reutiliza límites/errores/almacenamiento de uploadFiles. Sin navegador ni prueba del portapapeles del sistema; pendiente comprobar manualmente Ctrl+V y selección de archivo.
+
 ## Tarea — conectar planes a referencias existentes (2026-09-29)
 Base `f709654`, árbol limpio. Petición: corrección eficiente sin navegador ni agentes adicionales.
 - [x] C1. Causa: `planToGraph` crea Reference sin buscar el asset en el grafo actual.

@@ -12,10 +12,11 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
+import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Upload } from 'lucide-react';
 import { setGraph, setUi, useStore } from '../../store/store';
 import { addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
+import { uploadFiles } from '../../engine/actions';
 import { setNodeSelection } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
@@ -199,6 +200,30 @@ function Canvas() {
     setSelected(new Set([id]));
   };
 
+  const fileInput = useRef<HTMLInputElement>(null);
+  const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
+  const importImages = useCallback(async (files: File[], position?: { x: number; y: number }) => {
+    const images = files.filter(f => f.type.startsWith('image/'));
+    if (!images.length) return;
+    const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+    const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
+    const ids = await uploadFiles(images);
+    const added = ids.map((assetId, i) => addNode(sessionId, { kind: 'asset', title: 'Image', assetId }, { x: pos.x - NODE_WIDTH / 2 + i * (NODE_WIDTH + 30), y: pos.y }));
+    if (added.length) setSelected(new Set(added));
+  }, [sessionId, rf]);
+
+  useEffect(() => {
+    const paste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
+      const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      e.preventDefault();
+      void importImages(files);
+    };
+    document.addEventListener('paste', paste);
+    return () => document.removeEventListener('paste', paste);
+  }, [importImages]);
+
   const runIds = runnableIds(graph.nodes);
 
   // Right-click menu, anchored to an invisible point at the cursor.
@@ -228,6 +253,11 @@ function Canvas() {
         addNode(sessionId, { kind: 'asset', title: 'Asset', assetId }, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
       }}
     >
+      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={e => {
+        const files = [...(e.currentTarget.files ?? [])];
+        e.currentTarget.value = '';
+        void importImages(files, importPosition.current);
+      }} />
       <TopbarActions>
         <AddNodeMenu onAdd={addAtCenter} />
         <IconButton icon={LayoutGrid} label="Auto layout" size="sm" disabled={!graph.nodes.length} onClick={() => {
@@ -281,6 +311,13 @@ function Canvas() {
             />
           </div>
         ) : menu ? (
+          <>
+          <div className="menu"><MenuItem icon={Upload} label="Import images" onClick={() => {
+            const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+            importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
+            fileInput.current?.click();
+            setMenu(null);
+          }} /></div>
           <AddNodeItems
             onPick={(data) => {
               const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
@@ -293,6 +330,7 @@ function Canvas() {
               setUi({ panel: 'gallery' });
             }}
           />
+          </>
         ) : null}
       </Popover>
       {!graph.nodes.length ? (
