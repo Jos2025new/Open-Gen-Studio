@@ -9,6 +9,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — tarjetas de audio/3D cuadradas de verdad, miniatura 3D y tarjetas de error acotadas (2026-09-30)
+- [x] T1. El tile con `--ratio` usa `aspect-ratio` (audio y 3D quedaban aplastados: medían su contenido). Tarjetas de error/cancelado con el ancho de una tarjeta de resultado (300–480 px), no toda la columna. *Dónde:* `chat.css`.
+- [x] T2. Miniatura frontal de un 3D sin render del proveedor: `lib/model3dThumb.ts` la genera una vez con model-viewer fuera de vista (uno a la vez, 20 s máx.) y la guarda como JPEG en `asset.thumbnailUrl`; `AssetMedia` la pide al mostrar el 3D. *Por qué:* un icono no dice qué modelo es. Navegador: Seed3D muestra el personaje. Límite: en uno de los dos archivos de Seed3D la miniatura salió negra (quizá el segundo archivo es otra variante o carga lenta); si persiste, borrar su `thumbnailUrl` la vuelve a generar.
+
 ## Tarea — tarjetas de audio y 3D del tamaño de su contenido; audio de vídeo que se heredaba apagado (2026-09-30)
 - [x] Z1. Tarjeta de audio y 3D con la misma regla que imagen/vídeo (`is-fit`): tile cuadrado, sin franja a todo el ancho ni hueco vacío; el audio lleva su reproductor dentro (sin reproducción automática en el chat). *Dónde:* `GenerationCard.tsx`, `AssetMedia.tsx` (`autoPlay`), `chat.css`.
 - [x] Z2. Seedance 2.0 Mini (composer) salió mudo: `composer.video.settings.audio` era `false` heredado del modelo anterior (`coerceSettings` conserva el valor al cambiar de modelo). Al cambiar de modelo (composer y nodo), el audio toma el valor por defecto del nuevo modelo. *Dónde:* `catalog.ts` (`selectComposerModel`), `nodes.tsx`. Límite: el composer actual sigue con audio apagado hasta que se active o se cambie de modelo.

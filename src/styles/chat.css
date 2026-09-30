@@ -76,3 +76,9 @@
 /* Audio result: a square tile with the track inside. */
 .tile .media-audio { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
 .tile .media-audio audio { width: 100%; }
+/* Audio and 3D have no picture of their own: the tile keeps its square shape instead of shrinking to its content. */
+.tiles.is-single .tile[style*='--ratio'] { aspect-ratio: var(--ratio); }
+.tile .media-audio img { width: 100%; height: 100%; object-fit: contain; }
+.tile .media-audio:has(img:not([hidden])) > span { position: absolute; left: 8px; bottom: 8px; }
+/* A card with no result (error, canceled) as wide as a result card, not the whole column. */
+.gen-card.status-error, .gen-card.status-canceled { width: fit-content; min-width: 300px; max-width: min(100%, 480px); }

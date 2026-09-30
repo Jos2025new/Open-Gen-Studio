@@ -1,3 +1,4 @@
+import { ensureModelThumbnail } from '../../lib/model3dThumb';
 import { useRef, useState } from 'react';
 import { AudioLines, ImageOff, Box } from 'lucide-react';
 import { useStore } from '../../store/store';
@@ -37,9 +38,12 @@ export function AssetMedia({
       </div>
     );
   }
-  if (asset.kind === 'model3d') return <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={(e) => { e.dataTransfer.setData('application/x-ogs-asset', assetId); e.dataTransfer.effectAllowed = 'copy'; }}>
+  if (asset.kind === 'model3d') {
+    if (!asset.thumbnailUrl) ensureModelThumbnail(assetId);
+    return <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={(e) => { e.dataTransfer.setData('application/x-ogs-asset', assetId); e.dataTransfer.effectAllowed = 'copy'; }}>
     {asset.thumbnailUrl ? <img src={asset.thumbnailUrl} alt="3D preview" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} /> : <Box size={32} />}<span>3D</span>
   </div>;
+  }
   if (!url || failed) {
     return (
       <div className={`media media-loading ${failed ? 'is-failed' : ''} ${className ?? ''}`} style={{ aspectRatio: asset.width && asset.height ? `${asset.width} / ${asset.height}` : '1' }}>
