@@ -1,3 +1,4 @@
+import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
@@ -20,6 +21,7 @@ import type {
   PlanStep,
   PlanSubject,
   ShapeSpec,
+  StrokeSpec,
   StepRef,
   TextStep,
   TextStyle,
@@ -67,6 +69,7 @@ export interface RawStep {
   style?: Record<string, unknown>;
   box?: { x?: number; y?: number; width?: number };
   shapes?: Array<Record<string, unknown>>;
+  strokes?: Array<Record<string, unknown>>;
 }
 
 export interface RawPlan {
@@ -260,10 +263,43 @@ export function normalizeTextStyle(s: Record<string, unknown> | undefined): Part
   return out;
 }
 
-export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined): ShapeSpec[] {
-  return (raw ?? []).slice(0, 40).map((s) => {
+export const MAX_AGENT_STROKES = 200;
+export const MAX_STROKE_POINTS = 2000;
+
+/** Freehand strokes from the agent: points in document px, optional pressure 0–1. Invalid points are dropped. */
+export function normalizeStrokes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer'): StrokeSpec[] {
+  const list = raw ?? [];
+  if (list.length > MAX_AGENT_STROKES) errors.push(`${where}: at most ${MAX_AGENT_STROKES} strokes.`);
+  return list.slice(0, MAX_AGENT_STROKES).flatMap((s, i) => {
+    const pts = Array.isArray(s.points) ? s.points : [];
+    if (pts.length > MAX_STROKE_POINTS) errors.push(`${where}: stroke ${i + 1} has more than ${MAX_STROKE_POINTS} points.`);
+    const points = pts
+      .slice(0, MAX_STROKE_POINTS)
+      .filter((p): p is number[] => Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1])))
+      .map((p) => [Number(p[0]), Number(p[1]), p.length > 2 && Number.isFinite(Number(p[2])) ? Math.min(1, Math.max(0, Number(p[2]))) : 0.5] as [number, number, number]);
+    if (!points.length) {
+      errors.push(`${where}: stroke ${i + 1} needs "points" as [[x, y], …] or [[x, y, pressure], …].`);
+      return [];
+    }
+    const pressure = pts.some((p) => Array.isArray(p) && p.length > 2);
+    return [{ points, pressure, color: color(s.color, '#ffffff') ?? '#ffffff', size: Math.min(400, Math.max(0.5, num(s.size ?? s.width, 8))) }];
+  });
+}
+
+export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined, errors: string[] = [], where = 'layer'): ShapeSpec[] {
+  return (raw ?? []).slice(0, 40).flatMap((s, i): ShapeSpec[] => {
+    if (s.type === 'path') {
+      const d = typeof s.d === 'string' ? s.d.trim() : '';
+      const parsed = parsePath(d);
+      if ('error' in parsed) {
+        errors.push(`${where}: shape ${i + 1} path is invalid: ${parsed.error}.`);
+        return [];
+      }
+      const b = parsed.box;
+      return [{ type: 'path', d, box0: b, x: b.x, y: b.y, w: b.w, h: b.h, fill: color(s.fill, null), stroke: color(s.stroke, s.fill ? null : '#ffffff'), strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, s.fill ? 0 : 4)), radius: 0 }];
+    }
     const type = s.type === 'ellipse' || s.type === 'line' ? s.type : 'rect';
-    return {
+    return [{
       type,
       x: num(s.x, 0),
       y: num(s.y, 0),
@@ -273,7 +309,7 @@ export function normalizeShapes(raw: Array<Record<string, unknown>> | undefined)
       stroke: color(s.stroke, type === 'line' ? '#ffffff' : null),
       strokeWidth: Math.max(0, num(s.stroke_width ?? s.strokeWidth, type === 'line' ? 4 : 0)),
       radius: Math.max(0, num(s.radius, 0)),
-    };
+    }];
   });
 }
 
@@ -614,9 +650,16 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           errors.push(`${where}: layer_type must be raster, vector or text.`);
           continue;
         }
-        const target = s.target?.trim() || (layerType === 'raster' ? 'base' : 'new');
-        if (layerType === 'raster') {
-          if (!s.source) errors.push(`${where}: raster layers need "source" (an image step, asset:<id> or layer:<id>).`);
+        const drawing = Boolean(s.strokes?.length);
+        const target = s.target?.trim() || (layerType === 'raster' && !drawing ? 'base' : 'new');
+        const strokes = drawing && layerType !== 'text' ? normalizeStrokes(s.strokes, errors, where) : undefined;
+        if (drawing && layerType === 'text') errors.push(`${where}: text layers cannot take strokes; use a vector or raster layer.`);
+        if (layerType === 'raster' && drawing) {
+          // Painted strokes always go on a new layer: the user's own raster layers are never painted over.
+          if (s.source) errors.push(`${where}: a raster layer takes either "source" or "strokes", not both.`);
+          if (target !== 'new') errors.push(`${where}: painted strokes go on a new raster layer (target "new").`);
+        } else if (layerType === 'raster') {
+          if (!s.source) errors.push(`${where}: raster layers need "source" (an image step, asset:<id> or layer:<id>) or "strokes".`);
           else expectImage(s.source, where);
           if (target !== 'base' && target !== 'new') {
             const l = ctx.layer(target);
@@ -631,7 +674,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             else if (l.type !== layerType) errors.push(`${where}: target layer "${target}" is ${l.type}, not ${layerType}.`);
           }
           if (layerType === 'text' && !s.text?.trim()) errors.push(`${where}: text layers need "text".`);
-          if (layerType === 'vector' && !s.shapes?.length) errors.push(`${where}: vector layers need "shapes".`);
+          if (layerType === 'vector' && !s.shapes?.length && !drawing) errors.push(`${where}: vector layers need "shapes" or "strokes".`);
         }
         const step: LayerStep = {
           id: s.id!,
@@ -643,7 +686,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           text: layerType === 'text' ? s.text?.trim() : undefined,
           style: layerType === 'text' ? normalizeTextStyle(s.style) : undefined,
           box: s.box ? { x: num(s.box.x, 0), y: num(s.box.y, 0), width: num(s.box.width, 0) } : undefined,
-          shapes: layerType === 'vector' ? normalizeShapes(s.shapes) : undefined,
+          shapes: layerType === 'vector' ? normalizeShapes(s.shapes, errors, where) : undefined,
+          strokes,
         };
         steps.push(step);
         break;

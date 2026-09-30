@@ -68,6 +68,15 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'view_canvas',
+      description:
+        'Designer only: see the page again, or one layer alone (layer_id), as a reduced image with the scale back to document px. The page already comes with each new request; call this only for a single layer or after changes.',
+      parameters: { type: 'object', properties: { layer_id: { type: 'string', description: 'A layer id from the context; omit for the whole page.' } } },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'read_guide',
       description:
         'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
@@ -195,7 +204,18 @@ export const TOOLS: ToolSpec[] = [
                   properties: { x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number' } },
                   description: 'text layer position and wrap width in document pixels.',
                 },
-                shapes: { type: 'array', items: { type: 'object' }, description: 'vector layer shapes.' },
+                shapes: {
+                  type: 'array',
+                  items: { type: 'object' },
+                  description:
+                    'vector layer shapes in document px: {type: rect|ellipse|line, x, y, w, h, fill, stroke, stroke_width, radius} or {type: "path", d, fill, stroke, stroke_width} with absolute commands only (M L C Q S T Z) for precise curves.',
+                },
+                strokes: {
+                  type: 'array',
+                  items: { type: 'object' },
+                  description:
+                    'freehand drawing in document px: [{points: [[x, y] or [x, y, pressure 0-1], …], color, size}]; enough points to follow each curve. vector layer → editable strokes; raster layer (target "new") → painted with the brush on a new layer.',
+                },
               },
               required: ['id', 'kind'],
             },
@@ -225,6 +245,8 @@ export const readGraphSchema = z.object({
   node_ids: z.array(z.string().min(1).max(80)).max(10).optional(),
   offset: z.number().int().min(0).optional(),
 });
+
+export const viewCanvasSchema = z.object({ layer_id: z.string().min(1).max(80).optional() });
 
 export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
 
@@ -269,6 +291,7 @@ const stepSchema = z
     style: z.record(z.string(), z.unknown()).optional(),
     box: z.object({ x: num.optional(), y: num.optional(), width: num.optional() }).optional(),
     shapes: z.array(z.record(z.string(), z.unknown())).optional(),
+    strokes: z.array(z.record(z.string(), z.unknown())).optional(),
   })
   .passthrough();
 

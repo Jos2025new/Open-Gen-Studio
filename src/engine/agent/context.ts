@@ -247,6 +247,12 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
     if (doc) {
       const layers = doc.layers.map((l, i) => `  ${i + 1}. ${l.id} ${l.type} "${l.name}"${l.id === doc.activeLayerId ? ' (active)' : ''}${l.locked ? ' (locked)' : ''}`);
       lines.push(`designer document "${doc.name}" ${doc.width}×${doc.height}px; layers bottom→top:\n${layers.join('\n') || '  (empty)'}`);
+      const active = doc.layers.find((l) => l.id === doc.activeLayerId);
+      if (active?.type === 'vector') {
+        const shapes = active.shapes.slice(0, 20).map((s) => `${s.type} ${Math.round(s.x)},${Math.round(s.y)} ${Math.round(s.w)}×${Math.round(s.h)}${s.fill ? ` fill ${s.fill}` : ''}${s.stroke ? ` stroke ${s.stroke}` : ''}`);
+        lines.push(`active vector layer: ${shapes.join('; ') || 'no shapes'}${active.shapes.length > 20 ? ` (+${active.shapes.length - 20})` : ''}; ${active.strokes?.length ?? 0} strokes`);
+      }
+      lines.push('drawing: layer steps take "strokes" (freehand) and "path" shapes (precise curves) in document px; a drawing goes on a new layer unless the user names one; the page image, when shown, gives its scale.');
     } else {
       lines.push('designer: no document yet (one is created at the composer image aspect; the generated image becomes layer 1).');
     }

@@ -349,7 +349,10 @@ export interface TextStyle {
 }
 
 export interface ShapeSpec {
-  type: 'rect' | 'ellipse' | 'line';
+  type: 'rect' | 'ellipse' | 'line' | 'path';
+  /** path: SVG path data in absolute commands, in its own coordinates (`box0`), mapped onto x/y/w/h. */
+  d?: string;
+  box0?: { x: number; y: number; w: number; h: number };
   x: number;
   y: number;
   w: number;
@@ -441,6 +444,16 @@ export interface LayerStep extends StepBase {
   style?: Partial<TextStyle>;
   box?: { x: number; y: number; width: number };
   shapes?: ShapeSpec[];
+  /** Freehand strokes in document px: vector → editable Lineart strokes; raster → painted with the brush on a new layer. */
+  strokes?: StrokeSpec[];
+}
+
+export interface StrokeSpec {
+  points: Array<[number, number, number]>;
+  /** False when the agent gave no pressure: perfect-freehand simulates it. */
+  pressure: boolean;
+  color: string;
+  size: number;
 }
 
 export type PlanStep = TextStep | ImageStep | Model3dStep | VideoStep | AudioStep | OpStep | LayerStep;

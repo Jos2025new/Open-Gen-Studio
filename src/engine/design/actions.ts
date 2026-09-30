@@ -1,11 +1,12 @@
 import { uid } from '../../lib/id';
 import { getAssetBlob, putAssetBlob } from '../../lib/idb';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, downloadBlob, fetchBlob } from '../../lib/media';
-import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, TextStyle } from '../types';
+import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
-import { copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
+import { copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer, strokeSegment } from './raster';
+import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
@@ -346,6 +347,7 @@ export async function saveDocToGallery(sessionId: string, docId: string): Promis
 export async function applyLayerStep(sessionId: string, docId: string, step: LayerStep, sourceAssetId: string | null): Promise<string | null> {
   const doc = getDoc(sessionId, docId);
   if (!doc) return null;
+  if (step.layerType === 'raster' && step.strokes?.length) return paintStrokesLayer(sessionId, docId, step.strokes, step.title);
   if (step.layerType === 'raster') {
     if (!sourceAssetId) throw new Error(`Step ${step.id}: no image to place.`);
     return placeAsset(sessionId, docId, sourceAssetId, step.target === 'base' || step.target === 'new' ? step.target : step.target, step.title);
@@ -363,14 +365,44 @@ export async function applyLayerStep(sessionId: string, docId: string, step: Lay
     return addTextLayer(sessionId, docId, step.text ?? '', box, style, step.title);
   }
   const shapes = step.shapes ?? [];
+  const strokes = (step.strokes ?? []).map(toStroke);
   if (step.target !== 'new') {
     const l = doc.layers.find((x) => x.id === step.target);
     if (l && l.type === 'vector') {
-      patchLayer(sessionId, docId, l.id, { shapes: [...l.shapes, ...D.newVectorLayer('tmp', shapes).shapes] } as Partial<Layer>);
+      patchLayer(sessionId, docId, l.id, { shapes: [...l.shapes, ...D.newVectorLayer('tmp', shapes).shapes], strokes: [...(l.strokes ?? []), ...strokes] } as Partial<Layer>);
       return l.id;
     }
   }
-  return addVectorLayer(sessionId, docId, shapes, step.title);
+  if (!strokes.length) return addVectorLayer(sessionId, docId, shapes, step.title);
+  const layer = { ...D.newVectorLayer(step.title || 'Drawing', shapes), strokes };
+  mutateDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'top'));
+  return layer.id;
+}
+
+/** An agent stroke as an editable Lineart stroke. */
+function toStroke(s: StrokeSpec) {
+  return newStroke(s.points, { ...DEFAULT_STROKE_STYLE, color: s.color, size: s.size }, !s.pressure);
+}
+
+/** Agent strokes painted with the raster brush on a new full-page layer (never over the user's layers). */
+function paintStrokesLayer(sessionId: string, docId: string, strokes: StrokeSpec[], name: string): string | null {
+  const doc = getDoc(sessionId, docId);
+  if (!doc) return null;
+  const c = document.createElement('canvas');
+  c.width = doc.width;
+  c.height = doc.height;
+  const ctx = c.getContext('2d')!;
+  for (const s of strokes) {
+    s.points.forEach((p, i) => {
+      const a = s.points[Math.max(0, i - 1)];
+      const width = s.size * (s.pressure ? 0.4 + p[2] * 1.2 : 1);
+      strokeSegment(ctx, { x: a[0], y: a[1] }, { x: p[0], y: p[1] }, { width, color: s.color, opacity: 1, erase: false });
+    });
+  }
+  const layer = D.newRasterLayer(name || 'Painting', { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height });
+  setBuffer(layer.id, c);
+  mutateDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'top'));
+  return layer.id;
 }
 
 export type LayerOpRequest = { sessionId: string; docId: string; layerId: string; op: OpId; params: Record<string, AdvancedValue> };

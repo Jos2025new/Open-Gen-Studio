@@ -54,8 +54,9 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
+import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, findModelsSchema, readGraphSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -187,6 +188,11 @@ export async function sendAgentMessage(text: string): Promise<void> {
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
   const parts = await visibleAttachments(sessionId, workspace, attachments);
+  // The Designer page travels with a new request, so "draw on this" needs no extra round.
+  if (workspace === 'designer' && agentSeesImages()) {
+    const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
+    if (typeof view !== 'string') parts.push(...view);
+  }
   // A new request: images of earlier requests become a note instead of being sent again.
   patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
   pushHistory(sessionId, userMessage(`${clean || '(no text)'}\n\n${ctx}`, parts));
@@ -901,6 +907,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       }
 
       const toolResults: LlmMessage[] = [];
+      const afterTools: LlmMessage[] = [];
       // One action (questions or plan) per turn; later calls in the same message are answered as ignored.
       const ignoreRest = (fromIndex: number) => {
         for (const c of result.toolCalls.slice(fromIndex + 1)) {
@@ -994,6 +1001,23 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
           ignoreRest(index); flushToolResults(sessionId, toolResults); return;
         }
+        if (call.name === 'view_canvas') {
+          // Read-only look at the page or one layer; the image follows the tool results (they carry no images).
+          const v = viewCanvasSchema.safeParse(parsed.value);
+          if (!v.success) respond(`Invalid view_canvas input: ${formatZodError(v.error)}`);
+          else if (workspace !== 'designer') respond('view_canvas works only in the Designer.');
+          else if (!agentSeesImages()) respond('The selected agent model cannot see images.');
+          else {
+            const view = await canvasParts(sessionId, v.data.layer_id).catch(() => 'The page could not be rendered.');
+            if (typeof view === 'string') respond(view);
+            else {
+              log.action({ icon: 'search', label: 'Looked at the canvas', detail: v.data.layer_id });
+              respond('The image follows in the next message.');
+              afterTools.push(userMessage('Canvas view:', view));
+            }
+          }
+          continue;
+        }
         if (call.name === 'read_graph') {
           // Read-only view of the node graph; the agent continues in the next round.
           const v = readGraphSchema.safeParse(parsed.value);
@@ -1056,6 +1080,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         respond(`Unknown tool "${call.name}".`);
       }
       flushToolResults(sessionId, toolResults);
+      for (const m of afterTools) pushHistory(sessionId, m);
       if (planFailures >= 3) {
         notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.');
         return;

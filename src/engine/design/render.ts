@@ -1,3 +1,4 @@
+import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
@@ -95,6 +96,26 @@ export function layerBox(l: Layer): Box | null {
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
+  if (s.type === 'path') {
+    if (!s.d) return;
+    const t = pathTransform(s);
+    ctx.save();
+    ctx.setTransform(ctx.getTransform().multiply(new DOMMatrix([t.sx, 0, 0, t.sy, t.tx, t.ty])));
+    const p = new Path2D(s.d);
+    if (s.fill) {
+      ctx.fillStyle = s.fill;
+      ctx.fill(p);
+    }
+    if (s.stroke && s.strokeWidth > 0) {
+      ctx.strokeStyle = s.stroke;
+      ctx.lineWidth = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke(p);
+    }
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);

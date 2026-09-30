@@ -1,3 +1,4 @@
+import { pathTransform } from './path';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
 import { strokeSvg } from './brushTextures';
@@ -33,6 +34,11 @@ function paint(fill: string | null, stroke: string | null, strokeWidth: number):
 }
 
 export function shapeSvg(s: VectorShape): string {
+  if (s.type === 'path') {
+    const t = pathTransform(s);
+    const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
+    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${n(t.sx)} 0 0 ${n(t.sy)} ${n(t.tx)} ${n(t.ty)})" ${paint(s.fill, s.stroke, s.strokeWidth / k)}/>`;
+  }
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);
     const y = Math.min(s.y, s.y + s.h);
