@@ -40,6 +40,21 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'read_graph',
+      description:
+        'Node canvas only, read-only. Without node_ids: the next page of the node index (offset). With node_ids: each node\'s status, error, model, prompt, output asset (usable in plans) and connections by port. Use it when the index in the context is not enough; it cannot edit nodes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          node_ids: { type: 'array', items: { type: 'string' }, maxItems: 10, description: 'Node ids from the index.' },
+          offset: { type: 'integer', minimum: 0, description: 'Index page start when no node_ids are given.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'read_guide',
       description:
         'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
@@ -191,6 +206,11 @@ const questionSchema = z.object({
 export const findModelsSchema = z.object({
   query: z.string().min(1).max(120),
   kind: z.enum(['image', 'video', 'audio', 'model3d']).optional(),
+});
+
+export const readGraphSchema = z.object({
+  node_ids: z.array(z.string().min(1).max(80)).max(10).optional(),
+  offset: z.number().int().min(0).optional(),
 });
 
 export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });

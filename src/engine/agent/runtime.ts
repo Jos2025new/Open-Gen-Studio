@@ -49,7 +49,9 @@ import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { modelGuide } from '../guides';
-import { TOOLS, findModelsSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { readGraph } from '../flow/graphView';
+import { nodeSelection } from '../flow/selection';
+import { TOOLS, findModelsSchema, readGraphSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -905,6 +907,17 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             void resumePlan(sessionId, target.id, mode);
           }
           respond(problem ?? `${mode === 'check' ? 'Checking the providers' : 'Running the failed steps again'} for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
+          continue;
+        }
+        if (call.name === 'read_graph') {
+          // Read-only view of the node graph; the agent continues in the next round.
+          const v = readGraphSchema.safeParse(parsed.value);
+          if (!v.success) respond(`Invalid read_graph input: ${formatZodError(v.error)}`);
+          else if (workspace !== 'node') respond('read_graph works only on the node canvas.');
+          else {
+            log.action({ icon: 'search', label: 'Read the node graph', detail: v.data.node_ids?.join(', ') });
+            respond(readGraph(session(sessionId).graph, useStore.getState().generations, nodeSelection(sessionId), v.data));
+          }
           continue;
         }
         if (call.name === 'read_guide') {

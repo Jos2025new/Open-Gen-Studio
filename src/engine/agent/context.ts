@@ -12,6 +12,8 @@ import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
 import { REFERENCE_PROTOCOLS, modelFit } from '../modelRules';
 import { remainingBudget } from '../budget';
+import { graphIndex } from '../flow/graphView';
+import { nodeSelection } from '../flow/selection';
 
 const get = useStore.getState;
 
@@ -245,8 +247,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
     }
   }
   if (opts.workspace === 'node') {
-    const g = session.graph;
-    lines.push(`node graph: ${g.nodes.length} nodes, ${g.edges.length} connections (new flows are placed beside existing ones)`);
+    lines.push(graphIndex(session.graph, st.generations, nodeSelection(session.id)));
     const multi = Object.values(OPS).filter((o) => o.multiInput).map((o) => o.id);
     if (multi.length) lines.push(`node canvas cannot run: ${multi.join(', ')} (ops with several inputs); several clips = one node per clip`);
   }

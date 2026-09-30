@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -16,6 +16,7 @@ import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash
 import { setGraph, setUi, useStore } from '../../store/store';
 import { addNode, deleteNodes, duplicateNode, layoutAll, newNodeData, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
+import { setNodeSelection } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover, usePopover } from '../ui/Popover';
@@ -83,6 +84,8 @@ function Canvas() {
   const generations = useStore((s) => s.generations);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
+  // Shared with the agent (not persisted): what "this" means in a request.
+  useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());

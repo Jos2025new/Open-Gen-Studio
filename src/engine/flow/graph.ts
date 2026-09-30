@@ -283,7 +283,7 @@ export interface GraphRunPlan {
   errors: string[];
 }
 
-function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>): string | null {
+export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>): string | null {
   const d = node.data;
   if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
