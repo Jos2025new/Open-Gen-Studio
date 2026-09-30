@@ -7,7 +7,19 @@ import { AGENT_OP_IDS } from '../ops';
 
 const stepKinds = ['image', 'video', 'audio', 'model3d', 'op', 'text', 'layer'] as const;
 
+export const editNodeSchema = z.object({ node_id: z.string().min(1), title: z.string().optional(), prompt: z.string().optional(), model_ref: z.string().optional(), settings: z.object({
+  aspect: z.string().optional(), resolution: z.string().optional(), count: z.number().int().min(1).max(8).optional(), duration: z.number().optional(), audio: z.boolean().optional(), seed: z.number().optional(), negative: z.string().optional(), advanced: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), extras: z.record(z.string(), z.unknown()).optional(), shots: z.array(z.object({ prompt:z.string(), duration:z.number() })).optional(),
+}).strict().optional(), params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional() }).strict();
+export const connectNodesSchema = z.object({ source: z.string(), target: z.string(), port: z.string() }).strict();
+export const disconnectNodesSchema = z.object({ edge_ids: z.array(z.string()).min(1).max(40) }).strict();
+export const nodeIdsSchema = z.object({ node_ids: z.array(z.string()).min(1).max(40) }).strict();
+
 export const TOOLS: ToolSpec[] = [
+  { type:'function', function:{ name:'edit_node', description:'Node canvas: edit an existing node. prompt edits generation prompts or text-node text. settings/params merge with existing values. model_ref uses the same model action as the UI. Keeps outputs and connections except those invalidated by a model output change.', parameters:{type:'object',properties:{node_id:{type:'string'},title:{type:'string'},prompt:{type:'string'},model_ref:{type:'string'},settings:{type:'object',properties:{aspect:{type:'string'},resolution:{type:'string'},count:{type:'integer'},duration:{type:'number'},audio:{type:'boolean'},seed:{type:'number'},negative:{type:'string'},advanced:{type:'object'},extras:{type:'object'},shots:{type:'array',items:{type:'object'}}}},params:{type:'object'}},required:['node_id']} } },
+  { type:'function', function:{ name:'connect_nodes', description:'Node canvas: connect existing nodes to the named target port. Uses UI port/cycle validation and replaces an occupied single-input port.', parameters:{type:'object',properties:{source:{type:'string'},target:{type:'string'},port:{type:'string'}},required:['source','target','port']} } },
+  { type:'function', function:{ name:'disconnect_nodes', description:'Node canvas: disconnect existing edge IDs returned by read_graph.', parameters:{type:'object',properties:{edge_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['edge_ids']} } },
+  { type:'function', function:{ name:'delete_nodes', description:'Node canvas: delete these existing nodes and their connections. Results stay in the gallery; the chat offers Undo. No extra confirmation.', parameters:{type:'object',properties:{node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['node_ids']} } },
+  { type:'function', function:{ name:'run_nodes', description:'Node canvas: propose Run for existing node IDs. The card includes stale/missing ancestors and cost, and waits for the user click, even in Auto. Never creates nodes or runs descendants outside the requested targets.', parameters:{type:'object',properties:{node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['node_ids']} } },
   {
     type: 'function',
     function: {

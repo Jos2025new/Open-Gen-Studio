@@ -50,7 +50,7 @@ describe('node graph views for the agent', () => {
     expect(readGraph(graph, generations, [], {})).toContain('read_graph({offset: 40})');
     const detail = readGraph(graph, generations, ['nd1'], { node_ids: ['nd0', 'nd4', 'nope'] });
     expect(detail).toContain('output: asset:a0 (use it in plans)');
-    expect(detail).toContain('feeds: nd1 "Image nd1" (ref)');
+    expect(detail).toContain('feeds: nd1 "Image nd1" (ref, edge:e1)');
     expect(detail).toContain('error: boom');
     expect(detail).toContain('nope: no such node');
   });

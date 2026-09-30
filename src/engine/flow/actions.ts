@@ -304,3 +304,31 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
     return result;
   } finally { releaseAssets(); release(); }
 }
+
+export interface DeletedNodes { nodes: GraphNode[]; edges: import('../types').GraphEdge[] }
+export function deleteNodesWithUndo(sessionId: string, ids: string[]): { error: string | null; deleted?: DeletedNodes } {
+  const graph = get().sessions[sessionId]?.graph;
+  if (!graph) return { error: 'No such session.' };
+  const deleted = { nodes: structuredClone(graph.nodes.filter(n => ids.includes(n.id))), edges: structuredClone(graph.edges.filter(e => ids.includes(e.source) || ids.includes(e.target))) };
+  const error = deleteNodes(sessionId, ids);
+  return error ? { error } : { error: null, deleted };
+}
+
+/** Restore only the deletion, leaving later nodes, edits and occupied ports intact. */
+export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error: string | null; skipped: string[] } {
+  const graph = get().sessions[sessionId]?.graph;
+  if (!graph) return { error: 'No such session.', skipped: [] };
+  if (deleted.nodes.some(n => graph.nodes.some(live => live.id === n.id))) return { error: 'A deleted node ID is already in use.', skipped: [] };
+  let next = { ...graph, nodes: [...graph.nodes, ...structuredClone(deleted.nodes)] };
+  const skipped: string[] = [];
+  for (const edge of deleted.edges) {
+    if (next.edges.some(e => e.id === edge.id)) continue;
+    const target = next.nodes.find(n => n.id === edge.target);
+    const port = target && inputPorts(target.data).find(p => p.id === edge.targetHandle);
+    const occupied = port && !port.multi && next.edges.some(e => e.target === edge.target && e.targetHandle === edge.targetHandle);
+    const problem = connectionError(next, get().assets, edge);
+    if (occupied || problem) { skipped.push(`${edge.id}: ${occupied ? 'port changed since deletion' : problem}`); continue; }
+    next = { ...next, edges: [...next.edges, { ...edge }] };
+  }
+  return { error: editGraph(sessionId, () => next), skipped };
+}

@@ -1,3 +1,6 @@
+import { editGraphTool } from './nodeTools';
+import { nodeIdsSchema } from './tools';
+import { restoreNodes } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
 import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
@@ -469,6 +472,35 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   }));
 
   await runPlanItem(sessionId, itemId, chosen, off);
+}
+
+export async function presentNodeRun(sessionId: string, targets: string[], toolCallId: string | null = null): Promise<{ errors: string[]; itemId?: string }> {
+  if (!targets.length) return { errors: ['Select at least one existing node.'] };
+  const graph = session(sessionId).graph;
+  const missing = targets.find(id => !graph.nodes.some(n => n.id === id && runsGeneration(n.data)));
+  if (missing) return { errors: [`No runnable node: ${missing}.`] };
+  const preview = await prepareNodeRun(sessionId, targets);
+  if (preview.errors.length) return { errors: preview.errors };
+  const item: PlanFeedItem = {
+    ...feedBase('node'), type: 'plan', style: get().composer.agentStyle, status: 'awaiting',
+    nodeRun: { targets, force: true, signature: preview.signature },
+    plan: { id: uid('pln'), title: 'Run existing nodes', summary: 'Existing node IDs and required upstream updates. No new flow is created.', workspace: 'node', steps: preview.steps, adjustments: [] },
+    estimate: preview.estimate, stepStates: {}, stepGenerations: {},
+  };
+  closeRevisedPlan(sessionId, false);
+  appendFeed(sessionId, item);
+  patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
+  setThreadOpen(true);
+  return { errors: [], itemId: item.id };
+}
+
+export function undoNodeDeletion(sessionId: string, itemId: string): string | null {
+  const item = session(sessionId).feed.find(f => f.id === itemId);
+  if (item?.type !== 'notice' || !item.undoNodes || item.undone) return 'This deletion is no longer available to undo.';
+  const restored = restoreNodes(sessionId, item.undoNodes);
+  if (restored.error) { toast(restored.error, 'error'); return restored.error; }
+  updateFeedItem<NoticeFeedItem>(sessionId, itemId, { undone: true, text: restored.skipped.length ? `Nodes restored. Connections changed since deletion were preserved: ${restored.skipped.join('; ')}` : 'Nodes and their connections restored.' });
+  return null;
 }
 
 async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
@@ -946,6 +978,24 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           }
           respond(problem ?? `${mode === 'check' ? 'Checking the providers' : 'Running the failed steps again'} for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
           continue;
+        }
+        if (['edit_node', 'connect_nodes', 'disconnect_nodes', 'delete_nodes'].includes(call.name)) {
+          if (workspace !== 'node') { respond('Graph actions work only on the node canvas.'); continue; }
+          try {
+            const result = await editGraphTool(sessionId, call.name, parsed.value);
+            if (result.deleted) appendFeed(sessionId, { ...feedBase('node'), type: 'notice', level: 'info', text: result.text, undoNodes: result.deleted });
+            respond(result.text);
+          } catch (error) { respond(`Cannot ${call.name}: ${(error as Error).message}`); }
+          continue;
+        }
+        if (call.name === 'run_nodes') {
+          const v = nodeIdsSchema.safeParse(parsed.value);
+          if (workspace !== 'node') { respond('run_nodes works only on the node canvas.'); continue; }
+          if (!v.success) { respond(`Invalid run_nodes: ${v.error.message}`); continue; }
+          const proposed = await presentNodeRun(sessionId, v.data.node_ids, call.id);
+          if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); continue; }
+          log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
+          ignoreRest(index); flushToolResults(sessionId, toolResults); return;
         }
         if (call.name === 'read_graph') {
           // Read-only view of the node graph; the agent continues in the next round.

@@ -247,6 +247,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
     }
   }
   if (opts.workspace === 'node') {
+    lines.push('For changes to an existing flow, locate its nodes with the index/read_graph and use edit_node/connect_nodes/disconnect_nodes/delete_nodes/run_nodes. Create new nodes only when the request requires them. run_nodes waits for the user approval click.');
     lines.push(graphIndex(session.graph, st.generations, nodeSelection(session.id)));
     const multi = Object.values(OPS).filter((o) => o.multiInput).map((o) => o.id);
     if (multi.length) lines.push(`node canvas cannot run: ${multi.join(', ')} (ops with several inputs); several clips = one node per clip`);

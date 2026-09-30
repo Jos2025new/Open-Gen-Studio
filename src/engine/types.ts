@@ -524,6 +524,8 @@ export interface GenerationFeedItem extends FeedBase {
 }
 
 export interface NoticeFeedItem extends FeedBase {
+  undoNodes?: { nodes: GraphNode[]; edges: GraphEdge[] };
+  undone?: boolean;
   type: 'notice';
   level: 'info' | 'error';
   text: string;

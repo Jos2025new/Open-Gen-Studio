@@ -1,6 +1,6 @@
 import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
-import { retryAgentTurn } from '../../engine/agent/runtime';
+import { retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
@@ -50,6 +50,7 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
     <div className={`notice notice-${item.level}`}>
       {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}
       <span>{item.text}</span>
+      {item.undoNodes && !item.undone ? <button type="button" className="notice-retry" onClick={() => undoNodeDeletion(sessionId, item.id)}>Undo</button> : null}
       {item.retry && isLast ? (
         <button type="button" className="notice-retry" disabled={busy} onClick={() => void retryAgentTurn(sessionId, item.id)}>
           <RotateCw size={13} />

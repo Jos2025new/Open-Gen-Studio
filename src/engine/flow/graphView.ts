@@ -85,8 +85,8 @@ export function readGraph(graph: Graph, generations: Record<string, Generation>,
       }
       const asset = nodeOutputAsset(n, generations);
       lines.push(asset ? `  output: asset:${asset} (use it in plans)` : '  output: none yet');
-      const ins = graph.edges.filter((e) => e.target === n.id).map((e) => `${e.targetHandle} ← ${e.source} "${title(e.source)}"`);
-      const outs = graph.edges.filter((e) => e.source === n.id).map((e) => `${e.target} "${title(e.target)}" (${e.targetHandle})`);
+      const ins = graph.edges.filter((e) => e.target === n.id).map((e) => `${e.targetHandle} ← ${e.source} "${title(e.source)}" (edge:${e.id})`);
+      const outs = graph.edges.filter((e) => e.source === n.id).map((e) => `${e.target} "${title(e.target)}" (${e.targetHandle}, edge:${e.id})`);
       lines.push(`  inputs: ${ins.join('; ') || 'none'}`, `  feeds: ${outs.join('; ') || 'nothing'}`);
       return lines.join('\n');
     })
