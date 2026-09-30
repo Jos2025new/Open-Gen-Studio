@@ -9,6 +9,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — patrón de puntos del canvas (2026-09-30)
+- [x] F1. NodeWorkspace.tsx, línea del Background: reutilizar Dots existente; separación 20 px, tamaño 1.2 y color var(--border). Razón: puntos pequeños regulares como la referencia conservando tokens y fondo actuales.
+- [x] F2. Typecheck breve y diff; sin navegador ni suite completa para este cambio visual de una línea. Commit.
+
+Verificado: typecheck y diff verdes. Sin navegador.
+
 ## Tarea — panel de navegación e historial de Nodos (2026-09-30)
 - [x] N1. NodeWorkspace.tsx: sustituir Controls y MiniMap automático por panel inferior izquierdo; reutilizar MiniMap pannable/zoomable y APIs de viewport/fitView de React Flow. Razón: disposición de referencia y mapa bajo demanda.
 - [x] N2. flow/history.ts nuevo y setGraph en store.ts: historial en memoria por sesión con past/future separados, agrupación de edición continua y saltos; excluir cambios automáticos de generationId y viewport, conservar resultados actuales y guardas graphEditProblem. Razón: el historial Designer depende de documentos/píxeles y no puede aplicarse a Graph. Sin modificar persistencia ni ejecutar generaciones al restaurar.
