@@ -1,3 +1,4 @@
+import { recordGraph } from '../engine/flow/history';
 import { graphEditProblem } from '../engine/flow/locks';
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
@@ -385,6 +386,7 @@ export function setGraph(sessionId: string, fn: (g: Graph) => Graph): void {
     const graph = fn(s.graph);
     const problem = graphEditProblem(sessionId, s.graph, graph);
     if (problem) { queueMicrotask(() => toast(problem, 'error')); return s; }
+    recordGraph(sessionId, s.graph, graph);
     return { ...s, graph };
   });
 }

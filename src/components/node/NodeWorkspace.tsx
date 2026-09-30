@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
-  Controls,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -24,6 +22,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
+import { CanvasNavigation } from './CanvasNavigation';
 
 const nodeTypes = { studio: StudioNode };
 
@@ -290,8 +289,7 @@ function Canvas() {
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#26262b" />
-        <Controls showInteractive={false} position="bottom-right" />
-        {graph.nodes.length > 6 ? <MiniMap pannable zoomable position="top-right" maskColor="rgba(10,10,11,0.7)" nodeColor="#2a2a30" /> : null}
+        <CanvasNavigation sessionId={sessionId} onSelect={(id) => setSelected(new Set([id]))} />
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>

@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — panel de navegación e historial de Nodos (2026-09-30)
+- [x] N1. NodeWorkspace.tsx: sustituir Controls y MiniMap automático por panel inferior izquierdo; reutilizar MiniMap pannable/zoomable y APIs de viewport/fitView de React Flow. Razón: disposición de referencia y mapa bajo demanda.
+- [x] N2. flow/history.ts nuevo y setGraph en store.ts: historial en memoria por sesión con past/future separados, agrupación de edición continua y saltos; excluir cambios automáticos de generationId y viewport, conservar resultados actuales y guardas graphEditProblem. Razón: el historial Designer depende de documentos/píxeles y no puede aplicarse a Graph. Sin modificar persistencia ni ejecutar generaciones al restaurar.
+- [x] N3. components/node/CanvasNavigation.tsx nuevo: botones mapa/undo/redo/zoom/search usando IconButton, MenuItem y Popover; clic derecho muestra solo la pila correspondiente, salto aplica hasta la acción elegida. Buscar mediante botón/Enter títulos, text/prompt y título derivado de assets del grafo activo, resaltado con accent y clic centra el nodo. Sin feed ni prompt del agente.
+- [x] N4. node.css: estilos acotados del panel y desplegables. Tests acotados del historial, revisión de búsqueda y typecheck/suite con comprobaciones menores de 2 min; sin navegador. Registrar límites y commit.
+
+Verificado: typecheck verde; suite 315 verdes + 1 omitida en 32.79 s; tras proteger resultados más recientes, typecheck y 4 tests del historial verdes. Historial acotado a 40 acciones en memoria por sesión; se pierde al recargar. Búsqueda solo sobre nodos actuales, títulos y prompts derivados ya existentes, sin inventar nombres de archivo. Sin navegador ni generación remota; apariencia pendiente del usuario.
+
 ## Tarea GUI — quitar modelo superior y adjuntar con + (2026-09-30)
 - [x] P1. TopBar.tsx: retirar únicamente engineLabel, su selector y el span engine-tag. Razón: quitar el nombre del modelo señalado sin tocar su selección.
 - [x] P2. Composer.tsx: trasladar el botón de adjuntar desde composer-end a una fila con el textarea, cambiar Paperclip por Plus y mantener label, disabled y fileRef/onFiles. composer.css: tamaño y posición del botón como referencia con tokens actuales. Razón: cambiar ubicación e icono conservando importación, pegado y arrastre.
