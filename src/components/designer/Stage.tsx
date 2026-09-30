@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke } from '../../engine/design/strokes';
+import { brushPoint } from '../../engine/design/brushControl';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
@@ -21,7 +22,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
-  | { kind: 'paint'; layerId: string; last: { x: number; y: number }; erase: boolean }
+  | { kind: 'paint'; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[] };
@@ -276,7 +277,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
       if (!target || target.type !== 'raster') return;
       beginEdit(target);
-      drag.current = { kind: 'paint', layerId: target.id, last: p, erase };
+      drag.current = { kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
       paintSegment(target, p, p, erase);
       return;
     }
@@ -350,8 +351,16 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? scaled : l)) }));
     } else if (d.kind === 'paint') {
       const layer = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === d.layerId);
-      if (layer) paintSegment(layer, d.last, p, d.erase);
-      d.last = p;
+      const samples = e.nativeEvent.getCoalescedEvents?.() ?? [];
+      for (const sample of samples.length ? samples : [e.nativeEvent]) {
+        const point = toDoc(sample.clientX, sample.clientY);
+        const next = brushPoint(d.last, d.control, point, brush.smoothing ?? 0, brush.stabilization ?? 0, view.zoom, sample.timeStamp - d.time);
+        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint, d.erase);
+        d.last = next.paint;
+        d.control = next.control;
+        d.time = sample.timeStamp;
+      }
+      setCursor(d.last);
       window.dispatchEvent(new Event('ogs:paint'));
     } else if (d.kind === 'stroke') {
       const events = e.nativeEvent.getCoalescedEvents?.() ?? [];

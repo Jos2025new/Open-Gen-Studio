@@ -32,6 +32,8 @@ export function ToolRail({ doc }: { doc: DesignDoc }) {
           <Field label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></Field>
           <Field label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></Field>
           <Field label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></Field>
+          <Field label={`Smoothing · ${brush.smoothing ?? 0}`}><input aria-label="Brush smoothing" type="range" min={0} max={10} step={1} value={brush.smoothing ?? 0} onChange={(e) => setUi({ brush: { ...brush, smoothing: +e.target.value } })} /></Field>
+          <Field label={`Stabilization · ${brush.stabilization ?? 0}`}><input aria-label="Brush stabilization" type="range" min={0} max={10} step={1} value={brush.stabilization ?? 0} onChange={(e) => setUi({ brush: { ...brush, stabilization: +e.target.value } })} /></Field>
         </> : <>
           <Field label="Fill"><input type="color" value={shape.fill ?? '#d4f25a'} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.value } })} /></Field>
           <label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label>

@@ -26,6 +26,13 @@ Origen: hoy el agente solo crea texto, rect/ellipse/line e imágenes, y solo ve 
 - [x] D4. Tests (normalización de trazos y paths, `d` inválido rechazado, caja del path, capa raster nueva con trazos, vector con `Stroke`), typecheck, suite; un commit. Pendiente (usuario): calidad del dibujo con el modelo real.
   Hecho: `design/path.ts` (`parsePath`, `pathTransform`), `normalizeStrokes`/`normalizeShapes` con errores al agente (`plan.ts`), `applyLayerStep` con trazos (vector → `Stroke`; raster → `paintStrokesLayer` en capa nueva), render y SVG del path, `agent/canvasView.ts` + `view_canvas`, página enviada con cada petición nueva en el Designer (solo modelos con visión), formas de la capa vectorial activa en el contexto. Tests: `tests/agent-drawing.test.ts` (3). Suite 318 + 1 omitida. Sin navegador: comprobar en uso real que el path y la pintura se ven donde deben. Coste: una imagen (≤480 px, `CANVAS_VIEW_SIDE`; los adjuntos siguen a 768) por petición nueva en el Designer con contenido.
 
+## Tarea — suavizado y estabilización del pincel Designer (2026-09-30)
+- [x] B1. ToolRail.tsx y ui.brush en store.ts: dos sliders 0–10 en ajustes existentes (smoothing/stabilization opcionales, defecto 0 para sesiones anteriores). Razón: pincel raster sin estos controles; Lineart ya los tiene.
+- [x] B2. design/brushControl.ts y Stage.tsx: filtrar coordenadas antes del strokeSegment actual, con suavizado temporal y estabilización por distancia en píxeles de pantalla; procesar eventos coalescidos sin timers. Razón: control de trazo local ligero; conservar buffers, capas protegidas y un Undo por gesto. Sin cambiar dibujo del agente ni Lineart.
+- [x] B3. Tests pequeños del filtro (cero, niveles, zoom y frecuencia), typecheck y suite con límite menor de 2 min; sin navegador. Registrar y commit.
+
+Verificado: typecheck y diff verdes; suite 322 verdes + 1 omitida en 23.28 s, incluidos 4 tests nuevos del filtro. Sin navegador; sensaciones de dibujo pendientes de prueba manual. Niveles altos introducen seguimiento más lento de forma deliberada; no es réplica exacta del algoritmo de SAI.
+
 ## Tarea — acercar navegación al prompt visible (2026-09-30)
 - [x] A1. CanvasNavigation.tsx, cálculo de place: medir composer, thread-toggle y thread-body por separado y considerar solo rectángulos que se cruzan horizontalmente con el panel. Separación 8 px. Razón: composer-dock incluye zonas vacías a los lados de Conversation y elevaba innecesariamente el panel.
 - [x] A2. Typecheck breve y diff; sin navegador. Commit.
