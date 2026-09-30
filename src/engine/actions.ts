@@ -44,6 +44,7 @@ export const SUBJECT_KINDS: Array<{ value: SubjectKind; label: string }> = [
   { value: 'character', label: 'Character' },
   { value: 'object', label: 'Object' },
   { value: 'product', label: 'Product' },
+  { value: 'location', label: 'Location' },
   { value: 'style', label: 'Style' },
 ];
 
@@ -57,18 +58,41 @@ export function deleteSubject(id: string): void {
   useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
 }
 
-/** "Save to library" on an image: that image is the frontal view of a new library item. */
-export function subjectFromAsset(assetId: string, name: string, kind: SubjectKind = 'character'): Subject | null {
+export function libraryItem(name: string): Subject | undefined {
+  const clean = name.trim().replace(/^@/, '').toLowerCase();
+  return get().library.find((x) => x.name.toLowerCase() === clean);
+}
+
+/**
+ * "Save to library" on an image: that image is the frontal view of a library item. A taken name is refused unless
+ * `replace` (the library is shared by every session, so the UI confirms first); the item keeps its id and @Name.
+ */
+export function subjectFromAsset(assetId: string, name: string, kind: SubjectKind = 'character', opts: { replace?: boolean; views?: string[] } = {}): Subject | null {
   const clean = name.trim().replace(/^@/, '');
   if (!clean || get().assets[assetId]?.kind !== 'image') return null;
-  if (get().library.some((x) => x.name.toLowerCase() === clean.toLowerCase())) {
+  const existing = libraryItem(clean);
+  if (existing && !opts.replace) {
     toast(`@${clean} already exists in the library.`, 'error');
     return null;
   }
-  const subject: Subject = { id: uid('sub'), name: clean, kind, frontalAssetId: assetId, refAssetIds: [] };
+  const views = opts.views ?? [];
+  const subject: Subject = { ...existing, id: existing?.id ?? uid('sub'), name: existing?.name ?? clean, kind, frontalAssetId: views[0] ?? assetId, refAssetIds: views.slice(1, 4), videoAssetId: undefined };
   saveSubject(subject);
   toast(`Saved as @${clean}: mention it in any prompt`, 'success');
   return subject;
+}
+
+/** A 2×2 reference sheet saved as separate views (Grid-split, local and free): panel 1 frontal, 2–4 extra views. */
+export async function saveSheetViews(assetId: string, name: string, kind: SubjectKind, replace: boolean): Promise<Subject | null> {
+  const sessionId = get().assets[assetId]?.sessionId ?? get().activeSessionId;
+  try {
+    const g = createGeneration(await opSpec({ sessionId, sourceAssetId: assetId, op: 'grid_split', params: { grid: '2' }, origin: 'op' }));
+    const views = await runGeneration(g.id);
+    return subjectFromAsset(assetId, name, kind, { replace, views: views.length === 4 ? views : undefined });
+  } catch (err) {
+    toast((err as Error).message, 'error');
+    return null;
+  }
 }
 
 /** A new subject from the composer attachments: the first image is the frontal view, up to 3 more are views; or a video. */

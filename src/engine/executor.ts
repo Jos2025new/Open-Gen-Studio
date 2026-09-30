@@ -8,7 +8,7 @@ import { OPS } from './ops';
 import { parseRef, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
-import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Workspace } from './types';
+import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Subject, Workspace } from './types';
 import { useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -130,6 +130,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     return [text.trim(), s.prompt.trim()].filter(Boolean).join('\n');
   };
 
+  const local: Subject[] = [];
+  const withLocal = <T extends object>(inputs: T) => (local.length ? { ...inputs, subjects: [...local] } : inputs);
+
   const runStep = async (s: PlanStep): Promise<StepOutput> => {
     const base = { sessionId: ctx.sessionId, origin: ctx.origin, planId: ctx.planId, stepId: s.id };
     switch (s.kind) {
@@ -141,7 +144,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const a = await resolveAsset(r);
           if (a) refs.push(a);
         }
-        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs } });
+        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: withLocal({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }
@@ -167,7 +170,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const t = s.times?.[i];
           if (t != null) times[a] = t;
         }
-        const inputs = { refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined };
+        const inputs = withLocal({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
         const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
@@ -216,7 +219,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     }
   };
 
-  // Subjects from existing images are saved before anything runs; from steps, as soon as the step ends.
+  // The user's own images are saved to the library before anything runs. A subject made by a step (a reference
+  // sheet) is only a candidate: it serves this plan's @Name and reaches the library when the user saves it.
   for (const subj of ctx.subjects ?? []) {
     const p = parseRef(subj.from);
     if (p?.type === 'asset') saveSubjectOnce(subj, p.id);
@@ -226,7 +230,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       const p = parseRef(subj.from);
       if (p?.type !== 'step' || p.id !== stepId) continue;
       const asset = out.assetIds[p.index] ?? out.assetIds[0];
-      if (asset) saveSubjectOnce(subj, asset);
+      if (asset && get().assets[asset]?.kind === 'image') {
+        local.push({ id: uid('sub'), name: subj.name, kind: subj.kind ?? 'character', description: subj.description, frontalAssetId: asset, refAssetIds: [] });
+      }
     }
   };
 

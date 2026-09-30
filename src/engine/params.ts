@@ -713,6 +713,18 @@ export function mediumResolution(options: Array<string | number>, def?: unknown)
   return Number.isFinite(d) && d <= resolutionRank(mid) ? fallback : String(mid);
 }
 
+/**
+ * The size closest to `target` without going over it (a reference sheet prefers 2K; a 1K-only model gets 1K), else
+ * the smallest offered; undefined when no option is a size.
+ */
+export function preferredResolution(options: Array<string | number>, target: string): string | undefined {
+  const t = resolutionRank(target);
+  const sized = options.filter((o) => Number.isFinite(resolutionRank(o))).sort((a, b) => resolutionRank(a) - resolutionRank(b));
+  if (!sized.length) return undefined;
+  const under = sized.filter((o) => resolutionRank(o) <= t);
+  return String(under.length ? under[under.length - 1] : sized[0]);
+}
+
 // Quality values above "medium" that a model may default to (fal GPT Image defaults to "high").
 const ABOVE_MEDIUM = new Set(['auto', 'high', 'xhigh', 'max']);
 

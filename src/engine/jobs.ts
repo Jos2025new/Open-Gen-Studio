@@ -11,7 +11,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
@@ -382,7 +382,9 @@ async function execute(id: string): Promise<string[]> {
     const { audio, refAudios } = routeAudio(schema.slots, audios);
 
     // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
-    const subjects = get().library;
+    // A plan's own reference (not yet chosen for the library) wins over a library item with the same name.
+    const local = g.inputs.subjects ?? [];
+    const subjects = [...local, ...get().library.filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
     const elSlot = schema.slots.elements;
     const mentioned = mentionSubjects(g.prompt, subjects, elSlot?.mention);
     let prompt = mentioned.prompt;
@@ -851,11 +853,13 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const { settings } = coerceSettings(schema, 'image', { count, advanced: {} });
   const aspectParam = paramByRole(schema, 'aspect');
   if (aspectParam?.options?.length) {
-    const target = input.op === 'reframe' ? String(input.params.aspect) : source ? source.width / source.height : undefined;
+    // Reframe and a reference sheet take their own format; every other op keeps the source's shape.
+    const ownFormat = input.op === 'reframe' || input.op === 'reference_sheet';
+    const target = ownFormat ? String(input.params.aspect) : source ? source.width / source.height : undefined;
     // Keep the source's shape (Reframe: the chosen format). "auto" lets some models pick another shape (GPT Image turned a
     // portrait into a landscape), so only an explicit "match input" option is used, else the nearest ratio.
     const auto = aspectParam.options.find(isAutoOption);
-    const keep = input.op !== 'reframe' ? matchInputOption(aspectParam.options) : undefined;
+    const keep = !ownFormat ? matchInputOption(aspectParam.options) : undefined;
     settings.aspect = keep ?? nearestAspect(aspectParam.options, target, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
   }
   if (input.op === 'upscale') {
@@ -867,8 +871,19 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
       settings.advanced[factorParam.key] = factorParam.type === 'enum' ? (factorParam.options?.find((o) => Number(o) === f) ?? f) : f;
     }
   }
+  let sheetNote: string | undefined;
+  if (input.op === 'reference_sheet') {
+    // 2K preferred (a reference is paid once and reused); the nearest size below when the model has no 2K.
+    const res = paramByRole(schema, 'resolution');
+    const pick = res?.options?.length ? preferredResolution(res.options, '2K') : undefined;
+    if (pick) {
+      settings.resolution = pick;
+      if (pick.toUpperCase() !== '2K') sheetNote = `sheet at ${pick}: the model has no 2K`;
+    }
+  }
   const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: choice.ref, settings, op };
-  return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, choice.ref) };
+  const estimate = estimateOp(input.op, input.params, source, settings, choice.ref);
+  return { ...spec, estimate: sheetNote ? { ...estimate, note: [estimate.note, sheetNote].filter(Boolean).join('; ') } : estimate };
 }
 
 export function inputKindOf(assetId: string): AssetKind | undefined {

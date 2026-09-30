@@ -248,6 +248,7 @@ export type OpId =
   | 'remove_bg'
   | 'reframe'
   | 'variations'
+  | 'reference_sheet'
   | 'edit'
   | 'animate'
   | 'extract_frame'
@@ -291,6 +292,8 @@ export interface Generation {
     times?: Record<string, number>;
     /** Clip trim [start, end] in seconds per input video. */
     trims?: Record<string, [number, number]>;
+    /** Plan-local subjects (a reference sheet made by the plan): used for @Name here, not saved to the library. */
+    subjects?: Subject[];
   };
   op?: { id: OpId; params: Record<string, AdvancedValue>; sourceAssetId: string };
   origin: GenerationOrigin;
@@ -814,7 +817,7 @@ export interface AgentRequestMetrics {
 }
 
 /** A reusable character or object for Kling elements, kept per session and mentioned as @Name. */
-export type SubjectKind = 'character' | 'object' | 'product' | 'style';
+export type SubjectKind = 'character' | 'object' | 'product' | 'location' | 'style';
 
 export interface Subject {
   id: string;

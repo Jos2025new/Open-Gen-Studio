@@ -14,6 +14,7 @@ import {
   Film,
   Frame,
   Grid3x3,
+  IdCard,
   LayoutGrid,
   Maximize,
   Paperclip,
@@ -30,7 +31,7 @@ import {
   Workflow,
 } from 'lucide-react';
 import { OPS, opsFor } from '../../engine/ops';
-import { downloadAsset, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
+import { downloadAsset, libraryItem, saveSheetViews, sendToNodes, SUBJECT_KINDS, subjectFromAsset, toggleFavorite, useAsReference } from '../../engine/actions';
 import { openAssetInDesigner } from '../../engine/design/actions';
 import type { OpId, SubjectKind } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -45,6 +46,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   remove_bg: Scissors,
   reframe: Crop,
   variations: Shuffle,
+  reference_sheet: IdCard,
   edit: WandSparkles,
   animate: Clapperboard,
   extract_frame: Frame,
@@ -176,6 +178,13 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const [subject, setSubject] = useState(false);
   const [subjectName, setSubjectName] = useState('');
   const [subjectKind, setSubjectKind] = useState<SubjectKind>('character');
+  // A reference sheet can be saved as its four views (Grid-split); on by default for sheets only.
+  const isSheet = useStore((s) => {
+    const g = asset?.generationId ? s.generations[asset.generationId] : undefined;
+    return g?.op?.id === 'reference_sheet';
+  });
+  const [split, setSplit] = useState(true);
+  const taken = subjectName.trim() ? libraryItem(subjectName) : undefined;
   if (!asset) return null;
   const close = () => {
     pop.close();
@@ -200,7 +209,13 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
             className="subject-new"
             onSubmit={(e) => {
               e.preventDefault();
-              if (subjectFromAsset(assetId, subjectName, subjectKind)) {
+              const replace = Boolean(taken);
+              if (isSheet && split) {
+                const name = subjectName;
+                close();
+                setSubjectName('');
+                void saveSheetViews(assetId, name, subjectKind, replace);
+              } else if (subjectFromAsset(assetId, subjectName, subjectKind, { replace })) {
                 setSubjectName('');
                 close();
               }
@@ -208,8 +223,14 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
           >
             <input autoFocus placeholder="Name, e.g. Mia" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
             <Segmented size="sm" value={subjectKind} options={SUBJECT_KINDS} onChange={setSubjectKind} />
-            <Button size="sm" icon={UserPlus} type="submit" disabled={!subjectName.trim()}>
-              Save to library
+            {isSheet ? (
+              <label className="subject-split">
+                <input type="checkbox" checked={split} onChange={(e) => setSplit(e.target.checked)} /> Split into 4 views (free)
+              </label>
+            ) : null}
+            {taken ? <p className="subject-warn">@{taken.name} already exists. Saving replaces it in every session.</p> : null}
+            <Button size="sm" icon={UserPlus} type="submit" variant={taken ? 'danger' : undefined} disabled={!subjectName.trim()}>
+              {taken ? `Replace @${taken.name}` : 'Save to library'}
             </Button>
             <p className="faint">Kept in Assets for every session. Mention it as @Name in any prompt: its image goes as a reference.</p>
           </form>

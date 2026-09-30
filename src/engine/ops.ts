@@ -202,6 +202,25 @@ export const OPS: Record<OpId, OpDef> = {
       ].join(' ');
     },
   },
+  // Buzzy / Higgsfield: a multi-view sheet anchors an identity that repeats across steps. Always a 2×2 grid of equal
+  // panels so Grid-split can turn it into separate reference views.
+  reference_sheet: {
+    id: 'reference_sheet',
+    label: 'Reference sheet',
+    description: 'A 2×2 reference sheet (turnaround, expressions or outfits) of a character, object or place, to keep it identical in later steps.',
+    input: 'image',
+    output: 'image',
+    engine: 'edit',
+    quick: false,
+    fields: [
+      { key: 'subject', label: 'Subject', type: 'choice', default: 'character', options: opt(['character', 'Character'], ['object', 'Object / product'], ['location', 'Place']) },
+      { key: 'sheet', label: 'Sheet', type: 'choice', default: 'turnaround', options: opt(['turnaround', 'Turnaround'], ['expressions', 'Expressions'], ['outfits', 'Outfits']) },
+      { key: 'aspect', label: 'Format', type: 'choice', default: '16:9', options: opt(['16:9', '16:9'], ['3:2', '3:2'], ['4:3', '4:3'], ['1:1', '1:1']) },
+      { key: 'count', label: 'Candidates', type: 'choice', default: '1', options: opt(['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']) },
+      { key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'e.g. full body, sneakers' },
+    ],
+    instruction: (p) => `${sheetLayout(String(p.subject), String(p.sheet))} ${SHEET_RULES}${note(p)}`,
+  },
   variations: {
     id: 'variations',
     label: 'Variations',
@@ -382,6 +401,18 @@ export const OPS: Record<OpId, OpDef> = {
   },
 };
 
+const SHEET_RULES =
+  'A 2×2 grid of four equal panels with thin white gutters, on a plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
+
+/** The four panels of a reference sheet by subject and sheet type. */
+export function sheetLayout(subject: string, sheet: string): string {
+  if (sheet === 'expressions') return 'Reference sheet of this character: four head-and-shoulders panels with neutral, happy, angry and surprised expressions, same angle and lighting.';
+  if (sheet === 'outfits') return `Reference sheet of this ${subject === 'character' ? 'character' : 'subject'}: four full panels, the same identity in four different outfits or finishes, same pose and angle.`;
+  if (subject === 'location') return 'Reference sheet of this place: panel 1 establishing wide shot, panel 2 top-down plan view, panel 3 close detail of its main materials, panel 4 reverse angle.';
+  if (subject === 'object' || subject === 'product') return 'Reference sheet of this object: panel 1 front, panel 2 side, panel 3 back, panel 4 top-down, centered and whole in each.';
+  return 'Character turnaround reference sheet: panel 1 face close-up, panel 2 full-body front, panel 3 full-body profile, panel 4 full-body back, relaxed neutral pose.';
+}
+
 function note(p: Record<string, AdvancedValue>): string {
   const n = typeof p.note === 'string' ? p.note.trim() : '';
   return n ? ` Additional direction: ${n}.` : '';
@@ -397,7 +428,7 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
 }
 
 export function opCount(op: OpDef, params: Record<string, AdvancedValue>): number {
-  if (op.id === 'variations') return Math.max(1, Math.min(4, Number(params.count) || 1));
+  if (op.id === 'variations' || op.id === 'reference_sheet') return Math.max(1, Math.min(4, Number(params.count) || 1));
   if (op.id === 'grid_split') return (Number(params.grid) || 3) ** 2;
   return 1;
 }

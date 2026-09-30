@@ -85,4 +85,23 @@ describe('operation model follows the source', () => {
     useStore.setState({ catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [EDIT2]: { ...st.catalog.schemas[EDIT2], params: [{ ...(size as object), options: ['match_input_image', '1:1', '16:9'] } as never] } } } });
     expect((await opSpec({ sessionId: 's', sourceAssetId: 'made', op: 'relight', params: {}, origin: 'op' })).settings.aspect).toBe('match_input_image');
   });
+
+  it('a reference sheet takes its own landscape format and prefers 2K, noting a model without it', async () => {
+    install();
+    const size = { key: 'size', label: 'Size', role: 'aspect', type: 'enum', default: '1024x1024', options: ['match_input_image', '1024x1024', '1024x1536', '1536x1024'] } as never;
+    const res = { key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', default: '1K', options: ['1K', '2K', '4K'] } as never;
+    const st = useStore.getState();
+    const withParams = (params: unknown[]) => useStore.setState({ catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [EDIT2]: { ...st.catalog.schemas[EDIT2], params: params as never } } } });
+    withParams([size, res]);
+    const params = { subject: 'character', sheet: 'turnaround', aspect: '16:9', count: '1', note: '' };
+    const spec = await opSpec({ sessionId: 's', sourceAssetId: 'made', op: 'reference_sheet', params, origin: 'op' });
+    expect(spec.settings.aspect).toBe('1536x1024');
+    expect(spec.settings.resolution).toBe('2K');
+    expect(spec.estimate?.note ?? '').not.toMatch(/no 2K/);
+    withParams([size, { ...(res as object), options: ['512', '1K'] }]);
+    const low = await opSpec({ sessionId: 's', sourceAssetId: 'made', op: 'reference_sheet', params: { ...params, aspect: '1:1' }, origin: 'op' });
+    expect(low.settings.aspect).toBe('1024x1024');
+    expect(low.settings.resolution).toBe('1K');
+    expect(low.estimate?.note).toMatch(/sheet at 1K: the model has no 2K/);
+  });
 });

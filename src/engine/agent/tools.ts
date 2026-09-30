@@ -108,7 +108,7 @@ export const TOOLS: ToolSpec[] = [
               type: 'object',
               properties: {
                 name: { type: 'string', description: 'One word, e.g. "Reto".' },
-                kind: { type: 'string', enum: ['character', 'object', 'product', 'style'] },
+                kind: { type: 'string', enum: ['character', 'object', 'product', 'location', 'style'] },
                 from: { type: 'string', description: 'asset:<id> or an image step id.' },
                 description: { type: 'string', description: 'Short note, in the user\'s language.' },
               },
@@ -246,7 +246,7 @@ export const proposePlanSchema = z.object({
   total_duration: num.optional(),
   style: z.string().max(600).optional(),
   subjects: z
-    .array(z.object({ name: z.string().max(40), kind: z.enum(['character', 'object', 'product', 'style']).optional(), from: z.string().max(80), description: z.string().max(200).optional() }))
+    .array(z.object({ name: z.string().max(40), kind: z.enum(['character', 'object', 'product', 'location', 'style']).optional(), from: z.string().max(80), description: z.string().max(200).optional() }))
     .max(6)
     .optional(),
   steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
