@@ -1,3 +1,4 @@
+import { assetsInUse } from './flow/locks';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
@@ -48,13 +49,32 @@ export const SUBJECT_KINDS: Array<{ value: SubjectKind; label: string }> = [
   { value: 'style', label: 'Style' },
 ];
 
+/** Legacy node results did not record library images. Capture them before the first library edit. */
+function rememberNodeLibrary(name: string): void {
+  useStore.setState(st => {
+    const attached = new Set(Object.values(st.sessions).flatMap(s => s.graph.nodes.flatMap(n => 'generationId' in n.data && n.data.generationId ? [n.data.generationId] : [])));
+    const generations = { ...st.generations };
+    for (const id of attached) {
+      const g = generations[id];
+      if (g && !g.nodeRequest && !g.inputs.nodeLibrary && mentionSubjects(g.prompt, [{ id: name, name }]).ids.length) {
+        generations[id] = { ...g, inputs: { ...g.inputs, nodeLibrary: structuredClone(st.library) } };
+      }
+    }
+    return { generations };
+  });
+}
+
 export function saveSubject(subject: Subject): void {
+  const previous = get().library.find(s => s.id === subject.id);
+  if (previous) rememberNodeLibrary(previous.name);
   useStore.setState((st) => ({
     library: st.library.some((x) => x.id === subject.id) ? st.library.map((x) => (x.id === subject.id ? subject : x)) : [...st.library, subject],
   }));
 }
 
 export function deleteSubject(id: string): void {
+  const previous = get().library.find(s => s.id === id);
+  if (previous) rememberNodeLibrary(previous.name);
   useStore.setState((st) => ({ library: st.library.filter((x) => x.id !== id) }));
 }
 
@@ -515,6 +535,7 @@ export function deleteGeneration(generationId: string): void {
 
 export function deleteAssets(ids: string[]): void {
   if (!ids.length) return;
+  if (assetsInUse(ids)) { toast('An asset is in use by a running flow. Wait for it to finish.', 'error'); return; }
   const set = new Set(ids);
   useStore.setState((st) => {
     const assets = { ...st.assets };

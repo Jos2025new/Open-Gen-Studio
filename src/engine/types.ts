@@ -275,6 +275,8 @@ export interface RemoteJob {
 }
 
 export interface Generation {
+  /** Logical node request at execution time; provider transformations do not affect freshness. */
+  nodeRequest?: string;
   id: string;
   sessionId: string;
   /** 'text' for transcriptions: no asset, the result is `text`. */
@@ -294,6 +296,8 @@ export interface Generation {
     trims?: Record<string, [number, number]>;
     /** Plan-local subjects (a reference sheet made by the plan): used for @Name here, not saved to the library. */
     subjects?: Subject[];
+    /** Library snapshot approved for a node run; later library edits apply to the next run. */
+    nodeLibrary?: Subject[];
   };
   op?: { id: OpId; params: Record<string, AdvancedValue>; sourceAssetId: string };
   origin: GenerationOrigin;
@@ -357,6 +361,8 @@ export interface ShapeSpec {
 }
 
 interface StepBase {
+  /** Local node identities, resolved through the existing step executor. */
+  nodeSubjects?: PlanSubject[];
   id: string;
   title: string;
   /** Extra steps this one waits for without using their output (a @Name subject made by that step). */
@@ -496,6 +502,8 @@ export interface QuestionsFeedItem extends FeedBase {
 }
 
 export interface PlanFeedItem extends FeedBase {
+  /** Approval of existing node IDs; never materialized again. */
+  nodeRun?: { targets: string[]; force: boolean; signature: string };
   type: 'plan';
   plan: Plan;
   style: AgentStyle;
@@ -558,6 +566,8 @@ export interface TextNodeData {
 }
 
 export interface GenNodeData {
+  /** Plan-local identities retain their source node IDs when materialized. */
+  subjects?: PlanSubject[];
   kind: 'image' | 'video' | 'audio' | 'model3d';
   title: string;
   prompt: string;

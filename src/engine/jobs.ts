@@ -384,7 +384,7 @@ async function execute(id: string): Promise<string[]> {
     // Subjects: "@Name" mentions become the provider's elements (Kling); elsewhere just the name.
     // A plan's own reference (not yet chosen for the library) wins over a library item with the same name.
     const local = g.inputs.subjects ?? [];
-    const subjects = [...local, ...get().library.filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
+    const subjects = [...local, ...(g.inputs.nodeLibrary ?? get().library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
     const elSlot = schema.slots.elements;
     const mentioned = mentionSubjects(g.prompt, subjects, elSlot?.mention);
     let prompt = mentioned.prompt;
@@ -773,6 +773,8 @@ export interface OpSpecInput {
   sourceDims?: { width: number; height: number };
   /** Model picked for this run (edit / video engines); by default the source's model or the engine's. */
   modelRef?: string;
+  /** Model and composer settings reviewed by the Node Run confirmation. */
+  nodeChoice?: { ref: string; viaEdit: boolean; settings?: GenSettings };
 }
 
 /** Build the generation spec for an operation on an asset (model, instruction and settings). */
@@ -826,7 +828,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
-  const choice = input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId);
+  const choice = input.nodeChoice ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
@@ -837,7 +839,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, choice.ref) };
   }
   if (def.engine === 'video') {
-    const video = get().composer.video.settings;
+    const video = input.nodeChoice?.settings ?? get().composer.video.settings;
     const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });
     if (source && paramByRole(schema, 'aspect')?.options) {
       const opts = paramByRole(schema, 'aspect')!.options!;

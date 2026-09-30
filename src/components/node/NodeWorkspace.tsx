@@ -14,7 +14,7 @@ import {
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, useStore } from '../../store/store';
-import { addNode, deleteNodes, duplicateNode, layoutAll, newNodeData, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
+import { addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { setNodeSelection } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
@@ -51,24 +51,24 @@ function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
 
 function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
   const pop = usePopover();
-  useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
-  const preview = pop.open ? previewRun(sessionId, ids) : null;
+  useStore(s => s); // Keep the reviewed request and price current.
+  const preview = pop.open ? previewRun(sessionId, ids, false) : null;
   return (
     <>
-      <Button ref={pop.ref} size="sm" variant="primary" icon={Play} disabled={!ids.length} onClick={pop.toggle}>
+      <Button ref={pop.ref} size="sm" variant="primary" icon={Play} disabled={!ids.length} onClick={() => void prepareNodeRun(sessionId, ids, false).then(pop.toggle)}>
         Run all
       </Button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run all nodes">
         {preview ? (
           <SpendConfirm
             title={`Run ${preview.count} node${preview.count === 1 ? '' : 's'}`}
-            lines={['Every generation and tool node, in dependency order']}
+            lines={preview.runIds.map(id => `${id} · ${useStore.getState().sessions[sessionId].graph.nodes.find(n => n.id === id)?.data.title}`)}
             estimate={preview.estimate}
             blocked={preview.errors[0] ?? null}
             onCancel={pop.close}
             onConfirm={() => {
-              pop.close();
-              void runNodes(sessionId, ids);
+              if (previewRun(sessionId, ids, false).signature !== preview.signature) return;
+              void runNodes(sessionId, ids, preview, false).then(result => { if (result) pop.close(); });
             }}
           />
         ) : null}
@@ -171,7 +171,7 @@ function Canvas() {
         if (c.type === 'remove') removed.add(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
-      if (removed.size) setGraph(sessionId, (g) => ({ ...g, edges: g.edges.filter((e) => !removed.has(e.id)) }));
+      if (removed.size) disconnectEdges(sessionId, [...removed]);
       if (picks.length) {
         setSelectedEdges((prev) => {
           const next = new Set(prev);

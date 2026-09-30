@@ -1,14 +1,14 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
-import { OPS, OP_IDS, defaultOpParams } from '../../engine/ops';
+import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, deleteNodes, duplicateNode, newNodeData, patchNodeData, previewRun, runNodes, setNodeModel, setSketch, tryConnect } from '../../engine/flow/actions';
-import { inputPorts, NODE_WIDTH, outputPort, runsGeneration } from '../../engine/flow/graph';
+import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, setSketch, tryConnect } from '../../engine/flow/actions';
+import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, runsGeneration } from '../../engine/flow/graph';
 import { downloadAsset } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
-import { setGraph, setUi, useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, costLabel, MenuItem, Segmented, Toggle } from '../ui/primitives';
@@ -74,24 +74,24 @@ export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType 
 function RunButton({ node, primary }: { node: GraphNode; primary?: boolean }) {
   const sessionId = useSessionId();
   const pop = usePopover();
-  useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
+  useStore(s => s); // Keep the reviewed request and price current.
   const preview = pop.open || primary ? previewRun(sessionId, [node.id]) : null;
   return (
     <>
-      <button ref={pop.ref} type="button" className={`${primary ? 'nt-go' : 'nt-btn nt-run'} nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={pop.toggle}>
+      <button ref={pop.ref} type="button" className={`${primary ? 'nt-go' : 'nt-btn nt-run'} nodrag ${pop.open ? 'is-open' : ''}`} aria-label="Run node" onClick={() => void prepareNodeRun(sessionId, [node.id]).then(pop.toggle)}>
         <Play size={12} fill="currentColor" /> {primary && preview ? costLabel(preview.estimate, { short: true }) : 'Run'}
       </button>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={300} label="Run node">
         {pop.open && preview ? (
           <SpendConfirm
             title={preview.count > 1 ? `Run ${preview.count} nodes` : `Run “${node.data.title}”`}
-            lines={preview.count > 1 ? ['Includes upstream nodes without output'] : undefined}
+            lines={preview.runIds.map(id => `${id} · ${useStore.getState().sessions[sessionId].graph.nodes.find(n => n.id === id)?.data.title}`)}
             estimate={preview.estimate}
             blocked={preview.errors[0] ?? null}
             onCancel={pop.close}
             onConfirm={() => {
-              pop.close();
-              void runNodes(sessionId, [node.id]);
+              if (previewRun(sessionId, [node.id]).signature !== preview.signature) return;
+              void runNodes(sessionId, [node.id], preview).then(result => { if (result) pop.close(); });
             }}
           />
         ) : null}
@@ -131,8 +131,8 @@ function DeleteButton({ node }: { node: GraphNode }) {
   );
 }
 
-function StatusPill({ generationId }: { generationId?: string }) {
-  const g = useStore((s) => (generationId ? s.generations[generationId] : undefined));
+function StatusPill({ node }: { node: GraphNode }) {
+  const g = useStore(s => nodeAttempt(node, s.generations));
   if (!g) return null;
   if (g.status === 'running' || g.status === 'queued')
     return (
@@ -391,7 +391,7 @@ function InputRefs({ node }: { node: GraphNode }) {
             type="button"
             className="nt-ref-x"
             aria-label="Disconnect"
-            onClick={() => setGraph(sessionId, (g) => ({ ...g, edges: g.edges.filter((e) => e.id !== l.edge.id) }))}
+            onClick={() => disconnectEdges(sessionId, [l.edge.id])}
           >
             <X size={10} />
           </button>
@@ -611,24 +611,7 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
               active={id === d.op}
               onClick={() => {
                 opPop.close();
-                patchNodeData(sessionId, node.id, { op: id as OpId, params: defaultOpParams(OPS[id]), title: OPS[id].label, generationId: undefined });
-                // Edges into the input may no longer match the new input type.
-                useStore.setState((st) => {
-                  const s = st.sessions[sessionId];
-                  const edges = s.graph.edges.filter((e) => {
-                    if (e.target === node.id && e.targetHandle === 'input') {
-                      const src = s.graph.nodes.find((n) => n.id === e.source);
-                      return src ? outputPort(src.data, st.assets) === OPS[id].input : false;
-                    }
-                    if (e.source === node.id) {
-                      const tgt = s.graph.nodes.find((n) => n.id === e.target);
-                      const port = tgt ? inputPorts(tgt.data).find((p) => p.id === e.targetHandle) : undefined;
-                      return port?.type === OPS[id].output;
-                    }
-                    return true;
-                  });
-                  return { sessions: { ...st.sessions, [sessionId]: { ...s, graph: { ...s.graph, edges } } } };
-                });
+                setNodeOp(sessionId, node.id, id as OpId);
               }}
             />
           ))}
@@ -691,7 +674,6 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
   const { assetId } = useNodeOutput(node);
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
-  const genId = runsGeneration(d) ? d.generationId : undefined;
   const kindClass = d.kind === 'tool' ? `k-tool out-${OPS[(d as ToolNodeData).op].output}` : `k-${d.kind}`;
   const panel = d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' ? <GenNodeBody node={node as GraphNode & { data: GenNodeData }} /> : d.kind === 'tool' ? <ToolNodeBody node={node as GraphNode & { data: ToolNodeData }} /> : null;
   const showTools = Boolean(selected) && solo;
@@ -712,7 +694,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
         <div className="nc-label">
           <Icon size={12} />
           <input className="nc-title nodrag" value={d.title} onChange={(e) => patchNodeData(sessionId, node.id, { title: e.target.value })} aria-label="Node title" />
-          <StatusPill generationId={genId} />
+          <StatusPill node={node} />
         </div>
         {d.kind === 'text' ? (
           <textarea

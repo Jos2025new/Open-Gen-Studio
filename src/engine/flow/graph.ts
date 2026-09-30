@@ -1,3 +1,5 @@
+import { mentionSubjects } from '../params';
+import { nodeIsCurrent, type RequestContext } from './freshness';
 import { uid } from '../../lib/id';
 import { OPS } from '../ops';
 import { parseRef } from '../plan';
@@ -18,6 +20,7 @@ import type {
   PlanStep,
   PortType,
   TextStep,
+  Subject,
   VideoStep,
 } from '../types';
 
@@ -158,7 +161,11 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     const p = parseRef(ref);
     if (!p) return;
     let source: string | undefined;
-    if (p.type === 'step') source = nodeOf.get(p.id);
+    if (p.type === 'step') {
+      source = nodeOf.get(p.id);
+      const n = nodes.find(n => n.id === source);
+      if (n && 'outputIndex' in n.data && p.index) n.data.outputIndex = p.index;
+    }
     else if (p.type === 'asset') {
       source = assetNodes.get(p.id);
       if (!source) {
@@ -169,6 +176,16 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     }
     if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle });
   };
+
+  for (const n of nodes) {
+    if (!('prompt' in n.data)) continue;
+    const prompt = n.data.prompt;
+    const bindings = (plan.subjects ?? []).filter(s => mentionSubjects(prompt, [{ id: s.name, name: s.name }]).ids.length);
+    if (bindings.length) n.data.subjects = bindings.map(s => {
+      const p = parseRef(s.from);
+      return { ...s, from: p?.type === 'step' ? `${nid(p.id)}${p.index ? `#${p.index + 1}` : ''}` : s.from };
+    });
+  }
 
   const kindOfRef = (ref: string) => {
     const p = parseRef(ref);
@@ -283,13 +300,21 @@ export interface GraphRunPlan {
   errors: string[];
 }
 
+/** Last attempt may be running/failed while the last usable result stays attached. */
+export function nodeAttempt(node: GraphNode, generations: Record<string, Generation>): Generation | undefined {
+  const d = node.data;
+  let latest = runsGeneration(d) && d.generationId ? generations[d.generationId] : undefined;
+  for (const g of Object.values(generations)) if (g.stepId === node.id && (!latest || g.createdAt > (latest.createdAt ?? 0))) latest = g;
+  return latest;
+}
+
 export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>): string | null {
   const d = node.data;
   if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
   if (runsGeneration(d)) {
     const g = d.generationId ? generations[d.generationId] : undefined;
-    if (g?.status === 'done') return g.assetIds[d.outputIndex] ?? g.assetIds[0] ?? null;
+    if (g?.status === 'done') return g.assetIds[d.outputIndex] ?? null;
   }
   return null;
 }
@@ -306,27 +331,36 @@ function finishedText(node: GraphNode, generations: Record<string, Generation>):
  * Build steps for running `targets`. Upstream generation nodes without a finished
  * output run too; nodes that already have output are referenced by their asset.
  */
-export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>): GraphRunPlan {
+export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[] } = {}): GraphRunPlan {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const errors: string[] = [];
   const run = new Set<string>();
-  const visit = (id: string, forced: boolean) => {
+  const checked = new Map<string, boolean>();
+  const visiting = new Set<string>();
+  const visit = (id: string, forced: boolean): boolean => {
     const n = byId.get(id);
-    if (!n || run.has(id)) return;
-    const runnable = runsGeneration(n.data);
-    if (!runnable) return;
-    if (!forced && nodeOutputAsset(n, generations)) return;
-    // A finished text result (Transcribe, lyrics) is an output too: reuse it instead of running again.
-    if (!forced && finishedText(n, generations) != null) return;
-    run.add(id);
-    graph.edges.filter((e) => e.target === id).forEach((e) => visit(e.source, false));
+    if (!n) { errors.push(`No such node: ${id}.`); return false; }
+    if (visiting.has(id)) { errors.push('The graph contains a cycle.'); return false; }
+    if (checked.has(id) && !forced) return checked.get(id)!;
+    if (!runsGeneration(n.data)) return false;
+    visiting.add(id);
+    const subjectIds = 'subjects' in n.data ? (n.data.subjects ?? []).flatMap(s => { const p = parseRef(s.from); return p?.type === 'step' ? [p.id] : []; }) : [];
+    const upstream = [...graph.edges.filter(e => e.target === id).map(e => e.source), ...subjectIds].map(id => visit(id, false)).some(Boolean);
+    visiting.delete(id);
+    const needsRun = forced || upstream || !nodeIsCurrent(graph, n, generations, options.library, options);
+    checked.set(id, needsRun);
+    if (needsRun) {
+      if (n.data.sketchAssetId) errors.push(`“${n.data.title}” has a Sketch on its previous base. Reset or save the Sketch before updating this node.`);
+      run.add(id);
+    }
+    return needsRun;
   };
-  targets.forEach((t) => visit(t, true));
+  targets.forEach(t => visit(t, options.force !== false));
 
   const refFor = (sourceId: string): string | null => {
     const n = byId.get(sourceId);
     if (!n || n.data.kind === 'text') return null;
-    if (run.has(sourceId)) return sourceId;
+    if (run.has(sourceId)) return 'outputIndex' in n.data && n.data.outputIndex ? `${sourceId}#${n.data.outputIndex + 1}` : sourceId;
     const asset = nodeOutputAsset(n, generations);
     if (asset) return `asset:${asset}`;
     errors.push(`"${n.data.title}" has no output yet.`);
@@ -403,6 +437,16 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     }
   }
   for (const s of steps) {
+    const d = byId.get(s.id)!.data;
+    if ('subjects' in d && d.subjects?.length) {
+      s.nodeSubjects = d.subjects.map(subj => {
+        const p = parseRef(subj.from);
+        const source = p?.type === 'step' ? byId.get(p.id) : undefined;
+        return { ...subj, from: source ? refFor(source.id) ?? subj.from : subj.from };
+      });
+      s.after = s.nodeSubjects.flatMap(subj => { const p = parseRef(subj.from); return p?.type === 'step' ? [p.id] : []; });
+    }
+
     if ((s.kind === 'image' || s.kind === 'model3d' || s.kind === 'video') && !s.prompt.trim() && !s.promptFrom) {
       const needsPrompt = s.kind === 'image' || s.kind === 'model3d' ? !s.refs.length : !s.firstFrame && !s.refs?.length;
       if (needsPrompt) errors.push(`"${s.title}" needs a prompt.`);

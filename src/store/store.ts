@@ -1,3 +1,4 @@
+import { graphEditProblem } from '../engine/flow/locks';
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { uid } from '../lib/id';
@@ -380,7 +381,12 @@ export function patchAsset(id: string, patch: Partial<Asset>): void {
 }
 
 export function setGraph(sessionId: string, fn: (g: Graph) => Graph): void {
-  patchSession(sessionId, (s) => ({ ...s, graph: fn(s.graph) }));
+  patchSession(sessionId, (s) => {
+    const graph = fn(s.graph);
+    const problem = graphEditProblem(sessionId, s.graph, graph);
+    if (problem) { queueMicrotask(() => toast(problem, 'error')); return s; }
+    return { ...s, graph };
+  });
 }
 
 export function setDoc(sessionId: string, docId: string, fn: (d: DesignDoc) => DesignDoc): void {

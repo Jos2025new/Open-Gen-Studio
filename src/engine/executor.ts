@@ -2,7 +2,7 @@ import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
 import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
-import { createGeneration, opSpec, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
+import { createGeneration, opSpec, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
 import { parseRef, topoOrder } from './plan';
@@ -28,6 +28,8 @@ export interface ExecContext {
   concurrency?: number;
   /** Subjects the plan saves (F3): from an asset at the start, from a step when it ends. */
   subjects?: PlanSubject[];
+  nodeLibrary?: Subject[];
+  nodeOperations?: Record<string, OpSpecInput['nodeChoice']>;
   /** Resuming a plan: steps already done (their outputs are reused, they do not run again). */
   prior?: Map<string, StepOutput>;
   /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
@@ -120,7 +122,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       return (await layerToAsset(ctx.sessionId, ctx.docId, p.id)).id;
     }
     const out = outputs.get(p.id);
-    return out?.assetIds[p.index] ?? out?.assetIds[0] ?? null;
+    if (p.index > 0 && !out?.assetIds[p.index]) throw new Error(`Selected candidate ${p.index + 1} is unavailable for ${p.id}.`);
+    return out?.assetIds[p.index] ?? null;
   };
 
   const promptFor = (s: { prompt: string; promptFrom?: string }): string => {
@@ -131,9 +134,16 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   };
 
   const local: Subject[] = [];
-  const withLocal = <T extends object>(inputs: T) => (local.length ? { ...inputs, subjects: [...local] } : inputs);
+  const withLocal = <T extends object>(inputs: T) => ({ ...inputs, ...(local.length ? { subjects: [...local] } : {}), ...(ctx.nodeLibrary ? { nodeLibrary: ctx.nodeLibrary } : {}) });
 
   const runStep = async (s: PlanStep): Promise<StepOutput> => {
+    const nodeSubjects: Subject[] = [];
+    for (const subject of s.nodeSubjects ?? []) {
+      const asset = await resolveAsset(subject.from);
+      if (!asset) throw new Error(`No image for @${subject.name}.`);
+      nodeSubjects.push({ id: subject.name, name: subject.name, description: subject.description ?? '', kind: subject.kind ?? 'character', frontalAssetId: asset, refAssetIds: [] });
+    }
+    const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
     const base = { sessionId: ctx.sessionId, origin: ctx.origin, planId: ctx.planId, stepId: s.id };
     switch (s.kind) {
       case 'text':
@@ -144,7 +154,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const a = await resolveAsset(r);
           if (a) refs.push(a);
         }
-        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: withLocal({ refs }) });
+        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }
@@ -154,7 +164,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const a = await resolveAsset(r);
           if (a) refs.push(a);
         }
-        const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: { refs } });
+        const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }
@@ -170,7 +180,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const t = s.times?.[i];
           if (t != null) times[a] = t;
         }
-        const inputs = withLocal({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
+        const inputs = inputsFor({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
         const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
@@ -186,7 +196,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           settings = { ...settings, extras: { ...settings.extras, [key]: lyricsBody(text) } };
         }
         const kind = s.textOutput ? 'text' : 'audio';
-        const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: { refs: [] } });
+        const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: inputsFor({ refs: [] }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
         const assetIds = await runGeneration(g.id);
         return { assetIds, text: get().generations[g.id]?.text };
@@ -203,7 +213,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           }
           params = { ...params, clips: rest.join(',') };
         }
-        const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params });
+        const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
         const assetIds = await runGeneration(g.id);

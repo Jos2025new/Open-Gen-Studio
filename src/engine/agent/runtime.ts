@@ -1,3 +1,4 @@
+import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
 import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
 import { ratioOf } from '../params';
@@ -370,7 +371,12 @@ async function presentPlan(
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
-  if (workspace === 'node') materializeNodes(sessionId, plan);
+  if (workspace === 'node') {
+    materializeNodes(sessionId, plan);
+    const targets = plan.steps.filter(s => s.kind !== 'text').map(s => `${plan.id}_${s.id}`);
+    const preview = await prepareNodeRun(sessionId, targets);
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, { nodeRun: { targets, force: true, signature: preview.signature }, plan: { ...plan, steps: preview.steps }, estimate: preview.estimate, error: preview.errors.join(' ') || undefined });
+  }
   // Recorded before an auto-approval closes the request.
   if (agentMs != null) {
     const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];
@@ -433,6 +439,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
+  if (item.nodeRun) { await approveNodeRun(sessionId, item); return; }
   const { plan } = item;
   const off = new Set(item.skipped ?? []);
   // A join over clips the user unchecked joins only the clips that run (or is dropped when fewer than two remain).
@@ -462,6 +469,37 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   }));
 
   await runPlanItem(sessionId, itemId, chosen, off);
+}
+
+async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
+  const request = item.nodeRun!;
+  const preview = await prepareNodeRun(sessionId, request.targets, request.force);
+  if (preview.signature !== request.signature || preview.errors.length) {
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, {
+      nodeRun: { ...request, signature: preview.signature }, plan: { ...item.plan, steps: preview.steps }, estimate: preview.estimate,
+      error: preview.errors.join(' ') || 'The execution changed. Review this version and approve again.',
+    });
+    return;
+  }
+  if (overLimit(preview.estimate)) { toast(overLimitText(preview.estimate), 'error'); return; }
+  updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running', error: undefined, stepStates: {} });
+  const result = await runNodes(sessionId, request.targets, preview, request.force, (id, state, info) => {
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, it => ({ ...it, stepStates: { ...it.stepStates, [id]: state }, stepGenerations: info?.generationId ? { ...it.stepGenerations, [id]: info.generationId } : it.stepGenerations }));
+  });
+  if (!result) {
+    const next = previewRun(sessionId, request.targets, request.force);
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || 'The execution changed. Review and approve again.' });
+    return;
+  }
+  const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';
+  updateFeedItem<PlanFeedItem>(sessionId, item.id, { status, error: result.failed.map(f => `${f.stepId}: ${f.error}`).join(' · ') || undefined });
+  const pending = session(sessionId).agent.pending;
+  if (pending?.feedItemId === item.id) {
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User approved existing node execution. ${status}: ${[...result.outputs].map(([id, out]) => `${id}: ${out.assetIds.join(',')}`).join('; ')}` });
+    closeRequest(sessionId, 'approved', preview.estimate.usd);
+    patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
+  }
+  await wrapUpPlan(sessionId, item.id, item.plan.title, status, `${status}: ${preview.runIds.join(', ')}`);
 }
 
 /**

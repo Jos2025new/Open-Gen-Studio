@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { previewRun } from '../../engine/flow/actions';
+import { useEffect, useState } from 'react';
 import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette } from 'lucide-react';
 import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
@@ -72,6 +73,9 @@ function StateIcon({ state }: { state: StepState }) {
 const WS_NAMES = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
 
 export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: string }) {
+  const graph = useStore(s => s.sessions[sessionId].graph);
+  const library = useStore(s => s.library);
+  const composer = useStore(s => s.composer);
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const generations = useStore((s) => s.generations);
@@ -84,9 +88,14 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const revising = useStore((s) => s.sessions[sessionId]?.agent.revising === item.id);
   const { plan } = item;
   const awaiting = item.status === 'awaiting';
+  const nodePreview = awaiting && item.nodeRun ? previewRun(sessionId, item.nodeRun.targets, item.nodeRun.force) : null;
+  useEffect(() => {
+    if (!nodePreview || !item.nodeRun || nodePreview.signature === item.nodeRun.signature) return;
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, { nodeRun: { ...item.nodeRun, signature: nodePreview.signature }, plan: { ...plan, steps: nodePreview.steps }, estimate: nodePreview.estimate, error: nodePreview.errors.join(' ') || 'Execution updated. Review before running.' });
+  }, [nodePreview?.signature, graph, library, composer, item.id, sessionId]);
   const off = new Set(item.skipped ?? []);
   // Checkboxes only when there is a choice to make.
-  const selectable = awaiting && plan.steps.length > 1;
+  const selectable = awaiting && !item.nodeRun && plan.steps.length > 1;
   const toggle = (id: string) => updateFeedItem<PlanFeedItem>(sessionId, item.id, { skipped: toggleStep(plan.steps, item.skipped ?? [], id) });
   // Prices may load after the plan was proposed; show the live estimate (of the checked steps) while it waits.
   const live = awaiting ? estimateSteps(plan.steps.filter((s) => !off.has(s.id))) : null;
@@ -196,7 +205,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             <Button
               variant="primary"
               icon={Zap}
-              disabled={revising || none}
+              disabled={revising || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
                 if (over) acceptOverLimit();
                 void approvePlan(sessionId, item.id);

@@ -1,7 +1,7 @@
 import { truncate } from '../../lib/format';
 import { OPS } from '../ops';
 import type { Generation, Graph, GraphNode } from '../types';
-import { nodeOutputAsset, runsGeneration } from './graph';
+import { nodeAttempt, nodeOutputAsset, runsGeneration } from './graph';
 
 /* Compact views of the node graph for the agent: an index in the context and read_graph on demand.
    Derived on each call from session.graph; nothing is stored. */
@@ -18,7 +18,7 @@ function statusOf(n: GraphNode, generations: Record<string, Generation>): string
   if (d.kind === 'text') return d.text.trim() ? 'text' : 'empty';
   if (d.kind === 'asset') return d.assetId ? 'done' : 'empty';
   if (runsGeneration(d)) {
-    const g = d.generationId ? generations[d.generationId] : undefined;
+    const g = nodeAttempt(n, generations);
     return g ? g.status : 'not run';
   }
   return '';
@@ -74,7 +74,7 @@ export function readGraph(graph: Graph, generations: Record<string, Generation>,
       const d = n.data;
       const lines = [`${n.id} ${kindOf(n)} "${d.title}"${selected.has(n.id) ? ' (selected)' : ''}`, `  status: ${statusOf(n, generations)}`];
       if (runsGeneration(d) && d.generationId) {
-        const g = generations[d.generationId];
+        const g = nodeAttempt(n, generations);
         if (g?.error) lines.push(`  error: ${truncate(g.error, 160)}`);
       }
       if (d.kind === 'text') lines.push(`  text: ${truncate(d.text, 400)}`);
