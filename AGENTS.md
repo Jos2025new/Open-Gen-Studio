@@ -9,6 +9,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — espacio superior de sidebar con ampliación (2026-09-30)
+- [x] Z1. shell.css: reducir margen logo/grupo de 104 a 44 px en barra compacta y de 80 a 32 px en expandida; actualizar el override móvil. Razón: con ampliación 140%, el centro del + baja de ~254 a ~170 px, altura indicada en la captura. Sin cambiar presupuesto ni tamaños de iconos.
+- [x] Z2. Revisar diff y commit; sin navegador ni suite para este ajuste de espaciado.
+
 ## Tarea — disposición de la barra lateral (2026-09-30)
 - [x] S1. Sidebar.tsx: trasladar el botón Spending al grupo inferior, antes de ProviderPool, conservando handlers/tooltip y estado. Razón: situarlo encima de budget.
 - [x] S2. shell.css: separar logo y grupo principal por dos espacios de botón. Sidebar.tsx: medir la posición del + existente con ResizeObserver y ajustar solo el margen del grupo inferior para alinear el icono budget, también si el prompt cambia de altura. Razón: evitar una altura fija dependiente de la captura.
