@@ -9,6 +9,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — modelo y parámetros reales de Upscale video (2026-09-29)
+Base `adda4f6`, árbol limpio. Alcance exclusivo: operación `video_upscale` compartida por Nodos/chat/Assets; sin otros cambios de herramientas ni guardado.
+- [x] U1. Inspeccionar selección, formularios y ejecución. Causa: fields vacío, modelo automático y overrides ignorados; fallback incluye enhancement genérico.
+- [x] U2. Filtrar modelos dedicados a upscale de vídeo; selector y parámetros reales del esquema en un control compartido. Archivos: `catalog.ts`, `jobs.ts`, `flow/actions.ts`, `assets/OpForm.tsx`, `node/nodes.tsx`, control específico de upscale y export del campo existente en MediaControls. Reutilizar params de la operación, estimación y picker.
+- [x] U3. Verificar que modelo/parámetros elegidos llegan a estimación y ejecución; typecheck y pruebas relevantes, sin generaciones pagadas ni navegador por instrucción previa. Documentar límites y commit.
+
+  Implementado: VideoUpscaleControls compartido, modelo/proveedor visible, picker filtrado por capacidad de vídeo y upscale dedicado (excluye generation/edit/extend/generative y enhancement genérico), campos del esquema usando AdvancedField existente. Modelo elegido en params._modelRef; parámetros del esquema llegan a settings, estimación de planes y opSpec. Cambiar modelo limpia ajustes del anterior; no se muestran parámetros inventados. Schema derivado por fallo del proveedor bloquea Run/Apply.
+  Verificado: typecheck verde; 22 pruebas acotadas y suite completa 311 verdes + 1 omitida. Tests cubren filtro, modelo elegido, resolución/escala, rechazo de modelos ajenos y descarte de claves no pertenecientes al esquema. Referencia técnica: https://fal.ai/models/fal-ai/bytedance-upscaler/upscale/video/api (resolución del upscaler). Sin navegador ni generación real/proveedor de pago; no se comprobó en vivo cada catálogo/esquema/precio.
+
 ## Tarea — importar imágenes al canvas de Nodos (2026-09-29)
 Base `59382e5`, árbol limpio. Mantener verificación eficiente sin navegador por indicación previa del usuario.
 - [x] P1. Inspeccionar paste/importación y menú existentes. Razón: `uploadFiles` ya valida y guarda imágenes; el canvas solo admite arrastre de assets de galería.

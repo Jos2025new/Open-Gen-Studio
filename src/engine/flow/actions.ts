@@ -1,7 +1,7 @@
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
-import { ensureSchema, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
+import { ensureSchema, isConnected, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
 import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
 import { graphEditProblem, lockedNodes, lockNodes, lockAssets } from './locks';
@@ -178,8 +178,9 @@ function requestContext(sessionId: string) {
     const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations) : null;
     const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
     const fromModel = opFollowsSource(engine) ? opModelFromRef(sourceRef, engine === 'edit' ? 'image' : 'video') : null;
-    const choice = source && st.assets[source] ? opModelForAsset(engine, source) : fromModel ? { ref: fromModel, viaEdit: false } : opModelFor(engine);
-    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : ['video_edit', 'video_upscale', 'video_extend'].includes(engine) ? { settings: videoOpSettings(engine as 'video_edit' | 'video_upscale' | 'video_extend', st.catalog.schemas[choice.ref]) } : {}) };
+    const chosen = engine === 'video_upscale' && typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : undefined;
+    const choice = chosen ? { ref: chosen, viaEdit: false } : source && st.assets[source] ? opModelForAsset(engine, source) : fromModel ? { ref: fromModel, viaEdit: false } : opModelFor(engine);
+    return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : ['video_edit', 'video_upscale', 'video_extend'].includes(engine) ? { settings: videoOpSettings(engine as 'video_edit' | 'video_upscale' | 'video_extend', st.catalog.schemas[choice.ref], n.data.params) } : {}) };
   } };
 }
 
@@ -210,6 +211,11 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
     if (lockedNodes(sessionId).has(id) || (runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status))) errors.push(`“${n.data.title}” is already running.`);
+    if (n.data.kind === 'tool' && n.data.op === 'video_upscale') {
+      const ref = typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : opModelFor('video_upscale').ref;
+      if (!st.catalog.models[ref] || !isVideoUpscaler(st.catalog.models[ref]) || !isConnected(st.catalog.models[ref].provider)) errors.push(`“${n.data.title}”: choose an available dedicated video upscaler.`);
+      if (st.catalog.schemas[ref]?.source === 'derived') errors.push(`“${n.data.title}”: the provider parameter schema is unavailable.`);
+    }
     if (n.data.kind === 'asset' && (!n.data.assetId || !st.assets[n.data.sketchAssetId ?? n.data.assetId])) errors.push(`“${n.data.title}” needs an available asset.`);
     if (n.data.kind !== 'text' && n.data.sketchAssetId && !st.assets[n.data.sketchAssetId]) errors.push(`“${n.data.title}”: the Sketch asset is missing.`);
   }
@@ -260,7 +266,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
   const preview = previewRun(sessionId, targets, force);
-  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [opModelFor(OPS[s.op].engine).ref] : []);
+  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [s.op === 'video_upscale' && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
   return previewRun(sessionId, targets, force);
 }

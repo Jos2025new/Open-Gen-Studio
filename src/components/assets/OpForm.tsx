@@ -8,6 +8,7 @@ import { useStore } from '../../store/store';
 import { Segmented } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { Popover, usePopover } from '../ui/Popover';
+import { VideoUpscaleControls } from './VideoUpscaleControls';
 import { ModelList } from '../composer/ModelList';
 
 export type OpTarget = { kind: 'asset'; assetId: string; parentId?: string } | { kind: 'layer'; sessionId: string; docId: string; layerId: string };
@@ -30,9 +31,12 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
 
   useEffect(() => {
     let alive = true;
+    if (op === 'video_upscale') setVia('');
     const t = window.setTimeout(async () => {
       if (target.kind === 'asset') {
-        const r = await opEstimate(target.assetId, op, params, picked ?? undefined);
+        let r;
+        try { r = await opEstimate(target.assetId, op, params, picked ?? undefined); }
+        catch (e) { if (alive && op === 'video_upscale') { setEstimate({ usd: null, approximate: true, note: String((e as Error).message) }); setVia(''); } return; }
         if (!alive) return;
         setEstimate(r.estimate);
         setVia(r.modelName);
@@ -68,6 +72,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
           <div className="pop-sub">{def.description}</div>
         </div>
       </div>
+      {op === 'video_upscale' ? <VideoUpscaleControls params={params} onChange={setParams} /> : null}
       {def.fields.map((f) =>
         f.type === 'choice' ? (
           <div key={f.key} className="op-field">
@@ -115,7 +120,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
         confirmLabel={def.engine === 'local' ? 'Run (free)' : 'Apply'}
         onConfirm={run}
         onCancel={onClose}
-        blocked={missing ? `Fill in “${missing.label}”.` : null}
+        blocked={op === 'video_upscale' && !via ? estimate.note ?? 'Choose an available video upscaler.' : missing ? `Fill in “${missing.label}”.` : null}
       />
       {pickable ? (
         <Popover open={modelPop.open} anchor={modelPop.ref} onClose={modelPop.close} width={380} label="Model">

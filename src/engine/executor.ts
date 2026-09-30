@@ -57,10 +57,11 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
       const engine = OPS[s.op].engine;
       if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
         // Same estimate as the direct operation on that clip (jobs.opSpec). A clip still to be made: its step's duration.
-        const settings = videoOpSettings(engine, get().catalog.schemas[opModelFor(engine).ref]);
+        const ref = engine === 'video_upscale' && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(engine).ref;
+        const settings = videoOpSettings(engine, get().catalog.schemas[ref], s.params);
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
         const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
-        const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) });
+        const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) }, ref);
         perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
       } else {
         // Edit / video operations run on the model that made their input (jobs.opSpec); a step still to run: its model.

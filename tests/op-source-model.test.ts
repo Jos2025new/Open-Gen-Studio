@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { opModelForAsset } from '../src/engine/catalog';
-import { estimateSpec, opSpec } from '../src/engine/jobs';
+import { isVideoUpscaler, opModelFor, opModelForAsset } from '../src/engine/catalog';
+import { estimateSpec, opSpec, videoOpSettings } from '../src/engine/jobs';
 import { estimateSteps } from '../src/engine/executor';
 import { useStore } from '../src/store/store';
 import type { Asset, Generation, ModelSchema, ModelSummary, PlanStep } from '../src/engine/types';
@@ -103,5 +103,28 @@ describe('operation model follows the source', () => {
     expect(low.settings.aspect).toBe('1024x1024');
     expect(low.settings.resolution).toBe('1K');
     expect(low.estimate?.note).toMatch(/sheet at 1K: the model has no 2K/);
+  });
+});
+
+describe('dedicated video upscale controls', () => {
+  const ref = 'fal::fal-ai/bytedance-upscaler/upscale/video';
+  const upscaler = { ref, provider: 'fal', id: 'fal-ai/bytedance-upscaler/upscale/video', name: 'Video Upscaler', kind: 'video', acceptsVideo: true, acceptsText: false, acceptsImage: false, tags: ['upscale'] } as ModelSummary;
+  const schema = { ref, params: [{ key: 'target_resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: ['1080p', '4k'], default: '1080p' }, { key: 'scale', label: 'Scale', role: 'other', type: 'number', min: 1, max: 4 }], slots: { video: { key: 'video_url' } } } as ModelSchema;
+  it('excludes generic enhancement and generative/edit routes', () => {
+    expect(isVideoUpscaler(upscaler)).toBe(true);
+    expect(isVideoUpscaler({ ...upscaler, id: 'video-enhancement', name: 'Enhance', tags: ['enhance'] })).toBe(false);
+    expect(isVideoUpscaler({ ...upscaler, id: 'topaz/upscale/video/generative' })).toBe(false);
+    expect(isVideoUpscaler({ ...upscaler, acceptsVideo: false })).toBe(false);
+  });
+  it('uses selected model and schema parameters for the operation and estimate', async () => {
+    install();
+    const st = useStore.getState();
+    useStore.setState({ catalog: { ...st.catalog, models: { ...st.catalog.models, [ref]: upscaler }, schemas: { ...st.catalog.schemas, [ref]: schema } } });
+    const settings = videoOpSettings('video_upscale', schema, { target_resolution: '4k', scale: 2, invented: 99 });
+    expect(settings.resolution).toBe('4k'); expect(settings.advanced.scale).toBe(2); expect(settings.advanced).not.toHaveProperty('invented');
+    const spec = await opSpec({ sessionId: 's', sourceAssetId: 'upload', op: 'video_upscale', params: { _modelRef: ref, target_resolution: '4k', scale: 2 }, origin: 'op' });
+    expect(spec.modelRef).toBe(ref); expect(spec.settings.resolution).toBe('4k'); expect(spec.settings.advanced.scale).toBe(2);
+    expect(opModelFor('video_upscale').ref).toBe(ref);
+    await expect(opSpec({ sessionId: 's', sourceAssetId: 'upload', op: 'video_upscale', params: { _modelRef: EDIT2 }, origin: 'op' })).rejects.toThrow('dedicated video upscaler');
   });
 });

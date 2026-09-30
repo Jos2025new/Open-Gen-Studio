@@ -15,6 +15,7 @@ import { Button, IconButton, Chip, costLabel, MenuItem, Segmented, Toggle } from
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { ModelList } from '../composer/ModelList';
 import { AspectGlyph } from '../composer/MediaControls';
+import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
 
@@ -670,6 +671,7 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
           ))}
         </div>
       </Popover>
+      {d.op === 'video_upscale' ? <VideoUpscaleControls params={d.params} onChange={params => patchNodeData(sessionId, node.id, { params })} /> : null}
       {def.fields.map((f) =>
         f.type === 'choice' ? (
           <div key={f.key} className="node-field nodrag">

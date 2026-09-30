@@ -327,6 +327,12 @@ export function opModelForAsset(engine: OpEngine, assetId: string | undefined): 
   return opModelFor(engine);
 }
 
+/** Dedicated video super-resolution; enhancement/edit/extend alone is not upscale. */
+export function isVideoUpscaler(m: ModelSummary): boolean {
+  const identity = `${m.id} ${m.name} ${m.tags.join(' ')}`;
+  return m.kind === 'video' && Boolean(m.acceptsVideo) && /upscal|increase[-_/ ]resolution|super[-_/ ]resolution/i.test(identity) && !/text[-_/ ]to[-_/ ]video|image[-_/ ]to[-_/ ]video|video[-_/ ]edit|video[-_/ ]extend|generative/i.test(identity);
+}
+
 /** Which model runs an operation engine. */
 export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } {
   const ops = get().settings.ops;
@@ -358,13 +364,14 @@ export function opModelFor(engine: OpEngine): { ref: string; viaEdit: boolean } 
   if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
     // Video-to-video: settings override, then each provider's preferred list, then any tagged model that takes video.
     const key = engine === 'video_upscale' ? 'videoUpscale' : engine === 'video_edit' ? 'videoEdit' : 'videoExtend';
-    if (valid(ops[key])) return { ref: ops[key]!, viaEdit: false };
+    const fits = (ref: string) => engine !== 'video_upscale' || Boolean(modelSummary(ref) && isVideoUpscaler(modelSummary(ref)!));
+    if (valid(ops[key]) && fits(ops[key]!)) return { ref: ops[key]!, viaEdit: false };
     for (const p of providerOrder('video')) {
       const hit = firstAvailable(p, PREFERRED[p][key]);
-      if (hit) return { ref: hit, viaEdit: false };
+      if (hit && fits(hit)) return { ref: hit, viaEdit: false };
     }
-    const tag = engine === 'video_upscale' ? /upscal|enhance/ : engine === 'video_edit' ? /edit/ : /extend/;
-    const tagged = Object.values(get().catalog.models).find((m) => m.acceptsVideo && isConnected(m.provider) && (m.tags.some((t) => tag.test(t)) || tag.test(m.id)));
+    const tag = engine === 'video_upscale' ? /upscal/ : engine === 'video_edit' ? /edit/ : /extend/;
+    const tagged = Object.values(get().catalog.models).find((m) => m.acceptsVideo && isConnected(m.provider) && fits(m.ref) && (m.tags.some((t) => tag.test(t)) || tag.test(m.id)));
     return { ref: tagged?.ref ?? '', viaEdit: false };
   }
   const key = engine === 'upscale' ? 'upscale' : 'removeBg';

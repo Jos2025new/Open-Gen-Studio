@@ -4,7 +4,7 @@ import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, isVideoUpscaler, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { InputError } from './errors';
@@ -781,7 +781,7 @@ export interface OpSpecInput {
 type VideoOpEngine = 'video_upscale' | 'video_edit' | 'video_extend';
 
 /** Settings a video operation runs with: the source's framing and, for edits and upscales, its length. */
-export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | undefined): GenSettings {
+export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | undefined, params: Record<string, AdvancedValue> = {}): GenSettings {
   const { settings } = coerceSettings(schema, 'video', { count: 1, advanced: {} });
   const extend = engine === 'video_extend';
   // Keep the source's framing: the model's "auto"/"adaptive" option, else nothing.
@@ -795,6 +795,15 @@ export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | und
   // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
   const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
   if (mode && engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
+  if (engine === 'video_upscale') {
+    for (const p of schema?.params ?? []) {
+      const value = params[p.key];
+      if (value === undefined || ['count', 'duration', 'aspect', 'audio', 'negative'].includes(p.role)) continue;
+      if (p.role === 'other') settings.advanced[p.key] = value;
+      else if (p.role === 'resolution') settings.resolution = String(value);
+      else if (p.role === 'seed' && typeof value === 'number') settings.seed = value;
+    }
+  }
   return settings;
 }
 
@@ -828,12 +837,15 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
-  const choice = input.nodeChoice ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
+  const upscaleRef = def.engine === 'video_upscale' ? (typeof input.params._modelRef === 'string' ? input.params._modelRef : input.modelRef ?? input.nodeChoice?.ref) : undefined;
+  if (upscaleRef && (!modelSummary(upscaleRef) || !isVideoUpscaler(modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
+  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
+  if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
-    const settings = videoOpSettings(def.engine, schema);
+    const settings = videoOpSettings(def.engine, schema, input.params);
     const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
     const clip = get().assets[input.sourceAssetId];
     return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, choice.ref) };

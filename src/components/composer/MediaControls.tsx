@@ -347,7 +347,7 @@ function MultiField({ kind, p }: { kind: MediaKind; p: ParamDef }) {
   );
 }
 
-function AdvancedField({ p, value, onChange }: { p: ParamDef; value: AdvancedValue | undefined; onChange: (v: AdvancedValue | undefined) => void }) {
+export function AdvancedField({ p, value, onChange }: { p: ParamDef; value: AdvancedValue | undefined; onChange: (v: AdvancedValue | undefined) => void }) {
   const current = value ?? p.default;
   if (p.type === 'boolean') {
     return (
