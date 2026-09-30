@@ -9,6 +9,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — acercar navegación al prompt visible (2026-09-30)
+- [x] A1. CanvasNavigation.tsx, cálculo de place: medir composer, thread-toggle y thread-body por separado y considerar solo rectángulos que se cruzan horizontalmente con el panel. Separación 8 px. Razón: composer-dock incluye zonas vacías a los lados de Conversation y elevaba innecesariamente el panel.
+- [x] A2. Typecheck breve y diff; sin navegador. Commit.
+
+Verificado: typecheck y diff verdes; sin navegador.
+
 ## Tarea — navegación de Nodos sin solapar composer (2026-09-30)
 - [x] R1. CanvasNavigation.tsx: medir panel/composer-dock y calcular desplazamiento hacia arriba únicamente cuando la posición inferior normal se solape. ResizeObserver y resize recalculan al ampliar navegador, redimensionar o cambiar altura del prompt. Razón: responder al espacio real sin usar el zoom del grafo ni alterar la posición cuando cabe.
 - [x] R2. node.css: retirar el desplazamiento móvil fijo; aplicar al MiniMap el mismo desplazamiento del panel. Razón: conservar funciones y evitar otro solapamiento.

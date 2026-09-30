@@ -38,10 +38,12 @@ export function CanvasNavigation({ sessionId, onSelect }: { sessionId: string; o
     const dock = canvas?.parentElement?.querySelector('.composer-dock');
     if (!panel || !canvas || !dock) return;
     const place = () => {
-      const p = panel.getBoundingClientRect(), d = dock.getBoundingClientRect();
+      const p = panel.getBoundingClientRect();
       const top = p.top + liftRef.current, bottom = p.bottom + liftRef.current;
-      const overlaps = p.right > d.left && p.left < d.right && bottom > d.top && top < d.bottom;
-      const next = overlaps ? Math.max(0, bottom - d.top + 12) : 0;
+      const obstacles = [...dock.querySelectorAll('.composer, .thread-toggle, .thread-body')]
+        .map(el => el.getBoundingClientRect())
+        .filter(r => p.right > r.left && p.left < r.right && bottom > r.top && top < r.bottom);
+      const next = obstacles.length ? Math.max(0, bottom - Math.min(...obstacles.map(r => r.top)) + 8) : 0;
       if (Math.abs(next - liftRef.current) < 0.5) return;
       liftRef.current = next;
       panel.style.bottom = `${next}px`;
