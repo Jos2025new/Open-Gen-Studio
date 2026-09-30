@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — acciones e información en el historial del nodo (2026-09-29)
+Base: `fd4c3ce`, árbol limpio. Alcance: historial existente; reutilizar GenerationInfo, deleteAssets y acciones de edición; restaurar parámetros no genera ni cambia la salida activa.
+- [x] I1. Inspeccionar información, borrado y ajustes guardados. Razón: usar la información ya existente y evitar duplicar controles.
+- [x] I2. Separar entradas y añadir iconos de información/borrado y restauración. Archivos: `nodes.tsx`, `node.css`, `flow/actions.ts`; preservar conexiones y bloquear cambios sobre un Run activo.
+- [x] I3. Test acotado de restauración, typecheck, suite y una comprobación breve en navegador sin gasto; documentar límites y commit.
+
+  Verificado: typecheck y suite (308 verdes + 1 omitida). Test: restaura prompt lógico, modelo, semilla, resolución, aspecto, duración y ajustes avanzados sin ejecutar ni cambiar conexiones/salida activa; rechaza generación de otro nodo. Navegador local: separación 12px, iconos, panel GenerationInfo, restauración y borrado de un asset anterior manteniendo la salida actual, sin errores ni llamadas pagadas. Límite: en generaciones antiguas sin nodeRequest se reutiliza el prompt guardado de la generación; las entradas conectadas se conservan, no se restauran nodos ajenos.
+
 ## Tarea — respetar borrados y reproducir vídeos en Nodos (2026-09-29)
 Base: `d6eaee9`, árbol limpio. Alcance: reutilizar aviso/Deshacer, contexto y AssetMedia; sin motor, guardado ni llamadas nuevas.
 - [x] B1. Inspeccionar borrado UI/agente, contexto y hover. Razón: el borrado UI no conserva snapshot recuperable y los assets recientes no reflejan nodos vivos; CSS bloquea hover.

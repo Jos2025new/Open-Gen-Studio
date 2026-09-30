@@ -352,3 +352,32 @@ export function restoreNodeDeletion(sessionId: string, itemId: string, nodeIds?:
   updateFeedItem(sessionId, itemId, { undone: !remaining.length, undoNodes: { nodes: remaining, edges: snapshot.edges.filter(e => remaining.some(n => n.id === e.source || n.id === e.target)) }, text: `Restored: ${nodes.map(n => n.data.title).join(', ')}.${restored.skipped.length ? ` Connections not restored: ${restored.skipped.join('; ')}` : ''}${remaining.length ? ' Undo is available for the remaining deleted nodes.' : ''}` });
   return null;
 }
+
+/** Reuse a saved attempt's controls without executing or selecting its output. */
+export function restoreNodeGeneration(sessionId: string, nodeId: string, generationId: string): string | null {
+  const st = get(), node = st.sessions[sessionId]?.graph.nodes.find(n => n.id === nodeId), g = st.generations[generationId];
+  if (!node || !g || g.sessionId !== sessionId || (g.stepId !== nodeId && (!('generationId' in node.data) || node.data.generationId !== g.id))) return 'This generation does not belong to this node.';
+  if (node.data.kind === 'tool') {
+    if (!g.op) return 'This generation has no operation parameters.';
+    if (node.data.op !== g.op.id) {
+      const error = setNodeOp(sessionId, nodeId, g.op.id);
+      if (error) return error;
+    }
+    return patchNodeData(sessionId, nodeId, { params: structuredClone(g.op.params), generationId: node.data.generationId });
+  }
+  if (!('modelRef' in node.data)) return 'This node has no generation controls.';
+  let prompt = g.prompt;
+  if (g.nodeRequest) {
+    const request = JSON.parse(g.nodeRequest) as { prompt?: string; incoming?: { port: string; value: unknown }[] };
+    if (typeof request.prompt === 'string') {
+      prompt = request.prompt;
+      const input = request.incoming?.find(e => e.port === 'prompt')?.value;
+      if (typeof input === 'string' && input.trim()) {
+        const prefix = input.trim();
+        prompt = prompt === prefix ? '' : prompt.startsWith(`${prefix}\n`) ? prompt.slice(prefix.length + 1) : prompt;
+      }
+    }
+  }
+  const error = setNodeModel(sessionId, nodeId, { modelRef: g.modelRef, settings: structuredClone(g.settings) });
+  return error ?? patchNodeData(sessionId, nodeId, { prompt });
+}

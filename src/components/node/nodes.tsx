@@ -1,20 +1,21 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, setSketch, tryConnect } from '../../engine/flow/actions';
+import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, setSketch, tryConnect } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, runsGeneration } from '../../engine/flow/graph';
-import { downloadAsset } from '../../engine/actions';
+import { deleteAssets, downloadAsset } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
-import { setUi, useStore } from '../../store/store';
+import { setUi, toast, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Button, Chip, costLabel, MenuItem, Segmented, Toggle } from '../ui/primitives';
+import { Button, IconButton, Chip, costLabel, MenuItem, Segmented, Toggle } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { ModelList } from '../composer/ModelList';
 import { AspectGlyph } from '../composer/MediaControls';
+import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
@@ -155,12 +156,30 @@ function StatusPill({ node }: { node: GraphNode }) {
   return null;
 }
 
+function HistoryOutput({ node, generation: g, assetId, index, number, onOpen }: { node: GraphNode; generation: Generation; assetId: string; index: number; number: number; onOpen: () => void }) {
+  const sessionId = useSessionId();
+  const asset = useStore(s => s.assets[assetId]);
+  const info = usePopover();
+  return <div className="nc-history-output">
+    <button type="button" className="nc-history-preview" aria-label={`View generation ${number}, output ${index + 1}`} onClick={() => { onOpen(); setUi({ lightbox: { assetIds: g.assetIds, index } }); }}><AssetMedia assetId={assetId} hoverPlay draggable={false} /></button>
+    <div className="nc-history-actions">
+      <IconButton ref={info.ref} icon={Info} size="sm" label={`Details for generation ${number}, output ${index + 1}`} active={info.open} onClick={info.toggle} />
+      <IconButton icon={RotateCcw} size="sm" label={`Restore parameters from generation ${number}`} onClick={() => { const error = restoreNodeGeneration(sessionId, node.id, g.id); toast(error ?? 'Parameters restored. Run when ready.', error ? 'error' : 'success'); }} />
+    </div>
+    <Popover open={info.open} anchor={info.ref} onClose={info.close} width={340} label="Generation details" className="pop-scroll">
+      <PopoverHeader title="Generation details" />
+      <GenerationInfo generation={g} asset={asset} />
+      <div className="nc-history-footer"><Button icon={Trash} size="sm" variant="secondary" onClick={() => { deleteAssets([assetId]); info.close(); }}>Delete asset</Button></div>
+    </Popover>
+  </div>;
+}
+
 function NodeHistory({ node }: { node: GraphNode }) {
   const sessionId = useSessionId();
   const generations = useStore(s => s.generations);
   const pop = usePopover();
   const current = runsGeneration(node.data) ? node.data.generationId : undefined;
-  const history = Object.values(generations).filter(g => g.id === current || (g.sessionId === sessionId && g.stepId === node.id)).sort((a, b) => a.createdAt - b.createdAt);
+  const history = Object.values(generations).filter(g => (g.id === current || (g.sessionId === sessionId && g.stepId === node.id)) && (g.status !== 'done' || g.assetIds.length || g.text != null)).sort((a, b) => a.createdAt - b.createdAt);
   if (history.length < 2) return null;
   const index = history.findIndex(g => g.id === current);
   return <>
@@ -172,9 +191,7 @@ function NodeHistory({ node }: { node: GraphNode }) {
       <div className="nc-history-list">
         {history.map((g, i) => <div key={g.id} className={`nc-history-entry ${g.id === current ? 'is-current' : ''}`}>
           <div className="nc-history-heading"><span>Generation {i + 1}{g.id === current ? ' · Current' : ''}</span><span>{g.status === 'running' || g.status === 'queued' ? 'Generating…' : g.status === 'done' ? '' : g.status}</span></div>
-          {g.assetIds.length ? <div className="nc-history-outputs">{g.assetIds.map((id, outputIndex) => <button key={id} type="button" aria-label={`View generation ${i + 1}, output ${outputIndex + 1}`} onClick={() => { pop.close(); setUi({ lightbox: { assetIds: g.assetIds, index: outputIndex } }); }}>
-            <AssetMedia assetId={id} hoverPlay draggable={false} />
-          </button>)}</div> : <p>{g.text ?? g.error ?? g.statusText ?? 'No output yet'}</p>}
+          {g.assetIds.length ? <div className="nc-history-outputs">{g.assetIds.map((id, outputIndex) => <HistoryOutput key={id} node={node} generation={g} assetId={id} index={outputIndex} number={i + 1} onOpen={pop.close} />)}</div> : <p>{g.text ?? g.error ?? g.statusText ?? 'No output yet'}</p>}
         </div>)}
       </div>
     </Popover>

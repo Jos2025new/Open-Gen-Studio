@@ -6,7 +6,7 @@ vi.mock('../src/engine/executor',async original=>({...await original<typeof impo
 import { useStore, appendFeed } from '../src/store/store';
 import { editGraphTool } from '../src/engine/agent/nodeTools';
 import { sendAgentMessage, approvePlan, presentNodeRun, undoNodeDeletion } from '../src/engine/agent/runtime';
-import { deleteNodes, deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
+import { restoreNodeGeneration, deleteNodes, deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
 import { buildContext } from '../src/engine/agent/context';
 import type { Graph, PlanFeedItem, NoticeFeedItem } from '../src/engine/types';
 let sid:string;
@@ -61,6 +61,17 @@ describe('agent actions on existing nodes',()=>{
   patchNodeData(sid,'final',{prompt:'keep later edit'});
   expect(undoNodeDeletion(sid,'undo')).toBeNull();expect(session().graph.nodes).toHaveLength(2);expect(session().graph.edges.map(e=>e.id)).toEqual(['edge']);
   expect(session().graph.nodes.find(n=>n.id==='final')!.data).toMatchObject({prompt:'keep later edit'});expect(useStore.getState().assets).toBe(beforeAssets);
+ });
+ it('restores saved controls without selecting an output or executing, and avoids duplicating connected prompts',()=>{
+  const st=useStore.getState();
+  const settings={count:2,aspect:'16:9',resolution:'720p',duration:5,seed:123,advanced:{steps:9},extras:{custom:'value'}};
+  useStore.setState({generations:{...st.generations,saved:{id:'saved',sessionId:sid,stepId:'key2',kind:'image',modelRef:'local::studio-image',prompt:'transformed prompt',settings,nodeRequest:JSON.stringify({prompt:'Shared prompt\nOriginal @Aria',incoming:[{port:'prompt',value:'Shared prompt'}]})} as never}});
+  const before=session().graph;
+  expect(restoreNodeGeneration(sid,'key2','saved')).toBeNull();
+  expect(session().graph.nodes[0].data).toMatchObject({prompt:'Original @Aria',modelRef:'local::studio-image',settings});
+  expect(session().graph.nodes[0].data).not.toHaveProperty('generationId');
+  expect(session().graph.edges).toEqual(before.edges);expect(session().graph.nodes[1]).toEqual(before.nodes[1]);expect(execute).not.toHaveBeenCalled();
+  expect(restoreNodeGeneration(sid,'final','saved')).toContain('does not belong');
  });
  it('records UI deletion once and exposes recovery to the agent', async()=>{
   expect(deleteNodes(sid,['key2'])).toBeNull();
