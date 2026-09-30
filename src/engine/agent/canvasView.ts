@@ -2,10 +2,11 @@ import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d } from '../../lib/medi
 import { activeDoc } from '../design/actions';
 import { drawDoc, drawLayer } from '../design/render';
 import type { LlmContentPart } from '../types';
-import { VISION_MAX_SIDE } from './attachments';
 
 /* What the agent sees of the Designer: the page (or one layer) reduced like an attachment, with the scale
-   back to document px so its strokes land where it means. A mid-grey backdrop keeps light and dark marks visible. */
+   back to document px so its strokes land where it means. 480 px: enough to place marks, fewer image tokens than attachments. A mid-grey backdrop keeps light and dark marks visible. */
+
+export const CANVAS_VIEW_SIDE = 480;
 
 export async function canvasParts(sessionId: string, layerId?: string): Promise<LlmContentPart[] | string> {
   const doc = activeDoc(sessionId);
@@ -13,7 +14,7 @@ export async function canvasParts(sessionId: string, layerId?: string): Promise<
   const layer = layerId ? doc.layers.find((l) => l.id === layerId) : undefined;
   if (layerId && !layer) return `No layer "${layerId}" in this document.`;
   if (!doc.layers.length) return 'The document is empty.';
-  const k = Math.min(1, VISION_MAX_SIDE / Math.max(doc.width, doc.height));
+  const k = Math.min(1, CANVAS_VIEW_SIDE / Math.max(doc.width, doc.height));
   const c = createCanvas(Math.max(1, Math.round(doc.width * k)), Math.max(1, Math.round(doc.height * k)));
   const ctx = ctx2d(c);
   ctx.fillStyle = doc.background ?? '#808080';
