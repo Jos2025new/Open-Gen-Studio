@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, Stroke, TextLayer } from '../../engine/types';
+import type { DesignDoc, Layer, RasterLayer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke } from '../../engine/design/strokes';
+import { moveRasterStroke, rasterStrokeBox } from '../../engine/design/rasterStrokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
-import { beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
+import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -22,7 +23,8 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
-  | { kind: 'paint'; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | { kind: 'rasterMove'; layerId: string; strokeId: string; startX: number; startY: number; base: RasterLayer }
+  | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[] };
@@ -39,6 +41,8 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
+  const [selectedRaster, setSelectedRaster] = useState<{ layerId: string; strokeId: string } | null>(null);
+  const [shiftDown, setShiftDown] = useState(false);
   const drag = useRef<Drag | null>(null);
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -152,12 +156,21 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
     if (active && active.visible && !editingText) {
-      const b = layerBox(active);
+      const strokes = active.type === 'raster' ? active.paintStrokes?.filter((s) => !s.erase) ?? [] : [];
+      const selected = strokes.find((s) => selectedRaster?.layerId === active.id && s.id === selectedRaster.strokeId);
+      if (active.type === 'raster' && tool === 'move' && !shiftDown) {
+        ctx.strokeStyle = 'rgba(212,242,90,0.3)';
+        for (const stroke of strokes) {
+          const box = rasterStrokeBox(active, stroke);
+          if (box) ctx.strokeRect(sx(box.x) + 0.5, sy(box.y) + 0.5, box.w * view.zoom, box.h * view.zoom);
+        }
+      }
+      const b = selected && active.type === 'raster' && !shiftDown ? rasterStrokeBox(active, selected) : layerBox(active);
       if (b) {
         ctx.strokeStyle = '#d4f25a';
         ctx.lineWidth = 1;
         ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
-        if (tool === 'move' && !active.locked) {
+        if (tool === 'move' && !active.locked && (!selected || shiftDown)) {
           ctx.fillStyle = '#0a0a0b';
           for (const [hx, hy] of corners(b)) {
             ctx.fillRect(sx(hx) - HANDLE / 2, sy(hy) - HANDLE / 2, HANDLE, HANDLE);
@@ -197,19 +210,21 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       ctx.arc(sx(cursor.x), sy(cursor.y), Math.max(2, (brush.size / 2) * view.zoom), 0, Math.PI * 2);
       ctx.stroke();
     }
-  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live]);
+  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftDown(true);
       if (e.code === 'Space' && !isTyping(e)) {
         setSpaceDown(true);
         e.preventDefault();
       }
     };
     const onUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') setShiftDown(false);
       if (e.code === 'Space') setSpaceDown(false);
     };
     window.addEventListener('keydown', onDown);
@@ -239,6 +254,24 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     const act = activeLayer(current);
 
     if (tool === 'move') {
+      if (!e.shiftKey) {
+        const layer = act?.type === 'raster' && act.visible ? act : hitTest(current, p.x, p.y);
+        if (layer?.type === 'raster' && !layer.locked && layer.visible && (!layer.paintBaseId || getBuffer(layer.paintBaseId))) {
+          const stroke = [...(layer.paintStrokes ?? [])].reverse().find((s) => {
+            if (s.erase) return false;
+            const b = rasterStrokeBox(layer, s);
+            return b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
+          });
+          if (stroke) {
+            setActiveLayer(sessionId, doc.id, layer.id);
+            setSelectedRaster({ layerId: layer.id, strokeId: stroke.id });
+            record(current);
+            drag.current = { kind: 'rasterMove', layerId: layer.id, strokeId: stroke.id, startX: p.x, startY: p.y, base: layer };
+            return;
+          }
+        }
+      }
+      setSelectedRaster(null);
       if (act && !act.locked && act.visible) {
         const b = layerBox(act);
         if (b) {
@@ -276,8 +309,15 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       // Brush never touches protected images: it paints on its own layer.
       const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
       if (!target || target.type !== 'raster') return;
-      beginEdit(target);
-      drag.current = { kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
+      if (!getBuffer(target.id) || (target.paintBaseId && !getBuffer(target.paintBaseId))) {
+        toast('Layer pixels are still loading. Try again in a moment.', 'error');
+        return;
+      }
+      const prepared = withPaintBase(target);
+      if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
+      beginEdit(prepared);
+      const stroke: RasterStroke = { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase };
+      drag.current = { stroke, kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
       paintSegment(target, p, p, erase);
       return;
     }
@@ -327,12 +367,11 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     if (!ctx) return;
     const kx = layer.pxWidth / layer.width;
     const ky = layer.pxHeight / layer.height;
-    strokeSegment(ctx, { x: (a.x - layer.x) * kx, y: (a.y - layer.y) * ky }, { x: (b.x - layer.x) * kx, y: (b.y - layer.y) * ky }, {
-      width: (brush.size * (kx + ky)) / 2,
-      color: brush.color,
-      opacity: brush.opacity,
-      erase,
-    });
+    const segment: [number, number, number, number, number] = [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (brush.size * (kx + ky)) / 2];
+    const d = drag.current;
+    if (d?.kind !== 'paint') return;
+    d.stroke.segments.push(segment);
+    strokeSegment(ctx, { x: segment[0], y: segment[1] }, { x: segment[2], y: segment[3] }, { width: segment[4], color: d.stroke.color, opacity: d.stroke.opacity, erase });
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -342,6 +381,9 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     if (!d) return;
     if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
+    } else if (d.kind === 'rasterMove') {
+      const moved = moveRasterStroke(d.base, d.strokeId, p.x - d.startX, p.y - d.startY);
+      if (composeRaster(moved, false)) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
     } else if (d.kind === 'move') {
       const moved = translateLayer(d.base, p.x - d.startX, p.y - d.startY);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? moved : l)) }));
@@ -398,9 +440,14 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     drag.current = null;
     if (!d) return;
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
-    if (d.kind === 'paint') {
+    if (d.kind === 'rasterMove') {
       commitEdit(d.layerId);
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l)) }));
+      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
+    }
+    if (d.kind === 'paint') {
+      if (!d.erase) setSelectedRaster({ layerId: d.layerId, strokeId: d.stroke.id });
+      commitEdit(d.layerId);
+      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintStrokes: [...(l.paintStrokes ?? []), d.stroke] } : l)) }));
     }
     if (d.kind === 'stroke') {
       setLive(null);
@@ -523,6 +570,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
           }}
         />
       ) : null}
+      {tool === 'move' && active?.type === 'raster' && active.paintStrokes?.length ? <div className="stage-hint">Drag a stroke · Shift-drag to move the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );

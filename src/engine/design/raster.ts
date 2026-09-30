@@ -1,6 +1,7 @@
 import { blobDb } from '../../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
-import type { RasterLayer } from '../types';
+import { uid } from '../../lib/id';
+import type { RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
 
 /*
@@ -60,6 +61,35 @@ export function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   const c = createCanvas(src.width, src.height);
   ctx2d(c).drawImage(src, 0, 0);
   return c;
+}
+
+/** Keep the pre-existing flattened pixels as the immutable foundation for editable strokes. */
+export function withPaintBase(layer: RasterLayer): RasterLayer {
+  if (layer.paintBaseId) return layer;
+  const paintBaseId = uid('rbase');
+  setBuffer(paintBaseId, cloneCanvas(getBuffer(layer.id) ?? createCanvas(layer.pxWidth, layer.pxHeight)));
+  return { ...layer, paintBaseId, paintStrokes: [] };
+}
+
+export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke): void {
+  for (const [ax, ay, bx, by, width] of stroke.segments) {
+    strokeSegment(ctx, { x: ax + stroke.x, y: ay + stroke.y }, { x: bx + stroke.x, y: by + stroke.y }, { width, color: stroke.color, opacity: stroke.opacity, erase: stroke.erase });
+  }
+}
+
+/** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */
+export function composeRaster(layer: RasterLayer, persist = true): boolean {
+  const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
+  if (!base) return false;
+  const canvas = cloneCanvas(base);
+  const ctx = ctx2d(canvas);
+  for (const stroke of layer.paintStrokes ?? []) drawRasterStroke(ctx, stroke);
+  setBuffer(layer.id, canvas, persist);
+  return true;
+}
+
+export function rasterBufferIds(layers: RasterLayer[]): string[] {
+  return [...new Set(layers.flatMap((l) => l.paintBaseId ? [l.id, l.paintBaseId] : [l.id]))];
 }
 
 /** Start an edit: clone the current buffer so earlier snapshots stay intact. */
@@ -154,11 +184,15 @@ if (typeof window !== 'undefined') {
 /** Load buffers for layers that are not in memory yet (after reload). */
 export async function ensureBuffers(layers: RasterLayer[]): Promise<void> {
   let changed = false;
+  const baseIds = new Set(layers.map((l) => l.paintBaseId).filter(Boolean));
   await Promise.all(
-    layers.map(async (l) => {
+    layers.flatMap((l) => l.paintBaseId ? [l, { ...l, id: l.paintBaseId, paintBaseId: undefined }] : [l]).map(async (l) => {
       if (buffers.has(l.id)) return;
       const blob = await blobDb.get(keyFor(l.id)).catch(() => undefined);
       const canvas = blob ? await blobToCanvas(blob).catch(() => null) : null;
+      // A missing foundation must never be replaced by blank pixels when objects are moved.
+      if (!canvas && baseIds.has(l.id)) return;
+      if (buffers.has(l.id)) return;
       buffers.set(l.id, canvas ?? createCanvas(l.pxWidth, l.pxHeight));
       changed = true;
     }),

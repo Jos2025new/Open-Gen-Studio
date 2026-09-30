@@ -5,7 +5,7 @@ import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedVal
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
-import { copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer, strokeSegment } from './raster';
+import { composeRaster, rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
@@ -66,7 +66,7 @@ export function renameDoc(sessionId: string, docId: string, name: string): void 
 export function deleteDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
-  void deleteBuffers(doc.layers.filter((l) => l.type === 'raster').map((l) => l.id));
+  void deleteBuffers(rasterBufferIds(doc.layers.filter((l) => l.type === 'raster')));
   dropHistory(docId);
   patchSession(sessionId, (s) => {
     const docs = s.docs.filter((d) => d.id !== docId);
@@ -117,7 +117,7 @@ export async function placeAsset(sessionId: string, docId: string, assetId: stri
       setBuffer(base.id, canvas);
       const rect = D.fitRect(current.width, current.height, canvas.width, canvas.height, 'cover');
       setDoc(sessionId, docId, (d) =>
-        D.updateLayer(d, base.id, { ...rect, pxWidth: canvas.width, pxHeight: canvas.height, rev: base.rev + 1, sourceAssetId: assetId, name: name ?? base.name }),
+        D.updateLayer(d, base.id, { ...rect, paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, rev: base.rev + 1, sourceAssetId: assetId, name: name ?? base.name }),
       );
       setDoc(sessionId, docId, (d) => ({ ...d, activeLayerId: base.id }));
       return base.id;
@@ -135,7 +135,7 @@ export async function placeAsset(sessionId: string, docId: string, assetId: stri
     }
     setBuffer(targetLayer.id, canvas);
     const rect = { x: targetLayer.x, y: targetLayer.y, width: targetLayer.width, height: (targetLayer.width * canvas.height) / canvas.width };
-    setDoc(sessionId, docId, (d) => D.updateLayer(d, targetLayer!.id, { ...rect, pxWidth: canvas.width, pxHeight: canvas.height, rev: targetLayer!.rev + 1, sourceAssetId: assetId }));
+    setDoc(sessionId, docId, (d) => D.updateLayer(d, targetLayer!.id, { ...rect, paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, rev: targetLayer!.rev + 1, sourceAssetId: assetId }));
     return targetLayer.id;
   }
   const rect = current.layers.length
@@ -176,7 +176,7 @@ export function rebasePaintLayer(sessionId: string, docId: string, layerId: stri
   const doc = getDoc(sessionId, docId);
   const l = doc?.layers.find((x) => x.id === layerId);
   const buf = l?.type === 'raster' && !l.sourceAssetId ? getBuffer(l.id) : undefined;
-  if (!doc || !l || l.type !== 'raster' || !buf) return;
+  if (!doc || !l || l.type !== 'raster' || !buf || l.paintBaseId) return;
   if (l.x === 0 && l.y === 0 && l.width === doc.width && l.height === doc.height && buf.width === doc.width && buf.height === doc.height) return;
   const c = document.createElement('canvas');
   c.width = doc.width;
@@ -320,7 +320,7 @@ export async function replaceLayerPixels(sessionId: string, docId: string, layer
   setBuffer(layer.id, canvas);
   // Keep the on-canvas width, follow the new pixel aspect (reframe/upscale change it).
   const height = (layer.width * canvas.height) / canvas.width;
-  setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
+  setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
 }
 
 /** PNG/JPG through the editor renderer; SVG/PDF keep layers as vector objects (design/export.ts). */
@@ -407,16 +407,17 @@ function paintStrokesLayer(sessionId: string, docId: string, strokes: StrokeSpec
   const c = document.createElement('canvas');
   c.width = doc.width;
   c.height = doc.height;
-  const ctx = c.getContext('2d')!;
-  for (const s of strokes) {
-    s.points.forEach((p, i) => {
-      const a = s.points[Math.max(0, i - 1)];
-      const width = s.size * (s.pressure ? 0.4 + p[2] * 1.2 : 1);
-      strokeSegment(ctx, { x: a[0], y: a[1] }, { x: p[0], y: p[1] }, { width, color: s.color, opacity: 1, erase: false });
-    });
-  }
-  const layer = D.newRasterLayer(name || 'Painting', { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height });
+  let layer = D.newRasterLayer(name || 'Painting', { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height });
   setBuffer(layer.id, c);
+  layer = withPaintBase(layer);
+  layer.paintStrokes = strokes.map((s) => ({
+    id: uid('rst'), x: 0, y: 0, color: s.color, opacity: 1, erase: false,
+    segments: s.points.map((p, i) => {
+      const a = s.points[Math.max(0, i - 1)];
+      return [a[0], a[1], p[0], p[1], s.size * (s.pressure ? 0.4 + p[2] * 1.2 : 1)] as [number, number, number, number, number];
+    }),
+  }));
+  composeRaster(layer);
   mutateDoc(sessionId, docId, (d) => D.insertLayer(d, layer, 'top'));
   return layer.id;
 }

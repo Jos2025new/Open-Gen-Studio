@@ -665,8 +665,21 @@ interface LayerBase {
   blend: BlendMode;
 }
 
+export interface RasterStroke {
+  id: string;
+  /** Brush segments in buffer pixels: start x/y, end x/y, width. */
+  segments: Array<[number, number, number, number, number]>;
+  x: number;
+  y: number;
+  color: string;
+  opacity: number;
+  erase: boolean;
+}
+
 export interface RasterLayer extends LayerBase {
   type: 'raster';
+  paintBaseId?: string;
+  paintStrokes?: RasterStroke[];
   x: number;
   y: number;
   width: number;

@@ -664,3 +664,10 @@ Contrastado con esquemas vivos de fal, Atlas y NanoGPT antes de tocar código.
 7. [x] Panel derecho: ancho arrastrable (borde izquierdo, guardado en localStorage), botón para plegar, secciones "Layers" y "Properties" plegables; el composer se centra con la variable `--layers-w`. *Razón: más espacio de lienzo.*
 8. [x] Typecheck, tests, navegador; commit.
 9. [x] Extra hallado al verificar: el editor de texto se cerraba al crearse (el `mousedown` del lienzo le quitaba el foco) → foco en `requestAnimationFrame`. Separado el contador de grupo en la lista de modelos ("LOCAL DEMO 1").
+
+## Tarea — cajas independientes de trazos raster (2026-09-30)
+- [x] S1. Conservar el bitmap previo y registrar segmentos del pincel dentro de RasterLayer; componer con strokeSegment existente. Motivo: mover un trazo sin borrar los otros ni convertirlo en una capa. Archivos: types.ts, design/raster.ts, design/actions.ts; engine/actions.ts solo para eliminar también el bitmap base al borrar la sesión.
+- [x] S2. Stage: selección y arrastre de la caja de cada trazo; Shift permite mover/escalar la capa completa. Coordenadas locales conservadas al transformar la capa. Motivo: independencia del trazo y movimiento conjunto sin deformaciones.
+- [x] S3. Conservar lectura, duplicado, historial y guardado existentes; pruebas acotadas y typecheck/suite con límite de dos minutos, sin navegador; commit. Los trazos antiguos fusionados no se pueden separar automáticamente.
+
+Verificado: typecheck; suite completa 325 verdes + 1 omitida (22 s); tras protección de bitmap base ausente, 9 pruebas raster verdes (1 s). Historial, coordenadas relativas, duplicado y recarga cubiertos con buffers/almacenamiento simulados. Sin navegador por instrucción del usuario. Shift-arrastre conserva el movimiento de la capa; los trazos antiguos siguen en su bitmap.

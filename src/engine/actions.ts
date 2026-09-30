@@ -15,7 +15,7 @@ import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubject
 import { needsSpendCheck } from './pricing';
 import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
-import { deleteBuffers } from './design/raster';
+import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { designerDims } from './agent/runtime';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
@@ -740,7 +740,7 @@ export function deleteSession(sessionId: string): void {
   const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
   const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id)).map((a) => a.id);
   const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId).map((g) => g.id);
-  const rasterIds = s.docs.flatMap((d) => d.layers.filter((l) => l.type === 'raster').map((l) => l.id));
+  const rasterIds = rasterBufferIds(s.docs.flatMap((d) => d.layers.filter((l) => l.type === 'raster')));
   useStore.setState((cur) => {
     const sessions = { ...cur.sessions };
     delete sessions[sessionId];

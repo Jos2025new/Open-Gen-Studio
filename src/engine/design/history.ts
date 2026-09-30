@@ -1,5 +1,5 @@
 import type { DesignDoc } from '../types';
-import { restoreBuffers, snapshotBuffers } from './raster';
+import { rasterBufferIds, restoreBuffers, snapshotBuffers } from './raster';
 
 /* Undo/redo for Designer documents. Raster pixels are captured by reference (copy-on-write buffers). */
 
@@ -27,7 +27,7 @@ function stack(docId: string): Stack {
 }
 
 function capture(doc: DesignDoc): Snapshot {
-  const rasterIds = doc.layers.filter((l) => l.type === 'raster').map((l) => l.id);
+  const rasterIds = rasterBufferIds(doc.layers.filter((l) => l.type === 'raster'));
   return { doc, buffers: snapshotBuffers(rasterIds) };
 }
 
