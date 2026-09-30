@@ -9,6 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — estado visible e historial de generaciones del nodo (2026-09-29)
+Alcance: tarjeta de Nodos. HEAD `1cda323`, árbol limpio. Sin cambios al executor, gasto, guardado ni salida activa al consultar el historial.
+- [x] V1. Inspeccionar estado y previsualización de `nodes.tsx`; confirmar generaciones existentes por `stepId`/`generationId`. Razón: reutilizar datos guardados.
+- [x] V2. Aviso visible de generación sobre la tarjeta y contador de historial solo con 2+ intentos; miniaturas abren el visor existente. Archivos: `nodes.tsx`, `styles/node.css`. Razón: identificar el proceso y consultar salidas anteriores sin cambiar dependencias.
+- [x] V3. Typecheck, suite y navegador con fixtures locales (proceso, historial y apertura de salida anterior); documentar y commit. Sin llamadas pagadas.
+  Verificado: typecheck verde; suite 304 pruebas verdes + 1 omitida (el primer pase tuvo un timeout de 5 s en `composer-choice`, el segundo pasó con timeout de 15 s). Navegador en 5173 con tres intentos locales: estado Generating con 35%, contador 2/3 y miniaturas; abrir la primera salida mantiene `generationId` de la segunda; con un solo intento desaparece el contador, al terminar desaparece el aviso. Sin errores de navegador. Sin probar una generación real con proveedor ni progreso remoto.
+
 ## Tarea — Run vigente y acciones del agente sobre nodos existentes (2026-09-29)
 Base verificada: HEAD `34dbc31`, árbol limpio. Alcance: mismo grafo y executor; sin Designer, cascada nueva, actualización automática de modelos ni cambios al guardado `feffc15`. Sin generaciones pagadas.
 - [x] R1. Inspeccionar `flow/graph.ts`, `flow/actions.ts`, `executor.ts`, `jobs.ts`, tipos, acciones UI y aprobación/materialización (`agent/runtime.ts`). Razón: comparar solicitudes equivalentes y conservar transformaciones existentes.

@@ -155,6 +155,42 @@ function StatusPill({ node }: { node: GraphNode }) {
   return null;
 }
 
+function NodeHistory({ node }: { node: GraphNode }) {
+  const sessionId = useSessionId();
+  const generations = useStore(s => s.generations);
+  const pop = usePopover();
+  const current = runsGeneration(node.data) ? node.data.generationId : undefined;
+  const history = Object.values(generations).filter(g => g.id === current || (g.sessionId === sessionId && g.stepId === node.id)).sort((a, b) => a.createdAt - b.createdAt);
+  if (history.length < 2) return null;
+  const index = history.findIndex(g => g.id === current);
+  return <>
+    <button ref={pop.ref} type="button" className="nc-history-count nodrag" aria-label={`Generation history: ${history.length} generations`} aria-expanded={pop.open} onClick={pop.toggle}>
+      {index >= 0 ? index + 1 : history.length}/{history.length} <ChevronDown size={11} />
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={280} label="Generation history">
+      <PopoverHeader title="Generation history" />
+      <div className="nc-history-list">
+        {history.map((g, i) => <div key={g.id} className={`nc-history-entry ${g.id === current ? 'is-current' : ''}`}>
+          <div className="nc-history-heading"><span>Generation {i + 1}{g.id === current ? ' · Current' : ''}</span><span>{g.status === 'running' || g.status === 'queued' ? 'Generating…' : g.status === 'done' ? '' : g.status}</span></div>
+          {g.assetIds.length ? <div className="nc-history-outputs">{g.assetIds.map((id, outputIndex) => <button key={id} type="button" aria-label={`View generation ${i + 1}, output ${outputIndex + 1}`} onClick={() => { pop.close(); setUi({ lightbox: { assetIds: g.assetIds, index: outputIndex } }); }}>
+            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+          </button>)}</div> : <p>{g.text ?? g.error ?? g.statusText ?? 'No output yet'}</p>}
+        </div>)}
+      </div>
+    </Popover>
+  </>;
+}
+
+function GenerationProgress({ node }: { node: GraphNode }) {
+  const attempt = useStore(s => nodeAttempt(node, s.generations));
+  if (!attempt || !['queued', 'running'].includes(attempt.status)) return null;
+  return <div className="nc-generating" role="status" aria-live="polite">
+    <div className="nc-generating-label"><LoaderCircle size={18} className="spin" /><strong>{attempt.status === 'queued' ? 'Queued' : 'Generating…'}</strong>{attempt.progress != null ? <span>{Math.round(attempt.progress * 100)}%</span> : null}</div>
+    {attempt.statusText ? <span className="nc-generating-detail">{attempt.statusText}</span> : null}
+    {attempt.progress != null ? <progress max={1} value={attempt.progress} aria-label="Generation progress" /> : null}
+  </div>;
+}
+
 /** The asset a node currently shows (and passes downstream), plus its generation. */
 function nodeOutput(node: GraphNode, generations: Record<string, Generation>) {
   const d = node.data;
@@ -694,6 +730,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
         <div className="nc-label">
           <Icon size={12} />
           <input className="nc-title nodrag" value={d.title} onChange={(e) => patchNodeData(sessionId, node.id, { title: e.target.value })} aria-label="Node title" />
+          <NodeHistory node={node} />
           <StatusPill node={node} />
         </div>
         {d.kind === 'text' ? (
@@ -710,6 +747,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
             onDoubleClick={() => assetId && setUi({ lightbox: { assetIds: [assetId], index: 0 } })}
           >
             <Preview node={node} />
+            <GenerationProgress node={node} />
           </div>
         )}
       </div>
