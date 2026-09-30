@@ -333,7 +333,7 @@ export const OPS: Record<OpId, OpDef> = {
     engine: 'video_edit',
     quick: false,
     fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. make it night with neon reflections', required: true }],
-    instruction: (p) => `${String(p.instruction).trim()}. Apply only this change; keep motion, timing, framing and everything else identical.`,
+    instruction: (p) => `${String(p.instruction).trim()}. Apply only this change; keep the same aspect ratio, framing (no crop or zoom), motion, timing and everything else identical.`,
   },
   video_extend: {
     id: 'video_extend',
@@ -345,7 +345,7 @@ export const OPS: Record<OpId, OpDef> = {
     quick: false,
     fields: [{ key: 'instruction', label: 'Then', type: 'text', default: '', placeholder: 'e.g. the camera pulls back as she walks into the rain', required: true }],
     instruction: (p) =>
-      `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same characters, setting, style, lighting and camera language.`,
+      `Extend this video, continuing seamlessly from its last frame: ${String(p.instruction).trim()}. Keep the same aspect ratio, framing, characters, setting, style, lighting and camera language.`,
   },
   edit_region: {
     id: 'edit_region',

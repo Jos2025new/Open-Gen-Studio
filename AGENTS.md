@@ -9,6 +9,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — Edit/Extend video cambiaban la proporción y el encuadre (2026-09-30)
+Origen: Gemini Omni 1.1 Flash Video Edit devolvió un clip 1:1 (640×640) con otra proporción y más cerrado. Causa: su esquema (Atlas) no tiene parámetro de proporción, y la app solo enviaba "auto" si existía; sin él, el modelo decide.
+- [x] V1. Modelos con opciones de proporción y sin "auto": se envía la de la entrada (`match_input`) o la más cercana a la del clip. *Dónde:* `jobs.ts` (tras `videoOpSettings`).
+- [x] V2. Modelos sin parámetro (Omni): la instrucción de Edit y Extend pide conservar proporción y encuadre (sin recorte ni zoom). *Dónde:* `ops.ts`. Límite: es una petición al modelo; puede no obedecer. Suite verde; sin prueba de pago.
+
 ## Tarea — tarjetas de audio/3D cuadradas de verdad, miniatura 3D y tarjetas de error acotadas (2026-09-30)
 - [x] T1. El tile con `--ratio` usa `aspect-ratio` (audio y 3D quedaban aplastados: medían su contenido). Tarjetas de error/cancelado con el ancho de una tarjeta de resultado (300–480 px), no toda la columna. *Dónde:* `chat.css`.
 - [x] T2. Miniatura frontal de un 3D sin render del proveedor: `lib/model3dThumb.ts` la genera una vez con model-viewer fuera de vista (uno a la vez, 20 s máx.) y la guarda como JPEG en `asset.thumbnailUrl`; `AssetMedia` la pide al mostrar el 3D. *Por qué:* un icono no dice qué modelo es. Navegador: Seed3D muestra el personaje. Límite: en uno de los dos archivos de Seed3D la miniatura salió negra (quizá el segundo archivo es otra variante o carga lenta); si persiste, borrar su `thumbnailUrl` la vuelve a generar.

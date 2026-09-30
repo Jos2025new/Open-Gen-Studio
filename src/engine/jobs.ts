@@ -847,6 +847,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
     const settings = videoOpSettings(def.engine, schema, input.params);
+    // No "auto" option: keep the source's shape with the nearest ratio, or the model picks its own (16:9) and reframes.
+    const aspectOpts = paramByRole(schema, 'aspect')?.options;
+    if (settings.aspect == null && aspectOpts?.length && source?.width && source.height) settings.aspect = matchInputOption(aspectOpts) ?? nearestAspect(aspectOpts, source.width / source.height, undefined) ?? undefined;
     const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
     const clip = get().assets[input.sourceAssetId];
     return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, choice.ref) };
