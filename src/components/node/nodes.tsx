@@ -161,7 +161,7 @@ function HistoryOutput({ node, generation: g, assetId, index, number, onOpen }: 
   const asset = useStore(s => s.assets[assetId]);
   const info = usePopover();
   return <div className="nc-history-output">
-    <button type="button" className="nc-history-preview" aria-label={`View generation ${number}, output ${index + 1}`} onClick={() => { onOpen(); setUi({ lightbox: { assetIds: g.assetIds, index } }); }}><AssetMedia assetId={assetId} hoverPlay draggable={false} /></button>
+    <button type="button" className="nc-history-preview" style={{ aspectRatio: asset?.width && asset?.height ? `${asset.width} / ${asset.height}` : '1' }} aria-label={`View generation ${number}, output ${index + 1}`} onClick={() => { onOpen(); setUi({ lightbox: { assetIds: g.assetIds, index } }); }}><AssetMedia assetId={assetId} hoverPlay draggable={false} /></button>
     <div className="nc-history-actions">
       <IconButton ref={info.ref} icon={Info} size="sm" label={`Details for generation ${number}, output ${index + 1}`} active={info.open} onClick={info.toggle} />
       <IconButton icon={RotateCcw} size="sm" label={`Restore parameters from generation ${number}`} onClick={() => { const error = restoreNodeGeneration(sessionId, node.id, g.id); toast(error ?? 'Parameters restored. Run when ready.', error ? 'error' : 'success'); }} />
@@ -186,7 +186,7 @@ function NodeHistory({ node }: { node: GraphNode }) {
     <button ref={pop.ref} type="button" className="nc-history-count nodrag" aria-label={`Generation history: ${history.length} generations`} aria-expanded={pop.open} onClick={pop.toggle}>
       {index >= 0 ? index + 1 : history.length}/{history.length} <ChevronDown size={11} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={280} label="Generation history">
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={240} label="Generation history">
       <PopoverHeader title="Generation history" />
       <div className="nc-history-list">
         {history.map((g, i) => <div key={g.id} className={`nc-history-entry ${g.id === current ? 'is-current' : ''}`}>

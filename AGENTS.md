@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — corregir disposición del historial (2026-09-29)
+Base `b9bd710`, árbol limpio. Corrección visual solicitada, sin cambios de comportamiento.
+- [x] D1. Revisar únicamente historial/CSS. Razón: los iconos laterales dejaban ancho vacío.
+- [x] D2. Miniaturas al ancho del panel compacto, proporción original e iconos debajo; quitar separador/espacio añadido. Archivos: `nodes.tsx`, `node.css`.
+- [x] D3. Typecheck, suite y comprobación breve en navegador; commit.
+
+  Verificado: typecheck y suite (308 verdes + 1 omitida); navegador: panel de 240px, miniatura ocupa el ancho útil (202px) y ambos iconos están debajo. Sin generaciones ni cambios de lógica.
+
 ## Tarea — acciones e información en el historial del nodo (2026-09-29)
 Base: `fd4c3ce`, árbol limpio. Alcance: historial existente; reutilizar GenerationInfo, deleteAssets y acciones de edición; restaurar parámetros no genera ni cambia la salida activa.
 - [x] I1. Inspeccionar información, borrado y ajustes guardados. Razón: usar la información ya existente y evitar duplicar controles.
