@@ -64,4 +64,3 @@
 .canvas-zoom-controls { display: flex; align-items: center; justify-content: space-between; padding: 6px; }
 .canvas-search-result { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 8px; text-align: left; font-size: 12px; border-radius: 6px; overflow-wrap: anywhere; }
 .canvas-search-result:hover { background: var(--surface-3); }.canvas-search-result .faint { font-size: 10px; }.canvas-search-result mark { color: var(--accent); background: var(--accent-soft); border-radius: 2px; }
-@media (max-width: 767px) { .canvas-navigation { bottom: 150px; }.react-flow__minimap.canvas-map { bottom: 210px; } }

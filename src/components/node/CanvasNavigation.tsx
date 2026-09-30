@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
 import { Map, Minus, Plus, Redo2, Search, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
@@ -29,6 +29,32 @@ export function CanvasNavigation({ sessionId, onSelect }: { sessionId: string; o
   const rf = useReactFlow();
   const { zoom } = useViewport();
   const [mapOpen, setMapOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const liftRef = useRef(0);
+  const [lift, setLift] = useState(0);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const canvas = panel?.closest('.node-canvas');
+    const dock = canvas?.parentElement?.querySelector('.composer-dock');
+    if (!panel || !canvas || !dock) return;
+    const place = () => {
+      const p = panel.getBoundingClientRect(), d = dock.getBoundingClientRect();
+      const top = p.top + liftRef.current, bottom = p.bottom + liftRef.current;
+      const overlaps = p.right > d.left && p.left < d.right && bottom > d.top && top < d.bottom;
+      const next = overlaps ? Math.max(0, bottom - d.top + 12) : 0;
+      if (Math.abs(next - liftRef.current) < 0.5) return;
+      liftRef.current = next;
+      panel.style.bottom = `${next}px`;
+      setLift(next);
+    };
+    const observer = new ResizeObserver(place);
+    observer.observe(panel);
+    observer.observe(canvas);
+    observer.observe(dock);
+    window.addEventListener('resize', place);
+    place();
+    return () => { observer.disconnect(); window.removeEventListener('resize', place); };
+  }, []);
   const [direction, setDirection] = useState<'undo' | 'redo'>('undo');
   const history = usePopover();
   const undoPop = usePopover();
@@ -73,8 +99,8 @@ export function CanvasNavigation({ sessionId, onSelect }: { sessionId: string; o
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
-      {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" maskColor="rgba(10,10,11,0.7)" nodeColor="var(--accent)" /> : null}
-      <Panel position="bottom-left" className="canvas-navigation">
+      {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="rgba(10,10,11,0.7)" nodeColor="var(--accent)" /> : null}
+      <Panel ref={panelRef} position="bottom-left" className="canvas-navigation" style={{ bottom: lift }}>
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />

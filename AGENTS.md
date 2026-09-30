@@ -9,6 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — navegación de Nodos sin solapar composer (2026-09-30)
+- [x] R1. CanvasNavigation.tsx: medir panel/composer-dock y calcular desplazamiento hacia arriba únicamente cuando la posición inferior normal se solape. ResizeObserver y resize recalculan al ampliar navegador, redimensionar o cambiar altura del prompt. Razón: responder al espacio real sin usar el zoom del grafo ni alterar la posición cuando cabe.
+- [x] R2. node.css: retirar el desplazamiento móvil fijo; aplicar al MiniMap el mismo desplazamiento del panel. Razón: conservar funciones y evitar otro solapamiento.
+- [x] R3. Typecheck breve y diff; sin navegador por instrucción vigente. Commit.
+
+Verificado: typecheck y diff verdes. Sin navegador; revisión visual pendiente del usuario al 175% y al volver a una vista sin solapamiento.
+
 ## Tarea — espacio superior de sidebar con ampliación (2026-09-30)
 - [x] Z1. shell.css: reducir margen logo/grupo de 104 a 44 px en barra compacta y de 80 a 32 px en expandida; actualizar el override móvil. Razón: con ampliación 140%, el centro del + baja de ~254 a ~170 px, altura indicada en la captura. Sin cambiar presupuesto ni tamaños de iconos.
 - [x] Z2. Revisar diff y commit; sin navegador ni suite para este ajuste de espaciado.
