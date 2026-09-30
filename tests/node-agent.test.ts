@@ -6,8 +6,9 @@ vi.mock('../src/engine/executor',async original=>({...await original<typeof impo
 import { useStore, appendFeed } from '../src/store/store';
 import { editGraphTool } from '../src/engine/agent/nodeTools';
 import { sendAgentMessage, approvePlan, presentNodeRun, undoNodeDeletion } from '../src/engine/agent/runtime';
-import { deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
-import type { Graph, PlanFeedItem } from '../src/engine/types';
+import { deleteNodes, deleteNodesWithUndo, patchNodeData, connectNodes } from '../src/engine/flow/actions';
+import { buildContext } from '../src/engine/agent/context';
+import type { Graph, PlanFeedItem, NoticeFeedItem } from '../src/engine/types';
 let sid:string;
 const data=(title:string)=>({kind:'image' as const,title,prompt:'old',modelRef:'local::studio-image',settings:{count:1,advanced:{}},outputIndex:0});
 beforeEach(()=>{
@@ -60,6 +61,31 @@ describe('agent actions on existing nodes',()=>{
   patchNodeData(sid,'final',{prompt:'keep later edit'});
   expect(undoNodeDeletion(sid,'undo')).toBeNull();expect(session().graph.nodes).toHaveLength(2);expect(session().graph.edges.map(e=>e.id)).toEqual(['edge']);
   expect(session().graph.nodes.find(n=>n.id==='final')!.data).toMatchObject({prompt:'keep later edit'});expect(useStore.getState().assets).toBe(beforeAssets);
+ });
+ it('records UI deletion once and exposes recovery to the agent', async()=>{
+  expect(deleteNodes(sid,['key2'])).toBeNull();
+  const notices=session().feed.filter(f=>f.type==='notice') as NoticeFeedItem[];
+  expect(notices).toHaveLength(1);expect(notices[0].undoNodes?.edges[0].id).toBe('edge');
+  const ctx=buildContext(session(),{workspace:'node',style:'auto',round:0,maxRounds:2,attachments:[]});
+  expect(ctx).toContain(`deletion_id:${notices[0].id}`);expect(ctx).toContain('Never restore/recreate deleted nodes');
+  expect((await editGraphTool(sid,'restore_nodes',{deletion_id:notices[0].id})).text).toContain('Restored');
+  expect(session().graph.nodes.map(n=>n.id)).toContain('key2');expect(session().graph.edges[0].id).toBe('edge');
+  expect((session().feed[0] as NoticeFeedItem).undone).toBe(true);
+ });
+ it('recovers one node from a batch, then the rest, without duplicate notices',async()=>{
+  await editGraphTool(sid,'delete_nodes',{node_ids:['key2','final']});
+  expect(session().feed).toHaveLength(1);const id=session().feed[0].id;
+  expect((await editGraphTool(sid,'restore_nodes',{deletion_id:id,node_ids:['absent']})).text).toContain('not part');
+  await editGraphTool(sid,'restore_nodes',{deletion_id:id,node_ids:['key2']});
+  expect(session().graph.nodes.map(n=>n.id)).toEqual(['key2']);
+  expect((session().feed[0] as NoticeFeedItem).undoNodes?.nodes.map(n=>n.id)).toEqual(['final']);
+  expect(undoNodeDeletion(sid,id)).toBeNull();expect(session().graph.nodes).toHaveLength(2);expect(session().graph.edges[0].id).toBe('edge');
+ });
+ it('does not offer deleted outputs as recent node assets, while retaining the library',()=>{
+  const st=useStore.getState();
+  useStore.setState({assets:{...st.assets,'removed-output':{id:'removed-output',sessionId:sid,kind:'image',origin:'upload',createdAt:Date.now()} as never},library:[{id:'subject',name:'Aria',frontal:'removed-output'} as never]});
+  const ctx=buildContext(session(),{workspace:'node',style:'auto',round:0,maxRounds:2,attachments:[]});
+  expect(ctx).not.toContain('asset:removed-output');expect(ctx).toContain('@Aria');
  });
  it('preserves a subsequently occupied single-input port on Undo',()=>{
   const deleted=deleteNodesWithUndo(sid,['key2']);

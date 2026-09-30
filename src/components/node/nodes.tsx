@@ -173,7 +173,7 @@ function NodeHistory({ node }: { node: GraphNode }) {
         {history.map((g, i) => <div key={g.id} className={`nc-history-entry ${g.id === current ? 'is-current' : ''}`}>
           <div className="nc-history-heading"><span>Generation {i + 1}{g.id === current ? ' · Current' : ''}</span><span>{g.status === 'running' || g.status === 'queued' ? 'Generating…' : g.status === 'done' ? '' : g.status}</span></div>
           {g.assetIds.length ? <div className="nc-history-outputs">{g.assetIds.map((id, outputIndex) => <button key={id} type="button" aria-label={`View generation ${i + 1}, output ${outputIndex + 1}`} onClick={() => { pop.close(); setUi({ lightbox: { assetIds: g.assetIds, index: outputIndex } }); }}>
-            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+            <AssetMedia assetId={id} hoverPlay draggable={false} />
           </button>)}</div> : <p>{g.text ?? g.error ?? g.statusText ?? 'No output yet'}</p>}
         </div>)}
       </div>
@@ -250,7 +250,7 @@ function Preview({ node }: { node: GraphNode }) {
         <div className="nc-strip nodrag">
           {all.map((id, i) => (
             <button key={id} type="button" className={id === assetId ? 'is-active' : ''} onClick={() => patchNodeData(sessionId, node.id, { outputIndex: i })} data-tip={`Use output ${i + 1} downstream`}>
-              <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+              <AssetMedia assetId={id} hoverPlay draggable={false} />
             </button>
           ))}
         </div>
@@ -418,7 +418,7 @@ function InputRefs({ node }: { node: GraphNode }) {
         <span key={l.edge.id} className={`nt-ref ${l.edited ? 'is-edited' : ''}`} data-tip={l.assetId ? `${l.label}${l.edited ? ' · edited' : ''} · click to sketch over it` : l.label}>
           {l.assetId ? (
             <button type="button" className="nt-ref-open" aria-label="Sketch over this reference" onClick={() => setUi({ sketch: { assetId: l.assetId!, nodeId: l.edge.source } })}>
-              <AssetMedia assetId={l.assetId} hoverPlay={false} draggable={false} />
+              <AssetMedia assetId={l.assetId} hoverPlay draggable={false} />
             </button>
           ) : (
             <ImageIcon size={14} />
@@ -444,7 +444,7 @@ function InputRefs({ node }: { node: GraphNode }) {
         <div className="nt-pick">
           {recent.map((a) => (
             <button key={a.id} type="button" onClick={() => add(a.id)}>
-              <AssetMedia assetId={a.id} hoverPlay={false} draggable={false} />
+              <AssetMedia assetId={a.id} hoverPlay draggable={false} />
             </button>
           ))}
         </div>

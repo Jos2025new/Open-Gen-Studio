@@ -1,6 +1,6 @@
 import { coerceSettings } from '../params';
 import { resolveModel } from '../catalog';
-import { connectNodes, deleteNodesWithUndo, disconnectEdges, patchNodeData, setNodeModel } from '../flow/actions';
+import { restoreNodeDeletion, connectNodes, deleteNodesWithUndo, disconnectEdges, patchNodeData, setNodeModel } from '../flow/actions';
 import { useStore } from '../../store/store';
 import { connectNodesSchema, disconnectNodesSchema, editNodeSchema, nodeIdsSchema } from './tools';
 import type { DeletedNodes } from '../flow/actions';
@@ -40,6 +40,14 @@ export async function editGraphTool(sessionId: string, name: string, input: unkn
     const v = disconnectNodesSchema.safeParse(input);
     if (!v.success) return { text: `Invalid disconnect_nodes: ${v.error.message}` };
     return { text: disconnectEdges(sessionId, v.data.edge_ids) ?? 'Disconnected existing connections.' };
+  }
+  if (name === 'restore_nodes') {
+    const args = input as { deletion_id?: unknown; node_ids?: unknown } | null;
+    if (!args || typeof args.deletion_id !== 'string') return { text: 'restore_nodes requires a deletion_id from the context.' };
+    const parsed = args.node_ids === undefined ? undefined : nodeIdsSchema.safeParse({ node_ids: args.node_ids });
+    if (parsed && !parsed.success) return { text: `Invalid restore_nodes: ${parsed.error.message}` };
+    const error = restoreNodeDeletion(sessionId, args.deletion_id, parsed?.success ? parsed.data.node_ids : undefined);
+    return { text: error ?? 'Restored the requested existing nodes using the deletion snapshot. Available connections were restored; later changes were preserved.' };
   }
   const v = nodeIdsSchema.safeParse(input);
   if (!v.success) return { text: `Invalid delete_nodes: ${v.error.message}` };

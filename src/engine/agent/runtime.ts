@@ -1,6 +1,6 @@
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
-import { restoreNodes } from '../flow/actions';
+import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
 import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
@@ -495,12 +495,9 @@ export async function presentNodeRun(sessionId: string, targets: string[], toolC
 }
 
 export function undoNodeDeletion(sessionId: string, itemId: string): string | null {
-  const item = session(sessionId).feed.find(f => f.id === itemId);
-  if (item?.type !== 'notice' || !item.undoNodes || item.undone) return 'This deletion is no longer available to undo.';
-  const restored = restoreNodes(sessionId, item.undoNodes);
-  if (restored.error) { toast(restored.error, 'error'); return restored.error; }
-  updateFeedItem<NoticeFeedItem>(sessionId, itemId, { undone: true, text: restored.skipped.length ? `Nodes restored. Connections changed since deletion were preserved: ${restored.skipped.join('; ')}` : 'Nodes and their connections restored.' });
-  return null;
+  const error = restoreNodeDeletion(sessionId, itemId);
+  if (error) toast(error, 'error');
+  return error;
 }
 
 async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<void> {
@@ -979,11 +976,10 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           respond(problem ?? `${mode === 'check' ? 'Checking the providers' : 'Running the failed steps again'} for "${target!.plan.title}"; the plan card shows the progress. Tell the user in one short sentence.`);
           continue;
         }
-        if (['edit_node', 'connect_nodes', 'disconnect_nodes', 'delete_nodes'].includes(call.name)) {
+        if (['edit_node', 'connect_nodes', 'disconnect_nodes', 'delete_nodes', 'restore_nodes'].includes(call.name)) {
           if (workspace !== 'node') { respond('Graph actions work only on the node canvas.'); continue; }
           try {
             const result = await editGraphTool(sessionId, call.name, parsed.value);
-            if (result.deleted) appendFeed(sessionId, { ...feedBase('node'), type: 'notice', level: 'info', text: result.text, undoNodes: result.deleted });
             respond(result.text);
           } catch (error) { respond(`Cannot ${call.name}: ${(error as Error).message}`); }
           continue;

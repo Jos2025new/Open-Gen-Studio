@@ -12,6 +12,7 @@ import { useStore } from '../../store/store';
 import { activeDoc } from '../design/actions';
 import { REFERENCE_PROTOCOLS, modelFit } from '../modelRules';
 import { remainingBudget } from '../budget';
+import { nodeOutputAsset } from '../flow/graph';
 import { graphIndex } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
 
@@ -222,8 +223,12 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   }
   // Only this canvas's results: the chat, the node canvas and the designer keep separate assets.
   const canvas = canvasIndex(session, st.generations);
+  const liveNodeAssets = new Set(session.graph.nodes.flatMap(n => {
+    const output = nodeOutputAsset(n, st.generations);
+    return output ? [output] : [];
+  }));
   const recent = Object.values(st.assets)
-    .filter((a) => a.sessionId === session.id && canvas.visible(a, opts.workspace))
+    .filter((a) => a.sessionId === session.id && canvas.visible(a, opts.workspace) && (opts.workspace !== 'node' || liveNodeAssets.has(a.id)))
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 10);
   if (recent.length) {
@@ -249,6 +254,9 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (opts.workspace === 'node') {
     lines.push('For changes to an existing flow, locate its nodes with the index/read_graph and use edit_node/connect_nodes/disconnect_nodes/delete_nodes/run_nodes. Create new nodes only when the request requires them. run_nodes waits for the user approval click.');
     lines.push(graphIndex(session.graph, st.generations, nodeSelection(session.id)));
+    lines.push('The graph index is the current canvas. Library entries and old chat plans are not live nodes. Never restore/recreate deleted nodes or reintroduce their references automatically; use restore_nodes only when the user explicitly requests recovery. For an ambiguous "that girl/image", use the live selection or ask which reference; do not choose a deleted result from history.');
+    const deletions = session.feed.filter(f => f.type === 'notice' && f.undoNodes && !f.undone).slice(-10);
+    if (deletions.length) lines.push(`deleted nodes (recoverable with restore_nodes; not on the canvas):\n${deletions.map(f => f.type === 'notice' ? `  deletion_id:${f.id}: ${f.undoNodes!.nodes.map(n => `${n.id} ${n.data.kind} "${truncate(n.data.title, 40)}"`).join(', ')}` : '').join('\n')}`);
     const multi = Object.values(OPS).filter((o) => o.multiInput).map((o) => o.id);
     if (multi.length) lines.push(`node canvas cannot run: ${multi.join(', ')} (ops with several inputs); several clips = one node per clip`);
   }

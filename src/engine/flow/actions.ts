@@ -9,7 +9,7 @@ import { uid } from '../../lib/id';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
-import { patchGeneration, setGraph, toast, useStore } from '../../store/store';
+import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
 import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 
@@ -61,10 +61,14 @@ export function patchNodeData(sessionId: string, nodeId: string, patch: Partial<
 
 export function deleteNodes(sessionId: string, ids: string[]): string | null {
   const graph = get().sessions[sessionId]?.graph;
+  if (!graph) return 'No such session.';
   const missing = ids.find(id => !graph?.nodes.some(n => n.id === id));
   if (missing) return `No such node: ${missing}.`;
   const drop = new Set(ids);
-  return editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)) }));
+  const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
+  const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)) }));
+  if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted });
+  return error;
 }
 
 /** Add a node to the right of `fromId`, wired to its first input that accepts the source's output. */
@@ -331,4 +335,20 @@ export function restoreNodes(sessionId: string, deleted: DeletedNodes): { error:
     next = { ...next, edges: [...next.edges, { ...edge }] };
   }
   return { error: editGraph(sessionId, () => next), skipped };
+}
+
+/** Both chat Undo and requested agent recovery restore the same deletion snapshot. */
+export function restoreNodeDeletion(sessionId: string, itemId: string, nodeIds?: string[]): string | null {
+  const item = get().sessions[sessionId]?.feed.find(f => f.id === itemId);
+  if (item?.type !== 'notice' || !item.undoNodes || item.undone) return 'This deletion is no longer available to undo.';
+  const snapshot = item.undoNodes;
+  if (nodeIds?.some(id => !snapshot.nodes.some(n => n.id === id))) return 'A requested node is not part of this deletion.';
+  const nodes = nodeIds ? snapshot.nodes.filter(n => nodeIds.includes(n.id)) : snapshot.nodes;
+  if (!nodes.length) return 'No deleted nodes selected.';
+  const ids = new Set(nodes.map(n => n.id));
+  const restored = restoreNodes(sessionId, { nodes, edges: snapshot.edges.filter(e => ids.has(e.source) || ids.has(e.target)) });
+  if (restored.error) return restored.error;
+  const remaining = snapshot.nodes.filter(n => !ids.has(n.id));
+  updateFeedItem(sessionId, itemId, { undone: !remaining.length, undoNodes: { nodes: remaining, edges: snapshot.edges.filter(e => remaining.some(n => n.id === e.source || n.id === e.target)) }, text: `Restored: ${nodes.map(n => n.data.title).join(', ')}.${restored.skipped.length ? ` Connections not restored: ${restored.skipped.join('; ')}` : ''}${remaining.length ? ' Undo is available for the remaining deleted nodes.' : ''}` });
+  return null;
 }

@@ -15,7 +15,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 const asset = (id: string, generationId?: string): Asset => ({ id, kind: 'image', mime: 'image/png', width: 512, height: 512, sessionId: 's', generationId, origin: generationId ? 'generated' : 'upload', stored: true, favorite: false, createdAt: Date.now() });
-const gen = (id: string, origin: Generation['origin'], planId?: string): Generation => ({ id, sessionId: 's', origin, planId, prompt: id, assetIds: [`a_${id}`], settings: { count: 1, advanced: {} }, inputs: { refs: [] } } as unknown as Generation);
+const gen = (id: string, origin: Generation['origin'], planId?: string): Generation => ({ id, sessionId: 's', status: 'done', origin, planId, prompt: id, assetIds: [`a_${id}`], settings: { count: 1, advanced: {} }, inputs: { refs: [] } } as unknown as Generation);
 const base = (workspace: 'chat' | 'node') => ({ id: Math.random().toString(36), createdAt: 0, workspace });
 
 function setup(): Session {
@@ -26,7 +26,7 @@ function setup(): Session {
     { ...base('node'), type: 'plan', plan: { id: 'p_node', title: '', summary: '', workspace: 'node', steps: [], adjustments: [] } } as never,
     { ...base('chat'), type: 'plan', plan: { id: 'p_chat', title: '', summary: '', workspace: 'chat', steps: [], adjustments: [] } } as never,
   ];
-  s.graph = { ...s.graph, nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'x', assetId: 'up_node' } } as never] };
+  s.graph = { ...s.graph, nodes: [{ id: 'n1', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'x', assetId: 'up_node' } } as never, { id: 'n2', position: { x: 300, y: 0 }, data: { kind: 'image', title: 'Live output', prompt: '', generationId: 'nodeGen', outputIndex: 0, settings: {} } } as never] };
   const gens = { chat1: gen('chat1', 'composer'), nodeGen: gen('nodeGen', 'node'), nodePlan: gen('nodePlan', 'agent', 'p_node'), chatPlan: gen('chatPlan', 'agent', 'p_chat') };
   const assets: Record<string, Asset> = { up_chat: asset('up_chat'), up_node: asset('up_node'), loose: asset('loose') };
   for (const g of Object.values(gens)) assets[`a_${g.id}`] = asset(`a_${g.id}`, g.id);
@@ -55,7 +55,7 @@ describe('the agent sees only the active canvas', () => {
     for (const id of ['a_chat1', 'a_chatPlan', 'up_chat', 'loose']) expect(chat).toContain(`asset:${id}`);
     for (const id of ['a_nodeGen', 'a_nodePlan', 'up_node']) expect(chat).not.toContain(`asset:${id}`);
     const node = ctx('node');
-    for (const id of ['a_nodeGen', 'a_nodePlan', 'up_node', 'loose']) expect(node).toContain(`asset:${id}`);
-    for (const id of ['a_chat1', 'a_chatPlan', 'up_chat']) expect(node).not.toContain(`asset:${id}`);
+    for (const id of ['a_nodeGen', 'up_node']) expect(node).toContain(`asset:${id}`);
+    for (const id of ['a_chat1', 'a_chatPlan', 'up_chat', 'a_nodePlan', 'loose']) expect(node).not.toContain(`asset:${id}`);
   });
 });

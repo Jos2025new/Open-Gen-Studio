@@ -9,6 +9,16 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — respetar borrados y reproducir vídeos en Nodos (2026-09-29)
+Base: `d6eaee9`, árbol limpio. Alcance: reutilizar aviso/Deshacer, contexto y AssetMedia; sin motor, guardado ni llamadas nuevas.
+- [x] B1. Inspeccionar borrado UI/agente, contexto y hover. Razón: el borrado UI no conserva snapshot recuperable y los assets recientes no reflejan nodos vivos; CSS bloquea hover.
+- [x] B2. Unificar aviso recuperable del borrado; contexto distingue borrados de biblioteca y resultados activos; recuperar por petición usando restauración existente. Archivos: `flow/actions.ts`, `agent/{context,nodeTools,tools,runtime}.ts`, `tests/node-agent.test.ts`, `tests/canvas-scope.test.ts`.
+- [x] B3. Habilitar hover existente en previsualización e historial. Archivos: `nodes.tsx`, `node.css`. Typecheck, suite y comprobación breve del navegador sin gasto; documentar límites y commit.
+
+  Implementado: todas las eliminaciones manuales/agente dejan el mismo aviso recuperable; `restore_nodes` usa la misma acción de Undo y permite recuperar parte de un borrado. El contexto muestra IDs/títulos borrados y ofrece como recientes solo salidas activas; la biblioteca sigue disponible, claramente separada del canvas. Se reutiliza el snapshot del aviso existente, sin tablas ni consultas nuevas. Límite: no se pueden reconstruir conexiones de borrados anteriores de la UI que nunca dejaron un snapshot; sí se recuperan los avisos de borrado existentes del agente.
+
+  Verificado: typecheck verde; suite 307 verdes + 1 omitida. Tests: aviso único de UI/agente, contexto sin resultados huérfanos, biblioteca conservada, recuperación completa/parcial y puertos modificados posteriormente. Navegador breve en 5173, vídeo WebM local: hover reproduce, salir pausa y restablece; borrar deja un único Undo y pulsarlo restaura el ID original, sin errores. Se bloquearon escrituras al estado del servidor durante el fixture. Sin generaciones pagadas ni conversación con LLM real; no se midió latencia del proveedor.
+
 ## Tarea — estado visible e historial de generaciones del nodo (2026-09-29)
 Alcance: tarjeta de Nodos. HEAD `1cda323`, árbol limpio. Sin cambios al executor, gasto, guardado ni salida activa al consultar el historial.
 - [x] V1. Inspeccionar estado y previsualización de `nodes.tsx`; confirmar generaciones existentes por `stepId`/`generationId`. Razón: reutilizar datos guardados.
