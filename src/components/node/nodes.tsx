@@ -626,7 +626,7 @@ function GenNodeBody({ node }: { node: GraphNode & { data: GenNodeData } }) {
               modelPop.close();
               if (!ref) return;
               const sch = await ensureSchema(ref);
-              const { settings } = coerceSettings(sch ?? undefined, d.kind, { ...d.settings, advanced: {} });
+              const { settings } = coerceSettings(sch ?? undefined, d.kind, { ...d.settings, audio: undefined, advanced: {} });
               setNodeModel(sessionId, node.id, { modelRef: ref, settings });
             }}
           />

@@ -9,6 +9,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — tarjetas de audio y 3D del tamaño de su contenido; audio de vídeo que se heredaba apagado (2026-09-30)
+- [x] Z1. Tarjeta de audio y 3D con la misma regla que imagen/vídeo (`is-fit`): tile cuadrado, sin franja a todo el ancho ni hueco vacío; el audio lleva su reproductor dentro (sin reproducción automática en el chat). *Dónde:* `GenerationCard.tsx`, `AssetMedia.tsx` (`autoPlay`), `chat.css`.
+- [x] Z2. Seedance 2.0 Mini (composer) salió mudo: `composer.video.settings.audio` era `false` heredado del modelo anterior (`coerceSettings` conserva el valor al cambiar de modelo). Al cambiar de modelo (composer y nodo), el audio toma el valor por defecto del nuevo modelo. *Dónde:* `catalog.ts` (`selectComposerModel`), `nodes.tsx`. Límite: el composer actual sigue con audio apagado hasta que se active o se cambie de modelo.
+Typecheck y suite verdes; sin navegador.
+
 ## Tarea — Continue shot con modelo y parámetros; Extract frame que no se cuelga (2026-09-30)
 - [x] Y1. Continue shot usa el mismo selector (`VideoUpscaleControls`, engine `video`): solo modelos imagen→vídeo (`videoOpFits`); parámetros del esquema (incluida la duración) aplicados en `jobs.ts` solo si el usuario eligió modelo. *Dónde:* `catalog.ts`, `VideoUpscaleControls.tsx`, `nodes.tsx`, `OpForm.tsx`, `jobs.ts`, `flow/actions.ts`.
 - [x] Y2. Extract frame: `extractVideoFrame` falla a los 20 s con un error claro en vez de quedar "running" para siempre (la tarjeta/nodo se puede relanzar); `seek` resuelve si ya está en ese instante (no llega "seeked"). *Por qué:* desde pantalla completa quedó colgado y bloqueó el nodo. *Dónde:* `lib/media.ts`. Sin reproducir la causa exacta en navegador; typecheck y suite verdes.

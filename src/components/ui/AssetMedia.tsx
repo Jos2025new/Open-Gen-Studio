@@ -12,6 +12,7 @@ export function AssetMedia({
   hoverPlay = true,
   className,
   draggable = true,
+  autoPlay = true,
 }: {
   assetId: string;
   fit?: 'cover' | 'contain';
@@ -19,6 +20,7 @@ export function AssetMedia({
   hoverPlay?: boolean;
   className?: string;
   draggable?: boolean;
+  autoPlay?: boolean;
 }) {
   const asset = useStore((s) => s.assets[assetId]);
   const url = useAssetUrl(asset?.kind === 'model3d' ? null : assetId);
@@ -55,7 +57,7 @@ export function AssetMedia({
       <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={onDragStart}>
         <AudioLines size={controls ? 28 : 18} />
         {asset.duration ? <span className="num">{formatDuration(asset.duration * 1000)}</span> : null}
-        {controls ? <audio src={url} controls autoPlay onError={() => setFailed(true)} /> : null}
+        {controls ? <audio src={url} controls autoPlay={autoPlay} onError={() => setFailed(true)} /> : null}
       </div>
     );
   }

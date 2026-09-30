@@ -44,6 +44,8 @@ function chatResults(sessionId: string): string[] {
 
 function tileRatio(id: string): React.CSSProperties | undefined {
   const a = useStore.getState().assets[id];
+  // Sound and 3D have no frame: a square tile.
+  if (a?.kind === 'audio' || a?.kind === 'model3d') return { ['--ratio' as string]: 1 } as React.CSSProperties;
   return a?.width && a.height ? ({ ['--ratio' as string]: a.width / a.height } as React.CSSProperties) : undefined;
 }
 
@@ -55,7 +57,7 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
     return a?.width && a.height ? a.width / a.height : undefined;
   });
   const asked = g.op?.id === 'reframe' ? ratioOf(String(g.op.params.aspect)) : ratioOf(g.settings.aspect);
-  const ratio = g.kind === 'audio' || g.kind === 'text' ? 4 : asked ?? inputRatio ?? (g.kind === 'video' ? 16 / 9 : 1);
+  const ratio = g.kind === 'text' ? 4 : g.kind === 'audio' || g.kind === 'model3d' ? 1 : asked ?? inputRatio ?? (g.kind === 'video' ? 16 / 9 : 1);
   const now = useNow(1000, g.status === 'running' || g.status === 'queued');
   const elapsed = g.startedAt ? formatDuration(now - g.startedAt) : '';
   return (
@@ -106,7 +108,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   // Pictures and clips, one or several: each at its own shape and a shared height, the card as wide as they are
   // (audio and 3D keep the full-width strip). Several results use a lower height and wrap.
   const shown = outputs.length + pendingSlots;
-  const single = shown >= 1 && (g.kind === 'image' || g.kind === 'video');
+  const single = shown >= 1 && (g.kind === 'image' || g.kind === 'video' || g.kind === 'audio' || g.kind === 'model3d');
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
@@ -177,11 +179,11 @@ export function GenerationCard({ generationId, compact = false }: { generationId
               style={tileRatio(id)}
               role="button"
               tabIndex={0}
-              onClick={() => (outputs.length > 1 ? setSelected(i) : openLightbox(i))}
+              onClick={(e) => ((e.target as HTMLElement).tagName === 'AUDIO' ? undefined : outputs.length > 1 ? setSelected(i) : openLightbox(i))}
               onDoubleClick={() => openLightbox(i)}
               onKeyDown={(e) => e.key === 'Enter' && openLightbox(i)}
             >
-              <AssetMedia assetId={id} />
+              <AssetMedia assetId={id} controls={g.kind === 'audio'} autoPlay={false} />
               <button
                 type="button"
                 className="tile-expand"

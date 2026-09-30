@@ -72,3 +72,7 @@
 /* Several results: same rule as one (own shape, no bars), a lower shared height, wrapping with a small gap. */
 .tiles.is-single.is-multi { --tile-h: min(260px, 40vh); flex-wrap: wrap; gap: 5px; }
 .tiles.is-single.is-multi .tile.is-selected { outline-offset: -2px; }
+
+/* Audio result: a square tile with the track inside. */
+.tile .media-audio { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
+.tile .media-audio audio { width: 100%; }

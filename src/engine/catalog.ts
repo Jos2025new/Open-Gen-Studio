@@ -244,7 +244,7 @@ export async function selectComposerModel(kind: MediaKind, ref: string): Promise
   setComposerMedia(kind, { modelRef: ref });
   const schema = await ensureSchema(ref);
   if (get().composer[kind].modelRef !== ref) return;
-  const { settings } = coerceSettings(schema ?? undefined, kind, { ...current.settings, advanced: {} });
+  const { settings } = coerceSettings(schema ?? undefined, kind, { ...current.settings, audio: undefined, advanced: {} });
   setComposerMedia(kind, { settings });
 }
 
