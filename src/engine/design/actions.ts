@@ -170,6 +170,22 @@ export function addTextLayer(sessionId: string, docId: string, text: string, pos
   return layer.id;
 }
 
+/** After moving or scaling a painted layer, redraw it onto a page-sized buffer again, so later brush strokes
+    anywhere on the page are not clipped by the moved layer's edges. Images keep their own frame. */
+export function rebasePaintLayer(sessionId: string, docId: string, layerId: string): void {
+  const doc = getDoc(sessionId, docId);
+  const l = doc?.layers.find((x) => x.id === layerId);
+  const buf = l?.type === 'raster' && !l.sourceAssetId ? getBuffer(l.id) : undefined;
+  if (!doc || !l || l.type !== 'raster' || !buf) return;
+  if (l.x === 0 && l.y === 0 && l.width === doc.width && l.height === doc.height && buf.width === doc.width && buf.height === doc.height) return;
+  const c = document.createElement('canvas');
+  c.width = doc.width;
+  c.height = doc.height;
+  c.getContext('2d')!.drawImage(buf, l.x, l.y, l.width, l.height);
+  setBuffer(l.id, c);
+  mutateDoc(sessionId, docId, (d) => ({ ...d, layers: d.layers.map((x) => (x.id === l.id ? { ...l, x: 0, y: 0, width: doc.width, height: doc.height, pxWidth: doc.width, pxHeight: doc.height } : x)) }), { record: false });
+}
+
 export function addVectorLayer(sessionId: string, docId: string, shapes: ShapeSpec[], name = 'Shapes'): string | null {
   const doc = getDoc(sessionId, docId);
   if (!doc) return null;

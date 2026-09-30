@@ -7,7 +7,7 @@ import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, ins
 import { beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
-import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
+import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, toast, useStore } from '../../store/store';
 import { uid } from '../../lib/id';
 
@@ -388,6 +388,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     const d = drag.current;
     drag.current = null;
     if (!d) return;
+    if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'paint') {
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l)) }));

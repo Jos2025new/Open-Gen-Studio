@@ -2,7 +2,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
-import { getBuffer } from './raster';
+import { getBuffer, rasterVersion } from './raster';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 
@@ -82,10 +82,39 @@ export function textAscent(l: TextLayer): number {
   return m.emHeightAscent ?? m.fontBoundingBoxAscent ?? l.fontSize * 0.8;
 }
 
+/** A painted layer (no image) is page-sized: select and move what is drawn, not the whole page. Cached per buffer version. */
+const painted = new WeakMap<HTMLCanvasElement, { version: number; at: number; box: { x0: number; y0: number; x1: number; y1: number } | null }>();
+function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
+  if (l.sourceAssetId) return null;
+  const buf = getBuffer(l.id);
+  if (!buf || !buf.width || !buf.height) return null;
+  let hit = painted.get(buf);
+  // While painting the version changes every segment: rescan at most every 150 ms.
+  if (!hit || (hit.version !== rasterVersion() && performance.now() - hit.at > 150)) {
+    const data = buf.getContext('2d')!.getImageData(0, 0, buf.width, buf.height).data;
+    let x0 = buf.width, y0 = buf.height, x1 = -1, y1 = -1;
+    for (let y = 0; y < buf.height; y++) {
+      for (let x = 0; x < buf.width; x++) {
+        if (data[(y * buf.width + x) * 4 + 3] > 8) {
+          if (x < x0) x0 = x;
+          if (x > x1) x1 = x;
+          if (y < y0) y0 = y;
+          if (y > y1) y1 = y;
+        }
+      }
+    }
+    hit = { version: rasterVersion(), at: performance.now(), box: x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 } };
+    painted.set(buf, hit);
+  }
+  if (!hit.box) return null;
+  const kx = l.width / buf.width, ky = l.height / buf.height;
+  return { x: l.x + hit.box.x0 * kx, y: l.y + hit.box.y0 * ky, w: (hit.box.x1 - hit.box.x0) * kx, h: (hit.box.y1 - hit.box.y0) * ky };
+}
+
 export function layerBox(l: Layer): Box | null {
   switch (l.type) {
     case 'raster':
-      return { x: l.x, y: l.y, w: l.width, h: l.height };
+      return paintedBox(l) ?? { x: l.x, y: l.y, w: l.width, h: l.height };
     case 'vector':
       return unionBox([...l.shapes.map(shapeBox), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
     case 'text': {

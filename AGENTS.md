@@ -9,6 +9,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — mover una capa pintada mueve el dibujo, no la página (2026-09-30)
+Origen: las capas pintadas (pincel o agente) ocupan toda la página; Move mostraba y movía el marco de la página y dejaba la capa desplazada (x −235), y un trazo posterior fuera de ese marco se recortaba.
+- [x] M1. `layerBox` de una capa raster sin imagen = caja de lo pintado (píxeles con alfa), en caché por buffer y versión (re-escaneo como mucho cada 150 ms mientras se pinta). Selección, asas, mover y escalar actúan sobre el dibujo; un clic en zona vacía ya no la selecciona. *Dónde:* `design/render.ts`.
+- [x] M2. Al soltar un mover/escalar de una capa pintada, se redibuja en un buffer del tamaño de la página (`rebasePaintLayer`) para que el pincel no quede recortado; entra en el mismo paso de deshacer. Las imágenes conservan su marco. *Dónde:* `design/actions.ts`, `Stage.tsx`. Sin opción "mover la capa entera": en una capa pintada es lo mismo que mover su dibujo.
+Límite: escalar varias veces una capa pintada remuestrea sus píxeles (pierde nitidez, como en cualquier editor raster). Suite verde; sin navegador.
+
 ## Tarea — la página del Designer se distingue del fondo (2026-09-30)
 - [x] P1. Damero de transparencia más claro (#26262b / #303036, antes #1b1b1f / #24242a, casi igual al fondo) y borde de página de 1 px de pantalla (#55555e). *Dónde:* `Stage.tsx`. Sin navegador (abrirlo creaba un documento en tu sesión).
 
