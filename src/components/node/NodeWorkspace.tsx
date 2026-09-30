@@ -288,7 +288,7 @@ function Canvas() {
         defaultEdgeOptions={{ type: 'default' }}
         proOptions={{ hideAttribution: false }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--border)" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         <CanvasNavigation sessionId={sessionId} onSelect={(id) => setSelected(new Set([id]))} />
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />

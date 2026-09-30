@@ -9,6 +9,10 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — contraste del patrón del canvas (2026-09-30)
+- [x] C1. Background de NodeWorkspace.tsx: cambiar únicamente el color de var(--border) a var(--text-4). Razón: en la captura los puntos casi no se distinguen; usar un gris más claro de la misma paleta sin variar fondo, tamaño ni separación.
+- [x] C2. Revisar diff de una línea y commit; sin navegador ni repetir suite para un cambio de color.
+
 ## Tarea — patrón de puntos del canvas (2026-09-30)
 - [x] F1. NodeWorkspace.tsx, línea del Background: reutilizar Dots existente; separación 20 px, tamaño 1.2 y color var(--border). Razón: puntos pequeños regulares como la referencia conservando tokens y fondo actuales.
 - [x] F2. Typecheck breve y diff; sin navegador ni suite completa para este cambio visual de una línea. Commit.
