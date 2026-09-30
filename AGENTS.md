@@ -9,6 +9,11 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — el selector de Edit video ocultaba modelos (2026-09-30)
+Origen: Gemini Omni 1.1 Video Edit (Atlas) no salía en el selector; NanoGPT tiene Omni 1.1 con proporción y resolución.
+- [x] O1. `ModelList` con `filter` (selectores de operación) muestra todos los modelos que cumplen el filtro, no solo los "recomendados" de vídeo (Atlas Omni edit no estaba entre ellos y quedaba tras "Browse all"). *Dónde:* `ModelList.tsx`.
+- [x] O2. Edit video admite también modelos multimodo que aceptan un vídeo de origen sin ruta de edición aparte (`acceptsVideo && !needsVideo`, p. ej. `nanogpt::google/gemini-omni-flash/v1.1`). *Dónde:* `catalog.ts` (`videoOpFits`). Límite: sin prueba de pago; si un modelo multimodo usa el vídeo solo como referencia, el resultado no será una edición.
+
 ## Tarea — Edit/Extend video cambiaban la proporción y el encuadre (2026-09-30)
 Origen: Gemini Omni 1.1 Flash Video Edit devolvió un clip 1:1 (640×640) con otra proporción y más cerrado. Causa: su esquema (Atlas) no tiene parámetro de proporción, y la app solo enviaba "auto" si existía; sin él, el modelo decide.
 - [x] V1. Modelos con opciones de proporción y sin "auto": se envía la de la entrada (`match_input`) o la más cercana a la del clip. *Dónde:* `jobs.ts` (tras `videoOpSettings`).

@@ -191,10 +191,12 @@ export function ModelList({
     [models, kind, filter, providers],
   );
   const recommended = useMemo(() => {
+    // An operation picker (filter) is already the curated list: show every model that does the operation.
+    if (filter) return all;
     if (kind === 'image') return all.filter((m) => m.provider === 'local' || familyOf(m) || m.ref === value);
     const rec = recommendedRefs();
     return all.filter((m) => m.provider === 'local' || rec.has(m.ref) || m.ref === value);
-  }, [all, value, kind]);
+  }, [all, value, kind, filter]);
   const needle = q.trim().toLowerCase();
   // Searching always covers the whole catalog; with no recommendations there is nothing to curate.
   const full = browseAll || Boolean(needle) || !recommended.length;

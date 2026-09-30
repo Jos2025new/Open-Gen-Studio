@@ -336,7 +336,9 @@ export function videoOpFits(engine: string, m: ModelSummary): boolean {
   // Continue/Animate: image-to-video models (the last or chosen frame starts the clip).
   if (engine === 'video') return m.kind === 'video' && m.acceptsImage && !m.needsVideo;
   const tag = engine === 'video_edit' ? /edit/i : /extend/i;
-  return m.kind === 'video' && Boolean(m.acceptsVideo) && tag.test(`${m.id} ${m.name} ${m.tags.join(' ')}`);
+  if (m.kind !== 'video' || !m.acceptsVideo) return false;
+  // Multi-mode models that take a source video without a separate edit route (NanoGPT Gemini Omni 1.1) also edit it.
+  return tag.test(`${m.id} ${m.name} ${m.tags.join(' ')}`) || (engine === 'video_edit' && !m.needsVideo);
 }
 
 /** Dedicated video super-resolution; enhancement/edit/extend alone is not upscale. */
