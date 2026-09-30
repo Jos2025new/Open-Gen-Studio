@@ -70,3 +70,9 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .fmt-aspects .fmt-opt { flex-direction: column; gap: 5px; min-width: 38px; min-height: 52px; padding: 7px 4px; font-size: 11px; }
 .fmt-aspects .aspect-glyph { border-width: 1.5px; border-radius: 2px; }
 .fmt-aspects .aspect-glyph.is-auto, .fmt-chip .aspect-glyph.is-auto { width: 13px; height: 13px; border-style: dashed; }
+
+.composer-prompt-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 10px; }
+.composer-prompt-row .composer-input { flex: 1; min-width: 0; padding: 5px 3px; }
+.composer-prompt-row .composer-add { flex-shrink: 0; width: 42px; height: 48px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-3); color: var(--text-2); }
+.composer-prompt-row .composer-add:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.composer-prompt-row .composer-add svg { width: 20px; height: 20px; }

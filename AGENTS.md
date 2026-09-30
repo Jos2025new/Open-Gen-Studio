@@ -9,6 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea GUI — quitar modelo superior y adjuntar con + (2026-09-30)
+- [x] P1. TopBar.tsx: retirar únicamente engineLabel, su selector y el span engine-tag. Razón: quitar el nombre del modelo señalado sin tocar su selección.
+- [x] P2. Composer.tsx: trasladar el botón de adjuntar desde composer-end a una fila con el textarea, cambiar Paperclip por Plus y mantener label, disabled y fileRef/onFiles. composer.css: tamaño y posición del botón como referencia con tokens actuales. Razón: cambiar ubicación e icono conservando importación, pegado y arrastre.
+- [x] P3. Typecheck y suite con límite total inferior a 2 min; sin navegador por instrucción vigente. Registrar y commit.
+
+Verificado: typecheck verde; suite 311 verdes + 1 omitida en 31.75 s; diff sin errores. Sin navegador.
+
 ## Plan GUI — Connected / Generations / Settings (2026-09-30) · APLICADO
 Alcance solicitado: barra superior derecha y sus desplegables, con la estética actual. Implementación autorizada después del plan; navegador omitido por instrucción del usuario. Líneas referidas al árbol original, antes de insertar este plan.
 - [x] G0. Inspeccionar TopBar, Sidebar, ProviderPool, GalleryPanel, GenerationCard y Popover. Razón: identificar mecanismos reales y distinguir traslado de adaptación. Árbol limpio al comenzar.

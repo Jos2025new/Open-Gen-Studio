@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, type R
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Pencil, Pin, Plus, Search, Settings } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, useStore } from '../../store/store';
-import { engineLabel } from '../../engine/agent/runtime';
 import { formatRelative } from '../../lib/format';
 import { Popover, usePopover } from '../ui/Popover';
 import { useSessionMatcher } from './SessionsPanel';
@@ -26,7 +25,6 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const sessionId = useStore((s) => s.activeSessionId);
   const title = useStore((s) => s.sessions[s.activeSessionId]?.title ?? '');
   const workspace = useStore((s) => s.ui.workspace);
-  const engine = useStore(() => engineLabel());
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -82,9 +80,6 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       </div>
       <div className="topbar-right">
         <div className="topbar-slot" ref={slotRef} />
-        <span className="engine-tag" data-tip="Agent engine (change it in Settings)">
-          {engine}
-        </span>
         <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
           <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
         </button>

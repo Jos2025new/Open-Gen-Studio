@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowUp, CircleStop, Layers, Paperclip, Pencil, X, Zap } from 'lucide-react';
+import { ArrowUp, CircleStop, Layers, Plus, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
@@ -350,28 +350,40 @@ export function Composer() {
             ))}
           </div>
         ) : null}
-        <textarea
-          ref={taRef}
-          className="composer-input"
-          rows={1}
-          value={text}
-          placeholder={mode === 'agent' ? PLACEHOLDER.agent[workspace] : PLACEHOLDER[mode]}
-          onChange={(e) => setComposer({ text: e.target.value })}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              submit();
+        <div className="composer-prompt-row">
+          <IconButton
+            icon={Plus}
+            className="composer-add"
+            label={
+              acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
             }
-          }}
-          onPaste={(e) => {
-            const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
-            if (files.length) {
-              e.preventDefault();
-              onFiles(files);
-            }
-          }}
-          aria-label="Prompt"
-        />
+            size="md"
+            disabled={!acceptsImages && !takesAudio && mode !== 'model3d'}
+            onClick={() => fileRef.current?.click()}
+          />
+          <textarea
+            ref={taRef}
+            className="composer-input"
+            rows={1}
+            value={text}
+            placeholder={mode === 'agent' ? PLACEHOLDER.agent[workspace] : PLACEHOLDER[mode]}
+            onChange={(e) => setComposer({ text: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                submit();
+              }
+            }}
+            onPaste={(e) => {
+              const files = [...e.clipboardData.files].filter((f) => f.type.startsWith('image/'));
+              if (files.length) {
+                e.preventDefault();
+                onFiles(files);
+              }
+            }}
+            aria-label="Prompt"
+          />
+        </div>
         <div className="composer-bar">
           <ModeMenu />
           <div className="composer-controls">
@@ -380,15 +392,6 @@ export function Composer() {
           </div>
           <div className="composer-end">
             {mode === 'agent' ? <AgentModelControls /> : null}
-            <IconButton
-              icon={Paperclip}
-              label={
-                acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
-              }
-              size="md"
-              disabled={!acceptsImages && !takesAudio && mode !== 'model3d'}
-              onClick={() => fileRef.current?.click()}
-            />
             <input
               ref={fileRef}
               type="file"
