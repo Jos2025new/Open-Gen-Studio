@@ -1,11 +1,16 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Pencil, Pin, Plus, Search } from 'lucide-react';
+import { Check, ChevronDown, Pencil, Pin, Plus, Search, Settings } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, useStore } from '../../store/store';
 import { engineLabel } from '../../engine/agent/runtime';
 import { formatRelative } from '../../lib/format';
 import { Popover, usePopover } from '../ui/Popover';
 import { useSessionMatcher } from './SessionsPanel';
+import { SettingsPanel } from './SettingsPanel';
+import { GenerationsPanel } from './GenerationsPanel';
+import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
+import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { IconButton } from '../ui/primitives';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
@@ -25,6 +30,12 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const keys = useStore((s) => s.settings.keys);
+  const settingsOpen = useStore((s) => s.ui.settingsOpen);
+  const settingsRef = useRef<HTMLButtonElement>(null);
+  const connectedPop = usePopover();
+  const generationsPop = usePopover();
+  const connected = REMOTE_PROVIDERS.filter((p) => keys[p]?.trim());
 
   useEffect(() => {
     if (!editing) setDraft(title);
@@ -74,7 +85,24 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         <span className="engine-tag" data-tip="Agent engine (change it in Settings)">
           {engine}
         </span>
+        <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
+          <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
+        </button>
+        <button type="button" ref={generationsPop.ref} className={`topbar-menu ${generationsPop.open ? 'is-open' : ''}`} aria-expanded={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }}>Generations</button>
+        <IconButton ref={settingsRef} icon={Settings} label="Settings" active={settingsOpen} aria-expanded={settingsOpen} onClick={() => { connectedPop.close(); generationsPop.close(); setUi((u) => ({ settingsOpen: !u.settingsOpen })); }} />
       </div>
+      <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={220} label="Connected providers">
+        <div className="pool-details">
+          {connected.map((p) => <div key={p} className="pool-row">{PROVIDER_LABELS[p]}</div>)}
+          {!connected.length ? <div className="pool-row faint">No providers connected</div> : null}
+        </div>
+      </Popover>
+      <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={680} label="Generations" className="generations-popover">
+        <GenerationsPanel onClose={generationsPop.close} />
+      </Popover>
+      <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} width={400} label="Settings" className="pop-scroll">
+        <SettingsPanel />
+      </Popover>
     </header>
   );
 }

@@ -1,11 +1,9 @@
-import { useEffect, useRef } from 'react';
-import { Folder, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Settings, Workflow } from 'lucide-react';
+import { useEffect } from 'react';
+import { Folder, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
-import { Popover } from '../ui/Popover';
-import { SettingsPanel } from './SettingsPanel';
 import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
 
@@ -18,11 +16,9 @@ const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: 
 export function Sidebar() {
   const workspace = useStore((s) => s.ui.workspace);
   const panel = useStore((s) => s.ui.panel);
-  const settingsOpen = useStore((s) => s.ui.settingsOpen);
   const remaining = useStore((s) => (s.settings.budgetOn ? s.settings.budgetUsd - s.spentUsd : null));
   const spent = useStore((s) => s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
-  const settingsRef = useRef<HTMLButtonElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
 
   // --sidebar-w drives the layout (side panels are anchored to it), so the mode lives on the root.
@@ -114,23 +110,7 @@ export function Sidebar() {
       <div className="side-spacer" />
       <div className="side-group">
         <ProviderPool wide={wide} />
-        <button
-          ref={settingsRef}
-          type="button"
-          className={`side-btn ${settingsOpen ? 'is-open' : ''}`}
-          data-tip={remaining == null ? 'Settings' : `Settings · budget left ${formatUsd(Math.max(0, remaining))}`}
-          data-tip-side="right"
-          aria-label="Settings"
-          aria-expanded={settingsOpen}
-          onClick={() => setUi((u) => ({ settingsOpen: !u.settingsOpen }))}
-        >
-          <Settings size={18} strokeWidth={1.7} />
-          <span className="side-label wide-only">Settings</span>
-        </button>
       </div>
-      <Popover open={settingsOpen} anchor={settingsRef} onClose={() => setUi({ settingsOpen: false })} placement="right-end" width={400} label="Settings" className="pop-scroll">
-        <SettingsPanel />
-      </Popover>
     </nav>
   );
 }
