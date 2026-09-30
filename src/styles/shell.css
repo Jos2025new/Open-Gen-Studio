@@ -131,3 +131,8 @@
 .generations-popover .generations-panel.is-compact .generation-entry .gen-card > .tiles { display: none; }
 .generations-popover .generations-panel.is-compact .generation-entry .gen-card > .gen-head, .generations-popover .generations-panel.is-compact .generation-entry .gen-card > .gen-meta, .generations-popover .generations-panel.is-compact .generation-entry .gen-card > .gen-billed, .generations-popover .generations-panel.is-compact .generation-entry .gen-card > .gen-foot { grid-column: 1; }
 @media (max-width: 767px) { .topbar-menu { padding: 5px; font-size: 11px; }.generations-popover .generations-panel .generation-entry .gen-card { grid-template-columns: 88px minmax(0, 1fr); }.generations-popover .generations-panel .generation-entry .gen-card > .tiles { width: 88px; }.generations-popover .generations-panel .generation-entry .gen-card .tile { height: 88px; }.generations-popover .generations-panel.is-compact .generation-entry .gen-card { grid-template-columns: minmax(0, 1fr); } }
+
+.sidebar .brand, .sidebar .side-group { flex-shrink: 0; }
+.sidebar .brand + .side-group { margin-top: 104px; }
+.sidebar-wide .sidebar .brand + .side-group { margin-top: 80px; }
+@media (max-width: 767px) { .sidebar-wide .sidebar .brand + .side-group { margin-top: 104px; } }

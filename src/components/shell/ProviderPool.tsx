@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Settings2, Wallet } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw, Settings2, Coins } from 'lucide-react';
 import { ADAPTERS, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { RemoteProviderId } from '../../engine/types';
@@ -88,7 +88,7 @@ export function ProviderPool({ wide }: { wide: boolean }) {
             setPop(!pop);
           }}
         >
-          <Wallet size={18} strokeWidth={1.7} />
+          <Coins size={18} strokeWidth={1.7} />
           <span className="side-budget num">{total}</span>
         </button>
         <Popover open={pop} anchor={ref} onClose={() => setPop(false)} placement="right-end" width={260} label="Provider pool">

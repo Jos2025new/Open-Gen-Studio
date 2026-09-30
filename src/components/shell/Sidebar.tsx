@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Folder, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
@@ -19,6 +19,7 @@ export function Sidebar() {
   const remaining = useStore((s) => (s.settings.budgetOn ? s.settings.budgetUsd - s.spentUsd : null));
   const spent = useStore((s) => s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
+  const sidebarRef = useRef<HTMLElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
 
   // --sidebar-w drives the layout (side panels are anchored to it), so the mode lives on the root.
@@ -26,10 +27,34 @@ export function Sidebar() {
     document.documentElement.classList.toggle('sidebar-wide', wide);
   }, [wide]);
 
+  useEffect(() => {
+    const sidebar = sidebarRef.current;
+    const composer = document.querySelector('.composer');
+    if (!sidebar || !composer) return;
+    const alignBudget = () => {
+      const add = composer.querySelector('.composer-add svg');
+      const footer = sidebar.querySelector<HTMLElement>('.side-footer');
+      const budget = footer?.querySelector('[aria-label="Provider pool"] svg, .pool-title');
+      if (!add || !footer || !budget) return;
+      const a = add.getBoundingClientRect(), b = budget.getBoundingClientRect();
+      const current = parseFloat(getComputedStyle(footer).marginBottom) || 0;
+      const margin = Math.max(0, current + b.top + b.height / 2 - a.top - a.height / 2);
+      footer.style.marginBottom = `${margin}px`;
+    };
+    const observer = new ResizeObserver(alignBudget);
+    observer.observe(composer);
+    observer.observe(sidebar);
+    const footer = sidebar.querySelector('.side-footer');
+    if (footer) observer.observe(footer);
+    window.addEventListener('resize', alignBudget);
+    alignBudget();
+    return () => { observer.disconnect(); window.removeEventListener('resize', alignBudget); };
+  }, [workspace, wide]);
+
   const togglePanel = (p: 'gallery' | 'sessions' | 'spending') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
-    <nav className="sidebar" aria-label="Main">
+    <nav ref={sidebarRef} className="sidebar" aria-label="Main">
       <div className="brand">
         <span className="brand-mark" aria-hidden />
         <span className="brand-name">Open Gen Studio</span>
@@ -93,6 +118,9 @@ export function Sidebar() {
           <span className="side-label">Assets</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>
+      </div>
+      <div className="side-spacer" />
+      <div className="side-group side-footer">
         <button
           type="button"
           className={`side-btn ${panel === 'spending' ? 'is-open' : ''}`}
@@ -106,9 +134,6 @@ export function Sidebar() {
           <span className="side-label">Spending</span>
           {remaining != null && remaining < 0 ? <span className="side-badge is-warn" aria-label="Over the limit">!</span> : null}
         </button>
-      </div>
-      <div className="side-spacer" />
-      <div className="side-group">
         <ProviderPool wide={wide} />
       </div>
     </nav>

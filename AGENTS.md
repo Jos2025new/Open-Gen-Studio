@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — disposición de la barra lateral (2026-09-30)
+- [x] S1. Sidebar.tsx: trasladar el botón Spending al grupo inferior, antes de ProviderPool, conservando handlers/tooltip y estado. Razón: situarlo encima de budget.
+- [x] S2. shell.css: separar logo y grupo principal por dos espacios de botón. Sidebar.tsx: medir la posición del + existente con ResizeObserver y ajustar solo el margen del grupo inferior para alinear el icono budget, también si el prompt cambia de altura. Razón: evitar una altura fija dependiente de la captura.
+- [x] S3. ProviderPool.tsx: sustituir Wallet por Coins. Razón: diferenciar budget de Spending sin modificar consultas ni desplegables.
+- [x] S4. Typecheck breve y diff; sin navegador ni comprobaciones mayores de 2 min. Documentar y commit.
+
+Verificado: typecheck y diff verdes. Sin navegador; alineación visual pendiente del usuario.
+
 ## Tarea — contraste del patrón del canvas (2026-09-30)
 - [x] C1. Background de NodeWorkspace.tsx: cambiar únicamente el color de var(--border) a var(--text-4). Razón: en la captura los puntos casi no se distinguen; usar un gris más claro de la misma paleta sin variar fondo, tamaño ni separación.
 - [x] C2. Revisar diff de una línea y commit; sin navegador ni repetir suite para un cambio de color.
