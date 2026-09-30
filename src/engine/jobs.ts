@@ -4,7 +4,7 @@ import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, isVideoUpscaler, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { InputError } from './errors';
@@ -795,7 +795,7 @@ export function videoOpSettings(engine: VideoOpEngine, schema: ModelSchema | und
   // Multi-mode models (NanoGPT Seedance 2.5) need the operation named when a clip is given.
   const mode = schema?.params.find((p) => p.key === 'mode' && p.options?.some((o) => String(o) === (extend ? 'video-extend' : 'video-edit')));
   if (mode && engine !== 'video_upscale') settings.advanced[mode.key] = extend ? 'video-extend' : 'video-edit';
-  if (engine === 'video_upscale') {
+  {
     for (const p of schema?.params ?? []) {
       const value = params[p.key];
       if (value === undefined || ['count', 'duration', 'aspect', 'audio', 'negative'].includes(p.role)) continue;
@@ -837,8 +837,9 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     const language = String(input.params.language ?? 'auto');
     return { ...base, kind: 'text', prompt: `Transcribe (${language === 'auto' ? 'detect language' : language})`, modelRef: t.ref, settings: { count: 1, advanced: {} }, op, estimate: estimateTranscribe(t.usdPerMinute, clip?.duration) };
   }
-  const upscaleRef = def.engine === 'video_upscale' ? (typeof input.params._modelRef === 'string' ? input.params._modelRef : input.modelRef ?? input.nodeChoice?.ref) : undefined;
-  if (upscaleRef && (!modelSummary(upscaleRef) || !isVideoUpscaler(modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
+  const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
+  const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
+  if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
   const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);

@@ -671,7 +671,7 @@ function ToolNodeBody({ node }: { node: GraphNode & { data: ToolNodeData } }) {
           ))}
         </div>
       </Popover>
-      {d.op === 'video_upscale' ? <VideoUpscaleControls params={d.params} onChange={params => patchNodeData(sessionId, node.id, { params })} /> : null}
+      {d.op === 'video_upscale' || d.op === 'video_edit' || d.op === 'video_extend' ? <VideoUpscaleControls engine={d.op} params={d.params} onChange={params => patchNodeData(sessionId, node.id, { params })} /> : null}
       {def.fields.map((f) =>
         f.type === 'choice' ? (
           <div key={f.key} className="node-field nodrag">

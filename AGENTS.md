@@ -9,6 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — elegir modelo y parámetros también en Extend y Edit video (2026-09-30)
+Origen: tras 3f3e974 (Upscale video), el usuario vio lo mismo en Extend video. Alcance mínimo: reutilizar el mismo control en las operaciones de vídeo con modelo; sin tocar lo demás.
+- [x] X1. `PICKABLE_VIDEO_OPS` y `videoOpFits` (`catalog.ts`): upscale = upscalers dedicados; edit/extend = modelos con entrada de vídeo cuyo id/nombre/etiquetas dicen edit/extend. *Por qué:* el selector solo lista modelos que hacen esa operación.
+- [x] X2. `VideoUpscaleControls` acepta `engine`; nodos (`nodes.tsx`) y formulario de chat/Assets (`OpForm.tsx`) lo muestran en Upscale, Edit y Extend, con los parámetros del esquema del modelo elegido. *Por qué:* mismo control en todos los lienzos.
+- [x] X3. El `_modelRef` elegido se respeta en estimación y ejecución (`executor.ts`, `flow/actions.ts`, `jobs.ts`); sin elección, Edit/Extend siguen como antes (no se bloquean). Typecheck y suite (311 + 1 omitida); sin navegador ni generaciones de pago.
+Pendiente: las operaciones de imagen en nodos (Edit, Relight, Variations…) siguen sin selector en el nodo (en chat ya tienen "via Modelo ▾").
+
 ## Tarea — modelo y parámetros reales de Upscale video (2026-09-29)
 Base `adda4f6`, árbol limpio. Alcance exclusivo: operación `video_upscale` compartida por Nodos/chat/Assets; sin otros cambios de herramientas ni guardado.
 - [x] U1. Inspeccionar selección, formularios y ejecución. Causa: fields vacío, modelo automático y overrides ignorados; fallback incluye enhancement genérico.

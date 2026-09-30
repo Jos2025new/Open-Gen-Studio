@@ -327,6 +327,16 @@ export function opModelForAsset(engine: OpEngine, assetId: string | undefined): 
   return opModelFor(engine);
 }
 
+/** Video ops whose model the user can pick in the op form (node and chat). */
+export const PICKABLE_VIDEO_OPS: readonly string[] = ['video_upscale', 'video_edit', 'video_extend'];
+
+/** Models that really do this video op: upscale = dedicated upscalers; edit/extend = video-input models named for it. */
+export function videoOpFits(engine: string, m: ModelSummary): boolean {
+  if (engine === 'video_upscale') return isVideoUpscaler(m);
+  const tag = engine === 'video_edit' ? /edit/i : /extend/i;
+  return m.kind === 'video' && Boolean(m.acceptsVideo) && tag.test(`${m.id} ${m.name} ${m.tags.join(' ')}`);
+}
+
 /** Dedicated video super-resolution; enhancement/edit/extend alone is not upscale. */
 export function isVideoUpscaler(m: ModelSummary): boolean {
   const identity = `${m.id} ${m.name} ${m.tags.join(' ')}`;

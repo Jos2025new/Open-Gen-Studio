@@ -1,7 +1,7 @@
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
-import { ensureSchema, isConnected, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
+import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
 import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
 import { graphEditProblem, lockedNodes, lockNodes, lockAssets } from './locks';
@@ -178,7 +178,7 @@ function requestContext(sessionId: string) {
     const source = sourceNode ? nodeOutputAsset(sourceNode, st.generations) : null;
     const sourceRef = sourceNode && 'modelRef' in sourceNode.data ? sourceNode.data.modelRef : undefined;
     const fromModel = opFollowsSource(engine) ? opModelFromRef(sourceRef, engine === 'edit' ? 'image' : 'video') : null;
-    const chosen = engine === 'video_upscale' && typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : undefined;
+    const chosen = PICKABLE_VIDEO_OPS.includes(engine) && typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : undefined;
     const choice = chosen ? { ref: chosen, viaEdit: false } : source && st.assets[source] ? opModelForAsset(engine, source) : fromModel ? { ref: fromModel, viaEdit: false } : opModelFor(engine);
     return { ...choice, ...(engine === 'video' ? { settings: st.composer.video.settings } : ['video_edit', 'video_upscale', 'video_extend'].includes(engine) ? { settings: videoOpSettings(engine as 'video_edit' | 'video_upscale' | 'video_extend', st.catalog.schemas[choice.ref], n.data.params) } : {}) };
   } };
@@ -266,7 +266,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
   const preview = previewRun(sessionId, targets, force);
-  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [s.op === 'video_upscale' && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
+  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [PICKABLE_VIDEO_OPS.includes(s.op) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
   return previewRun(sessionId, targets, force);
 }
