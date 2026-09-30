@@ -854,6 +854,15 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   if (def.engine === 'video') {
     const video = input.nodeChoice?.settings ?? get().composer.video.settings;
     const { settings } = coerceSettings(schema, 'video', { ...video, count: 1, advanced: {} });
+    // Parameters the user set in the op form for the picked model (Continue shot).
+    if (picked) for (const p of schema?.params ?? []) {
+      const value = input.params[p.key];
+      if (value === undefined || ['count', 'aspect', 'negative'].includes(p.role)) continue;
+      if (p.role === 'resolution') settings.resolution = String(value);
+      else if (p.role === 'duration' && typeof value === 'number') settings.duration = value;
+      else if (p.role === 'seed' && typeof value === 'number') settings.seed = value;
+      else if (p.role === 'other') settings.advanced[p.key] = value;
+    }
     if (source && paramByRole(schema, 'aspect')?.options) {
       const opts = paramByRole(schema, 'aspect')!.options!;
       // Keep the source's shape: an explicit "match input" option, else the nearest ratio ("auto" may pick another).

@@ -154,6 +154,17 @@ export async function probeMedia(blob: Blob): Promise<MediaInfo> {
 /** Grab the first or last frame of a video as a PNG blob. */
 /** A frame as PNG: the first, the last, or the one at `which` seconds (clamped to the clip). */
 export async function extractVideoFrame(src: string, which: 'first' | 'last' | number): Promise<{ blob: Blob; width: number; height: number }> {
+  // A video that never loads or seeks must fail, not leave the node running forever.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('Could not read a frame from this video (timed out). Try again or pick another second.')), 20000)));
+  try {
+    return await Promise.race([readFrame(src, which), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readFrame(src: string, which: 'first' | 'last' | number): Promise<{ blob: Blob; width: number; height: number }> {
   const v = await loadVideo(src);
   v.preload = 'auto';
   let duration = v.duration;
@@ -175,6 +186,8 @@ function seek(v: HTMLVideoElement, t: number): Promise<void> {
       v.removeEventListener('seeked', done);
       resolve();
     };
+    // Seeking to the current time fires no "seeked" event.
+    if (Math.abs(v.currentTime - t) < 1e-3 && v.readyState >= 2) return resolve();
     v.addEventListener('seeked', done);
     v.onerror = () => reject(new Error('Video seek failed'));
     v.currentTime = t;

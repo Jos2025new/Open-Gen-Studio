@@ -328,11 +328,13 @@ export function opModelForAsset(engine: OpEngine, assetId: string | undefined): 
 }
 
 /** Video ops whose model the user can pick in the op form (node and chat). */
-export const PICKABLE_VIDEO_OPS: readonly string[] = ['video_upscale', 'video_edit', 'video_extend'];
+export const PICKABLE_VIDEO_OPS: readonly string[] = ['video_upscale', 'video_edit', 'video_extend', 'video'];
 
 /** Models that really do this video op: upscale = dedicated upscalers; edit/extend = video-input models named for it. */
 export function videoOpFits(engine: string, m: ModelSummary): boolean {
   if (engine === 'video_upscale') return isVideoUpscaler(m);
+  // Continue/Animate: image-to-video models (the last or chosen frame starts the clip).
+  if (engine === 'video') return m.kind === 'video' && m.acceptsImage && !m.needsVideo;
   const tag = engine === 'video_edit' ? /edit/i : /extend/i;
   return m.kind === 'video' && Boolean(m.acceptsVideo) && tag.test(`${m.id} ${m.name} ${m.tags.join(' ')}`);
 }

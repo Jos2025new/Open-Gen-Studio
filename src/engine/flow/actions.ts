@@ -266,7 +266,7 @@ export async function prepareNodeRun(sessionId: string, targets: string[], force
     if (subjects.length) patchNodeData(sessionId, n.id, { subjects });
   }
   const preview = previewRun(sessionId, targets, force);
-  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [PICKABLE_VIDEO_OPS.includes(s.op) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
+  const refs = preview.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' ? [PICKABLE_VIDEO_OPS.includes(OPS[s.op].engine) && typeof s.params._modelRef === 'string' ? s.params._modelRef : opModelFor(OPS[s.op].engine).ref] : []);
   await Promise.all([...new Set(refs)].filter(Boolean).map(ref => ensureSchema(ref)));
   return previewRun(sessionId, targets, force);
 }

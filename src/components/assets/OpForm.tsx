@@ -72,7 +72,7 @@ export function OpForm({ op, target: targetProp, onClose, onBack }: { op: OpId; 
           <div className="pop-sub">{def.description}</div>
         </div>
       </div>
-      {op === 'video_upscale' || op === 'video_edit' || op === 'video_extend' ? <VideoUpscaleControls engine={op} params={params} onChange={setParams} /> : null}
+      {op === 'video_upscale' || op === 'video_edit' || op === 'video_extend' || op === 'continue' ? <VideoUpscaleControls engine={op === 'continue' ? 'video' : op} params={params} onChange={setParams} /> : null}
       {def.fields.map((f) =>
         f.type === 'choice' ? (
           <div key={f.key} className="op-field">
