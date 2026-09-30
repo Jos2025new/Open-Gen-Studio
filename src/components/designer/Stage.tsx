@@ -130,13 +130,17 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       ctx.rect(0, 0, doc.width, doc.height);
       ctx.clip();
       const cell = 12 / view.zoom;
-      ctx.fillStyle = '#1b1b1f';
+      ctx.fillStyle = '#26262b';
       ctx.fillRect(0, 0, doc.width, doc.height);
-      ctx.fillStyle = '#24242a';
+      ctx.fillStyle = '#303036';
       for (let y = 0; y < doc.height; y += cell) for (let x = (Math.floor(y / cell) % 2) * cell; x < doc.width; x += cell * 2) ctx.fillRect(x, y, cell, cell);
       ctx.restore();
     }
     drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
+    // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
+    ctx.strokeStyle = '#55555e';
+    ctx.lineWidth = 1 / view.zoom;
+    ctx.strokeRect(0, 0, doc.width, doc.height);
     if (live) drawStroke(ctx, live);
     ctx.restore();
 

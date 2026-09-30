@@ -9,6 +9,9 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — la página del Designer se distingue del fondo (2026-09-30)
+- [x] P1. Damero de transparencia más claro (#26262b / #303036, antes #1b1b1f / #24242a, casi igual al fondo) y borde de página de 1 px de pantalla (#55555e). *Dónde:* `Stage.tsx`. Sin navegador (abrirlo creaba un documento en tu sesión).
+
 ## Tarea — el agente dibuja y ve el lienzo en el Designer (2026-09-30)
 Origen: hoy el agente solo crea texto, rect/ellipse/line e imágenes, y solo ve la lista de capas. Revisado con GPT: trazos (patrón del agente de tldraw: puntos → perfect-freehand) + `path` SVG para curvas precisas + lectura visual, todo dentro del paso `layer`. Sin botones, editores ni formatos intermedios.
 - [x] D1. **`strokes` en el paso `layer`:** `[{points:[[x,y,presión?]…], color, size}]` en coordenadas del documento. Vector → `Stroke` de Lineart (editables); raster → pintados con el pincel real (`strokeSegment`) en una capa raster **nueva** (nunca sobre las del usuario). Vector admite `target` de una capa vectorial existente (se conserva el agrupamiento actual); por defecto, capa nueva. Topes de seguridad altos (200 trazos, 2000 puntos). *Dónde:* `types.ts`, `plan.ts`, `design/actions.ts` (`applyLayerStep`), `agent/tools.ts`.
