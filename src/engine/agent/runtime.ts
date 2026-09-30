@@ -9,7 +9,7 @@ import { needsSpendCheck } from '../pricing';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
-import { autoLayout, graphBounds, graphToSteps, planToGraph, runsGeneration } from '../flow/graph';
+import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
@@ -410,8 +410,9 @@ function closeRevisedPlan(sessionId: string, replace: boolean): boolean {
 }
 
 function materializeNodes(sessionId: string, plan: Plan): void {
-  const { nodes, edges } = planToGraph(plan, (id) => get().assets[id]?.kind);
   const graph = session(sessionId).graph;
+  const st = get();
+  const { nodes, edges } = planToGraph(plan, (id) => st.assets[id]?.kind, (id) => graph.nodes.find(n => nodeOutputAsset(n, st.generations) === id)?.id);
   const bounds = graphBounds(graph.nodes);
   const origin = bounds ? { x: bounds.x + bounds.w + 160, y: bounds.y } : { x: 0, y: 0 };
   const positions = autoLayout(nodes, edges, origin);

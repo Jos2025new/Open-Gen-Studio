@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — conectar planes a referencias existentes (2026-09-29)
+Base `f709654`, árbol limpio. Petición: corrección eficiente sin navegador ni agentes adicionales.
+- [x] C1. Causa: `planToGraph` crea Reference sin buscar el asset en el grafo actual.
+- [x] C2. Añadir resolución opcional de asset a nodo existente en `flow/graph.ts`; `agent/runtime.ts` la obtiene con `nodeOutputAsset`, respetando candidata y Sketch. Razón: crear solo el nodo solicitado y conectarlo al original; referencias externas conservan el comportamiento actual.
+- [x] C3. Prueba de conexión/referencia externa en `tests/engine.test.ts`, typecheck y commit. Sin navegador por instrucción del usuario.
+
+  Verificado: typecheck verde y 38 pruebas en `engine`/`node-agent`. El plan conecta el asset a un nodo existente sin crear Reference; conserva Reference para assets externos. Sin navegador, suite completa ni llamadas pagadas.
+
 ## Tarea — corregir disposición del historial (2026-09-29)
 Base `b9bd710`, árbol limpio. Corrección visual solicitada, sin cambios de comportamiento.
 - [x] D1. Revisar únicamente historial/CSS. Razón: los iconos laterales dejaban ancho vacío.

@@ -135,7 +135,7 @@ export function connect(graph: Graph, c: { source: string; target: string; targe
 // Plan → graph
 
 /** `kindOf` tells whether an asset ref is a video (it goes to the video ports); step outputs are known from the plan. */
-export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | undefined = () => undefined): { nodes: GraphNode[]; edges: GraphEdge[] } {
+export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | undefined = () => undefined, existingSource: (assetId: string) => string | undefined = () => undefined): { nodes: GraphNode[]; edges: GraphEdge[] } {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const nodeOf = new Map<string, string>();
@@ -167,7 +167,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
       if (n && 'outputIndex' in n.data && p.index) n.data.outputIndex = p.index;
     }
     else if (p.type === 'asset') {
-      source = assetNodes.get(p.id);
+      source = existingSource(p.id) ?? assetNodes.get(p.id);
       if (!source) {
         source = `${plan.id}_asset_${assetNodes.size + 1}`;
         assetNodes.set(p.id, source);

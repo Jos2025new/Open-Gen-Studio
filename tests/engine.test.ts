@@ -160,6 +160,14 @@ describe('plan and graph validation', () => {
     expect(text).toContain('edited');
     expect(text).not.toContain('original');
   });
+  it('connects asset references to existing nodes and only creates references for external assets', () => {
+    const request: Plan = { ...plan, steps: [{ id: 'sheet', kind: 'image', title: 'Sheet', prompt: 'Character sheet', modelRef: 'local::studio-image', settings: { count: 1, advanced: {} }, refs: ['asset:selected-output', 'asset:external'] }] };
+    const created = planToGraph(request, () => 'image', id => id === 'selected-output' ? 'original-node' : undefined);
+    expect(created.nodes.map(n => n.data.kind)).toEqual(['image', 'asset']);
+    expect(created.edges).toEqual(expect.arrayContaining([expect.objectContaining({ source: 'original-node', target: 'plan_sheet', targetHandle: 'ref' })]));
+    expect(created.nodes.find(n => n.data.kind === 'asset')?.data).toMatchObject({ assetId: 'external' });
+    expect(planToGraph(request).nodes).toHaveLength(3);
+  });
   it('roundtrips prompt wiring through graph execution', () => {
     const graph = planToGraph(plan);
     const promptId = graph.nodes.find((n) => n.data.kind === 'text')!.id;
