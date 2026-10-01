@@ -507,8 +507,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (problem) errors.push(`${where}: model "${modelRef}" ${problem.message}`);
         }
         const defaults = ctx.defaultSettings(kind);
-        // R7: a clip made from an image keeps the image's shape unless the step sets one.
-        const shape = kind === 'video' && !s.aspect ? inputAspect(s.first_frame ?? imageRefs[0]) : undefined;
+        // R7: a clip made from an image, or an image redrawn from one image (a view, a lock-up, an edit), keeps that
+        // image's shape unless the step sets one.
+        const shape = !s.aspect && (kind === 'video' || (kind === 'image' && imageRefs.length === 1)) ? inputAspect(kind === 'video' ? s.first_frame ?? imageRefs[0] : imageRefs[0]) : undefined;
         const aspectOptions = paramByRole(schema, 'aspect')?.options?.filter((o) => !isAutoOption(o)) ?? [];
         const inherited = shape && aspectOptions.length ? nearestAspect(aspectOptions, shape) : undefined;
         if (inherited) adjustments.push(`${s.id}: aspect ${aspectLabel(inherited)} from the input image`);
