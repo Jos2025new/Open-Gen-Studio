@@ -203,8 +203,8 @@ function GenerationProgress({ node }: { node: GraphNode }) {
   const attempt = useStore(s => nodeAttempt(node, s.generations));
   if (!attempt || !['queued', 'running'].includes(attempt.status)) return null;
   return <div className="nc-generating" role="status" aria-live="polite">
-    <div className="nc-generating-label"><LoaderCircle size={18} className="spin" /><strong>{attempt.status === 'queued' ? 'Queued' : 'Generating…'}</strong>{attempt.progress != null ? <span>{Math.round(attempt.progress * 100)}%</span> : null}</div>
-    {attempt.statusText ? <span className="nc-generating-detail">{attempt.statusText}</span> : null}
+    <div className="nc-generating-label"><LoaderCircle size={12} className="spin" />{attempt.status === 'queued' ? 'Queued' : 'Generating'}{attempt.progress != null ? ` · ${Math.round(attempt.progress * 100)}%` : ''}</div>
+    {attempt.statusText && !/^generating/i.test(attempt.statusText) ? <span className="nc-generating-detail">{attempt.statusText}</span> : null}
     {attempt.progress != null ? <progress max={1} value={attempt.progress} aria-label="Generation progress" /> : null}
   </div>;
 }

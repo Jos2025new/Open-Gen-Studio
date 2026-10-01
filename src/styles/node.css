@@ -64,3 +64,13 @@
 .canvas-zoom-controls { display: flex; align-items: center; justify-content: space-between; padding: 6px; }
 .canvas-search-result { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 8px; text-align: left; font-size: 12px; border-radius: 6px; overflow-wrap: anywhere; }
 .canvas-search-result:hover { background: var(--surface-3); }.canvas-search-result .faint { font-size: 10px; }.canvas-search-result mark { color: var(--accent); background: var(--accent-soft); border-radius: 2px; }
+
+/* Quiet generating status: a small line at the bottom of the card and a thin progress bar on its edge. */
+.nc-generating { inset: auto 0 0; padding: 0 0 10px; gap: 4px; align-items: center; background: none; border: 0; border-radius: 0; color: var(--text-3); }
+.nc-generating-label { gap: 6px; font-size: 11px; }
+.nc-generating-label svg { color: var(--text-3); }
+.nc-generating-detail { font-size: 10px; color: var(--text-4); max-width: 90%; text-align: center; }
+.nc-generating progress { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; height: 2px; appearance: none; border: 0; background: transparent; }
+.nc-generating progress::-webkit-progress-bar { background: transparent; }
+.nc-generating progress::-webkit-progress-value { background: var(--accent); }
+.nc-generating progress::-moz-progress-bar { background: var(--accent); }
