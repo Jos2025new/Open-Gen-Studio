@@ -69,11 +69,12 @@ describe('saving to the shared library', () => {
 });
 
 describe('reference_sheet op', () => {
-  it('is always a 2×2 grid, with panels by subject and sheet type, and 1–4 candidates', () => {
+  it('is four panels: one row for a character turnaround, 2×2 otherwise, and 1–4 candidates', () => {
     const op = OPS.reference_sheet;
     const text = (p: Record<string, string>) => op.instruction!({ subject: 'character', sheet: 'turnaround', aspect: '16:9', count: '1', note: '', ...p });
-    expect(text({})).toMatch(/2×2 grid/);
-    expect(text({})).toMatch(/face close-up/);
+    expect(text({})).toMatch(/one row of four tall/);
+    expect(text({})).toMatch(/face and shoulders close-up/);
+    expect(text({ sheet: 'expressions' })).toMatch(/2×2 grid/);
     expect(text({ subject: 'location' })).toMatch(/top-down plan view/);
     expect(text({ subject: 'object' })).toMatch(/front.*side.*back.*top-down/);
     expect(sheetLayout('character', 'expressions')).toMatch(/expressions/);
