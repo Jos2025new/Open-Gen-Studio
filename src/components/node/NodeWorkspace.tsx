@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
+  SelectionMode,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -83,6 +84,8 @@ function Canvas() {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [tool, setTool] = useState<'select' | 'pan'>(() => { try { return localStorage.getItem('ogs.nodeTool') === 'pan' ? 'pan' : 'select'; } catch { return 'select'; } });
+  const pickTool = (t: 'select' | 'pan') => { setTool(t); try { localStorage.setItem('ogs.nodeTool', t); } catch { /* storage blocked */ } };
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
@@ -285,11 +288,24 @@ function Canvas() {
         minZoom={0.15}
         maxZoom={2}
         deleteKeyCode={['Backspace', 'Delete']}
+        selectionOnDrag={tool === 'select'}
+        panOnDrag={tool === 'select' ? [1, 2] : true}
+        selectionMode={SelectionMode.Partial}
         defaultEdgeOptions={{ type: 'default' }}
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        <CanvasNavigation sessionId={sessionId} onSelect={(id) => setSelected(new Set([id]))} />
+        <CanvasNavigation
+          sessionId={sessionId}
+          onSelect={(id) => setSelected(new Set([id]))}
+          tool={tool}
+          onTool={pickTool}
+          selectedCount={selected.size}
+          onDelete={() => {
+            deleteNodes(sessionId, [...selected]);
+            setSelected(new Set());
+          }}
+        />
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>

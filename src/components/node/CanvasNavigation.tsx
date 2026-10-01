@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { MiniMap, Panel, useReactFlow, useViewport } from '@xyflow/react';
-import { Map, Minus, Plus, Redo2, Search, Undo2, X, Maximize } from 'lucide-react';
+import { Hand, Map, Minus, MousePointer2, Plus, Redo2, Search, Trash, Undo2, X, Maximize } from 'lucide-react';
 import { setGraph, toast, useStore } from '../../store/store';
 import { graphEditProblem, lockedNodes } from '../../engine/flow/locks';
 import { graphHistory, historyRevision, subscribeGraphHistory, travelGraph } from '../../engine/flow/history';
@@ -21,7 +21,8 @@ function Highlight({ text, query }: { text: string; query: string }) {
   return <>{parts}</>;
 }
 
-export function CanvasNavigation({ sessionId, onSelect }: { sessionId: string; onSelect: (id: string) => void }) {
+/** `tool`: Select drags a selection box (middle/right drag pans); Pan drags the canvas. */
+export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCount, onDelete }: { sessionId: string; onSelect: (id: string) => void; tool: 'select' | 'pan'; onTool: (t: 'select' | 'pan') => void; selectedCount: number; onDelete: () => void }) {
   const graph = useStore(s => s.sessions[sessionId].graph);
   const generations = useStore(s => s.generations);
   const assets = useStore(s => s.assets);
@@ -103,6 +104,10 @@ export function CanvasNavigation({ sessionId, onSelect }: { sessionId: string; o
     <>
       {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="rgba(10,10,11,0.7)" nodeColor="var(--accent)" /> : null}
       <Panel ref={panelRef} position="bottom-left" className="canvas-navigation" style={{ bottom: lift }}>
+        <IconButton icon={MousePointer2} label="Select (drag a box; middle or right drag pans)" active={tool === 'select'} onClick={() => onTool('select')} />
+        <IconButton icon={Hand} label="Pan" active={tool === 'pan'} onClick={() => onTool('pan')} />
+        <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
+        <span className="canvas-nav-sep" />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
         <span className="canvas-nav-sep" />
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
