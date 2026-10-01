@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { ChevronDown, MessageSquare } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { FeedList } from '../chat/FeedList';
@@ -42,15 +41,14 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
       <ChevronDown size={13} className={open ? '' : 'rot-180'} />
     </button>
   );
-  // Folded: the button sits right beside the composer. Open: a card on the right of the canvas.
+  // Beside the composer, folded or open, so it never covers the canvas centre.
   if (!open) return <div className="thread-peek-folded">{toggle}</div>;
-  return createPortal(
+  return (
     <div className={`thread-peek thread-${workspace} is-open`}>
       {toggle}
       <div className="thread-body" ref={ref}>
         {count ? <FeedList sessionId={sessionId} compact /> : <p className="faint thread-empty">Ask the agent to build something here.</p>}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
