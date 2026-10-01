@@ -1,0 +1,1373 @@
+{
+  "date": "2026-10-01",
+  "commit": "3273c0a",
+  "provider": "nanogpt",
+  "model": "openai/gpt-6-luna",
+  "style": "auto",
+  "cases": [
+    {
+      "id": "clear-image",
+      "turns": [
+        "Una imagen de un gato astronauta flotando sobre la Tierra"
+      ],
+      "image": false,
+      "metrics": [
+        {
+          "id": "am_mupfc4yhw4gq0zwnri",
+          "startedAt": 1790852495129,
+          "request": "Una imagen de un gato astronauta flotando sobre la Tierra",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 0,
+          "llmCalls": 1,
+          "inputTokens": 10194,
+          "outputTokens": 170,
+          "llmUsd": 0.00035764,
+          "agentMs": 5119,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "fal::fal-ai/nano-banana-pro"
+          ],
+          "msToFirstOutput": 4892,
+          "callTimings": [
+            {
+              "ttfbMs": 3208,
+              "outputMs": 4891,
+              "toolMs": 4891,
+              "totalMs": 5097,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            }
+          ],
+          "msToPlan": 5109,
+          "planCheckMs": [
+            8
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Gato astronauta sobre la Tierra",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": null,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "image",
+              "model": "fal::fal-ai/nano-banana-pro",
+              "prompt": "A photorealistic hero image of a cat in a detailed white astronaut suit, gently floating in zero gravity above Earth. The cat looks toward the camera through a clear helmet visor, with the blue curve of Earth and delicate cloud formations filling the background and deep space beyond. Medium-wide composition, subject centered with a slight three-quarter angle, soft sunlight from the side creating a luminous rim on the suit, cinematic realism, crisp natural detail, no text, no logos."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "image",
+            "title": "Gato astronauta",
+            "prompt": "A photorealistic hero image of a cat in a detailed white astronaut suit, gently floating in zero gravity above Earth. The cat looks toward the camera through a clear helmet visor, with the blue curve of Earth and delicate cloud formations filling the background and deep space beyond. Medium-wide composition, subject centered with a slight three-quarter angle, soft sunlight from the side creating a luminous rim on the suit, cinematic realism, crisp natural detail, no text, no logos.",
+            "modelRef": "fal::fal-ai/nano-banana-pro",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "1:1",
+              "resolution": "1K"
+            },
+            "refs": []
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "animate-vague",
+      "turns": [
+        "Anima este personaje"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfc8x4btywe6u55g",
+          "startedAt": 1790852500264,
+          "request": "Anima este personaje",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 2,
+          "inputTokens": 24429,
+          "outputTokens": 305,
+          "llmUsd": 0.0025954000000000003,
+          "agentMs": 21785,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "fal::minimax/h3/reference-to-video"
+          ],
+          "msToFirstOutput": 11587,
+          "callTimings": [
+            {
+              "ttfbMs": 11256,
+              "outputMs": 11587,
+              "toolMs": 11587,
+              "totalMs": 11588,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 7320,
+              "outputMs": 9980,
+              "toolMs": 9980,
+              "totalMs": 10186,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            }
+          ],
+          "guides": [
+            "model:minimax"
+          ],
+          "msToPlan": 21778,
+          "planCheckMs": [
+            7
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Animar al personaje",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": null,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "video",
+              "model": "fal::minimax/h3/reference-to-video",
+              "prompt": "<Picture 1> is the first frame and character reference; preserve her identity, pose, black outfit, glowing sword, battlefield composition and 2D anime style. Flat 2D anime animation, not photorealistic, no 3D. One continuous take: the sword flames flicker and stream upward as tiny sparks and ash drift across the frame. The character's hair and clothing stir in the hot wind; she tightens her grip and slowly lowers the raised sword a little while keeping a resolute gaze toward camera. Distant figures advance subtly through smoke; foreground fires dance and smoke rolls naturally, the shattered moon remains steady. Camera makes a very slow push-in, keeping her centered and proportions consistent. Preserve clean cel-shaded linework and the original colors. Audio: wind, distant fire crackle and faint battlefield ambience; non_diegetic_music: N/A. Flat 2D anime animation, consistent linework and cel shading."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "video",
+            "title": "La espada en llamas",
+            "prompt": "<Picture 1> is the first frame and character reference; preserve her identity, pose, black outfit, glowing sword, battlefield composition and 2D anime style. Flat 2D anime animation, not photorealistic, no 3D. One continuous take: the sword flames flicker and stream upward as tiny sparks and ash drift across the frame. The character's hair and clothing stir in the hot wind; she tightens her grip and slowly lowers the raised sword a little while keeping a resolute gaze toward camera. Distant figures advance subtly through smoke; foreground fires dance and smoke rolls naturally, the shattered moon remains steady. Camera makes a very slow push-in, keeping her centered and proportions consistent. Preserve clean cel-shaded linework and the original colors. Audio: wind, distant fire crackle and faint battlefield ambience; non_diegetic_music: N/A. Flat 2D anime animation, consistent linework and cel shading.",
+            "modelRef": "fal::minimax/h3/reference-to-video",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "768P",
+              "duration": 8
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "two-clips-named-model",
+      "turns": [
+        "Haz dos clips de este personaje caminando por una ciudad de noche con Seedance 2.0 Fast"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfcpqk1flp2x6hb5",
+          "startedAt": 1790852522060,
+          "request": "Haz dos clips de este personaje caminando por una ciudad de noche con Seedance 2.0 Fast",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 3,
+          "inputTokens": 38753,
+          "outputTokens": 1059,
+          "llmUsd": 0.0034256,
+          "agentMs": 42079,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 1,
+          "findModels": 0,
+          "models": [
+            "nanogpt::bytedance-seedance-2-0-fast"
+          ],
+          "msToFirstOutput": 10166,
+          "callTimings": [
+            {
+              "ttfbMs": 10016,
+              "outputMs": 10166,
+              "toolMs": 10166,
+              "totalMs": 10167,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 12033,
+              "outputMs": 16544,
+              "toolMs": 16544,
+              "totalMs": 16545,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            },
+            {
+              "ttfbMs": 12273,
+              "outputMs": 15344,
+              "toolMs": 15344,
+              "totalMs": 15345,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            }
+          ],
+          "guides": [
+            "model:seedance"
+          ],
+          "msToPlan": 42073,
+          "estimatedUsd": 1.4118,
+          "lastEstimatedUsd": 1.4118,
+          "planCheckMs": [
+            5
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Dos clips nocturnos del personaje",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": 1.4118,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "video",
+              "model": "nanogpt::bytedance-seedance-2-0-fast",
+              "prompt": "@Image1 is the character and visual-style reference; preserve her anime identity and do not bring its battlefield setting. At night, she walks steadily along a rain-slick city sidewalk lined with glowing storefronts and tall buildings. Medium-wide tracking shot from a low three-quarter angle, camera moving backward at walking pace; a blurred streetlight pole passes close to the lens in the foreground, the woman stays in the left third. Neon signs reflect across wet pavement, light rain falls, her hair moves naturally with each step. Keep her face, proportions, outfit and colors consistent. Animated on twos (12 drawings per second). Diegetic city ambience, footsteps and rain; no music, no score, no bgm."
+            },
+            {
+              "id": "s2",
+              "kind": "video",
+              "model": "nanogpt::bytedance-seedance-2-0-fast",
+              "prompt": "@Image1 is the character and visual-style reference; preserve her anime identity and do not bring its battlefield setting. Continue the same nighttime walk through a rain-slick neon city; she passes a crosswalk as distant headlights sweep across the wet street. Side-profile medium tracking shot at a low angle, camera gliding parallel at walking pace; rain-streaked bus-stop glass crosses close in the foreground. She briefly glances toward the passing lights, then looks ahead and keeps walking. Maintain her face, proportions, outfit, colors, city-night continuity and the reference's drawn anime look. Animated on twos (12 drawings per second). Diegetic city ambience, footsteps, rain and passing-car hiss; no music, no score, no bgm."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s2 first_frame: \"s1\" produces video, an image is required."
+      ],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "video",
+            "title": "Caminata por la ciudad",
+            "prompt": "@Image1 is the character and visual-style reference; preserve her anime identity and do not bring its battlefield setting. At night, she walks steadily along a rain-slick city sidewalk lined with glowing storefronts and tall buildings. Medium-wide tracking shot from a low three-quarter angle, camera moving backward at walking pace; a blurred streetlight pole passes close to the lens in the foreground, the woman stays in the left third. Neon signs reflect across wet pavement, light rain falls, her hair moves naturally with each step. Keep her face, proportions, outfit and colors consistent. Animated on twos (12 drawings per second). Diegetic city ambience, footsteps and rain; no music, no score, no bgm.",
+            "modelRef": "nanogpt::bytedance-seedance-2-0-fast",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "720p",
+              "duration": 10
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          },
+          {
+            "id": "s2",
+            "kind": "video",
+            "title": "Sigue caminando",
+            "prompt": "@Image1 is the character and visual-style reference; preserve her anime identity and do not bring its battlefield setting. Continue the same nighttime walk through a rain-slick neon city; she passes a crosswalk as distant headlights sweep across the wet street. Side-profile medium tracking shot at a low angle, camera gliding parallel at walking pace; rain-streaked bus-stop glass crosses close in the foreground. She briefly glances toward the passing lights, then looks ahead and keeps walking. Maintain her face, proportions, outfit, colors, city-night continuity and the reference's drawn anime look. Animated on twos (12 drawings per second). Diegetic city ambience, footsteps, rain and passing-car hiss; no music, no score, no bgm.",
+            "modelRef": "nanogpt::bytedance-seedance-2-0-fast",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "720p",
+              "duration": 10
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "change-model",
+      "turns": [
+        "Haz dos clips de este personaje caminando por una ciudad de noche",
+        "Mejor usa MiniMax H3"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfdm7lswmr88r0td",
+          "startedAt": 1790852564145,
+          "request": "Haz dos clips de este personaje caminando por una ciudad de noche",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 8,
+          "inputTokens": 117170,
+          "outputTokens": 2252,
+          "llmUsd": 0.005343479999999999,
+          "agentMs": 114358,
+          "questionRounds": 1,
+          "revisions": 1,
+          "plans": 2,
+          "rejectedPlans": 2,
+          "findModels": 0,
+          "models": [
+            "atlas::minimax/h3-developer/reference-to-video"
+          ],
+          "msToFirstOutput": 15139,
+          "callTimings": [
+            {
+              "ttfbMs": 14731,
+              "outputMs": 15139,
+              "toolMs": 15139,
+              "totalMs": 15140,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 13414,
+              "outputMs": 13613,
+              "toolMs": 13613,
+              "totalMs": 13614,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 10963,
+              "outputMs": 10985,
+              "toolMs": 10985,
+              "totalMs": 11166,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            },
+            {
+              "ttfbMs": 13715,
+              "outputMs": 15153,
+              "toolMs": 15153,
+              "totalMs": 15359,
+              "reasoningTokens": 0,
+              "cachedTokens": 13056
+            },
+            {
+              "ttfbMs": 9092,
+              "outputMs": 12926,
+              "toolMs": 12926,
+              "totalMs": 12927,
+              "reasoningTokens": 0,
+              "cachedTokens": 13056
+            },
+            {
+              "ttfbMs": 12535,
+              "outputMs": 15193,
+              "toolMs": 15193,
+              "totalMs": 15403,
+              "reasoningTokens": 0,
+              "cachedTokens": 15104
+            },
+            {
+              "ttfbMs": 11871,
+              "outputMs": 14536,
+              "toolMs": 14536,
+              "totalMs": 14741,
+              "reasoningTokens": 0,
+              "cachedTokens": 15104
+            },
+            {
+              "ttfbMs": 13123,
+              "outputMs": 15754,
+              "toolMs": 15754,
+              "totalMs": 15959,
+              "reasoningTokens": 0,
+              "cachedTokens": 16128
+            }
+          ],
+          "guides": [
+            "workflow:story",
+            "model:minimax",
+            "skill:cinematic"
+          ],
+          "msToPlan": 98383,
+          "estimatedUsd": 0.18,
+          "lastEstimatedUsd": 0.18,
+          "planCheckMs": [
+            8,
+            5
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Caminata nocturna en dos clips",
+          "status": "awaiting",
+          "revised": true,
+          "estimateUsd": 0.18,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "video",
+              "model": "atlas::minimax/h3-developer/reference-to-video",
+              "prompt": "2D anime animation, matching the reference image's drawn style. <Picture 1> is the character reference; preserve her identity and design. One continuous take: she walks steadily toward camera along a rain-dark city street at night, ruined urban buildings and scattered fires giving way to dim neon signs and drifting smoke. Medium full shot, camera tracks backward smoothly at her walking pace, slightly low angle; wet pavement reflects red-orange firelight and cool blue moonlight. Her steps have clear weight, hair and clothing shift subtly with each stride, embers drift in the breeze. Ambient city wind, distant fire crackle and measured footsteps; non_diegetic_music: N/A. 2D anime animation, preserve the reference style."
+            },
+            {
+              "id": "s2",
+              "kind": "video",
+              "model": "atlas::minimax/h3-developer/reference-to-video",
+              "prompt": "2D anime animation, matching the reference image's drawn style. <Picture 1> is the character reference; preserve her identity and design, continuing the same city-night walk from the previous clip. One continuous take: side-profile medium-wide tracking shot as she keeps walking past rain-slick storefronts and pools of red and blue neon, then turns her gaze toward a distant glow without breaking stride. Camera tracks parallel at waist height, then gently arcs toward a three-quarter front view; reflections ripple under her boots and loose smoke moves across the street. Ambient wind, distant traffic, fire crackle and footsteps; non_diegetic_music: N/A. 2D anime animation, preserve the reference style."
+            },
+            {
+              "id": "s3",
+              "kind": "op"
+            }
+          ]
+        }
+      ],
+      "questions": [
+        "¿Qué tratamiento prefieres para la caminata nocturna?",
+        "¿Qué sonido deben llevar los clips?"
+      ],
+      "rejections": [
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s2: model \"atlas::minimax/h3-developer/text-to-video\" does not accept reference videos (use Extract frame to start from a still).",
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s2 first_frame: \"s1\" produces video, an image is required."
+      ],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "video",
+            "title": "Clip 1 · Avanza por la calle",
+            "prompt": "2D anime animation, matching the reference image's drawn style. <Picture 1> is the character reference; preserve her identity and design. One continuous take: she walks steadily toward camera along a rain-dark city street at night, ruined urban buildings and scattered fires giving way to dim neon signs and drifting smoke. Medium full shot, camera tracks backward smoothly at her walking pace, slightly low angle; wet pavement reflects red-orange firelight and cool blue moonlight. Her steps have clear weight, hair and clothing shift subtly with each stride, embers drift in the breeze. Ambient city wind, distant fire crackle and measured footsteps; non_diegetic_music: N/A. 2D anime animation, preserve the reference style.",
+            "modelRef": "atlas::minimax/h3-developer/reference-to-video",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "480P",
+              "duration": 6
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          },
+          {
+            "id": "s2",
+            "kind": "video",
+            "title": "Clip 2 · Sigue bajo las luces",
+            "prompt": "2D anime animation, matching the reference image's drawn style. <Picture 1> is the character reference; preserve her identity and design, continuing the same city-night walk from the previous clip. One continuous take: side-profile medium-wide tracking shot as she keeps walking past rain-slick storefronts and pools of red and blue neon, then turns her gaze toward a distant glow without breaking stride. Camera tracks parallel at waist height, then gently arcs toward a three-quarter front view; reflections ripple under her boots and loose smoke moves across the street. Ambient wind, distant traffic, fire crackle and footsteps; non_diegetic_music: N/A. 2D anime animation, preserve the reference style.",
+            "modelRef": "atlas::minimax/h3-developer/reference-to-video",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "480P",
+              "duration": 6
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          },
+          {
+            "id": "s3",
+            "kind": "op",
+            "title": "Unir los clips",
+            "op": "join_clips",
+            "input": "s1",
+            "more": [
+              "s2"
+            ],
+            "params": {
+              "music": ""
+            }
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "keep-first",
+      "turns": [
+        "Haz dos clips de este personaje: uno saludando y otro saltando",
+        "Quédate solo con el primero"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfg2gyhad6vhjs45",
+          "startedAt": 1790852678530,
+          "request": "Haz dos clips de este personaje: uno saludando y otro saltando",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 3,
+          "inputTokens": 40250,
+          "outputTokens": 828,
+          "llmUsd": 0.0034598,
+          "agentMs": 51708,
+          "questionRounds": 0,
+          "revisions": 1,
+          "plans": 2,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "atlas::minimax/h3-developer/reference-to-video"
+          ],
+          "msToFirstOutput": 17222,
+          "callTimings": [
+            {
+              "ttfbMs": 16893,
+              "outputMs": 17222,
+              "toolMs": 17222,
+              "totalMs": 17223,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 16065,
+              "outputMs": 18903,
+              "toolMs": 18903,
+              "totalMs": 19108,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            },
+            {
+              "ttfbMs": 14017,
+              "outputMs": 15359,
+              "toolMs": 15359,
+              "totalMs": 15361,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            }
+          ],
+          "guides": [
+            "model:minimax",
+            "skill:character",
+            "skill:cinematic"
+          ],
+          "msToPlan": 36334,
+          "estimatedUsd": 0.18,
+          "lastEstimatedUsd": 0.09,
+          "planCheckMs": [
+            7,
+            3
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Clip saludando",
+          "status": "awaiting",
+          "revised": true,
+          "estimateUsd": 0.09,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "video",
+              "model": "atlas::minimax/h3-developer/reference-to-video",
+              "prompt": "<Picture 1> is the character reference; preserve her identity and the exact 2D anime style of the reference. One continuous take. First frame: the character is already centered in the battlefield scene, sword lowered safely out of frame. Medium shot, she turns her gaze to camera, smiles warmly and raises her free hand for a friendly, natural wave, moving her wrist and fingers twice. Keep her face, outfit, proportions and surroundings consistent with the reference. Slow subtle camera push-in, fires flicker and distant smoke drifts gently; no other characters approach. Audio: soft battlefield wind and distant fire crackle; non_diegetic_music: N/A. Flat 2D anime animation, matching the reference image."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "video",
+            "title": "Saludando",
+            "prompt": "<Picture 1> is the character reference; preserve her identity and the exact 2D anime style of the reference. One continuous take. First frame: the character is already centered in the battlefield scene, sword lowered safely out of frame. Medium shot, she turns her gaze to camera, smiles warmly and raises her free hand for a friendly, natural wave, moving her wrist and fingers twice. Keep her face, outfit, proportions and surroundings consistent with the reference. Slow subtle camera push-in, fires flicker and distant smoke drifts gently; no other characters approach. Audio: soft battlefield wind and distant fire crackle; non_diegetic_music: N/A. Flat 2D anime animation, matching the reference image.",
+            "modelRef": "atlas::minimax/h3-developer/reference-to-video",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "480P",
+              "duration": 6
+            },
+            "refs": [
+              "asset:bench_img"
+            ]
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "product-portrait",
+      "turns": [
+        "Retrato de producto de un perfume sobre mármol con luz suave"
+      ],
+      "image": false,
+      "metrics": [
+        {
+          "id": "am_mupfh6dkkoawy3yh14",
+          "startedAt": 1790852730248,
+          "request": "Retrato de producto de un perfume sobre mármol con luz suave",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 0,
+          "llmCalls": 1,
+          "inputTokens": 10320,
+          "outputTokens": 150,
+          "llmUsd": 0.00036339,
+          "agentMs": 5043,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "fal::fal-ai/nano-banana-pro"
+          ],
+          "msToFirstOutput": 5039,
+          "callTimings": [
+            {
+              "ttfbMs": 3554,
+              "outputMs": 5039,
+              "toolMs": 5039,
+              "totalMs": 5041,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            }
+          ],
+          "msToPlan": 5041,
+          "planCheckMs": [
+            1
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Retrato de perfume",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": null,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "image",
+              "model": "fal::fal-ai/nano-banana-pro",
+              "prompt": "A premium perfume bottle standing on a polished white marble surface, subtle natural veining, refined glass reflections and a restrained elegant bottle design with no visible brand name or lettering. Close hero product composition, bottle centered slightly right with clean negative space, soft diffused window light from the side, gentle shadows, delicate highlights, shallow depth of field, luxury beauty campaign photography."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "image",
+            "title": "Foto de producto",
+            "prompt": "A premium perfume bottle standing on a polished white marble surface, subtle natural veining, refined glass reflections and a restrained elegant bottle design with no visible brand name or lettering. Close hero product composition, bottle centered slightly right with clean negative space, soft diffused window light from the side, gentle shadows, delicate highlights, shallow depth of field, luxury beauty campaign photography.",
+            "modelRef": "fal::fal-ai/nano-banana-pro",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "1:1",
+              "resolution": "1K"
+            },
+            "refs": []
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "designer-poster",
+      "turns": [
+        "Póster para un concierto de jazz, con título y fecha"
+      ],
+      "image": false,
+      "metrics": [
+        {
+          "id": "am_mupfha9rhf2s88er4s",
+          "startedAt": 1790852735295,
+          "request": "Póster para un concierto de jazz, con título y fecha",
+          "workspace": "designer",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 0,
+          "llmCalls": 4,
+          "inputTokens": 43827,
+          "outputTokens": 622,
+          "llmUsd": 0.00138791,
+          "agentMs": 22167,
+          "questionRounds": 1,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "fal::fal-ai/nano-banana-pro"
+          ],
+          "msToFirstOutput": 3839,
+          "callTimings": [
+            {
+              "ttfbMs": 3839,
+              "outputMs": 3839,
+              "toolMs": 3839,
+              "totalMs": 3940,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            },
+            {
+              "ttfbMs": 2964,
+              "outputMs": 3071,
+              "toolMs": 3071,
+              "totalMs": 3145,
+              "reasoningTokens": 0,
+              "cachedTokens": 10340
+            },
+            {
+              "ttfbMs": 5225,
+              "outputMs": 6581,
+              "toolMs": 6581,
+              "totalMs": 6583,
+              "reasoningTokens": 0,
+              "cachedTokens": 10513
+            },
+            {
+              "ttfbMs": 5216,
+              "outputMs": 8488,
+              "toolMs": 8488,
+              "totalMs": 8488,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            }
+          ],
+          "guides": [
+            "workflow:poster",
+            "skill:poster"
+          ],
+          "msToPlan": 22166,
+          "estimatedUsd": 0,
+          "lastEstimatedUsd": 0,
+          "planCheckMs": [
+            1
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Póster de concierto de jazz",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": 0,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "image",
+              "model": "fal::fal-ai/nano-banana-pro",
+              "prompt": "A moody jazz club stage with a polished brass trumpet resting on a piano, soft amber spotlight cutting through a little haze, intimate smoky atmosphere, graphic composition with the main still life concentrated on the right and generous clean dark negative space on the left for poster typography, no lettering, no logos.\n\nStyle: Vintage jazz-club poster, deep midnight navy and warm brass gold palette, subtle paper grain, dramatic low-key stage lighting, restrained art-deco accents, polished editorial layout."
+            },
+            {
+              "id": "l1",
+              "kind": "layer"
+            },
+            {
+              "id": "l2",
+              "kind": "layer"
+            },
+            {
+              "id": "l3",
+              "kind": "layer"
+            },
+            {
+              "id": "l4",
+              "kind": "layer"
+            }
+          ]
+        }
+      ],
+      "questions": [
+        "Título del concierto",
+        "Fecha y, si quieres, hora"
+      ],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "image",
+            "title": "Fondo del póster",
+            "prompt": "A moody jazz club stage with a polished brass trumpet resting on a piano, soft amber spotlight cutting through a little haze, intimate smoky atmosphere, graphic composition with the main still life concentrated on the right and generous clean dark negative space on the left for poster typography, no lettering, no logos.\n\nStyle: Vintage jazz-club poster, deep midnight navy and warm brass gold palette, subtle paper grain, dramatic low-key stage lighting, restrained art-deco accents, polished editorial layout.",
+            "modelRef": "fal::fal-ai/nano-banana-pro",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "4:5",
+              "resolution": "1K"
+            },
+            "refs": []
+          },
+          {
+            "id": "l1",
+            "kind": "layer",
+            "title": "Fondo",
+            "layerType": "raster",
+            "source": "s1",
+            "target": "base"
+          },
+          {
+            "id": "l2",
+            "kind": "layer",
+            "title": "Título",
+            "layerType": "text",
+            "target": "new",
+            "text": "NOCHE DE JAZZ",
+            "style": {
+              "fontFamily": "Display",
+              "fontSize": 116,
+              "fontWeight": 700,
+              "color": "#E7B85A",
+              "align": "left",
+              "lineHeight": 0.95,
+              "letterSpacing": 2
+            },
+            "box": {
+              "x": 90,
+              "y": 250,
+              "width": 760
+            }
+          },
+          {
+            "id": "l3",
+            "kind": "layer",
+            "title": "Fecha",
+            "layerType": "text",
+            "target": "new",
+            "text": "VIERNES 24 DE OCTUBRE · 20:00",
+            "style": {
+              "fontFamily": "Grotesk",
+              "fontSize": 30,
+              "fontWeight": 500,
+              "color": "#F3E9D5",
+              "align": "left",
+              "lineHeight": 1.2,
+              "letterSpacing": 2
+            },
+            "box": {
+              "x": 96,
+              "y": 590,
+              "width": 720
+            }
+          },
+          {
+            "id": "l4",
+            "kind": "layer",
+            "title": "Acento gráfico",
+            "layerType": "vector",
+            "target": "new",
+            "shapes": [
+              {
+                "type": "line",
+                "x": 96,
+                "y": 560,
+                "w": 190,
+                "h": 0,
+                "fill": null,
+                "stroke": "#E7B85A",
+                "strokeWidth": 4,
+                "radius": 0
+              }
+            ]
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "song",
+      "turns": [
+        "Una canción corta de lo-fi para estudiar, instrumental"
+      ],
+      "image": false,
+      "metrics": [
+        {
+          "id": "am_mupfhrdosopl34ddki",
+          "startedAt": 1790852757468,
+          "request": "Una canción corta de lo-fi para estudiar, instrumental",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 0,
+          "llmCalls": 1,
+          "inputTokens": 10317,
+          "outputTokens": 157,
+          "llmUsd": 0.00036651500000000004,
+          "agentMs": 4891,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "atlas::minimax/music-3.0"
+          ],
+          "msToFirstOutput": 4884,
+          "callTimings": [
+            {
+              "ttfbMs": 3815,
+              "outputMs": 4884,
+              "toolMs": 4884,
+              "totalMs": 4885,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            }
+          ],
+          "msToPlan": 4886,
+          "estimatedUsd": 0.15,
+          "lastEstimatedUsd": 0.15,
+          "planCheckMs": [
+            4
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Lo-fi instrumental para estudiar",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": 0.15,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "audio",
+              "model": "atlas::minimax/music-3.0",
+              "prompt": "Short instrumental lo-fi study beat, about 60 seconds. Calm, focused and unobtrusive, steady мellow groove around 72 BPM, warm dusty piano chords, soft muted drums, subtle vinyl texture, gentle bass and sparse mellow melodic details. Smooth dynamics, no dramatic changes, clean loop-friendly ending. No vocals, no spoken words."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "audio",
+            "title": "Lo-fi de estudio",
+            "prompt": "Short instrumental lo-fi study beat, about 60 seconds. Calm, focused and unobtrusive, steady мellow groove around 72 BPM, warm dusty piano chords, soft muted drums, subtle vinyl texture, gentle bass and sparse mellow melodic details. Smooth dynamics, no dramatic changes, clean loop-friendly ending. No vocals, no spoken words.",
+            "modelRef": "atlas::minimax/music-3.0",
+            "settings": {
+              "count": 1,
+              "advanced": {
+                "is_instrumental": true
+              }
+            }
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "model-3d-from-image",
+      "turns": [
+        "Conviértelo en un modelo 3D"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfhv5lcw0fyen2rt",
+          "startedAt": 1790852762361,
+          "request": "Conviértelo en un modelo 3D",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 2,
+          "inputTokens": 23365,
+          "outputTokens": 183,
+          "llmUsd": 0.0014487999999999999,
+          "agentMs": 20386,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 0,
+          "rejectedPlans": 1,
+          "findModels": 0,
+          "models": [],
+          "msToFirstOutput": 10246,
+          "callTimings": [
+            {
+              "ttfbMs": 8921,
+              "outputMs": 10246,
+              "toolMs": 10246,
+              "totalMs": 10246,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 9770,
+              "outputMs": 9938,
+              "totalMs": 10138,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            }
+          ]
+        }
+      ],
+      "plans": [],
+      "questions": [],
+      "rejections": [
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s1: no model3d model is available. Ask the user to connect a provider."
+      ],
+      "stepDetails": [],
+      "replies": [
+        "No hay un proveedor 3D conectado ahora mismo. Conecta Atlas Cloud o NanoGPT y podré convertir la imagen en un modelo 3D."
+      ]
+    },
+    {
+      "id": "character-sheet",
+      "turns": [
+        "Haz una hoja de personaje de ella"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfiawdsp5r4pg1av",
+          "startedAt": 1790852782765,
+          "request": "Haz una hoja de personaje de ella",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 2,
+          "inputTokens": 24873,
+          "outputTokens": 272,
+          "llmUsd": 0.0016441000000000001,
+          "agentMs": 25283,
+          "questionRounds": 1,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [],
+          "msToFirstOutput": 12778,
+          "callTimings": [
+            {
+              "ttfbMs": 12373,
+              "outputMs": 12778,
+              "toolMs": 12778,
+              "totalMs": 12778,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 10546,
+              "outputMs": 12296,
+              "toolMs": 12296,
+              "totalMs": 12494,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            }
+          ],
+          "msToPlan": 25275,
+          "planCheckMs": [
+            8
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Hoja de personaje",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": null,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "op"
+            }
+          ]
+        }
+      ],
+      "questions": [
+        "Elige el enfoque para la hoja"
+      ],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "op",
+            "title": "Hoja de personaje",
+            "op": "reference_sheet",
+            "input": "asset:bench_img",
+            "params": {
+              "subject": "character",
+              "sheet": "turnaround",
+              "aspect": "16:9",
+              "count": "1",
+              "note": "Conservar exactamente la identidad visual de la mujer de la imagen: rostro, proporciones corporales, corte y color de cabello, banda, vestuario, accesorios y estilo ilustrado. Hoja limpia de cuatro paneles con vistas frontal, tres cuartos, perfil y espalda, cuerpo entero, pose neutral y fondo simple claro. Espada enfundada o sostenida abajo sin ocultar el cuerpo; no incluir el campo de batalla ni elementos de fondo de la imagen."
+            }
+          }
+        ]
+      ],
+      "replies": []
+    },
+    {
+      "id": "story-3-clips",
+      "turns": [
+        "Una historia y animación de este personaje, 3 clips de 7 s"
+      ],
+      "image": true,
+      "metrics": [
+        {
+          "id": "am_mupfiuf5fko3ckbn40",
+          "startedAt": 1790852808065,
+          "request": "Una historia y animación de este personaje, 3 clips de 7 s",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 1,
+          "llmCalls": 6,
+          "inputTokens": 81559,
+          "outputTokens": 1886,
+          "llmUsd": 0.0046061,
+          "agentMs": 95374,
+          "questionRounds": 1,
+          "revisions": 0,
+          "plans": 0,
+          "rejectedPlans": 2,
+          "findModels": 0,
+          "models": [],
+          "msToFirstOutput": 12980,
+          "callTimings": [
+            {
+              "ttfbMs": 11552,
+              "outputMs": 12980,
+              "toolMs": 12980,
+              "totalMs": 13190,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 9933,
+              "outputMs": 10137,
+              "toolMs": 10137,
+              "totalMs": 10139,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            },
+            {
+              "ttfbMs": 12593,
+              "outputMs": 12594,
+              "toolMs": 12594,
+              "totalMs": 12594,
+              "reasoningTokens": 0,
+              "cachedTokens": 10880
+            },
+            {
+              "ttfbMs": 16684,
+              "outputMs": 18944,
+              "toolMs": 18944,
+              "totalMs": 18947,
+              "reasoningTokens": 0,
+              "cachedTokens": 0
+            },
+            {
+              "ttfbMs": 10847,
+              "outputMs": 16588,
+              "toolMs": 16588,
+              "totalMs": 16589,
+              "reasoningTokens": 0,
+              "cachedTokens": 13056
+            },
+            {
+              "ttfbMs": 8785,
+              "outputMs": 13183,
+              "toolMs": 13183,
+              "totalMs": 13396,
+              "reasoningTokens": 0,
+              "cachedTokens": 15104
+            }
+          ],
+          "guides": [
+            "workflow:story",
+            "skill:cinematic",
+            "model:minimax"
+          ]
+        }
+      ],
+      "plans": [],
+      "questions": [
+        "¿Qué tratamiento narrativo prefieres?",
+        "¿Qué sonido quieres?",
+        "¿Qué formato?",
+        "¿Cómo fijamos la identidad del personaje?"
+      ],
+      "rejections": [
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s2: model \"atlas::minimax/h3-developer/text-to-video\" does not accept reference videos (use Extract frame to start from a still).\n- Step s3: model \"atlas::minimax/h3-developer/text-to-video\" does not accept reference videos (use Extract frame to start from a still).",
+        "Plan rejected by the validator. Fix these problems and call propose_plan again:\n- Step s2 first_frame: \"s1\" produces video, an image is required.\n- Step s3 first_frame: \"s2\" produces video, an image is required."
+      ],
+      "stepDetails": [],
+      "replies": [
+        "[notice] NanoGPT: Could not reach NanoGPT. Check your connection."
+      ]
+    },
+    {
+      "id": "archviz-walkthrough",
+      "turns": [
+        "Render exterior de una casa moderna de hormigón y madera en un bosque al atardecer, y luego un recorrido en vídeo acercándose a la entrada"
+      ],
+      "image": false,
+      "metrics": [
+        {
+          "id": "am_mupfkw0nud6p43b3qf",
+          "startedAt": 1790852903447,
+          "request": "Render exterior de una casa moderna de hormigón y madera en un bosque al atardecer, y luego un recorrido en vídeo acercá",
+          "workspace": "chat",
+          "engine": "gpt-6-luna · NanoGPT",
+          "style": "auto",
+          "attachments": 0,
+          "llmCalls": 3,
+          "inputTokens": 34504,
+          "outputTokens": 557,
+          "llmUsd": 0.0013612700000000001,
+          "agentMs": 21691,
+          "questionRounds": 0,
+          "revisions": 0,
+          "plans": 1,
+          "rejectedPlans": 0,
+          "findModels": 0,
+          "models": [
+            "fal::fal-ai/nano-banana-pro",
+            "atlas::minimax/h3-developer/image-to-video"
+          ],
+          "msToFirstOutput": 8435,
+          "callTimings": [
+            {
+              "ttfbMs": 8122,
+              "outputMs": 8435,
+              "toolMs": 8435,
+              "totalMs": 8436,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            },
+            {
+              "ttfbMs": 4396,
+              "outputMs": 4634,
+              "toolMs": 4634,
+              "totalMs": 4635,
+              "reasoningTokens": 0,
+              "cachedTokens": 8709
+            },
+            {
+              "ttfbMs": 4515,
+              "outputMs": 8612,
+              "toolMs": 8612,
+              "totalMs": 8612,
+              "reasoningTokens": 0,
+              "cachedTokens": 10669
+            }
+          ],
+          "guides": [
+            "workflow:archviz-walkthrough",
+            "skill:archviz",
+            "skill:archviz-motion",
+            "model:minimax"
+          ],
+          "msToPlan": 21685,
+          "estimatedUsd": 0.12,
+          "lastEstimatedUsd": 0.12,
+          "planCheckMs": [
+            5
+          ]
+        }
+      ],
+      "plans": [
+        {
+          "title": "Casa en el bosque al atardecer",
+          "status": "awaiting",
+          "revised": false,
+          "estimateUsd": 0.12,
+          "steps": [
+            {
+              "id": "s1",
+              "kind": "image",
+              "model": "fal::fal-ai/nano-banana-pro",
+              "prompt": "Architectural hero exterior of a modern two-storey forest house: compact rectilinear massing with a broad flat roof and a modest cantilever, board-formed exposed concrete volumes paired with warm vertical timber cladding, generous floor-to-ceiling glazing in dark slim frames, a clearly visible recessed timber entrance door reached by a simple stone path. Dense mature woodland surrounds the house, restrained native ferns and moss in the foreground. Low golden-hour sun filters from the left through the trees, warm interior glow visible through the glazing. Eye-level 1.6 m three-quarter corner view showing the entry facade and one side, house prominent with a leading path in the foreground, 28 mm architectural lens, two-point perspective and perfectly straight verticals, photoreal architectural visualization.\n\nStyle: Fotografía arquitectónica fotorrealista, hormigón visto y madera cálida, vegetación forestal natural, luz cinematográfica de atardecer, materiales creíbles y detalle sobrio."
+            },
+            {
+              "id": "s2",
+              "kind": "video",
+              "model": "atlas::minimax/h3-developer/image-to-video",
+              "prompt": "Real photography, live action. One continuous take beginning from the exact first-frame composition. Make a slow, smooth, stabilized dolly-in along the stone path toward the recessed entrance, at eye level, with a natural 47° field of view; finish close to the front door with the entrance centered in frame. Golden-hour light and exposure remain consistent. Subtle leaves and ferns move in a light breeze, soft sunlight shifts gently across the ground and glazing. The approach has steady pacing, realistic camera travel and grounded perspective. Architecture stays rigid and unchanged, straight verticals, with no warping or new openings. Ambient forest sounds only; non_diegetic_music: N/A. Real photography, live action, natural cinematic image.\n\nStyle: Fotografía arquitectónica fotorrealista, hormigón visto y madera cálida, vegetación forestal natural, luz cinematográfica de atardecer, materiales creíbles y detalle sobrio."
+            }
+          ]
+        }
+      ],
+      "questions": [],
+      "rejections": [],
+      "stepDetails": [
+        [
+          {
+            "id": "s1",
+            "kind": "image",
+            "title": "Render exterior",
+            "prompt": "Architectural hero exterior of a modern two-storey forest house: compact rectilinear massing with a broad flat roof and a modest cantilever, board-formed exposed concrete volumes paired with warm vertical timber cladding, generous floor-to-ceiling glazing in dark slim frames, a clearly visible recessed timber entrance door reached by a simple stone path. Dense mature woodland surrounds the house, restrained native ferns and moss in the foreground. Low golden-hour sun filters from the left through the trees, warm interior glow visible through the glazing. Eye-level 1.6 m three-quarter corner view showing the entry facade and one side, house prominent with a leading path in the foreground, 28 mm architectural lens, two-point perspective and perfectly straight verticals, photoreal architectural visualization.\n\nStyle: Fotografía arquitectónica fotorrealista, hormigón visto y madera cálida, vegetación forestal natural, luz cinematográfica de atardecer, materiales creíbles y detalle sobrio.",
+            "modelRef": "fal::fal-ai/nano-banana-pro",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "aspect": "16:9",
+              "resolution": "1K"
+            },
+            "refs": []
+          },
+          {
+            "id": "s2",
+            "kind": "video",
+            "title": "Recorrido hacia la entrada",
+            "prompt": "Real photography, live action. One continuous take beginning from the exact first-frame composition. Make a slow, smooth, stabilized dolly-in along the stone path toward the recessed entrance, at eye level, with a natural 47° field of view; finish close to the front door with the entrance centered in frame. Golden-hour light and exposure remain consistent. Subtle leaves and ferns move in a light breeze, soft sunlight shifts gently across the ground and glazing. The approach has steady pacing, realistic camera travel and grounded perspective. Architecture stays rigid and unchanged, straight verticals, with no warping or new openings. Ambient forest sounds only; non_diegetic_music: N/A. Real photography, live action, natural cinematic image.\n\nStyle: Fotografía arquitectónica fotorrealista, hormigón visto y madera cálida, vegetación forestal natural, luz cinematográfica de atardecer, materiales creíbles y detalle sobrio.",
+            "modelRef": "atlas::minimax/h3-developer/image-to-video",
+            "settings": {
+              "count": 1,
+              "advanced": {},
+              "resolution": "480P",
+              "duration": 8
+            },
+            "firstFrame": "s1"
+          }
+        ]
+      ],
+      "replies": []
+    }
+  ]
+}

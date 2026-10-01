@@ -119,6 +119,9 @@ async function runCase(c: Case) {
     metrics: s.agentMetrics ?? [],
     plans: s.feed.flatMap((f) => (f.type === 'plan' ? [{ title: f.plan.title, status: f.status, revised: Boolean(f.revised), estimateUsd: f.estimate.usd, steps: f.plan.steps.map((x) => ({ id: x.id, kind: x.kind, model: 'modelRef' in x ? x.modelRef : undefined, prompt: 'prompt' in x ? x.prompt : undefined })) }] : [])),
     questions: s.feed.flatMap((f) => (f.type === 'questions' ? f.questions.map((q) => q.question) : [])),
+    // What the validator answered to rejected plans (only in the history: the feed drops them).
+    rejections: (s.agent?.history ?? []).flatMap((m) => (m.role === 'tool' && typeof m.content === 'string' && /^(Plan rejected|Invalid propose_plan)/.test(m.content) ? [m.content] : [])),
+    stepDetails: s.feed.flatMap((f) => (f.type === 'plan' ? [f.plan.steps] : [])),
     replies: s.feed.flatMap((f) => (f.type === 'assistant' ? [f.text] : f.type === 'notice' ? [`[notice] ${f.text}`] : [])),
   };
 }
@@ -142,7 +145,8 @@ describe.skipIf(!KEY)('agent bench (real LLM, plans only)', () => {
     });
     const st = useStore.getState();
     useStore.setState({ settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'bench', fal: 'bench', nanogpt: 'bench', [PROVIDER]: KEY! } } });
-    await loadCatalogs();
+    // Like connecting a provider in Settings: the local demo models give way to real ones.
+    await loadCatalogs({ preferRemote: true });
     expect(Object.keys(useStore.getState().catalog.models).length, 'recorded catalog did not load').toBeGreaterThan(50);
     await loadLlmCatalog(PROVIDER);
     const model = process.env.BENCH_LLM_MODEL ?? pickDefaultLlm(useStore.getState().catalog.llm[PROVIDER] ?? []);
@@ -151,7 +155,8 @@ describe.skipIf(!KEY)('agent bench (real LLM, plans only)', () => {
 
     const hasImage = existsSync(IMAGE);
     const results = [];
-    for (const c of CASES) {
+    const only = process.env.BENCH_ONLY?.split(',');
+    for (const c of CASES.filter((x) => !only || only.includes(x.id))) {
       if (c.image && !hasImage) {
         results.push({ id: c.id, skipped: `no image at ${IMAGE}` });
         continue;
@@ -168,7 +173,7 @@ describe.skipIf(!KEY)('agent bench (real LLM, plans only)', () => {
     })();
     const date = new Date().toISOString().slice(0, 10);
     mkdirSync('bench', { recursive: true });
-    const file = `bench/${date}-${commit}.json`;
+    const file = `bench/${date}-${commit}${only ? '-partial' : ''}.json`;
     writeFileSync(file, JSON.stringify({ date, commit, provider: PROVIDER, model, style: STYLE, cases: results }, null, 2));
     console.table(
       results.map((r) => {
