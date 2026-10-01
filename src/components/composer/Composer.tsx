@@ -29,6 +29,7 @@ function AttachStack({ ids, label, disabled, onAdd }: { ids: string[]; label: st
             <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
           </span>
         ))}
+        {ids.length > 1 ? <span className="attach-pile-count num">{ids.length}</span> : null}
         <span className="attach-pile-add"><Plus size={14} /></span>
       </div>
       <div className="attach-row">
