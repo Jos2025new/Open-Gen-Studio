@@ -17,7 +17,7 @@
 .nc-next { position: absolute; right: -34px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-2); opacity: 0; transition: opacity .12s; }
 .react-flow__node:hover .nc-next, .react-flow__node.selected .nc-next { opacity: 1; }.nc-next:hover { color: var(--accent); border-color: var(--accent-line); }
 .port-label { position: absolute; transform: translateY(-50%); font-size: 9px; color: var(--text-2); pointer-events: none; white-space: nowrap; opacity: 0; transition: opacity .12s; }.port-label.is-left { right: calc(100% + 10px); }.port-label.is-right { left: calc(100% + 36px); }
-.react-flow__node:hover .port-label, .react-flow__node.selected .port-label, .react-flow.connecting .port-label { opacity: 1; }
+.port-label { opacity: 1; }
 .nt-bar { display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-pop); white-space: nowrap; }
 .nt-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 6px; font-size: 11px; color: var(--text-2); }.nt-btn:hover, .nt-btn.is-open { color: var(--text); background: var(--surface-3); }.nt-icon { width: 28px; padding: 0; justify-content: center; }
 .nt-run { color: var(--accent); background: var(--accent-soft); }.nt-run:hover { color: var(--accent); }.nt-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--border); }
@@ -89,3 +89,6 @@
 .nc-body:has(.nc-generating) > :not(.nc-generating) { visibility: hidden; }
 .nc-body:has(.nc-generating) { background: var(--surface-2); }
 .nc-generating { inset: 0; padding: 0; justify-content: center; }
+
+/* Secondary inputs (Prompt) stay hidden until a connection is dragged; labels show only then too. */
+.port-quiet { opacity: 0; pointer-events: none; }

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
+import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
@@ -25,10 +25,11 @@ export type FlowNode = Node<FlowNodeData>;
 
 const KIND_ICON = { text: Type, image: ImageIcon, video: Film, audio: Music, model3d: Box, tool: Wand, asset: FileImage } as const;
 
-function PortHandle({ id, type, side, top, label, portType }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null }) {
+/** `quiet`: a secondary input, shown only while a connection is being dragged (or once something is connected to it). */
+function PortHandle({ id, type, side, top, label, portType, quiet }: { id: string; type: 'source' | 'target'; side: Position; top: string; label?: string; portType: PortType | null; quiet?: boolean }) {
   return (
     <>
-      <Handle id={id} type={type} position={side} className={`port port-${portType ?? 'none'}`} style={{ top }} />
+      <Handle id={id} type={type} position={side} className={`port port-${portType ?? 'none'} ${quiet ? 'port-quiet' : ''}`} style={{ top }} />
       {label ? (
         <span className={`port-label ${side === Position.Left ? 'is-left' : 'is-right'}`} style={{ top }}>
           {label}
@@ -756,6 +757,11 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
   const sessionId = useSessionId();
   const inputs = inputPorts(node.data);
   const out = outputPort(node.data, assets);
+  // Inputs already in use, and whether the model takes reference clips (only then the Video clip input exists).
+  const wired = new Set(useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.filter((e) => e.target === node.id).map((e) => e.targetHandle ?? '').join('|') ?? '').split('|'));
+  // While a connection is dragged every input shows, with its name.
+  const connecting = useConnection((c) => c.inProgress);
+  const clipModel = useStore((s) => ('modelRef' in node.data ? Boolean(s.catalog.schemas[node.data.modelRef]?.slots.clips) : false));
   const { assetId } = useNodeOutput(node);
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
@@ -772,8 +778,9 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
           <div className="nt-panel">{panel}</div>
         </NodeToolbar>
       ) : null}
-      {inputs.map((p, i) => (
-        <PortHandle key={p.id} id={p.id} type="target" side={Position.Left} top={`${((i + 1) / (inputs.length + 1)) * 100}%`} label={p.label} portType={p.type} />
+      {inputs.filter((p) => p.id !== 'clip' || wired.has('clip') || clipModel).map((p, i, shown) => (
+        // The prompt box already holds the prompt: its port shows only when connected or while connecting.
+        <PortHandle key={p.id} id={p.id} type="target" side={Position.Left} top={`${((i + 1) / (shown.length + 1)) * 100}%`} label={connecting ? p.label : undefined} portType={p.type} quiet={p.id === 'prompt' && !wired.has('prompt') && !connecting} />
       ))}
       <div className={`nc ${kindClass} ${selected ? 'is-selected' : ''}`}>
         <div className="nc-label">
@@ -800,7 +807,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
           </div>
         )}
       </div>
-      {out ? <PortHandle id="out" type="source" side={Position.Right} top="50%" portType={out} label={out} /> : null}
+      {out ? <PortHandle id="out" type="source" side={Position.Right} top="50%" portType={out} /> : null}
       {out ? <AddNext node={node} out={out} /> : null}
     </>
   );
