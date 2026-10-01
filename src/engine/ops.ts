@@ -402,7 +402,7 @@ export const OPS: Record<OpId, OpDef> = {
 };
 
 const SHEET_RULES =
-  'A 2×2 grid of four equal panels with thin white gutters, on a plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
+  'A 2×2 grid of four equal panels with thin white gutters, on a plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions (head size, build, height), hair length and style, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
 
 /** The four panels of a reference sheet by subject and sheet type. */
 export function sheetLayout(subject: string, sheet: string): string {
@@ -415,7 +415,8 @@ export function sheetLayout(subject: string, sheet: string): string {
 
 function note(p: Record<string, AdvancedValue>): string {
   const n = typeof p.note === 'string' ? p.note.trim() : '';
-  return n ? ` Additional direction: ${n}.` : '';
+  // The source image is the identity: a note adds or changes only what it names.
+  return n ? ` Additional direction (where it disagrees with the source image, the image wins unless this asks for a change): ${n}.` : '';
 }
 
 /** Operations offered in menus and nodes; mask operations start from Sketch. */
