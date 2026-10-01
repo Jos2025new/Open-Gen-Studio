@@ -205,7 +205,7 @@ function GenerationProgress({ node }: { node: GraphNode }) {
   return <div className="nc-generating" role="status" aria-live="polite">
     <div className="nc-generating-label"><LoaderCircle size={12} className="spin" />{attempt.status === 'queued' ? 'Queued' : 'Generating'}{attempt.progress != null ? ` · ${Math.round(attempt.progress * 100)}%` : ''}</div>
     {attempt.statusText && !/^generating/i.test(attempt.statusText) ? <span className="nc-generating-detail">{attempt.statusText}</span> : null}
-    {attempt.progress != null ? <progress max={1} value={attempt.progress} aria-label="Generation progress" /> : null}
+    {attempt.progress != null ? <progress max={1} value={attempt.progress} aria-label="Generation progress" /> : <span className="nc-generating-sweep" aria-hidden />}
   </div>;
 }
 

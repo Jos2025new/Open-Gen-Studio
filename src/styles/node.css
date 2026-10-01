@@ -74,3 +74,13 @@
 .nc-generating progress::-webkit-progress-bar { background: transparent; }
 .nc-generating progress::-webkit-progress-value { background: var(--accent); }
 .nc-generating progress::-moz-progress-bar { background: var(--accent); }
+
+/* Generating must be noticed: accent label, a moving bar when there is no percentage, and a breathing accent edge. */
+.nc-generating-label { color: var(--accent); font-size: 12px; font-weight: 500; }
+.nc-generating-label svg { color: var(--accent); }
+.nc-generating-sweep { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; }
+.nc-generating-sweep::after { content: ''; position: absolute; top: 0; bottom: 0; width: 35%; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: nc-sweep 1.4s ease-in-out infinite; }
+@keyframes nc-sweep { from { left: -35%; } to { left: 100%; } }
+.nc-body:has(.nc-generating) { box-shadow: inset 0 0 0 1px var(--accent-line); animation: nc-breathe 2s ease-in-out infinite; }
+@keyframes nc-breathe { 50% { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 24px var(--accent-soft); } }
+@media (prefers-reduced-motion: reduce) { .nc-generating-sweep::after, .nc-body:has(.nc-generating) { animation: none; } }
