@@ -9,13 +9,13 @@ import { describe, expect, it, vi } from 'vitest';
  * and needs the user's permission.
  *
  *   BENCH_LLM_KEY=… [BENCH_LLM_PROVIDER=nanogpt|openrouter|atlas] [BENCH_LLM_MODEL=id] [BENCH_STYLE=guided|auto]
- *   [BENCH_IMAGE=bench/fixtures/character.jpg] npx vitest run tests/bench
+ *   [BENCH_IMAGE=bench/fixtures/character.png] npx vitest run tests/bench
  *
  * Results: bench/<date>-<commit>.json (per case: the agent metrics of each request, plans and questions shown).
  */
 
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
-const IMAGE = process.env.BENCH_IMAGE ?? 'bench/fixtures/character.jpg';
+const IMAGE = process.env.BENCH_IMAGE ?? 'bench/fixtures/character.png';
 vi.mock('../../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
@@ -25,7 +25,7 @@ vi.mock('../../src/lib/idb', () => ({
 // No canvas in node: the attached image goes to the model as the file itself.
 vi.mock('../../src/lib/media', async (orig) => {
   const { readFileSync: read } = await import('node:fs');
-  const path = process.env.BENCH_IMAGE ?? 'bench/fixtures/character.jpg';
+  const path = process.env.BENCH_IMAGE ?? 'bench/fixtures/character.png';
   const mime = path.endsWith('.png') ? 'image/png' : 'image/jpeg';
   return {
     ...(await orig<typeof import('../../src/lib/media')>()),
@@ -68,6 +68,9 @@ const CASES: Case[] = [
   { id: 'designer-poster', workspace: 'designer', turns: ['Póster para un concierto de jazz, con título y fecha'] },
   { id: 'song', turns: ['Una canción corta de lo-fi para estudiar, instrumental'] },
   { id: 'model-3d-from-image', image: true, turns: ['Conviértelo en un modelo 3D'] },
+  { id: 'character-sheet', image: true, turns: ['Haz una hoja de personaje de ella'] },
+  { id: 'story-3-clips', image: true, turns: ['Una historia y animación de este personaje, 3 clips de 7 s'] },
+  { id: 'archviz-walkthrough', turns: ['Render exterior de una casa moderna de hormigón y madera en un bosque al atardecer, y luego un recorrido en vídeo acercándose a la entrada'] },
 ];
 
 /** Width and height from a PNG or JPEG header. */
@@ -184,6 +187,7 @@ describe.skipIf(!KEY)('agent bench (real LLM, plans only)', () => {
           findModels: sum('findModels'),
           models: [...new Set(m.flatMap((x) => x.models))].join(' '),
           usd: m.at(-1)?.lastEstimatedUsd ?? null,
+          llmUsd: +m.reduce((a, x) => a + x.llmUsd, 0).toFixed(4),
         };
       }),
     );

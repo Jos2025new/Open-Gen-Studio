@@ -9,6 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — línea base del banco del agente (R0d) (2026-10-01)
+Antes de reorganizar guías/prompt fijo: medir. Presupuesto autorizado por el usuario: 5 USD de LLM.
+- [x] B1. Fixture `bench/fixtures/character.png` (Aria, de la biblioteca) y 3 casos nuevos: hoja de personaje, historia de 3 clips, archviz render + recorrido. Columna `llmUsd`. *Por qué:* medir justo lo que se quiere mejorar.
+- [x] B2. Ejecutado en Auto con el modelo real del usuario (NanoGPT · `openai/gpt-6-luna`; clave leída de `data/state.json`, nunca impresa): `bench/2026-10-01-b098b23.json`. Coste total 0,024 USD.
+  Hallado: cada llamada al LLM tarda 10–14 s hasta el primer byte (con o sin caché; la app tarda < 15 ms), así que la espera = nº de llamadas × ~12 s. 1 llamada ≈ 5–6 s; historia de 3 clips = 7 llamadas, 102 s (2 planes rechazados por el validador, 1 ronda de preguntas, 3 guías). "Dos clips caminando" (change-model) cargó `workflow:story` y preguntó 3 cosas en Auto: 7 llamadas, 86 s. Sin revisar aún: 3D dice "no provider" (posible fallo del banco), el póster eligió el modelo demo `local::studio-image`, la hoja de personaje estimó $0 y se ejecutó sola.
+  Conclusión: el tamaño del prompt fijo no explica la latencia; las vueltas sí (guías encadenadas, planes rechazados, preguntas).
+
 ## Tarea — workflows y skills de archviz; principios de secuencia generales; música al unir clips (2026-10-01)
 Criterio (usuario): los workflows son flujos completos que el agente carga cuando la petición se parece a uno; las skills enseñan qué hacer en cada paso.
 - [x] A1. **Skills con guía** (`guides/archviz*.md`, cargadas con `read_guide`): `archviz` (render: estilo, materiales, luz, cámara y verticales, escala, qué evitar), `archviz-motion` (lenguaje de cámara de recorridos, movimiento ambiental, estructura estable, transiciones exterior→interior), `archviz-sketch` (boceto, clay o planta → render conservando volúmenes y huecos). `interior` remite a `archviz`. *Dónde:* `skills.ts`, `guides/`.
