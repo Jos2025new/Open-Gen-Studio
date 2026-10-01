@@ -198,7 +198,7 @@ function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
 /** Local operations (frames, grid split) run in the browser for free; they never reach a provider. */
 async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]> {
   const { id, sourceAssetId, params } = g.op!;
-  if (id === 'join_clips') return joinClips(g, [sourceAssetId, ...String(params.clips ?? '').split(',').filter(Boolean)], signal);
+  if (id === 'join_clips') return joinClips(g, [sourceAssetId, ...String(params.clips ?? '').split(',').filter(Boolean)], signal, String(params.music ?? '') || undefined);
   const images: Array<{ blob: Blob; width: number; height: number }> = [];
   if (id === 'extract_frame') {
     const seconds = parseFloat(String(params.seconds ?? ''));
@@ -232,7 +232,7 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
  * join_clips: the local server joins the clips with ffmpeg (server/local-store.js). The clips are written to
  * its data folder first; the result is a new video asset. Without that server (static hosting) it cannot run.
  */
-async function joinClips(g: Generation, ids: string[], signal: AbortSignal): Promise<string[]> {
+async function joinClips(g: Generation, ids: string[], signal: AbortSignal, music?: string): Promise<string[]> {
   if (ids.length < 2) throw new InputError('JOIN_CLIPS', 'Join clips needs at least two clips.');
   if (!(await diskAvailable())) throw new InputError('JOIN_UNAVAILABLE', 'Joining clips needs the local app server (npm run dev or npm run preview).');
   patchGeneration(g.id, { statusText: 'Joining clips' });
@@ -240,7 +240,11 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal): Pro
     if (get().assets[id]?.kind !== 'video') throw new InputError('JOIN_CLIPS', 'Join clips only takes videos.');
     await disk.setBlob(assetBlobKey(id), await ensureAssetBlob(id));
   }
-  const res = await fetch('/x/store/join', { method: 'POST', signal, body: JSON.stringify({ keys: ids.map(assetBlobKey) }), headers: { 'Content-Type': 'application/json' } });
+  if (music) {
+    if (get().assets[music]?.kind !== 'audio') throw new InputError('JOIN_CLIPS', 'The music under the joined video must be audio.');
+    await disk.setBlob(assetBlobKey(music), await ensureAssetBlob(music));
+  }
+  const res = await fetch('/x/store/join', { method: 'POST', signal, body: JSON.stringify({ keys: ids.map(assetBlobKey), ...(music ? { music: assetBlobKey(music) } : {}) }), headers: { 'Content-Type': 'application/json' } });
   if (!res.ok) throw new InputError(res.status === 501 ? 'JOIN_UNAVAILABLE' : 'JOIN_FAILED', `Could not join the clips: ${(await res.text()).slice(0, 300)}`);
   const first = get().assets[ids[0]];
   const asset = await storeOutput({ blob: await res.blob(), mime: 'video/mp4' }, g, 'video', { width: first?.width ?? 0, height: first?.height ?? 0 });

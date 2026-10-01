@@ -182,7 +182,7 @@ function ownDeps(step: PlanStep): StepRef[] {
     case 'audio':
       return [step.promptFrom, step.lyricsFrom].filter((r): r is string => Boolean(r));
     case 'op':
-      return [step.input, ...(step.more ?? [])];
+      return [step.input, ...(step.more ?? []), ...(typeof step.params?.music === 'string' && step.params.music ? [step.params.music] : [])];
     case 'layer':
       return [...(step.source ? [step.source] : []), ...(step.after ?? [])];
   }
@@ -636,6 +636,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           for (const r of more) {
             const k = refKind(r, where);
             if (k && k !== 'video') errors.push(`${where}: "${opId}" joins videos; "${r}" is ${k}.`);
+          }
+          const music = String(params.music ?? '').trim();
+          if (music) {
+            const k = refKind(music, where);
+            if (k && k !== 'audio') errors.push(`${where}: params.music must be an audio step or asset; "${music}" is ${k}.`);
           }
         }
         steps.push({ id: s.id!, kind: 'op', title, op: opId, input: s.input ?? '', ...(more ? { more } : {}), params } satisfies OpStep);

@@ -38,6 +38,27 @@ describe('join_clips on the local server (F4)', () => {
     }
   }, 30_000);
 
+  it.skipIf(!hasFfmpeg)('lays music under the joined video, looped and cut to its length', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-join-'));
+    try {
+      const a = join(dir, 'a.mp4');
+      const b = join(dir, 'b.mp4');
+      const m = join(dir, 'm.wav');
+      const out = join(dir, 'out.mp4');
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=24:duration=1.5', a]);
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=24:duration=1.5', b]);
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', m]);
+      execFileSync('ffmpeg', joinArgs([{ path: a, audio: false, duration: 1.5 }, { path: b, audio: false, duration: 1.5 }], { width: 320, height: 240 }, out, m));
+      const info = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type:format=duration', '-of', 'json', out]).toString());
+      expect(info.streams.map((s: { codec_type: string }) => s.codec_type).sort()).toEqual(['audio', 'video']);
+      const d = Number(info.format.duration);
+      expect(d).toBeGreaterThan(2.8);
+      expect(d).toBeLessThan(3.3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it('odd sizes are rounded up to even (H.264 needs it)', () => {
     const args: string[] = joinArgs([{ path: 'a', audio: true, duration: 1 }, { path: 'b', audio: true, duration: 1 }], { width: 481, height: 853 }, 'o');
     expect(args.join(' ')).toContain('scale=482:854');

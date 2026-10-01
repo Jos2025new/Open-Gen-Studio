@@ -2,6 +2,9 @@ import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
 import productGuide from './guides/product.md?raw';
 import socialGuide from './guides/social.md?raw';
+import archvizGuide from './guides/archviz.md?raw';
+import archvizMotionGuide from './guides/archviz-motion.md?raw';
+import archvizSketchGuide from './guides/archviz-sketch.md?raw';
 
 /* Skills shape how the agent writes prompts; workflows give it a proven step structure. */
 
@@ -42,6 +45,8 @@ export interface Workflow {
   workspaces: Workspace[];
   /** Skill applied with this workflow when the user picked none. */
   skill?: string;
+  /** Skills the agent loads for particular steps (what each one teaches is in its index line). */
+  skills?: Array<{ id: string; for: string }>;
   /** Values the workflow decides and does not ask. Never the resolution: it follows the chosen quality (cost). */
   fixed?: { model?: string; aspect?: string; audio?: boolean };
   /** Inputs the workflow needs; missing ones are asked in the one questions card. */
@@ -123,8 +128,32 @@ export const SKILLS: Skill[] = [
     id: 'interior',
     name: 'Interiors & architecture',
     description: 'Spaces, materials and natural light.',
-    guidance: 'Specify architectural style, materials, time of day and camera height; keep verticals straight (architectural photography).',
+    guidance: 'Specify architectural style, materials, time of day and camera height; keep verticals straight (architectural photography). For a project (renders, views, walkthroughs) load skill:archviz.',
     promptHint: 'architectural photography, natural light, straight verticals',
+  },
+  {
+    id: 'archviz',
+    name: 'Archviz stills',
+    description: 'Architectural renders: building sheet, materials, light, camera and straight verticals, scale.',
+    guidance: 'Write like an architectural photographer: one building sheet repeated in every view, one light condition with direction, eye-level camera with straight verticals, materials per surface. Load skill:archviz for the full guide before writing prompts.',
+    guide: archvizGuide,
+    promptHint: 'architectural visualization, photoreal render, tilt-shift, straight verticals, natural light',
+  },
+  {
+    id: 'archviz-motion',
+    name: 'Archviz walkthroughs',
+    description: 'Camera moves for walkthroughs and flythroughs from a render: one slow move per clip, subtle life, rigid structure.',
+    guidance: 'From an approved render: one slow, stable camera move per clip (dolly, tracking, orbit, drone reveal), subtle ambient life, architecture rigid and unchanged. Load skill:archviz-motion before writing video prompts.',
+    guide: archvizMotionGuide,
+    promptHint: 'slow steady architectural walkthrough, rigid structure, subtle ambient motion',
+  },
+  {
+    id: 'archviz-sketch',
+    name: 'Sketch to render',
+    description: 'A sketch, clay model or floor plan turned into a photoreal render that keeps its massing and openings.',
+    guidance: 'The sketch is the design: keep massing, proportions, openings and viewpoint; add only materials, light and landscape, as an edit of the attached image. Load skill:archviz-sketch before writing the prompt.',
+    guide: archvizSketchGuide,
+    promptHint: 'photoreal architectural render from sketch, exact massing and openings',
   },
 ];
 
@@ -330,6 +359,111 @@ export const WORKFLOWS: Workflow[] = [
     ],
   },
   {
+    // Archviz set: renders, a walkthrough, a full tour and sketch → render. Skills teach each step; the building
+    // is one place subject (@Name) so every view and clip keeps the same architecture.
+    id: 'archviz-render',
+    name: 'Archviz render',
+    description: 'Architectural renders: a hero exterior or interior, or a set of views of the same building.',
+    workspaces: ['chat', 'node'],
+    skill: 'archviz',
+    skills: [{ id: 'archviz', for: 'every render prompt' }],
+    needs: ['the building or space (style, exterior or interior), or an image of it', 'light or time of day when it matters'],
+    continuity: 'One building sheet repeated in every view; the hero render is the reference for the other views, and once approved the building is a place subject (@Name).',
+    variants: [
+      { id: 'exterior', name: 'Exterior hero', description: 'One exterior render, three-quarter view at eye level.', steps: [{ id: 's1', kind: 'image', title: 'Exterior', prompt: '{prompt}, exterior, three-quarter view, eye level', aspect: '16:9' }] },
+      { id: 'interior', name: 'Interior', description: 'One interior render of the main space.', steps: [{ id: 's1', kind: 'image', title: 'Interior', prompt: '{prompt}, interior, camera at 1.4 m, one-point perspective', aspect: '3:2' }] },
+      {
+        id: 'set',
+        name: 'Set of views',
+        description: 'Facade, living space, bedroom and terrace of the same building.',
+        steps: [
+          { id: 's1', kind: 'image', title: 'Facade', prompt: '{prompt}, main facade, exterior', aspect: '16:9' },
+          { id: 's2', kind: 'image', title: 'Living space', prompt: '{prompt}, living room and kitchen interior, same building', refs: ['s1'], aspect: '16:9' },
+          { id: 's3', kind: 'image', title: 'Bedroom', prompt: '{prompt}, main bedroom interior, same building', refs: ['s1'], aspect: '16:9' },
+          { id: 's4', kind: 'image', title: 'Terrace', prompt: '{prompt}, terrace or garden, same building', refs: ['s1'], aspect: '16:9' },
+        ],
+      },
+    ],
+    steps: [{ id: 's1', kind: 'image', title: 'Render', prompt: '{prompt}', aspect: '16:9' }],
+  },
+  {
+    id: 'archviz-walkthrough',
+    name: 'Archviz walkthrough',
+    description: 'One render animated into a walkthrough or flythrough clip (dolly, orbit, drone reveal, exterior to interior).',
+    workspaces: ['chat', 'node'],
+    skill: 'archviz-motion',
+    skills: [
+      { id: 'archviz', for: 'the render, when there is no approved image yet' },
+      { id: 'archviz-motion', for: 'the clip prompt' },
+    ],
+    needs: ['the render to animate (an image, or a description to render first)', 'the camera move, if the user has one in mind'],
+    continuity: 'The render is the first frame of the clip; the clip directs the camera and the life, never redescribes the architecture.',
+    variants: [
+      { id: 'dolly', name: 'Dolly in', description: 'Slow dolly toward the entrance or the window wall.' },
+      { id: 'orbit', name: 'Orbit', description: 'Slow 30–60° orbit around the building corner.' },
+      { id: 'drone', name: 'Drone reveal', description: 'Rising aerial move that reveals the site.' },
+      {
+        id: 'inside',
+        name: 'Exterior to interior',
+        description: 'From the facade through the open door into the main space: two clips joined (chat only).',
+        steps: [
+          { id: 's1', kind: 'image', title: 'Facade near the door', prompt: '{prompt}, exterior near the open glazed entrance', aspect: '16:9' },
+          { id: 's2', kind: 'image', title: 'Main interior', prompt: '{prompt}, main interior seen from the entrance, same building', refs: ['s1'], aspect: '16:9' },
+          { id: 's3', kind: 'video', title: 'Approach', prompt: '{prompt}, slow dolly toward the open door', firstFrame: 's1', aspect: '16:9' },
+          { id: 's4', kind: 'video', title: 'Inside', prompt: '{prompt}, the camera continues forward into the room', firstFrame: 's2', aspect: '16:9' },
+          { id: 's5', kind: 'op', title: 'Join clips', op: 'join_clips', input: 's3', more: ['s4'] },
+        ],
+      },
+    ],
+    steps: [
+      { id: 's1', kind: 'image', title: 'Render', prompt: '{prompt}', aspect: '16:9' },
+      { id: 's2', kind: 'video', title: 'Walkthrough', prompt: '{prompt}, one slow steady camera move', firstFrame: 's1', aspect: '16:9' },
+    ],
+  },
+  {
+    id: 'archviz-tour',
+    name: 'Archviz tour',
+    description: 'A full property tour: key views of one building, one clip per view, joined in order with optional ambient music.',
+    workspaces: ['chat'],
+    skill: 'archviz-motion',
+    skills: [
+      { id: 'archviz', for: 'the key views' },
+      { id: 'archviz-motion', for: 'each clip and the order of the tour' },
+    ],
+    needs: ['the building (description or images)', 'total length', 'ambient music: yes (generated) or no'],
+    continuity: 'Facade → entrance → main interior → terrace. The facade render is the reference for every other view and the building is a place subject (@Name); each clip starts from its view (first_frame); neighboring clips change shot size or angle; the clips are joined in order (join_clips, with params.music set to a music step or an audio asset when the user wants music).',
+    steps: [
+      { id: 's1', kind: 'image', title: 'Facade', prompt: '{prompt}, main facade at golden hour', aspect: '16:9' },
+      { id: 's2', kind: 'image', title: 'Entrance', prompt: '{prompt}, entrance and hall, same building', refs: ['s1'], aspect: '16:9' },
+      { id: 's3', kind: 'image', title: 'Living space', prompt: '{prompt}, main living space, same building', refs: ['s1'], aspect: '16:9' },
+      { id: 's4', kind: 'image', title: 'Terrace', prompt: '{prompt}, terrace or garden, same building', refs: ['s1'], aspect: '16:9' },
+      { id: 'v1', kind: 'video', title: 'Arrival', prompt: '{prompt}, slow dolly toward the house', firstFrame: 's1', aspect: '16:9' },
+      { id: 'v2', kind: 'video', title: 'Entrance', prompt: '{prompt}, slow walk-through of the hall', firstFrame: 's2', aspect: '16:9' },
+      { id: 'v3', kind: 'video', title: 'Living space', prompt: '{prompt}, slow pan across the living space', firstFrame: 's3', aspect: '16:9' },
+      { id: 'v4', kind: 'video', title: 'Terrace', prompt: '{prompt}, slow pull-back revealing the terrace', firstFrame: 's4', aspect: '16:9' },
+      { id: 'j1', kind: 'op', title: 'Join the tour', op: 'join_clips', input: 'v1', more: ['v2', 'v3', 'v4'] },
+    ],
+  },
+  {
+    id: 'archviz-sketch',
+    name: 'Sketch to render',
+    description: 'A hand sketch, clay model or floor plan turned into a photoreal render that keeps its design; optionally animated.',
+    workspaces: ['chat', 'node'],
+    skill: 'archviz-sketch',
+    skills: [
+      { id: 'archviz-sketch', for: 'the render from the sketch' },
+      { id: 'archviz-motion', for: 'the clip, when the user wants one' },
+    ],
+    needs: ['the sketch, clay render or floor plan (an image)', 'materials and light, when not obvious'],
+    continuity: 'The attached sketch is the design: the render is an edit of it (refs: the sketch) that keeps massing, openings and viewpoint.',
+    variants: [
+      { id: 'sketch', name: 'Hand sketch', description: 'A drawing turned into a photoreal render.' },
+      { id: 'clay', name: 'Clay / white model', description: 'A grey 3D render given materials and light.' },
+      { id: 'plan', name: 'Floor plan', description: 'A plan turned into a rendered top-down plan or an interpreted perspective.' },
+    ],
+    steps: [{ id: 's1', kind: 'image', title: 'Render', prompt: '{prompt}, photoreal architectural render that keeps the exact massing, openings and viewpoint of the attached sketch' }],
+  },
+  {
     id: 'poster',
     name: 'Poster layout',
     description: 'Background on layer 1, headline and accent layers on top.',
@@ -374,6 +508,7 @@ export function describeWorkflow(w: Workflow): string {
     w.needs?.length ? `needs (ask the missing ones in the one questions card): ${w.needs.join('; ')}` : '',
     w.continuity ? `continuity: ${w.continuity}` : '',
     w.variants?.length ? `variants: ${w.variants.map((v) => `${v.id} (${v.description})`).join('; ')}` : '',
+    w.skills?.length ? `skills (read_guide each before writing its steps): ${w.skills.map((k) => `skill:${k.id} for ${k.for}`).join('; ')}` : '',
   ].filter(Boolean);
   return [`${w.name}: ${w.description}`, ...lines, ...extra.map((e) => `  ${e}`)].join('\n');
 }

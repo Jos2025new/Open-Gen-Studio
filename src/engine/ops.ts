@@ -306,13 +306,13 @@ export const OPS: Record<OpId, OpDef> = {
   join_clips: {
     id: 'join_clips',
     label: 'Join clips',
-    description: 'Join clips in order into one video: input is the first clip, more the rest (free, on this computer).',
+    description: 'Join clips in order into one video: input is the first clip, more the rest; params.music optionally lays an audio step or asset under the whole video (free, on this computer).',
     input: 'video',
     output: 'video',
     engine: 'local',
     quick: false,
     multiInput: true,
-    fields: [],
+    fields: [{ key: 'music', label: 'Music', type: 'text', default: '', placeholder: 'an audio step id or asset:id' }],
   },
   video_upscale: {
     id: 'video_upscale',

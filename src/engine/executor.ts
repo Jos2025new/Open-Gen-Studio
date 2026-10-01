@@ -94,7 +94,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           : s.kind === 'audio'
             ? [s.promptFrom, s.lyricsFrom]
             : s.kind === 'op'
-            ? [s.input, ...(s.more ?? [])]
+            ? [s.input, ...(s.more ?? []), ...(typeof s.params?.music === 'string' && s.params.music ? [s.params.music] : [])]
             : s.kind === 'layer'
               ? [s.source]
               : [];
@@ -213,6 +213,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
             if (a) rest.push(a);
           }
           params = { ...params, clips: rest.join(',') };
+          // Music under the joined video: an audio step of this plan or an audio asset.
+          if (typeof params.music === 'string' && params.music) params = { ...params, music: (await resolveAsset(params.music)) ?? '' };
         }
         const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
         const g = createGeneration(spec);

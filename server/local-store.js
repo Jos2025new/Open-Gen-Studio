@@ -14,7 +14,7 @@ const run = promisify(execFile);
  * @param {Array<{ path: string, audio: boolean, duration: number }>} clips
  * @param {{ width: number, height: number }} size
  */
-export function joinArgs(clips, size, out) {
+export function joinArgs(clips, size, out, music) {
   const w = size.width + (size.width % 2);
   const h = size.height + (size.height % 2);
   const inputs = [];
@@ -29,7 +29,15 @@ export function joinArgs(clips, size, out) {
     );
   });
   const pairs = clips.map((_, i) => `[v${i}][a${i}]`).join('');
-  filters.push(`${pairs}concat=n=${clips.length}:v=1:a=1[v][a]`);
+  if (music) {
+    // Music under the whole video: looped to its length, lower than the clips' own sound, faded out at the end.
+    const total = clips.reduce((t, c) => t + Math.max(0.1, c.duration), 0);
+    const n = clips.length;
+    inputs.push('-stream_loop', '-1', '-i', music);
+    filters.push(`${pairs}concat=n=${n}:v=1:a=1[v][ca]`);
+    filters.push(`[${n}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:${total.toFixed(3)},volume=0.35,afade=t=out:st=${Math.max(0, total - 2).toFixed(3)}:d=2[m]`);
+    filters.push('[ca][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]');
+  } else filters.push(`${pairs}concat=n=${clips.length}:v=1:a=1[v][a]`);
   return [
     '-y', '-loglevel', 'error', ...inputs,
     '-filter_complex', filters.join(';'),
@@ -163,7 +171,7 @@ export function localStore(root = process.cwd()) {
 
     // join_clips: the clips are already in data/ (the app writes them first); the joined MP4 is returned, not kept.
     if (path === '/join' && req.method === 'POST') {
-      const { keys } = JSON.parse(String(await body(req)) || '{}');
+      const { keys, music } = JSON.parse(String(await body(req)) || '{}');
       if (!Array.isArray(keys) || keys.length < 2 || keys.length > 20) return send(400, 'join needs 2 to 20 clips');
       const clips = [];
       for (const k of keys) {
@@ -173,10 +181,16 @@ export function localStore(root = process.cwd()) {
         clips.push({ path: file, ...(await probe(file).catch(() => null)) });
       }
       if (clips.some((c) => !c.width)) return send(422, 'a clip has no video stream');
+      let musicFile = null;
+      if (music) {
+        const key = parseKey(String(music));
+        musicFile = key && (await findBlob(key.ns, key.id));
+        if (!musicFile) return send(404, `music ${music} is not on disk`);
+      }
       const out = join(dir, 'tmp', `join-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
       await mkdir(dirname(out), { recursive: true });
       try {
-        await run('ffmpeg', joinArgs(clips, clips[0], out), { maxBuffer: 1 << 24 });
+        await run('ffmpeg', joinArgs(clips, clips[0], out, musicFile), { maxBuffer: 1 << 24 });
         return send(200, await readFile(out), 'video/mp4');
       } catch (err) {
         if (err?.code === 'ENOENT') return send(501, 'ffmpeg is not installed on this computer');
