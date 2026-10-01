@@ -33,20 +33,23 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
     return () => cancelAnimationFrame(id);
   }, [open, lastKey]);
 
+  const toggle = (
+    <button type="button" className="thread-toggle" onClick={() => setUi({ threadOpen: !open })} aria-expanded={open}>
+      <MessageSquare size={13} />
+      <span>Conversation</span>
+      {count ? <span className="num faint">{count}</span> : null}
+      {pending ? <span className="pulse-dot" /> : null}
+      <ChevronDown size={13} className={open ? '' : 'rot-180'} />
+    </button>
+  );
+  // Folded: the button sits right beside the composer. Open: a card on the right of the canvas.
+  if (!open) return <div className="thread-peek-folded">{toggle}</div>;
   return createPortal(
-    <div className={`thread-peek thread-${workspace} ${open ? 'is-open' : ''}`}>
-      <button type="button" className="thread-toggle" onClick={() => setUi({ threadOpen: !open })} aria-expanded={open}>
-        <MessageSquare size={13} />
-        <span>Conversation</span>
-        {count ? <span className="num faint">{count}</span> : null}
-        {pending ? <span className="pulse-dot" /> : null}
-        <ChevronDown size={13} className={open ? '' : 'rot-180'} />
-      </button>
-      {open ? (
-        <div className="thread-body" ref={ref}>
-          {count ? <FeedList sessionId={sessionId} compact /> : <p className="faint thread-empty">Ask the agent to build something here.</p>}
-        </div>
-      ) : null}
+    <div className={`thread-peek thread-${workspace} is-open`}>
+      {toggle}
+      <div className="thread-body" ref={ref}>
+        {count ? <FeedList sessionId={sessionId} compact /> : <p className="faint thread-empty">Ask the agent to build something here.</p>}
+      </div>
     </div>,
     document.body,
   );

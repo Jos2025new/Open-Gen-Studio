@@ -108,3 +108,7 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .thread-peek.is-open .thread-toggle svg:last-child { margin-left: auto; }
 .thread-peek .thread-body { max-height: min(560px, calc(100vh - 160px)); margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 @media (max-width: 1100px) { .thread-peek { bottom: 150px; } .thread-peek .thread-body { max-height: calc(100vh - 300px); } }
+
+.thread-peek-folded { position: absolute; left: calc(100% + 12px); bottom: 0; }
+.thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; }
+@media (max-width: 1100px) { .thread-peek-folded { left: auto; right: 0; bottom: calc(100% + 8px); } }
