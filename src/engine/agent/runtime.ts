@@ -9,6 +9,7 @@ import { needsSpendCheck } from '../pricing';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
+import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
@@ -427,6 +428,8 @@ function materializeNodes(sessionId: string, plan: Plan): void {
     nodes: [...g.nodes, ...nodes.map((n) => ({ ...n, position: positions.get(n.id) ?? n.position }))],
     edges: [...g.edges, ...edges],
   }));
+  // Bring the new nodes into view, with what they connect to.
+  focusNodes(sessionId, [...new Set([...nodes.map((n) => n.id), ...edges.map((e) => e.source)])]);
 }
 
 function removeDraftNodes(sessionId: string, planId: string): void {

@@ -19,3 +19,10 @@ export function setNodeSelection(sessionId: string, ids: Iterable<string>): void
 export function nodeSelection(sessionId: string): string[] {
   return useNodeSelection.getState().bySession[sessionId] ?? [];
 }
+
+/** Nodes the canvas should bring into view (the agent just added them). Not persisted either. */
+export const useNodeFocus = create<{ sessionId: string; ids: string[]; tick: number }>(() => ({ sessionId: '', ids: [], tick: 0 }));
+
+export function focusNodes(sessionId: string, ids: string[]): void {
+  if (ids.length) useNodeFocus.setState((s) => ({ sessionId, ids, tick: s.tick + 1 }));
+}

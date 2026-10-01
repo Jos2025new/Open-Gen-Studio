@@ -16,7 +16,7 @@ import { setGraph, setUi, useStore } from '../../store/store';
 import { addAssetAsNode, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
-import { setNodeSelection } from '../../engine/flow/selection';
+import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
 import { Popover, usePopover } from '../ui/Popover';
@@ -90,6 +90,13 @@ function Canvas() {
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
   const rf = useReactFlow();
+  // Nodes the agent just added: frame them once they are measured.
+  const focus = useNodeFocus();
+  useEffect(() => {
+    if (!focus.tick || focus.sessionId !== sessionId) return;
+    const t = window.setTimeout(() => void rf.fitView({ nodes: focus.ids.map((id) => ({ id })), padding: 0.3, maxZoom: 1, duration: 450 }), 150);
+    return () => window.clearTimeout(t);
+  }, [focus.tick]);
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
 
