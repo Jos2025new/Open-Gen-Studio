@@ -402,16 +402,17 @@ export const OPS: Record<OpId, OpDef> = {
 };
 
 const SHEET_RULES =
-  'Four equal panels with thin white gutters (a 2×2 grid unless a row is stated), on a plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions (head size, build, body shape, height; never stretched, elongated or slimmed), hair length and style, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
+  'Plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions (head size, build, body shape, height; never stretched, elongated or slimmed), hair length and style, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
 
 /** The four panels of a reference sheet by subject and sheet type. */
 export function sheetLayout(subject: string, sheet: string): string {
-  if (sheet === 'expressions') return 'Reference sheet of this character: four head-and-shoulders panels with neutral, happy, angry and surprised expressions, same angle and lighting.';
-  if (sheet === 'outfits') return `Reference sheet of this ${subject === 'character' ? 'character' : 'subject'}: four full panels, the same identity in four different outfits or finishes, same pose and angle.`;
-  if (subject === 'location') return 'Reference sheet of this place: panel 1 establishing wide shot, panel 2 top-down plan view, panel 3 close detail of its main materials, panel 4 reverse angle.';
-  if (subject === 'object' || subject === 'product') return 'Reference sheet of this object: panel 1 front, panel 2 side, panel 3 back, panel 4 top-down, centered and whole in each.';
-  // One row of four tall panels: a full body fills each panel instead of shrinking inside a wide 2×2 cell.
-  return 'Character turnaround reference sheet in one row of four tall, equal panels side by side: panel 1 face and shoulders close-up, panel 2 full-body front, panel 3 full-body profile, panel 4 full-body back, relaxed neutral pose, each figure filling its panel from head to feet.';
+  const grid = 'A 2×2 grid of four equal panels with thin white gutters.';
+  if (sheet === 'expressions') return grid + ' Reference sheet of this character: four head-and-shoulders panels with neutral, happy, angry and surprised expressions, same angle and lighting.';
+  if (sheet === 'outfits') return `${grid} Reference sheet of this ${subject === 'character' ? 'character' : 'subject'}: four full panels, the same identity in four different outfits or finishes, same pose and angle.`;
+  if (subject === 'location') return grid + ' Reference sheet of this place: panel 1 establishing wide shot, panel 2 top-down plan view, panel 3 close detail of its main materials, panel 4 reverse angle.';
+  if (subject === 'object' || subject === 'product') return grid + ' Reference sheet of this object: panel 1 front, panel 2 side, panel 3 back, panel 4 top-down, centered and whole in each.';
+  // Three full-body views side by side on one canvas, no cells: narrow panels pushed models to stretch the body.
+  return 'Character turnaround reference sheet: the same character three times side by side on one canvas, side view, front view and back view, full body from head to feet at the same scale and height, relaxed neutral pose. Body proportions exactly as in the source: head size, chest, hips and leg length; never taller, longer-legged or slimmer.';
 }
 
 function note(p: Record<string, AdvancedValue>): string {
@@ -431,7 +432,7 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
 
 export function opCount(op: OpDef, params: Record<string, AdvancedValue>): number {
   if (op.id === 'variations' || op.id === 'reference_sheet') return Math.max(1, Math.min(4, Number(params.count) || 1));
-  if (op.id === 'grid_split') return params.grid === 'row4' ? 4 : (Number(params.grid) || 3) ** 2;
+  if (op.id === 'grid_split') return params.grid === 'row3' ? 3 : (Number(params.grid) || 3) ** 2;
   return 1;
 }
 

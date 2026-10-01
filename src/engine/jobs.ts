@@ -205,9 +205,9 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
     const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
     images.push(await frameInput(sourceAssetId, which));
   } else if (id === 'grid_split') {
-    // 'row4': one row of four panels (a character turnaround sheet); otherwise an n×n grid.
-    const cols = params.grid === 'row4' ? 4 : Number(params.grid) === 2 ? 2 : 3;
-    const rows = params.grid === 'row4' ? 1 : cols;
+    // 'row3': one row of three views (a character turnaround sheet); otherwise an n×n grid.
+    const cols = params.grid === 'row3' ? 3 : Number(params.grid) === 2 ? 2 : 3;
+    const rows = params.grid === 'row3' ? 1 : cols;
     const src = await blobToCanvas((await mediaInput(sourceAssetId)).blob);
     const w = Math.floor(src.width / cols);
     const h = Math.floor(src.height / rows);
@@ -834,7 +834,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'video', prompt: `${def.label} (${n} clips)`, modelRef: 'local::join', settings: { count: 1, advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'local') {
-    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : (input.params.grid === 'row4' ? '1×4' : `${input.params.grid}×${input.params.grid}`);
+    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : (input.params.grid === 'row3' ? '1×3' : `${input.params.grid}×${input.params.grid}`);
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'voice') {
