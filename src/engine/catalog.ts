@@ -225,7 +225,21 @@ export function ensureComposerModels(preferRemote = false): void {
 /** The user picks a model in the selector: from now on it is their choice, and the agent's default for that kind (C2). */
 export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
   setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
+  // One image model everywhere: its edit twin becomes the edit model (tools, agent edits) too.
+  if (kind === 'image') {
+    const edit = opModelFromRef(ref, 'image');
+    if (edit) setSettings((st) => ({ ops: { ...st.ops, edit } }));
+  }
   return selectComposerModel(kind, ref);
+}
+
+/** Pick the image-edit model; the composer's Image model follows to the same family's text-to-image twin. */
+export function pickImageEditModel(ref: string | null): void {
+  setSettings((st) => ({ ops: { ...st.ops, edit: ref } }));
+  if (!ref) return;
+  const base = routeTwins(ref).find((m) => !m.acceptsImage)?.ref ?? ref;
+  setComposer((c) => ({ userPicked: { ...c.userPicked, image: true } }));
+  void selectComposerModel('image', base);
 }
 
 /** Release a manual composer choice and restore the connected-provider default. */
@@ -314,12 +328,17 @@ export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video')
   const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : i2vCounterpart(parsed.provider, parsed.id);
   const alt = counterpart ? `${parsed.provider}::${counterpart}` : null;
   if (alt && takesImage(alt)) return alt;
-  // Same family, version and tier on the same provider, differing only by its input route (text-to-image ↔ edit,
-  // text-to-video ↔ image-to-video): ids equal once the route words are dropped.
+  // Same family, version and tier differing only by the input route (text-to-image ↔ edit, text-to-video ↔ image-to-video).
+  return routeTwins(ref).find((m) => takesImage(m.ref))?.ref ?? null;
+}
+
+/** Same family, version and tier on the same provider, differing only by the input route words. */
+function routeTwins(ref: string): ModelSummary[] {
+  const parsed = parseModelRef(ref);
+  if (!parsed) return [];
   const route = /[/_-]?(text|image|reference)-to-(image|video)|[/_-]edit\b|[/_-](t2i|i2i|t2v|i2v)\b/gi;
   const bare = parsed.id.toLowerCase().replace(route, '');
-  const twin = Object.values(get().catalog.models).find((m) => m.provider === parsed.provider && m.ref !== ref && m.id.toLowerCase().replace(route, '') === bare && takesImage(m.ref));
-  return twin?.ref ?? null;
+  return Object.values(get().catalog.models).filter((m) => m.provider === parsed.provider && m.ref !== ref && m.id.toLowerCase().replace(route, '') === bare);
 }
 
 /** Model for an operation on an asset: the one that made it for edit / video engines, else the engine's model. */

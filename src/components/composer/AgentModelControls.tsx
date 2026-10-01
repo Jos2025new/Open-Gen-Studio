@@ -4,6 +4,7 @@ import {
   defaultModelFor,
   modelSummary,
   opModelFor,
+  pickImageEditModel,
   pickComposerModel,
   preferredModel,
   resetAgentModel,
@@ -170,7 +171,7 @@ export function AgentModelControls() {
     if (picker === 'image' || picker === 'audio') {
       if (ref) void pickComposerModel(picker, ref);
       else void resetComposerModel(picker);
-    } else if (picker === 'imageEdit') setSettings((s) => ({ ops: { ...s.ops, edit: ref } }));
+    } else if (picker === 'imageEdit') pickImageEditModel(ref);
     else if (picker === 'videoEdit') setSettings((s) => ({ ops: { ...s.ops, videoEdit: ref } }));
     else {
       const mode = modeOf[picker];

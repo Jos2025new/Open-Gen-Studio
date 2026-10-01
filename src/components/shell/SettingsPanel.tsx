@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
-import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pickAgentModel, repickAgentModel, transcriberFor } from '../../engine/catalog';
+import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pickAgentModel, pickImageEditModel, repickAgentModel, transcriberFor } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { LLM_LABELS, LLM_TIERS, limitedLlmFallback, type LlmModel } from '../../engine/providers/llm';
@@ -247,7 +247,8 @@ function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slo
           filter={filter}
           autoOption={`Picks the best connected model (${autoName})`}
           onSelect={(ref) => {
-            setSettings((s) => ({ ops: { ...s.ops, [slot]: ref } }));
+            if (slot === 'edit') pickImageEditModel(ref);
+            else setSettings((s) => ({ ops: { ...s.ops, [slot]: ref } }));
             pop.close();
           }}
         />
