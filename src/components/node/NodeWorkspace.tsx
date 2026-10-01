@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Upload } from 'lucide-react';
 import { setGraph, setUi, useStore } from '../../store/store';
-import { addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
+import { addAssetAsNode, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { setNodeSelection } from '../../engine/flow/selection';
@@ -249,7 +249,7 @@ function Canvas() {
         if (!assetId) return;
         e.preventDefault();
         const pos = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        addNode(sessionId, { kind: 'asset', title: 'Asset', assetId }, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
+        addAssetAsNode(sessionId, assetId, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
       }}
     >
       <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={e => {

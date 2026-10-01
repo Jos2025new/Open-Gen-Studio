@@ -559,7 +559,7 @@ async function runPlanItem(
     // Run what is on the canvas now (the user may have edited the drafted nodes).
     const graph = session(sessionId).graph;
     const ids = graph.nodes.filter((n) => n.planId === plan.id && !off.has(n.id.replace(`${plan.id}_`, ''))).map((n) => n.id);
-    const run = graphToSteps(graph, ids, get().generations);
+    const run = graphToSteps(graph, ids, get().generations, { assets: get().assets });
     if (run.errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: run.errors.join(' ') });
       return;

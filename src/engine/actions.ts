@@ -719,6 +719,8 @@ export function addAssetNode(sessionId: string, assetId: string, position?: { x:
   if (!graph) return;
   const bounds = graphBounds(graph.nodes);
   const pos = position ?? (bounds ? { x: bounds.x, y: bounds.y + bounds.h + 80 } : { x: 0, y: 0 });
+  // A generated 3D model comes back as its own 3D node (see addAssetAsNode).
+  if (get().assets[assetId]?.kind === 'model3d') return void import('./flow/actions').then((m) => m.addAssetAsNode(sessionId, assetId, pos));
   setGraph(sessionId, (g) => ({ ...g, nodes: [...g.nodes, { id: uid('nd'), position: pos, data: { kind: 'asset', title: 'Asset', assetId } }] }));
 }
 

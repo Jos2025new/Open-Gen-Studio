@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { getAssetBlob } from '../../lib/idb';
 import { fetchBlob } from '../../lib/media';
 import { GLB_MIME, unpackModel, validateGlb } from '../../lib/model3d';
-import { useStore } from '../../store/store';
-import { FRONT_ORBIT } from '../../lib/model3dThumb';
+import { patchAsset, useStore } from '../../store/store';
+import { ensureModelThumbnail, FRONT_ORBIT } from '../../lib/model3dThumb';
+import { debug3d, readCamera, setCamera } from '../../lib/view3d';
+import type { SavedView3D } from '../../engine/types';
 import { applyView, panHandler, useViewer3d, VIEW3D_DEFAULT } from './viewer3d';
 
 /** Only the open lightbox mounts this component; lists never allocate WebGL. */
@@ -38,8 +40,12 @@ export function Model3DViewer({ assetId }: { assetId: string }) {
       viewer.addEventListener('load', () => {
         if (!live) return;
         setStatus('');
-        useViewer3d.setState({ el: viewer as never, view: VIEW3D_DEFAULT });
-        applyView(viewer as never, VIEW3D_DEFAULT);
+        // The view this model was left in, if any.
+        const saved = useStore.getState().assets[assetId]?.view3d;
+        const view = saved ? { ...VIEW3D_DEFAULT, exposure: saved.exposure, environment: saved.environment, texture: saved.texture, roughness: saved.roughness, metalness: saved.metalness, grid: saved.grid } : VIEW3D_DEFAULT;
+        if (saved) setCamera(viewer as never, saved);
+        useViewer3d.setState({ el: viewer as never, view, touched: false });
+        applyView(viewer as never, view);
       });
       viewer.addEventListener('error', () => live && setStatus('Could not render this model. You can still download the original.'));
       host.current.append(viewer);
@@ -49,6 +55,39 @@ export function Model3DViewer({ assetId }: { assetId: string }) {
   const view = useViewer3d((s) => s.view), el = useViewer3d((s) => s.el);
   useEffect(() => { if (el) applyView(el, view); }, [el, view]);
   useEffect(() => (el ? panHandler(el) : undefined), [el]);
+  // Save the view 800 ms after the user's last change and on close; then the view image follows it.
+  useEffect(() => {
+    if (!el) return;
+    let timer: ReturnType<typeof setTimeout> | undefined, pending: SavedView3D | null = null;
+    const flush = () => {
+      clearTimeout(timer);
+      if (!pending) return;
+      const t = performance.now();
+      patchAsset(assetId, { view3d: pending });
+      pending = null;
+      debug3d('save view', performance.now() - t);
+    };
+    const snap = () => {
+      if (!useViewer3d.getState().touched) return;
+      const { pan: _pan, ...look } = useViewer3d.getState().view;
+      pending = { ...readCamera(el), ...look };
+      clearTimeout(timer);
+      timer = setTimeout(flush, 800);
+    };
+    const touch = () => useViewer3d.setState({ touched: true });
+    el.addEventListener('pointerdown', touch);
+    el.addEventListener('wheel', touch, { passive: true });
+    el.addEventListener('camera-change', snap);
+    const unsub = useViewer3d.subscribe((st, prev) => { if (st.view !== prev.view) snap(); });
+    return () => {
+      el.removeEventListener('pointerdown', touch);
+      el.removeEventListener('wheel', touch);
+      el.removeEventListener('camera-change', snap);
+      unsub();
+      flush();
+      ensureModelThumbnail(assetId);
+    };
+  }, [el, assetId]);
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     <div ref={host} style={{ width: '100%', height: '100%' }} />
     {status && <p role="status" style={{ position: 'absolute', top: 16, left: 16, right: 16 }}>{status}</p>}

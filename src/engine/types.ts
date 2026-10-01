@@ -232,15 +232,31 @@ export interface Asset {
   generationId?: string;
   /** 'sketch': painted-over copy owned by a node; not listed in the gallery. */
   /** 'mask': drawn in Sketch for Edit region / Remove object; hidden from the gallery like 'sketch'. */
-  origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask';
+  origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask' | 'view3d';
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   thumbnailUrl?: string;
-  /** Which front-view convention rendered a 3D thumbnail; a different one re-renders it. */
-  thumbView?: number;
+  /** 3D: the view and look the viewer left it in (never changes the file). */
+  view3d?: SavedView3D;
+  /** 3D: hidden image of that view (origin 'view3d'); what image inputs receive. */
+  viewImageId?: string;
+  /** 3D: which view rendered the thumbnail; a different one re-renders it. */
+  thumbKey?: string;
   stored: boolean;
   favorite: boolean;
   createdAt: number;
+}
+
+export interface SavedView3D {
+  orbit: string;
+  target: string;
+  fov: string;
+  exposure: number;
+  environment: 'neutral' | 'legacy';
+  texture: boolean;
+  roughness: number | null;
+  metalness: number | null;
+  grid: boolean;
 }
 
 export type OpId =

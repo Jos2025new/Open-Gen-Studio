@@ -33,6 +33,11 @@ export function runsGeneration(d: GraphNodeData): d is GenNodeData | ToolNodeDat
   return d.kind === 'image' || d.kind === 'video' || d.kind === 'audio' || d.kind === 'model3d' || d.kind === 'tool';
 }
 
+/** Whether an output fits an input. A 3D model fits image inputs: they receive its view image. */
+export function portFits(out: PortType | null, input: PortType | undefined): boolean {
+  return !!out && (out === input || (out === 'model3d' && input === 'image'));
+}
+
 export function outputPort(data: GraphNodeData, assets: Record<string, Asset>): PortType | null {
   switch (data.kind) {
     case 'text':
@@ -116,7 +121,7 @@ export function connectionError(
   const port = inputPorts(tgt.data).find((p) => p.id === c.targetHandle);
   if (!port) return 'This node has no such input.';
   if (!out) return 'The source has no output yet.';
-  if (out !== port.type) return `${port.label} expects ${port.type}, got ${out}.`;
+  if (!portFits(out, port.type)) return `${port.label} expects ${port.type}, got ${out}.`;
   if (reaches(graph.edges, c.target, c.source)) return 'That connection would create a loop.';
   return null;
 }
@@ -331,7 +336,7 @@ function finishedText(node: GraphNode, generations: Record<string, Generation>):
  * Build steps for running `targets`. Upstream generation nodes without a finished
  * output run too; nodes that already have output are referenced by their asset.
  */
-export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[] } = {}): GraphRunPlan {
+export function graphToSteps(graph: Graph, targets: string[], generations: Record<string, Generation>, options: RequestContext & { force?: boolean; library?: Subject[]; assets?: Record<string, Asset> } = {}): GraphRunPlan {
   const byId = new Map(graph.nodes.map((n) => [n.id, n]));
   const errors: string[] = [];
   const run = new Set<string>();
@@ -360,6 +365,14 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   const refFor = (sourceId: string): string | null => {
     const n = byId.get(sourceId);
     if (!n || n.data.kind === 'text') return null;
+    // A 3D source gives its view image (rendered when the model is shown or its view changes).
+    if (n.data.kind === 'model3d' || (n.data.kind === 'asset' && options.assets?.[n.data.assetId ?? '']?.kind === 'model3d')) {
+      if (run.has(sourceId)) { errors.push(`Run "${n.data.title}" first: its view image is made from the finished model.`); return null; }
+      const model = nodeOutputAsset(n, generations), view = model ? options.assets?.[model]?.viewImageId : undefined;
+      if (view) return `asset:${view}`;
+      errors.push(`"${n.data.title}" has no view image yet. Wait a moment for its preview to render, then run again.`);
+      return null;
+    }
     if (run.has(sourceId)) return 'outputIndex' in n.data && n.data.outputIndex ? `${sourceId}#${n.data.outputIndex + 1}` : sourceId;
     const asset = nodeOutputAsset(n, generations);
     if (asset) return `asset:${asset}`;

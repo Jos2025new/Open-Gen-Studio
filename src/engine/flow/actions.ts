@@ -10,10 +10,26 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort, runsGeneration, nodeOutputAsset } from './graph';
+import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 
 const get = useStore.getState;
+
+/**
+ * An asset dropped on the canvas. A generated 3D model comes back as its 3D node (result, model and settings) with
+ * the images it was made from connected; anything else is an Asset node.
+ */
+export function addAssetAsNode(sessionId: string, assetId: string, position: { x: number; y: number }): string {
+  const st = get(), asset = st.assets[assetId];
+  const g = asset?.generationId ? st.generations[asset.generationId] : undefined;
+  if (asset?.kind !== 'model3d' || !g || g.status !== 'done' || g.kind !== 'model3d') return addNode(sessionId, { kind: 'asset', title: 'Asset', assetId }, position);
+  const id = addNode(sessionId, { kind: 'model3d', title: '3D model', prompt: g.prompt, modelRef: g.modelRef, settings: structuredClone(g.settings), outputIndex: Math.max(0, g.assetIds.indexOf(assetId)), generationId: g.id }, position);
+  g.inputs.refs.filter(r => st.assets[r]).forEach((r, i) => {
+    const src = addNode(sessionId, { kind: 'asset', title: 'Asset', assetId: r }, { x: position.x - NODE_WIDTH - 100, y: position.y + i * 360 });
+    tryConnect(sessionId, { source: src, target: id, targetHandle: 'ref' });
+  });
+  return id;
+}
 
 export function newNodeData(kind: GraphNodeData['kind'], opts: { op?: OpId; assetId?: string } = {}): GraphNodeData {
   const st = get();
@@ -78,7 +94,7 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   const from = graph.nodes.find((n) => n.id === fromId);
   if (!from) return null;
   const type = outputPort(from.data, st.assets);
-  const port = inputPorts(data).find((p) => p.type === type);
+  const port = inputPorts(data).find((p) => p.type === type) ?? inputPorts(data).find((p) => portFits(type, p.type));
   // Stack below the nodes this one already feeds, so new cards never land on top of them.
   const children = graph.edges.filter((e) => e.source === fromId).map((e) => graph.nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => Boolean(n));
   const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
@@ -104,7 +120,7 @@ export function setNodeModel(sessionId: string, nodeId: string, patch: Pick<GenN
     const edges = g.edges.filter(e => {
       if (e.source !== nodeId) return true;
       const tgt = nodes.find(n => n.id === e.target);
-      return tgt && inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type === out;
+      return tgt && portFits(out, inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type);
     });
     return { ...g, nodes, edges };
   });
@@ -152,7 +168,7 @@ export function setNodeOp(sessionId: string, nodeId: string, op: OpId): string |
     const edges = g.edges.filter(e => {
       if (e.source !== nodeId && e.target !== nodeId) return true;
       const src = nodes.find(n => n.id === e.source), tgt = nodes.find(n => n.id === e.target);
-      return src && tgt && outputPort(src.data, get().assets) === inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type;
+      return src && tgt && portFits(outputPort(src.data, get().assets), inputPorts(tgt.data).find(p => p.id === e.targetHandle)?.type);
     });
     return { ...g, nodes, edges };
   });
@@ -198,7 +214,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const context = requestContext(sessionId);
-  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, ...context });
+  const run = graphToSteps(graph, targets, st.generations, { force, library: st.library, assets: st.assets, ...context });
   const inputs = new Set(run.runIds);
   const visit = (id: string) => {
     const n = graph.nodes.find(n => n.id === id);

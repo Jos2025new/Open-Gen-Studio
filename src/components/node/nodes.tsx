@@ -5,7 +5,7 @@ import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, setSketch, tryConnect } from '../../engine/flow/actions';
-import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, runsGeneration } from '../../engine/flow/graph';
+import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
 import { deleteAssets, downloadAsset } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
@@ -45,8 +45,8 @@ function useSessionId() {
 /** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
 export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void }) {
   const [tools, setTools] = useState(false);
-  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => p.type === accepts);
-  const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || OPS[id].input === accepts));
+  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
+  const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || portFits(accepts, OPS[id].input)));
   if (tools) {
     return (
       <div className="menu">

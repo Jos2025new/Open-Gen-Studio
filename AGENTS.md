@@ -9,6 +9,14 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — vista 3D guardada, imagen de vista como referencia y 3D importado como nodo (2026-09-30)
+> ⚠️ **FRÁGIL · POSIBLE LAG.** Guarda la vista en el asset (estado persistido, ver `feffc15`) y renderiza la imagen de vista con WebGL fuera de pantalla. Si la app va más lenta: activar `localStorage['ogs.debug3d']='1'` (consola: tiempos de guardado y render 3D; avisos > 1,5 s salen siempre) y revisar esto primero.
+- [x] T1. La vista del visor (órbita, encuadre, zoom, luz, material, grid) se guarda en `asset.view3d` con espera de 800 ms tras el último cambio y al cerrar; al abrirlo se recupera. *Dónde:* `types.ts`, `viewer3d.ts`, `Model3DViewer.tsx`.
+- [x] T2. Imagen de vista (1024 px) renderizada con esa vista al cerrar el visor (o al mostrarse por primera vez): asset oculto (`origin: 'view3d'`, `asset.viewImageId`) y miniatura. La salida 3D se conecta a puertos de imagen y entrega esa imagen. *Dónde:* `model3dThumb.ts`, `flow/graph.ts` (`portFits`, `refFor`), `flow/actions.ts`, `NodeWorkspace.tsx`, `nodes.tsx`, `GalleryPanel.tsx`.
+- [x] T3. Soltar un 3D generado desde Assets crea un nodo 3D con su resultado y parámetros y su imagen de origen conectada como nodo Asset; un GLB subido sigue como Asset. *Dónde:* `NodeWorkspace.tsx`, `flow/actions.ts`.
+Hecho: `lib/view3d.ts` (aplicar luz/material/grid, cámara, `debug3d`), vista guardada solo si el usuario cambió algo (`touched`), imagen de vista nueva por cada vista distinta (la anterior se conserva: una generación puede usarla), `portFits` y `refFor` (3D → imagen de vista; error claro si el 3D aún corre o la imagen no existe), `addAssetAsNode` (soltar y "Add to Node canvas"). Typecheck y suite verdes (326 + 1 omitida); sin navegador. Riesgo: un 3D del composer reconstruido como nodo puede contar como desfasado y "Run all" lo regeneraría (coste); comprobar antes de Run all.
+Futuro: texturizado (ningún modelo en el catálogo actual); su puerto 3D aceptará la salida tal cual.
+
 ## Plan — controles del visor 3D (2026-09-30) · APLICADO, pendiente de revisión del usuario
 Se amplía el `model-viewer` 4.3.1 que ya tenemos, sin Three.js propio, gizmo ni luces que se muevan (model-viewer no las tiene). Three.js directo solo como plan B, si model-viewer bloquea algo necesario.
 - [x] V1. Barra de vista bajo el modelo, con el mismo patrón que la barra de operaciones (`.lb-dock`): View ▾ (Front/Back/Left/Right/Top/Bottom + Reset view, vía `cameraOrbit`), Pan, Zoom − +, Snapshot. *Dónde:* `Model3DViewer.tsx`, `Lightbox.tsx`, `shell.css`. *Por qué:* vistas exactas sin otro editor.
