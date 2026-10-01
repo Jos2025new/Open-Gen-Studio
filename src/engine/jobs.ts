@@ -4,7 +4,7 @@ import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { InputError } from './errors';
@@ -267,7 +267,7 @@ async function execute(id: string): Promise<string[]> {
   controllers.set(id, controller);
   const signal = controller.signal;
   patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined });
-  const g = get().generations[id];
+  let g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
       const assetIds = await runLocalOp(g, signal);
@@ -285,6 +285,15 @@ async function execute(id: string): Promise<string[]> {
     if (g.kind === 'text' && g.modelRef === RECRAFT_STYLE_REF) {
       await runCreateStyle(g, signal);
       return [];
+    }
+    // Inputs on a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
+    if ((g.kind === 'image' || g.kind === 'video') && !g.op && (g.inputs.refs.length || g.inputs.firstFrame)) {
+      const cur = modelSummary(g.modelRef);
+      const twin = cur && !cur.acceptsImage ? opModelFromRef(g.modelRef, g.kind) : null;
+      if (twin && twin !== g.modelRef) {
+        patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName });
+        g = get().generations[g.id];
+      }
     }
     const resolved = await resolveModel(g.modelRef);
     if (!resolved) {

@@ -313,7 +313,13 @@ export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video')
   if (takesImage(ref)) return ref;
   const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : i2vCounterpart(parsed.provider, parsed.id);
   const alt = counterpart ? `${parsed.provider}::${counterpart}` : null;
-  return alt && takesImage(alt) ? alt : null;
+  if (alt && takesImage(alt)) return alt;
+  // Same family, version and tier on the same provider, differing only by its input route (text-to-image ↔ edit,
+  // text-to-video ↔ image-to-video): ids equal once the route words are dropped.
+  const route = /[/_-]?(text|image|reference)-to-(image|video)|[/_-]edit\b|[/_-](t2i|i2i|t2v|i2v)\b/gi;
+  const bare = parsed.id.toLowerCase().replace(route, '');
+  const twin = Object.values(get().catalog.models).find((m) => m.provider === parsed.provider && m.ref !== ref && m.id.toLowerCase().replace(route, '') === bare && takesImage(m.ref));
+  return twin?.ref ?? null;
 }
 
 /** Model for an operation on an asset: the one that made it for edit / video engines, else the engine's model. */

@@ -3,6 +3,7 @@ import { ArrowUp, CircleStop, Layers, Plus, Pencil, X, Zap } from 'lucide-react'
 import { setComposer, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
+import { modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
 import { clipTrim, paramByRole, placeKeyframes } from '../../engine/params';
@@ -287,6 +288,18 @@ export function Composer() {
   }, [text, mode]);
 
   const liveAttachments = attachments.filter((id) => assets[id]);
+  // An image attached to a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
+  const hasImage = liveAttachments.some((id) => assets[id]?.kind === 'image');
+  const currentRef = useStore((s) => (mode === 'image' || mode === 'video' ? s.composer[mode].modelRef : ''));
+  useEffect(() => {
+    if (!hasImage || (mode !== 'image' && mode !== 'video')) return;
+    if (modelSummary(currentRef)?.acceptsImage !== false) return;
+    const twin = opModelFromRef(currentRef, mode);
+    if (twin && twin !== currentRef) {
+      void pickComposerModel(mode, twin);
+      toast(`Switched to ${modelSummary(twin)?.name ?? 'its edit variant'} for the attached image.`, 'info');
+    }
+  }, [hasImage, mode, currentRef]);
   const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0);
 
   const submit = () => {
