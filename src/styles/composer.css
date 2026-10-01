@@ -98,3 +98,11 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .attach-more:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
 .composer-bar .editing-chip { flex-shrink: 0; }
 .attach-pile-count { position: absolute; left: -6px; top: -6px; z-index: 4; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: var(--accent-ink, #111); font-size: 11px; font-weight: 600; }
+
+/* Conversation card on the right of Node/Designer (toggle at the bottom, body above it), not over the canvas centre. */
+.thread-peek { position: fixed; right: 16px; bottom: 20px; z-index: 13; width: min(400px, calc(100vw - 32px)); display: flex; flex-direction: column-reverse; align-items: flex-end; pointer-events: none; }
+.thread-peek > * { pointer-events: auto; }
+.thread-designer { right: calc(var(--layers-w, 260px) + 16px); }
+.thread-peek .thread-toggle { margin: 0; }
+.thread-peek .thread-body { width: 100%; max-height: calc(100vh - 140px); margin: 0 0 8px; }
+@media (max-width: 1100px) { .thread-peek { bottom: 150px; } .thread-peek .thread-body { max-height: calc(100vh - 280px); } }

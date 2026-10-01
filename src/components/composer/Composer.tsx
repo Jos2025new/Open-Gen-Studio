@@ -337,7 +337,7 @@ export function Composer() {
 
   return (
     <div className={`composer-dock dock-${workspace}`}>
-      {workspace !== 'chat' ? <ThreadPeek /> : null}
+      {workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}`}
         onDragOver={(e) => {

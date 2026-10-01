@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, MessageSquare } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { FeedList } from '../chat/FeedList';
 
-/** The session conversation, above the composer, in the Node and Designer workspaces. */
-export function ThreadPeek() {
+/** The session conversation in the Node and Designer workspaces: a foldable card on the right, clear of the canvas centre. */
+export function ThreadPeek({ workspace }: { workspace: string }) {
   const open = useStore((s) => s.ui.threadOpen);
   const sessionId = useStore((s) => s.activeSessionId);
   const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.length ?? 0);
@@ -27,8 +28,8 @@ export function ThreadPeek() {
     if (open && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
   }, [open, lastKey]);
 
-  return (
-    <div className={`thread-peek ${open ? 'is-open' : ''}`}>
+  return createPortal(
+    <div className={`thread-peek thread-${workspace} ${open ? 'is-open' : ''}`}>
       <button type="button" className="thread-toggle" onClick={() => setUi({ threadOpen: !open })} aria-expanded={open}>
         <MessageSquare size={13} />
         <span>Conversation</span>
@@ -41,6 +42,7 @@ export function ThreadPeek() {
           {count ? <FeedList sessionId={sessionId} compact /> : <p className="faint thread-empty">Ask the agent to build something here.</p>}
         </div>
       ) : null}
-    </div>
+    </div>,
+    document.body,
   );
 }
