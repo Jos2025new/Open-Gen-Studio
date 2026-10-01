@@ -9,6 +9,12 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Evaluación — davinci con KISS, YAGNI y DRY (2026-10-01)
+- [x] E1. Confirmar rama y estado; revisar ejecución, agente, modelos y persistencia. Razón: buscar complejidad con efectos reales, conservando cambios ajenos.
+- [x] E2. Contrastar hallazgos con usos y tests; typecheck, suite local y observación de navegador sin generar. Razón: distinguir duplicación peligrosa de diferencias necesarias de UX.
+- [x] E3. Informar solo oportunidades sustanciales y límites de evidencia; cerrar este registro. Razón: evaluación sin refactorizaciones ni alteraciones de experiencia.
+Resultado (HEAD revisado: `4ac6c61`, rama `claude/stoic-davinci-xt7o4z`): DRY, desajuste reproducido entre `estimateSteps` y `opSpec` en Continue shot con modelo/duración explícitos (tarifas ficticias: preview $0.50 frente a spec $4, sin red). KISS, oportunidad de agrupar la carga de workflow y sus skills para reducir vueltas del LLM; el banco `bench/2026-10-01-b098b23.json` es evidencia previa, no repetida: historia 7 llamadas/102.278 s, con preguntas y rechazos además de guías; archviz ya agrupa varias guías. YAGNI: sin eliminación justificada de funciones actuales. Sin cambios al código; prueba temporal retirada. Typecheck verde; suite inicial 332 verdes/1 timeout/1 omitida; test aislado verde, suite con `--testTimeout=15000`: 333 verdes/1 omitida. Navegador con agent-browser y servidor 5173 en 127.0.0.2 con copia de disco temporal: Chat, Nodos, Designer y Models, sin generación ni datos reales; navegador y servidor cerrados. Modificación previa de `tests/bench/agent-bench.test.ts` conservada.
+
 ## Tarea — línea base del banco del agente (R0d) (2026-10-01)
 Antes de reorganizar guías/prompt fijo: medir. Presupuesto autorizado por el usuario: 5 USD de LLM.
 - [x] B1. Fixture `bench/fixtures/character.png` (Aria, de la biblioteca) y 3 casos nuevos: hoja de personaje, historia de 3 clips, archviz render + recorrido. Columna `llmUsd`. *Por qué:* medir justo lo que se quiere mejorar.
