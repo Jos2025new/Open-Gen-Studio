@@ -102,6 +102,7 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
   const rest = ops.filter((o) => !quick.includes(o));
   // Only operations live here; sending, favorite and download have their own buttons (SendToMenu, card and viewer).
   const hasMenu = rest.length > 0 || asset.kind === 'image';
+  if (menuOnly && !hasMenu) return null;
 
   const close = () => {
     more.close();
