@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersHorizontal, Trash, Users, Volume2, VolumeX } from 'lucide-react';
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
-import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
+import { aspectLabel, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf, maxCountPerRequest, STRUCTURED_TYPES, type PaletteValue } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
 import type { AdvancedValue, MediaKind, ParamDef, SavedStyle } from '../../engine/types';
 import { createRecraftStyle, createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
@@ -68,11 +68,14 @@ function FormatChip({ kind }: { kind: MediaKind }) {
   const resolution = paramByRole(schema, 'resolution');
   const durations = kind === 'video' ? durationChoices(schema) : [];
   const counts = kind === 'image' ? [1, 2, 3, 4] : [];
+  // Sizes given as exact pixels (Seedream): a size tier plus a ratio, like other models.
+  const px = pixelSizes(aspect?.options);
+  const pxNow = px?.of(settings.aspect);
   const perRequest = maxCountPerRequest(schema);
   if (!aspect?.options?.length && !resolution?.options?.length && !durations.length && !counts.length) return null;
   const set = (patch: Partial<typeof settings>) => setComposerMedia(kind, { settings: { ...useStore.getState().composer[kind].settings, ...patch } });
   const summary = [
-    aspect?.options?.length && settings.aspect ? aspectLabel(settings.aspect) : null,
+    px && pxNow?.ratio ? `${pxNow.ratio} · ${pxNow.tier}` : aspect?.options?.length && settings.aspect ? aspectLabel(settings.aspect) : null,
     resolution?.options?.length ? settings.resolution : null,
     kind === 'image' ? String(settings.count) : null,
     durations.length ? durationLabel(settings.duration ?? durations[0]) : null,
@@ -80,13 +83,39 @@ function FormatChip({ kind }: { kind: MediaKind }) {
   return (
     <>
       <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" className="fmt-chip">
-        {aspect?.options?.length ? <AspectGlyph value={settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
+        {aspect?.options?.length ? <AspectGlyph value={pxNow?.ratio ?? settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
         <span>{summary.join(' · ')}</span>
         <ChevronDown size={12} />
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={430} label="Format">
         <div className="fmt-pop">
-          {aspect?.options?.length ? (
+          {px ? (
+            <>
+              <section className="fmt-sect">
+                <div className="fmt-label">Aspect ratio</div>
+                <div className="fmt-row fmt-aspects">
+                  {px.ratios.map((r) => (
+                    <FmtOption key={r} active={r === pxNow?.ratio} onClick={() => set({ aspect: px.pick(pxNow?.tier, r) })}>
+                      <AspectGlyph value={r} />
+                      <span>{r}</span>
+                    </FmtOption>
+                  ))}
+                </div>
+              </section>
+              {px.tiers.length > 1 ? (
+                <section className="fmt-sect">
+                  <div className="fmt-label">Resolution</div>
+                  <div className="fmt-row">
+                    {px.tiers.map((t) => (
+                      <FmtOption key={t} active={t === pxNow?.tier} onClick={() => set({ aspect: px.pick(t, pxNow?.ratio) })}>
+                        {t}
+                      </FmtOption>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+            </>
+          ) : aspect?.options?.length ? (
             <section className="fmt-sect">
               <div className="fmt-label">{aspect.label || 'Aspect ratio'}</div>
               <div className="fmt-row fmt-aspects">

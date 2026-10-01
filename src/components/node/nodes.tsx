@@ -2,7 +2,7 @@ import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
 import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
-import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
+import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, setSketch, tryConnect } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
@@ -485,6 +485,9 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
   const res = paramByRole(schema, 'resolution');
   const audio = paramByRole(schema, 'audio');
   const durations = durationChoices(schema);
+  // Sizes given as exact pixels (Seedream): shown as a size tier plus a ratio, like other models.
+  const px = pixelSizes(aspect?.options);
+  const pxNow = px?.of(d.settings.aspect);
   // Audio models: their switches and choices (instrumental, write lyrics, mode, format).
   const options = d.kind === 'audio' ? (schema?.params ?? []).filter((p) => p.role === 'other' && (p.type === 'boolean' || (p.type === 'enum' && p.options?.length))) : [];
   const set = (patch: Partial<GenNodeData['settings']>) => patchNodeData(sessionId, node.id, { settings: { ...d.settings, ...patch } });
@@ -502,7 +505,11 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
         {summary.map((v) => (
           <span key={String(v)}>{v}</span>
         ))}
-        {aspect?.options?.length && d.settings.aspect ? (
+        {px && pxNow?.ratio ? (
+          <span>
+            {pxNow.tier} <AspectGlyph value={pxNow.ratio} /> {pxNow.ratio}
+          </span>
+        ) : aspect?.options?.length && d.settings.aspect ? (
           <span>
             <AspectGlyph value={d.settings.aspect} /> {aspectLabel(d.settings.aspect)}
           </span>
@@ -529,7 +536,26 @@ function SettingsChip({ node }: { node: GraphNode & { data: GenNodeData } }) {
               </div>
             </section>
           ) : null}
-          {aspect?.options?.length ? (
+          {px ? (
+            <>
+              {px.tiers.length > 1 ? (
+                <section>
+                  <h5>Resolution</h5>
+                  <Segmented size="sm" value={pxNow?.tier ?? px.tiers[0]} options={px.tiers.map((t) => ({ value: t, label: t }))} onChange={(t) => set({ aspect: px.pick(t, pxNow?.ratio) })} />
+                </section>
+              ) : null}
+              <section>
+                <h5>Ratio</h5>
+                <div className="nt-options">
+                  {px.ratios.map((r) => (
+                    <button key={r} type="button" className={`option ${r === pxNow?.ratio ? 'is-active' : ''}`} onClick={() => set({ aspect: px.pick(pxNow?.tier, r) })}>
+                      <AspectGlyph value={r} /> {r}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            </>
+          ) : aspect?.options?.length ? (
             <section>
               <h5>Ratio</h5>
               <div className="nt-options">

@@ -124,6 +124,47 @@ export function aspectLabel(value: string | number | undefined): string {
   return v.replace('*', '×').replace(/(\d)x(\d)/, '$1×$2');
 }
 
+const PIXEL_SIZE = /^(\d+)\s*[x×*]\s*(\d+)$/i;
+const COMMON_RATIOS: Array<[number, number]> = [[1, 1], [4, 3], [3, 4], [3, 2], [2, 3], [16, 9], [9, 16], [21, 9], [9, 21], [5, 4], [4, 5], [2, 1], [1, 2]];
+
+/**
+ * A size list given as exact pixels (Seedream: "2048x2048", "2368x1776"…), split into the two choices people make:
+ * a size tier (1K, 1.5K, 2K…, by area) and a ratio. `pick` maps a choice back to the exact option.
+ */
+export function pixelSizes(options: Array<string | number> | undefined): {
+  tiers: string[];
+  ratios: string[];
+  of: (value: string | undefined) => { tier?: string; ratio?: string };
+  pick: (tier: string | undefined, ratio: string | undefined) => string | undefined;
+} | null {
+  if (!options?.length) return null;
+  const rows: Array<{ value: string; tier: string; ratio: string; tierN: number }> = [];
+  for (const o of options) {
+    const m = PIXEL_SIZE.exec(String(o).trim());
+    if (!m) return null;
+    const w = Number(m[1]), h = Number(m[2]);
+    const tierN = Math.max(1, Math.round(Math.sqrt(w * h) / 512)) / 2;
+    const near = COMMON_RATIOS.find(([a, b]) => Math.abs(w / h / (a / b) - 1) < 0.04);
+    rows.push({ value: String(o), tierN, tier: `${tierN}K`, ratio: near ? `${near[0]}:${near[1]}` : `${w}:${h}` });
+  }
+  const tiers = [...new Set(rows.sort((a, b) => a.tierN - b.tierN).map((r) => r.tier))];
+  const ratios = [...new Set(rows.map((r) => r.ratio))];
+  return {
+    tiers,
+    ratios,
+    of: (value) => {
+      const r = rows.find((x) => x.value === value);
+      return { tier: r?.tier, ratio: r?.ratio };
+    },
+    pick: (tier, ratio) => {
+      const same = rows.filter((r) => r.ratio === ratio);
+      const pool = same.length ? same : rows;
+      const want = rows.find((r) => r.tier === tier)?.tierN ?? pool[0].tierN;
+      return pool.reduce((best, r) => (Math.abs(r.tierN - want) < Math.abs(best.tierN - want) ? r : best), pool[0]).value;
+    },
+  };
+}
+
 /** Options that mean "let the model decide" (P Image: match_input_image; Seedance: adaptive). */
 /** An option that explicitly keeps the input's shape ("match_input_image", "adaptive"); plain "auto" lets the model choose. */
 export function matchInputOption(options: Array<string | number>): string | undefined {
