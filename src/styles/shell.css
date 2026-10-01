@@ -147,3 +147,5 @@
 .v3d-row .num { width: 32px; text-align: right; color: var(--text-3); }
 .v3d-sub { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-top: 4px; }
 .v3d-box > .chip { align-self: flex-start; }
+
+button.info-thumb { padding: 0; cursor: pointer; }

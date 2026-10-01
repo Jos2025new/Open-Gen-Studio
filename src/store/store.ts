@@ -98,7 +98,8 @@ export interface UiState {
   workspace: Workspace;
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
-  lightbox: { assetIds: string[]; index: number } | null;
+  /** `back`: the view to return to on close (a reference opened from inside the viewer). */
+  lightbox: { assetIds: string[]; index: number; back?: { assetIds: string[]; index: number } } | null;
   /** Sketch editor over a node's image; saving sets that node's painted-over copy. */
   /** Sketch editor: paint over a node's image (saved to the node), or draw a mask for Edit region / Remove object. */
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;

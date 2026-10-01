@@ -308,7 +308,8 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
   };
   autoTitleSession(sessionId, text || (kind === 'image' ? 'Image' : kind === 'video' ? 'Video' : kind === 'model3d' ? '3D model' : 'Music'));
   // Direct generations are recorded by their card (chat), node or layer; no separate chat bubble.
-  setComposer({ text: '', attachments: [], times: {}, trims: {}, editing: null });
+  // The prompt and attachments stay after sending, ready for the next try.
+  setComposer({ editing: null });
 
   if (workspace === 'node') {
     await runInNodes(sessionId, spec);

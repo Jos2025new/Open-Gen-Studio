@@ -5,7 +5,7 @@ import { aspectLabel, durationLabel } from '../../engine/params';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';
 import { formatDateTime, formatDuration, formatUsd } from '../../lib/format';
-import { useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import type { Asset, Generation } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, CostTag } from '../ui/primitives';
@@ -25,12 +25,23 @@ export function generationTitle(g: Generation): string {
   return detail ? `${def.label} · ${detail}` : def.label;
 }
 
+/** What went into a generation: the operation's source, the start/end frames and the references. */
+export function generationInputs(g: Generation): string[] {
+  return [...new Set([g.op?.sourceAssetId, g.inputs.firstFrame, g.inputs.lastFrame, ...g.inputs.refs].filter((id): id is string => Boolean(id)))];
+}
+
+/** Open these inputs in the viewer; from inside the viewer, closing comes back to where it was. */
+export function openInputs(ids: string[], index: number): void {
+  const lb = useStore.getState().ui.lightbox;
+  setUi({ lightbox: { assetIds: ids, index, ...(lb ? { back: { assetIds: lb.assetIds, index: lb.index } } : {}) } });
+}
+
 export function GenerationInfo({ generation: g, asset }: { generation?: Generation; asset?: Asset }) {
   const session = useStore((s) => (g ? s.sessions[g.sessionId]?.title : asset ? s.sessions[asset.sessionId]?.title : undefined));
   const [open, setOpen] = useState(false);
   const rows: Array<[string, React.ReactNode]> = [];
   // What went in: the operation's source, the start frame and the references, shown above the prompt.
-  const inputs = g ? [...new Set([g.op?.sourceAssetId, g.inputs.firstFrame, ...g.inputs.refs].filter((id): id is string => Boolean(id)))] : [];
+  const inputs = g ? generationInputs(g) : [];
   const text = g ? generationTitle(g) : '';
   if (g) {
     rows.push(['Model', `${g.modelName}${g.provider !== 'local' ? ` · ${PROVIDER_LABELS[g.provider]}` : ''}`]);
@@ -75,10 +86,10 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
           <div className="info-box">
             {inputs.length ? (
               <div className="info-inputs">
-                {inputs.map((id) => (
-                  <div key={id} className="info-thumb" data-tip={id === g.op?.sourceAssetId ? 'Source' : id === g.inputs.firstFrame ? 'Start frame' : 'Reference'}>
+                {inputs.map((id, i) => (
+                  <button type="button" key={id} className="info-thumb" onClick={() => openInputs(inputs, i)} data-tip={id === g.op?.sourceAssetId ? 'Source' : id === g.inputs.firstFrame ? 'Start frame' : id === g.inputs.lastFrame ? 'End frame' : 'Reference'}>
                     <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-                  </div>
+                  </button>
                 ))}
               </div>
             ) : null}

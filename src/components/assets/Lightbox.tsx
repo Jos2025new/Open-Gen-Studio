@@ -22,28 +22,29 @@ export function Lightbox() {
     const onKey = (e: KeyboardEvent) => {
       if (document.querySelector('.popover')) return;
       if ((e.target as HTMLElement).closest('input, textarea')) return;
-      if (e.key === 'Escape') setUi({ lightbox: null });
-      if (e.key === 'ArrowRight' && index < ids.length - 1) setUi({ lightbox: { assetIds: ids, index: index + 1 } });
-      if (e.key === 'ArrowLeft' && index > 0) setUi({ lightbox: { assetIds: ids, index: index - 1 } });
+      if (e.key === 'Escape') setUi({ lightbox: lb.back ?? null });
+      if (e.key === 'ArrowRight' && index < ids.length - 1) setUi({ lightbox: { ...lb, index: index + 1 } });
+      if (e.key === 'ArrowLeft' && index > 0) setUi({ lightbox: { ...lb, index: index - 1 } });
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [lb, index, ids]);
 
   if (!lb || !assetId || !asset) return null;
+  const close = () => setUi({ lightbox: lb.back ?? null });
   return (
     <div className="lightbox" role="dialog" aria-label="Viewer">
-      <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && setUi({ lightbox: null })}>
+      <div className="lb-stage" onClick={(e) => e.target === e.currentTarget && close()}>
         {/* The frame is as big as the picture, so « » sit right beside it. */}
         <div className={`lb-frame ${asset.kind === 'model3d' ? 'is-3d' : ''}`}>
           {asset.kind === 'model3d' ? <Model3DViewer key={assetId} assetId={assetId} /> : <AssetMedia key={assetId} assetId={assetId} fit="contain" controls={asset.kind !== 'image'} className="lb-media" />}
           {index > 0 ? (
-            <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { assetIds: ids, index: index - 1 } })}>
+            <button type="button" className="lb-nav lb-prev" aria-label="Previous" onClick={() => setUi({ lightbox: { ...lb, index: index - 1 } })}>
               <ChevronsLeft size={20} />
             </button>
           ) : null}
           {index < ids.length - 1 ? (
-            <button type="button" className="lb-nav lb-next" aria-label="Next" onClick={() => setUi({ lightbox: { assetIds: ids, index: index + 1 } })}>
+            <button type="button" className="lb-nav lb-next" aria-label="Next" onClick={() => setUi({ lightbox: { ...lb, index: index + 1 } })}>
               <ChevronsRight size={20} />
             </button>
           ) : null}
@@ -67,7 +68,7 @@ export function Lightbox() {
           <FavoriteButton assetId={assetId} />
           <SendToMenu assetId={assetId} />
           <span className="spacer" />
-          <IconButton icon={X} label="Close (Esc)" size="sm" onClick={() => setUi({ lightbox: null })} />
+          <IconButton icon={X} label="Close (Esc)" size="sm" onClick={close} />
         </div>
         <div className="lb-body">
           {asset.kind === 'model3d' ? <Viewer3DControls /> : null}

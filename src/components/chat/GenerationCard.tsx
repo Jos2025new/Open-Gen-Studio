@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { CircleAlert, CircleStop, Copy, Expand, FileText, Info, Music, Pencil, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
+import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
@@ -15,7 +15,8 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, CostTag, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AssetActions, DownloadButton, FavoriteButton, SendToMenu } from '../assets/AssetActions';
-import { GenerationInfo, generationTitle } from '../assets/GenerationInfo';
+import { GenerationInfo, generationInputs, generationTitle, openInputs } from '../assets/GenerationInfo';
+import { useShallow } from 'zustand/react/shallow';
 import { GenerationRecovery } from './RecoveryActions';
 
 function metaLine(g: Generation): string {
@@ -80,7 +81,8 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
 
 export function GenerationCard({ generationId, compact = false }: { generationId: string; compact?: boolean }) {
   const g = useStore((s) => s.generations[generationId]);
-  const source = useStore((s) => (g?.op ? s.assets[g.op.sourceAssetId] : undefined));
+  // Inputs still in the library (deleted ones are skipped).
+  const inputs = useStore(useShallow((s) => (g ? generationInputs(g).filter((id) => s.assets[id]) : [])));
   const [selected, setSelected] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const regen = usePopover();
@@ -114,16 +116,20 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   return (
     <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''}`}>
       <header className="gen-head">
-        <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'audio' ? <Music size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
+        {inputs.length ? (
+          // What was sent: the first input, with a count when there were several; click to see them all.
+          <button type="button" className="gen-source" onClick={() => openInputs(inputs, 0)} data-tip={inputs.length > 1 ? `${inputs.length} inputs` : g.op ? 'Source' : 'Reference'}>
+            <AssetMedia assetId={inputs[0]} hoverPlay={false} draggable={false} />
+            {inputs.length > 1 ? <span className="gen-source-count num">{inputs.length}</span> : null}
+          </button>
+        ) : (
+          <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'audio' ? <Music size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
+        )}
         <div className="gen-title">
-          {g.op && source ? (
-            <button type="button" className="gen-source" onClick={() => setUi({ lightbox: { assetIds: [source.id], index: 0 } })} data-tip="Source">
-              <AssetMedia assetId={source.id} hoverPlay={false} draggable={false} />
-            </button>
-          ) : null}
           <p className={`gen-prompt ${expanded ? 'is-expanded' : ''}`} onClick={() => setExpanded((v) => !v)} title={expanded ? undefined : title}>
             {title || <span className="faint">No prompt</span>}
           </p>
+          {g.prompt ? <IconButton icon={Copy} label="Copy prompt" size="sm" className="gen-copy" onClick={() => void copyText(g.prompt)} /> : null}
         </div>
       </header>
       <div className="gen-meta faint">
@@ -212,13 +218,8 @@ export function GenerationCard({ generationId, compact = false }: { generationId
 
 
       <footer className="gen-foot">
-        <IconButton icon={Copy} label="Copy prompt" size="sm" disabled={!g.prompt} onClick={() => void copyText(g.prompt)} />
-        <IconButton icon={Pencil} label="Edit in composer" size="sm" disabled={Boolean(g.op)} onClick={() => void editInComposer(g.id)} />
-        {busy ? (
-          <IconButton icon={CircleStop} label="Cancel" size="sm" onClick={() => cancelGeneration(g.id)} />
-        ) : (
-          <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} />
-        )}
+        {!g.op ? <IconButton icon={CopyPlus} label="Reuse: prompt, inputs, model and settings in the composer" size="sm" onClick={() => void editInComposer(g.id)} /> : null}
+        {!busy ? <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} /> : null}
         <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
         <span className="spacer" />
         {sel && g.status === 'done' ? (
@@ -228,8 +229,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
             <DownloadButton assetId={sel} />
           </>
         ) : null}
-        {/* Delete stands apart, at the far end. */}
-        <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} className="gen-delete" onClick={del.toggle} />
+        {/* Stop while it runs; Delete once it is over. Both stand apart, at the far end. */}
+        {busy ? (
+          <IconButton icon={CircleStop} label="Stop" size="sm" tone="danger" className="gen-delete" onClick={() => cancelGeneration(g.id)} />
+        ) : (
+          <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} className="gen-delete" onClick={del.toggle} />
+        )}
       </footer>
 
       <Popover open={regen.open} anchor={regen.ref} onClose={regen.close} width={300} label="Regenerate">
