@@ -7,6 +7,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Button, IconButton } from '../ui/primitives';
 import { AssetActions, FavoriteButton, SendToMenu } from './AssetActions';
 import { GenerationInfo } from './GenerationInfo';
+import { Viewer3DControls, Viewer3DDock } from './Viewer3DControls';
 
 export function Lightbox() {
   const lb = useStore((s) => s.ui.lightbox);
@@ -54,6 +55,7 @@ export function Lightbox() {
         ) : null}
         {/* Operations under the picture, as a floating bar. */}
         <div className="lb-dock">
+          {asset.kind === 'model3d' ? <Viewer3DDock /> : null}
           <AssetActions assetId={assetId} parentId={generation?.id} />
         </div>
       </div>
@@ -68,6 +70,7 @@ export function Lightbox() {
           <IconButton icon={X} label="Close (Esc)" size="sm" onClick={() => setUi({ lightbox: null })} />
         </div>
         <div className="lb-body">
+          {asset.kind === 'model3d' ? <Viewer3DControls /> : null}
           <GenerationInfo key={assetId} generation={generation} asset={asset} />
         </div>
       </aside>

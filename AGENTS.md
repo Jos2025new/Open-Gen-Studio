@@ -9,12 +9,13 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
-## Plan — controles del visor 3D (2026-09-30) · PENDIENTE
+## Plan — controles del visor 3D (2026-09-30) · APLICADO, pendiente de revisión del usuario
 Se amplía el `model-viewer` 4.3.1 que ya tenemos, sin Three.js propio, gizmo ni luces que se muevan (model-viewer no las tiene). Three.js directo solo como plan B, si model-viewer bloquea algo necesario.
-- [ ] V1. Barra de vista bajo el modelo, con el mismo patrón que la barra de operaciones (`.lb-dock`): View ▾ (Front/Back/Left/Right/Top/Bottom + Reset view, vía `cameraOrbit`), Pan, Zoom − +, Snapshot. *Dónde:* `Model3DViewer.tsx`, `Lightbox.tsx`, `shell.css`. *Por qué:* vistas exactas sin otro editor.
-- [ ] V2. Snapshot: `toBlob()` → asset de imagen normal (Galería, visor, Designer, operaciones). *Dónde:* `Model3DViewer.tsx`, guardado de assets existente. *Por qué:* reutilizar el flujo de imágenes.
-- [ ] V3. Sección plegable "3D Controls" en el panel lateral, antes de Details: Exposure, Shadow, Environment (neutral/estudio/exterior); Material: Texture on/off, Roughness, Metalness (API pública de materiales). Grid solo si `<extra-model>` existe en 4.3.1; si no, queda pendiente. Solo ajustes de vista: no modifican el archivo ni se guardan. *Dónde:* `Lightbox.tsx`, `Model3DViewer.tsx`, `shell.css`.
+- [x] V1. Barra de vista bajo el modelo, con el mismo patrón que la barra de operaciones (`.lb-dock`): View ▾ (Front/Back/Left/Right/Top/Bottom + Reset view, vía `cameraOrbit`), Pan, Zoom − +, Snapshot. *Dónde:* `Model3DViewer.tsx`, `Lightbox.tsx`, `shell.css`. *Por qué:* vistas exactas sin otro editor.
+- [x] V2. Snapshot: `toBlob()` → asset de imagen normal (Galería, visor, Designer, operaciones). *Dónde:* `Model3DViewer.tsx`, guardado de assets existente. *Por qué:* reutilizar el flujo de imágenes.
+- [x] V3. Sección plegable "3D Controls" en el panel lateral, antes de Details: Exposure, Shadow, Environment (neutral/estudio/exterior); Material: Texture on/off, Roughness, Metalness (API pública de materiales). Grid solo si `<extra-model>` existe en 4.3.1; si no, queda pendiente. Solo ajustes de vista: no modifican el archivo ni se guardan. *Dónde:* `Lightbox.tsx`, `Model3DViewer.tsx`, `shell.css`.
 - [ ] V4. Typecheck, suite, comprobación breve en navegador con un GLB local; un commit.
+Hecho: `viewer3d.ts` (estado no persistido, vistas, zoom, foto, aplicar exposición/sombra/entorno/material, grid como glTF de líneas en `<extra-model>`), `Viewer3DControls.tsx` (dock y panel), `Lightbox.tsx`, `shell.css`. Environment = Neutral/Soft (los dos entornos incluidos; estudio/exterior necesitarían HDR propios). Pan desactivado salvo con el botón. Solo typecheck; navegador y pruebas a cargo del usuario.
 Fuera: wireframe (exige tocar el Three.js interno), gizmo, luces direccionales.
 
 ## Futuro — modelo 3D como capa del Designer (no iniciado)

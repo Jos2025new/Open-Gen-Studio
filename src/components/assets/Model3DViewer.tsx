@@ -3,6 +3,7 @@ import { getAssetBlob } from '../../lib/idb';
 import { fetchBlob } from '../../lib/media';
 import { GLB_MIME, unpackModel, validateGlb } from '../../lib/model3d';
 import { useStore } from '../../store/store';
+import { applyView, useViewer3d, VIEW3D_DEFAULT } from './viewer3d';
 
 /** Only the open lightbox mounts this component; lists never allocate WebGL. */
 export function Model3DViewer({ assetId }: { assetId: string }) {
@@ -32,12 +33,19 @@ export function Model3DViewer({ assetId }: { assetId: string }) {
       viewer.setAttribute('interaction-prompt', 'none');
       viewer.setAttribute('loading', 'eager');
       viewer.style.cssText = 'width:100%;height:100%;min-height:320px;';
-      viewer.addEventListener('load', () => live && setStatus(''));
+      viewer.addEventListener('load', () => {
+        if (!live) return;
+        setStatus('');
+        useViewer3d.setState({ el: viewer as never, view: VIEW3D_DEFAULT });
+        applyView(viewer as never, VIEW3D_DEFAULT);
+      });
       viewer.addEventListener('error', () => live && setStatus('Could not render this model. You can still download the original.'));
       host.current.append(viewer);
     })().catch((e: unknown) => { if (live) setStatus(e instanceof Error ? e.message : '3D preview unavailable.'); });
-    return () => { live = false; abort.abort(); viewer?.removeAttribute('src'); viewer?.remove(); if (url) URL.revokeObjectURL(url); };
+    return () => { live = false; useViewer3d.setState({ el: null }); abort.abort(); viewer?.removeAttribute('src'); viewer?.remove(); if (url) URL.revokeObjectURL(url); };
   }, [assetId, asset?.mime, asset?.remoteUrl]);
+  const view = useViewer3d((s) => s.view), el = useViewer3d((s) => s.el);
+  useEffect(() => { if (el) applyView(el, view); }, [el, view]);
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     <div ref={host} style={{ width: '100%', height: '100%' }} />
     {status && <p role="status" style={{ position: 'absolute', top: 16, left: 16, right: 16 }}>{status}</p>}
