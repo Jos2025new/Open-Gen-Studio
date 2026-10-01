@@ -1,4 +1,4 @@
-import { ensureModelThumbnail } from '../../lib/model3dThumb';
+import { ensureModelThumbnail, thumbStale } from '../../lib/model3dThumb';
 import { useRef, useState } from 'react';
 import { AudioLines, ImageOff, Box } from 'lucide-react';
 import { useStore } from '../../store/store';
@@ -39,7 +39,7 @@ export function AssetMedia({
     );
   }
   if (asset.kind === 'model3d') {
-    if (!asset.thumbnailUrl) ensureModelThumbnail(assetId);
+    if (thumbStale(asset)) ensureModelThumbnail(assetId);
     return <div className={`media media-audio ${className ?? ''}`} draggable={draggable} onDragStart={(e) => { e.dataTransfer.setData('application/x-ogs-asset', assetId); e.dataTransfer.effectAllowed = 'copy'; }}>
     {asset.thumbnailUrl ? <img src={asset.thumbnailUrl} alt="3D preview" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} /> : <Box size={32} />}<span>3D</span>
   </div>;

@@ -236,6 +236,8 @@ export interface Asset {
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   thumbnailUrl?: string;
+  /** Which front-view convention rendered a 3D thumbnail; a different one re-renders it. */
+  thumbView?: number;
   stored: boolean;
   favorite: boolean;
   createdAt: number;

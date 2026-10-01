@@ -1,3 +1,4 @@
+import { FRONT_ORBIT } from '../../lib/model3dThumb';
 import { create } from 'zustand';
 import { uploadFiles } from '../../engine/actions';
 import { toast } from '../../store/store';
@@ -37,7 +38,7 @@ export function setOrbit(orbit: string): void {
   el.fieldOfView = 'auto';
 }
 export function resetView(): void {
-  setOrbit('90deg 75deg auto');
+  setOrbit(FRONT_ORBIT);
 }
 export function zoomBy(step: number): void {
   useViewer3d.getState().el?.zoom?.(step);

@@ -3,6 +3,7 @@ import { getAssetBlob } from '../../lib/idb';
 import { fetchBlob } from '../../lib/media';
 import { GLB_MIME, unpackModel, validateGlb } from '../../lib/model3d';
 import { useStore } from '../../store/store';
+import { FRONT_ORBIT } from '../../lib/model3dThumb';
 import { applyView, panHandler, useViewer3d, VIEW3D_DEFAULT } from './viewer3d';
 
 /** Only the open lightbox mounts this component; lists never allocate WebGL. */
@@ -30,6 +31,7 @@ export function Model3DViewer({ assetId }: { assetId: string }) {
       viewer.setAttribute('src', url);
       viewer.setAttribute('alt', 'Generated 3D model. Drag to orbit; scroll to zoom.');
       viewer.setAttribute('camera-controls', '');
+      viewer.setAttribute('camera-orbit', FRONT_ORBIT);
       viewer.setAttribute('interaction-prompt', 'none');
       viewer.setAttribute('loading', 'eager');
       viewer.style.cssText = 'width:100%;height:100%;min-height:320px;';

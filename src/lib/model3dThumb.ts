@@ -6,6 +6,12 @@ import { patchAsset, useStore } from '../store/store';
 /* A front-view picture of a 3D result when the provider sent none: rendered once, off to the side,
    one model at a time, and kept in the asset as a small JPEG. Lists still never keep WebGL alive. */
 
+/** Bump when the viewer's Front changes, so old 3D thumbnails are re-rendered. */
+export const THUMB_VIEW = 1;
+export const FRONT_ORBIT = '90deg 75deg auto';
+
+export const thumbStale = (a: { kind: string; thumbnailUrl?: string; thumbView?: number }) => a.kind === 'model3d' && (!a.thumbnailUrl || a.thumbView !== THUMB_VIEW);
+
 const tried = new Set<string>();
 let queue: Promise<void> = Promise.resolve();
 
@@ -17,7 +23,7 @@ export function ensureModelThumbnail(assetId: string): void {
 
 async function render(assetId: string): Promise<void> {
   const asset = useStore.getState().assets[assetId];
-  if (!asset || asset.thumbnailUrl || ![GLB_MIME, 'application/zip'].includes(asset.mime)) return;
+  if (!asset || !thumbStale(asset) || ![GLB_MIME, 'application/zip'].includes(asset.mime)) return;
   let blob = await getAssetBlob(assetId);
   if (!blob && asset.remoteUrl) blob = await fetchBlob(asset.remoteUrl);
   if (!blob) return;
@@ -30,6 +36,7 @@ async function render(assetId: string): Promise<void> {
   viewer.setAttribute('src', url);
   viewer.setAttribute('loading', 'eager');
   viewer.setAttribute('interaction-prompt', 'none');
+  viewer.setAttribute('camera-orbit', FRONT_ORBIT);
   // In the viewport (it only renders when visible) but invisible and inert.
   viewer.style.cssText = 'position:fixed;left:0;top:0;width:320px;height:320px;opacity:0;pointer-events:none;z-index:-1;background:#1a1a1d;';
   document.body.append(viewer);
@@ -47,7 +54,7 @@ async function render(assetId: string): Promise<void> {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(shot);
     });
-    if (useStore.getState().assets[assetId]) patchAsset(assetId, { thumbnailUrl: dataUrl });
+    if (useStore.getState().assets[assetId]) patchAsset(assetId, { thumbnailUrl: dataUrl, thumbView: THUMB_VIEW });
   } finally {
     viewer.remove();
     URL.revokeObjectURL(url);
