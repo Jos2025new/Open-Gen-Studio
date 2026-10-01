@@ -25,7 +25,12 @@ export function ThreadPeek({ workspace }: { workspace: string }) {
   }, [pending]);
 
   useLayoutEffect(() => {
-    if (open && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+    const el = ref.current;
+    if (!open || !el) return;
+    el.scrollTop = el.scrollHeight;
+    // Images in the thread load after the first layout; follow them to the newest message.
+    const id = requestAnimationFrame(() => (el.scrollTop = el.scrollHeight));
+    return () => cancelAnimationFrame(id);
   }, [open, lastKey]);
 
   return createPortal(
