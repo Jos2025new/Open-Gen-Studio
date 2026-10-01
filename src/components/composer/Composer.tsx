@@ -3,7 +3,7 @@ import { ArrowUp, CircleStop, Layers, Plus, Pencil, X, Zap } from 'lucide-react'
 import { setComposer, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
-import { modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
+import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
 import { clipTrim, paramByRole, placeKeyframes } from '../../engine/params';
@@ -288,18 +288,29 @@ export function Composer() {
   }, [text, mode]);
 
   const liveAttachments = attachments.filter((id) => assets[id]);
-  // An image attached to a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
-  const hasImage = liveAttachments.some((id) => assets[id]?.kind === 'image');
+  // The model follows what is attached, within its own line: no image → its text route; an image → edit (image) or
+  // image to video; two or more images in video → references. Only when the attachments change, so a variant the user
+  // picks by hand stays until they attach or remove something.
+  const imageCount = liveAttachments.filter((id) => assets[id]?.kind === 'image').length;
   const currentRef = useStore((s) => (mode === 'image' || mode === 'video' ? s.composer[mode].modelRef : ''));
+  const lastCount = useRef(imageCount);
   useEffect(() => {
-    if (!hasImage || (mode !== 'image' && mode !== 'video')) return;
-    if (modelSummary(currentRef)?.acceptsImage !== false) return;
-    const twin = opModelFromRef(currentRef, mode);
-    if (twin && twin !== currentRef) {
-      void pickComposerModel(mode, twin);
-      toast(`Switched to ${modelSummary(twin)?.name ?? 'its edit variant'} for the attached image.`, 'info');
+    const before = lastCount.current;
+    lastCount.current = imageCount;
+    if ((mode !== 'image' && mode !== 'video') || before === imageCount) return;
+    const bucket = (n: number) => (n === 0 ? 0 : mode === 'video' && n > 1 ? 2 : 1);
+    if (bucket(before) === bucket(imageCount)) return;
+    const routes = lineRoutes(currentRef);
+    const want =
+      imageCount === 0 ? routes.text
+      : mode === 'image' ? (modelSummary(currentRef)?.acceptsImage ? undefined : routes.edit ?? routes.reference ?? opModelFromRef(currentRef, 'image') ?? undefined)
+      : imageCount > 1 ? routes.reference ?? routes.image
+      : routes.image ?? routes.reference;
+    if (want && want !== currentRef) {
+      void pickComposerModel(mode, want);
+      toast(`Switched to ${modelSummary(want)?.name ?? 'the matching variant'} for ${imageCount ? 'the attached image' + (imageCount > 1 ? 's' : '') : 'text only'}.`, 'info');
     }
-  }, [hasImage, mode, currentRef]);
+  }, [imageCount, mode, currentRef]);
   const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0);
 
   const submit = () => {

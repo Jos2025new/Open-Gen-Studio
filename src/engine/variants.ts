@@ -54,11 +54,12 @@ export function variantKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'r
     .toLowerCase()
     .replace(/(\d)\.0(?!\d)/g, '$1') // v5.0 → v5
     .replace(/(\d)-0(?=-|\/|$)/g, '$1') // seedance-2-0-fast → seedance-2-fast
-    .replace(/text-to-image/g, ' '); // the base variant: "x/text-to-image" = "x"
+    .replace(/text-to-image/g, ' ') // the base variant: "x/text-to-image" = "x"
+    .replace(/(\d)[.-](\d)/g, '$1_$2'); // keep versions whole: 1.1 ≠ 1, 2.5 ≠ 2 5
   const words = id
     .replace(/([a-z])(\d)/g, '$1 $2')
     .replace(/(\d)([a-z])/g, '$1 $2')
-    .split(/[^a-z0-9]+/)
+    .split(/[^a-z0-9_]+/)
     .filter((w) => w && !NOISE.has(w));
   return `${m.kind}|${[...new Set(words)].sort().join(' ')}`;
 }
@@ -104,4 +105,71 @@ export function groupVariants(models: ModelSummary[], order: ProviderId[]): Vari
     const members = [...ms].sort(byCost(order));
     return { key, members, best: members[0] };
   });
+}
+
+/*
+ * A model line: one model (family + version + tier, e.g. "Nano Banana 2 Lite") and its input routes
+ * (text-to-image, edit, reference-to-image; text-to-video, image-to-video, reference-to-video…).
+ */
+const ROUTE_WORDS = new Set(['text', 'image', 'images', 'video', 'videos', 'to', 'edit', 'edits', 'reference', 'references', 'ref', 'refs', 'multi', 'extend', 'extended', 'extension', 'omni', 'layered', 'i2i', 't2i', 'i2v', 't2v', 'r2v', 'keyframes', 'keyframe', 'first', 'last', 'frame', 'frames', 'remix']);
+
+function words(m: Pick<ModelSummary, 'id'>): string[] {
+  return m.id
+    .toLowerCase()
+    .replace(/(\d)\.0(?!\d)/g, '$1')
+    .replace(/(\d)-0(?=-|\/|$)/g, '$1')
+    .replace(/(\d)[.-](\d)/g, '$1_$2')
+    .replace(/([a-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([a-z])/g, '$1 $2')
+    .split(/[^a-z0-9_]+/)
+    .filter((w) => w && !NOISE.has(w));
+}
+
+/** Same key = same model line on any provider, whatever its input route. */
+export function lineKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'ref'>): string {
+  if (m.provider === 'local') return m.ref;
+  return `${m.kind}|${[...new Set(words(m).filter((w) => !ROUTE_WORDS.has(w)))].sort().join(' ')}`;
+}
+
+export type VariantRoute = 'text' | 'edit' | 'image' | 'reference' | 'video';
+
+/** Which input a variant is for: none (text), an image to edit, a start image, references, or a source video. */
+export function variantRoute(m: Pick<ModelSummary, 'id' | 'kind' | 'needsVideo' | 'acceptsImage'>): VariantRoute {
+  const w = new Set(words(m));
+  if (m.needsVideo) return 'video';
+  if (w.has('reference') || w.has('references') || w.has('multi') || w.has('r2v')) return 'reference';
+  if (m.kind === 'video' && (w.has('image') || w.has('i2v') || w.has('first') || w.has('keyframes'))) return 'image';
+  if (m.kind !== 'video' && (w.has('edit') || w.has('i2i') || w.has('remix') || (w.has('image') && w.has('to') && !w.has('text')))) return 'edit';
+  return 'text';
+}
+
+const ROUTE_ORDER: VariantRoute[] = ['text', 'image', 'edit', 'reference', 'video'];
+
+export interface LineGroup {
+  key: string;
+  /** The variant the line row selects: its text route, else the most general one. */
+  head: VariantGroup;
+  /** The other variants of the line. */
+  rest: VariantGroup[];
+}
+
+/** Variant groups of the same line together, in the order of first appearance. */
+export function groupLines(groups: VariantGroup[]): LineGroup[] {
+  const map = new Map<string, VariantGroup[]>();
+  for (const g of groups) {
+    const k = lineKey(g.best);
+    map.set(k, [...(map.get(k) ?? []), g]);
+  }
+  return [...map.entries()].map(([key, gs]) => {
+    const sorted = [...gs].sort((a, b) => ROUTE_ORDER.indexOf(variantRoute(a.best)) - ROUTE_ORDER.indexOf(variantRoute(b.best)) || a.best.id.length - b.best.id.length);
+    return { key, head: sorted[0], rest: sorted.slice(1) };
+  });
+}
+
+/** Short label of a variant inside its line: what its name adds to the line's head ("Edit", "Reference to video"). */
+export function variantLabel(head: ModelSummary, m: ModelSummary): string {
+  const h = head.name.trim();
+  const n = m.name.trim();
+  const rest = n.toLowerCase().startsWith(h.toLowerCase()) ? n.slice(h.length).replace(/^[\s\-–·:/]+/, '') : '';
+  return rest || n;
 }

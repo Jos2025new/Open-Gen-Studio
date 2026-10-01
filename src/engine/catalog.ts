@@ -1,4 +1,5 @@
 import { coerceSettings } from './params';
+import { byCost, lineKey, variantRoute, type VariantRoute } from './variants';
 import { ADAPTERS, PREFERRED, REMOTE_PROVIDERS, editCounterpart, i2vCounterpart } from './providers/registry';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
 import { listLlmModels, pickDefaultLlm } from './providers/llm';
@@ -227,17 +228,27 @@ export function pickComposerModel(kind: MediaKind, ref: string): Promise<void> {
   setComposer((c) => ({ userPicked: { ...c.userPicked, [kind]: true } }));
   // One image model everywhere: its edit twin becomes the edit model (tools, agent edits) too.
   if (kind === 'image') {
-    const edit = opModelFromRef(ref, 'image');
+    const routes = lineRoutes(ref);
+    const edit = routes.edit ?? routes.reference ?? opModelFromRef(ref, 'image');
     if (edit) setSettings((st) => ({ ops: { ...st.ops, edit } }));
   }
+  // One video model everywhere: its text, image and reference routes fill the agent's video rows.
+  if (kind === 'video') fillVideoRoutes(ref);
   return selectComposerModel(kind, ref);
+}
+
+/** Set the agent's text / image / reference → video rows to the routes of this model's line that exist. */
+export function fillVideoRoutes(ref: string): void {
+  const r = lineRoutes(ref);
+  const routes = { ...(r.text ? { text: r.text } : {}), ...(r.image ? { image: r.image } : {}), ...(r.reference ? { reference: r.reference } : {}) };
+  if (Object.keys(routes).length) setComposer((c) => ({ videoRoutes: { ...(c.videoRoutes ?? {}), ...routes } }));
 }
 
 /** Pick the image-edit model; the composer's Image model follows to the same family's text-to-image twin. */
 export function pickImageEditModel(ref: string | null): void {
   setSettings((st) => ({ ops: { ...st.ops, edit: ref } }));
   if (!ref) return;
-  const base = routeTwins(ref).find((m) => !m.acceptsImage)?.ref ?? ref;
+  const base = lineRoutes(ref).text ?? ref;
   setComposer((c) => ({ userPicked: { ...c.userPicked, image: true } }));
   void selectComposerModel('image', base);
 }
@@ -332,13 +343,24 @@ export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video')
   return routeTwins(ref).find((m) => takesImage(m.ref))?.ref ?? null;
 }
 
-/** Same family, version and tier on the same provider, differing only by the input route words. */
+/** The other routes of the same model line on the same provider (text-to-image ↔ edit ↔ reference…). */
 function routeTwins(ref: string): ModelSummary[] {
-  const parsed = parseModelRef(ref);
-  if (!parsed) return [];
-  const route = /[/_-]?(text|image|reference)-to-(image|video)|[/_-]edit\b|[/_-](t2i|i2i|t2v|i2v)\b/gi;
-  const bare = parsed.id.toLowerCase().replace(route, '');
-  return Object.values(get().catalog.models).filter((m) => m.provider === parsed.provider && m.ref !== ref && m.id.toLowerCase().replace(route, '') === bare);
+  const me = get().catalog.models[ref];
+  if (!me) return [];
+  const key = lineKey(me);
+  return Object.values(get().catalog.models).filter((m) => m.provider === me.provider && m.ref !== ref && m.kind === me.kind && lineKey(m) === key).sort(byCost([me.provider]));
+}
+
+/** The model's line on its provider, one ref per input route (cheapest copy of each). */
+export function lineRoutes(ref: string): Partial<Record<VariantRoute, string>> {
+  const me = get().catalog.models[ref];
+  if (!me) return {};
+  const out: Partial<Record<VariantRoute, string>> = {};
+  for (const m of [me, ...routeTwins(ref)]) {
+    const r = variantRoute(m);
+    if (!out[r]) out[r] = m.ref;
+  }
+  return out;
 }
 
 /** Model for an operation on an asset: the one that made it for edit / video engines, else the engine's model. */

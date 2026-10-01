@@ -5,6 +5,7 @@ import {
   modelSummary,
   opModelFor,
   pickImageEditModel,
+  fillVideoRoutes,
   pickComposerModel,
   preferredModel,
   resetAgentModel,
@@ -175,6 +176,8 @@ export function AgentModelControls() {
     else if (picker === 'videoEdit') setSettings((s) => ({ ops: { ...s.ops, videoEdit: ref } }));
     else {
       const mode = modeOf[picker];
+      // Picking one route fills the others with the same model's routes, when they exist.
+      if (mode && ref) fillVideoRoutes(ref);
       if (mode) setRouteModel(mode, ref);
     }
     setPicker(null);

@@ -9,6 +9,15 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Tarea — modelos agrupados por línea y variantes que se rellenan solas (2026-10-01)
+Origen: el buscador lista "Image 1 Pro", "Image 1 Pro Edit", "Image 1 Pro Extended"… como modelos sueltos, y el usuario tiene que elegir a mano la variante de texto, edición, imagen→vídeo y referencias.
+- [x] L1. **Línea de modelo** (`variants.ts`): `lineKey` = la variante sin las palabras de ruta (text/image/video-to, edit, reference, multi, extend, omni, layered…), y `variantRoute` (text, edit, image, reference, video). *Por qué:* una sola regla para agrupar y para encontrar gemelas, en lugar de patrones por proveedor.
+- [x] L2. **Buscador** (`ModelList.tsx`): una fila por línea (su variante de texto, o la más corta) con un desplegable de sus variantes; buscar abre las líneas que coinciden. Elegir la fila = la variante base (la app pasa sola a la gemela según las entradas); elegir una subfila = esa variante exacta. Recomendados, Browse all y el panel Models.
+- [x] L3. **Rellenado automático** (`catalog.ts`, `AgentModelControls.tsx`): elegir un modelo de imagen fija también su edición; elegir uno de vídeo (composer o cualquier fila de vídeo del panel Models) fija texto→vídeo, imagen→vídeo y referencias con las gemelas de la misma línea y proveedor que existan.
+- [x] L4. **Composer según las entradas:** sin imágenes → variante de texto; con imagen → edición (imagen) o imagen→vídeo; con 2+ imágenes en vídeo → referencias si existe. Solo dentro de la misma línea; aviso al cambiar. `jobs.ts` usa la misma búsqueda de gemelas.
+- [x] L5. Tests (líneas y rutas con ids reales de la red de regresión), typecheck, suite; un commit. Sin navegador.
+  Hecho: `lineKey`/`variantRoute`/`groupLines`/`variantLabel` (`variants.ts`); 561 variantes de la red de regresión → 308 líneas. Hallado: las versiones con punto se partían y "HappyHorse 1.0" y "1.1" contaban como el mismo modelo (también en `variantKey`): ahora `1.1` es un solo token. `lineRoutes`/`fillVideoRoutes` (`catalog.ts`); el composer cambia de ruta solo cuando cambia el número de imágenes adjuntas (una variante elegida a mano se respeta). Tests: `tests/model-lines.test.ts` (2); suite 330 + 1 omitida.
+
 ## Tarea — vista 3D guardada, imagen de vista como referencia y 3D importado como nodo (2026-09-30)
 > ⚠️ **FRÁGIL · POSIBLE LAG.** Guarda la vista en el asset (estado persistido, ver `feffc15`) y renderiza la imagen de vista con WebGL fuera de pantalla. Si la app va más lenta: activar `localStorage['ogs.debug3d']='1'` (consola: tiempos de guardado y render 3D; avisos > 1,5 s salen siempre) y revisar esto primero.
 - [x] T1. La vista del visor (órbita, encuadre, zoom, luz, material, grid) se guarda en `asset.view3d` con espera de 800 ms tras el último cambio y al cerrar; al abrirlo se recupera. *Dónde:* `types.ts`, `viewer3d.ts`, `Model3DViewer.tsx`.

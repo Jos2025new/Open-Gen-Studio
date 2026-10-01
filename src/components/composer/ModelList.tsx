@@ -3,7 +3,7 @@ import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lu
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
-import { groupVariants, modelFamily, type VariantGroup } from '../../engine/variants';
+import { groupLines, groupVariants, modelFamily, variantLabel, type VariantGroup } from '../../engine/variants';
 import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
@@ -180,6 +180,7 @@ export function ModelList({
   const [sort, setSort] = usePref<SortId>('ogs.modelSort', 'az');
   const [browseAll, setBrowseAll] = useState(false);
   const [openFamilies, setOpenFamilies] = useState<string[]>([]);
+  const [openLines, setOpenLines] = useState<string[]>([]);
   const providers = connectedProviders();
 
   const all = useMemo(
@@ -294,36 +295,61 @@ export function ModelList({
               >
                 <ChevronDown size={13} />
                 <span>{label}</span>
-                <span className="faint num">{es.length}</span>
+                <span className="faint num">{groupLines(es).length}</span>
               </button>
             ) : (
               <div className="ml-group-head">
                 {label}
-                <span className="faint num">{es.length}</span>
+                <span className="faint num">{groupLines(es).length}</span>
               </div>
             )}
-            {open ? es.map(({ key, members, best: m }) => {
-              const selected = members.some((x) => x.ref === value);
-              return (
-                <button key={key} type="button" className={`ml-row ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
-                  <Monogram m={m} />
-                  <span className="ml-main">
-                    <span className="ml-name">{m.name}</span>
-                    <span className="ml-sub">
-                      {m.provider !== 'local' ? <span className="ml-where">{where(members)}</span> : null}
-                      {subtitle(m)}
-                    </span>
-                  </span>
-                  <span className="ml-side">
-                    {badges(m).map((b) => (
-                      <span key={b} className="badge">
-                        {b}
+            {open ? groupLines(es).map(({ key: lineId, head, rest }) => {
+              // One row per model line; its other routes (edit, reference, image to video…) fold under it.
+              const lineOpen = Boolean(needle) || openLines.includes(lineId) || rest.some((r) => r.members.some((x) => x.ref === value));
+              const row = (g: VariantGroup, sub: boolean) => {
+                const { key, members, best: m } = g;
+                const selected = members.some((x) => x.ref === value);
+                return (
+                  <button key={key} type="button" className={`ml-row ${sub ? 'is-variant' : ''} ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
+                    {sub ? <span className="ml-variant-dot" /> : <Monogram m={m} />}
+                    <span className="ml-main">
+                      <span className="ml-name">{sub ? variantLabel(head.best, m) : m.name}</span>
+                      <span className="ml-sub">
+                        {m.provider !== 'local' ? <span className="ml-where">{where(members)}</span> : null}
+                        {sub ? null : subtitle(m)}
                       </span>
-                    ))}
-                    <span className="ml-price num">{priceHint(m)}</span>
-                  </span>
-                  {selected ? <Check size={14} className="ml-check" /> : null}
-                </button>
+                    </span>
+                    <span className="ml-side">
+                      {badges(m).map((b) => (
+                        <span key={b} className="badge">
+                          {b}
+                        </span>
+                      ))}
+                      <span className="ml-price num">{priceHint(m)}</span>
+                    </span>
+                    {selected ? <Check size={14} className="ml-check" /> : null}
+                  </button>
+                );
+              };
+              return (
+                <div key={lineId} className="ml-line">
+                  <div className="ml-line-head">
+                    {row(head, false)}
+                    {rest.length ? (
+                      <button
+                        type="button"
+                        className={`ml-line-toggle ${lineOpen ? 'is-open' : ''}`}
+                        aria-expanded={lineOpen}
+                        data-tip={`${rest.length} more variant${rest.length > 1 ? 's' : ''}`}
+                        onClick={() => setOpenLines((xs) => (xs.includes(lineId) ? xs.filter((x) => x !== lineId) : [...xs, lineId]))}
+                      >
+                        <span className="num">+{rest.length}</span>
+                        <ChevronDown size={13} />
+                      </button>
+                    ) : null}
+                  </div>
+                  {lineOpen ? rest.map((g) => row(g, true)) : null}
+                </div>
               );
             }) : null}
           </div>

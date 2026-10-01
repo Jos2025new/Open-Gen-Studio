@@ -110,3 +110,16 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .thread-peek-folded { position: absolute; left: calc(100% + 12px); bottom: 0; }
 .thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; }
 @media (max-width: 1100px) { .thread-peek-folded { left: auto; right: 0; bottom: calc(100% + 8px); } }
+
+/* Model lines: one row per model, its other routes folded under it. */
+.ml-line-head { display: flex; align-items: center; }
+.ml-line-head > .ml-row { flex: 1; min-width: 0; }
+.ml-line-toggle { flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; height: 26px; padding: 0 6px; margin-left: 2px; border-radius: 6px; font-size: 10px; color: var(--text-2); }
+.ml-line-toggle:hover { color: var(--text); background: var(--surface-2); }
+.ml-line-toggle svg { transform: rotate(-90deg); transition: transform .15s; }
+.ml-line-toggle.is-open svg { transform: rotate(0); }
+.ml-row.is-variant { padding-left: 22px; }
+.ml-row.is-variant .ml-name { font-size: 12px; color: var(--text-2); }
+.ml-row.is-variant:hover .ml-name, .ml-row.is-variant.is-selected .ml-name { color: var(--text); }
+.ml-variant-dot { width: 22px; flex-shrink: 0; display: grid; place-items: center; }
+.ml-variant-dot::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-4); }
