@@ -1,12 +1,12 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X } from 'lucide-react';
+import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, setSketch, tryConnect } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
-import { deleteAssets, downloadAsset } from '../../engine/actions';
+import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -360,6 +360,9 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
               <RotateCcw size={13} /> Reset image
             </button>
           ) : null}
+          <button type="button" className="nt-btn nt-icon nodrag" aria-label="Attach to prompt" data-tip="Attach to prompt" onClick={() => useAsReference(assetId)}>
+            <Paperclip size={14} />
+          </button>
           <button type="button" className="nt-btn nt-icon nodrag" aria-label="Download" data-tip="Download" onClick={() => void downloadAsset(assetId)}>
             <Download size={14} />
           </button>
@@ -417,7 +420,7 @@ function InputRefs({ node }: { node: GraphNode }) {
     .map((e) => {
       const src = graph.nodes.find((n) => n.id === e.source);
       const out = src ? nodeOutput(src, generations) : undefined;
-      return { edge: e, assetId: out?.assetId, edited: Boolean(out?.sketch), label: ports.find((p) => p.id === e.targetHandle)?.label };
+      return { edge: e, assetId: out?.assetId, edited: Boolean(out?.sketch), is3d: out?.assetId ? assets[out.assetId]?.kind === 'model3d' : false, label: ports.find((p) => p.id === e.targetHandle)?.label };
     });
   const free = ports.find((p) => p.multi || !linked.some((l) => l.edge.targetHandle === p.id));
   const recent = Object.values(assets)
@@ -433,9 +436,10 @@ function InputRefs({ node }: { node: GraphNode }) {
   return (
     <div className="nt-refs">
       {linked.map((l) => (
-        <span key={l.edge.id} className={`nt-ref ${l.edited ? 'is-edited' : ''}`} data-tip={l.assetId ? `${l.label}${l.edited ? ' · edited' : ''} · click to sketch over it` : l.label}>
+        <span key={l.edge.id} className={`nt-ref ${l.edited ? 'is-edited' : ''}`} data-tip={l.assetId ? (l.is3d ? `${l.label} · 3D view image · click to open the model` : `${l.label}${l.edited ? ' · edited' : ''} · click to sketch over it`) : l.label}>
           {l.assetId ? (
-            <button type="button" className="nt-ref-open" aria-label="Sketch over this reference" onClick={() => setUi({ sketch: { assetId: l.assetId!, nodeId: l.edge.source } })}>
+            // A 3D source sends its view image; it opens in the 3D viewer (change the view there), not in Sketch.
+            <button type="button" className="nt-ref-open" aria-label={l.is3d ? 'Open the 3D model' : 'Sketch over this reference'} onClick={() => setUi(l.is3d ? { lightbox: { assetIds: [l.assetId!], index: 0 } } : { sketch: { assetId: l.assetId!, nodeId: l.edge.source } })}>
               <AssetMedia assetId={l.assetId} hoverPlay draggable={false} />
             </button>
           ) : (
