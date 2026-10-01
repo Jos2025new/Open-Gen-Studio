@@ -52,7 +52,6 @@ export function Viewer3DControls() {
       {open ? (
         <div className="info-box v3d-box">
           <Slider label="Exposure" value={v.exposure} min={0} max={2} step={0.05} onChange={(exposure) => setView3d({ exposure })} />
-          <Slider label="Shadow" value={v.shadow} min={0} max={1} step={0.05} onChange={(shadow) => setView3d({ shadow })} />
           <div className="v3d-row">
             <span>Environment</span>
             <Segmented size="sm" value={v.environment} options={[{ value: 'neutral', label: 'Neutral' }, { value: 'legacy', label: 'Soft' }]} onChange={(environment) => setView3d({ environment })} />

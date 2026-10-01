@@ -3,7 +3,7 @@ import { getAssetBlob } from '../../lib/idb';
 import { fetchBlob } from '../../lib/media';
 import { GLB_MIME, unpackModel, validateGlb } from '../../lib/model3d';
 import { useStore } from '../../store/store';
-import { applyView, useViewer3d, VIEW3D_DEFAULT } from './viewer3d';
+import { applyView, panHandler, useViewer3d, VIEW3D_DEFAULT } from './viewer3d';
 
 /** Only the open lightbox mounts this component; lists never allocate WebGL. */
 export function Model3DViewer({ assetId }: { assetId: string }) {
@@ -46,6 +46,7 @@ export function Model3DViewer({ assetId }: { assetId: string }) {
   }, [assetId, asset?.mime, asset?.remoteUrl]);
   const view = useViewer3d((s) => s.view), el = useViewer3d((s) => s.el);
   useEffect(() => { if (el) applyView(el, view); }, [el, view]);
+  useEffect(() => (el ? panHandler(el) : undefined), [el]);
   return <div style={{ width: '100%', height: '100%', position: 'relative' }}>
     <div ref={host} style={{ width: '100%', height: '100%' }} />
     {status && <p role="status" style={{ position: 'absolute', top: 16, left: 16, right: 16 }}>{status}</p>}

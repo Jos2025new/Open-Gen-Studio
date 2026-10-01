@@ -5,7 +5,6 @@ import { toast } from '../../store/store';
 /** View-only settings of the open 3D viewer. Not persisted; they never touch the file. */
 export interface View3D {
   exposure: number;
-  shadow: number;
   environment: 'neutral' | 'legacy';
   texture: boolean;
   /** null = the model's own value. */
@@ -14,7 +13,7 @@ export interface View3D {
   grid: boolean;
   pan: boolean;
 }
-export const VIEW3D_DEFAULT: View3D = { exposure: 1, shadow: 0, environment: 'neutral', texture: true, roughness: null, metalness: null, grid: false, pan: false };
+export const VIEW3D_DEFAULT: View3D = { exposure: 1, environment: 'neutral', texture: true, roughness: null, metalness: null, grid: false, pan: false };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type MV = HTMLElement & Record<string, any>;
@@ -57,18 +56,19 @@ export async function snapshot3d(): Promise<void> {
 }
 
 /** The model's original material values, so "auto" and texture on can restore them. */
-const originals = new WeakMap<object, { tex: unknown; r: number; m: number }>();
+const originals = new WeakMap<object, { tex: unknown; mr: unknown; r: number; m: number }>();
 
 export function applyView(el: MV, v: View3D): void {
   el.exposure = v.exposure;
-  el.shadowIntensity = v.shadow;
   el.environmentImage = v.environment;
-  el.disablePan = !v.pan;
   for (const mat of el.model?.materials ?? []) {
     const pbr = mat.pbrMetallicRoughness;
-    if (!originals.has(mat)) originals.set(mat, { tex: pbr.baseColorTexture?.texture ?? null, r: pbr.roughnessFactor, m: pbr.metallicFactor });
+    if (!originals.has(mat)) originals.set(mat, { tex: pbr.baseColorTexture?.texture ?? null, mr: pbr.metallicRoughnessTexture?.texture ?? null, r: pbr.roughnessFactor, m: pbr.metallicFactor });
     const o = originals.get(mat)!;
     pbr.baseColorTexture?.setTexture(v.texture ? o.tex : null);
+    // The metal/rough map multiplies the factors; a slider only works without it.
+    const manual = v.roughness !== null || v.metalness !== null;
+    pbr.metallicRoughnessTexture?.setTexture(manual ? null : o.mr);
     pbr.setRoughnessFactor(v.roughness ?? o.r);
     pbr.setMetallicFactor(v.metalness ?? o.m);
   }
@@ -113,4 +113,30 @@ function applyGrid(el: MV, on: boolean): void {
   }
   g.setAttribute('scale', `${size} 1 ${size}`);
   g.setAttribute('offset', `${c.x} ${c.y - d.y / 2} ${c.z}`);
+}
+
+/** With Pan on, a left drag moves the camera target instead of orbiting. */
+export function panHandler(el: MV): () => void {
+  const down = (e: PointerEvent) => {
+    if (e.button !== 0 || !useViewer3d.getState().view.pan) return;
+    e.stopPropagation();
+    e.preventDefault();
+    let x = e.clientX, y = e.clientY;
+    const move = (m: PointerEvent) => {
+      const o = el.getCameraOrbit(), t = el.getCameraTarget();
+      const fov = (el.getFieldOfView() * Math.PI) / 180;
+      const k = (2 * o.radius * Math.tan(fov / 2)) / el.clientHeight;
+      const dx = (m.clientX - x) * k, dy = (m.clientY - y) * k;
+      x = m.clientX; y = m.clientY;
+      const st = Math.sin(o.theta), ct = Math.cos(o.theta), sp = Math.sin(o.phi), cp = Math.cos(o.phi);
+      const r = [ct, 0, -st], u = [-cp * st, sp, -cp * ct];
+      el.cameraTarget = `${t.x - r[0] * dx + u[0] * dy}m ${t.y - r[1] * dx + u[1] * dy}m ${t.z - r[2] * dx + u[2] * dy}m`;
+      el.jumpCameraToGoal?.();
+    };
+    const up = () => { window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true); };
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', up, true);
+  };
+  el.addEventListener('pointerdown', down, true);
+  return () => el.removeEventListener('pointerdown', down, true);
 }
