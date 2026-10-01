@@ -9,6 +9,17 @@ Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 20
 - Un commit por tarea terminada.
 - **Puntos frágiles bajo supervisión** (probar primero si algo empeora sin razón aparente): guardado del estado, `feffc15` (ver la tarea "la tarjeta del plan tarda unos segundos").
 
+## Plan — controles del visor 3D (2026-09-30) · PENDIENTE
+Se amplía el `model-viewer` 4.3.1 que ya tenemos, sin Three.js propio, gizmo ni luces que se muevan (model-viewer no las tiene). Three.js directo solo como plan B, si model-viewer bloquea algo necesario.
+- [ ] V1. Barra de vista bajo el modelo, con el mismo patrón que la barra de operaciones (`.lb-dock`): View ▾ (Front/Back/Left/Right/Top/Bottom + Reset view, vía `cameraOrbit`), Pan, Zoom − +, Snapshot. *Dónde:* `Model3DViewer.tsx`, `Lightbox.tsx`, `shell.css`. *Por qué:* vistas exactas sin otro editor.
+- [ ] V2. Snapshot: `toBlob()` → asset de imagen normal (Galería, visor, Designer, operaciones). *Dónde:* `Model3DViewer.tsx`, guardado de assets existente. *Por qué:* reutilizar el flujo de imágenes.
+- [ ] V3. Sección plegable "3D Controls" en el panel lateral, antes de Details: Exposure, Shadow, Environment (neutral/estudio/exterior); Material: Texture on/off, Roughness, Metalness (API pública de materiales). Grid solo si `<extra-model>` existe en 4.3.1; si no, queda pendiente. Solo ajustes de vista: no modifican el archivo ni se guardan. *Dónde:* `Lightbox.tsx`, `Model3DViewer.tsx`, `shell.css`.
+- [ ] V4. Typecheck, suite, comprobación breve en navegador con un GLB local; un commit.
+Fuera: wireframe (exige tocar el Three.js interno), gizmo, luces direccionales.
+
+## Futuro — modelo 3D como capa del Designer (no iniciado)
+*Qué:* capa `model3d` = `assetId` + vista (órbita, zoom, exposición, material) + una imagen renderizada en caché que el lienzo dibuja como cualquier imagen. "Edit view" abre el visor 3D; al confirmar se vuelve a renderizar la imagen. *Dónde:* `types.ts`, `design/render.ts`, `design/actions.ts`, `design/export.ts`, panel de capas, "Send to → Designer" en assets 3D. *Hasta dónde:* mover, escalar, opacidad, orden, deshacer y exportar (el SVG/PDF usan la imagen); sin WebGL vivo en el lienzo, sin edición 3D dentro del Designer. *Por qué:* usar el modelo como referencia de perspectiva y dibujar encima sin otro subsistema; WebGL por capa choca con el límite de contextos del navegador y con la exportación.
+
 ## Tarea — mover una capa pintada mueve el dibujo, no la página (2026-09-30)
 Origen: las capas pintadas (pincel o agente) ocupan toda la página; Move mostraba y movía el marco de la página y dejaba la capa desplazada (x −235), y un trazo posterior fuera de ese marco se recortaba.
 - [x] M1. `layerBox` de una capa raster sin imagen = caja de lo pintado (píxeles con alfa), en caché por buffer y versión (re-escaneo como mucho cada 150 ms mientras se pinta). Selección, asas, mover y escalar actúan sobre el dibujo; un clic en zona vacía ya no la selecciona. *Dónde:* `design/render.ts`.
