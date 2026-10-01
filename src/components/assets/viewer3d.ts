@@ -21,12 +21,12 @@ export const useViewer3d = create<{ el: MV | null; view: View3D }>(() => ({ el: 
 export const setView3d = (p: Partial<View3D>) => useViewer3d.setState((s) => ({ view: { ...s.view, ...p } }));
 
 export const VIEWS: Array<{ id: string; label: string; orbit: string }> = [
-  { id: 'front', label: 'Front', orbit: '0deg 90deg auto' },
-  { id: 'back', label: 'Back', orbit: '180deg 90deg auto' },
-  { id: 'left', label: 'Left', orbit: '-90deg 90deg auto' },
-  { id: 'right', label: 'Right', orbit: '90deg 90deg auto' },
-  { id: 'top', label: 'Top', orbit: '0deg 0deg auto' },
-  { id: 'bottom', label: 'Bottom', orbit: '0deg 180deg auto' },
+  { id: 'front', label: 'Front', orbit: '90deg 90deg auto' },
+  { id: 'back', label: 'Back', orbit: '-90deg 90deg auto' },
+  { id: 'left', label: 'Left', orbit: '0deg 90deg auto' },
+  { id: 'right', label: 'Right', orbit: '180deg 90deg auto' },
+  { id: 'top', label: 'Top', orbit: '90deg 0deg auto' },
+  { id: 'bottom', label: 'Bottom', orbit: '90deg 180deg auto' },
 ];
 
 export function setOrbit(orbit: string): void {
@@ -37,7 +37,7 @@ export function setOrbit(orbit: string): void {
   el.fieldOfView = 'auto';
 }
 export function resetView(): void {
-  setOrbit('0deg 75deg auto');
+  setOrbit('90deg 75deg auto');
 }
 export function zoomBy(step: number): void {
   useViewer3d.getState().el?.zoom?.(step);
