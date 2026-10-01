@@ -14,7 +14,7 @@ import { useNow } from '../ui/hooks';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, CostTag, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { AssetActions, DownloadButton, FavoriteButton, SendToMenu } from '../assets/AssetActions';
+import { AssetActions, AttachButton, DownloadButton, FavoriteButton, SendToMenu } from '../assets/AssetActions';
 import { GenerationInfo, generationInputs, generationTitle, openInputs } from '../assets/GenerationInfo';
 import { useShallow } from 'zustand/react/shallow';
 import { GenerationRecovery } from './RecoveryActions';
@@ -224,6 +224,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         <span className="spacer" />
         {sel && g.status === 'done' ? (
           <>
+            <AttachButton assetId={sel} />
             <SendToMenu assetId={sel} />
             <FavoriteButton assetId={sel} />
             <DownloadButton assetId={sel} />

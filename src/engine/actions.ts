@@ -583,11 +583,13 @@ export function useAsReference(assetId: string): void {
   const st = get();
   const a = st.assets[assetId];
   if (!a) return;
-  if (a.kind === 'video') {
-    toast('Videos cannot be references. Extract a frame first.', 'error');
+  // A 3D model goes in as its view image.
+  const id = a.kind === 'model3d' ? a.viewImageId : assetId;
+  if (!id || !st.assets[id]) {
+    toast('This 3D model has no view image yet. Open it once, then try again.', 'error');
     return;
   }
-  setComposer((c) => ({ attachments: c.attachments.includes(assetId) ? c.attachments : [...c.attachments, assetId] }));
+  setComposer((c) => ({ attachments: c.attachments.includes(id) ? c.attachments : [...c.attachments, id] }));
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 

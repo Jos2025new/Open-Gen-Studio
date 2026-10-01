@@ -5,7 +5,7 @@ import { setUi, useStore } from '../../store/store';
 import { downloadAsset } from '../../engine/actions';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, IconButton } from '../ui/primitives';
-import { AssetActions, FavoriteButton, SendToMenu } from './AssetActions';
+import { AssetActions, AttachButton, FavoriteButton, SendToMenu } from './AssetActions';
 import { GenerationInfo } from './GenerationInfo';
 import { Viewer3DControls, Viewer3DDock } from './Viewer3DControls';
 
@@ -66,6 +66,7 @@ export function Lightbox() {
             Download
           </Button>
           <FavoriteButton assetId={assetId} />
+          <AttachButton assetId={assetId} />
           <SendToMenu assetId={assetId} />
           <span className="spacer" />
           <IconButton icon={X} label="Close (Esc)" size="sm" onClick={close} />

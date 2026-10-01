@@ -281,6 +281,11 @@ export function FavoriteButton({ assetId, size = 'sm' }: { assetId: string; size
   return <IconButton icon={Star} label={favorite ? 'Remove favorite' : 'Favorite'} size={size} active={favorite} className="fav-btn" onClick={() => toggleFavorite(assetId)} />;
 }
 
+/** Attach this file to the prompt (as a reference, start frame or input, depending on the mode). */
+export function AttachButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
+  return <IconButton icon={Paperclip} label="Attach to prompt" size={size} onClick={() => useAsReference(assetId)} />;
+}
+
 export function DownloadButton({ assetId, size = 'sm' }: { assetId: string; size?: 'sm' | 'md' }) {
   return <IconButton icon={Download} label="Download" size={size} onClick={() => void downloadAsset(assetId)} />;
 }
