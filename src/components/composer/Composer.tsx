@@ -17,6 +17,39 @@ import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 
+/** The attachments as a stack of cards in the + slot; hovering opens them into a row with remove buttons and a big preview. */
+function AttachStack({ ids, label, disabled, onAdd }: { ids: string[]; label: string; disabled: boolean; onAdd: () => void }) {
+  if (!ids.length) return <IconButton icon={Plus} className="composer-add" label={label} size="md" disabled={disabled} onClick={onAdd} />;
+  const remove = (id: string) => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }));
+  return (
+    <div className="attach-stack" tabIndex={0} aria-label={`${ids.length} attached`}>
+      <div className="attach-pile">
+        {ids.slice(0, 3).map((id, i) => (
+          <span key={id} className="attach-pile-card" style={{ '--i': i } as React.CSSProperties}>
+            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+          </span>
+        ))}
+        <span className="attach-pile-add"><Plus size={14} /></span>
+      </div>
+      <div className="attach-row">
+        {ids.map((id) => (
+          <span key={id} className="attach-thumb">
+            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+            <span className="attach-preview"><AssetMedia assetId={id} hoverPlay={false} draggable={false} /></span>
+            <AttachTiming id={id} />
+            <button type="button" aria-label="Remove attachment" onClick={() => remove(id)}>
+              <X size={11} />
+            </button>
+          </span>
+        ))}
+        <button type="button" className="attach-more" aria-label={label} data-tip={label} disabled={disabled} onClick={onAdd}>
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Keyframe second (keyframe models) or clip trim (clip models) of one attachment; click to change it. */
 function AttachTiming({ id }: { id: string }) {
   const mode = useStore((s) => s.composer.mode);
@@ -328,38 +361,13 @@ export function Composer() {
           }
         }}
       >
-        {editing || liveAttachments.length ? (
-          <div className="composer-top">
-            {editing ? (
-              <span className="editing-chip" data-tip={editingPrompt}>
-                <Pencil size={12} />
-                Editing
-                <button type="button" aria-label="Stop editing" onClick={() => setComposer({ editing: null })}>
-                  <X size={12} />
-                </button>
-              </span>
-            ) : null}
-            {liveAttachments.map((id) => (
-              <span key={id} className="attach-thumb">
-                <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-                <AttachTiming id={id} />
-                <button type="button" aria-label="Remove attachment" onClick={() => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }))}>
-                  <X size={11} />
-                </button>
-              </span>
-            ))}
-          </div>
-        ) : null}
         <div className="composer-prompt-row">
-          <IconButton
-            icon={Plus}
-            className="composer-add"
-            label={
-              acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'
-            }
-            size="md"
+          {/* Attachments live where + is: a small stack that opens into a row on hover. */}
+          <AttachStack
+            ids={liveAttachments}
+            label={acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
             disabled={!acceptsImages && !takesAudio && mode !== 'model3d'}
-            onClick={() => fileRef.current?.click()}
+            onAdd={() => fileRef.current?.click()}
           />
           <textarea
             ref={taRef}
@@ -385,6 +393,15 @@ export function Composer() {
           />
         </div>
         <div className="composer-bar">
+          {editing ? (
+            <span className="editing-chip" data-tip={editingPrompt}>
+              <Pencil size={12} />
+              Reusing
+              <button type="button" aria-label="Stop reusing" onClick={() => setComposer({ editing: null })}>
+                <X size={12} />
+              </button>
+            </span>
+          ) : null}
           <ModeMenu />
           <div className="composer-controls">
             {mode === 'agent' ? <AgentControls /> : <MediaControls kind={mode} />}

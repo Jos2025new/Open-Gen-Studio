@@ -76,3 +76,22 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .composer-prompt-row .composer-add { flex-shrink: 0; width: 42px; height: 48px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface-3); color: var(--text-2); }
 .composer-prompt-row .composer-add:hover:not(:disabled) { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
 .composer-prompt-row .composer-add svg { width: 20px; height: 20px; }
+
+/* Attachments in the + slot: a tilted pile; hover or focus opens a row over the prompt (Dreamina-like). */
+.attach-stack { position: relative; width: 52px; height: 52px; flex-shrink: 0; outline: none; }
+.attach-pile { position: relative; width: 52px; height: 52px; }
+.attach-pile-card { position: absolute; inset: 2px 4px 4px 2px; border: 2px solid var(--text-2); border-radius: 6px; overflow: hidden; background: var(--surface-2); transform: rotate(calc(var(--i) * 5deg - 4deg)); z-index: calc(3 - var(--i)); }
+.attach-pile-card .media { width: 100%; height: 100%; object-fit: cover; }
+.attach-pile-add { position: absolute; right: -6px; bottom: -6px; z-index: 4; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text); }
+.attach-row { display: none; position: absolute; left: -6px; top: -6px; z-index: 20; gap: 8px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+.attach-stack:hover .attach-row, .attach-stack:focus-within .attach-row { display: flex; }
+.attach-row .attach-thumb { width: 56px; height: 56px; }
+.attach-row .attach-thumb > .media { width: 100%; height: 100%; object-fit: cover; }
+.attach-row .attach-thumb > button { opacity: 0; }
+.attach-row .attach-thumb:hover > button { opacity: 1; }
+.attach-preview { display: none; position: absolute; left: 0; bottom: calc(100% + 10px); width: 220px; height: 220px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface-2); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5); pointer-events: none; }
+.attach-preview .media { width: 100%; height: 100%; object-fit: contain; }
+.attach-row .attach-thumb:hover .attach-preview { display: block; }
+.attach-more { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 6px; border: 1px dashed var(--border-strong); color: var(--text-2); background: var(--surface-2); }
+.attach-more:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.composer-bar .editing-chip { flex-shrink: 0; }
