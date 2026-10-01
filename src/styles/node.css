@@ -84,3 +84,8 @@
 .nc-body:has(.nc-generating) { box-shadow: inset 0 0 0 1px var(--accent-line); animation: nc-breathe 2s ease-in-out infinite; }
 @keyframes nc-breathe { 50% { box-shadow: inset 0 0 0 1px var(--accent), inset 0 0 24px var(--accent-soft); } }
 @media (prefers-reduced-motion: reduce) { .nc-generating-sweep::after, .nc-body:has(.nc-generating) { animation: none; } }
+
+/* While a node generates, its previous result is hidden: an empty placeholder with the status in the middle. */
+.nc-body:has(.nc-generating) > :not(.nc-generating) { visibility: hidden; }
+.nc-body:has(.nc-generating) { background: var(--surface-2); }
+.nc-generating { inset: 0; padding: 0; justify-content: center; }
