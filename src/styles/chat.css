@@ -93,3 +93,7 @@
 .gen-title { align-items: flex-start; }
 .gen-title .gen-prompt { flex: 1; min-width: 0; }
 .gen-copy { flex-shrink: 0; margin: -4px -4px 0 0; }
+
+/* A change to a model the user picked: shown, not folded. */
+.plan-user-model { display: flex; align-items: center; gap: 6px; margin: 0 14px 8px; font-size: 12px; color: var(--warn); }
+.plan-user-model svg { flex: none; }

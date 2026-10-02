@@ -148,6 +148,8 @@ export interface PlanContext {
   routeModel?: (mode: RouteMode) => string | undefined;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
+  /** True when the user picked this kind's model by hand but it has no variant for these inputs and a stand-in is used. */
+  defaultIsFallback?: (kind: MediaKind, needsImage: boolean) => boolean;
   /** What the user wrote (messages, answers): a model the plan names wins over the composer's pick only if it is named here. */
   userText?: () => string;
   /** Images attached to the current request: the start frame a model needs when the plan forgot it. */
@@ -549,6 +551,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
                 pickNotes.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
               }
             }
+          }
+          if (!modelRef && ctx.composerChosen?.(kind) && ctx.defaultIsFallback?.(kind, needsImage)) {
+            const fallback = ctx.defaultModel(kind, needsImage);
+            if (fallback) pickNotes.push(`${s.id}: your ${kind} model has no variant that takes ${kind === 'video' ? 'a start image' : 'an input image'}, so ${(await ctx.getModel(fallback))?.model.name ?? fallback.split('::')[1]} is used — pick one in Models to choose it yourself`);
           }
           modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
           return { modelRef, pickedRoute, routeParams, routeRefs, needsImage, resolved: modelRef ? await ctx.getModel(modelRef) : null };

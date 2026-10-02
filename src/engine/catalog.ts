@@ -278,6 +278,23 @@ export async function selectComposerModel(kind: MediaKind, ref: string): Promise
  * input image (edit / image-to-video counterpart of the current one when possible).
  */
 export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
+  return defaultModelChoice(kind, needsImage).ref;
+}
+
+/**
+ * The model for a step and where it came from: 'user' = the user's own pick, its line twin or their edit model;
+ * 'fallback' = none of those takes these inputs, so a known counterpart or the app's preference stands in (said aloud).
+ */
+export function defaultModelChoice(kind: MediaKind, needsImage: boolean): { ref: string; source: 'user' | 'fallback' } {
+  const ref = pickDefault(kind, needsImage);
+  const current = get().composer[kind].modelRef;
+  const line = lineRoutes(current);
+  const userEdit = kind === 'image' ? get().settings.ops.edit : null;
+  const own = ref === current || Object.values(line).includes(ref) || ref === userEdit;
+  return { ref, source: own || !needsImage ? 'user' : 'fallback' };
+}
+
+function pickDefault(kind: MediaKind, needsImage: boolean): string {
   const current = get().composer[kind].modelRef;
   const cur = modelSummary(current) ?? (current.startsWith('local::') ? { acceptsImage: true } : undefined);
   if (!needsImage) return current;

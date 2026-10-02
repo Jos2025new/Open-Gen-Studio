@@ -79,3 +79,20 @@ describe('a step with an input image keeps the composer image model line', () =>
     expect(defaultModelFor('image', true)).toBe(EDIT);
   });
 });
+
+describe('a stand-in for the user model is said aloud', () => {
+  it('no variant in the user line takes an image: the choice is marked as a fallback', async () => {
+    const { defaultModelChoice } = await import('../src/engine/catalog');
+    const img = (ref: string, acceptsImage: boolean): ModelSummary => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref.split('::')[1], kind: 'image', acceptsText: true, acceptsImage, tags: [] });
+    const ONLY = 'atlas::ideogram/v4/turbo/text-to-image';
+    const NB2 = 'atlas::google/nano-banana-2/edit-developer';
+    const st = useStore.getState();
+    useStore.setState({
+      catalog: { ...st.catalog, models: { [ONLY]: img(ONLY, false), [NB2]: img(NB2, true) } },
+      composer: { ...st.composer, userPicked: { image: true }, image: { ...st.composer.image, modelRef: ONLY } },
+      settings: { ...st.settings, ops: { ...st.settings.ops, edit: null } },
+    });
+    expect(defaultModelChoice('image', true).source).toBe('fallback');
+    expect(defaultModelChoice('image', false)).toEqual({ ref: ONLY, source: 'user' });
+  });
+});

@@ -34,6 +34,9 @@ function stepIcon(s: PlanStep) {
   }
 }
 
+/** An adjustment about a model the user picked (kept it, could not use it, a stand-in). */
+const aboutUserModel = (a: string) => /\byour [\w-]+ model\b/.test(a);
+
 /** `ref` names an input in words for the card: a step by its title, an asset as "your image" or "the earlier clip". */
 type RefName = (ref: string) => string;
 
@@ -196,6 +199,10 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           <span>Style: {plan.style}</span>
         </p>
       ) : null}
+      {/* Changes to a model the user picked are never folded away. */}
+      {plan.adjustments.filter(aboutUserModel).map((a, i) => (
+        <p key={`u${i}`} className="plan-user-model"><CircleAlert size={12} /> {a}</p>
+      ))}
       {plan.adjustments.length ? (
         <div className="plan-note faint">
           <button type="button" className="plan-adj-toggle" onClick={() => setShowAdj((v) => !v)} aria-expanded={showAdj}>

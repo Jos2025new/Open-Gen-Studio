@@ -14,7 +14,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
   ActivityEntry,
   ActivityFeedItem,
@@ -128,6 +128,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     workspace,
     getModel: resolveModel,
     defaultModel: (kind: MediaKind, needsImage: boolean) => defaultModelFor(kind, needsImage),
+    defaultIsFallback: (kind: MediaKind, needsImage: boolean) => defaultModelChoice(kind, needsImage).source === 'fallback',
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,
     asset: (id: string) => get().assets[id],
     layer: (id: string) => doc?.layers.find((l) => l.id === id),
