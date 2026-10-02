@@ -3,6 +3,7 @@ import type { DesignDoc, Layer, RasterLayer, RasterStroke, Stroke, TextLayer } f
 import { bendStroke, nearestPoint, newStroke } from '../../engine/design/strokes';
 import { moveRasterStroke, rasterStrokeBox } from '../../engine/design/rasterStrokes';
 import { brushPoint } from '../../engine/design/brushControl';
+import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
@@ -252,6 +253,12 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     const current = getDoc(sessionId, doc.id);
     if (!current) return;
     const act = activeLayer(current);
+
+    if (tool === 'fill') {
+      try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity); }
+      catch (error) { toast(error instanceof Error ? error.message : 'Could not fill this region.', 'error'); }
+      return;
+    }
 
     if (tool === 'move') {
       if (!e.shiftKey) {
