@@ -3,6 +3,7 @@ import type { Workspace } from './types';
 import productGuide from './guides/product.md?raw';
 import socialGuide from './guides/social.md?raw';
 import directingGuide from './guides/directing.md?raw';
+import photographyGuide from './guides/photography.md?raw';
 import archvizGuide from './guides/archviz.md?raw';
 import archvizMotionGuide from './guides/archviz-motion.md?raw';
 import archvizSketchGuide from './guides/archviz-sketch.md?raw';
@@ -74,6 +75,14 @@ export const SKILLS: Skill[] = [
     description: 'Keep the same character across images and shots.',
     guidance: 'Establish the character once (a clear front view) and pass that output as a reference to every later image step. Repeat identity anchors (face, hair, outfit, palette) in each prompt.',
     promptHint: 'consistent character, same face and outfit',
+  },
+  {
+    id: 'photography',
+    name: 'Photography glossary',
+    description: 'Optional reference: shot sizes, angles, lenses and light recipes for any still. Load only when unsure; never needed for a simple request.',
+    guidance: 'Shot, angle, lens with depth of field, and light with source, direction and color temperature, written as causes; mood word last.',
+    guide: photographyGuide,
+    promptHint: 'natural photographic look, considered lens and lighting',
   },
   {
     id: 'cinematic',
