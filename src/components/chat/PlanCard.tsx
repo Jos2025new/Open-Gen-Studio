@@ -158,7 +158,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               {selectable ? (
                 <input type="checkbox" className="step-check" checked={!off.has(s.id)} onChange={() => toggle(s.id)} aria-label={`Run ${s.id} · ${s.title}`} />
               ) : null}
-              <span className="step-id num">{s.id}</span>
+              <span className="step-id num">{s.id.replace(/^pln_[A-Za-z0-9]+_/, "")}</span>
               <span className={`kind-icon k-${s.kind === 'op' ? OPS[s.op].output : s.kind}`}>{stepIcon(s)}</span>
               {script ? (
                 <button type="button" className="step-text step-toggle" onClick={() => flip(s.id)} aria-expanded={shown}>

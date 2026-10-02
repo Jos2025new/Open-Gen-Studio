@@ -236,6 +236,17 @@ function Preview({ node }: { node: GraphNode }) {
   const d = node.data;
   const Icon = KIND_ICON[d.kind];
   if (g && (g.status === 'running' || g.status === 'queued')) {
+    // Results arrive one request at a time (×3 = three requests): show each as soon as it is saved.
+    if (g.assetIds.length) {
+      return (
+        <>
+          <div className="nc-media">
+            <AssetMedia assetId={g.assetIds[g.assetIds.length - 1]} draggable={false} />
+          </div>
+          <span className="nc-badge"><LoaderCircle size={10} className="spin" /> {g.assetIds.length}/{Math.max(g.settings.count, g.assetIds.length)}</span>
+        </>
+      );
+    }
     return (
       <div className="nc-empty is-pending">
         <div className="shimmer" />
