@@ -11,6 +11,9 @@
 .plan-step .step-check { margin: 0 2px 0 0; accent-color: var(--accent); cursor: pointer; }
 .plan-step.is-off .step-text, .plan-step.is-off .step-id, .plan-step.is-off .step-cost { opacity: 0.4; text-decoration: line-through; }
 .gen-billed { font-size: 10px; padding: 0 14px 10px; margin-top: -6px; }
+/* O3: delivered differs from requested ("asked 9:16, got 1:1"). */
+.gen-delivery { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--warn); padding: 0 14px 8px; margin-top: -4px; }
+.gen-delivery svg { flex: none; }
 
 /* F5: each step shows its script on demand; title and model on separate lines; adjustments folded. */
 .plan-step { flex-wrap: wrap; }
@@ -57,7 +60,7 @@
 .gen-foot { display: flex; align-items: center; gap: 1px; padding: 2px 9px 7px; }
 /* One picture or clip: the card is as wide as the picture (360px at least); prompt and meta wrap to that width instead of widening it. */
 .gen-card.is-fit { align-self: flex-start; width: fit-content; min-width: min(100%, 240px); max-width: 100%; }
-.gen-card.is-fit > .gen-head, .gen-card.is-fit > .gen-meta, .gen-card.is-fit > .gen-billed { width: 0; min-width: 100%; }
+.gen-card.is-fit > .gen-head, .gen-card.is-fit > .gen-meta, .gen-card.is-fit > .gen-billed, .gen-card.is-fit > .gen-delivery { width: 0; min-width: 100%; }
 .gen-foot .spacer { flex: 1; }
 .gen-foot .gen-delete { margin-left: 10px; }
 .fav-btn.is-active svg { fill: currentColor; }

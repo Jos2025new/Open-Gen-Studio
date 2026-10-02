@@ -191,7 +191,7 @@ function alternatives(): string {
 
 /** Sent only in the app's message after a plan runs (S4), never in every call. */
 export const WRAPUP_RULE =
-  'MUST reply in at most 2 short sentences: say it is ready (or what failed) and offer 1-2 next steps or leaving it as is. Text only: no tools, no new plan.';
+  'MUST reply in at most 2 short sentences: say it is ready (or what failed; name any "delivered differs" in plain words, e.g. "you asked 9:16, it came 1:1") and offer 1-2 next steps or leaving it as is. Text only: no tools, no new plan.';
 
 export function buildContext(session: Session, opts: { workspace: Workspace; style: AgentStyle; round: number; maxRounds: number; attachments: string[] }): string {
   const st = get();

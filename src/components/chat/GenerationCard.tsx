@@ -141,6 +141,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           est {formatUsd(g.estimate.usd)} · charged {formatUsd(g.actualUsd)}
         </div>
       ) : null}
+      {g.status === 'done' && g.delivery?.length ? (
+        <div className="gen-delivery" data-tip="What came back differs from what was asked">
+          <CircleAlert size={12} />
+          <span>{g.delivery.join(' · ')}</span>
+        </div>
+      ) : null}
 
       {g.status === 'error' || (g.status === 'canceled' && !outputs.length) ? (
         <div className={`gen-error ${g.status === 'canceled' ? 'is-canceled' : ''}`}>

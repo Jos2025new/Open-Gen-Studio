@@ -616,7 +616,10 @@ async function runPlanItem(
       if (fail) return `${st.id} failed (${fail.error})`;
       if (off.has(st.id)) return `${st.id} not run (unchecked by the user)`;
       if (!out) return `${st.id} skipped`;
-      if (out.assetIds.length) return `${st.id} → ${out.assetIds.map((a) => `asset:${a}`).join(', ')}`;
+      // O3: what came back different from what was asked, for the closing message.
+      const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
+      const delivery = genId ? get().generations[genId]?.delivery : undefined;
+      if (out.assetIds.length) return `${st.id} → ${out.assetIds.map((a) => `asset:${a}`).join(', ')}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
       return `${st.id} done`;
     })

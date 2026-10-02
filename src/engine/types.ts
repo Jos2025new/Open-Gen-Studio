@@ -339,6 +339,8 @@ export interface Generation {
   createdAt: number;
   startedAt?: number;
   finishedAt?: number;
+  /** What came back different from what was asked (O3: "asked 9:16, got 1:1 (640×640)"). */
+  delivery?: string[];
 }
 
 // ---------------------------------------------------------------------------

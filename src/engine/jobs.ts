@@ -7,6 +7,7 @@ import { randomSeed } from '../lib/rng';
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
+import { deliveryNotes } from './delivery';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
@@ -270,7 +271,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined });
   let g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -475,6 +476,7 @@ async function execute(id: string): Promise<string[]> {
     const perRequest = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
+    const delivered: Asset[] = [];
     let cost = 0;
     let costKnown = true;
     let done = 0;
@@ -516,12 +518,13 @@ async function execute(id: string): Promise<string[]> {
       }
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.slice(0, n).map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
+      delivered.push(...assets);
       assetIds.push(...assets.map((a) => a.id));
       patchGeneration(id, { assetIds: [...assetIds] });
       done += Math.max(1, Math.min(n, result.outputs.length));
       if (!result.outputs.length) break;
     }
-    finish(id, assetIds, costKnown ? cost : undefined);
+    finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered));
     return assetIds;
   } catch (err) {
     const cur = get().generations[id];
@@ -609,12 +612,21 @@ function finishText(id: string, text: string, actualUsd: number | undefined): vo
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
 }
 
-function finish(id: string, assetIds: string[], actualUsd: number | undefined): void {
+/** O3: never fails a generation; a file that cannot be read gives no note. */
+async function checkDelivery(id: string, assets: Asset[]): Promise<string[] | undefined> {
+  const g = get().generations[id];
+  if (!g) return undefined;
+  const notes = await deliveryNotes(g, assets, getAssetBlob).catch(() => []);
+  return notes.length ? notes : undefined;
+}
+
+function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[]): void {
   const g = get().generations[id];
   if (!g) return;
   patchGeneration(id, {
     status: 'done',
     assetIds,
+    delivery,
     statusText: undefined,
     progress: undefined,
     finishedAt: Date.now(),
@@ -756,7 +768,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const fallback = expectedDims(kind, g.settings);
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
-      finish(id, assets.map((a) => a.id), result.costUsd);
+      finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets));
       return assets.map((a) => a.id);
     } catch (err) {
       const remoteJob = keptJob(err, job);
