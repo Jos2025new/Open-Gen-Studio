@@ -120,6 +120,15 @@ export function reorderLayer(doc: DesignDoc, id: string, toIndex: number): Desig
   return touch({ ...doc, layers });
 }
 
+/**
+ * Drag in the layers list (shown top first): the layer at display row `from`, dropped at gap `slot` (0 = above the
+ * top row, n = below the bottom one) → the index to give reorderLayer (layers are stored bottom first). Null = no move.
+ */
+export function dropIndex(n: number, from: number, slot: number): number | null {
+  const to = slot > from ? slot - 1 : slot;
+  return to === from ? null : n - 1 - to;
+}
+
 export function cloneLayer(layer: Layer): Layer {
   const id = uid('lyr');
   if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => ({ ...s, id: uid('stk') })) } : {}) };

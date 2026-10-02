@@ -40,8 +40,8 @@
 .layer-row.is-active { background: var(--accent-soft); box-shadow: inset 2px 0 0 var(--accent); }
 .layer-list { padding: 4px 0; }
 .layer-select { gap: 9px; padding: 3px 2px; }
-.layer-thumb-wrap { position: relative; flex-shrink: 0; width: 40px; height: 40px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 10px 10px; }
-.layer-thumb { display: block; width: 40px; height: 40px; }
+.layer-thumb-wrap { position: relative; flex: 0 0 64px; width: 64px; height: 40px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 10px 10px; }
+.layer-thumb { display: block; width: 64px; height: 40px; }
 .layer-kind { position: absolute; right: 2px; bottom: 2px; padding: 1px; border-radius: 3px; background: rgba(0,0,0,.6); color: var(--text-2); box-sizing: content-box; }
 .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text); }
 .layer-row.is-hidden .layer-name, .layer-row.is-hidden .layer-thumb { opacity: .45; }
@@ -61,3 +61,20 @@
 .xywh-cell { display: flex; align-items: center; gap: 4px; padding: 0 0 0 7px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-1, var(--surface)); }
 .xywh-cell span { font-size: 10px; color: var(--text-2); font-weight: 600; }
 .xywh-cell input { width: 100%; min-width: 0; border: 0 !important; background: transparent !important; padding: 6px 4px !important; font-size: 12px; }
+
+/* Drag to reorder layers: the dragged row dims, a line marks where it lands. */
+.layer-row { position: relative; touch-action: none; cursor: grab; }
+.layer-row.is-dragging { opacity: .45; cursor: grabbing; }
+.layer-row.drop-before::before, .layer-row.drop-after::after { content: ''; position: absolute; left: 4px; right: 4px; height: 2px; border-radius: 2px; background: var(--accent); }
+.layer-row.drop-before::before { top: -2px; }
+.layer-row.drop-after::after { bottom: -2px; }
+/* Narrow panel: properties stack instead of squeezing. */
+.layer-properties { container-type: inline-size; }
+@container (max-width: 300px) {
+  .prop-row { grid-template-columns: minmax(0, 1fr); }
+  .xywh { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.layer-actions { padding-left: 10px; }
+.layer-ops-btn { padding: 0 8px; }
+/* The old ".layer-select span { flex: 1 }" must not stretch the thumbnail: it keeps 64×40 at any panel width. */
+.layer-select .layer-thumb-wrap { flex: 0 0 64px; }

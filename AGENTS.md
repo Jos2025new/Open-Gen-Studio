@@ -1,5 +1,9 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — miniaturas fijas y arrastrar capas (2026-10-02)
+- [x] L2. (usuario) Miniatura fija de 64×40 a cualquier ancho del panel (la regla antigua `.layer-select span { flex: 1 }` la estiraba); el panel sigue redimensionable. Propiedades en panel estrecho (<300 px): opacidad y Blend apilados, X·Y·W·H en 2×2 (container query). Operations sin recortarse.
+- [x] L3. (usuario) Arrastrar capas: mantener pulsado y mover una fila (>5 px) la arrastra; una línea de acento marca dónde cae; soltar usa `reorderLayer` (un Undo). Las capas bloqueadas no se arrastran; ojo, candado y el nombre en edición no inician arrastre. `dropIndex` (`design/doc.ts`) con test `layer-drag`. Sin navegador.
+
 ## Tarea — panel de capas más claro (2026-10-02)
 - [x] L1. (usuario: mejorar estética y UX con lo que hay) Filas con miniatura de la capa sola sobre damero (renderer `drawLayer`) y el icono de tipo en su esquina (sin la palabra "raster/vector"); fila activa con barra de acento; capas ocultas atenuadas; ojo y candado solo al pasar el ratón o en la activa, siempre visibles si están activados (oculta/bloqueada, en ámbar); doble clic en el nombre lo renombra. Botón "✦ Operations" con texto. Propiedades: opacidad con deslizador y número, Blend al lado con los 11 modos que ya soporta el renderer, X · Y · W · H en una fila. `LayersPanel.tsx`, `designer.css`. Sin navegador.
 

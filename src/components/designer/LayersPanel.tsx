@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
-import { activeLayer, FONT_NAMES } from '../../engine/design/doc';
+import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { restyleStrokes } from '../../engine/design/strokes';
 import { StrokeStyleFields } from './StrokeStyleFields';
-import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, setActiveLayer } from '../../engine/design/actions';
+import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
@@ -35,7 +35,7 @@ function LayerThumb({ doc, layer }: { doc: DesignDoc; layer: Layer }) {
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
-    const W = 40, H = 40;
+    const W = 64, H = 40;
     ctx.clearRect(0, 0, W, H);
     const k = Math.min(W / doc.width, H / doc.height);
     ctx.save();
@@ -44,7 +44,7 @@ function LayerThumb({ doc, layer }: { doc: DesignDoc; layer: Layer }) {
     drawLayer(ctx, { ...layer, visible: true, opacity: 1, blend: 'normal' } as Layer);
     ctx.restore();
   }, [doc.width, doc.height, layer, version]);
-  return <canvas ref={ref} width={40} height={40} className="layer-thumb" aria-hidden="true" />;
+  return <canvas ref={ref} width={64} height={40} className="layer-thumb" aria-hidden="true" />;
 }
 
 /** Layer name: double-click to rename in place (Enter keeps it, Esc cancels). */
@@ -66,6 +66,21 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
+  // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.
+  const rows = useRef<Array<HTMLDivElement | null>>([]);
+  const [drag, setDrag] = useState<{ id: string; from: number; y: number; active: boolean; slot: number } | null>(null);
+  const slotAt = (y: number) => {
+    const els = rows.current.slice(0, doc.layers.length);
+    const i = els.findIndex((el) => el && y < el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2);
+    return i < 0 ? doc.layers.length : i;
+  };
+  const endDrag = () => {
+    if (drag?.active) {
+      const to = dropIndex(doc.layers.length, drag.from, drag.slot);
+      if (to != null) reorderLayer(sessionId, doc.id, drag.id, to);
+    }
+    setDrag(null);
+  };
 
   // The composer dock centers itself on the free canvas area using this variable.
   useEffect(() => {
@@ -93,8 +108,12 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       <Button size="sm" icon={Type} onClick={() => addEmptyLayer(sessionId, doc.id, 'text')}>Text</Button>
     </div>
     <div className="layer-list">
-      {[...doc.layers].reverse().map((l) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''}`}>
-        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
+      {[...doc.layers].reverse().map((l, d) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} ref={(el) => { rows.current[d] = el; }}
+        className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
+        onPointerDown={(e) => { if (e.button !== 0 || l.locked || (e.target as HTMLElement).closest('input, .layer-toggle')) return; e.currentTarget.setPointerCapture(e.pointerId); setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d }); }}
+        onPointerMove={(e) => { if (!drag || drag.id !== l.id) return; if (!drag.active && Math.abs(e.clientY - drag.y) < 5) return; setDrag({ ...drag, active: true, slot: slotAt(e.clientY) }); }}
+        onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
+        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { if (drag?.active) return; setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
           <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /><Icon size={10} className="layer-kind" aria-label={l.type} /></span>
           <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
         </button>
