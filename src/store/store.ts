@@ -112,6 +112,8 @@ export interface UiState {
   lineartInfluence?: number;
   /** Edit tool snapping (page and other layers); on by default. */
   snap?: { on: boolean; page: boolean; layers: boolean };
+  /** Edit tool: Ctrl-click picks more objects of the active layer (default) or more layers. */
+  selectMode?: 'objects' | 'layers';
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
   text: TextStyle;
   threadOpen: boolean;

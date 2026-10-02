@@ -137,6 +137,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
 
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
+  const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
@@ -154,7 +155,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><span data-tip="Ctrl-click picks more strokes of the active layer (Objects) or more layers (Layers)"><InlineSelect label="Select" value={selectMode} options={[{ value: 'objects' as const, label: 'Objects' }, { value: 'layers' as const, label: 'Layers' }]} onChange={(v) => setUi({ selectMode: v })} /></span><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
