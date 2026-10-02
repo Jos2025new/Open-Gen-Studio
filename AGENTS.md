@@ -1,6 +1,7 @@
 # AGENTS.md — Open Gen Studio
 
 ## Tarea — Assets y Generations con la estética de Sesiones (2026-10-02)
+- [x] (usuario) Filtro Canvas (All · Chat · Nodes · Designer, con icono y recuento, desactivado si está vacío) en Assets y Generations, el mismo de Sesiones (`CanvasFilter`), con su etiqueta quitable. `canvasLookup` (`canvas.ts`) da el lienzo de cada asset o generación en cualquier sesión (subida sin usar = Chat).
 - [x] (usuario: "no comparten estética; minimalismo, agrupar funciones, desplegables e iconos que se entiendan") Mismo patrón que el panel de Sesiones (S5): buscador con el botón "Filter, sort and view" dentro (punto si algo no es lo normal), menú con segmentados e interruptores, y solo etiquetas quitables de los filtros activos. Generations: Show, Type (con iconos y recuentos), Status, Sort, Thumbnails; filas sin caja, con separador y "Go to" como icono que aparece al pasar el ratón. Assets: Show, Type, Sort, Favorites only, Grid size; Select junto al buscador. Sin navegador.
 
 ## Tarea — panel Generations: filas propias, filtros a la vista, "Go to" (2026-10-02)

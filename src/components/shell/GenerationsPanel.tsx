@@ -9,6 +9,8 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { generationPlace, goToGeneration } from '../../engine/goTo';
+import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
+import { canvasLookup } from '../../engine/canvas';
 
 type Sort = 'newest' | 'oldest' | 'cost';
 type Kind = 'all' | Generation['kind'];
@@ -47,7 +49,16 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
   const [sort, setSort] = useState<Sort>('newest');
   const [view, setView] = useState<'thumbs' | 'list'>('thumbs');
   const filters = usePopover();
-  const scoped = useMemo(() => Object.values(generations).filter((g) => scope === 'all' || g.sessionId === sessionId), [generations, scope, sessionId]);
+  const sessions = useStore((s) => s.sessions);
+  const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
+  const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
+  const inScope = useMemo(() => Object.values(generations).filter((g) => scope === 'all' || g.sessionId === sessionId), [generations, scope, sessionId]);
+  const canvasCounts = useMemo(() => {
+    const c = { all: inScope.length, chat: 0, node: 0, designer: 0 };
+    for (const g of inScope) c[where.generation(g)]++;
+    return c;
+  }, [inScope, where]);
+  const scoped = useMemo(() => inScope.filter((g) => canvas === 'all' || where.generation(g) === canvas), [inScope, canvas, where]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const cost = (g: Generation) => g.actualUsd ?? g.estimate.usd;
@@ -84,7 +95,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
           ) : null}
           <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
             <SlidersHorizontal size={14} />
-            {scope !== 'session' || kind !== 'all' || status !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
+            {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
           </button>
         </div>
         <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
@@ -92,6 +103,10 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
             <div className="sv-row">
               <span className="sv-label">Show</span>
               <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Canvas</span>
+              <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
             </div>
             <div className="sv-row">
               <span className="sv-label">Type</span>
@@ -119,8 +134,9 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
             <label className="sv-switch"><span>Thumbnails</span><Toggle checked={view === 'thumbs'} onChange={(v) => setView(v ? 'thumbs' : 'list')} label="Thumbnails" /></label>
           </div>
         </Popover>
-        {scope !== 'session' || kind !== 'all' || status !== 'all' ? (
+        {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' ? (
           <div className="sessions-active">
+            {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
             {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
             {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{KINDS.find((k) => k.id === kind)?.label} <X size={11} /></button> : null}
             {status !== 'all' ? <button type="button" className="active-chip" onClick={() => setStatus('all')}>{STATUSES.find((x) => x.id === status)?.label} <X size={11} /></button> : null}

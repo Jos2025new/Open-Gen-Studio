@@ -41,3 +41,19 @@ export function canvasIndex(session: Session, generations: Record<string, Genera
     },
   };
 }
+
+/**
+ * The canvas of any asset or generation across sessions (each session's index built once). An upload not used on
+ * any canvas yet counts as Chat, where uploads arrive.
+ */
+export function canvasLookup(sessions: Record<string, Session>, generations: Record<string, Generation>) {
+  const cache = new Map<string, ReturnType<typeof canvasIndex>>();
+  const index = (sid: string) => {
+    if (!cache.has(sid) && sessions[sid]) cache.set(sid, canvasIndex(sessions[sid], generations));
+    return cache.get(sid);
+  };
+  return {
+    asset: (a: Asset): Workspace => index(a.sessionId)?.asset(a) ?? 'chat',
+    generation: (g: Generation): Workspace => index(g.sessionId)?.generation(g) ?? 'chat',
+  };
+}

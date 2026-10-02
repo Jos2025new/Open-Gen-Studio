@@ -6,6 +6,8 @@ import { formatDuration, groupByDate } from '../../lib/format';
 import { IconButton, Button, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
+import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
+import { canvasLookup } from '../../engine/canvas';
 import type { Asset, Subject, SubjectKind } from '../../engine/types';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
@@ -106,10 +108,19 @@ function GeneratedAssets() {
 
   useEffect(() => setCols((c) => (expanded ? Math.max(c, 5) : Math.min(c, 4))), [expanded]);
 
+  const sessions = useStore((s) => s.sessions);
+  const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
+  const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
+  const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true)), [assets, scope, sessionId]);
+  const canvasCounts = useMemo(() => {
+    const c = { all: inScope.length, chat: 0, node: 0, designer: 0 };
+    for (const a of inScope) c[where.asset(a)]++;
+    return c;
+  }, [inScope, where]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return Object.values(assets)
-      .filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true))
+    return inScope
+      .filter((a) => canvas === 'all' || where.asset(a) === canvas)
       .filter((a) => kind === 'all' || a.kind === kind)
       .filter((a) => !favOnly || a.favorite)
       .filter((a) => {
@@ -118,7 +129,7 @@ function GeneratedAssets() {
         return (g?.prompt ?? '').toLowerCase().includes(needle) || (g?.modelName ?? '').toLowerCase().includes(needle) || a.origin.includes(needle);
       })
       .sort((a, b) => (newest ? b.createdAt - a.createdAt : a.createdAt - b.createdAt));
-  }, [assets, generations, q, kind, scope, favOnly, newest, sessionId]);
+  }, [inScope, canvas, where, generations, q, kind, favOnly, newest]);
 
   const open = (a: Asset) => {
     if (selecting) {
@@ -153,7 +164,7 @@ function GeneratedAssets() {
           ) : null}
           <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
             <SlidersHorizontal size={14} />
-            {kind !== 'all' || scope !== 'session' || favOnly || !newest ? <span className="dot" /> : null}
+            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly || !newest ? <span className="dot" /> : null}
           </button>
         </div>
         <IconButton
@@ -174,6 +185,10 @@ function GeneratedAssets() {
               <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
             </div>
             <div className="sv-row">
+              <span className="sv-label">Canvas</span>
+              <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
+            </div>
+            <div className="sv-row">
               <span className="sv-label">Type</span>
               <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }]} />
             </div>
@@ -188,8 +203,9 @@ function GeneratedAssets() {
             </div>
           </div>
         </Popover>
-        {kind !== 'all' || scope !== 'session' || favOnly ? (
+        {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly ? (
           <div className="sessions-active">
+            {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
             {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
             {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{({ image: 'Images', video: 'Videos', audio: 'Audio', model3d: '3D' } as Record<string, string>)[kind]} <X size={11} /></button> : null}
             {favOnly ? <button type="button" className="active-chip" onClick={() => setFavOnly(false)}>Favorites <X size={11} /></button> : null}
