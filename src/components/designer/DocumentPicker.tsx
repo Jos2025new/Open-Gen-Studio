@@ -1,10 +1,10 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import { selectDoc } from '../../engine/design/actions';
 import { drawDoc } from '../../engine/design/render';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
-import { Popover, usePopover } from '../ui/Popover';
+import { usePref } from '../ui/hooks';
 
 function Thumbnail({ doc }: { doc: DesignDoc }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -27,15 +27,14 @@ function Thumbnail({ doc }: { doc: DesignDoc }) {
 }
 
 export function DocumentPicker({ sessionId, docs, active }: { sessionId: string; docs: DesignDoc[]; active: DesignDoc }) {
-  const pop = usePopover();
+  // Stays open until its own button closes it (remembered in this browser), so canvases can be switched freely.
+  const [open, setOpen] = usePref('ogs:canvas-picker-open', false);
   return <div className="document-picker">
-    <button type="button" ref={pop.ref} className="document-picker-toggle" aria-label="Choose canvas" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}><span>{active.name}</span><ChevronDown size={14} /></button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} className="document-picker-popover" label="Canvases">
-      <div className="document-thumbnails">
-        {docs.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => { selectDoc(sessionId, doc.id); pop.close(); }}>
-          <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>
-        </button>)}
-      </div>
-    </Popover>
+    <button type="button" className="document-picker-toggle" aria-label="Choose canvas" aria-expanded={open} onClick={() => setOpen(!open)}><span>{active.name}</span>{open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
+    {open ? <div className="document-thumbnails document-picker-panel" role="listbox" aria-label="Canvases">
+      {docs.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => selectDoc(sessionId, doc.id)}>
+        <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>
+      </button>)}
+    </div> : null}
   </div>;
 }

@@ -130,3 +130,8 @@
 /* Short lists in the tool bar open the app's menu. */
 .opt-pick { cursor: pointer; }
 .opt-value { color: var(--text); font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Canvas picker: stays open until its button closes it; scrolls when there are many canvases. */
+.document-picker-panel { margin-top: 6px; width: 190px; max-height: calc(100dvh - 220px); overflow: auto; padding: 0; }
+.document-picker-panel .document-choice { background: var(--surface); }
+.document-picker-panel .document-choice.is-active { background: var(--surface-2); }
