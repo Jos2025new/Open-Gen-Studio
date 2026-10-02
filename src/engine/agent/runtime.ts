@@ -196,9 +196,36 @@ export async function sendAgentMessage(text: string): Promise<void> {
   }
   // A new request: images of earlier requests become a note instead of being sent again.
   patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
-  pushHistory(sessionId, userMessage(`${clean || '(no text)'}\n\n${ctx}`, parts));
+  pushHistory(sessionId, userMessage(`${clean || '(no text)'}\n\n${ctx}${pickedWorkflowGuides(sessionId)}`, parts));
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);
+}
+
+/** Whether a text is already somewhere in the conversation sent to the model (guides go once). */
+function inConversation(sessionId: string, t: string): boolean {
+  return session(sessionId).agent.history.some((m) => {
+    const c = m.content;
+    return typeof c === 'string' ? c.includes(t) : Array.isArray(c) && c.some((p) => p.type === 'text' && p.text.includes(t));
+  });
+}
+
+/** Model guides for the plan's image and video steps, as a block for a message; '' when none is new. */
+function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
+  const parts: string[] = [];
+  for (const [kind, id] of [
+    ['video', workflowMakesVideo(workflowGuideId) ? defaultVideoGuideId() : undefined],
+    ['image', workflowMakesImage(workflowGuideId) ? defaultImageGuideId() : undefined],
+  ] as const) {
+    const t = id ? readGuide(`model:${id}`) : undefined;
+    if (t && !inConversation(sessionId, t)) parts.push(`\n\n---\nPrompting guide of the ${kind} model this plan will use (model:${id}); write those prompts in its format:\n${t}`);
+  }
+  return parts.join('');
+}
+
+/** A workflow picked in the composer is in the context without read_guide: its model guides travel with the request. */
+function pickedWorkflowGuides(sessionId: string): string {
+  const id = get().composer.workflowId;
+  return id ? modelGuidesFor(sessionId, `workflow:${id}`) : '';
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
@@ -1046,18 +1073,10 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           }
           const text = v.success ? readGuide(v.data.id) : undefined;
           // Once per conversation: a guide already in the history is not sent again (C4).
-          const inHistory = (t: string) => session(sessionId).agent.history.some((m) => m.role === 'tool' && typeof m.content === 'string' && m.content.includes(t));
-          const seen = text != null && inHistory(text);
+          const seen = text != null && inConversation(sessionId, text);
           // A video workflow brings the guide of the video model the plan will use, in the same result (no extra round).
-          // Same for its image steps (sheets, key frames, renders): the guide of the image model they will use.
-          const attachGuide = (id: string | undefined, what: string) => {
-            const t = id ? readGuide(`model:${id}`) : undefined;
-            return t && !inHistory(t) ? `\n\n---\nPrompting guide of the ${what} model this plan will use (model:${id}); write those prompts in its format:\n${t}` : '';
-          };
-          const fresh = v.success && text && !seen;
-          const attach =
-            (fresh && workflowMakesVideo(v.data.id) ? attachGuide(defaultVideoGuideId(), 'video') : '') +
-            (fresh && workflowMakesImage(v.data.id) ? attachGuide(defaultImageGuideId(), 'image') : '');
+          // ... and of the image model for its image steps (sheets, key frames, renders).
+          const attach = v.success && text && !seen ? modelGuidesFor(sessionId, v.data.id) : '';
           if (v.success && text && !seen) {
             recordMetric(sessionId, { type: 'guide', id: v.data.id });
             log.action({ icon: 'guide', label: `Read the ${guideLabel(v.data.id)}` });
