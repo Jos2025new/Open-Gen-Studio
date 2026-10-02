@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — panel Generations: filas propias, filtros a la vista, "Go to" (2026-10-02)
+Origen (usuario): hueco vacío en las tarjetas fallidas, filtros incómodos (tres desplegables y un icono diminuto de dos vistas), y Retry no debe estar ahí: lo que hace falta es ir al sitio donde se hizo, preguntando antes.
+- [x] G1. `GenerationsPanel.tsx` sin la tarjeta del chat: una fila por generación (miniatura 64 px solo si hay resultado, si no un icono del tipo; título, estado, modelo · proveedor, fecha, lienzo —y sesión con "All sessions"—, coste; error en una línea). Sin Retry.
+- [x] G2. Filtros a la vista: This session / All sessions (segmentado), chips de tipo con recuento (solo los que hay), chips de estado (Any · Done · Failed · Running), orden pequeño y vista "Thumbnails / List" con texto.
+- [x] G3. "Go to" con confirmación ("Go to where this was made: Nodes, its node?"): `engine/goTo.ts` (`generationPlace`, `goToGeneration`) cambia de sesión y lienzo y enfoca la tarjeta del chat (scroll y destello), el nodo (`focusNodes`) o la capa del Designer (documento y capa activos); cierra el panel. Test `go-to`. Sin navegador.
+
 ## Tarea — confirmar Save to gallery sin el diálogo del navegador (2026-10-02)
 - [x] (usuario) `window.confirm` sustituido por un panel de la app junto al botón ("Save Design 3 to the gallery as an image?" · Cancel · Save). No queda ningún `confirm()` del navegador en la app. Sin navegador.
 

@@ -114,7 +114,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
-    <article className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''}`}>
+    <article id={`gen-${g.id}`} className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''}`}>
       <header className="gen-head">
         {inputs.length ? (
           // What was sent: the first input, with a count when there were several; click to see them all.
