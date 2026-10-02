@@ -302,7 +302,6 @@ export const WORKFLOWS: Workflow[] = [
     // Chat only, like story: plan subjects and join_clips do not exist in Nodes.
     workspaces: ['chat'],
     skill: 'ugc',
-    skills: [{ id: 'cinematic', for: 'the clip prompts' }],
     needs: [
       'the product (photo, or a description)',
       'the creator: an attached photo (used as is), or which kind from the user\'s words (influencer → lifestyle, tech, beauty, gaming streamer, cooking, fitness…; age range including 18–24 when they say young or streamer)',
@@ -313,7 +312,7 @@ export const WORKFLOWS: Workflow[] = [
     ],
     fixed: { aspect: '9:16' },
     continuity:
-      'Pre-production first, like a real shoot. The creator: the user\'s photo as is, or — when invented — a creator sheet (one image step, 2×2: front, three-quarter, profile and a face close-up, plain neutral background, same outfit), never a creator already holding the product. The product: the user\'s photo as is. Then the video: the creator sheet (or photo) and the product photo together in the refs of every clip (reference-to-video keeps both identities), cited with the model\'s reference syntax and their roles; never describe them again. Script before prompts: hook in the first 1–2 s → product in use or its benefit → call to action, as timed beats with the creator\'s spoken lines in quotes in the chosen language, short; audio on. Staged: plan 1 is only the sheet (and a product sheet if asked); with a test, plan 2 is a 5 s draft of the hook with the same refs and plan 3 the full video; each plan after the user sees the previous one. Save to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans.',
+      'Pre-production first, like a real shoot. The creator: the user\'s photo as is, or — when invented — a creator sheet made from text only (one text-to-image step, no refs: never the product photo; 2×2: front, three-quarter, profile and a face close-up, plain neutral background, same outfit; count 3 candidates so the user picks the look), never a creator already holding the product. The product: the user\'s photo as is. Then the video: the creator sheet (or photo) and the product photo together in the refs of every clip (reference-to-video keeps both identities), cited with the model\'s reference syntax and their roles; never describe them again. Script before prompts: hook in the first 1–2 s → product in use or its benefit → call to action, as timed beats with the creator\'s spoken lines in quotes in the chosen language, short; audio on. Staged: plan 1 is only the sheet (and a product sheet if asked); with a test, plan 2 is a 5 s draft of the hook with the same refs and plan 3 the full video; each plan after the user sees the previous one. Save to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans.',
     variants: [
       { id: 'review', name: 'Review', description: 'Creator talks to camera holding the product: hook, two benefits, verdict.' },
       { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.' },
