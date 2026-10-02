@@ -11,10 +11,15 @@ const run = promisify(execFile);
 /**
  * ffmpeg arguments that join clips in order into one MP4 (join_clips). Every clip is scaled and padded to the
  * first clip's size at 30 fps; a clip without sound gets silence of its length, so the audio stays in sync.
+ * Music (O4, OpenMontage sound guide: music 18–20 dB under the voice): looped and cut to the video, faded out;
+ * when the clips have sound, it ducks under it (sidechain compression keyed by the clips' audio). All in one pass.
  * @param {Array<{ path: string, audio: boolean, duration: number }>} clips
  * @param {{ width: number, height: number }} size
+ * @param {string} out
+ * @param {string} [music]
+ * @param {{ loudnorm?: boolean }} [opts] loudnorm: the final mix at −14 LUFS (social platforms).
  */
-export function joinArgs(clips, size, out, music) {
+export function joinArgs(clips, size, out, music, opts = {}) {
   const w = size.width + (size.width % 2);
   const h = size.height + (size.height % 2);
   const inputs = [];
@@ -29,15 +34,22 @@ export function joinArgs(clips, size, out, music) {
     );
   });
   const pairs = clips.map((_, i) => `[v${i}][a${i}]`).join('');
+  const n = clips.length;
+  const last = opts.loudnorm ? 'mix' : 'a';
   if (music) {
-    // Music under the whole video: looped to its length, lower than the clips' own sound, faded out at the end.
     const total = clips.reduce((t, c) => t + Math.max(0.1, c.duration), 0);
-    const n = clips.length;
+    const speech = clips.some((c) => c.audio);
     inputs.push('-stream_loop', '-1', '-i', music);
     filters.push(`${pairs}concat=n=${n}:v=1:a=1[v][ca]`);
-    filters.push(`[${n}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:${total.toFixed(3)},volume=0.35,afade=t=out:st=${Math.max(0, total - 2).toFixed(3)}:d=2[m]`);
-    filters.push('[ca][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]');
-  } else filters.push(`${pairs}concat=n=${clips.length}:v=1:a=1[v][a]`);
+    // Alone, the music is the soundtrack (≈ −2 dB); under the clips' sound it starts at ≈ −9 dB and ducks further.
+    filters.push(`[${n}:a]aresample=48000,aformat=channel_layouts=stereo,atrim=0:${total.toFixed(3)},volume=${speech ? 0.35 : 0.8},afade=t=out:st=${Math.max(0, total - 2).toFixed(3)}:d=2[m]`);
+    if (speech) {
+      filters.push('[ca]asplit=2[cm][key]');
+      filters.push('[m][key]sidechaincompress=threshold=0.02:ratio=10:attack=20:release=400[md]');
+      filters.push(`[cm][md]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[${last}]`);
+    } else filters.push(`[ca][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[${last}]`);
+  } else filters.push(`${pairs}concat=n=${n}:v=1:a=1[v][${last}]`);
+  if (opts.loudnorm) filters.push('[mix]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000[a]');
   return [
     '-y', '-loglevel', 'error', ...inputs,
     '-filter_complex', filters.join(';'),
@@ -171,7 +183,7 @@ export function localStore(root = process.cwd()) {
 
     // join_clips: the clips are already in data/ (the app writes them first); the joined MP4 is returned, not kept.
     if (path === '/join' && req.method === 'POST') {
-      const { keys, music } = JSON.parse(String(await body(req)) || '{}');
+      const { keys, music, loudnorm } = JSON.parse(String(await body(req)) || '{}');
       if (!Array.isArray(keys) || keys.length < 2 || keys.length > 20) return send(400, 'join needs 2 to 20 clips');
       const clips = [];
       for (const k of keys) {
@@ -190,7 +202,7 @@ export function localStore(root = process.cwd()) {
       const out = join(dir, 'tmp', `join-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.mp4`);
       await mkdir(dirname(out), { recursive: true });
       try {
-        await run('ffmpeg', joinArgs(clips, clips[0], out, musicFile), { maxBuffer: 1 << 24 });
+        await run('ffmpeg', joinArgs(clips, clips[0], out, musicFile, { loudnorm: loudnorm === true }), { maxBuffer: 1 << 24 });
         return send(200, await readFile(out), 'video/mp4');
       } catch (err) {
         if (err?.code === 'ENOENT') return send(501, 'ffmpeg is not installed on this computer');

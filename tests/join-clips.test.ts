@@ -59,6 +59,32 @@ describe('join_clips on the local server (F4)', () => {
     }
   }, 30_000);
 
+  it.skipIf(!hasFfmpeg)('music ducks under clips with sound and the mix can be levelled to −14 LUFS (O4)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'ogs-join-'));
+    try {
+      const a = join(dir, 'a.mp4');
+      const m = join(dir, 'm.wav');
+      const out = join(dir, 'out.mp4');
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=24:duration=1', '-f', 'lavfi', '-i', 'sine=frequency=220:duration=1', '-shortest', a]);
+      execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=880:duration=1', m]);
+      const clips = [{ path: a, audio: true, duration: 1 }, { path: a, audio: true, duration: 1 }];
+      const args: string[] = joinArgs(clips, { width: 320, height: 240 }, out, m, { loudnorm: true });
+      expect(args.join(' ')).toMatch(/sidechaincompress/);
+      expect(args.join(' ')).toMatch(/loudnorm=I=-14/);
+      execFileSync('ffmpeg', args);
+      const info = JSON.parse(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type:format=duration', '-of', 'json', out]).toString());
+      expect(info.streams.map((s: { codec_type: string }) => s.codec_type).sort()).toEqual(['audio', 'video']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 30_000);
+
+  it('silent clips: the music is the soundtrack, no ducking; no loudnorm unless asked', () => {
+    const args: string = joinArgs([{ path: 'a', audio: false, duration: 1 }, { path: 'b', audio: false, duration: 1 }], { width: 320, height: 240 }, 'o', 'm').join(' ');
+    expect(args).not.toMatch(/sidechaincompress|loudnorm/);
+    expect(args).toMatch(/volume=0.8/);
+  });
+
   it('odd sizes are rounded up to even (H.264 needs it)', () => {
     const args: string[] = joinArgs([{ path: 'a', audio: true, duration: 1 }, { path: 'b', audio: true, duration: 1 }], { width: 481, height: 853 }, 'o');
     expect(args.join(' ')).toContain('scale=482:854');
