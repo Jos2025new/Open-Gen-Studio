@@ -14,6 +14,10 @@ import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
 import { ToolRail } from './ToolRail';
 import { DocumentPicker } from './DocumentPicker';
+import { uploadFiles } from '../../engine/actions';
+import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
+import { cloneCanvas, getBuffer } from '../../engine/design/raster';
+import { canvasToBlob } from '../../lib/media';
 import { ToolSettings } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 
@@ -47,6 +51,45 @@ export function DesignerWorkspace() {
   );
   const undoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canUndo(doc.id));
   const redoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canRedo(doc.id));
+
+  useEffect(() => {
+    const inField = (e: Event) => e.target instanceof Element && !!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
+    const paste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || inField(e)) return;
+      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+      if (!files.length) return;
+      e.preventDefault();
+      const targetDocId = doc?.id;
+      void (async () => {
+        const ids = await uploadFiles(files);
+        if (useStore.getState().activeSessionId !== session.id) return;
+        if (!targetDocId) {
+          if (!ids.length) return;
+          await openAssetInDesigner(session.id, ids[0]);
+          const newDocId = useStore.getState().sessions[session.id]?.activeDocId;
+          if (newDocId) for (const id of ids.slice(1)) await placeAsset(session.id, newDocId, id, 'new');
+        } else if (getDoc(session.id, targetDocId)) {
+          for (const id of ids) await placeAsset(session.id, targetDocId, id, 'new');
+        }
+      })().catch((err) => toast(err instanceof Error ? err.message : 'Could not paste image.', 'error'));
+    };
+    const copy = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || inField(e) || window.getSelection()?.toString() || !doc) return;
+      const layer = activeLayer(doc);
+      if (layer?.type !== 'raster') return;
+      const buffer = getBuffer(layer.id);
+      if (!buffer) { toast('Image pixels are still loading.', 'error'); return; }
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') { toast('This browser cannot copy images to the clipboard.', 'error'); return; }
+      e.preventDefault();
+      const png = canvasToBlob(cloneCanvas(buffer), 'image/png');
+      void navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+        .then(() => toast('Image copied', 'success'))
+        .catch(() => toast('Could not copy image to the clipboard.', 'error'));
+    };
+    document.addEventListener('paste', paste);
+    document.addEventListener('copy', copy);
+    return () => { document.removeEventListener('paste', paste); document.removeEventListener('copy', copy); };
+  }, [doc, session.id]);
 
   useEffect(() => {
     const view = (e: Event) => setZoom((e as CustomEvent<number>).detail);

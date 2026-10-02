@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — copiar y pegar imágenes en Designer (2026-10-02)
+- [x] Pegar imágenes externas como capas mediante uploadFiles/placeAsset; crear lienzo si falta. Ctrl+C copia píxeles de capa raster seleccionada como PNG, Ctrl+V los importa. Respetar campos de texto/selección de texto y evitar sesiones cruzadas durante importación async. Reutilizar Undo de colocación. Sin pruebas por petición del usuario; commit reversible.
+
 ## Tarea — puntero visible sobre blanco (2026-10-02)
 - [x] Círculo de pincel/borrador con contorno oscuro de 3 px y claro de 1 px, conservando radio. Solo overlay, sin cambios en pintura; sin pruebas por petición del usuario.
 
