@@ -33,6 +33,11 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — "pásalo al Designer" (2026-10-02)
+Origen (usuario): como con Nodos, que el agente invoque una función y la app ponga las imágenes en el Designer como capas raster; cada imagen, un lienzo. Sin capas de vídeo, audio ni 3D.
+- [x] D1. `design/fromChat.ts` (`chatToDesigner`): imágenes → capas raster con `placeAsset` (la misma vía que "Open in Designer"): por defecto un diseño por imagen, a su tamaño (≤4096 px), con nombre del prompt; `as: "layers"` = todas como capas de un diseño del tamaño de la primera. Sin ids: cada imagen del Chat que aún no es fuente de ninguna capa. Vídeo, audio y 3D se omiten y se dicen. No cambia la vista; el primer diseño nuevo queda activo. Sin llamadas ni coste.
+- [x] D2. Herramienta `continue_in_designer` (cualquier lienzo; `asset_ids?`, `as?`) y regla ("pásalo / continúa en el Designer" → una llamada; vídeo, audio y 3D aún no: decirlo). Aviso en el Designer: "N images from Chat · Open each as a design · As layers of one". Test `chat-to-designer` (colocación simulada: los píxeles necesitan canvas del navegador). Sin navegador ni LLM real.
+
 ## Tarea — ver si el modelo del agente tiene visión (2026-10-02)
 - [x] V1. (usuario: no se veía en ningún sitio) `VisionTag` (`components/ui/VisionTag.tsx`): ojo verde = ve imágenes, ojo tachado ámbar = sin visión, "?" = el catálogo del proveedor no lo dice; con tooltip de qué pierde (adjuntos, página del Designer, find_assets) y que sigue trabajando por ids. En Ajustes → Agent: en cada fila (recomendados y Browse all) y junto al modelo elegido ("Vision" / "No vision"); en el panel Models del composer: filas del Director y su fila Auto. Sin navegador.
 

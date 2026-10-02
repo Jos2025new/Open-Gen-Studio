@@ -1,4 +1,5 @@
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { Download, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
@@ -29,6 +30,10 @@ export function DesignerWorkspace() {
   const exportMenu = usePopover();
   const [zoom, setZoom] = useState(1);
   const [busy, setBusy] = useState(false);
+  const assets = useStore((s) => s.assets);
+  const generations = useStore((s) => s.generations);
+  // Chat images not in a design yet: one click (or "send it to the Designer" to the agent) opens each as a design.
+  const fromChat = useMemo(() => chatImagesNotInDesigner(session.id).length, [session, assets, generations]);
   const undoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canUndo(doc.id));
   const redoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canRedo(doc.id));
 
@@ -88,6 +93,13 @@ export function DesignerWorkspace() {
         </Popover>
       </>}
     </TopbarActions>
+    {fromChat ? (
+      <div className="node-from-chat">
+        <span>{fromChat} image{fromChat === 1 ? '' : 's'} from Chat</span>
+        <Button size="sm" onClick={() => void chatToDesigner(session.id)}>Open each as a design</Button>
+        <Button size="sm" onClick={() => void chatToDesigner(session.id, { as: 'layers' })}>As layers of one</Button>
+      </div>
+    ) : null}
     {doc ? <><ToolRail doc={doc} /><Stage key={doc.id} sessionId={session.id} doc={doc} /><LayersPanel sessionId={session.id} doc={doc} /></> :
       <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></button>)}</div></div>}
   </div>;

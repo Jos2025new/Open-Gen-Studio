@@ -8,6 +8,7 @@ import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { chatToNodes } from '../flow/fromChat';
+import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
@@ -62,7 +63,7 @@ import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -1262,6 +1263,21 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
               respond(`${found.text}\n\n${shown ? `The first ${Math.min(found.rows.length, VIEW_MAX)} follow as images in the next message.` : 'None of them could be shown as an image.'}`);
               if (shown) afterTools.push(userMessage('Results you asked to see:', parts));
             }
+          }
+          continue;
+        }
+        if (call.name === 'continue_in_designer') {
+          const v = continueInDesignerSchema.safeParse(parsed.value ?? {});
+          if (!v.success) respond(`Invalid continue_in_designer input: ${formatZodError(v.error)}`);
+          else {
+            const r = await chatToDesigner(sessionId, v.data);
+            log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
+            const lines = [
+              r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : 'No image to send: every chat image is already in a design, or none was given.',
+              r.skipped.length ? `Skipped, no such layers yet: ${r.skipped.join(', ')}.` : '',
+              r.missing.length ? `Unknown ids: ${r.missing.join(', ')}.` : '',
+            ];
+            respond(lines.filter(Boolean).join('\n'));
           }
           continue;
         }

@@ -76,6 +76,21 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'continue_in_designer',
+      description:
+        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default each image its own design (as "documents"), or all as layers of one design (as "layers"). Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user sees them when they open the Designer.',
+      parameters: {
+        type: 'object',
+        properties: {
+          asset_ids: { type: 'array', items: { type: 'string' }, maxItems: 20, description: 'Image asset ids (without "asset:"); omit for every chat image not in a design yet.' },
+          as: { type: 'string', enum: ['documents', 'layers'] },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'continue_in_canvas',
       description:
         'Node canvas only. When the user wants to continue here what was done in chat ("continuamos en canvas"): the app adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
@@ -284,6 +299,11 @@ export const findAssetsSchema = z.object({
   limit: z.number().int().min(1).max(20).optional(),
   offset: z.number().int().min(0).optional(),
   view: z.boolean().optional(),
+});
+
+export const continueInDesignerSchema = z.object({
+  asset_ids: z.array(z.string().min(1).max(80).transform((x) => x.replace(/^asset:/, ''))).max(20).optional(),
+  as: z.enum(['documents', 'layers']).optional(),
 });
 
 export const readGraphSchema = z.object({
