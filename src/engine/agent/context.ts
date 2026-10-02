@@ -162,6 +162,10 @@ function describeModel(kind: MediaKind): string {
 export function defaultVideoGuideId(): string | undefined {
   const st = get();
   if (composerChosen('video')) return guideForModel(st.composer.video.modelRef?.split('::')[1] ?? '')?.id;
+  // A route the user picked (image → video first: the usual case with an attached image).
+  const routes = st.composer.videoRoutes ?? {};
+  const routed = routes.image ?? routes.reference ?? routes.text;
+  if (routed) return guideForModel(routed.split('::')[1] ?? '')?.id;
   const head = routeHead('normal', (ref) => Boolean(st.catalog.models[ref]));
   const ref = head && Object.values(head.refs).find((r) => r && st.catalog.models[r]);
   return ref ? guideForModel(ref.split('::')[1])?.id : undefined;

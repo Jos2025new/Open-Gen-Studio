@@ -242,10 +242,17 @@ function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
   return parts.join('');
 }
 
-/** A workflow picked in the composer is in the context without read_guide: its model guides travel with the request. */
+/**
+ * Model guides travel with the request, so prompts are written for the model that will run them without the agent
+ * having to load them: a picked workflow brings those of its steps; otherwise the video model the plan would use
+ * (its prompt format matters most). Each guide goes once per conversation; a later change of model brings the new one.
+ */
 function pickedWorkflowGuides(sessionId: string): string {
   const id = get().composer.workflowId;
-  return id ? modelGuidesFor(sessionId, `workflow:${id}`) : '';
+  if (id) return modelGuidesFor(sessionId, `workflow:${id}`);
+  const video = defaultVideoGuideId();
+  const t = video ? readGuide(`model:${video}`) : undefined;
+  return t && !inConversation(sessionId, t) ? `\n\n---\nPrompting guide of the video model a video step would use now (model:${video}); write video prompts in its format:\n${t}` : '';
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
