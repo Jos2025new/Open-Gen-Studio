@@ -123,3 +123,6 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .ml-row.is-variant:hover .ml-name, .ml-row.is-variant.is-selected .ml-name { color: var(--text); }
 .ml-variant-dot { width: 22px; flex-shrink: 0; display: grid; place-items: center; }
 .ml-variant-dot::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--text-4); }
+
+/* Models chip: manual picks show in a quiet grey, not the accent. */
+.chip.models-chip.is-active { background: var(--surface-3); color: var(--text); border-color: var(--border-strong); }

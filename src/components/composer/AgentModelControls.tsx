@@ -14,7 +14,7 @@ import {
 import { routeHead, type RouteMode } from '../../engine/routing';
 import { variantRoute } from '../../engine/variants';
 import type { ModelSummary } from '../../engine/types';
-import { setComposer, setSettings, useStore } from '../../store/store';
+import { setComposer, setSettings, toast, useStore } from '../../store/store';
 import { Chip } from '../ui/primitives';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { ModelList } from './ModelList';
@@ -41,6 +41,12 @@ const modeOf: Partial<Record<PickerId, RouteMode>> = {
 function modelName(ref: string | null | undefined): string {
   if (!ref) return 'No connected model';
   return modelSummary(ref)?.name ?? ref.split('::')[1] ?? ref;
+}
+
+/** Why a route row lists fewer models than the others. */
+function routeHint(picker: PickerId): string {
+  const mode = modeOf[picker];
+  return mode ? ` Only models that do ${mode}-to-video are listed${mode === 'reference' ? ' (several reference images)' : ''}.` : '';
 }
 
 function setRouteModel(mode: RouteMode, ref: string | null): void {
@@ -154,7 +160,10 @@ export function AgentModelControls() {
   useEffect(() => {
     for (const mode of Object.keys(routeManual) as RouteMode[]) {
       const m = routeManual[mode] ? models[routeManual[mode]!] : undefined;
-      if (m && !ROUTE_FILTER[mode](m)) setRouteModel(mode, null);
+      if (m && !ROUTE_FILTER[mode](m)) {
+        setRouteModel(mode, null);
+        toast(`${m.name} does not do ${mode}-to-video, so that row is back to Auto.`, 'error');
+      }
     }
   }, [routeManual, models]);
   const manualCount =
@@ -221,7 +230,7 @@ export function AgentModelControls() {
 
   return (
     <>
-      <Chip ref={pop.ref} active={pop.open || manualCount > 0} onClick={pop.toggle} data-tip="Models used by the agent">
+      <Chip ref={pop.ref} className="models-chip" active={pop.open || manualCount > 0} onClick={pop.toggle} data-tip="Models used by the agent">
         {manualCount ? `Models · ${manualCount}` : 'Models'}
         {pop.open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </Chip>
@@ -229,7 +238,7 @@ export function AgentModelControls() {
         {picker ? (
           <>
             <button type="button" className="agent-model-back" onClick={() => setPicker(null)}><ArrowLeft size={14} /> Models</button>
-            <PopoverHeader title={label[picker]} sub="Auto keeps the established routing; a choice affects only this row." />
+            <PopoverHeader title={label[picker]} sub={`Auto keeps the established routing; a choice affects only this row.${routeHint(picker)}`} />
             {picker === 'director' ? <DirectorList done={() => setPicker(null)} /> : pickerConfig ? (
               <ModelList kind={pickerConfig.kind} value={pickerConfig.value ?? null} filter={pickerConfig.filter} autoOption={pickerConfig.auto} familyTree onSelect={choose} />
             ) : null}
