@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — controles contextuales visibles arriba (2026-10-02)
+- [x] Extraer ajustes a controles compactos junto al selector de documento, cada uno con desplegable inferior y solo opciones aplicables a la herramienta. Reutilizar estado y campos de Lineart. Mover Undo/Redo, zoom y Fit a ToolRail sin cambiar acciones. Retirar icono global de ajustes. Prever desbordamiento con scroll en controles y rail; sin pruebas por petición del usuario. Commit reversible. Texto usa su estilo existente para nuevos textos; Mover/Mano sin ajustes irrelevantes, borrador sin color, línea sin relleno y radio solo en rectángulo.
+
 ## Tarea — ajustes del cubo (2026-10-02)
 - [x] Añadir umbral 0–255, expansión 0–12 px y suavizado 0–4 px en los ajustes existentes; persistir como opciones del pincel sin migración. Expandir la máscara después del flood fill y suavizar solo su borde antes de colorearla. Mantener valores anteriores por defecto (24/0/0), capa separada y Undo. Riesgo: umbral alto cruza contornos y expansión excesiva los tapa; parámetros afectan al siguiente clic. Sin pruebas por petición del usuario; commit reversible.
 

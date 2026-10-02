@@ -13,6 +13,7 @@ import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
 import { ToolRail } from './ToolRail';
+import { ToolSettings } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 
 const SHORTCUTS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', g: 'fill', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
@@ -82,17 +83,12 @@ export function DesignerWorkspace() {
   return <div className="designer">
     <TopbarActions>
       {doc && <select aria-label="Document" className="doc-select" value={doc.id} onChange={(e) => selectDoc(session.id, e.target.value)}>{session.docs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
+      {doc && <ToolSettings />}
       <IconButton ref={presets.ref} icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
       {doc && <>
-        <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
-        <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
-        <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
-        <span className="zoom-value num">{Math.round(zoom * 100)}%</span>
-        <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
-        <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
         <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
         <Button ref={exportMenu.ref} icon={Download} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
@@ -108,7 +104,14 @@ export function DesignerWorkspace() {
       modes={[{ id: 'documents', label: 'Each as a design' }, { id: 'layers', label: 'As layers of one' }]}
       onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'layers' ? 'layers' : 'documents' })}
     />
-    {doc ? <><ToolRail doc={doc} /><Stage key={doc.id} sessionId={session.id} doc={doc} /><LayersPanel sessionId={session.id} doc={doc} /></> :
+    {doc ? <><ToolRail doc={doc}>
+        <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
+        <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
+        <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
+        <span className="zoom-value num">{Math.round(zoom * 100)}%</span>
+        <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
+        <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
+      </ToolRail><Stage key={doc.id} sessionId={session.id} doc={doc} /><LayersPanel sessionId={session.id} doc={doc} /></> :
       <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></button>)}</div></div>}
   </div>;
 }
