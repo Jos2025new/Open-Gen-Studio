@@ -533,7 +533,7 @@ export function guideIndex(): string {
   return [
     ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}${canvasNote(w)}`),
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
-    ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}`),
+    ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}${g.optional ? ' (optional)' : ''}`),
   ].join('\n');
 }
 

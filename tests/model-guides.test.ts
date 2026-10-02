@@ -114,3 +114,23 @@ describe('model prompting guides', () => {
     expect(line).toContain('prompting guide: model:seedance');
   });
 });
+
+describe('image family guides (optional)', () => {
+  it('each family matches its ids, is marked optional and loads with read_guide', () => {
+    const cases: Array<[string, string]> = [
+      ['nano-banana-pro-edit', 'nano-banana'],
+      ['google/nano-banana-2/edit-developer', 'nano-banana'],
+      ['openai/gpt-image-2.5-sunburst/edit', 'gpt-image'],
+      ['bytedance/seedream-v5.0-pro', 'seedream'],
+      ['ideogram/v4/turbo/text-to-image', 'ideogram'],
+      ['krea/v2/turbo/text-to-image', 'krea'],
+      ['z-image-turbo', 'z-image'],
+      ['pruna-ai/p-image/edit', 'p-image'],
+      ['step-image-edit-2', 'step-image'],
+    ];
+    for (const [id, guide] of cases) expect(guideForModel(id)?.id, id).toBe(guide);
+    expect(guideIndex()).toContain('model:nano-banana — how to write prompts for Nano Banana (2, Lite, Pro) images (optional)');
+    expect(readGuide('model:gpt-image')).toMatch(/params.background "transparent"/);
+    expect(guideForModel('bytedance/seedance-2.5')?.optional).toBeFalsy();
+  });
+});

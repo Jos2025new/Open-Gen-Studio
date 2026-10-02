@@ -7,6 +7,14 @@ import veo from './veo.md?raw';
 import flux from './flux.md?raw';
 import kling from './kling.md?raw';
 import videoEdit from './video-edit.md?raw';
+import nanoBanana from './nano-banana.md?raw';
+import gptImage from './gpt-image.md?raw';
+import seedream from './seedream.md?raw';
+import ideogram from './ideogram.md?raw';
+import krea from './krea.md?raw';
+import zImage from './z-image.md?raw';
+import pImage from './p-image.md?raw';
+import stepImage from './step-image.md?raw';
 
 /*
  * Prompting guides per model family: how to write for that model (style), next to the schema the app already
@@ -19,6 +27,8 @@ export interface ModelGuide {
   /** Model ids this guide covers. */
   match: RegExp;
   text: string;
+  /** Image guides: loaded only when the image is demanding (text, layout, several references, a complex edit). */
+  optional?: boolean;
 }
 
 export const MODEL_GUIDES: ModelGuide[] = [
@@ -32,6 +42,14 @@ export const MODEL_GUIDES: ModelGuide[] = [
   { id: 'kling', name: 'Kling 3.0 (std, pro, 4K, turbo)', match: /kling-v3\.0|kling-video\/v3\/|kling-v30/i, text: kling },
   { id: 'flux', name: 'FLUX 3 Video and Video Edit', match: /flux-3(?!-action)|flux3/i, text: flux },
   { id: 'veo', name: 'Veo 3.1 (standard, Fast, Lite)', match: /veo[-_ .]?3[-_ .]?1|veo3[.-]1/i, text: veo },
+  { id: 'nano-banana', name: 'Nano Banana (2, Lite, Pro) images', match: /nano-?banana/i, text: nanoBanana, optional: true },
+  { id: 'gpt-image', name: 'GPT Image (1.5, 2, 2.5) images', match: /gpt-?image/i, text: gptImage, optional: true },
+  { id: 'seedream', name: 'Seedream (4.x, 5.0 Lite / Pro) images', match: /seedream/i, text: seedream, optional: true },
+  { id: 'ideogram', name: 'Ideogram V4 images', match: /ideogram/i, text: ideogram, optional: true },
+  { id: 'krea', name: 'Krea 2 images', match: /krea/i, text: krea, optional: true },
+  { id: 'z-image', name: 'Z-Image images', match: /z-?image/i, text: zImage, optional: true },
+  { id: 'p-image', name: 'P-Image images', match: /(^|[/_.-])p-image|prunaai/i, text: pImage, optional: true },
+  { id: 'step-image', name: 'Step Image Edit images', match: /step-?image|step1x/i, text: stepImage, optional: true },
 ];
 
 export function modelGuide(id: string): ModelGuide | undefined {

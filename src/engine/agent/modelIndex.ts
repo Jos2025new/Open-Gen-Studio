@@ -93,7 +93,7 @@ export function describeIndexed(m: ModelSummary): string {
   const prompt = [s?.promptRefs ? `prompt: ${s.promptRefs}` : '', s?.promptMax ? `prompt ≤${s.promptMax} chars` : ''].filter(Boolean).join('; ');
   const fit = modelFit(m.id);
   const guide = guideForModel(m.id);
-  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}${guide ? ` — prompting guide: model:${guide.id}` : ''}`;
+  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}${guide ? ` — prompting guide: model:${guide.id}${guide.optional ? ' (optional)' : ''}` : ''}`;
 }
 
 /** find_models tool result: one line per match, or a short "nothing found" the agent can act on. */
