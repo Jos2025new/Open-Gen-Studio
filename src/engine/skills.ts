@@ -2,6 +2,7 @@ import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
 import productGuide from './guides/product.md?raw';
 import socialGuide from './guides/social.md?raw';
+import directingGuide from './guides/directing.md?raw';
 import archvizGuide from './guides/archviz.md?raw';
 import archvizMotionGuide from './guides/archviz-motion.md?raw';
 import archvizSketchGuide from './guides/archviz-sketch.md?raw';
@@ -78,7 +79,8 @@ export const SKILLS: Skill[] = [
     id: 'cinematic',
     name: 'Cinematic video',
     description: 'Shot language, camera moves and film lighting.',
-    guidance: 'Describe shots with film language: shot size, lens, camera movement (dolly, crane, handheld), subject action, lighting and mood, in one sentence per beat. Prefer 16:9 unless asked otherwise. Generate a still first when image-to-video will improve control.',
+    guidance: 'Describe shots with film language: shot size, lens, camera movement (dolly, crane, handheld), subject action, lighting and mood, in one sentence per beat. Prefer 16:9 unless asked otherwise. Generate a still first when image-to-video will improve control. Load skill:cinematic before writing clip prompts (exact camera moves, emotion as visible causes, identity on clips without an image).',
+    guide: directingGuide,
     promptHint: 'cinematic, anamorphic lens, film grain, dramatic lighting',
   },
   {
@@ -291,6 +293,7 @@ export const WORKFLOWS: Workflow[] = [
     // Chat only, like story: plan subjects and join_clips do not exist in Nodes.
     workspaces: ['chat'],
     skill: 'ugc',
+    skills: [{ id: 'cinematic', for: 'the clip prompts' }],
     needs: [
       'the product (photo, or a description)',
       'the creator: an attached photo, or a description (age range, style); generated once and kept',
@@ -326,6 +329,7 @@ export const WORKFLOWS: Workflow[] = [
     description: 'Key frame, first clip and a continuation.',
     workspaces: ['chat', 'node'],
     skill: 'cinematic',
+    skills: [{ id: 'cinematic', for: 'every clip prompt' }],
     needs: ['the scene or a start image', 'total duration'],
     fixed: { aspect: '16:9' },
     continuity: 'Each clip continues from the last frame of the previous one; a character or object in 2+ clips is a library subject (@Name) in each; neighboring clips change at least one of shot size, subject or angle.',
@@ -343,6 +347,7 @@ export const WORKFLOWS: Workflow[] = [
     description: 'A short story, a series episode or several clips with a recurring character: brief, one identity, closed beats, one joined video.',
     workspaces: ['chat'],
     skill: 'cinematic',
+    skills: [{ id: 'cinematic', for: 'every clip prompt' }],
     needs: [
       'tone or genre (offer 2–3 treatments as options when the brief is abstract or the user has no idea; recommend the one that fits the image)',
       'sound: dialogue or voice-over, music and ambience, or silent (only for models with audio)',
@@ -350,7 +355,7 @@ export const WORKFLOWS: Workflow[] = [
       'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (a cheap first plan; the user picks one, then the clips)',
     ],
     continuity:
-      'One identity: save the character as a subject in propose_plan.subjects (from the attached image, or from the character-sheet image the user picked) and mention it as @Name in every clip — never describe her look again. Each clip is one closed beat with a start and an end (hook → conflict → payoff), written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
+      'One identity: save the character as a subject in propose_plan.subjects (from the attached image, or from the character-sheet image the user picked) and mention it as @Name in every clip — never describe her look again on a clip that carries her image (first_frame or refs); on a clip without one, repeat the same 3–6 literal traits (skill:cinematic). Each clip is one closed beat with a start and an end (hook → conflict → payoff), written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
     steps: [
       { id: 's1', kind: 'video', title: 'Clip 1 · hook', prompt: '{prompt}' },
       { id: 's2', kind: 'video', title: 'Clip 2 · conflict', prompt: '{prompt}' },

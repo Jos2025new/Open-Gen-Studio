@@ -67,3 +67,19 @@ describe('validator errors carry the exact fix (O2)', () => {
     expect(typo.errors.join(' ')).toMatch(/unknown step "s9". Fix: use one of the plan's step ids \(s1\)/);
   });
 });
+
+describe('identity without an image (O5)', () => {
+  it('a text-only model gets the name and, on its first mention, the saved description', async () => {
+    const { describeMentions } = await import('../src/engine/params');
+    const subjects = [{ id: 'r', name: 'Reto', description: 'a woman in her 30s, short black bob, mustard raincoat' }, { id: 'p', name: 'Pip' }];
+    expect(describeMentions('@Reto opens the door; @Pip barks at @reto', subjects)).toBe('Reto (a woman in her 30s, short black bob, mustard raincoat) opens the door; Pip barks at Reto');
+  });
+
+  it('the directing guide and the 9:16 safe zones load on demand', async () => {
+    const { readGuide, workflowById } = await import('../src/engine/skills');
+    expect(readGuide('skill:cinematic')).toMatch(/Dolly in \/ out[\s\S]*Zoom in \/ out/);
+    expect(readGuide('skill:cinematic')).toMatch(/3–6 literal, visible traits/);
+    expect(readGuide('skill:social')).toMatch(/bottom ~320 px/);
+    expect(workflowById('story')?.skills?.map((x) => x.id)).toContain('cinematic');
+  });
+});

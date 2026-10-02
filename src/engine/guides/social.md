@@ -32,3 +32,9 @@ Social ad — router and criteria (this guide decides; it generates nothing itse
 - If the material does not fit the format (no product photo for a UGC try-on, a video too long to edit), say so and offer what fits before proposing the plan.
 - Default social format 9:16 at medium quality (never a fixed 1080p). If the requested duration is not allowed by the model, say the allowed values when proposing; never change it silently.
 - Each image, video and audio step costs credits: the plan card shows the price and nothing runs until the user approves.
+
+7. Vertical layout and timing (9:16, 1080×1920)
+- Safe zone: keep faces, product and any on-screen text out of the bottom ~320 px (caption, buttons) and the top ~220 px (account name, progress bar), and ~60 px from each side; the right edge carries the action buttons on Reels and TikTok. Write it into the prompt as composition ("product centered in the upper middle third, clear space at the bottom").
+- Hook in the first 1–2 seconds: the first frame already shows the payoff, the product or a surprising action; no logo intro, no slow fade-in.
+- Length by placement: TikTok and Reels 9–30 s (15 s is a safe default); Stories ≤15 s per card; YouTube Shorts ≤60 s; feed video 6–15 s; bumper 6 s. Longer only when the user asks.
+- Loop-friendly endings for Reels/TikTok: the last beat can lead back to the first.

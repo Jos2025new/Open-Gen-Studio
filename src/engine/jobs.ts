@@ -12,7 +12,7 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, describeMentions, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
@@ -424,7 +424,10 @@ async function execute(id: string): Promise<string[]> {
     }
     // Subjects on models without elements (R10): their images join the references and the mention becomes the
     // model's own syntax, numbered by the app from the step's real references (frontal views first, extra views after).
-    if (!elSlot && !schema.slots.keyframes && (schema.slots.images || schema.slots.mixedRefs)) {
+    const subjectImages = !elSlot && !schema.slots.keyframes && (schema.slots.images || schema.slots.mixedRefs);
+    // No way to send the subject's image: the name carries its saved description (O5).
+    if (!elSlot && !subjectImages) prompt = describeMentions(g.prompt, subjects);
+    if (subjectImages) {
       const again = mentionSubjects(g.prompt, subjects);
       if (again.ids.length) {
         const chosen = again.ids.map((id) => subjects.find((x) => x.id === id)!);
