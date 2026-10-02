@@ -881,7 +881,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
   const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
-  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
+  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;

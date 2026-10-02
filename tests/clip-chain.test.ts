@@ -95,3 +95,16 @@ describe('op fields written on the step', () => {
     expect((plan!.steps.find((s) => s.id === 's1') as OpStep).params.instruction).toBe('Change only the bust size');
   });
 });
+
+describe('an op step keeps the model and words the agent gave it', () => {
+  const imgCtx: PlanContext = { ...ctx, asset: (id) => (id === 'pic' ? { kind: 'image' } : undefined) };
+  it('a named image model runs the op; the prompt becomes its note', async () => {
+    const { plan, errors } = await normalizePlan({ steps: [{ id: 's1', kind: 'op', op: 'reference_sheet', input: 'asset:pic', model: LOCAL_IMAGE_REF, prompt: 'four full-body views', params: { sheet: 'turnaround' } }] }, imgCtx, 'p');
+    expect(errors).toEqual([]);
+    expect((plan!.steps[0] as OpStep).params).toMatchObject({ _modelRef: LOCAL_IMAGE_REF, note: 'four full-body views' });
+  });
+  it('an unknown model is rejected instead of silently replaced', async () => {
+    const { errors } = await normalizePlan({ steps: [{ id: 's1', kind: 'op', op: 'reference_sheet', input: 'asset:pic', model: 'nope::x' }] }, imgCtx, 'p');
+    expect(errors.join(' ')).toMatch(/unknown model/);
+  });
+});

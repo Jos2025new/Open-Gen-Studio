@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — sesión "spreadsheet con nano banana normal" (2026-10-02)
+Origen (usuario, sesión real `ses_murdkh8hdjkgqhw0l8`): pidió Nano Banana normal; el agente puso `model: nanogpt::nano-banana` y un prompt de 4 vistas en un paso `reference_sheet`, pero `normalizePlan` descartaba `model` y `prompt` de los pasos op → corrió Seedream v5.0 Pro Edit (el modelo de la imagen de origen) con la instrucción fija de 3 vistas, y el cierre dijo "con Nano Banana normal".
+- [x] F1. Paso op de edición/animación con `model`: se valida (existe, acepta imagen) y va a `params._modelRef`, que estimación y ejecución usan; si no vale, rechazo con "did you mean" en vez de cambiarlo en silencio. `prompt` del paso → `params.note` si la op tiene nota. `plan.ts`, `executor.ts`, `jobs.ts`. Tests en `clip-chain` (2).
+- [x] F2. El resumen del plan para el cierre lleva `[made with <modelo real>]` por paso y `WRAPUP_RULE` pide nombrar solo ese modelo (y decir si difiere). `runtime.ts`, `context.ts`.
+No corregido: el agente prometió "4 candidatas" sin poner `count` (salió 1); estimado $0.036 frente a $0.072 cobrado en Seedream Edit de Atlas (sin investigar). Sin LLM real ni navegador.
+
 ## Tarea — Ajustes → Data: qué hay guardado y ZIP (2026-10-02)
 - [x] (usuario) `DataSummary.tsx`: sesiones, mensajes del usuario, generaciones, archivos por tipo, diseños · nodos, biblioteca; desde el disco (`/x/store/info`): tamaño de state.json, medios y capas pintadas, total y ruta de `data/` (borrarla no rompe la app). "Download all as ZIP" (`/x/store/export`, `zip` del sistema en `data/tmp`, borrado después): carpetas de medios + state.json con las claves de API vaciadas. Probado contra una copia de `data/` (77 archivos, 80 MB, claves vacías). Sin servidor local: lo dice. Sin navegador.
 

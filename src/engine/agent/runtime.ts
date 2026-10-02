@@ -20,7 +20,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary } from '../catalog';
 import type {
   LlmContentPart,
   ActivityEntry,
@@ -791,7 +791,10 @@ async function runPlanItem(
       // O3: what came back different from what was asked, for the closing message.
       const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
       const delivery = genId ? get().generations[genId]?.delivery : undefined;
-      if (out.assetIds.length) return `${st.id} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
+      // The model that really ran, so the closing message never names one that was only asked for.
+      const ran = genId ? get().generations[genId]?.modelRef : undefined;
+      const by = ran ? ` [made with ${modelSummary(ran)?.name ?? ran}]` : '';
+      if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
       return `${st.id} done`;
     })

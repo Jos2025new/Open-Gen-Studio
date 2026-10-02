@@ -67,7 +67,7 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
         // Edit / video operations run on the model that made their input (jobs.opSpec); a step still to run: its model.
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
         const kind = engine === 'edit' ? 'image' : 'video';
-        const ref = opFollowsSource(engine) ? (src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, kind) : null) ?? opModelFor(engine).ref) : undefined;
+        const ref = opFollowsSource(engine) ? (typeof s.params._modelRef === 'string' ? s.params._modelRef : src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, kind) : null) ?? opModelFor(engine).ref) : undefined;
         perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings, ref);
       }
     } else perStep[s.id] = { usd: 0, approximate: false };

@@ -760,6 +760,17 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else errors.push(`${where}: op "edit" needs params.instruction.`);
         }
         if ((opId === 'animate' || opId === 'continue') && !String(params.motion ?? '').trim() && s.prompt?.trim()) params.motion = s.prompt.trim();
+        // The step's own words go into the op's note (the op keeps its tuned instruction); before, they were dropped.
+        if (s.prompt?.trim() && def.fields.some((f) => f.key === 'note') && !String(params.note ?? '').trim()) params.note = s.prompt.trim();
+        // A model named on an edit / animate op runs it (before, the op silently used the source's model).
+        if (s.model?.trim() && (def.engine === 'edit' || def.engine === 'video')) {
+          const kind = def.engine === 'edit' ? 'image' : 'video';
+          const ref = familyRef(ctx, s.model, kind, true, s.id!, adjustments);
+          const got = ref ? await ctx.getModel(ref) : null;
+          if (!got) errors.push(`${where}: unknown model "${s.model}".${didYouMean(ctx, s.model, kind, true)}`);
+          else if (got.model.kind !== kind || !got.model.acceptsImage || got.model.needsVideo) errors.push(`${where}: model "${ref}" does not take an input image for "${opId}". Fix: use its edit variant (find_models) or leave "model" out.${didYouMean(ctx, s.model, kind, true)}`);
+          else params._modelRef = ref!;
+        }
         let more: string[] | undefined;
         if (def.multiInput) {
           more = (Array.isArray(s.more) ? s.more : []).map((r) => String(r).trim()).filter(Boolean);
