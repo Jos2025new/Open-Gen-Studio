@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Spending más legible (2026-10-02)
+- [x] S1. Reorganizar solo `SpendingPanel.tsx` y su CSS: resumen por tipo/proveedor, detalle Models/Sessions/Charges y cinco mayores gastos ampliables; facilitar lectura sin cambiar cálculos ni persistencia.
+- [x] S2. Aclarar límite desde Reset frente al periodo, identificar sesiones eliminadas por id y presentar cargos en tabla con precisión monetaria local. Conservar tipografía, tarjetas y espaciado existentes; barras neutras para reservar lima al presupuesto (energía 1, ritmo 2, movimiento 1).
+- [x] S3. Contener tabla en panel estrecho y conservar periodo al cambiar detalle. Pruebas a cargo del usuario por petición explícita; sin tests, typecheck ni navegador. Commit aislado; reversible con revert. Riesgo previsto: distribución en panel estrecho, sin cambios al motor ni datos.
+Implementado; comportamiento visual y de interacción pendiente de prueba por el usuario. Charges conserva los últimos 30 cargos del periodo; View all muestra todos los modelos o sesiones del periodo.
+
 Guía para agentes. Estado general e historial: `PROGRESS.md`. Repo git desde 2026-09-24 (`main`).
 
 ## Reglas de trabajo

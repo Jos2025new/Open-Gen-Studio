@@ -75,14 +75,23 @@
 .spend-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .spend-tile { display: flex; flex-direction: column; gap: 2px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface-2); font-size: 12px; }
 .spend-tile .num { font-size: 16px; font-weight: 600; }
-.spend-groups { display: flex; flex-direction: column; gap: 16px; }
-.side-panel.is-expanded .spend-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); align-items: start; }
+.spend-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; align-items: start; }
+.spend-group { min-width: 0; }
+.spending .spend-group .bar > span { background: var(--text-3); }
+.spend-more { margin-top: 10px; }
+.spend-table-wrap { max-width: 100%; overflow-x: auto; }
+.spend-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.spend-table th, .spend-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border); }
+.spend-table th { color: var(--text-2); font-weight: 500; }
+.spend-table td:nth-child(2) { min-width: 160px; overflow-wrap: anywhere; }
+.spend-table td:not(:nth-child(2)) { white-space: nowrap; }
+.spend-table th:last-child, .spend-table td:last-child { text-align: right; }
+.spending .num { font-variant-numeric: tabular-nums; }
 .spend-group h4 { margin: 0 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); }
 .spend-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
-.spend-group li { display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; font-size: 12px; align-items: baseline; }
+.spend-group li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; font-size: 12px; align-items: baseline; }
 .spend-group li .bar { grid-column: 1 / -1; }
-.spend-recent li { grid-template-columns: auto 1fr auto; }
-.spend-what { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.spend-what { overflow-wrap: anywhere; min-width: 0; }
 .spend-empty, .spend-foot { margin: 0; font-size: 11px; }
 .side-badge.is-warn { background: var(--danger); color: var(--bg); }
 .set-note.is-warn { color: var(--warn); }

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import { CATEGORY_LABELS, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
@@ -26,6 +26,7 @@ export function SpendingPanel() {
   const sessions = useStore((s) => s.sessions);
   const expanded = useStore((s) => s.ui.panelExpanded);
   const [period, setPeriod] = usePref<SpendPeriod>('ogs:spending-period', '7d');
+  const [detail, setDetail] = useState<'models' | 'sessions' | 'charges'>('models');
   const sum = useMemo(() => summarizeSpend(log, periodStart(period)), [log, period]);
 
   const providerName = (p: string) => PROVIDER_LABELS[p as keyof typeof PROVIDER_LABELS] ?? LLM_LABELS[p as keyof typeof LLM_LABELS] ?? p;
@@ -52,6 +53,7 @@ export function SpendingPanel() {
       </div>
       <div className="spend-body">
         <section className="spend-limit">
+          <p className="faint spend-foot">Budget counter · since last reset · independent of the period below</p>
           {limitLeft == null ? (
             <p>
               <span className="num">{formatUsd(spent)}</span> spent · no limit: spending is only shown.
@@ -76,32 +78,39 @@ export function SpendingPanel() {
         <Segmented value={period} options={PERIODS} onChange={setPeriod} size="sm" />
 
         <div className="spend-tiles">
-          <Tile label="Total" usd={sum.total} note={`${sum.count} charge${sum.count === 1 ? '' : 's'}`} />
+          <Tile label={`Total · ${PERIODS.find((p) => p.value === period)?.label ?? period}`} usd={sum.total} note={`${sum.count} charge${sum.count === 1 ? '' : 's'}`} />
           <Tile label="Agent (LLM)" usd={sum.agent} />
           <Tile label="Media" usd={sum.media} />
         </div>
 
         {sum.count ? (
-          <div className="spend-groups">
+          <>
+          <div className="spend-overview">
             <Group title="By type" rows={sum.byCategory} name={(k) => CATEGORY_LABELS[k as SpendCategory] ?? k} />
-            <Group title="By model" rows={sum.byModel} name={modelName} limit={expanded ? 20 : 8} />
             <Group title="By provider" rows={sum.byProvider} name={providerName} />
-            <Group title="By session" rows={sum.bySession} name={(id) => sessions[id]?.title ?? 'Deleted session'} limit={expanded ? 20 : 6} />
-            <section className="spend-group spend-recent">
-              <h4>Latest charges</h4>
-              <ul>
-                {sum.recent.map((e, i) => (
-                  <li key={`${e.at}-${i}`}>
-                    <span className="faint num">{new Date(e.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                    <span className="spend-what">
-                      {CATEGORY_LABELS[e.category]} · {modelName(e.model)}
-                    </span>
-                    <span className="num">{formatUsd(e.usd, { approx: e.estimated })}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
           </div>
+          <Segmented value={detail} options={[{ value: 'models', label: 'Models' }, { value: 'sessions', label: 'Sessions' }, { value: 'charges', label: 'Charges' }]} onChange={setDetail} size="sm" />
+          {detail === 'models' && <Group key={`models-${period}`} title="Highest spending by model" rows={sum.byModel} name={modelName} limit={5} />}
+          {detail === 'sessions' && <Group key={`sessions-${period}`} title="Highest spending by session" rows={sum.bySession} name={(id) => sessions[id]?.title ?? `Deleted session · ${id.slice(-8)}`} limit={5} />}
+          {detail === 'charges' && <section className="spend-group">
+              <h4>Latest {sum.recent.length} charges</h4>
+              <div className="spend-table-wrap" tabIndex={0} role="region" aria-label="Latest charges">
+              <table className="spend-table">
+                <thead><tr><th scope="col">Date</th><th scope="col">Model</th><th scope="col">Type</th><th scope="col">Amount</th></tr></thead>
+                <tbody>
+                {sum.recent.map((e, i) => (
+                  <tr key={`${e.at}-${i}`}>
+                    <td className="faint num">{new Date(e.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td>{modelName(e.model)}</td>
+                    <td>{CATEGORY_LABELS[e.category]}</td>
+                    <td className="num" title={e.estimated ? 'Estimated cost' : 'Reported cost'}>{spendUsd(e.usd, e.estimated)}</td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+              </div>
+            </section>}
+          </>
         ) : (
           <p className="faint spend-empty">Nothing spent in this period.</p>
         )}
@@ -112,35 +121,40 @@ export function SpendingPanel() {
   );
 }
 
+function spendUsd(usd: number, estimated = false): string {
+  return Math.abs(usd) >= 0.1 || usd === 0 ? `${estimated ? '≈' : ''}$${usd.toFixed(2)}` : formatUsd(usd, { approx: estimated });
+}
+
 function Tile({ label, usd, note }: { label: string; usd: number; note?: string }) {
   return (
     <div className="spend-tile">
       <span className="faint">{label}</span>
-      <span className="num">{formatUsd(usd)}</span>
+      <span className="num">{spendUsd(usd)}</span>
       {note ? <span className="faint">{note}</span> : null}
     </div>
   );
 }
 
-function Group({ title, rows, name, limit = 8 }: { title: string; rows: SpendRow[]; name: (key: string) => string; limit?: number }) {
+function Group({ title, rows, name, limit = Infinity }: { title: string; rows: SpendRow[]; name: (key: string) => string; limit?: number }) {
+  const [showAll, setShowAll] = useState(false);
   const max = rows[0]?.usd || 1;
   return (
     <section className="spend-group">
       <h4>{title}</h4>
       <ul>
-        {rows.slice(0, limit).map((r) => (
+        {rows.slice(0, showAll ? rows.length : limit).map((r) => (
           <li key={r.key}>
-            <span className="spend-what" title={r.key}>
+            <span className="spend-what" title={`${name(r.key)} · ${r.key}`}>
               {name(r.key)} <span className="faint num">×{r.count}</span>
             </span>
-            <span className="num">{formatUsd(r.usd, { approx: r.estimated })}</span>
+            <span className="num">{spendUsd(r.usd, r.estimated)}</span>
             <div className="bar">
               <span style={{ width: `${(r.usd / max) * 100}%` }} />
             </div>
           </li>
         ))}
       </ul>
-      {rows.length > limit ? <p className="faint">+{rows.length - limit} more</p> : null}
+      {rows.length > limit ? <button type="button" className="link-btn spend-more" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>{showAll ? 'Show top 5' : `View all (${rows.length})`}</button> : null}
     </section>
   );
 }
