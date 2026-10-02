@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — opciones de herramienta en la barra, sin desplegables (2026-10-02)
+- [x] T1. (usuario: "mejor UX") `InlineSlider` (etiqueta, deslizador de 72 px y número editable; rueda del ratón ajusta), `InlineColor` (muestra redonda) e `InlineSelect` (lista corta) en `ToolSettings.tsx`: pincel/borrador, cubo, texto, modo e influencia de Lineart, grosor y radio de formas. Siguen en desplegable lo que necesita más de un control (relleno/trazo de formas con "ninguno", estilo de trazo de Lineart). Sin navegador.
+
 ## Tarea — miniaturas fijas y arrastrar capas (2026-10-02)
 - [x] L6. (usuario) Cabecera "Properties — [icono] Raster/Vector/Text" con el tipo de la capa activa, en el mismo gris tenue que el icono de su fila; número de opacidad un poco más ancho ("100" se cortaba).
 - [x] L5. (usuario) El icono del tipo de capa sale de la miniatura y va junto al ojo, en gris tenue y siempre visible.

@@ -84,3 +84,17 @@
 .props-kind { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; font-weight: 400; color: var(--text-3, var(--text-2)); }
 .opacity-field input[type=number] { width: 60px; }
 .xywh-cell input { padding-right: 2px !important; }
+
+/* Tool options in the top bar: values set in place (slider + number), color swatches, short lists; no menus. */
+.opt { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; color: var(--text-2); }
+.opt:hover { border-color: var(--border-strong); color: var(--text); }
+.opt-label { white-space: nowrap; }
+.opt-range { width: 72px; accent-color: var(--accent); }
+.opt-num { width: 40px; padding: 2px 3px !important; border: 0 !important; background: transparent !important; color: var(--text); font-size: 11px; text-align: right; -moz-appearance: textfield; }
+.opt-num::-webkit-inner-spin-button, .opt-num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.opt-unit { margin-left: -4px; color: var(--text-3, var(--text-2)); }
+.opt-color input[type=color] { width: 18px; height: 18px; padding: 0; border: 1px solid var(--border-strong); border-radius: 50%; background: none; cursor: pointer; }
+.opt-color input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+.opt-color input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+.opt-select { background: transparent; border: 0; color: var(--text); font-size: 11px; padding: 2px 0; max-width: 110px; }
+.tool-settings { gap: 6px; }

@@ -17,6 +17,31 @@ export function ContextField({ label, hint, children }: { label: ReactNode; hint
   </>;
 }
 
+/**
+ * A number set right in the bar: short label, a small slider and the value (type it, or scroll the wheel over it).
+ * No menu to open: what it is and what it holds stay in sight.
+ */
+export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; onChange: (v: number) => void }) {
+  const shown = Math.round(value * scale * 100) / 100;
+  const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
+  return <label className="opt" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
+    <span className="opt-label">{label}</span>
+    <input className="opt-range" type="range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
+    <input className="opt-num num" type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
+    {unit && <span className="opt-unit">{unit}</span>}
+  </label>;
+}
+
+/** A color swatch in the bar: click to pick. */
+export function InlineColor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return <label className="opt opt-color" data-tip={label}><span className="opt-label">{label}</span><input type="color" value={value} aria-label={label} onChange={(e) => onChange(e.target.value)} /></label>;
+}
+
+/** A short list in the bar. */
+export function InlineSelect<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; onChange: (v: T) => void }) {
+  return <label className="opt"><span className="opt-label">{label}</span><select className="opt-select" aria-label={label} value={String(value)} onChange={(e) => { const hit = options.map((o) => (typeof o === 'object' ? o.value : o)).find((o) => String(o) === e.target.value); if (hit !== undefined) onChange(hit); }}>{options.map((o) => { const v = typeof o === 'object' ? o.value : o; return <option key={String(v)} value={String(v)}>{typeof o === 'object' ? o.label : String(o)}</option>; })}</select></label>;
+}
+
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -36,37 +61,36 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><ContextField label={`Influence · ${influence}px`} hint="Double-click a Lineart stroke to edit its points; drag normally to move."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField>{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
-          <ContextField label={`Font · ${text.fontFamily}`}><select aria-label="Font" value={text.fontFamily} onChange={(e) => setUi({ text: { ...text, fontFamily: e.target.value } })}>{FONT_NAMES.map((name) => <option key={name}>{name}</option>)}</select></ContextField>
-          <ContextField label={`Size · ${text.fontSize}px`}><input aria-label="Font size" type="number" min={1} max={500} value={text.fontSize} onChange={(e) => setUi({ text: { ...text, fontSize: Math.max(1, +e.target.value) } })} /></ContextField>
-          <ContextField label={`Weight · ${text.fontWeight}`}><select aria-label="Font weight" value={text.fontWeight} onChange={(e) => setUi({ text: { ...text, fontWeight: +e.target.value } })}>{[100,200,300,400,500,600,700,800,900].map((n) => <option key={n}>{n}</option>)}</select></ContextField>
-          <ContextField label="Color"><input aria-label="Text color" type="color" value={text.color} onChange={(e) => setUi({ text: { ...text, color: e.target.value } })} /></ContextField>
-          <ContextField label={`Align · ${text.align}`}><select aria-label="Text alignment" value={text.align} onChange={(e) => setUi({ text: { ...text, align: e.target.value as typeof text.align } })}>{['left','center','right'].map((n) => <option key={n}>{n}</option>)}</select></ContextField>
-          <ContextField label={`Line height · ${text.lineHeight}`}><input aria-label="Line height" type="number" min={0.1} step={0.1} value={text.lineHeight} onChange={(e) => setUi({ text: { ...text, lineHeight: Math.max(0.1, +e.target.value) } })} /></ContextField>
-          <ContextField label={`Spacing · ${text.letterSpacing}px`}><input aria-label="Letter spacing" type="number" step={0.5} value={text.letterSpacing} onChange={(e) => setUi({ text: { ...text, letterSpacing: +e.target.value } })} /></ContextField>
+          <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
+          <InlineSlider label="Size" unit="px" min={1} max={500} value={text.fontSize} onChange={(v) => setUi({ text: { ...text, fontSize: v } })} />
+          <InlineSelect label="Weight" value={text.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => setUi({ text: { ...text, fontWeight: v } })} />
+          <InlineColor label="Color" value={text.color} onChange={(v) => setUi({ text: { ...text, color: v } })} />
+          <InlineSelect label="Align" value={text.align} options={['left', 'center', 'right'] as const as unknown as Array<typeof text.align>} onChange={(v) => setUi({ text: { ...text, align: v } })} />
+          <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={text.lineHeight} onChange={(v) => setUi({ text: { ...text, lineHeight: v } })} />
+          <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={text.letterSpacing} onChange={(v) => setUi({ text: { ...text, letterSpacing: v } })} />
         </> : tool === 'fill' ? <>
-          <ContextField label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></ContextField>
-          <ContextField label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></ContextField>
-          <ContextField label={`Threshold · ${brush.fillThreshold ?? 24}`}><input aria-label="Fill threshold" type="range" min={0} max={255} step={1} value={brush.fillThreshold ?? 24} onChange={(e) => setUi({ brush: { ...brush, fillThreshold: +e.target.value } })} /></ContextField>
-          <ContextField label={`Expand · ${brush.fillExpand ?? 0}px`}><input aria-label="Fill expansion" type="range" min={0} max={12} step={1} value={brush.fillExpand ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillExpand: +e.target.value } })} /></ContextField>
-          <ContextField label={`Smooth · ${brush.fillSmooth ?? 0}px`}><input aria-label="Fill smoothing" type="range" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillSmooth: +e.target.value } })} /></ContextField>
-          
+          <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
+          <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
+          <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setUi({ brush: { ...brush, fillThreshold: v } })} />
+          <InlineSlider label="Expand" unit="px" min={0} max={12} value={brush.fillExpand ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillExpand: v } })} />
+          <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillSmooth: v } })} />
         </> : tool === 'lineart' ? <>
-          <ContextField label={lineartMode === 'draw' ? 'Mode · Draw' : 'Mode · Edit'}><select aria-label="Lineart mode" value={lineartMode} onChange={(e) => setUi({ lineartMode: e.target.value as 'draw' | 'edit' })}><option value="draw">Draw</option><option value="edit">Edit</option></select></ContextField>
-          {lineartMode === 'edit' ? <><ContextField label={`Influence · ${influence}px`} hint="Distance along the stroke affected by dragging a point."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField>{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
+          <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
+          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
         </> : paint ? <>
-          <ContextField label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></ContextField>
-          {tool !== 'eraser' && <ContextField label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></ContextField>}
-          <ContextField label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></ContextField>
-          <ContextField label={`Smoothing · ${brush.smoothing ?? 0}`}><input aria-label="Brush smoothing" type="range" min={0} max={10} step={1} value={brush.smoothing ?? 0} onChange={(e) => setUi({ brush: { ...brush, smoothing: +e.target.value } })} /></ContextField>
-          <ContextField label={`Stabilization · ${brush.stabilization ?? 0}`}><input aria-label="Brush stabilization" type="range" min={0} max={10} step={1} value={brush.stabilization ?? 0} onChange={(e) => setUi({ brush: { ...brush, stabilization: +e.target.value } })} /></ContextField>
+          <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => setUi({ brush: { ...brush, size: v } })} />
+          {tool !== 'eraser' && <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />}
+          <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
+          <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => setUi({ brush: { ...brush, smoothing: v } })} />
+          <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => setUi({ brush: { ...brush, stabilization: v } })} />
         </> : <>
           {tool !== 'line' && <ContextField label={shape.fill === null ? "Fill · none" : "Fill"}><input type="color" value={shape.fill ?? '#d4f25a'} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.value } })} /><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></ContextField>}
           <ContextField label={shape.stroke === null ? "Stroke · none" : "Stroke"}><input type="color" value={shape.stroke ?? '#ffffff'} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.value } })} /><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></ContextField>
-          <ContextField label={`Stroke width · ${shape.strokeWidth}px`}><input type="range" min={1} max={40} value={shape.strokeWidth} onChange={(e) => setUi({ shape: { ...shape, strokeWidth: +e.target.value } })} /></ContextField>
-          {tool === 'rect' && <ContextField label="Corner radius"><input type="number" min={0} max={500} value={shape.radius} onChange={(e) => setUi({ shape: { ...shape, radius: Math.max(0, +e.target.value) } })} /></ContextField>}
+          <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
+          {tool === 'rect' && <InlineSlider label="Radius" unit="px" min={0} max={200} value={shape.radius} onChange={(v) => setUi({ shape: { ...shape, radius: v } })} />}
         </>}
 
   </div>;
