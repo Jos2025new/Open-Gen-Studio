@@ -242,6 +242,36 @@ export async function rasterLayerBlob(l: Layer): Promise<Blob | null> {
 }
 
 /** Topmost visible layer whose box contains the point. */
+/**
+ * The topmost visible layer with something drawn exactly at (x, y): raster layers by their pixels (alpha), others
+ * by their box. Big transparent layers (a paint layer the size of the page) no longer catch every click.
+ */
+export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null {
+  for (let i = doc.layers.length - 1; i >= 0; i--) {
+    const l = doc.layers[i];
+    if (!l.visible) continue;
+    const b = layerBox(l);
+    if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) continue;
+    if (l.type === 'vector') {
+      // One of its own shapes or strokes, not the box around all of them.
+      const inside = (bx: Box | null) => bx && x >= bx.x && x <= bx.x + bx.w && y >= bx.y && y <= bx.y + bx.h;
+      if (l.shapes.some((sh) => inside(shapeBox(sh))) || (l.strokes ?? []).some((st) => inside(strokeBox(st)))) return l;
+      continue;
+    }
+    if (l.type !== 'raster') return l;
+    const buf = getBuffer(l.id);
+    if (!buf) continue;
+    const px = Math.floor(((x - l.x) / l.width) * buf.width), py = Math.floor(((y - l.y) / l.height) * buf.height);
+    if (px < 0 || py < 0 || px >= buf.width || py >= buf.height) continue;
+    // A small neighbourhood, so thin strokes can be picked.
+    const r = Math.max(1, Math.round(buf.width / Math.max(1, l.width) * 3));
+    const x0 = Math.max(0, px - r), y0 = Math.max(0, py - r);
+    const data = buf.getContext('2d')?.getImageData(x0, y0, Math.min(buf.width - x0, r * 2 + 1), Math.min(buf.height - y0, r * 2 + 1)).data;
+    if (data) for (let k = 3; k < data.length; k += 4) if (data[k] > 16) return l;
+  }
+  return null;
+}
+
 export function hitTest(doc: DesignDoc, x: number, y: number): Layer | null {
   for (let i = doc.layers.length - 1; i >= 0; i--) {
     const l = doc.layers[i];

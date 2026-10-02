@@ -5,9 +5,10 @@ import { moveRasterStroke, rasterStrokeBox } from '../../engine/design/rasterStr
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
-import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
+import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel } from '../../engine/design/render';
+import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
+import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -23,7 +24,7 @@ interface View {
 
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer }
+  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[] }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'rasterMove'; layerId: string; strokeId: string; startX: number; startY: number; base: RasterLayer }
   | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
@@ -41,8 +42,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  // Layers picked with Ctrl/Shift (panel) or Ctrl (canvas): their boxes show and they move together.
+  useLayerSelection((st) => st.byDoc[doc.id]);
+  const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const pickedOthers = (d0: DesignDoc, id: string) => layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).includes(id) ? layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).filter((x) => x !== id).map((x) => d0.layers.find((l) => l.id === x)).filter((l): l is Layer => Boolean(l && !l.locked && l.visible)) : [];
   // Snap guides while moving (screen overlay only).
-  const guides = useRef<{ x?: number; y?: number }>({});
+  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number }>({});
+  const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
   const [editingText, setEditingText] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
@@ -164,7 +170,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
     // Snap guides: the line the moving layer sticks to, across the view.
-    const g = guides.current;
+    const g = guideLines;
     if (g.x != null || g.y != null) {
       ctx.save();
       ctx.strokeStyle = '#ff4fd8';
@@ -172,6 +178,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.setLineDash([4, 3]);
       if (g.x != null) { ctx.beginPath(); ctx.moveTo(Math.round(sx(g.x)) + 0.5, 0); ctx.lineTo(Math.round(sx(g.x)) + 0.5, size.h); ctx.stroke(); }
       if (g.y != null) { ctx.beginPath(); ctx.moveTo(0, Math.round(sy(g.y)) + 0.5); ctx.lineTo(size.w, Math.round(sy(g.y)) + 0.5); ctx.stroke(); }
+      ctx.restore();
+    }
+    // Several layers picked: each one's box (dashed) and the box around all of them.
+    if (picked.length > 1 && !editingText) {
+      const boxes = picked.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is Layer => Boolean(l && l.visible)).map((l) => layerBox(l)).filter((b): b is NonNullable<typeof b> => Boolean(b));
+      ctx.save();
+      ctx.strokeStyle = 'rgba(212,242,90,0.75)';
+      ctx.setLineDash([5, 4]);
+      for (const b of boxes) ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
+      const all = unionBox(boxes);
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(212,242,90,0.35)';
+      if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
       ctx.restore();
     }
     if (active && active.visible && !editingText) {
@@ -251,7 +270,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.lineWidth = 1;
       ctx.stroke();
     }
-  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve]);
+  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -301,6 +320,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
 
     if (tool === 'move') {
+      // Ctrl/Cmd-click: add the layer under the pointer to the selection (or take it out). Shift stays "whole layer".
+      if (e.ctrlKey || e.metaKey) {
+        const hit = hitTestPixel(current, p.x, p.y);
+        if (hit) {
+          pickLayer(doc.id, hit.id, true, layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)));
+          setActiveLayer(sessionId, doc.id, hit.id);
+        }
+        return;
+      }
       if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
         const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
         const stroke = act.strokes?.[index];
@@ -342,16 +370,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
             record(current);
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act };
+            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: pickedOthers(current, act.id) };
             return;
           }
         }
       }
       const hit = hitTest(current, p.x, p.y);
+      const sel = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+      // A plain click on a layer outside the selection starts a new selection; inside it, the group moves together.
+      if (!hit || !sel.includes(hit.id)) pickLayer(doc.id, hit?.id ?? '', false, sel);
       setActiveLayer(sessionId, doc.id, hit?.id ?? null);
       if (hit && !hit.locked) {
         record(current);
-        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit };
+        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: pickedOthers(current, hit.id) };
       }
       return;
     }
@@ -465,16 +496,20 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const moved = moveRasterStroke(d.base, d.strokeId, p.x - d.startX, p.y - d.startY);
       if (composeRaster(moved, false)) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
     } else if (d.kind === 'move') {
-      let moved = translateLayer(d.base, p.x - d.startX, p.y - d.startY);
-      // Snap to the page and the other layers (Alt held: free move).
+      // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
+      const group = [d.base, ...(d.others ?? [])];
+      let dx = p.x - d.startX, dy = p.y - d.startY;
       const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
-      const box = snap.on && !e.altKey ? layerBox(moved) : null;
+      const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
-        const s = snapBox(box, snapTargets(doc, d.layerId, snap), 6 / view.zoom);
-        if (s.dx || s.dy) moved = translateLayer(d.base, p.x - d.startX + s.dx, p.y - d.startY + s.dy);
-        guides.current = { x: s.gx, y: s.gy };
-      } else guides.current = {};
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? moved : l)) }));
+        const ids = new Set(group.map((l) => l.id));
+        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap), 6 / view.zoom);
+        dx += s.dx;
+        dy += s.dy;
+        showGuides({ x: s.gx, y: s.gy });
+      } else showGuides({});
+      const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
+      setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
     } else if (d.kind === 'scale') {
       const k = Math.max(0.02, Math.hypot(p.x - d.ax, p.y - d.ay) / d.startDist);
       const scaled = scaleLayer(d.base, k, k, d.ax, d.ay);
@@ -534,8 +569,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const d = drag.current;
     drag.current = null;
     if (!d) return;
-    guides.current = {};
+    showGuides({});
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
+    if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     if (d.kind === 'rasterMove') {
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
