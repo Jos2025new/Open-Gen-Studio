@@ -113,6 +113,11 @@ export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
     note: '<Picture 1>, <Picture 2> (not @Image1), with timing when it helps ("<Picture 1> aligns with the 0.00-second mark"); with good references the prompt covers action, camera and sound, not appearance.',
     source: 'MiniMax-H3 VIDEO_PROMPT_WRITING_GUIDE_ref_en.md; ai-director guide minimax-h3 lines 29–31, 104',
   },
+  {
+    family: 'Image models (Nano Banana, GPT Image, Seedream, Ideogram, others)',
+    note: 'plain words by order and role: "image 1 is the character, image 2 the room"; "the girl from image 1 lies on the bed of image 2". Never another family\'s tokens (<Picture N>, @Image1, <IMAGE_0>): each syntax belongs only to its model, and a later step on another model uses its own.',
+    source: 'open-generation-studio/skills/prompting nano-banana.md, gpt-image.md, seedream.md (references named "image 1", "image 2" with their roles)',
+  },
 ];
 
 /** What a preferred model is best for and what to avoid it for: the user-approved purpose table (R1) and schema limits. */
