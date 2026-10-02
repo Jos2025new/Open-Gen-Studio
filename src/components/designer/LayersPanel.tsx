@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, FONT_NAMES } from '../../engine/design/doc';
@@ -6,6 +6,8 @@ import { restyleStrokes } from '../../engine/design/strokes';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
+import { drawLayer } from '../../engine/design/render';
+import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { Button, Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
@@ -19,6 +21,39 @@ function Section({ title, open, onToggle, extra, children }: { title: string; op
     <div className="panel-head"><button type="button" className="section-toggle" aria-expanded={open} onClick={onToggle}>{open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<strong>{title}</strong></button>{extra}</div>
     {open && children}
   </section>;
+}
+
+const BLENDS: Layer['blend'][] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'soft-light', 'hard-light', 'difference', 'color', 'luminosity'];
+
+/** The layer alone, small, over a checkerboard: what it holds at a glance (drawn with the editor's renderer). */
+function LayerThumb({ doc, layer }: { doc: DesignDoc; layer: Layer }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const version = useSyncExternalStore(subscribeRaster, rasterVersion);
+  useEffect(() => {
+    if (layer.type === 'raster') void ensureBuffers([layer]);
+  }, [layer]);
+  useEffect(() => {
+    const ctx = ref.current?.getContext('2d');
+    if (!ctx) return;
+    const W = 40, H = 40;
+    ctx.clearRect(0, 0, W, H);
+    const k = Math.min(W / doc.width, H / doc.height);
+    ctx.save();
+    ctx.translate((W - doc.width * k) / 2, (H - doc.height * k) / 2);
+    ctx.scale(k, k);
+    drawLayer(ctx, { ...layer, visible: true, opacity: 1, blend: 'normal' } as Layer);
+    ctx.restore();
+  }, [doc.width, doc.height, layer, version]);
+  return <canvas ref={ref} width={40} height={40} className="layer-thumb" aria-hidden="true" />;
+}
+
+/** Layer name: double-click to rename in place (Enter keeps it, Esc cancels). */
+function LayerName({ name, onRename }: { name: string; onRename: (n: string) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft != null) return <input autoFocus className="layer-name-edit" value={draft} aria-label="Layer name" onFocus={(e) => e.currentTarget.select()} onChange={(e) => setDraft(e.target.value)} onClick={(e) => e.stopPropagation()}
+    onBlur={() => { if (draft.trim() && draft.trim() !== name) onRename(draft.trim()); setDraft(null); }}
+    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setDraft(null); e.stopPropagation(); }} />;
+  return <span className="layer-name" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setDraft(name); }}>{name}</span>;
 }
 
 export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
@@ -58,15 +93,18 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       <Button size="sm" icon={Type} onClick={() => addEmptyLayer(sessionId, doc.id, 'text')}>Text</Button>
     </div>
     <div className="layer-list">
-      {[...doc.layers].reverse().map((l) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} className={`layer-row ${layer?.id === l.id ? 'is-active' : ''}`}>
-        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}><Icon size={14} /><span>{l.name}</span><small>{l.type}</small></button>
-        <IconButton icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
-        <IconButton icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
+      {[...doc.layers].reverse().map((l) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''}`}>
+        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
+          <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /><Icon size={10} className="layer-kind" aria-label={l.type} /></span>
+          <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
+        </button>
+        <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
+        <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
       </div>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     {layer && <div className="layer-actions">
-        {layer.type === 'raster' && <IconButton ref={pop.ref} icon={Sparkles} label="Layer operations" size="sm" disabled={layer.locked} onClick={() => { setOp(null); pop.toggle(); }} />}
+        {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} data-tip="Relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}>Operations</Button>}
         <span className="layer-actions-gap" />
         <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={layer.locked || index === doc.layers.length - 1} onClick={() => moveLayer(sessionId, doc.id, layer.id, 1)} />
         <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={layer.locked || index === 0} onClick={() => moveLayer(sessionId, doc.id, layer.id, -1)} />
@@ -78,11 +116,12 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       <Section title="Properties" open={sections.props} onToggle={() => setSections({ ...sections, props: !sections.props })} extra={layer.locked ? <span className="faint">Locked</span> : null}>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         <Field label="Name"><input key={layer.id + layer.name} defaultValue={layer.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== layer.name) patch({ name: e.target.value.trim() }); }} /></Field>
-        <Field label={`Opacity · ${Math.round(layer.opacity * 100)}%`}><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} /></Field>
-        <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{['normal', 'multiply', 'screen', 'overlay'].map((b) => <option key={b}>{b}</option>)}</select></Field>
-        {layer.type !== 'vector' && <div className="property-grid">{(['x', 'y', 'width'] as const).map((key) => <Field label={key} key={key}><input type="number" value={Math.round(layer[key])} min={key === 'width' ? 1 : undefined} onChange={(e) => patch({ [key]: key === 'width' ? Math.max(layer.type === 'text' ? 0 : 1, +e.target.value) : +e.target.value })} /></Field>)}</div>}
-        {layer.type === 'text' && <p className="faint">Width 0 = automatic, the box follows the text.</p>}
-        {layer.type === 'raster' && <Field label="Height"><input type="number" min={1} value={Math.round(layer.height)} onChange={(e) => patch({ height: Math.max(1, +e.target.value) })} /></Field>}
+        <div className="prop-row">
+          <Field label="Opacity"><div className="opacity-field"><input type="range" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
+          <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
+        </div>
+        {layer.type !== 'vector' && <div className="xywh">{(['x', 'y', 'width', ...(layer.type === 'raster' ? ['height'] as const : [])] as const).map((key) => <label key={key} className="xywh-cell"><span>{key === 'width' ? 'W' : key === 'height' ? 'H' : key.toUpperCase()}</span><input type="number" value={Math.round((layer as unknown as Record<string, number>)[key])} min={key === 'width' || key === 'height' ? 1 : undefined} onChange={(e) => patch({ [key]: key === 'width' ? Math.max(layer.type === 'text' ? 0 : 1, +e.target.value) : key === 'height' ? Math.max(1, +e.target.value) : +e.target.value })} /></label>)}</div>}
+        {layer.type === 'text' && <p className="faint">W 0 = automatic, the box follows the text.</p>}
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
         {layer.type === 'text' && <>
           <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>

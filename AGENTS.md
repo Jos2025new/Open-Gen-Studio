@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — panel de capas más claro (2026-10-02)
+- [x] L1. (usuario: mejorar estética y UX con lo que hay) Filas con miniatura de la capa sola sobre damero (renderer `drawLayer`) y el icono de tipo en su esquina (sin la palabra "raster/vector"); fila activa con barra de acento; capas ocultas atenuadas; ojo y candado solo al pasar el ratón o en la activa, siempre visibles si están activados (oculta/bloqueada, en ámbar); doble clic en el nombre lo renombra. Botón "✦ Operations" con texto. Propiedades: opacidad con deslizador y número, Blend al lado con los 11 modos que ya soporta el renderer, X · Y · W · H en una fila. `LayersPanel.tsx`, `designer.css`. Sin navegador.
+
 ## Tarea — operaciones de capa a la izquierda (2026-10-02)
 - [x] Botón "Layer operations" (✦) primero en la fila de acciones de la capa, pegado al borde izquierdo; subir, bajar, duplicar y borrar siguen a la derecha. `LayersPanel.tsx`, `designer.css`. Sin navegador.
 
