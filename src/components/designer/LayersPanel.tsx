@@ -110,8 +110,15 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     <div className="layer-list">
       {[...doc.layers].reverse().map((l, d) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} ref={(el) => { rows.current[d] = el; }}
         className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
-        onPointerDown={(e) => { if (e.button !== 0 || l.locked || (e.target as HTMLElement).closest('input, .layer-toggle')) return; e.currentTarget.setPointerCapture(e.pointerId); setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d }); }}
-        onPointerMove={(e) => { if (!drag || drag.id !== l.id) return; if (!drag.active && Math.abs(e.clientY - drag.y) < 5) return; setDrag({ ...drag, active: true, slot: slotAt(e.clientY) }); }}
+        onPointerDown={(e) => { if (e.button !== 0 || l.locked || (e.target as HTMLElement).closest('input, .layer-toggle')) return; setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d }); }}
+        onPointerMove={(e) => {
+          if (!drag || drag.id !== l.id) return;
+          if (!(e.buttons & 1)) { setDrag(null); return; }
+          if (!drag.active && Math.abs(e.clientY - drag.y) < 5) return;
+          // Captured only once it really drags, so clicks and double-clicks (rename) still reach the name.
+          if (!drag.active) e.currentTarget.setPointerCapture(e.pointerId);
+          setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
+        }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
         <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { if (drag?.active) return; setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
           <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /><Icon size={10} className="layer-kind" aria-label={l.type} /></span>
