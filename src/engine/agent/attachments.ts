@@ -1,10 +1,10 @@
 import { getAssetBlob } from '../../lib/idb';
-import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, blobToCanvas } from '../../lib/media';
+import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, fetchBlob, blobToCanvas, videoFrameSheet } from '../../lib/media';
 import type { LlmContentPart, LlmMessage } from '../types';
 import { useStore } from '../../store/store';
 
 /*
- * What the agent sees of the user's attachments: the images themselves (and a video's first frame), reduced,
+ * What the agent sees of the user's attachments: the images themselves (and four moments of a video on one sheet), reduced,
  * each labeled with its asset id so plans can cite it. They travel only while the request that brought them is
  * open (questions, plan, revisions); a new request swaps them for a one-line note, so they are not re-sent
  * with every message nor kept in the saved state.
@@ -35,7 +35,7 @@ async function assetBlob(id: string): Promise<Blob | undefined> {
   return (await getAssetBlob(id)) ?? (a?.remoteUrl ? await fetchBlob(a.remoteUrl).catch(() => undefined) : undefined);
 }
 
-/** Image parts for the attached images and videos (first frame); audio and 3D stay as text in the context. */
+/** Image parts for the attached images and videos (a 2×2 sheet of four moments); audio and 3D stay as text in the context. */
 export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: string) => Promise<string | null> } = {}): Promise<LlmContentPart[]> {
   const assets = useStore.getState().assets;
   const parts: LlmContentPart[] = [];
@@ -51,7 +51,7 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
         else if (blob) {
           const src = URL.createObjectURL(blob);
           try {
-            url = await reducedDataUrl((await extractVideoFrame(src, 'first')).blob);
+            url = await blobToDataUrl((await videoFrameSheet(src, VISION_MAX_SIDE)).blob);
           } finally {
             URL.revokeObjectURL(src);
           }
@@ -60,7 +60,7 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
     } catch {
       url = null;
     }
-    const label = `asset:${id} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, first frame shown` : `image ${a.width}×${a.height}`})`;
+    const label = `asset:${id} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
     parts.push({ type: 'text', text: url ? `${label}:` : `${label}: could not be shown.` });
     if (url) parts.push({ type: 'image_url', image_url: { url } });
   }

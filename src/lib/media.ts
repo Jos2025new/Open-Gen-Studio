@@ -180,6 +180,41 @@ async function readFrame(src: string, which: 'first' | 'last' | number): Promise
   return { blob, width: c.width, height: c.height };
 }
 
+/**
+ * Four moments of a video (start, ⅓, ⅔, end) on one 2×2 sheet no larger than `maxSide`: what the agent sees of an
+ * attached clip (O6). One load, four seeks; same image size as a single frame, so no extra tokens.
+ */
+export async function videoFrameSheet(src: string, maxSide: number): Promise<{ blob: Blob; times: number[] }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => (timer = setTimeout(() => reject(new Error('Could not read frames from this video (timed out).')), 20000)));
+  const read = async () => {
+    const v = await loadVideo(src);
+    v.preload = 'auto';
+    let duration = v.duration;
+    if (!Number.isFinite(duration)) {
+      await seek(v, 1e9);
+      duration = Number.isFinite(v.duration) ? v.duration : v.currentTime;
+    }
+    const end = Math.max(0.001, duration - 0.05);
+    const times = [0.001, end / 3, (2 * end) / 3, end];
+    const k = Math.min(1, maxSide / (2 * Math.max(v.videoWidth, v.videoHeight)));
+    const w = Math.max(1, Math.round(v.videoWidth * k));
+    const h = Math.max(1, Math.round(v.videoHeight * k));
+    const c = createCanvas(w * 2, h * 2);
+    const ctx = ctx2d(c);
+    for (const [i, t] of times.entries()) {
+      await seek(v, t);
+      ctx.drawImage(v, (i % 2) * w, Math.floor(i / 2) * h, w, h);
+    }
+    return { blob: await canvasToBlob(c, 'image/jpeg', 0.82), times };
+  };
+  try {
+    return await Promise.race([read(), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function seek(v: HTMLVideoElement, t: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const done = () => {
