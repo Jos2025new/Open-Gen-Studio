@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — puntero visible sobre blanco (2026-10-02)
+- [x] Círculo de pincel/borrador con contorno oscuro de 3 px y claro de 1 px, conservando radio. Solo overlay, sin cambios en pintura; sin pruebas por petición del usuario.
+
 ## Tarea — miniaturas flotantes (2026-10-02)
 - [x] Quitar fondo, borde, sombra y padding exterior solo del panel de miniaturas; mantener botón sólido y tarjetas visibles. Sin pruebas por petición del usuario.
 

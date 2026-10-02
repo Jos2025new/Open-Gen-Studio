@@ -228,9 +228,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.restore();
     }
     if (cursor && (tool === 'brush' || tool === 'eraser')) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
       ctx.beginPath();
       ctx.arc(sx(cursor.x), sy(cursor.y), Math.max(2, (brush.size / 2) * view.zoom), 0, Math.PI * 2);
+      ctx.strokeStyle = '#16161a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
   }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve]);
