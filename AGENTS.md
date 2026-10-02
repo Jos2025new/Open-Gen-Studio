@@ -26,6 +26,13 @@ Origen: comparación con OpenMontage (`/home/samuel/Documentos/Projects/AI/My Ap
 Verificación del plan: typecheck y suite verdes (344 + 1 omitida). Sin LLM real ni banco: falta medir con `BENCH_ONLY=two-clips-named-model,change-model,story-3-clips` contra `bench/2026-10-01-3273c0a.json` (necesita la clave y presupuesto del usuario).
 Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeline de 7 etapas con puertas, investigación web, puntuaciones de slideshow/variedad y de proveedores, decision log/checkpoints JSON, playbooks YAML, tablero Backlot, reserva de presupuesto.
 
+## Tarea — lo útil del "Flujo v3" (síntesis pegada por el usuario) (2026-10-02)
+Origen: síntesis que compara un flujo de vídeo por fases con una skill de referencia. Casi todo ya existe (estilo congelado = `propose_plan.style`, refs de assets fijados, completitud = la unión se salta si falla un clip, Retry failed, `join_clips`, `reference_sheet`). Se añaden solo reglas, sin vueltas extra (la caché del prompt fijo se pierde una vez). Decidido (usuario): QC por deriva sigue pendiente (H7); sin reintento automático. No se adopta: decidir un clip/varios en silencio (contradice U2), un asset por escenario en dos pasos (coste).
+- [x] V1. Estilo elegido por el usuario: en piezas de 2+ clips o por etapas, la tarjeta de preguntas (también en Auto) pregunta el look con 3–4 opciones y la recomendada, salvo que la petición o una referencia ya lo fije; lo elegido va tal cual a `style`. *Dónde:* `agent/context.ts`.
+- [x] V2. Una familia de vocabulario por plan: 2D, anime, cartoon, stop-motion o 3D animado sin términos fotográficos (mm, f/, "photoreal", poros); lo fotorreal sin "illustration"/"render". *Dónde:* `agent/context.ts`.
+- [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
+- [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
+
 ## Tarea — más vida y contraste en la GUI (2026-10-02)
 - [x] K1. (usuario, referencia Higgsfield: "lo nuestro luce opaco") Solo tokens (`tokens.css`): texto más claro (#f8f8fa; secundario #c3c3cb; terciario #8e8e98), superficies y bordes un paso más separados, acento lima más vivo (#d8ff3a) y colores de tipo, aviso y ok algo más saturados. Sin cambiar tamaños ni maquetación. Navegador: panel de Sesiones y Nodos.
 

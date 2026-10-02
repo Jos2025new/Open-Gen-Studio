@@ -69,10 +69,10 @@ describe('validator errors carry the exact fix (O2)', () => {
 });
 
 describe('identity without an image (O5)', () => {
-  it('a text-only model gets the name and, on its first mention, the saved description', async () => {
+  it('a text-only model gets no proper name: the description, then its first trait', async () => {
     const { describeMentions } = await import('../src/engine/params');
     const subjects = [{ id: 'r', name: 'Reto', description: 'a woman in her 30s, short black bob, mustard raincoat' }, { id: 'p', name: 'Pip' }];
-    expect(describeMentions('@Reto opens the door; @Pip barks at @reto', subjects)).toBe('Reto (a woman in her 30s, short black bob, mustard raincoat) opens the door; Pip barks at Reto');
+    expect(describeMentions('@Reto opens the door; @Pip barks at @reto', subjects)).toBe('a woman in her 30s, short black bob, mustard raincoat opens the door; Pip barks at the woman in her 30s');
   });
 
   it('the directing guide and the 9:16 safe zones load on demand', async () => {

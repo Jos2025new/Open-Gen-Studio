@@ -1140,8 +1140,9 @@ export function mentionSubjects(prompt: string, subjects: Array<{ id: string; na
 }
 
 /**
- * O5 · "@Name" for a model that gets no image of the subject: the name, and on its first mention the subject's
- * saved description ("Reto (a woman in her 30s, short black bob)"), so the look is not reduced to a bare name.
+ * O5 · "@Name" for a model that gets no image of the subject: no proper name (models render it as nothing or as
+ * text), its saved description on the first mention ("a woman in her 30s, short black bob") and its first trait
+ * after that ("the woman in her 30s"). Without a description the name is all there is.
  */
 export function describeMentions(prompt: string, subjects: Array<{ id: string; name: string; description?: string }>): string {
   const mark = '\u0000';
@@ -1150,9 +1151,12 @@ export function describeMentions(prompt: string, subjects: Array<{ id: string; n
   return marked.replace(new RegExp(`${mark}(\\d+)${mark}`, 'g'), (_, n: string) => {
     const s = subjects.find((x) => x.id === ids[Number(n) - 1])!;
     const desc = s.description?.trim();
-    if (seen.has(Number(n)) || !desc) return s.name;
-    seen.add(Number(n));
-    return `${s.name} (${desc})`;
+    if (!desc) return s.name;
+    if (!seen.has(Number(n))) {
+      seen.add(Number(n));
+      return desc;
+    }
+    return `the ${desc.split(/[,;(]/)[0].trim().replace(/^(a|an|the)\s+/i, '')}`;
   });
 }
 
