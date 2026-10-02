@@ -6,6 +6,7 @@ import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
+import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
@@ -923,12 +924,6 @@ function endedWithoutPlan(sessionId: string, workspace: Workspace): boolean {
   return !feed.slice(at + 1).some((f) => f.type === 'plan' || f.type === 'questions');
 }
 
-/** Where a tool call written as plain text starts (DeepSeek DSML, raw <tool_call> tags), or -1. */
-export function toolMarkupAt(text: string): number {
-  const m = /<[｜|]\s*DSML\s*[｜|]|<[｜|]tool[▁_ ]calls?|<tool_call>|<function_calls>/i.exec(text);
-  return m ? m.index : -1;
-}
-
 /** Delete under a garbled reply: removes it and the warning. */
 export function deleteGarbled(sessionId: string, noticeId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === noticeId);
@@ -1004,7 +999,19 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       // A tool call written as text (the provider did not convert the model's native format): not kept in the
       // history, its markup hidden, and a warning with Retry (the same call again) and Delete.
       const garbled = !result.toolCalls.length ? toolMarkupAt(result.text) : -1;
-      if (garbled >= 0) {
+      // Readable markup becomes the real calls; the reply keeps only the text before it.
+      const converted = garbled >= 0 ? parseToolMarkup(result.text.slice(garbled)) : null;
+      if (converted) {
+        result = {
+          ...result,
+          text: result.text.slice(0, garbled).trim(),
+          toolCalls: converted.map((c, i) => ({ ...c, id: `${CONVERTED_CALL}${Date.now().toString(36)}_${i}` })),
+        };
+        if (textItemId) {
+          if (result.text) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text });
+          else removeFeedItem(sessionId, textItemId);
+        }
+      } else if (garbled >= 0) {
         const shown = result.text.slice(0, garbled).trim();
         if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: shown || '…' });
         appendFeed(sessionId, {
@@ -1260,6 +1267,17 @@ function flushToolResults(sessionId: string, results: LlmMessage[]): void {
   results.length = 0;
 }
 
+/** Id prefix of a tool call the app read from text markup (toolMarkup): its result carries a warning. */
+const CONVERTED_CALL = 'call_txt_';
+const CONVERTED_WARNING =
+  'Warning: you wrote this call as text markup (DSML / <tool_call>) inside your reply, so the app had to convert it; markup it cannot read runs nothing. Call tools only through the tool-calling interface, never as text.';
+
+/** The result of a converted call tells the model, on its next call, what went wrong. */
+function warnConverted(m: LlmMessage): LlmMessage {
+  if (m.role !== 'tool' || !m.tool_call_id?.startsWith(CONVERTED_CALL) || typeof m.content !== 'string') return m;
+  return { ...m, content: `${CONVERTED_WARNING}\n\n${m.content}` };
+}
+
 /** Keeps OpenAI-format history valid: every assistant tool call gets exactly one tool message. */
 export function repairHistory(history: LlmMessage[]): LlmMessage[] {
   const out: LlmMessage[] = [];
@@ -1275,9 +1293,9 @@ export function repairHistory(history: LlmMessage[]): LlmMessage[] {
         j++;
       }
       const have = new Set(following.map((f) => f.tool_call_id));
-      out.push(...following);
+      out.push(...following.map(warnConverted));
       for (const id of ids) {
-        if (!have.has(id)) out.push({ role: 'tool', tool_call_id: id, content: 'No result.' });
+        if (!have.has(id)) out.push(warnConverted({ role: 'tool', tool_call_id: id, content: 'No result.' }));
       }
       i = j - 1;
     }

@@ -110,8 +110,8 @@ describe('a provider that goes silent', () => {
 });
 
 describe('a tool call written as text (DeepSeek DSML)', () => {
-  it('hides the markup, keeps it out of the history and offers Retry and Delete', async () => {
-    vi.stubGlobal('fetch', async () => sse([text('La rehago con la cara más joven.\n\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="propose_plan">')]));
+  it('unreadable: hides the markup, keeps it out of the history and offers Retry and Delete', async () => {
+    vi.stubGlobal('fetch', async () => sse([text('La rehago con la cara más joven.\n\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="propose_plan">\n<｜DSML｜ parameter name="steps" string="false">[{"id": broken</｜DSML｜ parameter>\n</｜DSML｜ invoke>')]));
     const sid = useStore.getState().activeSessionId;
     await sendAgentMessage('parece una vieja');
     const s = useStore.getState().sessions[sid];
@@ -123,5 +123,29 @@ describe('a tool call written as text (DeepSeek DSML)', () => {
     const { deleteGarbled } = await import('../src/engine/agent/runtime');
     deleteGarbled(sid, note.id);
     expect(useStore.getState().sessions[sid].feed.some((f) => f.type === 'assistant' || f.type === 'notice')).toBe(false);
+  });
+});
+
+describe('a readable tool call written as text', () => {
+  it('becomes the real call: DSML ask_questions shows its card', async () => {
+    const q = JSON.stringify([{ id: 'edad', question: '¿Qué edad?', options: ['18–24', '25–30'] }]);
+    const dsml = `Te pregunto una cosa.\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="ask_questions">\n<｜DSML｜ parameter name="intro" string="true">Una duda</｜DSML｜ parameter>\n<｜DSML｜ parameter name="questions" string="false">${q}</｜DSML｜ parameter>\n</｜DSML｜ invoke>\n</｜DSML｜ calls>`;
+    vi.stubGlobal('fetch', async () => sse([text(dsml)]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('crea una heroína');
+    const feed = useStore.getState().sessions[sid].feed;
+    expect(feed.find((f) => f.type === 'questions')).toBeTruthy();
+    expect(feed.some((f) => f.type === 'assistant' && f.text.includes('DSML'))).toBe(false);
+    expect(feed.some((f) => f.type === 'notice')).toBe(false);
+    // On its next call the model reads a warning with the result of the converted call.
+    const { repairHistory } = await import('../src/engine/agent/runtime');
+    const sent = repairHistory(useStore.getState().sessions[sid].agent.history);
+    expect(sent.find((m) => m.role === 'tool')?.content).toMatch(/^Warning: you wrote this call as text markup/);
+  });
+
+  it('parses DSML strings and JSON values, and <tool_call> JSON', async () => {
+    const { parseToolMarkup } = await import('../src/engine/agent/toolMarkup');
+    expect(parseToolMarkup('<｜DSML｜ invoke name="propose_plan"><｜DSML｜ parameter name="title" string="true">Hola</｜DSML｜ parameter><｜DSML｜ parameter name="revision" string="false">true</｜DSML｜ parameter></｜DSML｜ invoke>')).toEqual([{ name: 'propose_plan', arguments: '{"title":"Hola","revision":true}' }]);
+    expect(parseToolMarkup('<tool_call>{"name":"read_guide","arguments":{"id":"skill:archviz"}}</tool_call>')).toEqual([{ name: 'read_guide', arguments: '{"id":"skill:archviz"}' }]);
   });
 });
