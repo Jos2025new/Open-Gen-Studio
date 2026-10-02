@@ -33,6 +33,12 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — reglas MUST tras la sesión "casa mediterránea" (2026-10-02)
+Origen (usuario, sesión real): el agente cargó 4 guías (2 de Sketch to render sin boceto), eligió fotorreal sin preguntar en una pieza por etapas de imágenes y dejó el dormitorio en 3:4 entre vistas 16:9. Solo prompt (caché perdida una vez); sin LLM real.
+- [x] R1. MUST cargar solo lo que se usa: un workflow, sus skills para los pasos de ahora; lo que transforma una entrada (boceto, planta, foto) solo si esa entrada está adjunta o en el lienzo; nunca recargar. *Dónde:* `agent/context.ts`.
+- [x] R2. V1 ampliada a imagen (sets de vistas o renders) y MUST: el look elegido se reutiliza tal cual en los planes siguientes de la misma pieza; un paso técnico puede omitirlo pero no tomar otro.
+- [x] R3. MUST: todas las imágenes de un set o serie con la misma proporción, salvo la que el usuario pida en otro formato.
+
 ## Tarea — más vida y contraste en la GUI (2026-10-02)
 - [x] K1. (usuario, referencia Higgsfield: "lo nuestro luce opaco") Solo tokens (`tokens.css`): texto más claro (#f8f8fa; secundario #c3c3cb; terciario #8e8e98), superficies y bordes un paso más separados, acento lima más vivo (#d8ff3a) y colores de tipo, aviso y ok algo más saturados. Sin cambiar tamaños ni maquetación. Navegador: panel de Sesiones y Nodos.
 
