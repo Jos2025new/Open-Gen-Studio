@@ -173,7 +173,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
       {plan.subjects?.length ? (
         <p className="plan-subjects">
           <UserRound size={12} />
-          {plan.subjects.map((x) => `@${x.name} ← ${x.from.startsWith('asset:') ? 'your image' : x.from}`).join(' · ')}
+          {plan.subjects.map((x) => `@${x.name} ← ${x.from.startsWith('asset:') ? 'your image (saved to your library when you run it)' : `${x.from} (this plan only)`}`).join(' · ')}
           <span className="faint"> — kept identical in every step that mentions it</span>
         </p>
       ) : null}

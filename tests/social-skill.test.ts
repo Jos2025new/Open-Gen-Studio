@@ -24,11 +24,12 @@ describe('social ad router and UGC workflow', () => {
     for (const id of text.match(/workflow:([a-z-]+)/g)!.map((m) => m.slice(9))) expect(workflowById(id), id).toBeDefined();
   });
 
-  it('UGC is its own chat workflow: 9:16, subjects and claims in continuity, one piece per variant', () => {
+  it('UGC is its own chat workflow: 9:16, images in refs and claims in continuity, one piece per variant', () => {
     const w = workflowById('ugc')!;
     expect(w.workspaces).toEqual(['chat']);
     expect(w.fixed).toEqual({ aspect: '9:16' });
-    expect(w.continuity).toMatch(/subjects/);
+    expect(w.continuity).toMatch(/refs of every step/);
+    expect(w.continuity).toMatch(/library only if the user asks/);
     expect(w.continuity).toMatch(/Claims only from the brief/);
     expect(w.variants!.map((v) => v.id)).toEqual(['review', 'unboxing', 'try-on', 'tutorial']);
     expect(readGuide('workflow:ugc/tutorial')).toMatch(/join_clips/);

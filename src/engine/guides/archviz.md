@@ -2,7 +2,7 @@ Architectural visualization — stills (exteriors, interiors, the same building 
 
 1. Building sheet first (one identity)
 - Before any prompt, write one short building sheet: type (house, apartment, office, pavilion), style (minimalist, brutalist, biophilic, Scandinavian, mid-century…), massing (storeys, roof shape, cantilevers), facade materials (board-formed concrete, walnut slats, travertine, tempered glass, black steel frames), openings (floor-to-ceiling glazing, clerestory), landscape (garden, pool, native grasses).
-- Repeat it word for word in every view of the same project and save the building as a place subject (@Name) once it is approved, so every later view and clip keeps the same architecture. With the user's image, the image is the identity: never re-describe what it shows.
+- Repeat it word for word in every view of the same project and put the approved render in the refs of every later view and clip, so the architecture stays the same (save it to the library only if the user asks). With the user's image, the image is the identity: never re-describe what it shows.
 
 2. Light and atmosphere (one condition per image)
 - Name the condition and its direction: golden hour low sun from the left, overcast soft daylight, blue hour with warm interior glow, night with wet reflective ground, morning mist. Give interior light a source: skylight, window wall, cove lighting, pendant.

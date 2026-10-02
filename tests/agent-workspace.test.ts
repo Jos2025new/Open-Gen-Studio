@@ -89,3 +89,14 @@ describe('text before a rejected plan', () => {
     expect(session().feed.some((f) => f.type === 'notice')).toBe(true);
   });
 });
+
+describe('attached images as references, no library saves unasked', () => {
+  it('the agent cites the attached image in refs and saves subjects only when the user decided', async () => {
+    const { SYSTEM_PROMPT } = await import('../src/engine/agent/context');
+    const { workflowById } = await import('../src/engine/skills');
+    expect(SYSTEM_PROMPT).toMatch(/Never save anything to the library on your own/);
+    expect(SYSTEM_PROMPT).toMatch(/only when the user asked to save it or said yes in the questions card/);
+    expect(SYSTEM_PROMPT).not.toMatch(/the character as a @Name subject/);
+    expect(workflowById('story')!.continuity).toMatch(/goes in the refs of every clip/);
+  });
+});

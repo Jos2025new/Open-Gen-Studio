@@ -263,7 +263,7 @@ export const WORKFLOWS: Workflow[] = [
     skill: 'storyboard',
     needs: ['the story or scene'],
     fixed: { aspect: '16:9' },
-    continuity: 'Shots 2–4 use shot 1 as reference; a character or object in 2+ shots is a library subject (@Name) in each; neighboring shots change at least one of shot size, subject or angle.',
+    continuity: 'Shots 2–4 use shot 1 as reference; a character or object in 2+ shots keeps one visual source in each (the attached image in refs, or a library @Name); neighboring shots change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Shot 1 · establishing', prompt: '{prompt}, establishing wide shot', aspect: '16:9' },
       { id: 's2', kind: 'image', title: 'Shot 2 · medium', prompt: '{prompt}, medium shot, same scene and style', refs: ['s1'], aspect: '16:9' },
@@ -303,7 +303,7 @@ export const WORKFLOWS: Workflow[] = [
     ],
     fixed: { aspect: '9:16' },
     continuity:
-      'Save the creator and the product as subjects in propose_plan.subjects and mention them as @Name in every step; never describe them again. Claims only from the brief. One variant per piece: two formats are two plans. Spoken lines in the chosen language, quoted, short.',
+      'The creator and product images (attached, or the approved key frame) go in the refs of every step and are cited with the model\'s reference syntax and their role; never describe them again. Save them to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans. Spoken lines in the chosen language, quoted, short.',
     variants: [
       { id: 'review', name: 'Review', description: 'Creator talks to camera holding the product: hook, two benefits, verdict.' },
       { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.', steps: [
@@ -332,7 +332,7 @@ export const WORKFLOWS: Workflow[] = [
     skills: [{ id: 'cinematic', for: 'every clip prompt' }],
     needs: ['the scene or a start image', 'total duration'],
     fixed: { aspect: '16:9' },
-    continuity: 'Each clip continues from the last frame of the previous one; a character or object in 2+ clips is a library subject (@Name) in each; neighboring clips change at least one of shot size, subject or angle.',
+    continuity: 'Each clip continues from the last frame of the previous one; a character or object in 2+ clips keeps one visual source in each (the attached image in refs, or a library @Name); neighboring clips change at least one of shot size, subject or angle.',
     steps: [
       { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}', aspect: '16:9' },
       { id: 's2', kind: 'video', title: 'Clip 1', prompt: '{prompt}', firstFrame: 's1', aspect: '16:9' },
@@ -355,7 +355,7 @@ export const WORKFLOWS: Workflow[] = [
       'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (a cheap first plan; the user picks one, then the clips)',
     ],
     continuity:
-      'One identity: save the character as a subject in propose_plan.subjects (from the attached image, or from the character-sheet image the user picked) and mention it as @Name in every clip — never describe her look again on a clip that carries her image (first_frame or refs); on a clip without one, repeat the same 3–6 literal traits (skill:cinematic). Each clip is one closed beat with a start and an end (hook → conflict → payoff), written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
+      'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; a clip with no image of her repeats the same 3–6 literal traits (skill:cinematic). Save her to the library only if the user asks or says yes in the questions card. Each clip is one closed beat with a start and an end (hook → conflict → payoff), written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
     steps: [
       { id: 's1', kind: 'video', title: 'Clip 1 · hook', prompt: '{prompt}' },
       { id: 's2', kind: 'video', title: 'Clip 2 · conflict', prompt: '{prompt}' },
@@ -365,7 +365,7 @@ export const WORKFLOWS: Workflow[] = [
   },
   {
     // Archviz set: renders, a walkthrough, a full tour and sketch → render. Skills teach each step; the building
-    // is one place subject (@Name) so every view and clip keeps the same architecture.
+    // render is the reference (refs) of every view and clip, so the architecture stays the same.
     id: 'archviz-render',
     name: 'Archviz render',
     description: 'Architectural renders: a hero exterior or interior, or a set of views of the same building.',
@@ -373,7 +373,7 @@ export const WORKFLOWS: Workflow[] = [
     skill: 'archviz',
     skills: [{ id: 'archviz', for: 'every render prompt' }],
     needs: ['the building or space (style, exterior or interior), or an image of it', 'light or time of day when it matters'],
-    continuity: 'One building sheet repeated in every view; the hero render is the reference for the other views, and once approved the building is a place subject (@Name).',
+    continuity: 'One building sheet repeated in every view; the hero render is the reference for the other views, and the approved render goes in the refs of every later view (save it to the library only if the user asks).',
     variants: [
       { id: 'exterior', name: 'Exterior hero', description: 'One exterior render, three-quarter view at eye level.', steps: [{ id: 's1', kind: 'image', title: 'Exterior', prompt: '{prompt}, exterior, three-quarter view, eye level', aspect: '16:9' }] },
       { id: 'interior', name: 'Interior', description: 'One interior render of the main space.', steps: [{ id: 's1', kind: 'image', title: 'Interior', prompt: '{prompt}, interior, camera at 1.4 m, one-point perspective', aspect: '3:2' }] },
@@ -436,7 +436,7 @@ export const WORKFLOWS: Workflow[] = [
       { id: 'archviz-motion', for: 'each clip and the order of the tour' },
     ],
     needs: ['the building (description or images)', 'total length', 'ambient music: yes (generated) or no'],
-    continuity: 'Facade → entrance → main interior → terrace. The facade render is the reference for every other view and the building is a place subject (@Name); each clip starts from its view (first_frame); neighboring clips change shot size or angle; the clips are joined in order (join_clips, with params.music set to a music step or an audio asset when the user wants music).',
+    continuity: 'Facade → entrance → main interior → terrace. The facade render is the reference (refs) for every other view; each clip starts from its view (first_frame); neighboring clips change shot size or angle; the clips are joined in order (join_clips, with params.music set to a music step or an audio asset when the user wants music).',
     steps: [
       { id: 's1', kind: 'image', title: 'Facade', prompt: '{prompt}, main facade at golden hour', aspect: '16:9' },
       { id: 's2', kind: 'image', title: 'Entrance', prompt: '{prompt}, entrance and hall, same building', refs: ['s1'], aspect: '16:9' },

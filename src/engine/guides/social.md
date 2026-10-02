@@ -26,7 +26,7 @@ Social ad — router and criteria (this guide decides; it generates nothing itse
 - Cinematic product piece: 2+ clips → workflow:shot-sequence; one shot → workflow:image-to-video.
 - Edit an existing video (background, clothing, object, restyle): the video_edit op; longer → video_extend.
 - Motion / typographic / product-only: key image, then animate it (typography stays short; see 4).
-- Two formats asked (e.g. unboxing and tutorial) = two pieces, each its own flow; never a hybrid. One creator and one product per video, as @Name subjects.
+- Two formats asked (e.g. unboxing and tutorial) = two pieces, each its own flow; never a hybrid. One creator and one product per video, their images in the refs of every step (library @Name only if the user saved them).
 
 6. Before spending
 - If the material does not fit the format (no product photo for a UGC try-on, a video too long to edit), say so and offer what fits before proposing the plan.

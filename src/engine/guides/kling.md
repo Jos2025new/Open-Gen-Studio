@@ -6,7 +6,7 @@ CONTRACT ON OUR PROVIDERS
 - Duration 3–15 s (integer). Aspect only 16:9, 9:16 or 1:1. Prompt at most 2 500 characters (longer fails).
 - Sound on by default; turning it off also lowers the cost. On fal the voice is Chinese or English; other languages are translated to English.
 - Multi-shot is structured, not written in the text: plan steps carry `shots` [{prompt, duration}] whose seconds add up to the clip duration (the app sends Kling's multi_prompt; on fal a single prompt and shots cannot go together). The whole storyboard is ONE clip.
-- Persistent characters are the app's subjects: mention them as @Name and the app sends them as Kling elements. Register a character once and reuse it; re-uploading the same photo each time makes identity drift.
+- A character saved in the library is mentioned as @Name and the app sends it as a Kling element (saving is the user's call). Otherwise the attached image goes in refs; keep the same image across clips, a different photo each time makes identity drift.
 - Strict moderation: no NSFW, no recognisable IP; the safest shot is one that does not depend on a famous face.
 
 PROMPT STRUCTURE
