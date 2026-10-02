@@ -286,6 +286,12 @@ export function defaultModelFor(kind: MediaKind, needsImage: boolean): string {
     const ok = kind === 'image' || kind === 'model3d' ? schema?.slots.images != null || !schema : schema?.slots.firstFrame != null || !schema;
     if (ok) return current;
   }
+  // The same line's variant for these inputs (Nano Banana text → Nano Banana edit), then the user's own edit model.
+  const line = lineRoutes(current);
+  const twin = kind === 'image' ? line.edit ?? line.reference : kind === 'video' ? line.image ?? line.reference : undefined;
+  if (twin && modelSummary(twin)?.acceptsImage) return twin;
+  const userEdit = kind === 'image' ? get().settings.ops.edit : null;
+  if (userEdit && modelSummary(userEdit)?.acceptsImage) return userEdit;
   const parsed = parseModelRef(current);
   if (parsed) {
     const counterpart = kind === 'image' ? editCounterpart(parsed.provider, parsed.id) : kind === 'model3d' ? null : i2vCounterpart(parsed.provider, parsed.id);

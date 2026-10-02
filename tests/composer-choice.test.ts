@@ -63,3 +63,19 @@ describe("the context names each purpose's default model and its guide (C4)", ()
     expect(ctx()).toMatch(/video route models picked by the user: image → atlas::minimax\/h3-developer\/image-to-video/);
   });
 });
+
+describe('a step with an input image keeps the composer image model line', () => {
+  it('Nano Banana (v1) picked by the user edits with Nano Banana edit, not the app preference', async () => {
+    const { defaultModelFor } = await import('../src/engine/catalog');
+    const img = (ref: string, acceptsImage: boolean): ModelSummary => ({ ref, provider: 'atlas', id: ref.split('::')[1], name: ref.split('::')[1], kind: 'image', acceptsText: true, acceptsImage, tags: [] });
+    const T2I = 'atlas::google/nano-banana/text-to-image-developer';
+    const EDIT = 'atlas::google/nano-banana/edit-developer';
+    const NB2 = 'atlas::google/nano-banana-2/edit-developer';
+    const st = useStore.getState();
+    useStore.setState({
+      catalog: { ...st.catalog, models: { [T2I]: img(T2I, false), [EDIT]: img(EDIT, true), [NB2]: img(NB2, true) } },
+      composer: { ...st.composer, userPicked: { image: true }, image: { ...st.composer.image, modelRef: T2I } },
+    });
+    expect(defaultModelFor('image', true)).toBe(EDIT);
+  });
+});
