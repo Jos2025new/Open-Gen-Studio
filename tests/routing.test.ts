@@ -107,6 +107,35 @@ describe('the plan follows the table unless the user picked the composer model (
     expect(st.settings.advanced.quality).toBe('draft');
   });
 
+  it('repairs instead of rejecting: an asset id in the prompt, a start image the named model needs', async () => {
+    const wired = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'asset:a slow push-in' }] }, ctx(false), 'p');
+    const v = wired.plan!.steps[0] as { firstFrame?: string; prompt: string; modelRef: string };
+    expect(v.firstFrame).toBe('asset:a');
+    expect(v.prompt).toBe('slow push-in');
+    expect(v.modelRef).toMatch(/image-to-video/);
+    const named = await normalizePlan(
+      { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'she smiles', model: 'atlas::minimax/h3-max/image-to-video' }] },
+      { ...ctx(false), requestImages: () => ['a'] },
+      'p',
+    );
+    expect(named.errors).toEqual([]);
+    expect((named.plan!.steps[0] as { firstFrame?: string }).firstFrame).toBe('asset:a');
+  });
+
+  it('the composer model wins over one only the plan names; a model the user named wins', async () => {
+    const plan = (said: string) =>
+      normalizePlan(
+        { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: 'atlas::alibaba/wan-3.0/text-to-video' }] },
+        { ...ctx(true), userText: () => said },
+        'p',
+      );
+    const kept = await plan('haz un video de un gato');
+    expect((kept.plan!.steps[0] as { modelRef: string }).modelRef).toBe('atlas::kwaivgi/kling-v3.0-pro/text-to-video');
+    expect(kept.plan!.adjustments.join(' ')).toMatch(/kept your video model/);
+    const asked = await plan('hazlo con wan 3');
+    expect((asked.plan!.steps[0] as { modelRef: string }).modelRef).toBe('atlas::alibaba/wan-3.0/text-to-video');
+  });
+
   it('picked by hand: the composer model, as before', async () => {
     expect(await model(true, { purpose: 'draft' })).toBe('atlas::kwaivgi/kling-v3.0-pro/text-to-video');
   });

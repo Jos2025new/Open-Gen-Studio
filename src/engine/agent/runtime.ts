@@ -105,6 +105,18 @@ export function designerDims(): { width: number; height: number } {
   return r >= 1 ? { width: Math.round(1080 * r), height: 1080 } : { width: 1080, height: Math.round(1080 / r) };
 }
 
+/** The user's own words, marked off from everything the app adds (context, guides, notes). */
+function userBlock(text: string): string {
+  return `<user_message>\n${text}\n</user_message>`;
+}
+
+/** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
+function userWords(sessionId: string): string {
+  const s = session(sessionId);
+  const said = s.feed.flatMap((f) => (f.type === 'user' ? [f.text ?? ''] : f.type === 'questions' && f.answers ? Object.values(f.answers) : []));
+  return [...said, s.agent.draft?.request ?? '', ...Object.values(s.agent.draft?.answers ?? {})].join('\n');
+}
+
 function planContext(sessionId: string, workspace: Workspace) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
@@ -118,6 +130,8 @@ function planContext(sessionId: string, workspace: Workspace) {
     composerChosen,
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     subjectNames: () => get().library.map((x) => x.name),
+    userText: () => userWords(sessionId),
+    requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
   };
 }
 
@@ -155,7 +169,7 @@ export async function sendAgentMessage(text: string): Promise<void> {
       pushHistory(sessionId, {
         role: 'tool',
         tool_call_id: pending.toolCallId,
-        content: `The user replied instead of approving: ${clean}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
+        content: `The user replied instead of approving:\n${userBlock(clean)}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
       });
       // Images attached to the comment: a user message right after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
@@ -196,7 +210,7 @@ export async function sendAgentMessage(text: string): Promise<void> {
   }
   // A new request: images of earlier requests become a note instead of being sent again.
   patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
-  pushHistory(sessionId, userMessage(`${clean || '(no text)'}\n\n${ctx}${pickedWorkflowGuides(sessionId)}`, parts));
+  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)')}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);
 }

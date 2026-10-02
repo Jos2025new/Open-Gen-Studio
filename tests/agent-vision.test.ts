@@ -61,7 +61,7 @@ describe('the agent sees the attached references', () => {
     expect(Array.isArray(msg.content)).toBe(true);
     const parts = msg.content as Array<{ type: string; text?: string; image_url?: { url: string } }>;
     expect(parts[0]).toMatchObject({ type: 'text' });
-    expect(parts[0].text).toMatch(/^animate this character/);
+    expect(parts[0].text).toMatch(/^<user_message>\nanimate this character\n<\/user_message>/);
     expect(parts.some((p) => p.type === 'text' && /asset:img1 \(image 2000×1000\)/.test(p.text!))).toBe(true);
     expect(parts.some((p) => p.type === 'image_url' && p.image_url!.url.startsWith('data:image/jpeg'))).toBe(true);
     expect(drawn).toContainEqual([768, 384]);

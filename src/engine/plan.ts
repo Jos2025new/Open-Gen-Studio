@@ -119,6 +119,18 @@ function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; images:
   return `add the missing input (an image step or asset:<id> in refs).${other}`;
 }
 
+/** Words that name a route or tier, not a model family ("image to video", "pro", "developer"). */
+const ROUTE_WORDS = new Set(['video', 'image', 'text', 'to', 'edit', 'reference', 'references', 'developer', 'dev', 'pro', 'fast', 'lite', 'max', 'turbo', 'mini', 'standard', 'std', 'preview', 'ultra', 'plus', 'model', 'atlas', 'nanogpt', 'fal', 'ai', 'spicy']);
+function nameTokens(s: string): string[] {
+  return s.toLowerCase().split(/[^a-z0-9.]+/).map((t) => t.replace(/\.0$/, '').replace(/\.$/, '')).filter((t) => t.length >= 2 && !ROUTE_WORDS.has(t));
+}
+/** Whether the user's words name this model's family ("wan", "seedance", "nano banana", "h3"). */
+function userNamed(names: string[], said: string): boolean {
+  const words = new Set(nameTokens(said));
+  const flat = said.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return names.some((n) => nameTokens(n).some((t) => words.has(t) || (t.length >= 4 && flat.includes(t.replace(/[^a-z0-9]/g, '')))));
+}
+
 export interface PlanContext {
   workspace: Workspace;
   getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
@@ -136,6 +148,10 @@ export interface PlanContext {
   routeModel?: (mode: RouteMode) => string | undefined;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
+  /** What the user wrote (messages, answers): a model the plan names wins over the composer's pick only if it is named here. */
+  userText?: () => string;
+  /** Images attached to the current request: the start frame a model needs when the plan forgot it. */
+  requestImages?: () => string[];
   /** Names of the session's subjects: a plan subject with one of these names reuses it. */
   subjectNames?: () => string[];
 }
@@ -469,6 +485,17 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       case 'model3d':
       case 'video': {
         const kind: MediaKind = s.kind;
+        // An asset id written in the prompt is an input the plan forgot to wire: it becomes the step's image (no rejection).
+        for (const token of new Set((s.prompt ?? '').match(/asset:[A-Za-z0-9_-]+/g) ?? [])) {
+          const a = ctx.asset(token.slice(6));
+          if (!a) continue;
+          s.prompt = (s.prompt ?? '').split(token).join('').replace(/\s{2,}/g, ' ').trim();
+          if (s.first_frame === token || s.refs?.includes(token)) continue;
+          const asStart = kind === 'video' && a.kind === 'image' && !s.first_frame && !s.refs?.length;
+          if (asStart) s.first_frame = token;
+          else s.refs = [...(s.refs ?? []), token];
+          adjustments.push(`${s.id}: ${token} moved from the prompt to the step's ${asStart ? 'start frame' : 'references'}`);
+        }
         const refs = (s.refs ?? []).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
@@ -485,6 +512,16 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (kind === 'video') {
           expectImage(s.first_frame, `${where} first_frame`);
           expectImage(s.last_frame, `${where} last_frame`);
+        }
+        // The user's own model pick (composer, or a video route) wins over a model only the plan names.
+        const named = s.model?.trim();
+        const userPicked = ctx.composerChosen?.(kind) || (kind === 'video' && Boolean(ctx.routeModel?.(routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length }))));
+        if (named && userPicked && ctx.userText) {
+          const found = await ctx.getModel(named);
+          if (!userNamed([named, found?.model.name ?? ''], ctx.userText())) {
+            adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${found?.model.name ?? named})`);
+            s.model = undefined;
+          }
         }
         // Model choice depends on the image inputs; it runs again if video refs become frames (O1).
         const pickModel = async (pickNotes: string[]) => {
@@ -562,6 +599,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const audioProblem = audioInputProblem(schema.slots, audioRefs.length);
           if (audioProblem) errors.push(`${where}: model "${modelRef}" ${audioProblem}`);
         } else {
+          // A model that needs a start image, with none wired: the one image attached to this request is it.
+          const needsStart = Boolean(schema.slots.firstFrame?.required) || (!resolved.model.acceptsText && Boolean(schema.slots.firstFrame));
+          const attached = ctx.requestImages?.() ?? [];
+          if (needsStart && !s.first_frame && !refs.length && attached.length === 1) {
+            s.first_frame = `asset:${attached[0]}`;
+            adjustments.push(`${s.id}: start frame = your attached image (the model needs one)`);
+          }
           // Same routing as the composer and the job runner (params.routeVideoInputs).
           const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
           const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length });
