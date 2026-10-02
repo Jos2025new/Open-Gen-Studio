@@ -104,3 +104,7 @@
 .confirm-pop strong { color: var(--text); font-weight: 600; }
 .confirm-pop p { margin: 0; line-height: 1.45; }
 .confirm-pop-actions { display: flex; justify-content: flex-end; gap: 6px; }
+/* The value sits right after its slider: narrow, left-aligned number, unit close to it. */
+.opt { gap: 5px; }
+.opt-num { width: 3.6ch; text-align: left; padding: 2px 0 !important; }
+.opt-unit { margin-left: -3px; }
