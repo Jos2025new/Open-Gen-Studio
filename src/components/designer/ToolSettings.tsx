@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, FlipHorizontal2, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, FlipHorizontal2, Magnet, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
+import { SNAP_DEFAULT } from '../../engine/design/snap';
 import { MenuItem } from '../ui/primitives';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
@@ -71,6 +72,24 @@ const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
   { value: 'smallest', label: 'Smallest' },
 ];
 
+/** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
+function SnapControl() {
+  const pop = usePopover();
+  const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
+  const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });
+  return <>
+    <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip="Snap while moving"><Magnet size={13} />Snap<ChevronDown size={12} /></button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Snap">
+      <div className="snap-pop">
+        <label className="check-row"><input type="checkbox" checked={snap.on} onChange={(e) => set({ on: e.target.checked })} />Snap while moving</label>
+        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.page} onChange={(e) => set({ page: e.target.checked })} />Page edges and center</label>
+        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.layers} onChange={(e) => set({ layers: e.target.checked })} />Other layers</label>
+        <p className="faint">Hold Alt while dragging to move freely.</p>
+      </div>
+    </Popover>
+  </>;
+}
+
 /**
  * Edit tool: Align (to the page, or with several layers picked relative to the selection, the first or last picked,
  * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
@@ -135,7 +154,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />

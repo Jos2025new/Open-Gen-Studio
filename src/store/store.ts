@@ -110,6 +110,8 @@ export interface UiState {
   lineart: StrokeStyle;
   lineartMode?: 'draw' | 'edit';
   lineartInfluence?: number;
+  /** Edit tool snapping (page and other layers); on by default. */
+  snap?: { on: boolean; page: boolean; layers: boolean };
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
   text: TextStyle;
   threadOpen: boolean;

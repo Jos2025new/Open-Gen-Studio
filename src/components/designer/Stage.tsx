@@ -7,6 +7,7 @@ import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, layoutText, hitTest } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer } from '../../engine/design/doc';
+import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -40,6 +41,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  // Snap guides while moving (screen overlay only).
+  const guides = useRef<{ x?: number; y?: number }>({});
   const [editingText, setEditingText] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [preview, setPreview] = useState<Drag | null>(null);
@@ -160,6 +163,17 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
+    // Snap guides: the line the moving layer sticks to, across the view.
+    const g = guides.current;
+    if (g.x != null || g.y != null) {
+      ctx.save();
+      ctx.strokeStyle = '#ff4fd8';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      if (g.x != null) { ctx.beginPath(); ctx.moveTo(Math.round(sx(g.x)) + 0.5, 0); ctx.lineTo(Math.round(sx(g.x)) + 0.5, size.h); ctx.stroke(); }
+      if (g.y != null) { ctx.beginPath(); ctx.moveTo(0, Math.round(sy(g.y)) + 0.5); ctx.lineTo(size.w, Math.round(sy(g.y)) + 0.5); ctx.stroke(); }
+      ctx.restore();
+    }
     if (active && active.visible && !editingText) {
       const strokes = active.type === 'raster' ? active.paintStrokes?.filter((s) => !s.erase) ?? [] : [];
       const selected = strokes.find((s) => selectedRaster?.layerId === active.id && s.id === selectedRaster.strokeId);
@@ -451,7 +465,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const moved = moveRasterStroke(d.base, d.strokeId, p.x - d.startX, p.y - d.startY);
       if (composeRaster(moved, false)) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
     } else if (d.kind === 'move') {
-      const moved = translateLayer(d.base, p.x - d.startX, p.y - d.startY);
+      let moved = translateLayer(d.base, p.x - d.startX, p.y - d.startY);
+      // Snap to the page and the other layers (Alt held: free move).
+      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
+      const box = snap.on && !e.altKey ? layerBox(moved) : null;
+      if (box) {
+        const s = snapBox(box, snapTargets(doc, d.layerId, snap), 6 / view.zoom);
+        if (s.dx || s.dy) moved = translateLayer(d.base, p.x - d.startX + s.dx, p.y - d.startY + s.dy);
+        guides.current = { x: s.gx, y: s.gy };
+      } else guides.current = {};
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? moved : l)) }));
     } else if (d.kind === 'scale') {
       const k = Math.max(0.02, Math.hypot(p.x - d.ax, p.y - d.ay) / d.startDist);
@@ -512,6 +534,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const d = drag.current;
     drag.current = null;
     if (!d) return;
+    guides.current = {};
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'rasterMove') {
       commitEdit(d.layerId);
