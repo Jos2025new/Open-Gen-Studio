@@ -143,5 +143,8 @@ describe('a video workflow brings its video model guide', () => {
     expect(workflowMakesVideo('workflow:ugc/review')).toBe(true);
     expect(workflowMakesVideo('workflow:poster')).toBe(false);
     expect(workflowMakesVideo('skill:cinematic')).toBe(false);
+    const { workflowMakesImage } = await import('../src/engine/skills');
+    expect(workflowMakesImage('workflow:ugc')).toBe(true); // the creator sheet
+    expect(workflowMakesImage('workflow:story')).toBe(false);
   });
 });

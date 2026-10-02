@@ -496,6 +496,14 @@ export function workflowMakesVideo(guideId: string): boolean {
   return steps.some((st) => st.kind === 'video' || (st.kind === 'op' && ['animate', 'continue', 'join_clips'].includes(String(st.op))));
 }
 
+/** Whether a "workflow:<id>[/variant]" guide plans image steps (a sheet, a key frame, renders). */
+export function workflowMakesImage(guideId: string): boolean {
+  const [type, rest = ''] = guideId.trim().split(':');
+  const w = type === 'workflow' ? workflowById(rest.split('/')[0]) : undefined;
+  if (!w) return false;
+  return [...w.steps, ...(w.variants ?? []).flatMap((v) => v.steps ?? [])].some((st) => st.kind === 'image');
+}
+
 export function workflowById(id: string | null | undefined): Workflow | undefined {
   return WORKFLOWS.find((w) => w.id === id);
 }

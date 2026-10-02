@@ -163,6 +163,12 @@ export function defaultVideoGuideId(): string | undefined {
   return ref ? guideForModel(ref.split('::')[1])?.id : undefined;
 }
 
+/** The prompting guide of the image model image steps use now (the composer's image model: picked or default). */
+export function defaultImageGuideId(): string | undefined {
+  const ref = get().composer.image.modelRef;
+  return ref ? guideForModel(ref.split('::')[1] ?? '')?.id : undefined;
+}
+
 /** Which model each video purpose resolves to with the connected providers. */
 function videoRouteLine(): string {
   const models = get().catalog.models;

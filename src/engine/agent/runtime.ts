@@ -46,13 +46,13 @@ import {
   updateFeedItem,
   useStore,
 } from '../../store/store';
-import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultVideoGuideId } from './context';
+import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultImageGuideId, defaultVideoGuideId } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, guideWorkspaceProblem, skillById, workflowMakesVideo } from '../skills';
+import { readGuide, guideWorkspaceProblem, skillById, workflowMakesImage, workflowMakesVideo } from '../skills';
 import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -1049,9 +1049,15 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const inHistory = (t: string) => session(sessionId).agent.history.some((m) => m.role === 'tool' && typeof m.content === 'string' && m.content.includes(t));
           const seen = text != null && inHistory(text);
           // A video workflow brings the guide of the video model the plan will use, in the same result (no extra round).
-          const videoGuide = v.success && text && !seen && workflowMakesVideo(v.data.id) ? defaultVideoGuideId() : undefined;
-          const videoText = videoGuide ? readGuide(`model:${videoGuide}`) : undefined;
-          const attach = videoText && !inHistory(videoText) ? `\n\n---\nPrompting guide of the video model this plan will use (model:${videoGuide}); write the clip prompts in its format:\n${videoText}` : '';
+          // Same for its image steps (sheets, key frames, renders): the guide of the image model they will use.
+          const attachGuide = (id: string | undefined, what: string) => {
+            const t = id ? readGuide(`model:${id}`) : undefined;
+            return t && !inHistory(t) ? `\n\n---\nPrompting guide of the ${what} model this plan will use (model:${id}); write those prompts in its format:\n${t}` : '';
+          };
+          const fresh = v.success && text && !seen;
+          const attach =
+            (fresh && workflowMakesVideo(v.data.id) ? attachGuide(defaultVideoGuideId(), 'video') : '') +
+            (fresh && workflowMakesImage(v.data.id) ? attachGuide(defaultImageGuideId(), 'image') : '');
           if (v.success && text && !seen) {
             recordMetric(sessionId, { type: 'guide', id: v.data.id });
             log.action({ icon: 'guide', label: `Read the ${guideLabel(v.data.id)}` });
