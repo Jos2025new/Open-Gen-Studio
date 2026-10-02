@@ -7,13 +7,13 @@ import { FeedList } from '../chat/FeedList';
 export function ThreadPeek({ workspace }: { workspace: string }) {
   const open = useStore((s) => s.ui.threadOpen);
   const sessionId = useStore((s) => s.activeSessionId);
-  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.length ?? 0);
+  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === s.ui.workspace).length ?? 0);
   const pending = useStore((s) => {
     const sess = s.sessions[s.activeSessionId];
     return Boolean(sess?.agent.pending) || Boolean(sess?.agent.busy);
   });
   const lastKey = useStore((s) => {
-    const f = s.sessions[s.activeSessionId]?.feed;
+    const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === s.ui.workspace);
     const last = f?.[f.length - 1];
     return last ? (last.type === 'assistant' ? `${last.id}:${last.text.length}` : last.id) : '';
   });

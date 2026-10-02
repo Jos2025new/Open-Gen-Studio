@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
@@ -113,7 +114,10 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
 }
 
 export function FeedList({ sessionId, compact }: { sessionId: string; compact?: boolean }) {
-  const feed = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
+  // Each canvas shows only its own conversation with the agent.
+  const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
+  const canvas = useStore((s) => s.ui.workspace);
+  const feed = useMemo(() => all.filter((f) => f.workspace === canvas), [all, canvas]);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
   // While text streams, its caret already shows activity; an open activity block shows its own progress (L3).

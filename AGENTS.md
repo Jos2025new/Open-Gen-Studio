@@ -26,6 +26,11 @@ Origen: comparación con OpenMontage (`/home/samuel/Documentos/Projects/AI/My Ap
 Verificación del plan: typecheck y suite verdes (344 + 1 omitida). Sin LLM real ni banco: falta medir con `BENCH_ONLY=two-clips-named-model,change-model,story-3-clips` contra `bench/2026-10-01-3273c0a.json` (necesita la clave y presupuesto del usuario).
 Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeline de 7 etapas con puertas, investigación web, puntuaciones de slideshow/variedad y de proveedores, decision log/checkpoints JSON, playbooks YAML, tablero Backlot, reserva de presupuesto.
 
+## Tarea — una conversación del agente por lienzo (2026-10-02)
+Origen (usuario): la conversación del agente en Chat se mezclaba con la de Nodos (y Designer).
+- [x] C1. Vista: cada lienzo muestra solo los mensajes de su lienzo (`FeedList` filtra por `item.workspace`; contadores de `ChatWorkspace` y `ThreadPeek` también).
+- [x] C2. Lo que ve el modelo: `AgentState.canvas` + `parked` por lienzo (historial, pendiente, ronda de preguntas, notas, borrador, revisión). `toCanvas` aparca la conversación activa y recupera la del lienzo al escribir, responder preguntas, aprobar, cancelar, reintentar, recuperar o cerrar un plan (nunca con el agente trabajando). Sesiones antiguas: su historial se adopta tal cual en el primer lienzo usado. La sesión (assets, grafo, documento) sigue siendo una. Test en `agent-workspace`.
+
 ## Tarea — mensaje del usuario delimitado, modelo del composer respetado, reparar en vez de rechazar (2026-10-02)
 - [x] M1. La petición va como `<user_message>…</user_message>` y el contexto de la app como `<app_context>…</app_context>` (también el comentario a un plan pendiente); regla en el prompt: el usuario solo nombró lo que está en su mensaje o sus respuestas. *Por qué:* los modelos débiles tomaban los modelos listados en el contexto como pedidos.
 - [x] M2. Con un modelo elegido a mano en el composer (o una ruta de vídeo), un modelo que solo nombra el plan no gana: se usa el del usuario y se anota "kept your … model". Gana si el usuario lo nombró en la sesión (`PlanContext.userText`, comparación por familia: "wan", "seedance", "h3"…).

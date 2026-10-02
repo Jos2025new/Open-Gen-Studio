@@ -811,7 +811,14 @@ export interface AgentState {
   revising?: string;
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
+  /** Canvas the conversation above belongs to; each canvas keeps its own (unset: older sessions, adopted as is). */
+  canvas?: Workspace;
+  /** The other canvases' conversations, kept while this one is active. */
+  parked?: Partial<Record<Workspace, CanvasConversation>>;
 }
+
+/** One canvas's agent conversation: what the model saw and what is waiting on the user there. */
+export type CanvasConversation = Pick<AgentState, 'history' | 'pending' | 'questionRound' | 'notes' | 'draft' | 'revising'>;
 
 /** Where money went: the agent's model calls and each paid generation. */
 export type SpendCategory = 'agent' | MediaKind | 'text';

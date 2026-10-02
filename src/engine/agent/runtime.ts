@@ -16,6 +16,7 @@ import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
+  CanvasConversation,
   ActivityEntry,
   ActivityFeedItem,
   AgentQuestion,
@@ -115,6 +116,28 @@ function userBlock(text: string): string {
   return `<user_message>\n${text}\n</user_message>`;
 }
 
+/**
+ * Each canvas has its own conversation with the agent (chat, nodes, designer): switching canvas parks the current
+ * one and brings back that canvas's. Never while the agent is working.
+ */
+function toCanvas(sessionId: string, workspace: Workspace): void {
+  const a = session(sessionId)?.agent;
+  if (!a || a.busy) return;
+  if (!a.canvas || a.canvas === workspace) {
+    if (a.canvas !== workspace) patchAgent(sessionId, { canvas: workspace });
+    return;
+  }
+  const here: CanvasConversation = { history: a.history, pending: a.pending, questionRound: a.questionRound, notes: a.notes, draft: a.draft, revising: a.revising };
+  const there: CanvasConversation = a.parked?.[workspace] ?? { history: [], questionRound: 0, notes: [] };
+  patchAgent(sessionId, { ...there, pending: there.pending, draft: there.draft, revising: there.revising, canvas: workspace, parked: { ...(a.parked ?? {}), [a.canvas]: here, [workspace]: undefined } });
+}
+
+/** The conversation of the canvas a feed item belongs to. */
+function toCanvasOfItem(sessionId: string, itemId: string): void {
+  const item = session(sessionId)?.feed.find((f) => f.id === itemId);
+  if (item) toCanvas(sessionId, item.workspace);
+}
+
 /** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
 function userWords(sessionId: string): string {
   const s = session(sessionId);
@@ -148,9 +171,10 @@ function planContext(sessionId: string, workspace: Workspace) {
 export async function sendAgentMessage(text: string): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
-  const s = session(sessionId);
-  if (!s || s.agent.busy) return;
+  if (!session(sessionId) || session(sessionId).agent.busy) return;
   const workspace = st.ui.workspace;
+  toCanvas(sessionId, workspace);
+  const s = session(sessionId);
   const attachments = [...st.composer.attachments];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
@@ -290,6 +314,7 @@ function pushHistory(sessionId: string, msg: LlmMessage): void {
 
 /** Answers chosen in a questions card. */
 export async function submitAnswers(sessionId: string, itemId: string, answers: Record<string, string>, how: 'chips' | 'typed' = 'chips'): Promise<void> {
+  toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'questions' || item.status !== 'pending') return;
@@ -317,6 +342,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */
 export async function skipQuestions(sessionId: string, itemId: string): Promise<void> {
+  toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'questions' || item.status !== 'pending') return;
@@ -344,6 +370,7 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
  * a model search) are kept and not repeated. The half-written answer and the error notice are removed.
  */
 export async function retryAgentTurn(sessionId: string, noticeId: string): Promise<void> {
+  toCanvasOfItem(sessionId, noticeId);
   const s = session(sessionId);
   const item = s?.feed.find((f) => f.id === noticeId);
   if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine().kind !== 'llm') return;
@@ -505,6 +532,7 @@ function removeDraftNodes(sessionId: string, planId: string): void {
 
 
 export async function approvePlan(sessionId: string, itemId: string): Promise<void> {
+  toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;
@@ -694,6 +722,7 @@ async function runPlanItem(
  * with a pending card, or when the user already wrote something after this plan.
  */
 async function wrapUpPlan(sessionId: string, itemId: string, title: string, status: PlanFeedItem['status'], summary: string): Promise<void> {
+  toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   if (!s || agentEngine().kind !== 'llm' || s.agent.busy || s.agent.pending) return;
   const at = s.feed.findIndex((f) => f.id === itemId);
@@ -752,6 +781,7 @@ export function planRecoveryProblem(item: PlanFeedItem, mode: PlanRecoveryMode):
  * Returns a short summary for the agent.
  */
 export async function resumePlan(sessionId: string, itemId: string, mode: PlanRecoveryMode): Promise<string> {
+  toCanvasOfItem(sessionId, itemId);
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return 'No such plan.';
   const problem = planRecoveryProblem(item, mode);
@@ -803,6 +833,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
 }
 
 export function cancelPlan(sessionId: string, itemId: string): void {
+  toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan' || item.status !== 'awaiting') return;

@@ -11,9 +11,9 @@ const SUGGESTIONS = [
 
 export function ChatWorkspace() {
   const sessionId = useStore((s) => s.activeSessionId);
-  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.length ?? 0);
+  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === 'chat').length ?? 0);
   const lastKey = useStore((s) => {
-    const f = s.sessions[s.activeSessionId]?.feed;
+    const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === 'chat');
     const last = f?.[f.length - 1];
     if (!last) return '';
     return last.type === 'assistant' ? `${last.id}:${last.text.length}` : last.id;
