@@ -131,3 +131,11 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .vision-tag { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; height: 16px; padding: 0 5px; border-radius: 4px; border: 1px solid var(--border); font-size: 10px; color: var(--text-3, var(--text-2)); vertical-align: middle; }
 .vision-tag.is-on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
 .vision-tag.is-off { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+
+/* Agent model rows: name, vision, context and price on one line, the provider's description under it. */
+.llm-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.llm-line .ml-name { flex: 0 1 auto; min-width: 0; }
+.llm-line .ml-price { margin-left: auto; }
+.llm-ctx { font-size: 10px; color: var(--text-2); }
+.llm-filters .ml-filter { cursor: pointer; }
+.llm-sort { background: transparent; }

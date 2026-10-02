@@ -1,4 +1,6 @@
 import { VisionTag } from '../ui/VisionTag';
+import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
+import { filterLlm, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -109,9 +111,17 @@ function DirectorList({ done }: { done: () => void }) {
   const models = useStore((s) => (agent.provider === 'offline' ? undefined : s.catalog.llm[agent.provider]));
   const [q, setQ] = useState('');
   const [openFamilies, setOpenFamilies] = useState<string[]>([]);
+  const [caps, setCaps] = useState<LlmCapability[]>([]);
+  const [sort, setSort] = useState<LlmSort>('recommended');
   if (agent.provider === 'offline') return <div className="ml-empty">The local planner is active. Choose an agent provider in Settings to use another Director.</div>;
   const needle = q.trim().toLowerCase();
-  const list = (models ?? []).filter((m) => m.tools && (!needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)));
+  const list = filterLlm(models ?? [], { caps, q: needle, sort });
+  // An order puts every model in one list; otherwise by family.
+  const flat = sort !== 'recommended';
+  const pick = (id: string) => {
+    setSettings((s) => ({ agent: { ...s.agent, model: id, modelPinned: true } }));
+    done();
+  };
   const families = new Map<string, typeof list>();
   for (const m of list) {
     const family = directorFamily(m.id, m.name);
@@ -120,29 +130,35 @@ function DirectorList({ done }: { done: () => void }) {
   return (
     <>
       <div className="ml-search"><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Director models" aria-label="Search Director models" /></div>
+      <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} />
       <div className="ml-scroll agent-director-list">
         <button type="button" className={`ml-row ${agent.modelPinned ? '' : 'is-selected'}`} onClick={() => { void resetAgentModel(); done(); }}>
           <span className="ml-main"><span className="ml-name">Auto</span><span className="ml-sub">{agent.tier === 'top' ? 'Top tier' : 'Normal tier'} · {agent.model || 'No model resolved'} <VisionTag vision={models?.find((m) => m.id === agent.model)?.vision} /></span></span>
           {!agent.modelPinned ? <Check size={14} className="ml-check" /> : null}
         </button>
-        {[...families.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([family, entries]) => {
+        {flat ? list.map((m) => (
+          <button key={m.id} type="button" className={`ml-row ${agent.modelPinned && m.id === agent.model ? 'is-selected' : ''}`} onClick={() => pick(m.id)}>
+            <LlmRowBody m={m} />
+            {agent.modelPinned && m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
+          </button>
+        )) : [...families.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([family, entries]) => {
           const selected = entries.some((m) => agent.modelPinned && m.id === agent.model);
-          const open = Boolean(needle) || selected || openFamilies.includes(family);
+          const open = Boolean(needle) || caps.length > 0 || selected || openFamilies.includes(family);
           return (
             <div key={family} className="ml-group is-family">
               <button type="button" className={`ml-family ${open ? 'is-open' : ''}`} onClick={() => setOpenFamilies((xs) => xs.includes(family) ? xs.filter((x) => x !== family) : [...xs, family])} aria-expanded={open}>
                 <ChevronDown size={13} /><span>{family}</span><span className="faint num">{entries.length}</span>
               </button>
               {open ? entries.map((m) => (
-                <button key={m.id} type="button" className={`ml-row ${agent.modelPinned && m.id === agent.model ? 'is-selected' : ''}`} onClick={() => { setSettings((s) => ({ agent: { ...s.agent, model: m.id, modelPinned: true } })); done(); }}>
-                  <span className="ml-main"><span className="ml-name">{m.name} <VisionTag vision={m.vision} /></span><span className="ml-sub">{m.id}</span></span>
+                <button key={m.id} type="button" className={`ml-row ${agent.modelPinned && m.id === agent.model ? 'is-selected' : ''}`} onClick={() => pick(m.id)}>
+                  <LlmRowBody m={m} />
                   {agent.modelPinned && m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
                 </button>
               )) : null}
             </div>
           );
         })}
-        {!list.length ? <div className="ml-empty">The Director catalog is not loaded. It will remain on the current automatic model.</div> : null}
+        {!list.length ? <div className="ml-empty">{models?.length ? 'No model with tool calling matches these filters.' : 'The Director catalog is not loaded. It will remain on the current automatic model.'}</div> : null}
       </div>
     </>
   );

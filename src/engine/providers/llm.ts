@@ -12,6 +12,11 @@ export interface LlmModel {
   tools: boolean;
   /** Accepts image input (undefined when the catalog does not say). */
   vision?: boolean;
+  /** Thinks before answering (reasoning tokens); undefined when the catalog does not say. */
+  reasoning?: boolean;
+  videoInput?: boolean;
+  audioInput?: boolean;
+  description?: string;
   contextLength?: number;
   /** USD per million tokens. */
   inputPrice?: number;
@@ -92,7 +97,7 @@ function perMillion(v: unknown, unit: 'token' | 'million'): number | undefined {
 }
 
 export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]> {
-  const cacheKey = `llm:v2:${provider}`;
+  const cacheKey = `llm:v3:${provider}`;
   const cached = await cacheDb.get<LlmModel[]>(cacheKey, 12 * 3600 * 1000);
   if (cached) return cached;
   const res = await requestJson<{ data: Loose[] }>(ENDPOINTS[provider].models);
@@ -102,22 +107,36 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
     if (!id) continue;
     let tools = false;
     let vision: boolean | undefined;
+    let reasoning: boolean | undefined;
+    let videoInput: boolean | undefined;
+    let audioInput: boolean | undefined;
     let inputPrice: number | undefined;
     let outputPrice: number | undefined;
     const pricing = (m.pricing ?? {}) as Loose;
     if (provider === 'openrouter') {
       tools = Array.isArray(m.supported_parameters) && (m.supported_parameters as string[]).includes('tools');
-      vision = ((m.architecture as Loose | undefined)?.input_modalities as string[] | undefined)?.includes('image');
+      const mods = (m.architecture as Loose | undefined)?.input_modalities as string[] | undefined;
+      vision = mods?.includes('image');
+      videoInput = mods?.includes('video');
+      audioInput = mods?.includes('audio');
+      reasoning = Array.isArray(m.supported_parameters) ? (m.supported_parameters as string[]).includes('reasoning') : undefined;
       inputPrice = perMillion(pricing.prompt, 'token');
       outputPrice = perMillion(pricing.completion, 'token');
     } else if (provider === 'nanogpt') {
       tools = Boolean((m.capabilities as Loose | undefined)?.tool_calling);
-      vision = (m.capabilities as Loose | undefined)?.vision as boolean | undefined;
+      const caps = m.capabilities as Loose | undefined;
+      vision = caps?.vision as boolean | undefined;
+      reasoning = caps?.reasoning as boolean | undefined;
+      videoInput = caps?.video_input as boolean | undefined;
+      audioInput = caps?.audio_input as boolean | undefined;
       inputPrice = perMillion(pricing.prompt, 'million');
       outputPrice = perMillion(pricing.completion, 'million');
     } else {
       tools = Array.isArray(m.supported_features) && (m.supported_features as string[]).includes('tools');
-      vision = (m.input_modalities as string[] | undefined)?.includes('image');
+      const mods = m.input_modalities as string[] | undefined;
+      vision = mods?.includes('image');
+      videoInput = mods?.includes('video');
+      audioInput = mods?.includes('audio');
       inputPrice = perMillion(pricing.prompt, 'token');
       outputPrice = perMillion(pricing.completion, 'token');
     }
@@ -128,6 +147,10 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
       name: String(m.name ?? id).replace(/^[^:]+:\s*/, ''),
       tools,
       vision,
+      ...(reasoning !== undefined ? { reasoning } : {}),
+      ...(videoInput !== undefined ? { videoInput } : {}),
+      ...(audioInput !== undefined ? { audioInput } : {}),
+      ...(typeof m.description === 'string' && m.description.trim() ? { description: m.description.trim().slice(0, 240) } : {}),
       contextLength: typeof m.context_length === 'number' ? m.context_length : undefined,
       inputPrice,
       outputPrice,
@@ -138,6 +161,30 @@ export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]
 }
 
 export const capable = (m: LlmModel) => m.tools && m.vision !== false;
+
+export type LlmCapability = 'vision' | 'reasoning' | 'videoInput' | 'audioInput';
+export type LlmSort = 'recommended' | 'price' | 'context' | 'name';
+
+/**
+ * The agent model list: tool calling always (the agent needs it), every checked capability confirmed by the
+ * catalog, words in the name, id or description; sorted by price (input + output, unpriced last), context
+ * (largest first) or name. 'recommended' keeps the given order.
+ */
+export function filterLlm(models: LlmModel[], opts: { caps?: LlmCapability[]; q?: string; sort?: LlmSort } = {}): LlmModel[] {
+  const words = (opts.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+  const out = models.filter((m) => m.tools && (opts.caps ?? []).every((c) => m[c] === true) && words.every((w) => `${m.id} ${m.name} ${m.description ?? ''}`.toLowerCase().includes(w)));
+  const cost = (m: LlmModel) => (m.inputPrice ?? Infinity) + (m.outputPrice ?? Infinity);
+  if (opts.sort === 'price') out.sort((a, b) => cost(a) - cost(b));
+  else if (opts.sort === 'context') out.sort((a, b) => (b.contextLength ?? 0) - (a.contextLength ?? 0));
+  else if (opts.sort === 'name') out.sort((a, b) => a.name.localeCompare(b.name));
+  return out;
+}
+
+/** "128K", "1M": a context window in tokens. */
+export function contextLabel(n?: number): string {
+  if (!n) return '';
+  return n >= 1e6 ? `${+(n / 1e6).toFixed(1)}M` : `${Math.round(n / 1e3)}K`;
+}
 
 /** Priority lists by tier; the model picker shows these first. */
 export const LLM_TIERS: Record<AgentTier, string[]> = { normal: NORMAL_LLM, top: TOP_LLM };

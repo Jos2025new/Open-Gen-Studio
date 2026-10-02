@@ -4,7 +4,8 @@ import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pi
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { VisionTag } from '../ui/VisionTag';
-import { LLM_LABELS, LLM_TIERS, limitedLlmFallback, type LlmModel } from '../../engine/providers/llm';
+import { LLM_LABELS, LLM_TIERS, filterLlm, limitedLlmFallback, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
+import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
 import type { OpEngine } from '../../engine/ops';
 import { formatUsd } from '../../lib/format';
@@ -76,6 +77,8 @@ function LlmModelPicker() {
   const pop = usePopover();
   const [q, setQ] = useState('');
   const [browseAll, setBrowseAll] = useState(false);
+  const [caps, setCaps] = useState<LlmCapability[]>([]);
+  const [sort, setSort] = useState<LlmSort>('recommended');
   useEffect(() => {
     if (provider) void loadLlmCatalog(provider);
   }, [provider]);
@@ -89,11 +92,9 @@ function LlmModelPicker() {
     [withTools],
   );
   const needle = q.trim().toLowerCase();
-  const full = browseAll || Boolean(needle) || !groups.length;
-  const list = useMemo(
-    () => (full ? withTools.filter((m) => !needle || m.id.toLowerCase().includes(needle) || m.name.toLowerCase().includes(needle)).slice(0, 200) : []),
-    [full, withTools, needle],
-  );
+  // Any filter or order shows the whole catalog through it; otherwise the recommended tiers first.
+  const full = browseAll || Boolean(needle) || caps.length > 0 || sort !== 'recommended' || !groups.length;
+  const list = useMemo(() => (full ? filterLlm(models ?? [], { caps, q: needle, sort }).slice(0, 200) : []), [full, models, caps, needle, sort]);
   if (!provider) return null;
   const current = models?.find((m) => m.id === agent.model);
   const row = (m: LlmModel) => (
@@ -107,9 +108,7 @@ function LlmModelPicker() {
         pop.close();
       }}
     >
-      <span className="ml-name">{m.name}</span>
-      <VisionTag vision={m.vision} />
-      <span className="ml-price num">{m.inputPrice != null ? `${formatUsd(m.inputPrice)}/${formatUsd(m.outputPrice)}` : ''}</span>
+      <LlmRowBody m={m} />
       {m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
     </button>
   );
@@ -120,13 +119,15 @@ function LlmModelPicker() {
         {current ? <VisionTag vision={current.vision} full /> : null}
         <ChevronDown size={13} />
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={380} label="Agent model">
-        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · models with tool calling · eye = sees images`} />
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={460} label="Agent model">
+        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · models with tool calling`} />
         <div className="ml-search">
           <Search size={14} />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models" aria-label="Search agent models" />
         </div>
+        <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} />
         <div className="ml-scroll">
+          {full && !list.length && status !== 'loading' ? <div className="ml-empty">No model with tool calling matches these filters.</div> : null}
           {status === 'loading' ? (
             <div className="ml-empty">
               <Spinner /> Loading…
@@ -148,7 +149,7 @@ function LlmModelPicker() {
               {browseAll ? 'Show recommended' : `Browse all models (${withTools.length})`}
             </button>
           ) : (
-            <span className="ml-foot-main faint">{withTools.length} models</span>
+            <span className="ml-foot-main faint">{full ? `${list.length} of ${withTools.length}` : withTools.length} models</span>
           )}
           <span className="faint ml-foot-note" data-tip="USD per million input / output tokens">$/M tokens</span>
         </div>
