@@ -1,6 +1,7 @@
 # AGENTS.md — Open Gen Studio
 
 ## Tarea — miniaturas fijas y arrastrar capas (2026-10-02)
+- [x] L6. (usuario) Cabecera "Properties — [icono] Raster/Vector/Text" con el tipo de la capa activa, en el mismo gris tenue que el icono de su fila; número de opacidad un poco más ancho ("100" se cortaba).
 - [x] L5. (usuario) El icono del tipo de capa sale de la miniatura y va junto al ojo, en gris tenue y siempre visible.
 - [x] L4. (usuario) Una capa bloqueada no se mueve ni con arrastre ni con las flechas, y en vez de ignorarlo avisa: "\"Nombre\" is locked. Unlock it to move it." (flechas activas para poder avisar; el arrastre avisa una vez al moverse).
 - [x] L2. (usuario) Miniatura fija de 64×40 a cualquier ancho del panel (la regla antigua `.layer-select span { flex: 1 }` la estiraba); el panel sigue redimensionable. Propiedades en panel estrecho (<300 px): opacidad y Blend apilados, X·Y·W·H en 2×2 (container query). Operations sin recortarse.

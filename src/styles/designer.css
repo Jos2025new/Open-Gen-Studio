@@ -79,3 +79,8 @@
 .layer-ops-btn { padding: 0 8px; }
 /* The old ".layer-select span { flex: 1 }" must not stretch the thumbnail: it keeps 64×40 at any panel width. */
 .layer-select .layer-thumb-wrap { flex: 0 0 64px; }
+
+/* "Properties — Raster": the active layer's type, with the same quiet icon as its row. */
+.props-kind { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; font-weight: 400; color: var(--text-3, var(--text-2)); }
+.opacity-field input[type=number] { width: 60px; }
+.xywh-cell input { padding-right: 2px !important; }
