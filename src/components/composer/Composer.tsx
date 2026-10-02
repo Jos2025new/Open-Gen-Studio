@@ -1,3 +1,4 @@
+import { ComposerAlerts } from './ComposerAlerts';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, CircleStop, Layers, Plus, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, toast, useStore } from '../../store/store';
@@ -369,6 +370,7 @@ export function Composer() {
   return (
     <div className={`composer-dock dock-${workspace}`}>
       {workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
+      <ComposerAlerts />
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}`}
         onDragOver={(e) => {

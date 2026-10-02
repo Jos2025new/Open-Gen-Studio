@@ -8,6 +8,8 @@ import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { chatToNodes } from '../flow/fromChat';
+import { isCreditError, onAgentCredit } from '../credit';
+import { pushAlert } from '../alerts';
 import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
@@ -85,6 +87,8 @@ function feedBase(workspace: Workspace) {
 
 function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error', retry?: NoticeFeedItem['retry']): void {
   appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level, text, ...(retry ? { retry } : {}) });
+  // Errors also show above the prompt box, where they are seen.
+  if (level === 'error') pushAlert({ level: 'error', text });
   if (level === 'error' && get().ui.workspace !== 'chat') setThreadOpen(true);
 }
 
@@ -1026,7 +1030,7 @@ export function askForPlan(sessionId: string, noticeId: string): void {
   void sendAgentMessage('Propose the plan now.');
 }
 
-async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean } = {}): Promise<void> {
+async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
   void loadLlmCatalog(engine.provider);
@@ -1077,8 +1081,14 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           notice(sessionId, workspace, 'Stopped.', 'info');
           return;
         }
+        // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
+        // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
+        if (isCreditError(err) && !opts.creditRetried) {
+          if (textItemId) removeFeedItem(sessionId, textItemId);
+          if (await onAgentCredit()) return llmTurn(sessionId, workspace, { ...opts, creditRetried: true });
+        }
         // History only grows with completed calls, so a retry repeats just the call that failed.
-        const retry = isTransient(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
+        const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
         notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry);
         return;
       }

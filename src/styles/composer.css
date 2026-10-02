@@ -139,3 +139,15 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .llm-ctx { font-size: 10px; color: var(--text-2); }
 .llm-filters .ml-filter { cursor: pointer; }
 .llm-sort { background: transparent; }
+
+/* Warnings above the prompt box: no credit, a switched model, agent errors. */
+.composer-alerts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
+.composer-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 10px 9px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 12px; color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.composer-alert.is-error { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
+.composer-alert.is-error > svg:first-child { color: var(--danger); }
+.composer-alert.is-warn { border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+.composer-alert.is-warn > svg:first-child { color: var(--warn); }
+.composer-alert.is-info > svg:first-child { color: var(--accent); }
+.composer-alert-text { flex: 1 1 260px; min-width: 0; line-height: 1.45; }
+.composer-alert-close { margin-left: auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--text-2); }
+.composer-alert-close:hover { color: var(--text); background: var(--surface-3); }

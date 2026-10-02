@@ -8,6 +8,7 @@ import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, 
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { deliveryNotes } from './delivery';
+import { isCreditError, onGenerationCredit } from './credit';
 import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
@@ -257,10 +258,20 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal, musi
 export function runGeneration(id: string): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
-  const p = execute(id).finally(() => {
-    running.delete(id);
-    controllers.delete(id);
-  });
+  // No credit at the provider: the same model elsewhere at the same price or less runs instead (said above the
+  // prompt box); otherwise the choices or "recharge" are shown there and the failure stands.
+  const p = execute(id)
+    .catch(async (err) => {
+      if (!isCreditError(err)) throw err;
+      let rerun: Promise<string[]> | undefined;
+      await onGenerationCredit(id, (gid) => (rerun = execute(gid)));
+      if (rerun) return rerun;
+      throw err;
+    })
+    .finally(() => {
+      running.delete(id);
+      controllers.delete(id);
+    });
   running.set(id, p);
   return p;
 }

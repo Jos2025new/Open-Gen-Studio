@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — sin saldo: cambiar a un equivalente, ofrecer opciones o pedir recarga; avisos sobre el prompt (2026-10-02)
+Origen (usuario): "insufficient credit" fallaba sin más, y los avisos en la conversación no se ven.
+- [x] S1. Generación sin saldo (`engine/credit.ts`, en `runGeneration`, así que composer, planes, nodos y operaciones): el mismo modelo (misma línea, `lineKey`, mismas entradas) en otro proveedor conectado con saldo y precio igual o menor (misma unidad) → cambia y reintenta solo, con aviso. Si no: hasta 3 opciones con saldo (misma línea o familia, con precio) como botones; si ninguna: "recarga". Nunca cambia solo a uno más caro. Saldos con `balance()` del proveedor (caché 1 min; un "sin saldo" marca el proveedor vacío; saldo desconocido cuenta como posible).
+- [x] S2. Agente sin saldo: el mismo modelo (mismo nombre) en otro proveedor LLM con clave y saldo, a precio igual o menor → pasa a ser el modelo del agente y la llamada se repite una vez; si no, hasta 3 modelos con herramientas (y visión si el actual la tiene) hasta 1,5× el precio como botones, y el aviso del chat conserva Retry; si ninguno, "recarga".
+- [x] S3. `ComposerAlerts` encima de la caja del prompt (todas las vistas): avisos de saldo, cambios de modelo y errores del agente, con ✕ (máx. 3; no persistentes). Tests `credit` (4). Límite: si el cambio se elige a mano en un plan, la generación se rehace en su tarjeta pero la tarjeta del plan sigue "failed" (Retry failed sirve para el resto). Sin navegador ni proveedores reales.
+
 ## Tarea — operaciones y generaciones del Designer visibles y como capas nuevas (2026-10-02)
 Origen (usuario): "ejecuté varias operaciones en Designer y no veo dónde aparecen". Causa: `runLayerOp` sustituía los píxeles de la capa y no dejaba tarjeta; las imágenes de un plan del agente solo llegaban al lienzo si el plan tenía un paso `layer`.
 - [x] D1. Operación sobre una capa → capa nueva justo encima, misma posición y ancho ("Relight · Layer 1"), original intacto (`placeAboveLayer`, un Undo). Tarjeta de la generación en la conversación del Designer.
