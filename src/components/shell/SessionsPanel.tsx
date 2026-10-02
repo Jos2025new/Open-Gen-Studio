@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { ArrowDownUp, Check, LayoutList, List, Maximize2, MessageSquare, Minimize2, Pencil, PenTool, Pin, PinOff, Plus, Search, SquareCheck, Trash, Workflow, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Maximize2, MessageSquare, Minimize2, Pencil, PenTool, Pin, PinOff, Plus, Search, SlidersHorizontal, Trash, Workflow, X } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
 import { formatRelative, formatUsd, groupByDate } from '../../lib/format';
-import { Button, IconButton, Segmented } from '../ui/primitives';
+import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Session, Workspace } from '../../engine/types';
@@ -37,9 +37,10 @@ export function SessionsPanel() {
   const [pinnedOnly, setPinnedOnly] = useState(false);
   const [compact, setCompact] = useState(false);
   const [canvas, setCanvas] = useState<CanvasFilter>('all');
-  const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const selecting = selected.size > 0;
   const bulkDel = usePopover();
+  const view = usePopover();
   const expanded = useStore((s) => s.ui.panelExpanded);
 
   const stats = useMemo(() => {
@@ -85,10 +86,7 @@ export function SessionsPanel() {
     else next.add(id);
     return next;
   });
-  const stopSelecting = () => {
-    setSelecting(false);
-    setSelected(new Set());
-  };
+  const stopSelecting = () => setSelected(new Set());
   const picked = list.filter((x) => selected.has(x.id));
   const allPinned = picked.length > 0 && picked.every((x) => x.pinned);
   const isEmpty = (x: Session) => !x.feed.length && !x.graph.nodes.length && !x.docs.some((d) => d.layers.length) && !stats.get(x.id)?.gens && !stats.get(x.id)?.assets.length;
@@ -119,76 +117,61 @@ export function SessionsPanel() {
           >
             New
           </Button>
-          <IconButton icon={SquareCheck} label={selecting ? 'Stop selecting' : 'Select sessions'} size="sm" active={selecting} onClick={() => (selecting ? stopSelecting() : setSelecting(true))} />
           <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
         </div>
       </div>
-      <div className="gallery-controls">
+      <div className="sessions-controls">
         <div className="search-input">
           <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search names, chats and prompts" aria-label="Search sessions" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
           {q ? (
             <button type="button" aria-label="Clear search" onClick={() => setQ('')}>
               <X size={13} />
             </button>
           ) : null}
+          <button ref={view.ref} type="button" className={`search-view ${view.open ? 'is-open' : ''}`} onClick={view.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
+            <SlidersHorizontal size={14} />
+            {canvas !== 'all' || pinnedOnly || sort !== 'recent' || reversed ? <span className="dot" /> : null}
+          </button>
         </div>
-        <div className="gallery-tools">
-          <IconButton icon={Pin} label={pinnedOnly ? 'Showing pinned' : 'Pinned only'} size="sm" active={pinnedOnly} onClick={() => setPinnedOnly((v) => !v)} />
-          <IconButton icon={ArrowDownUp} label={sortLabel(sort, reversed)} size="sm" active={reversed} onClick={() => setReversed((v) => !v)} />
-          <Segmented
-            value={sort}
-            size="sm"
-            onChange={setSort}
-            options={[
-              { value: 'recent', label: 'Recent', tip: 'Last activity' },
-              { value: 'created', label: 'Created' },
-              { value: 'name', label: 'Name' },
-            ]}
-          />
-          <span className="spacer" />
-          <IconButton icon={compact ? List : LayoutList} label={compact ? 'Compact list · show thumbnails' : 'With thumbnails · compact list'} size="sm" onClick={() => setCompact((v) => !v)} />
-        </div>
-        <div className="canvas-filter" role="tablist" aria-label="Canvas">
-          {(['all', 'chat', 'node', 'designer'] as const).map((w) => {
-            const Icon = w === 'all' ? null : CANVAS[w].icon;
-            return (
-              <button key={w} type="button" role="tab" aria-selected={canvas === w} className={`canvas-tab ${canvas === w ? 'is-on' : ''}`} onClick={() => setCanvas(w)}>
-                {Icon ? <Icon size={12} /> : null}
-                {w === 'all' ? 'All' : CANVAS[w].label}
-                <span className="num faint">{counts[w]}</span>
-              </button>
-            );
-          })}
-        </div>
-        {selecting ? (
-          <div className="session-bulk">
-            <span className="num">{selected.size} selected</span>
-            <span className="spacer" />
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set(list.map((x) => x.id)))}>All</Button>
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set(list.filter(isEmpty).map((x) => x.id)))} data-tip="Sessions with no messages, nodes, designs or generations">Empty</Button>
-            <Button size="sm" variant="ghost" disabled={!selected.size} onClick={() => setSelected(new Set())}>None</Button>
-            <IconButton icon={allPinned ? PinOff : Pin} label={allPinned ? 'Unpin selected' : 'Pin selected'} size="sm" disabled={!picked.length} onClick={() => picked.forEach((x) => { if (x.pinned === allPinned) togglePinSession(x.id); })} />
-            <IconButton ref={bulkDel.ref} icon={Trash} label="Delete selected" size="sm" tone="danger" disabled={!picked.length} onClick={bulkDel.toggle} />
-            <Popover open={bulkDel.open} anchor={bulkDel.ref} onClose={bulkDel.close} width={300} label="Delete sessions">
-              <div className="confirm">
-                <p>Delete {picked.length} session{picked.length === 1 ? '' : 's'} with their conversations, nodes, designs and assets? Library items are kept.</p>
-                <div className="spend-actions">
-                  <Button variant="ghost" onClick={bulkDel.close}>Cancel</Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => {
-                      bulkDel.close();
-                      picked.forEach((x) => deleteSession(x.id));
-                      stopSelecting();
-                    }}
-                  >
-                    Delete {picked.length}
-                  </Button>
-                </div>
+        <Popover open={view.open} anchor={view.ref} onClose={view.close} width={300} label="Filter, sort and view">
+          <div className="sessions-view">
+            <div className="sv-row">
+              <span className="sv-label">Canvas</span>
+              <div className="sv-canvas">
+                {(['all', 'chat', 'node', 'designer'] as const).map((w) => {
+                  const Icon = w === 'all' ? null : CANVAS[w].icon;
+                  return (
+                    <button key={w} type="button" className={`canvas-tab ${canvas === w ? 'is-on' : ''}`} onClick={() => setCanvas(w)} disabled={w !== 'all' && !counts[w]}>
+                      {Icon ? <Icon size={12} /> : null}
+                      {w === 'all' ? 'All' : CANVAS[w].label}
+                      <span className="num faint">{counts[w]}</span>
+                    </button>
+                  );
+                })}
               </div>
-            </Popover>
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Sort</span>
+              <div className="sv-inline">
+                <Segmented value={sort} size="sm" onChange={setSort} options={[{ value: 'recent', label: 'Recent' }, { value: 'created', label: 'Created' }, { value: 'name', label: 'Name' }]} />
+                <IconButton icon={reversed ? ArrowUp : ArrowDown} label={sortLabel(sort, reversed)} size="sm" onClick={() => setReversed((v) => !v)} />
+              </div>
+            </div>
+            <label className="sv-switch"><span>Pinned only</span><Toggle checked={pinnedOnly} onChange={setPinnedOnly} label="Pinned only" /></label>
+            <label className="sv-switch"><span>Thumbnails</span><Toggle checked={!compact} onChange={(v) => setCompact(!v)} label="Thumbnails" /></label>
+            {list.some(isEmpty) ? (
+              <button type="button" className="sv-action" onClick={() => { setSelected(new Set(list.filter(isEmpty).map((x) => x.id))); view.close(); }}>
+                Select the {list.filter(isEmpty).length} empty session{list.filter(isEmpty).length === 1 ? '' : 's'}
+              </button>
+            ) : null}
+          </div>
+        </Popover>
+        {canvas !== 'all' || pinnedOnly ? (
+          <div className="sessions-active">
+            {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS[canvas].label} <X size={11} /></button> : null}
+            {pinnedOnly ? <button type="button" className="active-chip" onClick={() => setPinnedOnly(false)}>Pinned <X size={11} /></button> : null}
           </div>
         ) : null}
       </div>
@@ -209,6 +192,27 @@ export function SessionsPanel() {
         ))}
         {!list.length ? <div className="empty-block">No sessions match.</div> : null}
       </div>
+      {selecting ? (
+        <div className="session-bar">
+          <span className="num">{selected.size} selected</span>
+          <button type="button" className="sb-link" onClick={() => setSelected(new Set(list.map((x) => x.id)))}>Select all</button>
+          <span className="spacer" />
+          <IconButton icon={allPinned ? PinOff : Pin} label={allPinned ? 'Unpin' : 'Pin'} size="sm" onClick={() => picked.forEach((x) => { if (x.pinned === allPinned) togglePinSession(x.id); })} />
+          <IconButton ref={bulkDel.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={bulkDel.toggle} />
+          <IconButton icon={X} label="Cancel selection" size="sm" onClick={stopSelecting} />
+          <Popover open={bulkDel.open} anchor={bulkDel.ref} onClose={bulkDel.close} width={300} label="Delete sessions">
+            <div className="confirm">
+              <p>Delete {picked.length} session{picked.length === 1 ? '' : 's'} with their conversations, nodes, designs and assets? Library items are kept.</p>
+              <div className="spend-actions">
+                <Button variant="ghost" onClick={bulkDel.close}>Cancel</Button>
+                <Button variant="danger" onClick={() => { bulkDel.close(); picked.forEach((x) => deleteSession(x.id)); stopSelecting(); }}>
+                  Delete {picked.length}
+                </Button>
+              </div>
+            </div>
+          </Popover>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -265,11 +269,9 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
 
   return (
     <div className={`session-row ${active ? 'is-active' : ''} ${selecting ? 'is-selecting' : ''} ${selected ? 'is-selected' : ''}`}>
-      {selecting ? (
-        <button type="button" className={`session-check ${selected ? 'is-on' : ''}`} onClick={onToggle} aria-pressed={selected} aria-label={`Select ${session.title}`}>
-          {selected ? <Check size={12} /> : null}
-        </button>
-      ) : null}
+      <button type="button" className={`session-check ${selected ? 'is-on' : ''}`} onClick={onToggle} aria-pressed={selected} aria-label={`Select ${session.title}`}>
+        {selected ? <Check size={12} /> : null}
+      </button>
       <div
         role="button"
         tabIndex={0}
