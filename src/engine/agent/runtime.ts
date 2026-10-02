@@ -984,12 +984,15 @@ function activityLog(sessionId: string, workspace: Workspace) {
  * A failed turn only: in auto, the latest request asked to make something (not a question) and the agent ended
  * with text alone — no plan or questions card after that request.
  */
+const MAKE_WORDS = /\b(crea|cre[aá]me|haz|hazle|hazme|genera|gen[eé]rala|gen[eé]ralo|dibuja|pinta|anima|edita|cambia|a[nñ]ade|agrega|quita|pon|ponle|convierte|mejora|rehaz|redise[nñ]a|render|create|make|generate|draw|paint|animate|edit|change|add|remove|turn|upscale|design)\w*/i;
+
 function endedWithoutPlan(sessionId: string, workspace: Workspace): boolean {
   if (get().composer.agentStyle !== 'auto') return false;
   const feed = session(sessionId).feed.filter((f) => f.workspace === workspace);
   const at = feed.map((f) => f.type).lastIndexOf('user');
   const request = feed[at];
-  if (request?.type !== 'user' || /[?¿]/.test(request.text)) return false;
+  // Only a request to make or change something (not a question, a greeting or "let's move to the canvas").
+  if (request?.type !== 'user' || /[?¿]/.test(request.text) || !MAKE_WORDS.test(request.text)) return false;
   return !feed.slice(at + 1).some((f) => f.type === 'plan' || f.type === 'questions');
 }
 
@@ -1271,6 +1274,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           if (!v.success) respond(`Invalid continue_in_designer input: ${formatZodError(v.error)}`);
           else {
             const r = await chatToDesigner(sessionId, v.data);
+            if (r.docs.length && get().ui.workspace !== 'designer') setUi({ workspace: 'designer', panel: null, lightbox: null });
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
             const lines = [
               r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : 'No image to send: every chat image is already in a design, or none was given.',
@@ -1282,13 +1286,14 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           continue;
         }
         if (call.name === 'continue_in_canvas') {
-          if (workspace !== 'node') respond('continue_in_canvas works only on the node canvas: ask the user to switch to Nodes.');
-          else {
+          {
+            // From any canvas: the chat's work comes to Nodes and the user's view follows ("pasémonos al canvas").
             const { added } = chatToNodes(sessionId);
+            if (get().ui.workspace !== 'node') setUi({ workspace: 'node', panel: null, lightbox: null });
             log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} chat results to the node canvas` : 'Nothing new from chat' });
             respond(added.length
               ? `Added ${added.length} nodes from the chat (up to date, nothing ran): ${added.map((n) => `${n.id} ${n.data.kind} "${n.data.title}"`).join('; ')}. They are in the node index from now on.`
-              : 'Every chat result is already on the node canvas; nothing added.');
+              : 'Every chat result is already on the node canvas; nothing added. The user\'s view is now the node canvas.');
           }
           continue;
         }

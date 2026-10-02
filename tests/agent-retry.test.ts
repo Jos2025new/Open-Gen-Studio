@@ -90,6 +90,7 @@ describe('a request answered without a plan (auto)', () => {
   it('not for a question, nor in guided mode', async () => {
     expect((await run('auto', '¿Qué modelos de 3D tengo?')).type).toBe('assistant');
     expect((await run('guided', 'Crea una chica 3D tipo overwatch')).type).toBe('assistant');
+    expect((await run('auto', 'Pasemonos al canvas de nodos')).type).toBe('assistant');
   });
 });
 

@@ -33,6 +33,13 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — errores de la sesión "modelo 3D de la heroína" (2026-10-02)
+- [x] F1. "Pasémonos al canvas de nodos" desde el chat: `continue_in_canvas` solo valía en Nodos y el agente mandó al usuario a cambiar a mano. Ahora funciona desde cualquier lienzo y cambia la vista a Nodos; `continue_in_designer` también cambia la vista. Regla: nunca pedir al usuario que cambie de lienzo a mano.
+- [x] F2. Aviso falso "The agent replied without a plan" bajo esa respuesta: solo sale si la petición pide hacer o cambiar algo (`MAKE_WORDS`: crea, haz, genera, edita, anima, añade, quita, create, make…), además de no ser pregunta. Test en `agent-retry`.
+- [x] F3. Rechazo "op edit needs params.instruction" (una vuelta extra): el agente puso `instruction` en el paso. Un campo de la operación escrito en el paso cuenta como dado (`plan.ts`). Test en `clip-chain`.
+- [x] F4. Cierre "…con todo lo demás intacto" sin haberlo visto: `WRAPUP_RULE` pide decir lo que pidió ("pedí que conservara todo lo demás"), nunca que salió bien o intacto.
+No es fallo de la app: Tripo rechazó la imagen por su verificador de contenido; el agente lo explicó y ofreció alternativas.
+
 ## Tarea — "pásalo al Designer" (2026-10-02)
 Origen (usuario): como con Nodos, que el agente invoque una función y la app ponga las imágenes en el Designer como capas raster; cada imagen, un lienzo. Sin capas de vídeo, audio ni 3D.
 - [x] D1. `design/fromChat.ts` (`chatToDesigner`): imágenes → capas raster con `placeAsset` (la misma vía que "Open in Designer"): por defecto un diseño por imagen, a su tamaño (≤4096 px), con nombre del prompt; `as: "layers"` = todas como capas de un diseño del tamaño de la primera. Sin ids: cada imagen del Chat que aún no es fuente de ninguna capa. Vídeo, audio y 3D se omiten y se dicen. No cambia la vista; el primer diseño nuevo queda activo. Sin llamadas ni coste.

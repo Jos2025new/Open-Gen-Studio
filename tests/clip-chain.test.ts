@@ -83,3 +83,15 @@ describe('identity without an image (O5)', () => {
     expect(workflowById('story')?.skills?.map((x) => x.id)).toContain('cinematic');
   });
 });
+
+describe('op fields written on the step', () => {
+  it('"instruction" outside params counts as given (no rejection, no extra round)', async () => {
+    const { plan, errors } = await normalizePlan(
+      { title: 't', steps: [{ id: 's0', kind: 'image', prompt: 'a heroine' }, { id: 's1', kind: 'op', op: 'edit', input: 's0', instruction: 'Change only the bust size' } as never] },
+      ctx,
+      'p',
+    );
+    expect(errors).toEqual([]);
+    expect((plan!.steps.find((s) => s.id === 's1') as OpStep).params.instruction).toBe('Change only the bust size');
+  });
+});

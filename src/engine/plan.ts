@@ -740,7 +740,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const params: Record<string, AdvancedValue> = {};
         for (const f of def.fields) {
-          const v = s.params?.[f.key];
+          // A field written on the step itself ("instruction": …) instead of in params counts as given.
+          const loose = (s as unknown as Record<string, unknown>)[f.key];
+          const v = s.params?.[f.key] ?? (typeof loose === 'string' || typeof loose === 'number' ? (loose as AdvancedValue) : undefined);
           if (f.type === 'choice') {
             const ok = f.options?.some((o) => o.value === String(v));
             params[f.key] = ok ? String(v) : f.default;
