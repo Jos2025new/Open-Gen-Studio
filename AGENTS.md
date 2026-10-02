@@ -33,6 +33,10 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — duplicar con conexiones y conexiones visibles (2026-10-02)
+- [x] N1. Duplicate: copia parámetros y prompt, título "(copy)", sin resultado propio (la generación del original, en curso o terminada, se queda con él; sin sketch, salida 1) y con las conexiones: todas las entradas, y las salidas hacia puertos de varias entradas (un puerto de una sola entrada conserva su origen). *Dónde:* `flow/actions.ts` (`duplicateNode`). Test en `chat-to-nodes`.
+- [x] N2. Conexiones más visibles (gris #8e8e98, 1,6 px; al pasar el ratón más claras) y la seleccionada en lima (2,6 px); las que alimentan un nodo en curso, en lima. *Dónde:* `node.css`. Sin navegador.
+
 ## Tarea — importar del Chat: cerrar el aviso y acceso fijo (2026-10-02)
 - [x] I1. (usuario) `ImportFromChat` (`components/ui/ImportFromChat.tsx`), en Nodos y Designer: botón ⤓ "Import from Chat" en la barra superior con un diálogo (miniatura y título de cada resultado, todos marcados al abrir, All/None; en Designer "Each as a design" / "As layers of one") e "Import N". El aviso sobre el lienzo lleva ✕ y "Choose…"; cerrado se queda así hasta que lleguen más resultados (por sesión y lienzo, localStorage). `chatToNodes(sessionId, only?)` importa solo lo elegido. Sin navegador.
 

@@ -50,3 +50,38 @@ describe('chat work → node canvas', () => {
     expect(chatToNodes(sid).added).toHaveLength(0);
   });
 });
+
+describe('duplicate a node', () => {
+  it('keeps params and connections (inputs; outputs only into multi-input ports), not the result, and says it is a copy', async () => {
+    const { duplicateNode } = await import('../src/engine/flow/actions');
+    const st = useStore.getState();
+    const sid = st.activeSessionId;
+    const img = { kind: 'image', title: 'Image', prompt: 'back view', modelRef: 'atlas::nb', settings: { count: 1, advanced: {} }, outputIndex: 0 };
+    useStore.setState({
+      assets: { ...st.assets, up: asset('up', 'image') },
+      generations: { ...st.generations, gX: gen('gX', sid, { status: 'running' as never }) },
+      sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], graph: {
+        nodes: [
+          { id: 'src', position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Asset', assetId: 'up' } },
+          { id: 'n', position: { x: 300, y: 0 }, data: { ...img, generationId: 'gX' } },
+          { id: 'v', position: { x: 600, y: 0 }, data: { ...img, kind: 'video', title: 'Video' } },
+        ],
+        edges: [
+          { id: 'e1', source: 'src', target: 'n', sourceHandle: 'out', targetHandle: 'ref' },
+          { id: 'e2', source: 'n', target: 'v', sourceHandle: 'out', targetHandle: 'first' },
+          { id: 'e3', source: 'n', target: 'v', sourceHandle: 'out', targetHandle: 'ref' },
+        ],
+      } } as never },
+    });
+    const node = useStore.getState().sessions[sid].graph.nodes.find((n) => n.id === 'n')!;
+    const id = duplicateNode(sid, node);
+    const g = useStore.getState().sessions[sid].graph;
+    const copy = g.nodes.find((n) => n.id === id)!;
+    expect(copy.data).toMatchObject({ title: 'Image (copy)', prompt: 'back view' });
+    expect('generationId' in copy.data && copy.data.generationId).toBeFalsy();
+    expect(g.edges.filter((e) => e.target === id).map((e) => [e.source, e.targetHandle])).toEqual([['src', 'ref']]);
+    // "first" takes one input and keeps the original; "ref" takes several, so the copy joins it.
+    expect(g.edges.filter((e) => e.source === id).map((e) => e.targetHandle)).toEqual(['ref']);
+    expect(g.edges.find((e) => e.id === 'e2')).toBeTruthy();
+  });
+});

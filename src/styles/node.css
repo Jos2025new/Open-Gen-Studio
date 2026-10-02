@@ -106,3 +106,10 @@
 .import-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .import-foot { display: flex; align-items: center; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
 .import-all { margin-right: auto; background: none; border: 0; font-size: 12px; cursor: pointer; }
+
+/* Connections readable on the dark canvas; the selected one in the accent. */
+.node-canvas .react-flow__edge-path { stroke: #8e8e98; stroke-width: 1.6; }
+.node-canvas .react-flow__edge:hover .react-flow__edge-path { stroke: var(--text-2); stroke-width: 2; }
+.node-canvas .react-flow__edge.selected .react-flow__edge-path,
+.node-canvas .react-flow__edge:focus-visible .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.6; }
+.node-canvas .react-flow__edge.animated .react-flow__edge-path { stroke: var(--accent); }

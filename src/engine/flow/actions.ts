@@ -144,10 +144,36 @@ export function setSketch(sessionId: string, nodeId: string, assetId: string | u
 }
 
 /** Copy a node (without its results) slightly offset. */
+/**
+ * A copy of the node: its parameters and prompt, marked "(copy)", with no result of its own (the original's
+ * generation, running or finished, stays with the original) and the same connections: every input, and every
+ * output whose target port takes several inputs (a single-input port keeps its original source).
+ */
 export function duplicateNode(sessionId: string, node: GraphNode): string {
-  const data = { ...node.data } as GraphNodeData;
-  if (runsGeneration(data)) delete (data as GenNodeData).generationId;
-  return addNode(sessionId, data, { x: node.position.x + 40, y: node.position.y + 40 });
+  const data = structuredClone(node.data) as GraphNodeData;
+  if (runsGeneration(data)) {
+    delete (data as GenNodeData).generationId;
+    delete (data as GenNodeData).sketchAssetId;
+    (data as GenNodeData).outputIndex = 0;
+  }
+  data.title = / \(copy\)$/.test(data.title) ? data.title : `${data.title} (copy)`;
+  const id = uid('nd');
+  const st = get();
+  const graph = st.sessions[sessionId]?.graph;
+  if (!graph) return id;
+  let next: import('../types').Graph = { ...graph, nodes: [...graph.nodes, { id, position: { x: node.position.x + 40, y: node.position.y + 60 }, data }] };
+  for (const e of graph.edges.filter((x) => x.target === node.id)) {
+    const c = { source: e.source, target: id, targetHandle: e.targetHandle };
+    if (!connectionError(next, st.assets, c)) next = connect(next, c);
+  }
+  for (const e of graph.edges.filter((x) => x.source === node.id)) {
+    const target = next.nodes.find((n) => n.id === e.target);
+    const port = target ? inputPorts(target.data).find((p) => p.id === e.targetHandle) : undefined;
+    const c = { source: id, target: e.target, targetHandle: e.targetHandle };
+    if (port?.multi && !connectionError(next, st.assets, c)) next = connect(next, c);
+  }
+  setGraph(sessionId, () => next);
+  return id;
 }
 
 export function connectNodes(sessionId: string, c: { source: string; target: string; targetHandle: string | null }): string | null {
