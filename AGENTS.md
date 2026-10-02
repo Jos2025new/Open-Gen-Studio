@@ -1,5 +1,9 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — terminar Ajustes por apartados (2026-10-02)
+- [x] Conservar los cambios pendientes de SettingsPanel y shell.css; ajustar estilos solo dentro de Ajustes y textos coherentes con las pestañas y el borrado real. Riesgo: distribución sin validación visual; reversible con revert.
+- [x] Typecheck correcto; suite: 390 pasan, 1 omitida, pero termina con un rechazo no manejado `window is not defined` en `store.ts:256` durante `snap.test.ts`. Sin navegador por petición del usuario. Cambios guardados en un commit de esta tarea.
+
 ## Tarea — Edit: alinear, ajustar, voltear y girar la capa (2026-10-02)
 - [x] E8. (usuario: Ctrl-clic sobre un trazo cogía además la capa de encima) "Select: Objects / Layers" en la barra de Edit (`ui.selectMode`, Objects por defecto). Objects: Ctrl/Cmd-clic añade o quita trazos de la capa activa (pincel) y nunca toca otras capas; arrastrar uno de los elegidos mueve todos; sus cajas se marcan y la caja del conjunto lleva las asas. Layers: el Ctrl-clic de capas (E6). Shift sigue siendo "mover la capa entera". Navegador: el interruptor y el aviso nuevo se ven; los clics sobre trazos no se probaron (los trazos quedaban fuera de la vista). Pendiente: elegir varias formas/trazos de una capa vector.
 - [x] E6. (usuario: "la selección no hace nada en el lienzo") En el lienzo con Edit: Ctrl/Cmd-clic añade o quita la capa bajo el puntero (Shift sigue siendo "mover la capa de pincel entera"); detección por píxel (`hitTestPixel`: raster por alfa, vector por cada forma o trazo, no por la caja de toda la capa; antes una capa de pincel del tamaño de la página atrapaba todos los clics). Cajas punteadas de cada capa elegida + la caja que las envuelve; arrastrar una de ellas mueve todas juntas (el imán usa la caja del grupo); un clic normal fuera de la selección empieza otra. Navegador: Ctrl-clic añadió "Image 4" a "Lineart 2" ("2 selected", cajas visibles).

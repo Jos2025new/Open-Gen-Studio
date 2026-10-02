@@ -1,3 +1,4 @@
+import { usePref } from '../ui/hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
 import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pickAgentModel, pickImageEditModel, repickAgentModel, transcriberFor } from '../../engine/catalog';
@@ -35,14 +36,14 @@ function ProviderRow({ id }: { id: RemoteProviderId }) {
     toast(v ? `${PROVIDER_LABELS[id]} key saved` : `${PROVIDER_LABELS[id]} disconnected`, 'success');
   };
 
-  const dot = !saved ? 'off' : status === 'ready' ? 'ok' : status === 'error' ? 'err' : 'busy';
+  const dot = !saved ? 'off' : status === 'ready' ? 'ready' : status === 'error' ? 'error' : 'busy';
   return (
     <div className="prov-row">
       <div className="prov-head">
         <span className={`dot dot-${dot}`} />
         <span className="prov-name">{PROVIDER_LABELS[id]}</span>
         <span className="prov-status faint">
-          {!saved ? 'Not connected' : status === 'ready' ? `${count} models` : status === 'error' ? 'Catalog error' : status === 'loading' ? 'Loading…' : 'Connected'}
+          {!saved ? 'Not connected' : status === 'ready' ? `Connected · ${count} models` : status === 'error' ? 'Catalog error' : 'Loading models…'}
         </span>
         <a className="prov-link" href={PROVIDER_SITES[id].keys} target="_blank" rel="noreferrer" data-tip="Get an API key">
           <ExternalLink size={13} />
@@ -230,7 +231,7 @@ function TranscriberRow() {
   );
 }
 
-function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slot: keyof Settings['ops']; kind: 'image' | 'video'; engine: OpEngine; filter: (m: ModelSummary) => boolean }) {
+function OpsModelRow({ label, tip, slot, kind, engine, filter }: { label: string; tip?: string; slot: keyof Settings['ops']; kind: 'image' | 'video'; engine: OpEngine; filter: (m: ModelSummary) => boolean }) {
   const value = useStore((s) => s.settings.ops[slot]);
   useStore((s) => s.catalog.models);
   const pop = usePopover();
@@ -239,7 +240,7 @@ function OpsModelRow({ label, slot, kind, engine, filter }: { label: string; slo
   const current = value ? modelSummary(value)?.name ?? value : `Auto · ${autoName}${auto.viaEdit ? ' (instruction)' : ''}`;
   return (
     <div className="set-row">
-      <span className="set-label">{label}</span>
+      <span className="set-label" data-tip={tip}>{label}</span>
       <Chip ref={pop.ref} onClick={pop.toggle} active={pop.open} className="wide-chip">
         <span className="truncate">{current}</span>
         <ChevronDown size={13} />
@@ -276,7 +277,7 @@ export function SettingsPanel() {
 
   const setEngine = (v: LlmProviderId | 'offline') => {
     if (v !== 'offline' && !settings.keys[v]) {
-      toast(`Add your ${LLM_LABELS[v]} key above first.`, 'error');
+      toast(`Add your ${LLM_LABELS[v]} key in Providers first.`, 'error');
       return;
     }
     const changed = v !== settings.agent.provider;
@@ -284,19 +285,26 @@ export function SettingsPanel() {
     if (changed || !settings.agent.model) void repickAgentModel();
   };
 
+  const [tab, setTab] = usePref<'providers' | 'agent' | 'ops' | 'budget' | 'data'>('ogs:settings-tab', 'providers');
+  // Load missing catalogs when Settings opens.
+  useEffect(() => {
+    void loadCatalogs();
+  }, []);
+
   return (
     <div className="settings">
-      <PopoverHeader title="Settings" sub="Keys stay in this browser (IndexedDB) and are sent only to their provider." />
+      <PopoverHeader title="Settings" sub="Keys are kept on this computer and sent only to their provider." />
+      <div className="set-tabs">
+        <Segmented size="sm" value={tab} onChange={setTab} options={[{ value: 'providers', label: 'Providers' }, { value: 'agent', label: 'Agent' }, { value: 'ops', label: 'Operations' }, { value: 'budget', label: 'Budget' }, { value: 'data', label: 'Data' }]} />
+      </div>
 
-      <section className="set-section">
-        <h3>Providers</h3>
+      {tab === 'providers' ? <section className="set-section">
         {REMOTE_PROVIDERS.map((p) => (
           <ProviderRow key={p} id={p} />
         ))}
-      </section>
+      </section> : null}
 
-      <section className="set-section">
-        <h3>Agent</h3>
+      {tab === 'agent' ? <section className="set-section">
         <div className="set-row col">
           <span className="set-label">Engine</span>
           <Segmented value={settings.agent.provider} options={engines} onChange={setEngine} size="sm" />
@@ -378,24 +386,22 @@ export function SettingsPanel() {
             size="sm"
           />
         </div>
-      </section>
+      </section> : null}
 
-      <section className="set-section">
-        <h3>Operations</h3>
-        <OpsModelRow label="Edit · relight · angle" slot="edit" kind="image" engine="edit" filter={(m) => m.acceptsImage && !m.tags.length} />
-        <OpsModelRow label="Upscale" slot="upscale" kind="image" engine="upscale" filter={(m) => m.acceptsImage} />
-        <OpsModelRow label="Remove background" slot="removeBg" kind="image" engine="remove_bg" filter={(m) => m.acceptsImage} />
-        <OpsModelRow label="Animate · continue" slot="video" kind="video" engine="video" filter={(m) => m.acceptsImage && !m.needsVideo} />
-        <OpsModelRow label="Upscale video" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
-        <OpsModelRow label="Edit video" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
-        <OpsModelRow label="Extend video" slot="videoExtend" kind="video" engine="video_extend" filter={(m) => Boolean(m.acceptsVideo)} />
-        <OpsModelRow label="Edit region" slot="editRegion" kind="image" engine="inpaint" filter={takesMask} />
-        <OpsModelRow label="Remove object" slot="removeObject" kind="image" engine="remove_object" filter={takesMask} />
+      {tab === 'ops' ? <section className="set-section">
+        <OpsModelRow label="Image edits" tip="Edit, relight, change angle, reframe, variations" slot="edit" kind="image" engine="edit" filter={(m) => m.acceptsImage && !m.tags.length} />
+        <OpsModelRow label="Upscale" tip="Image upscale" slot="upscale" kind="image" engine="upscale" filter={(m) => m.acceptsImage} />
+        <OpsModelRow label="Remove BG" tip="Remove the background of an image" slot="removeBg" kind="image" engine="remove_bg" filter={(m) => m.acceptsImage} />
+        <OpsModelRow label="Animate" tip="Animate an image or continue a shot" slot="video" kind="video" engine="video" filter={(m) => m.acceptsImage && !m.needsVideo} />
+        <OpsModelRow label="Video upscale" slot="videoUpscale" kind="video" engine="video_upscale" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Video edit" slot="videoEdit" kind="video" engine="video_edit" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Video extend" slot="videoExtend" kind="video" engine="video_extend" filter={(m) => Boolean(m.acceptsVideo)} />
+        <OpsModelRow label="Edit region" tip="Edit a painted area (mask)" slot="editRegion" kind="image" engine="inpaint" filter={takesMask} />
+        <OpsModelRow label="Remove object" tip="Remove what you paint over (mask)" slot="removeObject" kind="image" engine="remove_object" filter={takesMask} />
         <TranscriberRow />
-      </section>
+      </section> : null}
 
-      <section className="set-section">
-        <h3>Budget</h3>
+      {tab === 'budget' ? <section className="set-section">
         <div className="set-row">
           <span className="set-label" data-tip="With a limit, a run that goes over it asks first. Nothing running is ever stopped for its cost.">
             Spending limit
@@ -427,7 +433,7 @@ export function SettingsPanel() {
             />
           </div>
         ) : null}
-        <div className="set-row">
+        <div className="set-row set-row-3">
           <span className="set-label">Spent</span>
           <span className="num">{formatUsd(spent)}</span>
           <Button
@@ -450,10 +456,9 @@ export function SettingsPanel() {
           </button>
           .
         </p>
-      </section>
+      </section> : null}
 
-      <section className="set-section">
-        <h3>Data</h3>
+      {tab === 'data' ? <section className="set-section">
         <div className="set-row">
           <span className="set-label">Local data</span>
           <Button ref={confirmRef} size="sm" variant="danger" icon={Trash} onClick={() => setConfirmOpen(true)}>
@@ -461,7 +466,7 @@ export function SettingsPanel() {
           </Button>
           <Popover open={confirmOpen} anchor={confirmRef} onClose={() => setConfirmOpen(false)} width={300} label="Confirm clear">
             <div className="confirm">
-              <p>Delete all sessions, generations, designs and keys stored in this browser? This cannot be undone.</p>
+              <p>Delete all sessions, generations, designs and keys? Export anything you want to keep first.</p>
               <div className="spend-actions">
                 <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
                   Cancel
@@ -473,7 +478,7 @@ export function SettingsPanel() {
             </div>
           </Popover>
         </div>
-      </section>
+      </section> : null}
     </div>
   );
 }

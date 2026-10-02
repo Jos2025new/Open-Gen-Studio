@@ -255,3 +255,22 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .gallery-search-row { display: flex; align-items: center; gap: 6px; }
 .gallery-search-row .search-input { flex: 1; min-width: 0; }
 .density-range { flex: 1; min-width: 0; accent-color: var(--accent); }
+
+/* Settings: one tab at a time, label and control on one line, nothing wider than the panel. */
+.settings { overflow-x: hidden; }
+.set-tabs { padding: 8px 10px 0; }
+.set-tabs .segmented { width: 100%; display: flex; }
+.set-tabs .segmented > button { flex: 1; padding-left: 0; padding-right: 0; font-size: 11px; }
+.settings .set-section { border-bottom: 0; }
+.settings .set-row:not(.col):not(.set-row-3) { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; }
+.settings .set-row:not(.col):not(.set-row-3) > :last-child { justify-self: end; max-width: 100%; min-width: 0; }
+.settings .set-row .wide-chip { justify-self: stretch !important; width: 100%; min-width: 0; }
+.settings .set-row > .set-label { line-height: 1.3; }
+.settings .set-row-3 { display: grid !important; grid-template-columns: 112px 1fr auto; align-items: center; gap: 10px; }
+.settings .prov-row { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.settings .prov-row:last-child { border-bottom: 0; }
+.settings .prov-head { justify-content: flex-start; gap: 8px; margin: 0 0 7px; }
+.settings .prov-head .prov-name { flex: 1; min-width: 0; }
+.settings .dot { width: 7px; height: 7px; margin: 0; }
+.settings .dot-busy { background: var(--warn); }
+.settings .dot-off { background: var(--text-3, #555); }
