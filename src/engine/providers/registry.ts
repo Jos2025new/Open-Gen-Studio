@@ -47,12 +47,12 @@ export const PREFERRED: Record<
     removeObject: [],
   },
   fal: {
-    image: ['fal-ai/nano-banana-pro', 'fal-ai/nano-banana-2', 'fal-ai/bytedance/seedream/v4/text-to-image'],
+    image: ['fal-ai/nano-banana-2', 'fal-ai/nano-banana-pro', 'fal-ai/bytedance/seedream/v4/text-to-image'],
     // fal is not in the purpose table (the user works with Atlas and NanoGPT); Wan 3 first.
     video: ['alibaba/wan-3.0/text-to-video', 'bytedance/seedance-2.0/text-to-video', 'minimax/h3/text-to-video', 'fal-ai/veo3.1/fast', 'fal-ai/kling-video/v3/pro/text-to-video'],
     audio: [],
     model3d: [],
-    edit: ['fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana-2/edit', 'fal-ai/nano-banana/edit'],
+    edit: ['fal-ai/nano-banana-2/edit', 'fal-ai/nano-banana-pro/edit', 'fal-ai/nano-banana/edit'],
     upscale: ['fal-ai/clarity-upscaler', 'fal-ai/seedvr/upscale/image'],
     removeBg: ['fal-ai/bria/background/remove', 'fal-ai/birefnet/v2'],
     videoUpscale: ['fal-ai/bytedance-upscaler/upscale/video', 'fal-ai/seedvr/upscale/video'],
@@ -65,12 +65,12 @@ export const PREFERRED: Record<
     videoExtend: ['fal-ai/veo3.1/fast/extend-video', 'xai/grok-imagine-video/extend-video', 'blackforestlabs/flux-3/extend-video', 'minimax/h3-max/extend-video', 'bytedance/seedance-2.5/reference-to-video'],
   },
   nanogpt: {
-    image: ['nano-banana-pro', 'nano-banana-2', 'seedream-4.5-alternative'],
+    image: ['nano-banana-2', 'nano-banana-pro', 'seedream-4.5-alternative'],
     // Normal row of the purpose table (routing.ts), by price; then the rest.
     video: ['bytedance-seedance-2-0-fast', 'minimax-h3', 'alibaba/wan-3.0/text-to-video', 'bytedance-seedance-2-0', 'bytedance/seedance-2.5', 'kling-v30-pro'],
     audio: [],
     model3d: ['wavespeed-ai/trellis-2/image-to-3d', 'meshy/v7.1/image-to-3d', 'meshy/v7.1/text-to-3d', 'bytedance/seed3d-2.0'],
-    edit: ['nano-banana-pro-edit', 'nano-banana-pro', 'nano-banana-edit'],
+    edit: ['nano-banana-2', 'nano-banana-pro-edit', 'nano-banana-edit'],
     // Faithful first (SeedVR2 $0.01, P-Image $0.005), then Clarity creative ($0.05, adds detail).
     upscale: ['seedvr2-image', 'pruna-ai/p-image/upscale', 'clarity-ai-creative-upscaler'],
     removeBg: ['birefnet/v2'],
@@ -83,13 +83,13 @@ export const PREFERRED: Record<
     videoExtend: ['alibaba/wan-3.0/video-extend', 'grok-imagine-video-extend', 'veo3-1-fast-extend', 'bytedance-seedance-2-0-video-extend', 'bytedance/seedance-2.5'],
   },
   atlas: {
-    image: ['google/nano-banana-pro/text-to-image', 'google/nano-banana-2/text-to-image', 'black-forest-labs/flux-2-pro/text-to-image'],
+    image: ['google/nano-banana-2/text-to-image-developer', 'google/nano-banana-2/text-to-image', 'google/nano-banana-pro/text-to-image', 'black-forest-labs/flux-2-pro/text-to-image'],
     // Normal row of the purpose table (routing.ts), by price; then the rest.
     video: ['minimax/h3-developer/text-to-video', 'bytedance/seedance-2.0-fast/text-to-video', 'alibaba/wan-3.0/text-to-video', 'bytedance/seedance-2.0/text-to-video', 'minimax/h3/text-to-video', 'google/veo3.1-fast/text-to-video', 'kwaivgi/kling-v3.0-pro/text-to-video'],
     // Music first; Lyrics answers with text (the user picks it for songwriting).
     audio: ['minimax/music-3.0', 'minimax/lyrics-generation'],
     model3d: ['tripo-h3.1/image-to-3d', 'tripo-h3.1/text-to-3d', 'bytedance/seed3d-v2.0/image-to-3d'],
-    edit: ['google/nano-banana-pro/edit', 'google/nano-banana-2/edit', 'black-forest-labs/flux-2-pro/edit'],
+    edit: ['google/nano-banana-2/edit-developer', 'google/nano-banana-2/edit', 'google/nano-banana-pro/edit', 'black-forest-labs/flux-2-pro/edit'],
     upscale: ['atlascloud/image-upscaler', 'tencent/image/upscaler'],
     removeBg: ['youchuan/v8.2/remove-background'],
     videoUpscale: ['byteplus/video/upscaler', 'atlascloud/video-upscaler', 'tencent/video/upscaler'],

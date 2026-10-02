@@ -137,7 +137,7 @@ export const MODEL_FITS: ModelFit[] = [
   { match: /gpt-?image-?2/i, bestFor: 'text in the image, design, edits, transparent backgrounds (params.background)', prompt: 'scene → subject → details → constraints', source: 'PLAN_PROMPTING.md §2' },
   { match: /seedream/i, bestFor: 'character sheets, identity, face retouch', prompt: 'subject > setting > style > light > technique', source: 'PLAN_PROMPTING.md §2' },
   { match: /nano-?banana-?pro/i, bestFor: 'photoreal hero shots', prompt: 'subject + action + context + composition + style', source: 'PLAN_PROMPTING.md §2' },
-  { match: /nano-?banana/i, bestFor: 'cartoon and illustration', prompt: 'subject + action + context + composition + style', source: 'PLAN_PROMPTING.md §2' },
+  { match: /nano-?banana/i, bestFor: 'the default image model: photoreal, hero shots, cartoon and illustration', prompt: 'subject + action + context + composition + style', source: 'PLAN_PROMPTING.md §2' },
   { match: /recraft/i, bestFor: 'vector: logos, icons, stickers', prompt: 'short = the model interprets, long = control of the layout; flat vector: "flat colors, no gradients"', source: 'PLAN_PROMPTING.md §2' },
   { match: /ideogram/i, bestFor: 'posters and typography', prompt: 'free text with the literal text in quotes (the app turns Magic Prompt off for quoted text or JSON)', source: 'PLAN_PROMPTING.md §2; fal ideogram schemas (expand_prompt)' },
   { match: /z-?image[-/]?turbo/i, bestFor: 'fast, cheap images', prompt: 'long and structured; constraints stated positively (no negative prompt field)', source: 'PLAN_PROMPTING.md §2–3; live snapshot (no negative_prompt on Turbo)' },
