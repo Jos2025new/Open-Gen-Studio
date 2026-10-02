@@ -24,7 +24,8 @@ export function ToolSettings() {
   const shape = useStore((s) => s.ui.shape);
   const text = useStore((s) => s.ui.text);
   const paint = tool === 'brush' || tool === 'eraser';
-  if (tool === 'move' || tool === 'hand') return null;
+  if (tool === 'hand') return null;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><ContextField label={`Influence · ${influence}px`} hint="Double-click a Lineart stroke to edit its points; drag normally to move."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField></div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <ContextField label={`Font · ${text.fontFamily}`}><select aria-label="Font" value={text.fontFamily} onChange={(e) => setUi({ text: { ...text, fontFamily: e.target.value } })}>{FONT_NAMES.map((name) => <option key={name}>{name}</option>)}</select></ContextField>

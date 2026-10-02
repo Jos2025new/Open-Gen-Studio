@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Pencil, Pin, Plus, Search, Settings } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, useStore } from '../../store/store';
@@ -16,7 +16,12 @@ export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 /** Workspaces render their contextual actions into the top bar through this. */
 export function TopbarActions({ children }: { children: ReactNode }) {
   const slot = useContext(TopbarSlotContext);
-  return slot ? createPortal(children, slot) : null;
+  const [destination, setDestination] = useState<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    setDestination(document.querySelector<HTMLDivElement>('#workspace-actions'));
+  }, [slot]);
+  const target = slot?.isConnected ? slot : destination;
+  return target ? createPortal(children, target) : null;
 }
 
 const WS_LABEL = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
@@ -79,7 +84,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         <SessionSwitcher activeId={sessionId} />
       </div>
       <div className="topbar-right">
-        <div className="topbar-slot" ref={slotRef} />
+        <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
         <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
           <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
         </button>

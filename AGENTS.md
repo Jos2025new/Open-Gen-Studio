@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Edit y barra de herramientas (2026-10-02)
+- [x] Renombrar Move a Edit conservando id interno y sesiones; doble clic en Lineart activa puntos dentro de Edit, arrastre normal mueve, Influence arriba. Evitar edición en capas bloqueadas y clic vacío sale de puntos. Recuperar destino del portal superior desde DOM si su contexto pierde referencia. Sin pruebas por petición del usuario; commit reversible. No se reprodujo desaparición; recuperación de referencia aplicada como protección al montaje/recarga de módulos.
+
 ## Tarea — edición visible de Lineart (2026-10-02)
 - [x] Añadir modo Draw/Edit e influencia a ajustes; seleccionar trazos vectoriales visibles y desbloqueados, mostrar eje y puntos espaciados incluidos extremos, arrastrar con bendStroke y un Undo por arrastre. Sin conversión de datos ni Bézier; clic vacío en Edit nunca dibuja. Conservar presión/estilo. Sin pruebas por instrucción del usuario; commit reversible. Los controles son muestras de los trazos originales, no tiradores Bézier; influencia 1–500 px a lo largo del trazo.
 

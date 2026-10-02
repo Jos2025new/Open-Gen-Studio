@@ -183,7 +183,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
         }
       }
     }
-    if (tool === 'lineart' && lineartMode === 'edit' && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
+    if ((tool === 'move' || (tool === 'lineart' && lineartMode === 'edit')) && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
       const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
       if (stroke) {
         ctx.strokeStyle = '#d4f25a';
@@ -282,6 +282,16 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     }
 
     if (tool === 'move') {
+      if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
+        const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
+        const stroke = act.strokes?.[index];
+        const point = stroke ? selectedCurve.handles.find((i) => stroke.points[i] && Math.hypot(stroke.points[i][0] - p.x, stroke.points[i][1] - p.y) <= 8 / view.zoom) : undefined;
+        if (point !== undefined) {
+          drag.current = { kind: 'bend', layerId: act.id, stroke: index, point, startX: p.x, startY: p.y, base: act.strokes!, influence };
+          return;
+        }
+      }
+      setSelectedCurve(null);
       if (!e.shiftKey) {
         const layer = act?.type === 'raster' && act.visible ? act : hitTest(current, p.x, p.y);
         if (layer?.type === 'raster' && !layer.locked && layer.visible && (!layer.paintBaseId || getBuffer(layer.paintBaseId))) {
@@ -577,6 +587,14 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
   const onDoubleClick = (e: React.MouseEvent) => {
     if (tool !== 'move') return;
     const p = toDoc(e.clientX, e.clientY);
+    for (const layer of [...doc.layers].reverse()) {
+      if (layer.type !== 'vector' || !layer.visible || layer.locked || layer.opacity === 0) continue;
+      const stroke = [...(layer.strokes ?? [])].reverse().find((s) => s.opacity > 0 && nearStroke(s, p.x, p.y, 8 / view.zoom));
+      if (!stroke) continue;
+      setActiveLayer(sessionId, doc.id, layer.id);
+      setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
+      return;
+    }
     const hit = hitTest(doc, p.x, p.y);
     if (hit?.type === 'text' && !hit.locked) {
       setActiveLayer(sessionId, doc.id, hit.id);
@@ -628,7 +646,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
           }}
         />
       ) : null}
-      {tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
+      {tool === 'move' && selectedCurve ? <div className="stage-hint">Drag points to edit · Click away to move again</div> : tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
       {tool === 'move' && active?.type === 'raster' && active.paintStrokes?.length ? <div className="stage-hint">Drag a stroke · Shift-drag to move the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>

@@ -7,7 +7,7 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
-  { id: 'move', icon: MousePointer2, label: 'Move (V)' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
+  { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move, double-click to edit' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
   { id: 'fill', icon: PaintBucket, label: 'Fill (G) · contiguous visible color, on a new layer' },
   { id: 'brush', icon: Brush, label: 'Brush (B)' }, { id: 'lineart', icon: PenTool, label: 'Lineart (P) · editable pressure strokes; Alt-drag bends a stroke' }, { id: 'eraser', icon: Eraser, label: 'Eraser (E)' },
   { id: 'rect', icon: Square, label: 'Rectangle (R)' }, { id: 'ellipse', icon: Circle, label: 'Ellipse (O)' },
