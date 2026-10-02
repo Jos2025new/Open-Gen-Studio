@@ -52,3 +52,6 @@
   --topbar-h: 48px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+
+/* Native dropdown options: some systems (Linux GTK) draw them light despite color-scheme; force the dark ones. */
+select option, select optgroup { background-color: var(--surface, #141417); color: var(--text, #f8f8fa); }

@@ -126,3 +126,7 @@
 .snap-pop { display: flex; flex-direction: column; gap: 8px; padding: 12px; font-size: 12px; }
 .snap-pop .check-row.is-sub { padding-left: 18px; }
 .snap-pop p { margin: 2px 0 0; font-size: 11px; }
+
+/* Short lists in the tool bar open the app's menu. */
+.opt-pick { cursor: pointer; }
+.opt-value { color: var(--text); font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

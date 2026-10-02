@@ -42,9 +42,21 @@ export function InlineColor({ label, value, onChange }: { label: string; value: 
   return <label className="opt opt-color" data-tip={label}><span className="opt-label">{label}</span><input type="color" value={value} aria-label={label} onChange={(e) => onChange(e.target.value)} /></label>;
 }
 
-/** A short list in the bar. */
+/** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */
 export function InlineSelect<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; onChange: (v: T) => void }) {
-  return <label className="opt"><span className="opt-label">{label}</span><select className="opt-select" aria-label={label} value={String(value)} onChange={(e) => { const hit = options.map((o) => (typeof o === 'object' ? o.value : o)).find((o) => String(o) === e.target.value); if (hit !== undefined) onChange(hit); }}>{options.map((o) => { const v = typeof o === 'object' ? o.value : o; return <option key={String(v)} value={String(v)}>{typeof o === 'object' ? o.label : String(o)}</option>; })}</select></label>;
+  const pop = usePopover();
+  const items = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
+  const current = items.find((o) => o.value === value)?.label ?? String(value);
+  return <>
+    <button type="button" ref={pop.ref} className="opt opt-pick" aria-haspopup="listbox" aria-expanded={pop.open} onClick={pop.toggle}>
+      <span className="opt-label">{label}</span><span className="opt-value">{current}</span><ChevronDown size={12} />
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={170} label={label}>
+      <div className="menu" role="listbox">
+        {items.map((o) => <MenuItem key={String(o.value)} label={o.label} active={o.value === value} onClick={() => { onChange(o.value); pop.close(); }} />)}
+      </div>
+    </Popover>
+  </>;
 }
 
 const ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVertical }> = [
