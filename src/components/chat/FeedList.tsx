@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
-import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
+import { CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
-import { askForPlan, deleteGarbled, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
-import { useStore } from '../../store/store';
+import { askForPlan, deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
+import { toast, useStore } from '../../store/store';
+import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
@@ -43,6 +44,72 @@ function RichText({ text }: { text: string }) {
   );
 }
 
+/** One of the user's messages; copy, edit and delete show on hover or focus. Editing makes the answer again. */
+function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type: 'user' }>; sessionId: string; tag: React.ReactNode }) {
+  const busy = useStore((s) => Boolean(s.sessions[sessionId]?.agent.busy));
+  const later = useStore((s) => {
+    const feed = s.sessions[sessionId]?.feed ?? [];
+    return feed.length - 1 - feed.findIndex((f) => f.id === item.id);
+  });
+  const current = useStore((s) => s.ui.workspace);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.text);
+  const save = () => {
+    if (!draft.trim() && !item.attachments.length) return;
+    setEditing(false);
+    void editUserMessage(sessionId, item.id, draft);
+  };
+  return (
+    <div className="msg msg-user">
+      <div className="bubble">
+        {item.attachments.length ? (
+          <div className="bubble-attachments">
+            {item.attachments.map((id) => (
+              <span key={id} className="attach-thumb small">
+                <AssetMedia assetId={id} hoverPlay={false} />
+              </span>
+            ))}
+          </div>
+        ) : null}
+        {editing ? (
+          <div className="msg-edit">
+            <textarea
+              autoFocus
+              value={draft}
+              rows={Math.min(10, draft.split('\n').length + 1)}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setEditing(false);
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  save();
+                }
+              }}
+            />
+            {later ? <span className="faint">Everything after this message is replaced by the new answer; results stay in Assets.</span> : null}
+            <div className="msg-edit-actions">
+              <button type="button" className="notice-retry" onClick={() => setEditing(false)}>Cancel</button>
+              <button type="button" className="notice-retry is-primary" disabled={busy} onClick={save}>Send</button>
+            </div>
+          </div>
+        ) : item.text ? (
+          <p>{item.text}</p>
+        ) : null}
+      </div>
+      {!editing ? (
+        <div className="msg-actions">
+          {tag}
+          <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void navigator.clipboard.writeText(item.text).then(() => toast('Copied', 'success'))} />
+          {item.workspace === current ? (
+            <IconButton icon={Pencil} label="Edit" size="sm" disabled={busy} onClick={() => { setDraft(item.text); setEditing(true); }} />
+          ) : null}
+          <IconButton icon={Trash} label="Delete" size="sm" tone="danger" disabled={busy} onClick={() => deleteUserMessage(sessionId, item.id)} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: string }) {
   // Retry only on the latest item: after a new message it would answer out of order.
   const isLast = useStore((s) => s.sessions[sessionId]?.feed.at(-1)?.id === item.id);
@@ -77,23 +144,7 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
   const tag = item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
   switch (item.type) {
     case 'user':
-      return (
-        <div className="msg msg-user">
-          <div className="bubble">
-            {item.attachments.length ? (
-              <div className="bubble-attachments">
-                {item.attachments.map((id) => (
-                  <span key={id} className="attach-thumb small">
-                    <AssetMedia assetId={id} hoverPlay={false} />
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {item.text ? <p>{item.text}</p> : null}
-          </div>
-          {tag}
-        </div>
-      );
+      return <UserMessage item={item} sessionId={sessionId} tag={tag} />;
     case 'assistant':
       // A turn that ended with no words (only tool calls) leaves nothing to show.
       if (!item.streaming && !item.text.trim()) return null;

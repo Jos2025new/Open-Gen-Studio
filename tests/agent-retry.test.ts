@@ -149,3 +149,37 @@ describe('a readable tool call written as text', () => {
     expect(parseToolMarkup('<tool_call>{"name":"read_guide","arguments":{"id":"skill:archviz"}}</tool_call>')).toEqual([{ name: 'read_guide', arguments: '{"id":"skill:archviz"}' }]);
   });
 });
+
+describe("the user's own messages", () => {
+  const said = (sid: string) => useStore.getState().sessions[sid].agent.history.filter((m) => m.role === 'user').map((m) => String(m.content).split('\n').slice(1, 2).join(''));
+  it('delete: gone from the chat, and the agent reads only a deletion note in its place', async () => {
+    let n = 0;
+    vi.stubGlobal('fetch', async () => sse([text(`answer ${++n}`)]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('primero');
+    await sendAgentMessage('segundo');
+    const first = useStore.getState().sessions[sid].feed.find((f) => f.type === 'user' && f.text === 'primero')!;
+    const { deleteUserMessage } = await import('../src/engine/agent/runtime');
+    deleteUserMessage(sid, first.id);
+    const s = useStore.getState().sessions[sid];
+    expect(s.feed.some((f) => f.id === first.id)).toBe(false);
+    expect(s.agent.history.some((m) => String(m.content).includes('primero'))).toBe(false);
+    expect(s.agent.history.find((m) => m.role === 'user')?.content).toMatch(/^\[The user deleted this message/);
+    expect(said(sid)[1]).toBe('segundo');
+  });
+
+  it('edit: the old answer and what followed are dropped, the edited text is answered again', async () => {
+    let n = 0;
+    vi.stubGlobal('fetch', async () => sse([text(`answer ${++n}`)]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('uno');
+    await sendAgentMessage('dos');
+    const msg = useStore.getState().sessions[sid].feed.find((f) => f.type === 'user' && f.text === 'uno')!;
+    const { editUserMessage } = await import('../src/engine/agent/runtime');
+    await editUserMessage(sid, msg.id, 'uno, corregido');
+    const s = useStore.getState().sessions[sid];
+    expect(said(sid)).toEqual(['uno, corregido']);
+    expect(s.feed.filter((f) => f.type === 'user').map((f) => f.type === 'user' && f.text)).toEqual(['uno, corregido']);
+    expect(s.feed.filter((f) => f.type === 'assistant').map((f) => f.type === 'assistant' && f.text)).toEqual(['answer 3']);
+  });
+});

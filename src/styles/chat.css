@@ -106,3 +106,15 @@
 /* One conversation per session: the other canvases' messages, shown on demand (each with its canvas badge). */
 .feed-everywhere { align-self: center; background: none; border: 0; font: inherit; font-size: 12px; cursor: pointer; padding: 4px 8px; }
 .feed-everywhere:hover { color: var(--text); }
+
+/* The user's message: copy, edit and delete under it, shown on hover or keyboard focus. */
+.msg-user { flex-direction: column; align-items: flex-end; gap: 2px; }
+.msg-actions { display: flex; align-items: center; gap: 1px; min-height: 26px; }
+.msg-actions > button { opacity: 0; transition: opacity 0.12s; }
+.msg-user:hover .msg-actions > button, .msg-user:focus-within .msg-actions > button { opacity: 1; }
+@media (hover: none) { .msg-actions > button { opacity: 1; } }
+.msg-edit { display: flex; flex-direction: column; gap: 8px; min-width: min(520px, 70vw); }
+.msg-edit textarea { width: 100%; resize: vertical; background: var(--surface-1, var(--surface)); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 8px 10px; font: inherit; }
+.msg-edit > span { font-size: 11px; white-space: normal; }
+.msg-edit-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.notice-retry.is-primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; }

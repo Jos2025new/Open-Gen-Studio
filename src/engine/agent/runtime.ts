@@ -46,6 +46,7 @@ import {
   removeFeedItem,
   setComposer,
   setGraph,
+  setUi,
   toast,
   updateFeedItem,
   useStore,
@@ -171,20 +172,21 @@ function planContext(sessionId: string, workspace: Workspace) {
 // Entry points
 
 /** Send a message from the composer in agent mode. */
-export async function sendAgentMessage(text: string): Promise<void> {
+export async function sendAgentMessage(text: string, opts: { attachments?: string[] } = {}): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
   if (!session(sessionId) || session(sessionId).agent.busy) return;
   const workspace = st.ui.workspace;
   toCanvas(sessionId, workspace);
   const s = session(sessionId);
-  const attachments = [...st.composer.attachments];
+  // An edited message brings its own attachments and leaves the composer as it is.
+  const attachments = [...(opts.attachments ?? st.composer.attachments)];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
 
   autoTitleSession(sessionId, clean || 'Edit');
   appendFeed(sessionId, { ...feedBase(workspace), type: 'user', text: clean, mode: 'agent', attachments });
-  setComposer({ text: '', attachments: [] });
+  if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
   // A card waiting on another canvas is not what the user is answering here: it closes as superseded.
@@ -517,6 +519,69 @@ function materializeNodes(sessionId: string, plan: Plan): void {
   }));
   // Bring the new nodes into view, with what they connect to.
   focusNodes(sessionId, [...new Set([...nodes.map((n) => n.id), ...edges.map((e) => e.source)])]);
+}
+
+// ---------------------------------------------------------------------------
+// The user's own messages: edit (the answer is made again) and delete (it leaves the agent's context)
+
+const DELETED_MESSAGE = '[The user deleted this message. Ignore it and anything that only answered it.]';
+
+function messageText(m: LlmMessage): string {
+  return typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map((p) => (p.type === 'text' ? p.text : '')).join('\n') : '';
+}
+
+/**
+ * The history message that carries a user feed message (its words inside <user_message>), or -1. Identical texts
+ * are told apart by order, counted from the end (the feed can hold copies the history does not, e.g. offline turns).
+ */
+function historyIndexOf(sessionId: string, itemId: string): number {
+  const s = session(sessionId);
+  const users = s.feed.filter((f): f is Extract<FeedItem, { type: 'user' }> => f.type === 'user');
+  const item = users.find((f) => f.id === itemId);
+  if (!item) return -1;
+  const same = users.filter((f) => f.text === item.text);
+  const needle = `\n${item.text || '(no text)'}\n</user_message>`;
+  const hits = s.agent.history.flatMap((m, i) => ((m.role === 'user' || m.role === 'tool') && messageText(m).includes(needle) ? [i] : []));
+  const k = hits.length - (same.length - same.indexOf(item));
+  return k >= 0 ? hits[k] : -1;
+}
+
+/** Delete one of the user's messages: gone from the chat, and from what the agent reads (a short note keeps the turn order valid). */
+export function deleteUserMessage(sessionId: string, itemId: string): void {
+  const s = session(sessionId);
+  const item = s?.feed.find((f) => f.id === itemId);
+  if (!s || s.agent.busy || item?.type !== 'user') return;
+  const i = historyIndexOf(sessionId, itemId);
+  if (i >= 0) patchAgent(sessionId, (a) => ({ history: a.history.map((m, j) => (j === i ? { ...m, content: DELETED_MESSAGE } : m)) }));
+  else if (item.text) patchAgent(sessionId, (a) => ({ notes: [...a.notes, `The user deleted an earlier message of theirs ("${item.text.slice(0, 80)}"): ignore it.`] }));
+  removeFeedItem(sessionId, itemId);
+}
+
+/**
+ * Edit one of the user's messages: it and everything after it in the conversation (every canvas) are dropped — the
+ * old answer is not kept; results stay in Assets — and the edited text is sent again with its attachments.
+ */
+export async function editUserMessage(sessionId: string, itemId: string, text: string): Promise<void> {
+  const s = session(sessionId);
+  const item = s?.feed.find((f) => f.id === itemId);
+  if (!s || s.agent.busy || item?.type !== 'user' || (!text.trim() && !item.attachments.length)) return;
+  const i = historyIndexOf(sessionId, itemId);
+  const at = s.feed.indexOf(item);
+  for (const f of s.feed.slice(at)) {
+    if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
+    removeFeedItem(sessionId, f.id);
+  }
+  patchAgent(sessionId, (a) => ({
+    history: i >= 0 ? a.history.slice(0, i) : a.history,
+    notes: i >= 0 ? [] : [...a.notes, 'The user edited an earlier message; the answers after it were discarded.'],
+    pending: undefined,
+    revising: undefined,
+    questionRound: 0,
+    draft: undefined,
+    phase: undefined,
+  }));
+  if (get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
+  await sendAgentMessage(text, { attachments: item.attachments });
 }
 
 function removeDraftNodes(sessionId: string, planId: string): void {
