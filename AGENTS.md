@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — confirmar Save to gallery sin el diálogo del navegador (2026-10-02)
+- [x] (usuario) `window.confirm` sustituido por un panel de la app junto al botón ("Save Design 3 to the gallery as an image?" · Cancel · Save). No queda ningún `confirm()` del navegador en la app. Sin navegador.
+
 ## Tarea — opciones de herramienta en la barra, sin desplegables (2026-10-02)
 - [x] T1. (usuario: "mejor UX") `InlineSlider` (etiqueta, deslizador de 72 px y número editable; rueda del ratón ajusta), `InlineColor` (muestra redonda) e `InlineSelect` (lista corta) en `ToolSettings.tsx`: pincel/borrador, cubo, texto, modo e influencia de Lineart, grosor y radio de formas. Siguen en desplegable lo que necesita más de un control (relleno/trazo de formas con "ninguno", estilo de trazo de Lineart). Sin navegador.
 

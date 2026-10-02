@@ -98,3 +98,9 @@
 .opt-color input[type=color]::-webkit-color-swatch { border: 0; border-radius: 50%; }
 .opt-select { background: transparent; border: 0; color: var(--text); font-size: 11px; padding: 2px 0; max-width: 110px; }
 .tool-settings { gap: 6px; }
+
+/* In-app confirmation (instead of the browser's confirm box). */
+.confirm-pop { display: flex; flex-direction: column; gap: 12px; padding: 12px; font-size: 12px; color: var(--text-2); }
+.confirm-pop strong { color: var(--text); font-weight: 600; }
+.confirm-pop p { margin: 0; line-height: 1.45; }
+.confirm-pop-actions { display: flex; justify-content: flex-end; gap: 6px; }

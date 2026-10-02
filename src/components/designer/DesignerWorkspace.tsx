@@ -35,6 +35,7 @@ export function DesignerWorkspace() {
   const doc = session.docs.find((d) => d.id === session.activeDocId) ?? session.docs[0];
   const presets = usePopover();
   const exportMenu = usePopover();
+  const saveConfirm = usePopover();
   const [zoom, setZoom] = useState(1);
   const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
   useEffect(() => { setSelectedCurve(null); }, [doc?.id, session.id]);
@@ -120,7 +121,6 @@ export function DesignerWorkspace() {
 
   const output = async (gallery: boolean, format: ExportFormat = 'png') => {
     if (!doc || busy) return;
-    if (gallery && !window.confirm(`Save "${doc.name}" to Gallery as an image?`)) return;
     setBusy(true);
     try { await (gallery ? saveDocToGallery(session.id, doc.id) : exportDocFile(session.id, doc.id, format)); }
     catch (err) { toast(err instanceof Error ? err.message : 'Export failed', 'error'); }
@@ -135,7 +135,16 @@ export function DesignerWorkspace() {
       </Popover>
       {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <>
-        <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
+        <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />
+        <Popover open={saveConfirm.open} anchor={saveConfirm.ref} onClose={saveConfirm.close} width={260} label="Save to gallery">
+          <div className="confirm-pop">
+            <p>Save <strong>{doc.name}</strong> to the gallery as an image?</p>
+            <div className="confirm-pop-actions">
+              <Button size="sm" variant="ghost" onClick={saveConfirm.close}>Cancel</Button>
+              <Button size="sm" variant="primary" icon={Images} onClick={() => { saveConfirm.close(); void output(true); }}>Save</Button>
+            </div>
+          </div>
+        </Popover>
         <Button ref={exportMenu.ref} icon={ArrowUpFromLine} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
           {EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => { exportMenu.close(); void output(false, f.id); }} />)}
