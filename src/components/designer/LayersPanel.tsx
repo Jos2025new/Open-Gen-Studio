@@ -144,7 +144,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       </div>}
     </Section>
     {layer && <>
-      <Section title={<>Properties <span className="props-kind">— {(() => { const K = layer.type === 'raster' ? Image : layer.type === 'text' ? Type : Shapes; return <><K size={12} />{layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}</>; })()}</span></>} open={sections.props} onToggle={() => setSections({ ...sections, props: !sections.props })} extra={layer.locked ? <span className="faint">Locked</span> : null}>
+      <Section title={<>Properties <span className="props-kind">— {layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}</span></>} open={sections.props} onToggle={() => setSections({ ...sections, props: !sections.props })} extra={layer.locked ? <span className="faint">Locked</span> : null}>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         <Field label="Name"><input key={layer.id + layer.name} defaultValue={layer.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== layer.name) patch({ name: e.target.value.trim() }); }} /></Field>
         <div className="prop-row">
