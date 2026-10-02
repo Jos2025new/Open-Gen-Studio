@@ -125,9 +125,10 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
         <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { if (drag?.active) return; setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
-          <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /><Icon size={10} className="layer-kind" aria-label={l.type} /></span>
+          <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /></span>
           <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
         </button>
+        <span className="layer-kind" data-tip={`${l.type} layer`} aria-label={`${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
       </div>; })}

@@ -1,6 +1,7 @@
 # AGENTS.md — Open Gen Studio
 
 ## Tarea — miniaturas fijas y arrastrar capas (2026-10-02)
+- [x] L5. (usuario) El icono del tipo de capa sale de la miniatura y va junto al ojo, en gris tenue y siempre visible.
 - [x] L4. (usuario) Una capa bloqueada no se mueve ni con arrastre ni con las flechas, y en vez de ignorarlo avisa: "\"Nombre\" is locked. Unlock it to move it." (flechas activas para poder avisar; el arrastre avisa una vez al moverse).
 - [x] L2. (usuario) Miniatura fija de 64×40 a cualquier ancho del panel (la regla antigua `.layer-select span { flex: 1 }` la estiraba); el panel sigue redimensionable. Propiedades en panel estrecho (<300 px): opacidad y Blend apilados, X·Y·W·H en 2×2 (container query). Operations sin recortarse.
 - [x] L3. (usuario) Arrastrar capas: mantener pulsado y mover una fila (>5 px) la arrastra; una línea de acento marca dónde cae; soltar usa `reorderLayer` (un Undo). Las capas bloqueadas no se arrastran; ojo, candado y el nombre en edición no inician arrastre. `dropIndex` (`design/doc.ts`) con test `layer-drag`. Doble clic en el nombre renombra: la fila captura el puntero solo al empezar a arrastrar (antes la captura al pulsar se quedaba el doble clic) y un movimiento sin botón pulsado cancela. Sin navegador.

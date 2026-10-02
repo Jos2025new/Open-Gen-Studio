@@ -42,7 +42,8 @@
 .layer-select { gap: 9px; padding: 3px 2px; }
 .layer-thumb-wrap { position: relative; flex: 0 0 64px; width: 64px; height: 40px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 10px 10px; }
 .layer-thumb { display: block; width: 64px; height: 40px; }
-.layer-kind { position: absolute; right: 2px; bottom: 2px; padding: 1px; border-radius: 3px; background: rgba(0,0,0,.6); color: var(--text-2); box-sizing: content-box; }
+/* Layer type: a quiet icon next to the eye, always shown. */
+.layer-kind { display: grid; place-items: center; width: 22px; flex-shrink: 0; color: var(--text-3, var(--text-2)); opacity: .7; }
 .layer-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--text); }
 .layer-row.is-hidden .layer-name, .layer-row.is-hidden .layer-thumb { opacity: .45; }
 .layer-name-edit { flex: 1; min-width: 0; font-size: 12px; padding: 3px 6px; background: var(--surface-2); border: 1px solid var(--accent); border-radius: 5px; color: var(--text); outline: none; }
