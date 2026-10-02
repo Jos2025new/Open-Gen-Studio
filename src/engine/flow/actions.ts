@@ -351,6 +351,8 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [] };
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
+  // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
+  const startGraph = get().sessions[sessionId].graph;
   const assetIds = preview.inputIds.flatMap(id => {
     const st = get(), n = st.sessions[sessionId].graph.nodes.find(n => n.id === id)!;
     const asset = nodeOutputAsset(n, st.generations);
@@ -370,12 +372,13 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
         if (info?.generationId) pending.set(stepId, info.generationId);
         const generationId = pending.get(stepId);
         if (state === 'done' && generationId) {
-          const st = get(), graph = st.sessions[sessionId].graph;
+          const st = get(), graph = startGraph;
           const node = graph.nodes.find(n => n.id === stepId)!;
           const completed = { ...node, data: { ...node.data, generationId } } as GraphNode;
           const snapshot = { ...graph, nodes: graph.nodes.map(n => n.id === stepId ? completed : n) };
           patchGeneration(generationId, { nodeRequest: stable(nodeRequest(snapshot, completed, st.generations, library, { ...context, schemas: st.catalog.schemas })) });
-          setGraph(sessionId, g => ({ ...g, nodes: g.nodes.map(n => n.id === stepId ? completed : n) }));
+          // Keep whatever the user edited meanwhile; only the result changes (an edited node then shows as outdated).
+          setGraph(sessionId, g => ({ ...g, nodes: g.nodes.map(n => n.id === stepId ? { ...n, data: { ...n.data, generationId } } as GraphNode : n) }));
         }
         onState?.(stepId, state, info);
       },

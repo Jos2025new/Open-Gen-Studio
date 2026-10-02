@@ -94,14 +94,15 @@ describe('node Run freshness', () => {
     (graph.nodes[0].data as any).settings.resolution = '2K';
     expect(graphToSteps(graph,['final'],gens,{force:false,schemas}).runIds).toEqual(['character','key','final']);
   });
-  it('locks only involved nodes and their input edges, allowing movement/title and unrelated edits', () => {
+  it('edits are free during a run; only deleting a node being generated waits', () => {
     const release = lockNodes('test', ['character','key','final']);
     const copy = structuredClone(graph); copy.nodes[0].data.title = 'new'; copy.nodes[0].position.x = 30;
     expect(graphEditProblem('test', graph, copy)).toBeNull();
     (copy.nodes[3].data as any).prompt = 'sibling'; expect(graphEditProblem('test',graph,copy)).toBeNull();
     expect(() => lockNodes('test',['key'])).toThrow('already running');
     copy.edges.pop(); expect(graphEditProblem('test',graph,copy)).toBeNull();
-    copy.edges.shift(); expect(graphEditProblem('test',graph,copy)).toContain('in use'); release();
+    copy.edges.shift(); (copy.nodes[1].data as any).prompt = 'edited'; expect(graphEditProblem('test',graph,copy)).toBeNull();
+    copy.nodes = copy.nodes.filter(n => n.id !== 'key'); expect(graphEditProblem('test',graph,copy)).toContain('generating'); release();
   });
   it('two runs may read the same input; a node being generated is neither run nor read by another', () => {
     const a = lockNodes('share', ['n1'], ['n1', 'src']);
@@ -135,7 +136,7 @@ describe('node Run freshness', () => {
     expect(approved.errors).toEqual([]);
     const running=p.runNodes(sid,['final'],approved);
     await vi.waitFor(()=>expect(execute).toHaveBeenCalledTimes(1));
-    expect(p.patchNodeData(sid,'key',{prompt:'cannot edit'})).toContain('in use');
+    expect(p.patchNodeData(sid,'key',{prompt:'edited while running'})).toBeNull();
     expect(p.patchNodeData(sid,'sibling',{prompt:'allowed'})).toBeNull();
     expect(await p.runNodes(sid,['final'],approved)).toBeNull();
     finishRun(); await running;

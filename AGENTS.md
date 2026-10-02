@@ -2,6 +2,7 @@
 
 ## Tarea — avisos repetidos al escribir en un nodo retenido (2026-10-02)
 - [x] (usuario, captura) Borrar texto en el prompt de un nodo retenido por una ejecución (él o una entrada suya) no borraba el nodo: el guardado lo rechaza y cada tecla apilaba el mismo aviso. `toast` ya no repite un aviso que sigue en pantalla. El bloqueo se mantiene (no editar lo que una ejecución lee). Typecheck; sin navegador.
+- [x] (usuario: "debería dejarme editar, aislarlo internamente") Una ejecución trabaja sobre el grafo tal como estaba al empezar (`startGraph` en `runNodes`, también para la firma del resultado); editar cualquier nodo durante la ejecución ya no se bloquea y el cambio vale para la siguiente (si editaste el nodo que se generaba, al terminar sale como desfasado). Solo se impide borrar un nodo que se está generando. `locks.ts` (`graphEditProblem`), `flow/actions.ts`, `node-run` ajustado. Typecheck y suite (390 + 1 omitida); sin navegador.
 
 ## Tarea — terminar Ajustes por apartados (2026-10-02)
 - [x] Conservar los cambios pendientes de SettingsPanel y shell.css; ajustar estilos solo dentro de Ajustes y textos coherentes con las pestañas y el borrado real. Riesgo: distribución sin validación visual; reversible con revert.

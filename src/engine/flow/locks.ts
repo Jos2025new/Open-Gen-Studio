@@ -3,7 +3,8 @@ import type { Graph } from '../types';
 /*
  * A node run holds the nodes it writes (the nodes it runs) and the nodes it reads (their inputs, up the graph).
  * Writing is exclusive; reading is shared: two runs may read the same input (a node and its duplicate share their
- * sources), but a node being written is never written or read by another run. Editing any held node waits.
+ * sources), but a node being written is never written or read by another run. Editing is always allowed (runs use a
+ * snapshot); deleting a node being written waits.
  */
 interface Held { writes: Set<string>; reads: Set<string> }
 const locks = new Map<string, Held[]>();
@@ -23,19 +24,10 @@ export function lockNodes(sessionId: string, writes: string[], reads: string[] =
   locks.set(sessionId, [...(locks.get(sessionId) ?? []), held]);
   return () => { locks.set(sessionId, (locks.get(sessionId) ?? []).filter(h => h !== held)); };
 }
-export function graphEditProblem(sessionId: string, before: Graph, after: Graph): string | null {
-  const held = lockedNodes(sessionId);
-  for (const id of held) {
-    const a = before.nodes.find(n => n.id === id), b = after.nodes.find(n => n.id === id);
-    const relevant = (n: typeof a) => {
-      if (!n) return null;
-      const { title: _title, ...data } = n.data;
-      if ('generationId' in data) delete data.generationId;
-      return data;
-    };
-    if (JSON.stringify(relevant(a)) !== JSON.stringify(relevant(b)) || JSON.stringify(before.edges.filter(e => e.target === id)) !== JSON.stringify(after.edges.filter(e => e.target === id))) {
-      return 'This node or its inputs are in use by a running flow. Wait for it to finish.';
-    }
+/** Runs work on the graph as it was when they started, so edits are free; only deleting a node being generated waits. */
+export function graphEditProblem(sessionId: string, _before: Graph, after: Graph): string | null {
+  for (const id of writingNodes(sessionId)) {
+    if (!after.nodes.some(n => n.id === id)) return 'This node is generating. Wait for it to finish before deleting it.';
   }
   return null;
 }
