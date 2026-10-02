@@ -113,3 +113,9 @@
 .node-canvas .react-flow__edge.selected .react-flow__edge-path,
 .node-canvas .react-flow__edge:focus-visible .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.6; }
 .node-canvas .react-flow__edge.animated .react-flow__edge-path { stroke: var(--accent); }
+
+/* Node name: text with its file extension; double-click edits the name only. */
+.nc-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; user-select: none; }
+.nc-title-edit { flex: 1; min-width: 0; display: flex; align-items: baseline; }
+.nc-title-edit .nc-title { flex: 1; min-width: 0; color: var(--text); border-bottom: 1px solid var(--accent)!important; }
+.nc-ext { color: var(--text-3, var(--text-2)); font-weight: 400; }

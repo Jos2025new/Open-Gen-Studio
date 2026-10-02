@@ -578,7 +578,7 @@ export async function downloadAsset(assetId: string): Promise<void> {
     let blob = await getAssetBlob(assetId);
     if (!blob && a.remoteUrl) blob = await fetchBlob(a.remoteUrl);
     if (!blob) throw new Error('File not available');
-    downloadBlob(blob, `ogs-${assetId.slice(-8)}.${extensionForMime(blob.type || a.mime)}`);
+    downloadBlob(blob, `${a.name || `ogs-${assetId.slice(-8)}`}.${extensionForMime(blob.type || a.mime)}`);
   } catch (err) {
     toast((err as Error).message, 'error');
   }

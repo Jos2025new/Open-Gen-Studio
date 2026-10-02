@@ -225,6 +225,8 @@ export interface Estimate {
 
 export interface Asset {
   id: string;
+  /** File name chosen by the user, without extension (the extension always comes from the file's type). */
+  name?: string;
   kind: AssetKind;
   mime: string;
   width: number;

@@ -6,6 +6,7 @@ import { isAutoOption, matchInputOption, nearestAspect, paramByRole, routeVideoI
 import { nodeRequest, stable } from './freshness';
 import { graphEditProblem, lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { uid } from '../../lib/id';
+import { cleanFileName } from '../../lib/media';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
@@ -156,11 +157,14 @@ export function duplicateNode(sessionId: string, node: GraphNode): string {
     delete (data as GenNodeData).sketchAssetId;
     (data as GenNodeData).outputIndex = 0;
   }
-  data.title = / \(copy\)$/.test(data.title) ? data.title : `${data.title} (copy)`;
   const id = uid('nd');
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return id;
+  // "Image (copy 1)", "Image (copy 2)"…: the next free number for that name.
+  const base = data.title.replace(/ \(copy(?: \d+)?\)$/, '');
+  const taken = graph.nodes.map((n) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} \\(copy(?: (\\d+))?\\)$`).exec(n.data.title)).filter(Boolean).map((m) => Number(m![1] ?? 1));
+  data.title = `${base} (copy ${Math.max(0, ...taken) + 1})`;
   let next: import('../types').Graph = { ...graph, nodes: [...graph.nodes, { id, position: { x: node.position.x + 40, y: node.position.y + 60 }, data }] };
   for (const e of graph.edges.filter((x) => x.target === node.id)) {
     const c = { source: e.source, target: id, targetHandle: e.targetHandle };
@@ -174,6 +178,17 @@ export function duplicateNode(sessionId: string, node: GraphNode): string {
   }
   setGraph(sessionId, () => next);
   return id;
+}
+
+/** Rename a node; its result takes the same name (used for downloads). The extension never changes: it is the file's. */
+export function renameNode(sessionId: string, nodeId: string, typed: string): void {
+  const name = cleanFileName(typed);
+  const st = get();
+  const node = st.sessions[sessionId]?.graph.nodes.find((n) => n.id === nodeId);
+  if (!node || !name) return;
+  patchNodeData(sessionId, nodeId, { title: name });
+  const asset = nodeOutputAsset(node, st.generations);
+  if (asset && st.assets[asset]) useStore.setState((s0) => ({ assets: { ...s0.assets, [asset]: { ...s0.assets[asset], name } } }));
 }
 
 export function connectNodes(sessionId: string, c: { source: string; target: string; targetHandle: string | null }): string | null {

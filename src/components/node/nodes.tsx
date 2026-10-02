@@ -4,8 +4,9 @@ import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
-import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, setSketch, tryConnect } from '../../engine/flow/actions';
-import { nodeAttempt, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
+import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, renameNode, setSketch, tryConnect } from '../../engine/flow/actions';
+import { nodeAttempt, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
+import { extensionForMime } from '../../lib/media';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
@@ -762,6 +763,49 @@ function previewRatio(node: GraphNode, assetId: string | undefined, assets: Retu
   return Math.min(2, Math.max(0.6, r));
 }
 
+/**
+ * The node's name: plain text with its result's extension ("rosalinda_frente.png"); double-click to rename. Only
+ * the name is edited — the extension is shown apart and always comes from the file, so it can never change.
+ */
+function NodeTitle({ sessionId, node }: { sessionId: string; node: GraphNode }) {
+  const ext = useStore((s) => {
+    const id = nodeOutputAsset(node, s.generations);
+    const a = id ? s.assets[id] : undefined;
+    return a ? extensionForMime(a.mime) : '';
+  });
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft != null) renameNode(sessionId, node.id, draft);
+    setDraft(null);
+  };
+  if (draft != null)
+    return (
+      <span className="nc-title-edit nodrag">
+        <input
+          autoFocus
+          className="nc-title"
+          value={draft}
+          aria-label="Name"
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+            if (e.key === 'Escape') setDraft(null);
+            e.stopPropagation();
+          }}
+        />
+        {ext ? <span className="nc-ext">.{ext}</span> : null}
+      </span>
+    );
+  return (
+    <span className="nc-title nc-title-text" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setDraft(node.data.title); }}>
+      {node.data.title}
+      {ext ? <span className="nc-ext">.{ext}</span> : null}
+    </span>
+  );
+}
+
 export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps<FlowNode>) {
   const { node, solo } = data;
   const assets = useStore((s) => s.assets);
@@ -796,7 +840,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
       <div className={`nc ${kindClass} ${selected ? 'is-selected' : ''}`}>
         <div className="nc-label">
           <Icon size={12} />
-          <input className="nc-title nodrag" value={d.title} onChange={(e) => patchNodeData(sessionId, node.id, { title: e.target.value })} aria-label="Node title" />
+          <NodeTitle sessionId={sessionId} node={node} />
           <NodeHistory node={node} />
           <StatusPill node={node} />
         </div>

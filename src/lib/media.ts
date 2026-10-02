@@ -319,3 +319,20 @@ export function whiteToAlpha(px: Uint8ClampedArray): Uint8ClampedArray {
   }
   return px;
 }
+
+/** Characters a file name cannot hold on common systems. */
+const BAD_NAME = /[\\/:*?"<>|\u0000-\u001f]/g;
+
+/**
+ * A name the user typed, made safe for a file name and kept free of an extension: the extension always comes from
+ * the file itself, so a rename can never change it ("rosalinda_frente.jpg" on a PNG stays "rosalinda_frente").
+ */
+export function cleanFileName(typed: string): string {
+  return typed
+    .replace(BAD_NAME, '')
+    .trim()
+    .replace(/[.\s]+$/, '')
+    .replace(/\.(png|jpe?g|webp|gif|avif|bmp|tiff?|mp4|webm|mov|m4v|mp3|wav|m4a|aac|ogg|flac|opus|glb|gltf|obj|fbx|usdz?|zip|txt|svg|pdf)$/i, '')
+    .replace(/[.\s]+$/, '')
+    .slice(0, 120);
+}
