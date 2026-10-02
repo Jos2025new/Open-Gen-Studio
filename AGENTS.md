@@ -32,6 +32,7 @@ Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeli
 - [x] S3. Modo selección (icono junto a New): casillas, "N selected", All / Empty (sin mensajes, nodos, diseños, generaciones ni assets) / None, fijar o soltar en bloque, borrar en bloque con confirmación (los elementos de la biblioteca se conservan). En modo selección el clic marca en vez de abrir.
 - [x] S4. Sesiones vacías dicen "empty" en su línea. Navegador: filtro con contadores, iconos, modo selección y barra; sin borrar nada.
 - [x] S5. (usuario: "parece una nave espacial") Rediseño mínimo: cabecera con título, New, ampliar y cerrar; un buscador con un botón "Filter, sort and view" dentro (menú con lienzo y contadores, orden y dirección, solo fijadas, miniaturas, "seleccionar las N vacías"; un punto avisa si hay algo distinto de lo normal); los filtros activos salen como etiquetas quitables bajo el buscador; la casilla de cada sesión aparece al pasar el ratón (no ocupa espacio si no) y con algo marcado sale abajo una barra: "N selected · Select all · fijar · borrar · cancelar". Iconos de lienzo más discretos. Navegador: menú y casilla al pasar el ratón.
+- [x] S6. (usuario) "New" del panel pregunta el lienzo (Chat · Nodes · Designer) y abre la sesión nueva en él; el botón de la barra lateral sigue creando directamente.
 
 ## Tarea — una conversación del agente por lienzo (2026-10-02)
 Origen (usuario): la conversación del agente en Chat se mezclaba con la de Nodos (y Designer).

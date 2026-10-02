@@ -41,6 +41,7 @@ export function SessionsPanel() {
   const selecting = selected.size > 0;
   const bulkDel = usePopover();
   const view = usePopover();
+  const newPop = usePopover();
   const expanded = useStore((s) => s.ui.panelExpanded);
 
   const stats = useMemo(() => {
@@ -106,17 +107,29 @@ export function SessionsPanel() {
           Sessions <span className="faint num">{Object.keys(sessions).length}</span>
         </div>
         <div className="panel-head-actions">
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={Plus}
-            onClick={() => {
-              newSession();
-              setUi({ panel: null });
-            }}
-          >
+          <Button ref={newPop.ref} size="sm" variant="secondary" icon={Plus} onClick={newPop.toggle}>
             New
           </Button>
+          <Popover open={newPop.open} anchor={newPop.ref} onClose={newPop.close} width={220} label="New session">
+            <div className="new-session-menu">
+              {(['chat', 'node', 'designer'] as const).map((w) => {
+                const Icon = CANVAS[w].icon;
+                return (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => {
+                      newPop.close();
+                      newSession();
+                      setUi({ panel: null, workspace: w });
+                    }}
+                  >
+                    <Icon size={14} /> {CANVAS[w].label}
+                  </button>
+                );
+              })}
+            </div>
+          </Popover>
           <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
         </div>
