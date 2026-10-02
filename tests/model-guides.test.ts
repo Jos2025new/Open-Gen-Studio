@@ -73,7 +73,7 @@ describe('MiniMax H3 guide', () => {
     expect(guideIndex()).toContain('  model:minimax — how to write prompts for MiniMax H3 (all tiers)');
     for (const id of ['minimax/h3/reference-to-video', 'minimax/h3-max/image-to-video', 'minimax/h3-fast/text-to-video', 'minimax-h3']) expect(guideForModel(id)?.id).toBe('minimax');
     const t = readGuide('model:minimax')!;
-    for (const rule of ['<Picture 1>', 'one continuous take', 'non_diegetic_music: N/A', 'leans strongly photoreal', 'H3 Developer', 'medium (768P)']) expect(t).toContain(rule);
+    for (const rule of ['<Picture 1>', 'one continuous take', 'non_diegetic_music:N/A', 'subject_definitions:', 'retention_analysis:', 'At 00:02.000', 'leans strongly photoreal', 'H3 Developer', 'medium (768P)']) expect(t).toContain(rule);
     expect(t).not.toMatch(/@Image/);
   });
 });
@@ -132,5 +132,16 @@ describe('image family guides (optional)', () => {
     expect(guideIndex()).toContain('model:nano-banana — how to write prompts for Nano Banana (2, Lite, Pro) images (optional)');
     expect(readGuide('model:gpt-image')).toMatch(/params.background "transparent"/);
     expect(guideForModel('bytedance/seedance-2.5')?.optional).toBeFalsy();
+  });
+});
+
+describe('a video workflow brings its video model guide', () => {
+  it('knows which workflows plan clips', async () => {
+    const { workflowMakesVideo } = await import('../src/engine/skills');
+    expect(workflowMakesVideo('workflow:ugc')).toBe(true);
+    expect(workflowMakesVideo('workflow:story')).toBe(true);
+    expect(workflowMakesVideo('workflow:ugc/review')).toBe(true);
+    expect(workflowMakesVideo('workflow:poster')).toBe(false);
+    expect(workflowMakesVideo('skill:cinematic')).toBe(false);
   });
 });

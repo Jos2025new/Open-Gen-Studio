@@ -487,6 +487,15 @@ export const WORKFLOWS: Workflow[] = [
   },
 ];
 
+/** Whether a "workflow:<id>[/variant]" guide plans video clips (its steps or any variant's). */
+export function workflowMakesVideo(guideId: string): boolean {
+  const [type, rest = ''] = guideId.trim().split(':');
+  const w = type === 'workflow' ? workflowById(rest.split('/')[0]) : undefined;
+  if (!w) return false;
+  const steps = [...w.steps, ...(w.variants ?? []).flatMap((v) => v.steps ?? [])];
+  return steps.some((st) => st.kind === 'video' || (st.kind === 'op' && ['animate', 'continue', 'join_clips'].includes(String(st.op))));
+}
+
 export function workflowById(id: string | null | undefined): Workflow | undefined {
   return WORKFLOWS.find((w) => w.id === id);
 }

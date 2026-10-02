@@ -46,13 +46,13 @@ import {
   updateFeedItem,
   useStore,
 } from '../../store/store';
-import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext } from './context';
+import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultVideoGuideId } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
+import { readGuide, guideWorkspaceProblem, skillById, workflowMakesVideo } from '../skills';
 import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -1046,7 +1046,12 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           }
           const text = v.success ? readGuide(v.data.id) : undefined;
           // Once per conversation: a guide already in the history is not sent again (C4).
-          const seen = text != null && session(sessionId).agent.history.some((m) => m.role === 'tool' && m.content === text);
+          const inHistory = (t: string) => session(sessionId).agent.history.some((m) => m.role === 'tool' && typeof m.content === 'string' && m.content.includes(t));
+          const seen = text != null && inHistory(text);
+          // A video workflow brings the guide of the video model the plan will use, in the same result (no extra round).
+          const videoGuide = v.success && text && !seen && workflowMakesVideo(v.data.id) ? defaultVideoGuideId() : undefined;
+          const videoText = videoGuide ? readGuide(`model:${videoGuide}`) : undefined;
+          const attach = videoText && !inHistory(videoText) ? `\n\n---\nPrompting guide of the video model this plan will use (model:${videoGuide}); write the clip prompts in its format:\n${videoText}` : '';
           if (v.success && text && !seen) {
             recordMetric(sessionId, { type: 'guide', id: v.data.id });
             log.action({ icon: 'guide', label: `Read the ${guideLabel(v.data.id)}` });
@@ -1054,7 +1059,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           respond(
             seen
               ? `Guide "${v.data?.id}" is already loaded earlier in this conversation; follow it.`
-              : (text ?? (v.success ? `No guide "${v.data.id}". Use an id from the index.` : `Invalid read_guide input: ${formatZodError(v.error)}`)),
+              : text != null ? text + attach : v.success ? `No guide "${v.data.id}". Use an id from the index.` : `Invalid read_guide input: ${formatZodError(v.error)}`,
           );
           continue;
         }

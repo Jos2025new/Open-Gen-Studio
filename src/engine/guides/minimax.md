@@ -11,22 +11,27 @@ TIERS ON OUR PROVIDERS (names differ from other platforms: read the variant, not
 - Resolution follows the chosen quality: medium (768P) by default; 2K only if the user asks.
 - At low resolution (480P), write more directly: micro-texture (skin pores, fabric grain) is lost. At 2K the prompt can be more sensory.
 
-STRUCTURE (natural cinematic language)
-1. Scene context — 1–2 sentences, only what happens in this shot.
-2. First frame — the key subjects already in position (no empty opening frame).
-3. Blocking — measurable positions ("less than a metre from X", screen left/right, foreground/midground/background); body orientation and gaze direction separately.
-4. Optics — diagonal FOV in degrees + distance (47° normal, 84° wide, 29° portrait, 18° tele) and the visible result.
-5. Camera — the operator's physical behaviour: height, distance, side, movement.
-6. Light — main source + direction + camera side + exposure priority.
-7. Physics — the critical motion with weight, ground contact, cause → effect.
-8. Audio — ambience, or the exact line in double quotes, attributed ("She says: \"You came.\""). Lips move only on scripted dialogue. For no score, end with "non_diegetic_music: N/A"; never ask for a soundtrack and ban music together.
+PROMPT FORMAT (Higgsfield's production skill for H3, user-supplied 2026-10-01): one string with six labelled sections, in this order, always.
+subject_definitions:<Picture 1> is [role: the creator / the character sheet / the storyboard, read in scene order]. <Picture 2> is [role: the exact product]. <Subject 1> is [the identity it defines: who she is, or the product's design system].
+summary:reference generation — [the mode and the concrete result, one line].
+retention_analysis:<Subject 1>: fully_preserved - [face, hair, build; or product shape, palette, materials, exact visible text]. <Picture 1>: partially_preserved - [what to take from it and what to exclude: sheet grid, borders, labels, background].
+detailed_description:[One style sentence (real photography, live action… or the exact 2D/3D medium), full-screen aspect and the camera policy.][Shot 1] [Full-frame composition with the subjects already in place, one main change, the camera move with direction, amount and speed, and the visible end state.][Shot 2] At 00:02.000, [the next state and the causal transition].[… one entry per beat, timestamps rising inside the duration …][The exact final composition; the last reveal ends before the end and the full frame holds still until the close.]
+overall_soundscape:[Concrete physical SFX and ambience. Speech only when wanted, with a stable speaker: (S1) says to camera: <d>[Spanish] "¿Buscas un parlante portátil?"</d>]
+non_diegetic_music:N/A (or the music, described, when the user wants it)
 
-RULES
-- No "negative constraints" block: write the wanted states in positive.
-- Motion is its strength: describe the action step by step with timing ("at 2 s she jumps, turns 360° with arms open and lands").
-- H3 cuts between shots by default: write "one continuous take" when no cut is wanted. For several beats in one clip, time them: "0–3s: … 3–7s: … 7–10s: …", naming shot size and subject at each cut so identity holds.
+RULES FOR THE SECTIONS
+- Shot 1 has no timestamp; later shots use "At 00:SS.mmm", rising. One action per beat: never stack camera moves or actions in one shot.
+- References: <Picture N> in the order the refs are sent, each with its role in subject_definitions; a file without a role is ignored or misused. Up to 9 images, 3 videos, 3 audios (audio needs an image or video).
+- Text: quote every visible word allowed, in its language, with position and treatment; no incidental text.
+- Everything positive and renderable: the prompt describes what is seen and heard. Rules for you (which claims are allowed, what not to invent) never go in the prompt — apply them by what you write.
+- Duration: whole seconds, 4–15. H3 cuts between shots by default; for one continuous take say so in the camera policy.
+
+WHAT EACH SHOT CAN CARRY (from production practice)
+- Blocking: measurable positions (less than a metre from X, screen left/right, foreground/midground/background); body orientation and gaze separately.
+- Optics: diagonal FOV in degrees + distance (47° normal, 84° wide, 29° portrait, 18° tele).
+- Light: main source + direction + camera side + exposure priority.
+- Physics: the critical motion with weight, ground contact, cause → effect. Motion is H3's strength: time it ("at 2 s she jumps, turns 360° and lands").
 - Start/end frames: describe the transition between them, not only the two ends.
-- References: open with one line per file and its role, using MiniMax's labels — "<Picture 1> is the character reference (lock this woman's face)", "<Picture 2> is the first frame"; video and audio references by their role (camera or motion reference, voice reference). A file without a declared role is ignored or misused. Each extra reference spends attention: use only those that anchor identity, style or composition.
 
 STYLE: REALISTIC, 2D OR 3D
 H3 leans strongly photoreal: style is declared, not hinted. Put it in the first sentence, repeat it once at the end as a quality suffix, and never mix two styles in one shot (realism wins and the result is a hybrid). A reference or start frame carries the style, but restate it in text or H3 will "realise" it.
@@ -35,5 +40,10 @@ H3 leans strongly photoreal: style is declared, not hinted. Put it in the first 
 - 3D (stylised feature, AAA game cinematic, realistic PBR): declare the render ("stylised 3D render, feature-animation look" or "AAA game cinematic"). Material and light language: subsurface scattering, rim light, ambient occlusion, volumetric light, specular highlights, global illumination, light depth of field. Stylised = exaggerated proportions (big head, big eyes, expressive hands); AAA = human proportions with an engine look. Motion can be cleaner and more readable. Avoid "photography", "filmed", "documentary" (pushes to live action).
 - With a 2D start image, write "the style of the reference image, 2D animation", or H3 may translate it to 3D or realism between frames. Keep one style across start/end frames and every reference.
 
-EXAMPLE (standard, 8 s, 16:9)
-Real photography, live action. A dancer jumps and spins in a minimalist studio. First frame: she is already on the floor, knees bent, looking at camera. Static camera at 3 m, 29° portrait FOV, warm side light from camera left, exposed for the face. At 2 s she jumps, turns 360° with arms open and lands. Real weight on the landing, firm foot contact, her hair follows the spin. Audio: the dull thud of the landing and her breathing; non_diegetic_music: N/A. Real photography, natural skin texture.
+EXAMPLE (UGC review, 5 s, 9:16, creator sheet + product photo)
+subject_definitions:<Picture 1> is the creator character sheet. <Picture 2> is the exact portable speaker. <Subject 1> is the creator: a 19-year-old streamer. <Subject 2> is the speaker.
+summary:reference generation — a 5-second handheld UGC hook where the creator shows the speaker to camera.
+retention_analysis:<Subject 1>: fully_preserved - face, hair, build and outfit from the sheet. <Subject 2>: fully_preserved - shape, black housing, handle, front control panel and its printed labels. <Picture 1>: partially_preserved - only the person; exclude the sheet layout and the neutral background.
+detailed_description:Real photography, live action, vertical 9:16 full screen, handheld smartphone at arm's length with slight organic sway, one continuous take.[Shot 1] Medium close-up in a lived-in streaming corner, window light from camera left; she already holds the speaker by its handle at chest height, looking into the lens.[Shot 2] At 00:01.500, she turns the speaker so its front control panel faces camera and taps the top edge; the camera eases 10% closer.[Shot 3] At 00:03.500, she lowers it beside her face and smiles into the lens; the frame holds from 00:04.300 to 00:05.000.
+overall_soundscape:Quiet room tone, a light plastic click as she taps the speaker. (S1) says to camera: <d>[Spanish] "¿Buscas un parlante portátil? Mira, tiene asa y los controles al frente."</d>
+non_diegetic_music:N/A

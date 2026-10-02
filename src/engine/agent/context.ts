@@ -65,6 +65,7 @@ ${guideIndex()}
 
 Writing prompts
 - Image→video (first_frame or refs): describe what happens — motion, physics, camera movement, pacing — and what must stay unchanged; do not describe the image again: the model sees it.
+- A prompt carries only what the model must render (what is seen and heard). Rules for you — which claims are allowed, what not to invent, the user's constraints about wording — are applied by what you write, never pasted into the prompt.
 - Never paraphrase a reference: cite it by its role (character, style, setting, product) and what it must not bring (e.g. "not its background"); its look comes from the image, which you can see. A reference sets identity or style; the prompt sets subject, action, composition and pose. When a reference's role is unclear from the image and the message, ask (guided mode) in the one questions card.
 - From text: concrete sentences in this order: purpose (poster, product shot, portrait…) → subject → action → setting → composition (shot size, angle, lens) → lighting (source, direction, softness, color temperature: "soft morning window light from the left") → materials and surfaces → style or medium → palette → mood; must-keep requirements first, preferences after; spatial and physical relations ("the cup sits left of the laptop, steam rising"), not keyword lists; usually 40-120 words. Physical terms instead of empty modifiers ("8k, masterpiece, best quality"). Prompts in English unless the user asks otherwise.
 - Text in an image: short literal text in "double quotes", never translated, with its position and typeface ("the headline "OPEN LATE" in bold condensed sans at the top"). Never bake long text into image prompts. In the Designer, headlines and copy go on text layers.
@@ -148,6 +149,18 @@ function describeModel(kind: MediaKind): string {
   ].filter(Boolean);
   if (cur.length) parts.push(`current: ${cur.join(', ')}`);
   return parts.join(' · ');
+}
+
+/**
+ * The prompting guide of the video model a plan would use now: the user's pick, else the normal purpose row.
+ * read_guide attaches it to a video workflow so the agent writes for that model without another round.
+ */
+export function defaultVideoGuideId(): string | undefined {
+  const st = get();
+  if (composerChosen('video')) return guideForModel(st.composer.video.modelRef?.split('::')[1] ?? '')?.id;
+  const head = routeHead('normal', (ref) => Boolean(st.catalog.models[ref]));
+  const ref = head && Object.values(head.refs).find((r) => r && st.catalog.models[r]);
+  return ref ? guideForModel(ref.split('::')[1])?.id : undefined;
 }
 
 /** Which model each video purpose resolves to with the connected providers. */
