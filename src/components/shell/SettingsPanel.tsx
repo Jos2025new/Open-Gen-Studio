@@ -14,6 +14,7 @@ import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Sett
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
+import { DataSummary } from './DataSummary';
 
 function ProviderRow({ id }: { id: RemoteProviderId }) {
   const saved = useStore((s) => s.settings.keys[id]);
@@ -459,6 +460,7 @@ export function SettingsPanel() {
       </section> : null}
 
       {tab === 'data' ? <section className="set-section">
+        <DataSummary />
         <div className="set-row">
           <span className="set-label">Local data</span>
           <Button ref={confirmRef} size="sm" variant="danger" icon={Trash} onClick={() => setConfirmOpen(true)}>

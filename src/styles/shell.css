@@ -274,3 +274,12 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .settings .dot { width: 7px; height: 7px; margin: 0; }
 .settings .dot-busy { background: var(--warn); }
 .settings .dot-off { background: var(--text-3, #555); }
+
+/* Settings → Data */
+.data-summary { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.data-rows { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.data-rows > div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.data-rows dt { color: var(--text-3); }
+.data-rows dd { margin: 0; color: var(--text); text-align: right; }
+.data-path { font-size: 11px; word-break: break-all; }
+.data-summary > button { align-self: flex-start; }

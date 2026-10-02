@@ -2,7 +2,7 @@
 // The app has no backend: this only exists while `npm run dev` / `npm run preview` runs. Files live in
 // <project>/data (git-ignored): state.json (contains API keys, mode 600) and <ns>/<id>.<ext> media files.
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -208,6 +208,56 @@ export function localStore(root = process.cwd()) {
         if (err?.code === 'ENOENT') return send(501, 'ffmpeg is not installed on this computer');
         return send(500, `ffmpeg failed: ${String(err?.stderr || err?.message || err).slice(0, 400)}`);
       } finally {
+        await rm(out, { force: true });
+      }
+    }
+
+    // What is on disk: the folder and the size of each part (Settings → Data).
+    if (path === '/info' && req.method === 'GET') {
+      const parts = {};
+      for (const ns of await readdir(dir).catch(() => [])) {
+        if (ns === 'tmp') continue;
+        const full = join(dir, ns);
+        const st = await stat(full).catch(() => null);
+        if (!st) continue;
+        if (st.isFile()) { parts[ns] = { files: 1, bytes: st.size }; continue; }
+        let files = 0, bytes = 0;
+        for (const f of await readdir(full).catch(() => [])) {
+          const fs = await stat(join(full, f)).catch(() => null);
+          if (fs?.isFile()) { files++; bytes += fs.size; }
+        }
+        parts[ns] = { files, bytes };
+      }
+      return send(200, JSON.stringify({ path: dir, parts }), 'application/json');
+    }
+
+    // Everything as a ZIP (media folders + state.json without the API keys). Built in data/tmp and removed after.
+    if (path === '/export' && req.method === 'GET') {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const work = join(dir, 'tmp', `export-${stamp}`);
+      const out = join(dir, 'tmp', `export-${stamp}.zip`);
+      await mkdir(work, { recursive: true });
+      try {
+        const raw = await readFile(join(dir, 'state.json'), 'utf8').catch(() => '');
+        if (raw) {
+          const saved = JSON.parse(raw);
+          const keys = saved?.state?.settings?.keys;
+          if (keys) for (const k of Object.keys(keys)) keys[k] = '';
+          await writeFile(join(work, 'state.json'), JSON.stringify(saved, null, 1));
+        }
+        const folders = [];
+        for (const ns of await readdir(dir).catch(() => [])) {
+          if (ns !== 'tmp' && SAFE.test(ns) && (await stat(join(dir, ns))).isDirectory()) folders.push(ns);
+        }
+        if (folders.length) await run('zip', ['-rq', out, ...folders, '-x', '*.tmp'], { cwd: dir, maxBuffer: 1 << 24 });
+        if (raw) await run('zip', ['-jq', out, join(work, 'state.json')]);
+        res.setHeader('Content-Disposition', `attachment; filename="open-gen-studio-${stamp.slice(0, 10)}.zip"`);
+        return send(200, await readFile(out), 'application/zip');
+      } catch (err) {
+        if (err?.code === 'ENOENT') return send(501, 'zip is not installed on this computer');
+        throw err;
+      } finally {
+        await rm(work, { recursive: true, force: true });
         await rm(out, { force: true });
       }
     }
