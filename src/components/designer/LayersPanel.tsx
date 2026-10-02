@@ -12,6 +12,7 @@ import { Button, Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
+import { toast } from '../../store/store';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -68,7 +69,8 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.
   const rows = useRef<Array<HTMLDivElement | null>>([]);
-  const [drag, setDrag] = useState<{ id: string; from: number; y: number; active: boolean; slot: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; from: number; y: number; active: boolean; slot: number; locked?: boolean } | null>(null);
+  const lockedNote = (name: string) => toast(`"${name}" is locked. Unlock it to move it.`, 'error');
   const slotAt = (y: number) => {
     const els = rows.current.slice(0, doc.layers.length);
     const i = els.findIndex((el) => el && y < el.getBoundingClientRect().top + el.getBoundingClientRect().height / 2);
@@ -110,11 +112,13 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     <div className="layer-list">
       {[...doc.layers].reverse().map((l, d) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} ref={(el) => { rows.current[d] = el; }}
         className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
-        onPointerDown={(e) => { if (e.button !== 0 || l.locked || (e.target as HTMLElement).closest('input, .layer-toggle')) return; setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d }); }}
+        onPointerDown={(e) => { if (e.button !== 0 || (e.target as HTMLElement).closest('input, .layer-toggle')) return; setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d, locked: l.locked }); }}
         onPointerMove={(e) => {
           if (!drag || drag.id !== l.id) return;
           if (!(e.buttons & 1)) { setDrag(null); return; }
           if (!drag.active && Math.abs(e.clientY - drag.y) < 5) return;
+          // A locked layer does not move: say why, once, instead of ignoring the drag.
+          if (drag.locked) { lockedNote(l.name); setDrag(null); return; }
           // Captured only once it really drags, so clicks and double-clicks (rename) still reach the name.
           if (!drag.active) e.currentTarget.setPointerCapture(e.pointerId);
           setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
@@ -132,8 +136,8 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     {layer && <div className="layer-actions">
         {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} data-tip="Relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}>Operations</Button>}
         <span className="layer-actions-gap" />
-        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={layer.locked || index === doc.layers.length - 1} onClick={() => moveLayer(sessionId, doc.id, layer.id, 1)} />
-        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={layer.locked || index === 0} onClick={() => moveLayer(sessionId, doc.id, layer.id, -1)} />
+        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, 1))} />
+        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, -1))} />
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         <IconButton icon={Trash} label="Delete layer" size="sm" tone="danger" disabled={layer.locked} onClick={() => deleteLayer(sessionId, doc.id, layer.id)} />
       </div>}
