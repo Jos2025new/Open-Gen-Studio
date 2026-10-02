@@ -305,31 +305,24 @@ export const WORKFLOWS: Workflow[] = [
     skills: [{ id: 'cinematic', for: 'the clip prompts' }],
     needs: [
       'the product (photo, or a description)',
-      'the creator: an attached photo, or a description (age range, style); generated once and kept',
+      'the creator: an attached photo (used as is), or a description (age range, look, style)',
+      'how to start (recommended: "creator sheet first, then the video" when the creator is invented — you see her before any video is paid; or "all at once")',
       'language of the spoken lines',
-      'total duration',
+      'total duration (one clip with timed shots when it fits the model)',
       'claims to use: only benefits the user states or the product shows (none → neutral)',
     ],
     fixed: { aspect: '9:16' },
     continuity:
-      'The creator and product images (attached, or the approved key frame) go in the refs of every step and are cited with the model\'s reference syntax and their role; never describe them again. Save them to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans. Spoken lines in the chosen language, quoted, short.',
+      'Pre-production first, like a real shoot. The creator: the user\'s photo as is, or — when invented — a creator sheet (one image step, 2×2: front, three-quarter, profile and a face close-up, plain neutral background, same outfit), never a creator already holding the product. The product: the user\'s photo as is. Then the video: the creator sheet (or photo) and the product photo together in the refs of every clip (reference-to-video keeps both identities), cited with the model\'s reference syntax and their roles; never describe them again. Script before prompts: hook in the first 1–2 s → product in use or its benefit → call to action, as timed beats with the creator\'s spoken lines in quotes in the chosen language, short; audio on. "Creator sheet first": plan 1 is only the sheet, plan 2 (after the user sees it) the video. Save to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans.',
     variants: [
       { id: 'review', name: 'Review', description: 'Creator talks to camera holding the product: hook, two benefits, verdict.' },
-      { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.', steps: [
-        { id: 's1', kind: 'image', title: 'Key frame · package', prompt: '{prompt}, hands holding the closed package, phone-shot, natural light', aspect: '9:16' },
-        { id: 's2', kind: 'video', title: 'Unboxing clip', prompt: '{prompt}, opening the package, reveal of the product, genuine reaction', firstFrame: 's1', aspect: '9:16' },
-      ] },
+      { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.' },
       { id: 'try-on', name: 'Try-on', description: 'The creator wears or uses the product and shows it from two sides.' },
-      { id: 'tutorial', name: 'Tutorial', description: 'Step by step use, one clip per step, joined.', steps: [
-        { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}, creator with the product, ready to show how to use it', aspect: '9:16' },
-        { id: 's2', kind: 'video', title: 'Step 1', prompt: '{prompt}, step 1', firstFrame: 's1', aspect: '9:16' },
-        { id: 's3', kind: 'video', title: 'Step 2', prompt: '{prompt}, step 2', refs: ['s1'], aspect: '9:16' },
-        { id: 's4', kind: 'op', title: 'Join clips', op: 'join_clips', input: 's2', more: ['s3'] },
-      ] },
+      { id: 'tutorial', name: 'Tutorial', description: 'Step by step use as timed shots in one clip, or one clip per step joined when it is long.' },
     ],
     steps: [
-      { id: 's1', kind: 'image', title: 'Key frame', prompt: '{prompt}, creator holding the product, phone-shot selfie framing, natural light', aspect: '9:16' },
-      { id: 's2', kind: 'video', title: 'UGC clip', prompt: '{prompt}, talking to camera about the product, handheld', firstFrame: 's1', aspect: '9:16' },
+      { id: 's1', kind: 'image', title: 'Creator sheet', prompt: '{prompt}, creator character sheet: front, three-quarter, profile and a close-up of the face, plain neutral background, same outfit, natural light', aspect: '16:9' },
+      { id: 's2', kind: 'video', title: 'UGC clip', prompt: '{prompt}, 0–2s hook to camera, then the product in use, then the call to action; handheld phone framing, natural light, spoken lines in quotes', refs: ['s1'], aspect: '9:16' },
     ],
   },
   {

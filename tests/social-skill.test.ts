@@ -28,11 +28,14 @@ describe('social ad router and UGC workflow', () => {
     const w = workflowById('ugc')!;
     expect(w.workspaces).toEqual(['chat']);
     expect(w.fixed).toEqual({ aspect: '9:16' });
-    expect(w.continuity).toMatch(/refs of every step/);
+    expect(w.continuity).toMatch(/refs of every clip/);
+    expect(w.continuity).toMatch(/creator sheet/);
+    expect(w.continuity).toMatch(/never a creator already holding the product/);
+    expect(w.steps[0].title).toBe('Creator sheet');
     expect(w.continuity).toMatch(/library only if the user asks/);
     expect(w.continuity).toMatch(/Claims only from the brief/);
     expect(w.variants!.map((v) => v.id)).toEqual(['review', 'unboxing', 'try-on', 'tutorial']);
-    expect(readGuide('workflow:ugc/tutorial')).toMatch(/join_clips/);
+    expect(readGuide('workflow:ugc/tutorial')).toMatch(/timed shots in one clip/);
   });
 
   it('the wrap-up rule is not in the fixed prompt (it travels only after a plan runs)', () => {
