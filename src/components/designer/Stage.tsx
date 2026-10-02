@@ -255,7 +255,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     const act = activeLayer(current);
 
     if (tool === 'fill') {
-      try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity); }
+      try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity, { threshold: brush.fillThreshold, expand: brush.fillExpand, smooth: brush.fillSmooth }); }
       catch (error) { toast(error instanceof Error ? error.message : 'Could not fill this region.', 'error'); }
       return;
     }

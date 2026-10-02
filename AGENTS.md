@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — ajustes del cubo (2026-10-02)
+- [x] Añadir umbral 0–255, expansión 0–12 px y suavizado 0–4 px en los ajustes existentes; persistir como opciones del pincel sin migración. Expandir la máscara después del flood fill y suavizar solo su borde antes de colorearla. Mantener valores anteriores por defecto (24/0/0), capa separada y Undo. Riesgo: umbral alto cruza contornos y expansión excesiva los tapa; parámetros afectan al siguiente clic. Sin pruebas por petición del usuario; commit reversible.
+
 ## Tarea — cubo de relleno y traslado a Designer (2026-10-02)
 - [x] B1. Cubo (G): muestrear composición visible, rellenar región contigua de color parecido en una capa raster nueva con color/opacidad del pincel. Reutilizar render, buffers, historial y guardado; conservar originales y trazos editables. Tolerancia fija moderada; una abertura en el contorno permite que el relleno salga. Evitar operación mientras cargan píxeles y limitarla al documento. Implementado, sin pruebas por petición del usuario.
 - [x] B2. Corregir `asset_ids` → `assetIds`; pedir llamada real sin ids para todas las imágenes del Chat, enfocar un diseño existente si ya están importadas y contar solo colocaciones reales. Evitar aviso falso sin plan tras traslado. Sin llamadas remotas ni pruebas por petición del usuario. Un commit por tarea; revert permite deshacer código. Captura: segunda petición fue respuesta sin herramienta; defecto adicional localizado en el mapeo de ids. No se afirma reproducción del caso real.

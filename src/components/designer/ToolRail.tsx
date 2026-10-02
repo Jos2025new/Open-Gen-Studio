@@ -32,7 +32,10 @@ export function ToolRail({ doc }: { doc: DesignDoc }) {
         {tool === 'fill' ? <>
           <Field label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></Field>
           <Field label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></Field>
-          <p className="faint">Fills connected similar colors across visible layers. Close gaps in the outline first.</p>
+          <Field label={`Threshold · ${brush.fillThreshold ?? 24}`}><input aria-label="Fill threshold" type="range" min={0} max={255} step={1} value={brush.fillThreshold ?? 24} onChange={(e) => setUi({ brush: { ...brush, fillThreshold: +e.target.value } })} /></Field>
+          <Field label={`Expand · ${brush.fillExpand ?? 0}px`}><input aria-label="Fill expansion" type="range" min={0} max={12} step={1} value={brush.fillExpand ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillExpand: +e.target.value } })} /></Field>
+          <Field label={`Smooth · ${brush.fillSmooth ?? 0}px`}><input aria-label="Fill smoothing" type="range" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillSmooth: +e.target.value } })} /></Field>
+          <p className="faint">Threshold accepts more color variation; Expand covers edge gaps; Smooth softens the edge. Applied on the next fill. Pixels are document pixels.</p>
         </> : tool === 'lineart' ? <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} /> : paint ? <>
           <Field label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></Field>
           <Field label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></Field>

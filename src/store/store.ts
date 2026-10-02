@@ -105,7 +105,7 @@ export interface UiState {
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
   tool: DesignTool;
-  brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number };
+  brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
   /** Style of new Lineart strokes (editable afterwards per layer). */
   lineart: StrokeStyle;
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
