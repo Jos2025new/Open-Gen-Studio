@@ -27,7 +27,7 @@ export function InlineSlider({ label, value, min, max, step = 1, unit = '', scal
   return <label className="opt" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
     <span className="opt-label">{label}</span>
     <input className="opt-range" type="range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
-    <input className="opt-num num" type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
+    <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
     {unit && <span className="opt-unit">{unit}</span>}
   </label>;
 }

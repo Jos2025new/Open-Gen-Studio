@@ -108,3 +108,6 @@
 .opt { gap: 5px; }
 .opt-num { width: 3.6ch; text-align: left; padding: 2px 0 !important; }
 .opt-unit { margin-left: -3px; }
+/* The number is as wide as its digits, the unit right after it, no trailing gap. */
+.opt-unit { margin-left: -4px; }
+.opt { padding-right: 9px; }
