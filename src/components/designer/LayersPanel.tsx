@@ -107,7 +107,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onDoubleClick={() => setWidth(260)} />
     <div className="layers-body">
     <Section title="Layers" open={sections.layers} onToggle={() => setSections({ ...sections, layers: !sections.layers })}
-      extra={<div className="panel-head-actions"><span className="faint num">{doc.width} × {doc.height}</span><IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
+      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num">{picked.length} selected<button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
     <div className="layer-add">
       <Button size="sm" icon={Image} onClick={() => addEmptyLayer(sessionId, doc.id, 'raster')}>Raster</Button>
       <Button size="sm" icon={Shapes} onClick={() => addEmptyLayer(sessionId, doc.id, 'vector')}>Vector</Button>
