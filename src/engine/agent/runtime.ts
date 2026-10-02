@@ -17,7 +17,6 @@ import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
-  CanvasConversation,
   ActivityEntry,
   ActivityFeedItem,
   AgentQuestion,
@@ -112,25 +111,25 @@ function adjustedNote(adjustments: string[] | undefined): string {
   return adjustments?.length ? `\nThe app adjusted your plan before showing it (keep this in mind for revisions and later plans): ${adjustments.join('; ')}.` : '';
 }
 
-/** The user's own words, marked off from everything the app adds (context, guides, notes). */
-function userBlock(text: string): string {
-  return `<user_message>\n${text}\n</user_message>`;
+/** The user's own words, marked off from everything the app adds (context, guides, notes), with the canvas they wrote on. */
+function userBlock(text: string, canvas: Workspace): string {
+  return `<user_message canvas="${canvas}">\n${text}\n</user_message>`;
 }
 
 /**
- * Each canvas has its own conversation with the agent (chat, nodes, designer): switching canvas parks the current
- * one and brings back that canvas's. Never while the agent is working.
+ * One agent conversation per session; the canvas only restricts what the agent may do there and which messages the
+ * GUI shows. A session from before this keeps the conversation that was active; when that one is empty, the
+ * conversation parked for this canvas comes back. Never while the agent is working.
  */
 function toCanvas(sessionId: string, workspace: Workspace): void {
   const a = session(sessionId)?.agent;
-  if (!a || a.busy) return;
-  if (!a.canvas || a.canvas === workspace) {
-    if (a.canvas !== workspace) patchAgent(sessionId, { canvas: workspace });
+  if (!a || a.busy || a.canvas === workspace) return;
+  const there = a.parked?.[workspace];
+  if (there && !a.history.length) {
+    patchAgent(sessionId, { ...there, pending: there.pending, draft: there.draft, revising: there.revising, canvas: workspace, parked: { ...a.parked, [workspace]: undefined } });
     return;
   }
-  const here: CanvasConversation = { history: a.history, pending: a.pending, questionRound: a.questionRound, notes: a.notes, draft: a.draft, revising: a.revising };
-  const there: CanvasConversation = a.parked?.[workspace] ?? { history: [], questionRound: 0, notes: [] };
-  patchAgent(sessionId, { ...there, pending: there.pending, draft: there.draft, revising: there.revising, canvas: workspace, parked: { ...(a.parked ?? {}), [a.canvas]: here, [workspace]: undefined } });
+  patchAgent(sessionId, { canvas: workspace });
 }
 
 /** The conversation of the canvas a feed item belongs to. */
@@ -185,7 +184,8 @@ export async function sendAgentMessage(text: string): Promise<void> {
   setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
-  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId) : undefined;
+  // A card waiting on another canvas is not what the user is answering here: it closes as superseded.
+  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && f.workspace === workspace) : undefined;
 
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
@@ -200,7 +200,7 @@ export async function sendAgentMessage(text: string): Promise<void> {
       pushHistory(sessionId, {
         role: 'tool',
         tool_call_id: pending.toolCallId,
-        content: `The user replied instead of approving:\n${userBlock(clean)}${adjustedNote(pendingItem.plan.adjustments)}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
+        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan.adjustments)}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
       });
       // Images attached to the comment: a user message right after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
@@ -241,7 +241,7 @@ export async function sendAgentMessage(text: string): Promise<void> {
   }
   // A new request: images of earlier requests become a note instead of being sent again.
   patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
-  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)')}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
+  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);
 }

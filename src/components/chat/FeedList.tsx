@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { askForPlan, deleteGarbled, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
@@ -124,10 +124,12 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
 }
 
 export function FeedList({ sessionId, compact }: { sessionId: string; compact?: boolean }) {
-  // Each canvas shows only its own conversation with the agent.
+  // Each canvas shows its own messages; the agent's conversation is one per session, so the others can be shown too.
   const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const canvas = useStore((s) => s.ui.workspace);
-  const feed = useMemo(() => all.filter((f) => f.workspace === canvas), [all, canvas]);
+  const [everywhere, setEverywhere] = useState(false);
+  const others = useMemo(() => all.filter((f) => f.workspace !== canvas && f.type !== 'activity').length, [all, canvas]);
+  const feed = useMemo(() => (everywhere ? all : all.filter((f) => f.workspace === canvas)), [all, canvas, everywhere]);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
   // While text streams, its caret already shows activity; an open activity block shows its own progress (L3).
@@ -135,6 +137,11 @@ export function FeedList({ sessionId, compact }: { sessionId: string; compact?: 
   const showStatus = phase && !liveActivity && !(last?.type === 'assistant' && last.streaming);
   return (
     <div className={`feed ${compact ? 'is-compact' : ''}`}>
+      {others ? (
+        <button type="button" className="feed-everywhere faint" onClick={() => setEverywhere((v) => !v)}>
+          {everywhere ? 'Show only this canvas' : `Show the other canvases too (${others})`}
+        </button>
+      ) : null}
       {feed.map((item) => (
         <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} />
       ))}

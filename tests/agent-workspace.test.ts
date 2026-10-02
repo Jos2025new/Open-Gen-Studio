@@ -101,23 +101,19 @@ describe('attached images as references, no library saves unasked', () => {
   });
 });
 
-describe('one conversation per canvas', () => {
+describe('one conversation per session, canvas-tagged', () => {
   const setCanvas = (w: 'chat' | 'node') => useStore.setState((st) => ({ ui: { ...st.ui, workspace: w } }));
-  const said = () => session().agent.history.filter((m: LlmMessage) => m.role === 'user').map((m: LlmMessage) => String(typeof m.content === 'string' ? m.content : '').split('\n')[1]);
+  const tags = () => session().agent.history.filter((m: LlmMessage) => m.role === 'user').map((m: LlmMessage) => String(typeof m.content === 'string' ? m.content : '').split('\n').slice(0, 2).join(' '));
 
-  it('the node canvas starts its own conversation and the chat one comes back intact', async () => {
+  it('the node canvas continues the chat conversation; each message says where it was written', async () => {
     setCanvas('chat');
     replies = [{ text: 'chat answer' }];
     await sendAgentMessage('hello from chat');
     setCanvas('node');
     replies = [{ text: 'node answer' }];
-    await sendAgentMessage('hello from nodes');
-    expect(said()).toEqual(['hello from nodes']);
-    setCanvas('chat');
-    replies = [{ text: 'again' }];
-    await sendAgentMessage('back in chat');
-    expect(said()).toEqual(['hello from chat', 'back in chat']);
-    expect(session().agent.parked?.node?.history.some((m: LlmMessage) => String(m.content).includes('hello from nodes'))).toBe(true);
+    await sendAgentMessage('continue here');
+    expect(tags()).toEqual(['<user_message canvas="chat"> hello from chat', '<user_message canvas="node"> continue here']);
+    expect(session().agent.canvas).toBe('node');
     setCanvas('chat');
   });
 });

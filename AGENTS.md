@@ -33,6 +33,12 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — una conversación por sesión y "continuamos en canvas" (2026-10-02)
+Origen (usuario): pasar al canvas de Nodos y retomar lo hecho en Chat. Criterio: los lienzos son vistas y restricciones, no conversaciones aparte; el usuario sigue distinguiendo sesiones y el agente no las mezcla. Sustituye la parte "lo que ve el modelo" de C2 (C1 se mantiene).
+- [x] K1. Una conversación del agente por sesión: cambiar de lienzo ya no aparca la conversación (sesiones antiguas: la activa sigue; si está vacía, vuelve la aparcada de ese lienzo). Cada mensaje va como `<user_message canvas="chat|node|designer">` y una regla explica que es una conversación entre lienzos, que solo valen las herramientas del lienzo actual y que otras sesiones nunca están en ella. Una tarjeta pendiente en otro lienzo se cierra como reemplazada al escribir aquí. *Dónde:* `runtime.ts` (`toCanvas`, `userBlock`), `context.ts`. Tests `agent-workspace`, `agent-vision`.
+- [x] K2. GUI: cada lienzo muestra sus mensajes; botón "Show the other canvases too (N)" arriba de la conversación para verlos todos, cada uno con su etiqueta de lienzo. *Dónde:* `FeedList.tsx`, `chat.css`. Sin navegador.
+- [ ] K3. Herramienta `continue_in_canvas` (solo en Nodos) y acción de la app: cada generación del Chat → nodo con su resultado, conectado por sus entradas, adjuntos como nodos Asset; entran "al día" (nada se regenera). Test: reconstruir y comprobar que no queda nada pendiente.
+
 ## Tarea — elegir entre varios resultados (2026-10-02)
 Origen (usuario, 4 hojas candidatas): no sabía cómo decirle al agente cuál quería.
 - [x] N1. Con varios resultados, cada uno lleva su número arriba a la izquierda (1, 2…; en lima el seleccionado). *Dónde:* `GenerationCard.tsx`, `chat.css`.

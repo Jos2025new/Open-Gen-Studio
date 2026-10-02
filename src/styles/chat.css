@@ -102,3 +102,7 @@
 /* A change to a model the user picked: shown, not folded. */
 .plan-user-model { display: flex; align-items: center; gap: 6px; margin: 0 14px 8px; font-size: 12px; color: var(--warn); }
 .plan-user-model svg { flex: none; }
+
+/* One conversation per session: the other canvases' messages, shown on demand (each with its canvas badge). */
+.feed-everywhere { align-self: center; background: none; border: 0; font: inherit; font-size: 12px; cursor: pointer; padding: 4px 8px; }
+.feed-everywhere:hover { color: var(--text); }
