@@ -1,3 +1,4 @@
+import { VisionTag } from '../ui/VisionTag';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -121,7 +122,7 @@ function DirectorList({ done }: { done: () => void }) {
       <div className="ml-search"><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Director models" aria-label="Search Director models" /></div>
       <div className="ml-scroll agent-director-list">
         <button type="button" className={`ml-row ${agent.modelPinned ? '' : 'is-selected'}`} onClick={() => { void resetAgentModel(); done(); }}>
-          <span className="ml-main"><span className="ml-name">Auto</span><span className="ml-sub">{agent.tier === 'top' ? 'Top tier' : 'Normal tier'} · {agent.model || 'No model resolved'}</span></span>
+          <span className="ml-main"><span className="ml-name">Auto</span><span className="ml-sub">{agent.tier === 'top' ? 'Top tier' : 'Normal tier'} · {agent.model || 'No model resolved'} <VisionTag vision={models?.find((m) => m.id === agent.model)?.vision} /></span></span>
           {!agent.modelPinned ? <Check size={14} className="ml-check" /> : null}
         </button>
         {[...families.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([family, entries]) => {
@@ -134,7 +135,7 @@ function DirectorList({ done }: { done: () => void }) {
               </button>
               {open ? entries.map((m) => (
                 <button key={m.id} type="button" className={`ml-row ${agent.modelPinned && m.id === agent.model ? 'is-selected' : ''}`} onClick={() => { setSettings((s) => ({ agent: { ...s.agent, model: m.id, modelPinned: true } })); done(); }}>
-                  <span className="ml-main"><span className="ml-name">{m.name}</span><span className="ml-sub">{m.id}</span></span>
+                  <span className="ml-main"><span className="ml-name">{m.name} <VisionTag vision={m.vision} /></span><span className="ml-sub">{m.id}</span></span>
                   {agent.modelPinned && m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
                 </button>
               )) : null}

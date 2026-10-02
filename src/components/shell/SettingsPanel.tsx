@@ -3,6 +3,7 @@ import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lu
 import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pickAgentModel, pickImageEditModel, repickAgentModel, transcriberFor } from '../../engine/catalog';
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { VisionTag } from '../ui/VisionTag';
 import { LLM_LABELS, LLM_TIERS, limitedLlmFallback, type LlmModel } from '../../engine/providers/llm';
 import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
 import type { OpEngine } from '../../engine/ops';
@@ -107,6 +108,7 @@ function LlmModelPicker() {
       }}
     >
       <span className="ml-name">{m.name}</span>
+      <VisionTag vision={m.vision} />
       <span className="ml-price num">{m.inputPrice != null ? `${formatUsd(m.inputPrice)}/${formatUsd(m.outputPrice)}` : ''}</span>
       {m.id === agent.model ? <Check size={14} className="ml-check" /> : null}
     </button>
@@ -115,10 +117,11 @@ function LlmModelPicker() {
     <>
       <Chip ref={pop.ref} onClick={pop.toggle} active={pop.open} className="wide-chip">
         <span className="truncate">{current?.name ?? (agent.model || (status === 'loading' ? 'Loading models…' : 'Choose a model'))}</span>
+        {current ? <VisionTag vision={current.vision} full /> : null}
         <ChevronDown size={13} />
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={380} label="Agent model">
-        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · models with tool calling`} />
+        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · models with tool calling · eye = sees images`} />
         <div className="ml-search">
           <Search size={14} />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models" aria-label="Search agent models" />
