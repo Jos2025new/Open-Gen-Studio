@@ -33,6 +33,9 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — huecos en tarjetas de varios resultados anchos (2026-10-02)
+- [x] T1. (usuario, captura: 4 resultados 3:2 en curso, uno por fila con media tarjeta vacía) Con varios resultados, cada uno ocupa como mucho la mitad del ancho (`chat.css`): los anchos van de dos en dos y la altura sigue su proporción. Sin navegador.
+
 ## Tarea — edad de los personajes y acciones escritas como texto (2026-10-02)
 Origen (usuario, dos sesiones "chica 3D tipo Overwatch", mismo modelo de imagen): la de Grok parecía de 28–32 porque el prompt apilaba "mature… adult features… not youthful"; la de deepseek, sin edad, salía veinteañera. Y deepseek respondió a "parece una vieja" con su llamada a herramienta en texto (`<｜DSML｜ calls>…`): no se creó plan.
 - [x] E1. Edad: cada personaje tiene la edad que pide la petición o la historia (niños bien en obras infantiles: kodomo, cuentos, familia), dicha una vez como cifra o rango, nunca apilando "mature/adult features/not youthful"; lo sensual o centrado en el cuerpo, solo adultos (18+, 18–24 ofrecido); nadie que parezca menor se sexualiza. Sustituye "adults read as adults". *Dónde:* `agent/context.ts`.
