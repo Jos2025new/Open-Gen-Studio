@@ -35,6 +35,8 @@ ANIMATION (2D, 3D, 2.5D, stop-motion) — same skeleton, different vocabulary
 - 2.5D (painterly 3D): 3D base with 2D treatment — drawn contours, halftone, chromatic aberration, painterly brush layers, paper texture.
 - Stop-motion: physical materials (felt, clay, fingerprints), small practical lights, micro-jitter.
 - Write the frame cadence inside the prompt, or the model smooths it out: 2D and 2.5D "animated on twos (12 drawings per second)"; stop-motion "12fps physical stop-motion cadence"; 3D "24fps smooth".
+- Rhythm, not constant motion: mix snappy key poses with brief holds at impact or emotional moments and fluid motion where the action flows; vary it shot to shot to fit the scene and the user's style, never one fixed rule.
+- If a result shows deformed hands or limbs, the fix for the next try is a simpler gesture or placing that moment across a cut; not a default constraint.
 - Anchor the style with an image: one style key passed as a reference ("@Image1 is the style reference — match its line weight and palette exactly") beats paragraphs of adjectives. For several shots, make the character, location and prop images first in the locked style and pass them as references; the prompt then carries only action, camera and cadence.
 - No proper names in animation: stable 3–4 word descriptors ("the silver-haired woman", "the melancholy skater boy"), identical across shots.
 
