@@ -149,3 +149,19 @@
 .v3d-box > .chip { align-self: flex-start; }
 
 button.info-thumb { padding: 0; cursor: pointer; }
+
+/* Sessions: canvas filter, canvas marks, selection. */
+.canvas-filter { display: flex; gap: 4px; flex-wrap: wrap; }
+.canvas-tab { display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 9px; border-radius: 6px; border: 1px solid var(--border); font-size: 11px; color: var(--text-2); }
+.canvas-tab:hover { color: var(--text); background: var(--surface-2); }
+.canvas-tab.is-on { color: var(--text); background: var(--surface-3); border-color: var(--border-strong); }
+.session-meta { display: flex; align-items: center; gap: 6px; }
+.session-canvases { display: inline-flex; gap: 3px; }
+.session-canvas { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 4px; background: var(--surface-2); color: var(--text-2); }
+.session-bulk { display: flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.session-check { flex-shrink: 0; width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--text-3); display: grid; place-items: center; color: var(--bg, #0b0b0d); }
+.session-check.is-on { background: var(--text); border-color: var(--text); }
+.session-row.is-selected { background: var(--surface-2); }
+.session-row.is-selecting.is-active { box-shadow: none; background: transparent; }
+.session-row.is-selecting.is-active.is-selected { background: var(--surface-2); }
+.session-actions.is-hidden { display: none; }

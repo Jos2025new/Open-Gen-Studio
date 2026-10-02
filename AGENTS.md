@@ -26,6 +26,12 @@ Origen: comparación con OpenMontage (`/home/samuel/Documentos/Projects/AI/My Ap
 Verificación del plan: typecheck y suite verdes (344 + 1 omitida). Sin LLM real ni banco: falta medir con `BENCH_ONLY=two-clips-named-model,change-model,story-3-clips` contra `bench/2026-10-01-3273c0a.json` (necesita la clave y presupuesto del usuario).
 Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeline de 7 etapas con puertas, investigación web, puntuaciones de slideshow/variedad y de proveedores, decision log/checkpoints JSON, playbooks YAML, tablero Backlot, reserva de presupuesto.
 
+## Tarea — panel de Sesiones: lienzo, filtro y selección múltiple (2026-10-02)
+- [x] S1. Cada sesión muestra iconos de los lienzos donde tiene trabajo (mensajes del agente en ese lienzo, nodos, diseños con capas): `sessionCanvases`.
+- [x] S2. Filtro por lienzo: All · Chat · Nodes · Designer, con contadores.
+- [x] S3. Modo selección (icono junto a New): casillas, "N selected", All / Empty (sin mensajes, nodos, diseños, generaciones ni assets) / None, fijar o soltar en bloque, borrar en bloque con confirmación (los elementos de la biblioteca se conservan). En modo selección el clic marca en vez de abrir.
+- [x] S4. Sesiones vacías dicen "empty" en su línea. Navegador: filtro con contadores, iconos, modo selección y barra; sin borrar nada.
+
 ## Tarea — una conversación del agente por lienzo (2026-10-02)
 Origen (usuario): la conversación del agente en Chat se mezclaba con la de Nodos (y Designer).
 - [x] C1. Vista: cada lienzo muestra solo los mensajes de su lienzo (`FeedList` filtra por `item.workspace`; contadores de `ChatWorkspace` y `ThreadPeek` también).
