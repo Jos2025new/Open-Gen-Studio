@@ -104,6 +104,21 @@ function didYouMean(ctx: PlanContext, ref: string, kind: MediaKind, needsImage: 
   return near ? ` Did you mean "${near}"?` : ' Use a listed model ref, one returned by find_models, or omit "model".';
 }
 
+/** The exact change that makes a video step's inputs fit its model (O2: constructive errors, one round). */
+function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; images: string[]; videos: string[] }, named: boolean): string {
+  const other = named ? ' Or leave "model" out: the app picks a model for these inputs.' : '';
+  if (n.firstFrame && !slots.firstFrame) return `move first_frame "${n.firstFrame}" into refs, or drop it.${other}`;
+  const imageMax = slots.mixedRefs?.max ?? slots.keyframes?.max ?? slots.images?.max ?? 0;
+  if (n.images.length > imageMax) {
+    if (!imageMax && slots.firstFrame && !n.firstFrame) return `first_frame: "${n.images[0]}" and drop refs.${other}`;
+    return imageMax ? `refs: [${n.images.slice(0, imageMax).map((r) => `"${r}"`).join(', ')}] (drop ${n.images.slice(imageMax).join(', ')}).${other}` : `drop ${n.images.join(', ')} from refs (this model takes only first_frame).${other}`;
+  }
+  const videoMax = slots.mixedRefs?.max ?? (slots.clips ?? slots.refVideos)?.max ?? 0;
+  if (n.videos.length > videoMax) return `keep ${videoMax} video(s) in refs (drop ${n.videos.slice(videoMax).join(', ')}).${other}`;
+  if (slots.firstFrame?.required && !n.firstFrame) return `set first_frame to an image step or asset:<id>.${other}`;
+  return `add the missing input (an image step or asset:<id> in refs).${other}`;
+}
+
 export interface PlanContext {
   workspace: Workspace;
   getModel: (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
@@ -369,12 +384,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     }
     if (p.type === 'step') {
       const k = kindById.get(p.id);
-      if (!k) errors.push(`${where}: unknown step "${p.id}".`);
+      if (!k) errors.push(`${where}: unknown step "${p.id}". Fix: use one of the plan's step ids (${[...kindById.keys()].join(', ')}) or asset:<id> from the context.`);
       return k ?? null;
     }
     if (p.type === 'asset') {
       const a = ctx.asset(p.id);
-      if (!a) errors.push(`${where}: asset "${p.id}" does not exist.`);
+      if (!a) errors.push(`${where}: asset "${p.id}" does not exist. Fix: use an asset:<id> listed in the context, or the step that makes it.`);
       return a?.kind ?? null;
     }
     const l = ctx.layer(p.id);
@@ -390,7 +405,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   };
   const expectImage = (ref: string | undefined, where: string) => {
     const k = refKind(ref, where);
-    if (k && k !== 'image' && k !== 'raster') errors.push(`${where}: "${ref}" produces ${k}, an image is required.`);
+    if (k && k !== 'image' && k !== 'raster') errors.push(`${where}: "${ref}" produces ${k}, an image is required.${k === 'video' ? ` Fix: add a step { kind: "op", op: "extract_frame", input: "${ref}", params: { which: "last" } } and use that step here.` : ' Fix: use an image step or an image asset.'}`);
   };
 
   const steps: PlanStep[] = [];
@@ -457,7 +472,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         const refs = (s.refs ?? []).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
-          if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step.`);
+          if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step. Fix: write the text in "prompt" and drop prompt_from (an image or clip goes in refs or first_frame).`);
         }
         // References are images, videos (reference-video / clip models) or audio (lip-sync, soundtrack, reference audio).
         const refKinds = refs.map((r) => refKind(r, where));
@@ -523,7 +538,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           continue;
         }
         if (resolved.model.kind !== kind) {
-          errors.push(`${where}: model "${modelRef}" generates ${resolved.model.kind}, not ${kind}.`);
+          errors.push(`${where}: model "${modelRef}" generates ${resolved.model.kind}, not ${kind}. Fix: set kind "${resolved.model.kind}", or leave "model" out for the default ${kind} model.`);
           continue;
         }
         const { schema } = resolved;
@@ -534,11 +549,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;
           const extra = schema.slots.source ? 1 : 0;
-          if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images.`);
-          else if (slot && imageRefs.length > slot.max + extra) errors.push(`${where}: model "${modelRef}" accepts at most ${slot.max + extra} reference image(s).`);
-          if (imageRefs.length < (slot?.min ?? 0) + extra) errors.push(`${where}: model "${modelRef}" requires ${extra ? 'a source image first, then reference images' : 'an input image'} (refs).`);
+          if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images. Fix: ${s.model ? 'leave "model" out (the app switches to a variant that takes images) or ' : ''}drop refs.`);
+          else if (slot && imageRefs.length > slot.max + extra) errors.push(`${where}: model "${modelRef}" accepts at most ${slot.max + extra} reference image(s). Fix: refs: [${imageRefs.slice(0, slot.max + extra).map((r) => `"${r}"`).join(', ')}] (drop ${imageRefs.slice(slot.max + extra).join(', ')}), or merge them first in one image step.`);
+          if (imageRefs.length < (slot?.min ?? 0) + extra) errors.push(`${where}: model "${modelRef}" requires ${extra ? 'a source image first, then reference images' : 'an input image'} (refs). Fix: put an image step or asset:<id> in refs${s.model ? ', or leave "model" out for a text-to-image model' : ''}.`);
           const clips = schema.slots.clips;
-          if (videoRefs.length && !clips) errors.push(`${where}: model "${modelRef}" does not take video refs.`);
+          if (videoRefs.length && !clips) errors.push(`${where}: model "${modelRef}" does not take video refs. Fix: add a step { kind: "op", op: "extract_frame", input: "${videoRefs[0]}", params: { which: "last" } } and put that step in refs instead.`);
           else if (clips && (videoRefs.length > clips.max || videoRefs.length < clips.min)) errors.push(`${where}: model "${modelRef}" takes ${clips.min}–${clips.max} video clip ref(s).`);
           const audioProblem = audioInputProblem(schema.slots, audioRefs.length);
           if (audioProblem) errors.push(`${where}: model "${modelRef}" ${audioProblem}`);
@@ -546,13 +561,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           // Same routing as the composer and the job runner (params.routeVideoInputs).
           const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
           const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length });
-          if (problem) errors.push(`${where}: model "${modelRef}" ${problem}`);
-          if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame.`);
-          if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame.`);
+          if (problem) errors.push(`${where}: model "${modelRef}" ${problem} Fix: ${videoFix(schema.slots, routed, Boolean(s.model))}`);
+          if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame. Fix: drop last_frame and describe the ending in the prompt${s.model ? ', or name a model with a last-frame input' : ''}.`);
+          if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
         const prompt = (s.prompt ?? '').trim();
-        if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required.`);
+        if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required. Fix: write "prompt" (what happens and how it looks).`);
         if (schema.slots.promptMax && prompt.length > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${prompt.length}). Shorten it. [PROMPT_TOO_LONG]`);
         if (kind === 'model3d') {
           if (videoRefs.length || audioRefs.length) errors.push(`${where}: 3D models take only images in refs.`);
@@ -663,7 +678,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (!s.input) errors.push(`${where}: "input" is required.`);
         else if (k) {
           const inputKind = k === 'raster' ? 'image' : k;
-          if (inputKind !== def.input) errors.push(`${where}: op "${opId}" needs a${def.input === 'image' ? 'n image' : ' video'} input, "${s.input}" is ${inputKind}.`);
+          if (inputKind !== def.input) errors.push(`${where}: op "${opId}" needs a${def.input === 'image' ? 'n image' : ' video'} input, "${s.input}" is ${inputKind}.${def.input === 'image' && inputKind === 'video' ? ` Fix: add a step { kind: "op", op: "extract_frame", input: "${s.input}", params: { which: "last" } } and use it as input.` : def.input === 'video' && inputKind === 'image' ? ' Fix: make a clip from it first (a video step with first_frame) and use that step as input.' : ''}`);
         }
         const params: Record<string, AdvancedValue> = {};
         for (const f of def.fields) {

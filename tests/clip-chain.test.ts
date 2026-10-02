@@ -56,3 +56,14 @@ describe('clip → clip chaining is repaired, not rejected (O1)', () => {
     void plan;
   });
 });
+
+describe('validator errors carry the exact fix (O2)', () => {
+  it('says what to write instead', async () => {
+    const many = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'x', refs: ['asset:a', 'asset:b', 'asset:c', 'asset:d', 'asset:e'] }] }, { ...ctx, asset: () => ({ kind: 'image' }) }, 'p');
+    expect(many.errors.join(' ')).toMatch(/Fix: refs: \["asset:a", "asset:b", "asset:c", "asset:d"\] \(drop asset:e\)/);
+    const video = await normalizePlan({ steps: [{ id: 's1', kind: 'video', prompt: 'x', model: LOCAL_VIDEO_REF, refs: ['asset:a', 'asset:b'] }] }, { ...ctx, asset: () => ({ kind: 'image' }) }, 'p');
+    expect(video.errors.join(' ')).toMatch(/Fix: drop asset:b from refs/);
+    const typo = await normalizePlan({ steps: [{ id: 's1', kind: 'video', prompt: 'x', first_frame: 's9' }] }, ctx, 'p');
+    expect(typo.errors.join(' ')).toMatch(/unknown step "s9". Fix: use one of the plan's step ids \(s1\)/);
+  });
+});
