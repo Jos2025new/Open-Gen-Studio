@@ -568,6 +568,8 @@ export interface NoticeFeedItem extends FeedBase {
   retry?: { partialItemId?: string };
   /** The agent answered a request to make something with text only (no plan, no questions): offer to ask it for the plan. */
   proposePlan?: boolean;
+  /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
+  garbledItemId?: string;
 }
 
 /** One thing the agent did during a turn, shown in its activity block (L3). */

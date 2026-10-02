@@ -923,6 +923,20 @@ function endedWithoutPlan(sessionId: string, workspace: Workspace): boolean {
   return !feed.slice(at + 1).some((f) => f.type === 'plan' || f.type === 'questions');
 }
 
+/** Where a tool call written as plain text starts (DeepSeek DSML, raw <tool_call> tags), or -1. */
+export function toolMarkupAt(text: string): number {
+  const m = /<[｜|]\s*DSML\s*[｜|]|<[｜|]tool[▁_ ]calls?|<tool_call>|<function_calls>/i.exec(text);
+  return m ? m.index : -1;
+}
+
+/** Delete under a garbled reply: removes it and the warning. */
+export function deleteGarbled(sessionId: string, noticeId: string): void {
+  const item = session(sessionId)?.feed.find((f) => f.id === noticeId);
+  if (item?.type !== 'notice') return;
+  if (item.garbledItemId) removeFeedItem(sessionId, item.garbledItemId);
+  removeFeedItem(sessionId, noticeId);
+}
+
 /** "Propose the plan" under a reply without one: asks the agent for it as the user would. */
 export function askForPlan(sessionId: string, noticeId: string): void {
   const s = session(sessionId);
@@ -987,6 +1001,22 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         return;
       }
       log.callEnded(result.timing.reasoningMs, result.timing.outputMs ?? result.timing.totalMs);
+      // A tool call written as text (the provider did not convert the model's native format): not kept in the
+      // history, its markup hidden, and a warning with Retry (the same call again) and Delete.
+      const garbled = !result.toolCalls.length ? toolMarkupAt(result.text) : -1;
+      if (garbled >= 0) {
+        const shown = result.text.slice(0, garbled).trim();
+        if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: shown || '…' });
+        appendFeed(sessionId, {
+          ...feedBase(workspace),
+          type: 'notice',
+          level: 'error',
+          text: 'The model wrote its action as text the app cannot read, so nothing ran.',
+          retry: textItemId ? { partialItemId: textItemId } : {},
+          ...(textItemId ? { garbledItemId: textItemId } : {}),
+        });
+        return;
+      }
       if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
       // Every tier counts: the provider's reported cost, else tokens × the catalog price (marked estimated). Never blocks.
       const llmUsd = llmCallUsd(engine.provider, engine.model, result.usage);

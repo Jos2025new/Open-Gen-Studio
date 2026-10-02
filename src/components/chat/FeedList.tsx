@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { CircleAlert, Info, LoaderCircle, RotateCw } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
-import { askForPlan, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
+import { askForPlan, deleteGarbled, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
@@ -52,6 +52,11 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
       {item.level === 'error' ? <CircleAlert size={14} /> : <Info size={14} />}
       <span>{item.text}</span>
       {item.undoNodes && !item.undone ? <button type="button" className="notice-retry" onClick={() => undoNodeDeletion(sessionId, item.id)}>Undo</button> : null}
+      {item.garbledItemId !== undefined && isLast ? (
+        <button type="button" className="notice-retry" disabled={busy} onClick={() => deleteGarbled(sessionId, item.id)}>
+          Delete
+        </button>
+      ) : null}
       {item.proposePlan && isLast ? (
         <button type="button" className="notice-retry" disabled={busy} onClick={() => askForPlan(sessionId, item.id)}>
           Propose the plan

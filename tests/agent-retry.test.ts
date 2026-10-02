@@ -108,3 +108,20 @@ describe('a provider that goes silent', () => {
     expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
   });
 });
+
+describe('a tool call written as text (DeepSeek DSML)', () => {
+  it('hides the markup, keeps it out of the history and offers Retry and Delete', async () => {
+    vi.stubGlobal('fetch', async () => sse([text('La rehago con la cara más joven.\n\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="propose_plan">')]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('parece una vieja');
+    const s = useStore.getState().sessions[sid];
+    const note = s.feed.at(-1) as NoticeFeedItem;
+    expect(note.retry).toBeDefined();
+    expect(note.garbledItemId).toBeTruthy();
+    expect(s.feed.find((f) => f.id === note.garbledItemId)).toMatchObject({ text: 'La rehago con la cara más joven.' });
+    expect(s.agent.history.some((m) => m.role === 'assistant')).toBe(false);
+    const { deleteGarbled } = await import('../src/engine/agent/runtime');
+    deleteGarbled(sid, note.id);
+    expect(useStore.getState().sessions[sid].feed.some((f) => f.type === 'assistant' || f.type === 'notice')).toBe(false);
+  });
+});
