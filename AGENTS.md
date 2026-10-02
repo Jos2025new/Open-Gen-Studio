@@ -26,6 +26,9 @@ Origen: comparación con OpenMontage (`/home/samuel/Documentos/Projects/AI/My Ap
 Verificación del plan: typecheck y suite verdes (344 + 1 omitida). Sin LLM real ni banco: falta medir con `BENCH_ONLY=two-clips-named-model,change-model,story-3-clips` contra `bench/2026-10-01-3273c0a.json` (necesita la clave y presupuesto del usuario).
 Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeline de 7 etapas con puertas, investigación web, puntuaciones de slideshow/variedad y de proveedores, decision log/checkpoints JSON, playbooks YAML, tablero Backlot, reserva de presupuesto.
 
+## Tarea — más vida y contraste en la GUI (2026-10-02)
+- [x] K1. (usuario, referencia Higgsfield: "lo nuestro luce opaco") Solo tokens (`tokens.css`): texto más claro (#f8f8fa; secundario #c3c3cb; terciario #8e8e98), superficies y bordes un paso más separados, acento lima más vivo (#d8ff3a) y colores de tipo, aviso y ok algo más saturados. Sin cambiar tamaños ni maquetación. Navegador: panel de Sesiones y Nodos.
+
 ## Tarea — panel de Sesiones: lienzo, filtro y selección múltiple (2026-10-02)
 - [x] S1. Cada sesión muestra iconos de los lienzos donde tiene trabajo (mensajes del agente en ese lienzo, nodos, diseños con capas): `sessionCanvases`.
 - [x] S2. Filtro por lienzo: All · Chat · Nodes · Designer, con contadores.
