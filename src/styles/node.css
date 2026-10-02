@@ -92,3 +92,6 @@
 
 /* Secondary inputs (Prompt) stay hidden until a connection is dragged; labels show only then too. */
 .port-quiet { opacity: 0; pointer-events: none; }
+
+/* Chat results not on the node canvas yet: one click brings them as connected nodes. */
+.node-from-chat { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); font-size: 12px; color: var(--text-2); }

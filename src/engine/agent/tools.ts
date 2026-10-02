@@ -53,6 +53,15 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'continue_in_canvas',
+      description:
+        'Node canvas only. When the user wants to continue here what was done in chat ("continuamos en canvas"): the app adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'read_graph',
       description:
         'Node canvas only, read-only. Without node_ids: the next page of the node index (offset). With node_ids: each node\'s status, error, model, prompt, output asset (usable in plans) and connections by port. Use it when the index in the context is not enough; it cannot edit nodes.',

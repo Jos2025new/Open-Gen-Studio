@@ -7,6 +7,7 @@ import { isAbort, isTransient } from '../../lib/http';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
+import { chatToNodes } from '../flow/fromChat';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
@@ -1169,6 +1170,17 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
               respond('The image follows in the next message.');
               afterTools.push(userMessage('Canvas view:', view));
             }
+          }
+          continue;
+        }
+        if (call.name === 'continue_in_canvas') {
+          if (workspace !== 'node') respond('continue_in_canvas works only on the node canvas: ask the user to switch to Nodes.');
+          else {
+            const { added } = chatToNodes(sessionId);
+            log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} chat results to the node canvas` : 'Nothing new from chat' });
+            respond(added.length
+              ? `Added ${added.length} nodes from the chat (up to date, nothing ran): ${added.map((n) => `${n.id} ${n.data.kind} "${n.data.title}"`).join('; ')}. They are in the node index from now on.`
+              : 'Every chat result is already on the node canvas; nothing added.');
           }
           continue;
         }

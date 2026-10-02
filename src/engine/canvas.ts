@@ -14,7 +14,9 @@ export function canvasIndex(session: Session, generations: Record<string, Genera
     else if (f.type === 'user') for (const id of f.attachments) if (!byUpload.has(id)) byUpload.set(id, f.workspace);
   }
   const inGraph = new Set<string>();
+  const graphGens = new Set<string>();
   for (const n of session.graph.nodes) {
+    if ('generationId' in n.data && n.data.generationId) graphGens.add(n.data.generationId);
     if (n.data.kind !== 'asset') continue;
     if (n.data.assetId) inGraph.add(n.data.assetId);
     if (n.data.sketchAssetId) inGraph.add(n.data.sketchAssetId);
@@ -34,7 +36,8 @@ export function canvasIndex(session: Session, generations: Record<string, Genera
     /** The asset is shown on this canvas (or belongs to none). */
     visible: (a: Asset, workspace: Workspace) => {
       const c = ofAsset(a);
-      return c == null || c === workspace;
+      // A chat result brought to the node canvas is shown there too.
+      return c == null || c === workspace || (workspace === 'node' && (inGraph.has(a.id) || (a.generationId != null && graphGens.has(a.generationId))));
     },
   };
 }
