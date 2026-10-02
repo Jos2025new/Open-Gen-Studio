@@ -34,18 +34,21 @@ function stepIcon(s: PlanStep) {
   }
 }
 
-function stepDetail(s: PlanStep, modelName: (ref: string) => string): string {
+/** `ref` names an input in words for the card: a step by its title, an asset as "your image" or "the earlier clip". */
+type RefName = (ref: string) => string;
+
+function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: RefName): string {
   switch (s.kind) {
     case 'image':
       return [modelName(s.modelRef), s.settings.aspect ? aspectLabel(s.settings.aspect) : '', s.settings.count > 1 ? `×${s.settings.count}` : '', s.refs.length ? `${s.refs.length} ref` : ''].filter(Boolean).join(' · ');
     case 'model3d':
       return [modelName(s.modelRef), s.refs.length ? `${s.refs.length} ref` : 'from text'].join(' · ');
     case 'video':
-      return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${s.firstFrame}` : ''].filter(Boolean).join(' · ');
+      return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${refName(s.firstFrame)}` : ''].filter(Boolean).join(' · ');
     case 'audio':
-      return [modelName(s.modelRef), s.lyricsFrom ? `lyrics from ${s.lyricsFrom}` : s.settings.extras?.lyrics ? 'with lyrics' : s.settings.advanced.is_instrumental ? 'instrumental' : ''].filter(Boolean).join(' · ');
+      return [modelName(s.modelRef), s.lyricsFrom ? `lyrics from ${refName(s.lyricsFrom)}` : s.settings.extras?.lyrics ? 'with lyrics' : s.settings.advanced.is_instrumental ? 'instrumental' : ''].filter(Boolean).join(' · ');
     case 'op':
-      return `${OPS[s.op].label} of ${s.input}`;
+      return `${OPS[s.op].label} of ${refName(s.input)}`;
     case 'text':
       return s.text.length > 60 ? `${s.text.slice(0, 59)}…` : s.text;
     case 'layer':
@@ -79,6 +82,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const generations = useStore((s) => s.generations);
+  const assets = useStore((s) => s.assets);
   useStore((s) => s.spentUsd);
   useStore((s) => s.settings);
   useStore((s) => s.quotes); // exact Atlas prices replace the estimate when they arrive
@@ -104,6 +108,15 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const total = live?.total ?? item.estimate;
   const perStep = live?.perStep;
   const name = (ref: string) => models[ref]?.name ?? (ref.startsWith('local::') ? (ref.endsWith('video') ? 'Local Motion' : 'Local Sketch') : ref.split('::')[1] ?? ref);
+  const refName: RefName = (ref) => {
+    if (ref.startsWith('asset:')) {
+      const a = assets[ref.slice(6)];
+      const what = a?.kind === 'video' ? 'clip' : a?.kind === 'audio' ? 'audio' : 'image';
+      return a?.origin === 'upload' ? `your ${what}` : `the earlier ${what}`;
+    }
+    const st = plan.steps.find((x) => x.id === ref.split('#')[0]);
+    return st ? `“${st.title}”` : ref;
+  };
   const doneCount = Object.values(item.stepStates).filter((s) => s === 'done').length;
   const over = awaiting && overLimit(total);
   // Scripts open while the plan waits for approval, so the user reads what each clip does before paying.
@@ -149,12 +162,12 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <span className="step-title">
                     {shown ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {s.title}
                   </span>
-                  <span className="step-detail faint">{stepDetail(s, name)}</span>
+                  <span className="step-detail faint">{stepDetail(s, name, refName)}</span>
                 </button>
               ) : (
                 <span className="step-text">
                   <span className="step-title">{s.title}</span>
-                  <span className="step-detail faint">{stepDetail(s, name)}</span>
+                  <span className="step-detail faint">{stepDetail(s, name, refName)}</span>
                 </span>
               )}
               {gen?.assetIds.length ? (

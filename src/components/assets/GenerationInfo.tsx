@@ -119,7 +119,6 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
           ))}
         </dl>
       </section>
-      {g ? <div className="info-id faint num">{g.id}</div> : null}
     </div>
   );
 }
