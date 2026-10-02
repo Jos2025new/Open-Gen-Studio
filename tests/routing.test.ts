@@ -155,13 +155,16 @@ describe('the plan follows the table unless the user picked the composer model (
     expect(await model(false, { first_frame: 'asset:a' }, { text })).toBe('atlas::minimax/h3-developer/image-to-video');
   });
 
-  it('rejects a route override that no longer fits instead of silently spending with it', async () => {
+  it('a route model that cannot take the step gives way to the default, noted on the card (no rejection)', async () => {
     const wrong = 'atlas::alibaba/wan-3.0/text-to-video';
     const result = await normalizePlan(
-      { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', first_frame: 'asset:a' }] },
+      { title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', first_frame: 'asset:a', refs: ['asset:a'] }] },
       ctx(false, { image: wrong }),
       'p',
     );
-    expect(result.errors.join(' ')).toMatch(/selected for image-to-video no longer fits/);
+    expect(result.errors).toEqual([]);
+    expect((result.plan!.steps[0] as { modelRef: string; refs?: string[] }).modelRef).toMatch(/image-to-video/);
+    expect((result.plan!.steps[0] as { refs?: string[] }).refs).toBeUndefined(); // the start frame was also in refs
+    expect(result.plan!.adjustments.join(' ')).toMatch(/your image-to-video model .* cannot take this step/);
   });
 });

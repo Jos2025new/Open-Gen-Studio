@@ -496,6 +496,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else s.refs = [...(s.refs ?? []), token];
           adjustments.push(`${s.id}: ${token} moved from the prompt to the step's ${asStart ? 'start frame' : 'references'}`);
         }
+        // The start frame listed again in refs is the same input twice: keep it as the start frame only.
+        if (s.first_frame && s.refs?.includes(s.first_frame)) s.refs = s.refs.filter((r) => r !== s.first_frame);
         const refs = (s.refs ?? []).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
@@ -524,7 +526,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           }
         }
         // Model choice depends on the image inputs; it runs again if video refs become frames (O1).
-        const pickModel = async (pickNotes: string[]) => {
+        const pickModel = async (pickNotes: string[], skipOverride = false) => {
           const needsImage = refs.length > 0 || Boolean(s.first_frame);
           let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, pickNotes);
           let pickedRoute: RouteMode | undefined;
@@ -532,7 +534,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const routeRefs = imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0);
           if (!modelRef && kind === 'video') {
             const route = routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
-            const override = ctx.routeModel?.(route);
+            const override = skipOverride ? undefined : ctx.routeModel?.(route);
             if (override) {
               modelRef = override;
               pickedRoute = route;
@@ -566,10 +568,15 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             pick = await pickModel(pickNotes);
           }
         }
+        // A route model the user picked that cannot take this step (e.g. no reference input): the default takes over, noted.
+        if (pick.pickedRoute && pick.resolved && !routeFits(pick.resolved.model, pick.resolved.schema, { mode: pick.pickedRoute, refs: pick.routeRefs, duration: s.duration })) {
+          pickNotes = [`${s.id}: your ${pick.pickedRoute}-to-video model (${pick.resolved.model.name}) cannot take this step; the default model is used`];
+          pick = await pickModel(pickNotes, true);
+        }
         adjustments.push(...pickNotes);
         // A routed entry's own settings (FLUX 3 Draft: quality "draft"); the step's params win.
         if (pick.routeParams) s.params = { ...pick.routeParams, ...(s.params ?? {}) };
-        const { modelRef, pickedRoute, routeRefs, needsImage, resolved } = pick;
+        const { modelRef, needsImage, resolved } = pick;
         if (!modelRef) {
           errors.push(`${where}: no ${kind} model is available. Ask the user to connect a provider.`);
           continue;
@@ -583,9 +590,6 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           continue;
         }
         const { schema } = resolved;
-        if (pickedRoute && !routeFits(resolved.model, schema, { mode: pickedRoute, refs: routeRefs, duration: s.duration })) {
-          errors.push(`${where}: the model selected for ${pickedRoute}-to-video no longer fits this step. Return that row to Auto or choose another model.`);
-        }
         if (schema.missing?.length) errors.push(`${where}: model "${modelRef}" needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;

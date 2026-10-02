@@ -84,6 +84,8 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
         </div>
       );
     case 'assistant':
+      // A turn that ended with no words (only tool calls) leaves nothing to show.
+      if (!item.streaming && !item.text.trim()) return null;
       return (
         <div className="msg msg-agent">
           <span className="agent-mark" aria-hidden />
