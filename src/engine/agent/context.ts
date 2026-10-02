@@ -116,7 +116,7 @@ ${OP_LINES}
 - One vocabulary family per plan, in "style" and in every prompt: 2D, anime, cartoon, stop-motion or 3D animation never get photographic terms (lens mm, f-stops, "photoreal", "photo", skin pores) — use drawing, animation or render terms (line weight, cel shading, frame cadence, puppet materials); photoreal gets no "illustration", "render" or "cartoon".
 - Continuity: in a chain that must keep an identity or style, steps of the same type use the same model or family, unless a later step needs a capability it lacks.
 - No orphan steps: every step is either a deliverable or feeds a later step through its refs, first_frame, input or prompt_from.
-- Keep plans minimal: the fewest steps that fully deliver the request. count defaults to 1; use more only when asked or clearly useful (max 4).
+- Keep plans minimal: the fewest steps that fully deliver the request. MUST: count is 1 (leave it out); more only when the user asked for several ("2 versions", "options", "variaciones") or chose them in the questions card, or a rule here asks for candidates (reference sheets). Never more on your own: each one is paid.
 - In the Node workspace the plan becomes connected nodes: structure it as a clean left-to-right flow (use text steps + prompt_from when several steps share a prompt).
 - The app computes costs from provider prices; do not quote prices.
 - If the validator rejects a plan, fix exactly the reported problems and call propose_plan again.

@@ -40,6 +40,7 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] F4. Cierre "…con todo lo demás intacto" sin haberlo visto: `WRAPUP_RULE` pide decir lo que pidió ("pedí que conservara todo lo demás"), nunca que salió bien o intacto.
 - [x] F5. Precio de Atlas antes de generar: Seedream v5.0 Pro ×2 mostró "est $0.072 · charged $0.14". El modelo no tiene campo de cantidad, así que se hacen 2 peticiones; la cotización en vivo era de una petición y se mostraba como el total. `knownAtlasQuote` suma la cotización de cada petición (mismo reparto que la ejecución, `maxCountPerRequest`). Test en `quotes`.
 - [x] F6. Notas de ajuste sin contenido: "aspect 1776x2368 → 1776×2368" (mismo tamaño, otro separador: ya no se anota) y "kept your image model (the plan had named Seedream 5)" (un nombre que no corresponde a ningún modelo, o de la misma línea que el del usuario, no se anota; el modelo del usuario se usa igual).
+- [x] F7. El agente pidió ×2 sin que el usuario lo pidiera ("count": 2 en el plan; el composer estaba en 1): la regla decía "más si se pide o es claramente útil". MUST: count 1 salvo que el usuario pida varias o las elija en la tarjeta, o una regla pida candidatas (hojas); nunca más por su cuenta.
 No es fallo de la app: Tripo rechazó la imagen por su verificador de contenido; el agente lo explicó y ofreció alternativas.
 
 ## Tarea — "pásalo al Designer" (2026-10-02)
