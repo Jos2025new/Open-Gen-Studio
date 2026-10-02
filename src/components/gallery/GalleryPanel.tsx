@@ -199,8 +199,9 @@ function GeneratedAssets() {
           <div className="gallery-bulk">
             <span className="num">{ids.length} selected</span>
             <span className="spacer" />
-            <Button size="sm" variant="ghost" onClick={() => setSelected(new Set(list.map((a) => a.id)))}>
-              All
+            {/* All selects everything; pressed again with everything selected, it clears the selection. */}
+            <Button size="sm" variant="ghost" onClick={() => setSelected(list.length && list.every((a) => selected.has(a.id)) ? new Set() : new Set(list.map((a) => a.id)))}>
+              {list.length && list.every((a) => selected.has(a.id)) ? 'None' : 'All'}
             </Button>
             <IconButton icon={Paperclip} label="Use as references" size="sm" disabled={!ids.length} onClick={() => ids.forEach((id) => useAsReference(id))} />
             <IconButton icon={Download} label="Download" size="sm" disabled={!ids.length} onClick={() => ids.forEach((id) => void downloadAsset(id))} />
