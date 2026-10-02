@@ -793,7 +793,10 @@ async function runPlanItem(
       const delivery = genId ? get().generations[genId]?.delivery : undefined;
       // The model that really ran, so the closing message never names one that was only asked for.
       const ran = genId ? get().generations[genId]?.modelRef : undefined;
-      const by = ran ? ` [made with ${modelSummary(ran)?.name ?? ran}]` : '';
+      // …and what came out (read from the files: size, length), a few words in the message that already goes.
+      const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
+      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}` : '', first?.width && first.height ? `${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
+      const by = facts.length ? ` [${facts.join(' · ')}]` : '';
       if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
       return `${st.id} done`;
