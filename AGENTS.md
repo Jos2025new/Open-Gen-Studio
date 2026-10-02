@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — operaciones y generaciones del Designer visibles y como capas nuevas (2026-10-02)
+Origen (usuario): "ejecuté varias operaciones en Designer y no veo dónde aparecen". Causa: `runLayerOp` sustituía los píxeles de la capa y no dejaba tarjeta; las imágenes de un plan del agente solo llegaban al lienzo si el plan tenía un paso `layer`.
+- [x] D1. Operación sobre una capa → capa nueva justo encima, misma posición y ancho ("Relight · Layer 1"), original intacto (`placeAboveLayer`, un Undo). Tarjeta de la generación en la conversación del Designer.
+- [x] D2. Generaciones en el Designer (composer y planes del agente) dejan su tarjeta en la conversación del Designer; siguen en Generations y Assets.
+- [x] D3. Plan del agente en el Designer: cada imagen final (que no alimenta otro paso) que no quedó en ninguna capa se coloca como capa nueva (o base si el lienzo está vacío) con el título del paso. Sin test nuevo (necesita canvas del navegador); sin navegador.
+
 ## Tarea — al Designer, todo como capas de un lienzo (2026-10-02)
 - [x] L1. (usuario) Por defecto `chatToDesigner` pone todas las imágenes como capas raster de un solo diseño; un diseño por imagen solo si se pide (`as: "documents"`). Herramienta, regla del agente, aviso y diálogo de importación con "As layers of one" primero. Test `chat-to-designer` ajustado. Descartado (usuario: frágil): regla de palabras "hazla/ella → último resultado como entrada".
 

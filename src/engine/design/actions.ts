@@ -323,6 +323,23 @@ export async function replaceLayerPixels(sessionId: string, docId: string, layer
   setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, pxWidth: canvas.width, pxHeight: canvas.height, height, rev: layer.rev + 1, sourceAssetId: assetId }));
 }
 
+/**
+ * A layer operation's result as a new raster layer right above the layer it came from, in the same place (same
+ * width, height following the result's aspect): the original stays untouched underneath. One undo step.
+ */
+export async function placeAboveLayer(sessionId: string, docId: string, layerId: string, assetId: string, name: string): Promise<string | null> {
+  const doc = getDoc(sessionId, docId);
+  const src = doc?.layers.find((l) => l.id === layerId);
+  if (!doc || !src || src.type !== 'raster') return null;
+  const canvas = await assetCanvas(assetId);
+  record(getDoc(sessionId, docId)!);
+  const rect = { x: src.x, y: src.y, width: src.width, height: (src.width * canvas.height) / canvas.width };
+  const layer = D.newRasterLayer(name, rect, { width: canvas.width, height: canvas.height }, assetId);
+  setBuffer(layer.id, canvas);
+  setDoc(sessionId, docId, (d) => D.insertLayer({ ...d, activeLayerId: layerId }, layer, 'above'));
+  return layer.id;
+}
+
 /** PNG/JPG through the editor renderer; SVG/PDF keep layers as vector objects (design/export.ts). */
 export async function exportDocFile(sessionId: string, docId: string, format: ExportFormat = 'png'): Promise<void> {
   const doc = getDoc(sessionId, docId);

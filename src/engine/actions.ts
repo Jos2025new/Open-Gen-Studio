@@ -14,7 +14,7 @@ import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
 import { overLimit, overLimitText } from './budget';
-import { ensureDoc, placeAsset, replaceLayerPixels, layerToAsset, getDoc } from './design/actions';
+import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { designerDims } from './agent/runtime';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
@@ -321,7 +321,7 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     return;
   }
   const g = createGeneration(spec);
-  if (workspace === 'chat') appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: g.id });
+  if (workspace === 'chat' || workspace === 'designer') appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: g.id });
   if (workspace === 'designer') {
     // The doc exists before the image arrives so it lands where the user is working.
     const doc = ensureDoc(sessionId, designerDims());
@@ -687,7 +687,7 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
   }
 }
 
-/** Designer: run an image operation on the active raster layer and replace its pixels. */
+/** Designer: run an image operation on a raster layer; the result is a new layer above it (the original is kept). */
 export async function runLayerOp(sessionId: string, docId: string, layerId: string, op: OpId, params: Record<string, AdvancedValue>): Promise<void> {
   const def = OPS[op];
   if (def.input !== 'image' || def.output !== 'image') {
@@ -703,9 +703,12 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
       return;
     }
     const g = createGeneration(spec);
+    // Its card in the Designer's conversation, like any generation (also in Generations and Assets).
+    appendFeed(sessionId, { ...feedBase('designer'), type: 'generation', generationId: g.id });
     const ids = await runGeneration(g.id);
-    if (ids[0]) await replaceLayerPixels(sessionId, docId, layerId, ids[0]);
-    toast(`${def.label} applied to the layer`, 'success');
+    const name = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId)?.name ?? 'Layer';
+    if (ids[0]) await placeAboveLayer(sessionId, docId, layerId, ids[0], `${def.label} · ${name}`);
+    toast(`${def.label}: new layer above "${name}"`, 'success');
   } catch (err) {
     if (!isAbort(err)) toast((err as Error).message, 'error');
   }

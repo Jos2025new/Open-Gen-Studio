@@ -10,12 +10,12 @@ import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { chatToNodes } from '../flow/fromChat';
 import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
-import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
+import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
-import { activeDoc, ensureDoc } from '../design/actions';
+import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
@@ -744,7 +744,8 @@ async function runPlanItem(
         stepGenerations: info?.generationId ? { ...it.stepGenerations, [planStepId]: info.generationId } : it.stepGenerations,
       }));
       if (info?.generationId) {
-        if (workspace === 'chat') {
+        // The Designer shows each generation's card in its conversation too (it also lands on the page, below).
+        if (workspace === 'chat' || workspace === 'designer') {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId });
         } else if (workspace === 'node') {
           const nodeId = stepId.startsWith(`${plan.id}_`) ? stepId : nodeOf(stepId);
@@ -758,6 +759,19 @@ async function runPlanItem(
       }
     },
   });
+
+  // Designer: a final image the plan did not put on a layer goes on the page as a new layer (kept in Generations too).
+  if (workspace === 'designer' && docId) {
+    const used = new Set(steps.flatMap((st) => stepDeps(st)).map((r) => parseRef(r)).flatMap((p) => (p?.type === 'step' ? [p.id] : [])));
+    for (const st of steps) {
+      if (stepOutputKind(st) !== 'image' || used.has(st.id)) continue;
+      for (const a of result.outputs.get(st.id)?.assetIds ?? []) {
+        const doc = getDoc(sessionId, docId);
+        if (!doc || doc.layers.some((l) => 'sourceAssetId' in l && l.sourceAssetId === a)) continue;
+        await placeAsset(sessionId, docId, a, doc.layers.length ? 'new' : 'base', 'title' in st && st.title ? st.title : 'Image').catch(() => null);
+      }
+    }
+  }
 
   const failed = result.failed.length;
   const status: PlanFeedItem['status'] = failed === 0 && !result.skipped.length ? 'done' : result.outputs.size ? 'partial' : 'error';
