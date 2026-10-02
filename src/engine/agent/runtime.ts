@@ -910,6 +910,27 @@ function activityLog(sessionId: string, workspace: Workspace) {
   };
 }
 
+/**
+ * A failed turn only: in auto, the latest request asked to make something (not a question) and the agent ended
+ * with text alone — no plan or questions card after that request.
+ */
+function endedWithoutPlan(sessionId: string, workspace: Workspace): boolean {
+  if (get().composer.agentStyle !== 'auto') return false;
+  const feed = session(sessionId).feed.filter((f) => f.workspace === workspace);
+  const at = feed.map((f) => f.type).lastIndexOf('user');
+  const request = feed[at];
+  if (request?.type !== 'user' || /[?¿]/.test(request.text)) return false;
+  return !feed.slice(at + 1).some((f) => f.type === 'plan' || f.type === 'questions');
+}
+
+/** "Propose the plan" under a reply without one: asks the agent for it as the user would. */
+export function askForPlan(sessionId: string, noticeId: string): void {
+  const s = session(sessionId);
+  if (!s || s.agent.busy || get().activeSessionId !== sessionId) return;
+  removeFeedItem(sessionId, noticeId);
+  void sendAgentMessage('Propose the plan now.');
+}
+
 async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
@@ -991,6 +1012,9 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       });
       if (!result.toolCalls.length) {
         if (!result.text.trim()) notice(sessionId, workspace, 'The model returned an empty answer. Try rephrasing.');
+        else if (!opts.textOnly && endedWithoutPlan(sessionId, workspace)) {
+          appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level: 'info', text: 'The agent replied without a plan.', proposePlan: true });
+        }
         return;
       }
       // The wrap-up after a plan (S4) is text only: a tool call there is answered as ignored and nothing runs.

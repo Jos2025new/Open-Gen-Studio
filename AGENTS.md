@@ -33,6 +33,11 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — el agente respondió sin plan y parecía congelado (2026-10-02)
+Origen (sesión real, Grok 4.7, Auto): a "crea una chica 3D tipo Overwatch" respondió una frase; la propuesta y "¿la genero?" quedaron en su razonamiento. Sin plan ni tarjeta, el turno acababa sin nada. Decidido (usuario): que el agente lo sepa por el prompt (sin llamada extra de empujón) y una pista visible solo si falla.
+- [x] P1. MUST en el prompt: una petición de crear, editar o animar termina con `propose_plan` (Auto) o `ask_questions`; el texto solo es para preguntas reales; el usuario no ve el razonamiento. *Dónde:* `agent/context.ts`.
+- [x] P2. Solo si falla: en Auto, si la última petición no es una pregunta (sin ?/¿) y el turno termina con texto sin plan ni tarjeta después, aviso "The agent replied without a plan." con botón **Propose the plan** (envía "Propose the plan now." como el usuario). *Dónde:* `runtime.ts` (`endedWithoutPlan`, `askForPlan`), `types.ts`, `FeedList.tsx`. Tests en `agent-retry` (2). Límite: una petición de crear escrita como pregunta ("¿me haces…?") no muestra el botón.
+
 ## Tarea — reglas MUST tras la sesión "casa mediterránea" (2026-10-02)
 Origen (usuario, sesión real): el agente cargó 4 guías (2 de Sketch to render sin boceto), eligió fotorreal sin preguntar en una pieza por etapas de imágenes y dejó el dormitorio en 3:4 entre vistas 16:9. Solo prompt (caché perdida una vez); sin LLM real.
 - [x] R1. MUST cargar solo lo que se usa: un workflow, sus skills para los pasos de ahora; lo que transforma una entrada (boceto, planta, foto) solo si esa entrada está adjunta o en el lienzo; nunca recargar. *Dónde:* `agent/context.ts`.

@@ -75,3 +75,20 @@ describe('retry after a dropped connection', () => {
     expect(note.retry).toBeUndefined();
   });
 });
+
+describe('a request answered without a plan (auto)', () => {
+  const run = async (style: 'auto' | 'guided', msg: string) => {
+    const st = useStore.getState();
+    useStore.setState({ composer: { ...st.composer, agentStyle: style } });
+    vi.stubGlobal('fetch', async () => sse([text('Una heroína original de videojuego, adulta, en pose de tres cuartos.')]));
+    await sendAgentMessage(msg);
+    return useStore.getState().sessions[st.activeSessionId].feed.at(-1) as NoticeFeedItem;
+  };
+  it('offers "Propose the plan" only when it failed', async () => {
+    expect((await run('auto', 'Crea una chica 3D tipo overwatch')).proposePlan).toBe(true);
+  });
+  it('not for a question, nor in guided mode', async () => {
+    expect((await run('auto', '¿Qué modelos de 3D tengo?')).type).toBe('assistant');
+    expect((await run('guided', 'Crea una chica 3D tipo overwatch')).type).toBe('assistant');
+  });
+});
