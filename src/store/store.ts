@@ -108,6 +108,8 @@ export interface UiState {
   brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
   /** Style of new Lineart strokes (editable afterwards per layer). */
   lineart: StrokeStyle;
+  lineartMode?: 'draw' | 'edit';
+  lineartInfluence?: number;
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
   text: TextStyle;
   threadOpen: boolean;

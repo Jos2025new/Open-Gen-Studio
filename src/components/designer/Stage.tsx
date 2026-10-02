@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterLayer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
-import { bendStroke, nearestPoint, newStroke } from '../../engine/design/strokes';
+import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { moveRasterStroke, rasterStrokeBox } from '../../engine/design/rasterStrokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
@@ -28,7 +28,7 @@ type Drag =
   | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
-  | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[] };
+  | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
 
 const HANDLE = 8;
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
@@ -48,6 +48,9 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
+  const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
+  const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
+  const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
   // The stroke being drawn lives here until pointer up: one document change (and one undo step) per gesture.
   const [live, setLive] = useState<Stroke | null>(null);
   const shapeStyle = useStore((s) => s.ui.shape);
@@ -180,6 +183,24 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
         }
       }
     }
+    if (tool === 'lineart' && lineartMode === 'edit' && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
+      const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
+      if (stroke) {
+        ctx.strokeStyle = '#d4f25a';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        stroke.points.forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)));
+        ctx.stroke();
+        for (const i of selectedCurve.handles) {
+          const point = stroke.points[i];
+          if (!point) continue;
+          ctx.beginPath();
+          ctx.arc(sx(point[0]), sy(point[1]), 4, 0, Math.PI * 2);
+          ctx.fillStyle = i === 0 || i === stroke.points.length - 1 ? '#d4f25a' : '#18181c';
+          ctx.fill(); ctx.stroke();
+        }
+      }
+    }
     if (preview?.kind === 'shape') {
       const x = Math.min(preview.x0, preview.x1);
       const y = Math.min(preview.y0, preview.y1);
@@ -211,7 +232,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       ctx.arc(sx(cursor.x), sy(cursor.y), Math.max(2, (brush.size / 2) * view.zoom), 0, Math.PI * 2);
       ctx.stroke();
     }
-  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown]);
+  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -330,6 +351,29 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
     }
 
     if (tool === 'lineart') {
+      if (lineartMode === 'edit') {
+        if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
+          const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
+          const stroke = act.strokes?.[index];
+          if (stroke) {
+            const point = selectedCurve.handles.find((i) => stroke.points[i] && Math.hypot(stroke.points[i][0] - p.x, stroke.points[i][1] - p.y) <= 8 / view.zoom);
+            if (point !== undefined) {
+              drag.current = { kind: 'bend', layerId: act.id, stroke: index, point, startX: p.x, startY: p.y, base: act.strokes!, influence };
+              return;
+            }
+          }
+        }
+        for (const layer of [...current.layers].reverse()) {
+          if (layer.type !== 'vector' || !layer.visible || layer.locked || layer.opacity === 0) continue;
+          const stroke = [...(layer.strokes ?? [])].reverse().find((s) => s.opacity > 0 && nearStroke(s, p.x, p.y, 8 / view.zoom));
+          if (!stroke) continue;
+          setActiveLayer(sessionId, doc.id, layer.id);
+          setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
+          return;
+        }
+        setSelectedCurve(null);
+        return;
+      }
       // Strokes go to the active Lineart layer (a vector layer without shapes), else to a new one.
       const target = act && act.type === 'vector' && !act.locked && !act.shapes.length ? act : null;
       // Alt-drag near a point bends that stroke; its neighbours follow smoothly.
@@ -337,7 +381,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
         const hit = nearestPoint(target.strokes, p.x, p.y, 12 / view.zoom);
         if (hit) {
           record(current);
-          drag.current = { kind: 'bend', layerId: target.id, ...hit, startX: p.x, startY: p.y, base: target.strokes };
+          drag.current = { kind: 'bend', layerId: target.id, ...hit, startX: p.x, startY: p.y, base: target.strokes, recorded: true };
           return;
         }
       }
@@ -419,8 +463,15 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
       }
       setLive(newStroke([...d.points], lineart, !d.pen));
     } else if (d.kind === 'bend') {
-      const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, Math.max(24, s.size * 4)) : s));
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
+      if (!d.recorded) {
+        if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom < 2) return;
+        const current = getDoc(sessionId, doc.id);
+        if (!current) return;
+        record(current);
+        d.recorded = true;
+      }
+      const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, d.influence ?? Math.max(24, s.size * 4)) : s));
+      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
     } else if (d.kind === 'shape') {
       let x1 = p.x;
       let y1 = p.y;
@@ -577,6 +628,7 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
           }}
         />
       ) : null}
+      {tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
       {tool === 'move' && active?.type === 'raster' && active.paintStrokes?.length ? <div className="stage-hint">Drag a stroke · Shift-drag to move the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>

@@ -99,6 +99,32 @@ export function newStroke(points: Array<[number, number, number]>, style: Stroke
   return { id: uid('stk'), ...style, points, simulatePressure };
 }
 
+/** A small set of editable samples, including both ends, without changing the stored path. */
+export function strokeHandles(s: Stroke): number[] {
+  if (!s.points.length) return [];
+  const indices = [0];
+  let length = 0;
+  for (let i = 1; i < s.points.length; i++) length += Math.hypot(s.points[i][0] - s.points[i - 1][0], s.points[i][1] - s.points[i - 1][1]);
+  const spacing = Math.max(24, length / 24);
+  let distance = 0;
+  for (let i = 1; i < s.points.length - 1; i++) {
+    distance += Math.hypot(s.points[i][0] - s.points[i - 1][0], s.points[i][1] - s.points[i - 1][1]);
+    if (distance >= spacing) { indices.push(i); distance = 0; }
+  }
+  if (s.points.length > 1) indices.push(s.points.length - 1);
+  return indices;
+}
+
+export function nearStroke(s: Stroke, x: number, y: number, tolerance: number): boolean {
+  for (let i = 0; i < s.points.length; i++) {
+    const a = s.points[Math.max(0, i - 1)], b = s.points[i];
+    const dx = b[0] - a[0], dy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= tolerance + s.size / 2) return true;
+  }
+  return false;
+}
+
 export function translateStroke(s: Stroke, dx: number, dy: number): Stroke {
   return { ...s, points: s.points.map(([x, y, p]) => [x + dx, y + dy, p]) };
 }

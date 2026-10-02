@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — edición visible de Lineart (2026-10-02)
+- [x] Añadir modo Draw/Edit e influencia a ajustes; seleccionar trazos vectoriales visibles y desbloqueados, mostrar eje y puntos espaciados incluidos extremos, arrastrar con bendStroke y un Undo por arrastre. Sin conversión de datos ni Bézier; clic vacío en Edit nunca dibuja. Conservar presión/estilo. Sin pruebas por instrucción del usuario; commit reversible. Los controles son muestras de los trazos originales, no tiradores Bézier; influencia 1–500 px a lo largo del trazo.
+
 ## Tarea — ayudas recortadas arriba (2026-10-02)
 - [x] Ajustar solo TooltipLayer: medir la ayuda y colocarla debajo si no cabe encima; limitar posición a la ventana también en lateral. Mantener eventos y demora. Sin pruebas por petición del usuario; reversible con revert.
 

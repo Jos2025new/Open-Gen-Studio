@@ -19,6 +19,8 @@ export function ToolSettings() {
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
+  const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
+  const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
   const shape = useStore((s) => s.ui.shape);
   const text = useStore((s) => s.ui.text);
   const paint = tool === 'brush' || tool === 'eraser';
@@ -39,7 +41,10 @@ export function ToolSettings() {
           <ContextField label={`Expand · ${brush.fillExpand ?? 0}px`}><input aria-label="Fill expansion" type="range" min={0} max={12} step={1} value={brush.fillExpand ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillExpand: +e.target.value } })} /></ContextField>
           <ContextField label={`Smooth · ${brush.fillSmooth ?? 0}px`}><input aria-label="Fill smoothing" type="range" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(e) => setUi({ brush: { ...brush, fillSmooth: +e.target.value } })} /></ContextField>
           
-        </> : tool === 'lineart' ? <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} /> : paint ? <>
+        </> : tool === 'lineart' ? <>
+          <ContextField label={lineartMode === 'draw' ? 'Mode · Draw' : 'Mode · Edit'}><select aria-label="Lineart mode" value={lineartMode} onChange={(e) => setUi({ lineartMode: e.target.value as 'draw' | 'edit' })}><option value="draw">Draw</option><option value="edit">Edit</option></select></ContextField>
+          {lineartMode === 'edit' ? <ContextField label={`Influence · ${influence}px`} hint="Distance along the stroke affected by dragging a point."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
+        </> : paint ? <>
           <ContextField label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></ContextField>
           {tool !== 'eraser' && <ContextField label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></ContextField>}
           <ContextField label={`Opacity · ${Math.round(brush.opacity * 100)}%`}><input type="range" min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(e) => setUi({ brush: { ...brush, opacity: +e.target.value } })} /></ContextField>
