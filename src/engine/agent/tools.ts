@@ -53,6 +53,29 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'find_assets',
+      description:
+        'This session\'s results and uploads (never other sessions), newest first: id, type and file extension, date, model, prompt or operation, settings, inputs. Filter by kind, origin, canvas, date (since: "24h", "7d", "today" or a date) and words (prompt, model, operation, extension like "png" or "glb", id). view: true also sends the first matches (up to 4) as images in the next message — the only way to see a result you were not shown. A 3D model is shown by its view image.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kind: { type: 'array', items: { type: 'string', enum: ['image', 'video', 'audio', 'model3d'] } },
+          query: { type: 'string' },
+          canvas: { type: 'string', enum: ['this', 'all'], description: 'this (default): the current canvas; all: every canvas of this session.' },
+          since: { type: 'string' },
+          origin: { type: 'array', items: { type: 'string', enum: ['generated', 'upload', 'view3d', 'frame', 'design'] } },
+          favorites: { type: 'boolean' },
+          sort: { type: 'string', enum: ['newest', 'oldest'] },
+          limit: { type: 'integer', minimum: 1, maximum: 20 },
+          offset: { type: 'integer', minimum: 0 },
+          view: { type: 'boolean' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'continue_in_canvas',
       description:
         'Node canvas only. When the user wants to continue here what was done in chat ("continuamos en canvas"): the app adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
@@ -248,6 +271,19 @@ const questionSchema = z.object({
 export const findModelsSchema = z.object({
   query: z.string().min(1).max(120),
   kind: z.enum(['image', 'video', 'audio', 'model3d']).optional(),
+});
+
+export const findAssetsSchema = z.object({
+  kind: z.array(z.enum(['image', 'video', 'audio', 'model3d'])).optional(),
+  query: z.string().max(200).optional(),
+  canvas: z.enum(['this', 'all']).optional(),
+  since: z.string().max(40).optional(),
+  origin: z.array(z.enum(['generated', 'upload', 'view3d', 'frame', 'design'])).optional(),
+  favorites: z.boolean().optional(),
+  sort: z.enum(['newest', 'oldest']).optional(),
+  limit: z.number().int().min(1).max(20).optional(),
+  offset: z.number().int().min(0).optional(),
+  view: z.boolean().optional(),
 });
 
 export const readGraphSchema = z.object({

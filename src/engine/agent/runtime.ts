@@ -8,6 +8,7 @@ import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { chatToNodes } from '../flow/fromChat';
+import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
@@ -18,6 +19,7 @@ import { activeSkill, workflowById } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel } from '../catalog';
 import type {
+  LlmContentPart,
   ActivityEntry,
   ActivityFeedItem,
   AgentQuestion,
@@ -59,7 +61,7 @@ import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -1169,6 +1171,31 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
               log.action({ icon: 'search', label: 'Looked at the canvas', detail: v.data.layer_id });
               respond('The image follows in the next message.');
               afterTools.push(userMessage('Canvas view:', view));
+            }
+          }
+          continue;
+        }
+        if (call.name === 'find_assets') {
+          const v = findAssetsSchema.safeParse(parsed.value ?? {});
+          if (!v.success) respond(`Invalid find_assets input: ${formatZodError(v.error)}`);
+          else {
+            const st = useStore.getState();
+            const found = findAssets(session(sessionId), workspace, st.assets, st.generations, v.data);
+            log.action({ icon: 'search', label: v.data.view ? 'Looked at results' : 'Searched results', detail: [v.data.kind?.join(','), v.data.query, v.data.since].filter(Boolean).join(' · ') || undefined });
+            if (!v.data.view || !found.rows.length) respond(found.text);
+            else if (!agentSeesImages()) respond(`${found.text}\n\nThe selected agent model cannot see images: none sent.`);
+            else {
+              const parts: LlmContentPart[] = [];
+              for (const t of viewTargets(found.rows)) {
+                if (!t.show) parts.push({ type: 'text', text: `${t.note}.` });
+                else {
+                  if (t.note !== `asset:${t.show}`) parts.push({ type: 'text', text: `${t.note}:` });
+                  parts.push(...(await attachmentParts([t.show])));
+                }
+              }
+              const shown = parts.some((p) => p.type === 'image_url');
+              respond(`${found.text}\n\n${shown ? `The first ${Math.min(found.rows.length, VIEW_MAX)} follow as images in the next message.` : 'None of them could be shown as an image.'}`);
+              if (shown) afterTools.push(userMessage('Results you asked to see:', parts));
             }
           }
           continue;
