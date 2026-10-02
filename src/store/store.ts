@@ -442,6 +442,7 @@ export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): v
 }
 
 export function toast(text: string, level: Toast['level'] = 'info', ms?: number): void {
+  if (get().ui.toasts.some((t) => t.text === text)) return; // the same notice is already on screen
   const id = uid('tst');
   set((st) => ({ ui: { ...st.ui, toasts: [...st.ui.toasts.slice(-3), { id, text, level }] } }));
   window.setTimeout(() => dismissToast(id), ms ?? (level === 'error' ? 6500 : 3200));
