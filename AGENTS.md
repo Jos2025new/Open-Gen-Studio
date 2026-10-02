@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — ancho y margen del selector de lienzos (2026-10-02)
+- [x] Igualar botón y panel a 190 px; reducir padding de lista a 3 px y tarjetas a 4 px. Solo presentación; sin pruebas por petición del usuario.
+
 ## Tarea — lienzos como miniaturas desplegables (2026-10-02)
 - [x] Sustituir selector superior por desplegable en esquina izquierda del área de trabajo junto a ToolRail. Miniaturas con renderer existente, nombre y tamaño; selección usa selectDoc. Cargar buffers al mostrar miniaturas, mantener lienzos/datos intactos. Sin pruebas por petición del usuario; commit reversible.
 

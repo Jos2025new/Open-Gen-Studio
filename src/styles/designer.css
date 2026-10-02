@@ -17,10 +17,10 @@
 .topbar-slot .designer-import-chat { order: -1; }
 .topbar-slot > .tool-settings { order: -3; }
 .document-picker { position: absolute; left: 56px; top: 10px; z-index: 6; }
-.document-picker-toggle { display: flex; align-items: center; gap: 8px; width: 170px; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); font-size: 12px; }
+.document-picker-toggle { display: flex; align-items: center; gap: 8px; width: 190px; max-width: calc(100vw - 16px); padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius-s); background: var(--surface); font-size: 12px; }
 .document-picker-toggle span { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: left; }
-.document-thumbnails { display: flex; flex-direction: column; gap: 8px; padding: 8px; }
-.document-choice { display: flex; flex-direction: column; gap: 4px; padding: 7px; border: 1px solid var(--border); border-radius: var(--radius-s); text-align: left; overflow-wrap: anywhere; font-size: 12px; }
+.document-thumbnails { display: flex; flex-direction: column; gap: 5px; padding: 3px; }
+.document-choice { display: flex; flex-direction: column; gap: 4px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-s); text-align: left; overflow-wrap: anywhere; font-size: 12px; }
 .document-choice:hover { background: var(--surface-2); }
 .document-choice.is-active { border-color: var(--accent); background: var(--accent-soft); }
 .document-choice small { color: var(--text-3); }
