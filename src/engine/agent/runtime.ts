@@ -427,6 +427,8 @@ async function presentPlan(
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
+  // Changes to a model the user picked also pop up for 5 s: the card alone is easy to miss.
+  for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') {
     materializeNodes(sessionId, plan);

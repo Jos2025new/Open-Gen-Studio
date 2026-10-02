@@ -435,10 +435,10 @@ export function addSpend(usd: number, entry?: Omit<SpendEntry, 'at' | 'usd'>): v
   }
 }
 
-export function toast(text: string, level: Toast['level'] = 'info'): void {
+export function toast(text: string, level: Toast['level'] = 'info', ms?: number): void {
   const id = uid('tst');
   set((st) => ({ ui: { ...st.ui, toasts: [...st.ui.toasts.slice(-3), { id, text, level }] } }));
-  window.setTimeout(() => dismissToast(id), level === 'error' ? 6500 : 3200);
+  window.setTimeout(() => dismissToast(id), ms ?? (level === 'error' ? 6500 : 3200));
 }
 
 export function dismissToast(id: string): void {
