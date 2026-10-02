@@ -240,3 +240,18 @@ button.info-thumb { padding: 0; cursor: pointer; }
 /* A card reached from Generations flashes once. */
 .gen-card.is-flash { animation: gen-flash 1.6s ease-out; }
 @keyframes gen-flash { 0%, 40% { box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* Generations rows read like the Sessions list: no boxes, a divider, hover shade; Go to appears on hover. */
+.generations-list { padding: 4px 8px 12px; gap: 0; }
+.gen-row { border: 0; border-radius: 8px; background: transparent; padding: 8px; }
+.gen-row + .gen-row { box-shadow: 0 -1px 0 var(--border); border-top-left-radius: 0; border-top-right-radius: 0; }
+.gen-row:hover { background: var(--surface-2); }
+.gen-row-thumb { flex-basis: 52px; width: 52px; height: 52px; border-radius: 7px; }
+.gen-row-go { opacity: 0; transition: opacity .12s; }
+.gen-row:hover .gen-row-go, .gen-row-go:focus-visible, .gen-row-go.is-active { opacity: 1; }
+@media (hover: none) { .gen-row-go { opacity: 1; } }
+
+/* Assets: search with its filter button and Select beside it, as in Sessions and Generations. */
+.gallery-search-row { display: flex; align-items: center; gap: 6px; }
+.gallery-search-row .search-input { flex: 1; min-width: 0; }
+.density-range { flex: 1; min-width: 0; accent-color: var(--accent); }

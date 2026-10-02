@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Box, CornerDownRight, FileText, Film, Image as ImageIcon, Music, Search, X } from 'lucide-react';
+import { Box, CornerDownRight, FileText, Film, Image as ImageIcon, Music, Search, SlidersHorizontal, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { formatDateTime, formatUsd } from '../../lib/format';
@@ -7,7 +7,7 @@ import type { Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
-import { Button, IconButton, Segmented } from '../ui/primitives';
+import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { generationPlace, goToGeneration } from '../../engine/goTo';
 
 type Sort = 'newest' | 'oldest' | 'cost';
@@ -46,6 +46,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
   const [view, setView] = useState<'thumbs' | 'list'>('thumbs');
+  const filters = usePopover();
   const scoped = useMemo(() => Object.values(generations).filter((g) => scope === 'all' || g.sessionId === sessionId), [generations, scope, sessionId]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -72,36 +73,59 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
         <div className="panel-title">Generations <span className="faint num">{list.length}</span></div>
         <IconButton icon={X} label="Close generations" size="sm" onClick={onClose} />
       </div>
-      <div className="gallery-controls gen-filters">
+      <div className="sessions-controls">
         <div className="search-input">
           <Search size={14} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search names, models, providers" aria-label="Search generations" />
-          {q ? <IconButton icon={X} label="Clear search" size="sm" onClick={() => setQ('')} /> : null}
-        </div>
-        <div className="gen-filter-row">
-          <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
-          <span className="gen-filter-gap" />
-          <select className="gen-sort" aria-label="Sort by" value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-            <option value="newest">Newest</option>
-            <option value="oldest">Oldest</option>
-            <option value="cost">Highest cost</option>
-          </select>
-          <Segmented size="sm" value={view} onChange={setView} options={[{ value: 'thumbs', label: 'Thumbnails' }, { value: 'list', label: 'List' }]} />
-        </div>
-        <div className="gen-chips" role="group" aria-label="Type">
-          {KINDS.filter((k) => k.id === 'all' || count(k.id)).map((k) => (
-            <button key={k.id} type="button" className={`gen-chip ${kind === k.id ? 'is-on' : ''}`} aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
-              {k.label} <span className="num">{count(k.id)}</span>
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search generations" aria-label="Search generations" />
+          {q ? (
+            <button type="button" aria-label="Clear search" onClick={() => setQ('')}>
+              <X size={13} />
             </button>
-          ))}
+          ) : null}
+          <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
+            <SlidersHorizontal size={14} />
+            {scope !== 'session' || kind !== 'all' || status !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
+          </button>
         </div>
-        <div className="gen-chips" role="group" aria-label="Status">
-          {STATUSES.map((s) => (
-            <button key={s.id} type="button" className={`gen-chip ${status === s.id ? 'is-on' : ''} ${s.id === 'error' ? 'is-error' : ''}`} aria-pressed={status === s.id} onClick={() => setStatus(s.id)}>
-              {s.label}
-            </button>
-          ))}
-        </div>
+        <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
+          <div className="sessions-view">
+            <div className="sv-row">
+              <span className="sv-label">Show</span>
+              <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Type</span>
+              <div className="sv-canvas">
+                {KINDS.map((k) => {
+                  const KIcon = k.id === 'all' ? null : KIND_ICON[k.id];
+                  return (
+                    <button key={k.id} type="button" className={`canvas-tab ${kind === k.id ? 'is-on' : ''}`} onClick={() => setKind(k.id)} disabled={k.id !== 'all' && !count(k.id)}>
+                      {KIcon ? <KIcon size={12} /> : null}
+                      {k.label}
+                      <span className="num faint">{count(k.id)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Status</span>
+              <Segmented size="sm" value={status} onChange={setStatus} options={STATUSES.map((x) => ({ value: x.id, label: x.id === 'all' ? 'Any' : x.label }))} />
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Sort</span>
+              <Segmented size="sm" value={sort} onChange={setSort} options={[{ value: 'newest', label: 'Newest' }, { value: 'oldest', label: 'Oldest' }, { value: 'cost', label: 'Cost' }]} />
+            </div>
+            <label className="sv-switch"><span>Thumbnails</span><Toggle checked={view === 'thumbs'} onChange={(v) => setView(v ? 'thumbs' : 'list')} label="Thumbnails" /></label>
+          </div>
+        </Popover>
+        {scope !== 'session' || kind !== 'all' || status !== 'all' ? (
+          <div className="sessions-active">
+            {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
+            {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{KINDS.find((k) => k.id === kind)?.label} <X size={11} /></button> : null}
+            {status !== 'all' ? <button type="button" className="active-chip" onClick={() => setStatus('all')}>{STATUSES.find((x) => x.id === status)?.label} <X size={11} /></button> : null}
+          </div>
+        ) : null}
       </div>
       <div className="generations-list">
         {list.map((g) => <GenerationRow key={g.id} g={g} thumbs={view === 'thumbs'} showSession={scope === 'all'} onGo={onClose} />)}
@@ -141,7 +165,7 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
       </div>
       {place ? (
         <>
-          <Button ref={jump.ref} size="sm" variant="ghost" icon={CornerDownRight} className="gen-row-go" onClick={jump.toggle}>Go to</Button>
+          <IconButton ref={jump.ref} icon={CornerDownRight} label="Go to where it was made" size="sm" className="gen-row-go" active={jump.open} onClick={jump.toggle} />
           <Popover open={jump.open} anchor={jump.ref} onClose={jump.close} width={260} label="Go to generation">
             <div className="confirm-pop">
               <p>

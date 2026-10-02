@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDownUp, AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, Star, Trash, X } from 'lucide-react';
+import { AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, SlidersHorizontal, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, deleteSubject, downloadAsset, SUBJECT_KINDS, useAsReference } from '../../engine/actions';
 import { formatDuration, groupByDate } from '../../lib/format';
-import { IconButton, Button, Segmented } from '../ui/primitives';
+import { IconButton, Button, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Asset, Subject, SubjectKind } from '../../engine/types';
@@ -100,6 +100,7 @@ function GeneratedAssets() {
   const [newest, setNewest] = useState(true);
   const [cols, setCols] = useState(3);
   const [selecting, setSelecting] = useState(false);
+  const filters = usePopover();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const del = usePopover();
 
@@ -141,6 +142,7 @@ function GeneratedAssets() {
           {list.length} {list.length === 1 ? 'asset' : 'assets'}
           {running ? <span className="running-pill num">{running} running</span> : null}
         </div>
+        <div className="gallery-search-row">
         <div className="search-input">
           <Search size={14} />
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search prompts and models" aria-label="Search assets" />
@@ -149,48 +151,50 @@ function GeneratedAssets() {
               <X size={13} />
             </button>
           ) : null}
+          <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
+            <SlidersHorizontal size={14} />
+            {kind !== 'all' || scope !== 'session' || favOnly || !newest ? <span className="dot" /> : null}
+          </button>
         </div>
-        <div className="gallery-row">
-          <Segmented
-            value={kind}
-            size="sm"
-            onChange={setKind}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'image', label: 'Images' },
-              { value: 'video', label: 'Videos' },
-              { value: 'audio', label: 'Audio' },
-              { value: 'model3d', label: '3D' },
-            ]}
-          />
-          <Segmented
-            value={scope}
-            size="sm"
-            onChange={setScope}
-            options={[
-              { value: 'session', label: 'Session', tip: 'Only this session' },
-              { value: 'all', label: 'All', tip: 'Every session' },
-            ]}
-          />
+        <IconButton
+          icon={CheckSquare}
+          label={selecting ? 'Done selecting' : 'Select'}
+          size="sm"
+          active={selecting}
+          onClick={() => {
+            setSelecting((v) => !v);
+            setSelected(new Set());
+          }}
+        />
         </div>
-        <div className="gallery-tools">
-          <IconButton icon={Star} label={favOnly ? 'Showing favorites' : 'Favorites only'} size="sm" active={favOnly} onClick={() => setFavOnly((v) => !v)} />
-          <IconButton icon={ArrowDownUp} label={newest ? 'Newest first' : 'Oldest first'} size="sm" onClick={() => setNewest((v) => !v)} />
-          <span className="spacer" />
-          <label className="density" data-tip="Grid density">
-            <input type="range" min={2} max={expanded ? 8 : 5} value={cols} onChange={(e) => setCols(Number(e.target.value))} aria-label="Columns" />
-          </label>
-          <IconButton
-            icon={CheckSquare}
-            label={selecting ? 'Done selecting' : 'Select'}
-            size="sm"
-            active={selecting}
-            onClick={() => {
-              setSelecting((v) => !v);
-              setSelected(new Set());
-            }}
-          />
-        </div>
+        <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
+          <div className="sessions-view">
+            <div className="sv-row">
+              <span className="sv-label">Show</span>
+              <Segmented value={scope} size="sm" onChange={setScope} options={[{ value: 'session', label: 'This session' }, { value: 'all', label: 'All sessions' }]} />
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Type</span>
+              <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }]} />
+            </div>
+            <div className="sv-row">
+              <span className="sv-label">Sort</span>
+              <Segmented value={newest ? 'new' : 'old'} size="sm" onChange={(v) => setNewest(v === 'new')} options={[{ value: 'new', label: 'Newest' }, { value: 'old', label: 'Oldest' }]} />
+            </div>
+            <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
+            <div className="sv-row">
+              <span className="sv-label">Grid size</span>
+              <input className="density-range" type="range" min={2} max={expanded ? 8 : 5} value={cols} onChange={(e) => setCols(Number(e.target.value))} aria-label="Columns" />
+            </div>
+          </div>
+        </Popover>
+        {kind !== 'all' || scope !== 'session' || favOnly ? (
+          <div className="sessions-active">
+            {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
+            {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{({ image: 'Images', video: 'Videos', audio: 'Audio', model3d: '3D' } as Record<string, string>)[kind]} <X size={11} /></button> : null}
+            {favOnly ? <button type="button" className="active-chip" onClick={() => setFavOnly(false)}>Favorites <X size={11} /></button> : null}
+          </div>
+        ) : null}
         {selecting ? (
           <div className="gallery-bulk">
             <span className="num">{ids.length} selected</span>

@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Assets y Generations con la estética de Sesiones (2026-10-02)
+- [x] (usuario: "no comparten estética; minimalismo, agrupar funciones, desplegables e iconos que se entiendan") Mismo patrón que el panel de Sesiones (S5): buscador con el botón "Filter, sort and view" dentro (punto si algo no es lo normal), menú con segmentados e interruptores, y solo etiquetas quitables de los filtros activos. Generations: Show, Type (con iconos y recuentos), Status, Sort, Thumbnails; filas sin caja, con separador y "Go to" como icono que aparece al pasar el ratón. Assets: Show, Type, Sort, Favorites only, Grid size; Select junto al buscador. Sin navegador.
+
 ## Tarea — panel Generations: filas propias, filtros a la vista, "Go to" (2026-10-02)
 Origen (usuario): hueco vacío en las tarjetas fallidas, filtros incómodos (tres desplegables y un icono diminuto de dos vistas), y Retry no debe estar ahí: lo que hace falta es ir al sitio donde se hizo, preguntando antes.
 - [x] G1. `GenerationsPanel.tsx` sin la tarjeta del chat: una fila por generación (miniatura 64 px solo si hay resultado, si no un icono del tipo; título, estado, modelo · proveedor, fecha, lienzo —y sesión con "All sessions"—, coste; error en una línea). Sin Retry.
