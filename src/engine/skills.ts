@@ -355,7 +355,7 @@ export const WORKFLOWS: Workflow[] = [
       'sound: dialogue or voice-over, music and ambience, or silent (only for models with audio)',
       'format: the attached image\'s aspect (recommended) or another',
       'one clip with timed shots (recommended when the total fits the model: up to 30 s on Seedance 2.5 / Wan 3, 15 s on MiniMax H3) or several separate clips joined; both use the same fixed character sources in every clip',
-      'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (a cheap first plan; the user picks one, then the clips)',
+      'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (recommended when the character is invented or the image does not show it well; a cheap first plan, the user sees it, then the clips with the sheet in their refs)',
     ],
     continuity:
       'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; a clip with no image of her repeats the same 3–6 literal traits (skill:cinematic). Save her to the library only if the user asks or says yes in the questions card. One clip or several is asked in the brief card (see needs). One clip: the whole story with timed shots (hook → conflict → payoff as "0–5s / 5–10s / …" with shot size and camera each), no join. Several clips: each clip is one closed beat with a start and an end, written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
@@ -404,7 +404,7 @@ export const WORKFLOWS: Workflow[] = [
       { id: 'archviz', for: 'the render, when there is no approved image yet' },
       { id: 'archviz-motion', for: 'the clip prompt' },
     ],
-    needs: ['the render to animate (an image, or a description to render first)', 'the camera move, if the user has one in mind'],
+    needs: ['the render to animate (an image, or a description to render first)', 'with no image: "render first, then the clip" (recommended: the user approves the building before any video) or "all at once"', 'the camera move, if the user has one in mind'],
     continuity: 'The render is the first frame of the clip; the clip directs the camera and the life, never redescribes the architecture.',
     variants: [
       { id: 'dolly', name: 'Dolly in', description: 'Slow dolly toward the entrance or the window wall.' },
@@ -438,7 +438,7 @@ export const WORKFLOWS: Workflow[] = [
       { id: 'archviz', for: 'the key views' },
       { id: 'archviz-motion', for: 'each clip and the order of the tour' },
     ],
-    needs: ['the building (description or images)', 'total length', 'ambient music: yes (generated) or no'],
+    needs: ['the building (description or images)', 'how to start: "key views first, then the clips" (recommended: the views are approved before any video, and each clip starts from its view with the facade in refs) or "all at once"', 'total length', 'ambient music: yes (generated) or no'],
     continuity: 'Facade → entrance → main interior → terrace. The facade render is the reference (refs) for every other view; each clip starts from its view (first_frame); neighboring clips change shot size or angle; the clips are joined in order (join_clips, with params.music set to a music step or an audio asset when the user wants music).',
     steps: [
       { id: 's1', kind: 'image', title: 'Facade', prompt: '{prompt}, main facade at golden hour', aspect: '16:9' },
