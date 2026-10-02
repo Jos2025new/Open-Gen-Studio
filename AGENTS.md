@@ -33,6 +33,9 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — importar del Chat: cerrar el aviso y acceso fijo (2026-10-02)
+- [x] I1. (usuario) `ImportFromChat` (`components/ui/ImportFromChat.tsx`), en Nodos y Designer: botón ⤓ "Import from Chat" en la barra superior con un diálogo (miniatura y título de cada resultado, todos marcados al abrir, All/None; en Designer "Each as a design" / "As layers of one") e "Import N". El aviso sobre el lienzo lleva ✕ y "Choose…"; cerrado se queda así hasta que lleguen más resultados (por sesión y lienzo, localStorage). `chatToNodes(sessionId, only?)` importa solo lo elegido. Sin navegador.
+
 ## Tarea — errores de la sesión "modelo 3D de la heroína" (2026-10-02)
 - [x] F1. "Pasémonos al canvas de nodos" desde el chat: `continue_in_canvas` solo valía en Nodos y el agente mandó al usuario a cambiar a mano. Ahora funciona desde cualquier lienzo y cambia la vista a Nodos; `continue_in_designer` también cambia la vista. Regla: nunca pedir al usuario que cambie de lienzo a mano.
 - [x] F2. Aviso falso "The agent replied without a plan" bajo esa respuesta: solo sale si la petición pide hacer o cambiar algo (`MAKE_WORDS`: crea, haz, genera, edita, anima, añade, quita, create, make…), además de no ser pregunta. Test en `agent-retry`.

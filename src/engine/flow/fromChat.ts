@@ -25,10 +25,11 @@ export function chatWorkNotInNodes(sessionId: string): Generation[] {
  * Nodes carry the stored request unchanged, so they count as up to date: nothing runs again unless edited.
  * Operations the node canvas cannot run (join_clips, mask edits) come in as their result. No calls, no cost.
  */
-export function chatToNodes(sessionId: string): { added: GraphNode[]; edges: GraphEdge[] } {
+export function chatToNodes(sessionId: string, only?: string[]): { added: GraphNode[]; edges: GraphEdge[] } {
   const st = get();
   const s = st.sessions[sessionId];
-  const gens = chatWorkNotInNodes(sessionId);
+  // `only`: the generations the user picked in the import dialog; otherwise all of them.
+  const gens = chatWorkNotInNodes(sessionId).filter((g) => !only || only.includes(g.id));
   if (!s || !gens.length) return { added: [], edges: [] };
 
   const nodes: GraphNode[] = [];

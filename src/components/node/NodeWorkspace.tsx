@@ -25,6 +25,7 @@ import { SpendConfirm } from '../ui/SpendConfirm';
 import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
 import { CanvasNavigation } from './CanvasNavigation';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
+import { ImportFromChat } from '../ui/ImportFromChat';
 
 const nodeTypes = { studio: StudioNode };
 
@@ -86,7 +87,10 @@ function Canvas() {
   const generations = useStore((s) => s.generations);
   const feed = useStore((s) => s.sessions[s.activeSessionId].feed);
   // Chat results not on this canvas yet: one click (or "continue here" to the agent) brings them as connected nodes.
-  const fromChat = useMemo(() => chatWorkNotInNodes(sessionId).length, [sessionId, graph, generations, feed]);
+  const fromChat = useMemo(
+    () => chatWorkNotInNodes(sessionId).map((g) => ({ id: g.id, assetId: g.assetIds[0], label: g.op ? g.op.id.replace(/_/g, ' ') : g.prompt.split(/[.,\n]/)[0].slice(0, 60) || g.kind })),
+    [sessionId, graph, generations, feed],
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [tool, setTool] = useState<'select' | 'pan'>(() => { try { return localStorage.getItem('ogs.nodeTool') === 'pan' ? 'pan' : 'select'; } catch { return 'select'; } });
   const pickTool = (t: 'select' | 'pan') => { setTool(t); try { localStorage.setItem('ogs.nodeTool', t); } catch { /* storage blocked */ } };
@@ -358,12 +362,16 @@ function Canvas() {
           </>
         ) : null}
       </Popover>
-      {fromChat ? (
-        <div className="node-from-chat">
-          <span>{fromChat} result{fromChat === 1 ? '' : 's'} from Chat</span>
-          <Button size="sm" onClick={() => { chatToNodes(sessionId); window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50); }}>Add as nodes</Button>
-        </div>
-      ) : null}
+      <ImportFromChat
+        sessionId={sessionId}
+        canvas="node"
+        items={fromChat}
+        noun="result"
+        onImport={(ids) => {
+          chatToNodes(sessionId, ids);
+          window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
+        }}
+      />
       {!graph.nodes.length ? (
         <div className="node-empty">
           <h2>Build a flow</h2>
