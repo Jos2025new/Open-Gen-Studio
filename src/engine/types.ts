@@ -666,6 +666,8 @@ export interface GraphGroup {
   id: string;
   title: string;
   nodeIds: string[];
+  /** Optional background tint (hex); none by default. */
+  color?: string;
 }
 
 export interface Graph {

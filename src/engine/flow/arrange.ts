@@ -89,6 +89,21 @@ export function renameGroup(sessionId: string, groupId: string, title: string): 
   if (t) setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, title: t } : x)) }));
 }
 
+export function setGroupColor(sessionId: string, groupId: string, color: string | undefined): void {
+  setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).map((x) => (x.id === groupId ? { ...x, color } : x)) }));
+}
+
+/** The frame around a group's nodes (flow coordinates), from their real sizes: it follows them as they move. */
+export function groupBounds(graph: Graph, group: GraphGroup, sizes: Sizes, pad = 28): { x: number; y: number; width: number; height: number } | null {
+  const members = graph.nodes.filter((n) => group.nodeIds.includes(n.id));
+  if (!members.length) return null;
+  const l = Math.min(...members.map((n) => n.position.x)) - pad;
+  const t = Math.min(...members.map((n) => n.position.y)) - pad - 18;
+  const r = Math.max(...members.map((n) => n.position.x + sizeOf(n, sizes).width)) + pad;
+  const b = Math.max(...members.map((n) => n.position.y + sizeOf(n, sizes).height)) + pad;
+  return { x: l, y: t, width: r - l, height: b - t };
+}
+
 /** Move every node of a group by (dx, dy). */
 export function moveGroup(sessionId: string, groupId: string, dx: number, dy: number): void {
   setGraph(sessionId, (g) => {

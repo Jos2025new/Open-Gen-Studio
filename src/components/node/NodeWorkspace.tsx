@@ -24,12 +24,12 @@ import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
 import { CanvasNavigation } from './CanvasNavigation';
-import { GroupFrames, Operations } from './Operations';
-import { copyNodes, cutNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
+import { GroupNode, Operations, type GroupFlowNode } from './Operations';
+import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 
-const nodeTypes = { studio: StudioNode };
+const nodeTypes = { studio: StudioNode, group: GroupNode };
 
 function AddNodeMenu({ onAdd }: { onAdd: (data: GraphNodeData) => void }) {
   const pop = usePopover();
@@ -109,11 +109,37 @@ function Canvas() {
   }, [focus.tick]);
   // Controlled flow: React Flow reports measured sizes as changes; nodes passed back without them stay hidden.
   const [measured, setMeasured] = useState<Map<string, { width: number; height: number }>>(new Map());
+  const measuredRef = useRef(measured);
+  measuredRef.current = measured;
 
-  const nodes: FlowNode[] = useMemo(() => {
+  // Groups are containers: a frame node behind their members, sized from them (it follows them as they move).
+  const groupFrames = useMemo(
+    () =>
+      (graph.groups ?? []).flatMap((g) => {
+        const b = groupBounds(graph, g, measured);
+        return b ? [{ group: g, b }] : [];
+      }),
+    [graph, measured],
+  );
+  // Frames go in the same list; React Flow takes them as nodes of type "group".
+  const nodes = useMemo((): FlowNode[] => {
     // Count only live nodes: ids of deleted nodes must not keep the toolbar hidden.
     const solo = graph.nodes.filter((n) => selected.has(n.id)).length === 1;
-    return graph.nodes.map((n) => ({
+    const frames: GroupFlowNode[] = groupFrames.map(({ group, b }) => ({
+      id: group.id,
+      type: 'group',
+      position: { x: b.x, y: b.y },
+      data: { group, sessionId },
+      width: b.width,
+      height: b.height,
+      measured: { width: b.width, height: b.height },
+      zIndex: -1,
+      draggable: true,
+      selectable: true,
+      connectable: false,
+      style: { width: b.width, height: b.height },
+    }));
+    return [...(frames as unknown as FlowNode[]), ...graph.nodes.map((n) => ({
         id: n.id,
         type: 'studio',
         position: n.position,
@@ -121,8 +147,8 @@ function Canvas() {
         selected: selected.has(n.id),
         width: NODE_WIDTH,
         measured: measured.get(n.id),
-      }));
-  }, [graph.nodes, selected, measured]);
+      } as FlowNode))];
+  }, [graph.nodes, selected, measured, groupFrames, sessionId]);
 
   const running = useMemo(() => {
     const set = new Set<string>();
@@ -161,13 +187,29 @@ function Canvas() {
       const removed: string[] = [];
       const picks: Array<[string, boolean]> = [];
       const sizes: Array<[string, { width: number; height: number }]> = [];
+      const frameMoves: Array<[import('../../engine/types').GraphGroup, { x: number; y: number }]> = [];
+      const frames = new Map((useStore.getState().sessions[sessionId]?.graph.groups ?? []).map((g) => [g.id, g]));
       for (const c of changes) {
+        // A group frame: dragging it moves its nodes; selecting it selects them; deleting it ungroups.
+        if ('id' in c && frames.has(c.id)) {
+          const g = frames.get(c.id)!;
+          if (c.type === 'position' && c.position) frameMoves.push([g, c.position]);
+          else if (c.type === 'select' && c.selected) picks.push(...g.nodeIds.map((id) => [id, true] as [string, boolean]));
+          else if (c.type === 'remove') ungroup(sessionId, g.id);
+          continue;
+        }
         if (c.type === 'dimensions' && c.dimensions) sizes.push([c.id, c.dimensions]);
         else if (c.type === 'position' && c.position) moves.set(c.id, c.position);
         else if (c.type === 'remove') removed.push(c.id);
         else if (c.type === 'select') picks.push([c.id, c.selected]);
       }
       if (moves.size) setGraph(sessionId, (g) => ({ ...g, nodes: g.nodes.map((n) => (moves.has(n.id) ? { ...n, position: moves.get(n.id)! } : n)) }));
+      // A dragged frame moves its nodes — unless they are selected too, then they already moved with it.
+      for (const [g, p] of frameMoves) {
+        if (g.nodeIds.some((id) => moves.has(id))) continue;
+        const b = groupBounds(useStore.getState().sessions[sessionId].graph, g, measuredRef.current);
+        if (b) moveGroup(sessionId, g.id, p.x - b.x, p.y - b.y);
+      }
       if (removed.length) deleteNodes(sessionId, removed);
       // Functional updates: several reports can arrive before a re-render; none may be lost.
       if (picks.length || removed.length) {
@@ -337,8 +379,7 @@ function Canvas() {
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        <GroupFrames sessionId={sessionId} graph={graph} sizes={measured} onSelect={(ids) => setSelected(new Set(ids))} />
-        <Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids) => setSelected(new Set(ids))} />
+        <Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
           onSelect={(id) => setSelected(new Set([id]))}

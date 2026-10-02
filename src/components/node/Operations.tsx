@@ -1,16 +1,13 @@
-import { useState } from 'react';
-import { NodeToolbar, Position, ViewportPortal, useReactFlow } from '@xyflow/react';
+import { memo, useState } from 'react';
+import { NodeToolbar, Position, type Node, type NodeProps } from '@xyflow/react';
 import {
   AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignHorizontalDistributeCenter,
-  AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy, Group, Scissors, Trash, Ungroup,
+  AlignStartHorizontal, AlignStartVertical, AlignVerticalDistributeCenter, ChevronDown, ChevronRight, ClipboardCopy, Group, Scissors, Trash, Ungroup, X,
 } from 'lucide-react';
-import { alignNodes, copyNodes, cutNodes, groupNodes, moveGroup, renameGroup, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
+import { alignNodes, copyNodes, cutNodes, groupNodes, renameGroup, setGroupColor, ungroup, wholeGroup, type AlignMode, type AlignTo, type Sizes } from '../../engine/flow/arrange';
 import { deleteNodes } from '../../engine/flow/actions';
-import { NODE_WIDTH } from '../../engine/flow/graph';
-import type { Graph } from '../../engine/types';
+import type { Graph, GraphGroup } from '../../engine/types';
 import { toast } from '../../store/store';
-import { Popover, usePopover } from '../ui/Popover';
-import { Chip, IconButton, MenuItem } from '../ui/primitives';
 
 const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertical }> = [
   { id: 'left', label: 'Left edges', icon: AlignStartVertical },
@@ -24,130 +21,118 @@ const ALIGN: Array<{ id: AlignMode; label: string; icon: typeof AlignStartVertic
 ];
 
 /**
- * Several nodes selected: a small "Operations" button over them that opens only on click (the popover goes down or
- * up, where there is room): Group (or Ungroup), Align » (on hover, with what to align to), and copy · cut · delete.
+ * Several nodes selected: "Operations ▾" over them, in the same bar as a node's tools; it opens only on click into
+ * Group (or Ungroup) · Align › (its options show on hover, with what to align to) · copy · cut · delete.
  */
 export function Operations({ sessionId, graph, ids, sizes, onSelect }: { sessionId: string; graph: Graph; ids: string[]; sizes: Sizes; onSelect: (ids: string[]) => void }) {
-  const pop = usePopover();
-  const [alignOpen, setAlignOpen] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [align, setAlign] = useState(false);
   const [to, setTo] = useState<AlignTo>('selection');
-  const group = wholeGroup(graph, ids);
   if (ids.length < 2) return null;
-  const done = () => pop.close();
+  const group = wholeGroup(graph, ids);
   return (
-    <NodeToolbar nodeId={ids} isVisible position={Position.Top} offset={16}>
-      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} className="ops-chip">
-        Operations · {ids.length}
-        <ChevronDown size={12} />
-      </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={() => { setAlignOpen(false); pop.close(); }} width={230} label="Operations">
-        <div className="menu ops-menu">
-          {group ? (
-            <MenuItem icon={Ungroup} label={`Ungroup “${group.title}”`} onClick={() => { ungroup(sessionId, group.id); done(); }} />
-          ) : (
-            <MenuItem icon={Group} label="Group" detail="Ctrl+G" onClick={() => { groupNodes(sessionId, ids); done(); }} />
-          )}
-          <div className="ops-align" onMouseEnter={() => setAlignOpen(true)} onMouseLeave={() => setAlignOpen(false)}>
-            <button type="button" className="menu-item ops-align-head" aria-expanded={alignOpen} onClick={() => setAlignOpen((v) => !v)}>
-              <span>Align</span>
-              <ChevronRight size={13} className="ops-more" />
-            </button>
-            {alignOpen ? (
-              <div className="ops-sub">
-                {ALIGN.map((a) => (
-                  <MenuItem
-                    key={a.id}
-                    icon={a.icon}
-                    label={a.label}
-                    disabled={a.id.startsWith('distribute') && ids.length < 3}
-                    onClick={() => alignNodes(sessionId, ids, a.id, to, sizes)}
-                  />
-                ))}
-                <div className="ops-to">
-                  <span className="faint">Relative to</span>
-                  <div className="ops-to-opts">
+    <NodeToolbar nodeId={ids} isVisible position={Position.Top} offset={14}>
+      <div className="nt-bar ops-bar nodrag">
+        {!open ? (
+          <button type="button" className="nt-btn" onClick={() => setOpen(true)}>
+            Operations · {ids.length} <ChevronDown size={13} />
+          </button>
+        ) : (
+          <>
+            {group ? (
+              <button type="button" className="nt-btn" data-tip="Ctrl+Shift+G" onClick={() => ungroup(sessionId, group.id)}>
+                <Ungroup size={13} /> Ungroup
+              </button>
+            ) : (
+              <button type="button" className="nt-btn" data-tip="Ctrl+G" onClick={() => groupNodes(sessionId, ids)}>
+                <Group size={13} /> Group
+              </button>
+            )}
+            <div className="ops-align" onMouseEnter={() => setAlign(true)} onMouseLeave={() => setAlign(false)}>
+              <button type="button" className={`nt-btn ${align ? 'is-open' : ''}`} onClick={() => setAlign((v) => !v)}>
+                <AlignStartVertical size={13} /> Align <ChevronRight size={12} />
+              </button>
+              {align ? (
+                <div className="ops-sub nt-bar">
+                  {ALIGN.map((a) => (
+                    <button key={a.id} type="button" className="nt-btn ops-row" disabled={a.id.startsWith('distribute') && ids.length < 3} onClick={() => alignNodes(sessionId, ids, a.id, to, sizes)}>
+                      <a.icon size={13} /> {a.label}
+                    </button>
+                  ))}
+                  <div className="ops-to">
+                    <span>Relative to</span>
                     {(['selection', 'first'] as const).map((t) => (
-                      <button key={t} type="button" className={`ml-filter ${to === t ? 'is-active' : ''}`} aria-pressed={to === t} onClick={() => setTo(t)}>
+                      <button key={t} type="button" className={`nt-btn ${to === t ? 'is-open' : ''}`} aria-pressed={to === t} onClick={() => setTo(t)}>
                         {t === 'selection' ? 'Selection' : 'First selected'}
                       </button>
                     ))}
                   </div>
                 </div>
-              </div>
-            ) : null}
-          </div>
-          <div className="ops-icons">
-            <IconButton icon={ClipboardCopy} label="Copy (Ctrl+C)" size="sm" onClick={() => { toast(`Copied ${copyNodes(sessionId, ids)} nodes · Ctrl+V to paste`, 'success'); done(); }} />
-            <IconButton icon={Scissors} label="Cut (Ctrl+X)" size="sm" onClick={() => { cutNodes(sessionId, ids); onSelect([]); done(); }} />
-            <IconButton icon={Trash} label="Delete" size="sm" tone="danger" onClick={() => { deleteNodes(sessionId, ids); onSelect([]); done(); }} />
-          </div>
-        </div>
-      </Popover>
+              ) : null}
+            </div>
+            <span className="nt-sep" />
+            <button type="button" className="nt-btn nt-icon" aria-label="Copy" data-tip="Copy (Ctrl+C)" onClick={() => toast(`Copied ${copyNodes(sessionId, ids)} nodes · Ctrl+V to paste`, 'success')}>
+              <ClipboardCopy size={14} />
+            </button>
+            <button type="button" className="nt-btn nt-icon" aria-label="Cut" data-tip="Cut (Ctrl+X)" onClick={() => { cutNodes(sessionId, ids); onSelect([]); }}>
+              <Scissors size={14} />
+            </button>
+            <button type="button" className="nt-btn nt-icon nt-danger" aria-label="Delete" data-tip="Delete" onClick={() => { deleteNodes(sessionId, ids); onSelect([]); }}>
+              <Trash size={14} />
+            </button>
+            <span className="nt-sep" />
+            <button type="button" className="nt-btn nt-icon" aria-label="Close" data-tip="Close" onClick={() => { setOpen(false); setAlign(false); }}>
+              <X size={13} />
+            </button>
+          </>
+        )}
+      </div>
     </NodeToolbar>
   );
 }
 
-/** Group frames behind their nodes: drag the title to move the group, click it to select its nodes, double-click to rename. */
-export function GroupFrames({ sessionId, graph, sizes, onSelect }: { sessionId: string; graph: Graph; sizes: Sizes; onSelect: (ids: string[]) => void }) {
-  const rf = useReactFlow();
-  const [editing, setEditing] = useState<string | null>(null);
-  if (!graph.groups?.length) return null;
+const COLORS = [undefined, '#d8ff3a', '#5ec8ff', '#b892ff', '#ff7ab6', '#ffc25e', '#86e3a5'];
+
+export type GroupFlowNode = Node<{ group: GraphGroup; sessionId: string }, 'group'>;
+
+/**
+ * A group as a container on the canvas: a frame behind its nodes, sized from them (it follows them as they move).
+ * Dragging it — also in hand mode — moves everything inside. Title: double-click to rename; the dot sets an
+ * optional background color (none by default).
+ */
+export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<GroupFlowNode>) {
+  const { group, sessionId } = data;
+  const [editing, setEditing] = useState(false);
+  const [palette, setPalette] = useState(false);
   return (
-    <ViewportPortal>
-      {graph.groups.map((g) => {
-        const members = graph.nodes.filter((n) => g.nodeIds.includes(n.id));
-        if (!members.length) return null;
-        const pad = 24;
-        const l = Math.min(...members.map((n) => n.position.x)) - pad;
-        const t = Math.min(...members.map((n) => n.position.y)) - pad;
-        const r = Math.max(...members.map((n) => n.position.x + (sizes.get(n.id)?.width ?? NODE_WIDTH))) + pad;
-        const b = Math.max(...members.map((n) => n.position.y + (sizes.get(n.id)?.height ?? 220))) + pad;
-        return (
-          <div key={g.id} className="group-frame" style={{ transform: `translate(${l}px, ${t}px)`, width: r - l, height: b - t }}>
-            {editing === g.id ? (
-              <input
-                autoFocus
-                className="group-title nodrag"
-                defaultValue={g.title}
-                onBlur={(e) => { renameGroup(sessionId, g.id, e.target.value); setEditing(null); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                  if (e.key === 'Escape') setEditing(null);
-                  e.stopPropagation();
-                }}
-              />
-            ) : (
-              <div
-                className="group-title"
-                title="Drag to move · click to select · double-click to rename"
-                onDoubleClick={() => setEditing(g.id)}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  const start = { x: e.clientX, y: e.clientY };
-                  let last = start;
-                  let moved = false;
-                  const move = (ev: PointerEvent) => {
-                    const z = rf.getZoom();
-                    const dx = (ev.clientX - last.x) / z, dy = (ev.clientY - last.y) / z;
-                    if (Math.abs(ev.clientX - start.x) + Math.abs(ev.clientY - start.y) > 3) moved = true;
-                    if (moved && (dx || dy)) moveGroup(sessionId, g.id, dx, dy);
-                    last = { x: ev.clientX, y: ev.clientY };
-                  };
-                  const up = () => {
-                    window.removeEventListener('pointermove', move);
-                    window.removeEventListener('pointerup', up);
-                    if (!moved) onSelect(g.nodeIds);
-                  };
-                  window.addEventListener('pointermove', move);
-                  window.addEventListener('pointerup', up);
-                }}
-              >
-                {g.title}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </ViewportPortal>
+    <div className={`group-frame ${selected ? 'is-selected' : ''}`} style={group.color ? { background: `color-mix(in srgb, ${group.color} 10%, transparent)`, borderColor: `color-mix(in srgb, ${group.color} 55%, transparent)` } : undefined}>
+      <div className="group-head">
+        {editing ? (
+          <input
+            autoFocus
+            className="group-title nodrag"
+            defaultValue={group.title}
+            onBlur={(e) => { renameGroup(sessionId, group.id, e.target.value); setEditing(false); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+              if (e.key === 'Escape') setEditing(false);
+              e.stopPropagation();
+            }}
+          />
+        ) : (
+          <span className="group-title" title="Drag the group to move everything in it · double-click to rename" onDoubleClick={() => setEditing(true)}>
+            {group.title}
+          </span>
+        )}
+        <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
+        {palette ? (
+          <span className="group-palette nodrag">
+            {COLORS.map((c) => (
+              <button key={c ?? 'none'} type="button" className={`group-swatch ${c === group.color ? 'is-on' : ''} ${c ? '' : 'is-none'}`} aria-label={c ?? 'No color'} style={c ? { background: c } : undefined} onClick={() => { setGroupColor(sessionId, group.id, c); setPalette(false); }} />
+            ))}
+          </span>
+        ) : null}
+      </div>
+    </div>
   );
-}
+});
