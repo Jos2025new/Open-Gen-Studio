@@ -311,6 +311,13 @@ export function Composer() {
       toast(`Switched to ${modelSummary(want)?.name ?? 'the matching variant'} for ${imageCount ? 'the attached image' + (imageCount > 1 ? 's' : '') : 'text only'}.`, 'info');
     }
   }, [imageCount, mode, currentRef]);
+  // A text-only variant still takes images when its line has an image route: attaching switches to it (above).
+  const lineTwin = (() => {
+    if (acceptsImages || (mode !== 'image' && mode !== 'video') || !currentRef) return undefined;
+    const routes = lineRoutes(currentRef);
+    return mode === 'image' ? routes.edit ?? routes.reference ?? opModelFromRef(currentRef, 'image') ?? undefined : routes.image ?? routes.reference;
+  })();
+  const takesImages = acceptsImages || Boolean(lineTwin && lineTwin !== currentRef);
   const canSendAgent = !busy && (text.trim().length > 0 || liveAttachments.length > 0);
 
   const submit = () => {
@@ -348,7 +355,7 @@ export function Composer() {
     if (!files?.length) return;
     const list = [...files];
     const onlyAudio = list.every((f) => f.type.startsWith('audio/'));
-    if (!acceptsImages && !(takesAudio && onlyAudio)) {
+    if (!takesImages && !(takesAudio && onlyAudio)) {
       toast('The selected model does not take input images.', 'error');
       return;
     }
@@ -376,7 +383,7 @@ export function Composer() {
           const assetId = e.dataTransfer.getData('application/x-ogs-asset');
           if (assetId) {
             e.preventDefault();
-            if (!acceptsImages) toast('The selected model does not take input images.', 'error');
+            if (!takesImages) toast('The selected model does not take input images.', 'error');
             else addAssets([assetId]);
             return;
           }
@@ -390,8 +397,8 @@ export function Composer() {
           {/* Attachments live where + is: a small stack that opens into a row on hover. */}
           <AttachStack
             ids={liveAttachments}
-            label={acceptsImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
-            disabled={!acceptsImages && !takesAudio && mode !== 'model3d'}
+            label={takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
+            disabled={!takesImages && !takesAudio && mode !== 'model3d'}
             onAdd={() => fileRef.current?.click()}
           />
           <textarea
