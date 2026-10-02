@@ -4,6 +4,8 @@ import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
+import type { DesignDoc, StrokeStyle } from '../../engine/types';
+import { getDoc, mutateDoc } from '../../engine/design/actions';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -15,7 +17,7 @@ export function ContextField({ label, hint, children }: { label: ReactNode; hint
   </>;
 }
 
-export function ToolSettings() {
+export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
@@ -24,8 +26,17 @@ export function ToolSettings() {
   const shape = useStore((s) => s.ui.shape);
   const text = useStore((s) => s.ui.text);
   const paint = tool === 'brush' || tool === 'eraser';
+  const layer = doc.layers.find((l) => l.id === selectedCurve?.layerId && l.id === doc.activeLayerId);
+  const curve = layer?.type === 'vector' && layer.visible && !layer.locked ? layer.strokes?.find((s) => s.id === selectedCurve?.strokeId) : undefined;
+  const applyCurveStyle = (patch: Partial<StrokeStyle>) => {
+    if (!selectedCurve) return;
+    const current = getDoc(sessionId, doc.id);
+    const target = current?.layers.find((l) => l.id === selectedCurve.layerId && l.id === current.activeLayerId);
+    if (target?.type !== 'vector' || target.locked || !target.visible || !target.strokes?.some((s) => s.id === selectedCurve.strokeId)) return;
+    mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
+  };
   if (tool === 'hand') return null;
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><ContextField label={`Influence · ${influence}px`} hint="Double-click a Lineart stroke to edit its points; drag normally to move."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField></div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><ContextField label={`Influence · ${influence}px`} hint="Double-click a Lineart stroke to edit its points; drag normally to move."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField>{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <ContextField label={`Font · ${text.fontFamily}`}><select aria-label="Font" value={text.fontFamily} onChange={(e) => setUi({ text: { ...text, fontFamily: e.target.value } })}>{FONT_NAMES.map((name) => <option key={name}>{name}</option>)}</select></ContextField>
@@ -44,7 +55,7 @@ export function ToolSettings() {
           
         </> : tool === 'lineart' ? <>
           <ContextField label={lineartMode === 'draw' ? 'Mode · Draw' : 'Mode · Edit'}><select aria-label="Lineart mode" value={lineartMode} onChange={(e) => setUi({ lineartMode: e.target.value as 'draw' | 'edit' })}><option value="draw">Draw</option><option value="edit">Edit</option></select></ContextField>
-          {lineartMode === 'edit' ? <ContextField label={`Influence · ${influence}px`} hint="Distance along the stroke affected by dragging a point."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
+          {lineartMode === 'edit' ? <><ContextField label={`Influence · ${influence}px`} hint="Distance along the stroke affected by dragging a point."><input aria-label="Curve influence" type="range" min={1} max={500} value={influence} onChange={(e) => setUi({ lineartInfluence: +e.target.value })} /></ContextField>{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
         </> : paint ? <>
           <ContextField label={`Size · ${brush.size}px`}><input type="range" min={1} max={240} value={brush.size} onChange={(e) => setUi({ brush: { ...brush, size: +e.target.value } })} /></ContextField>
           {tool !== 'eraser' && <ContextField label="Color"><input type="color" value={brush.color} onChange={(e) => setUi({ brush: { ...brush, color: e.target.value } })} /></ContextField>}

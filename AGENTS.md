@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — orden superior y estilo de curva seleccionada (2026-10-02)
+- [x] New document antes del selector, ajustes entre documentos y salida. Compartir selección de curva entre Stage y ajustes mediante DesignerWorkspace; reutilizar StrokeStyleFields para modificar solo el trazo seleccionado con historial. Cerrar selección al cambiar documento; bloquear cambios en capas ocultas/bloqueadas. Sin pruebas por petición del usuario. Commit reversible. Los ajustes superiores de Edit afectan solo a la curva elegida; Properties conserva su alcance sobre toda la capa.
+
 ## Tarea — Edit y barra de herramientas (2026-10-02)
 - [x] Renombrar Move a Edit conservando id interno y sesiones; doble clic en Lineart activa puntos dentro de Edit, arrastre normal mueve, Influence arriba. Evitar edición en capas bloqueadas y clic vacío sale de puntos. Recuperar destino del portal superior desde DOM si su contexto pierde referencia. Sin pruebas por petición del usuario; commit reversible. No se reprodujo desaparición; recuperación de referencia aplicada como protección al montaje/recarga de módulos.
 

@@ -33,7 +33,9 @@ type Drag =
 const HANDLE = 8;
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
 
-export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
+
+export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: CurveSelection; setSelectedCurve: (value: CurveSelection) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -50,7 +52,6 @@ export function Stage({ sessionId, doc }: { sessionId: string; doc: DesignDoc })
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
   const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
-  const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
   // The stroke being drawn lives here until pointer up: one document change (and one undo step) per gesture.
   const [live, setLive] = useState<Stroke | null>(null);
   const shapeStyle = useStore((s) => s.ui.shape);

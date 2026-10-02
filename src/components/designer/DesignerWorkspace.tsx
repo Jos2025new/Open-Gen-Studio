@@ -31,6 +31,8 @@ export function DesignerWorkspace() {
   const presets = usePopover();
   const exportMenu = usePopover();
   const [zoom, setZoom] = useState(1);
+  const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
+  useEffect(() => { setSelectedCurve(null); }, [doc?.id, session.id]);
   const [busy, setBusy] = useState(false);
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
@@ -82,12 +84,12 @@ export function DesignerWorkspace() {
 
   return <div className="designer">
     <TopbarActions>
-      {doc && <select aria-label="Document" className="doc-select" value={doc.id} onChange={(e) => selectDoc(session.id, e.target.value)}>{session.docs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
-      {doc && <ToolSettings />}
       <IconButton ref={presets.ref} icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
+      {doc && <select aria-label="Document" className="doc-select" value={doc.id} onChange={(e) => selectDoc(session.id, e.target.value)}>{session.docs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
+      {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <>
         <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
         <Button ref={exportMenu.ref} icon={Download} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
@@ -111,7 +113,7 @@ export function DesignerWorkspace() {
         <span className="zoom-value num">{Math.round(zoom * 100)}%</span>
         <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
         <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
-      </ToolRail><Stage key={doc.id} sessionId={session.id} doc={doc} /><LayersPanel sessionId={session.id} doc={doc} /></> :
+      </ToolRail><Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} /><LayersPanel sessionId={session.id} doc={doc} /></> :
       <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></button>)}</div></div>}
   </div>;
 }
