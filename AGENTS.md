@@ -26,6 +26,10 @@ Origen: comparación con OpenMontage (`/home/samuel/Documentos/Projects/AI/My Ap
 Verificación del plan: typecheck y suite verdes (344 + 1 omitida). Sin LLM real ni banco: falta medir con `BENCH_ONLY=two-clips-named-model,change-model,story-3-clips` contra `bench/2026-10-01-3273c0a.json` (necesita la clave y presupuesto del usuario).
 Fuera (decidido): muestra obligatoria (ya: todos los clips con casillas), pipeline de 7 etapas con puertas, investigación web, puntuaciones de slideshow/variedad y de proveedores, decision log/checkpoints JSON, playbooks YAML, tablero Backlot, reserva de presupuesto.
 
+## Tarea — prueba piloto recomendada en planes largos (2026-10-01)
+Origen: `open-generation-studio/skills/director/SKILL.md` ("pilot first"), con el matiz del usuario.
+- [x] P1. Regla en `context.ts`: con 3+ clips, un plan caro o un modelo nuevo en la conversación, la tarjeta de preguntas ofrece como recomendada "un piloto primero": plan 1 = hoja del personaje o producto (reference_sheet sobre el adjunto, o paso de imagen desde texto) + solo el clip 1, con la hoja y la imagen adjunta juntas en sus refs (referencias→vídeo); plan 2 = el resto con las mismas refs. Alternativa: "todos ahora". Decide el usuario; un clip suelto nunca. Descartado por el usuario: fijar vestuario por escrito (la imagen manda salvo que diga lo contrario). Sin LLM real.
+
 ## Tarea — FLUX 3 Draft de NanoGPT para borradores, sin fal (2026-10-01)
 - [x] D1. NanoGPT sirve FLUX 3 como un modelo (`nanogpt::flux-3`) con `quality: full|draft`; Atlas no tiene draft; fal no se usa (decisión del usuario). Precio: `parseNanoVideoPrice` lee `full_per_second_by_mode_and_resolution` y `draft_per_second_by_mode` (0,06 $/s frente a 0,17 a 720p); `PriceSku.quality` y `EstimateContext.quality` (desde `settings.advanced.quality`).
 - [x] D2. Fila `draft` de `routing.ts`: H3 Max Turbo Atlas (0,038) → FLUX 3 Draft NanoGPT (0,06, `params: { quality: 'draft' }`, texto e imagen, 5–20 s) → H3 Max Turbo NanoGPT. `RouteEntry.params` se aplica al paso (los params del paso ganan). Un borrador de más de 15 s cae en FLUX 3 Draft.
