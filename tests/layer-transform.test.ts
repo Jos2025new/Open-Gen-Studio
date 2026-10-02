@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async (id: string) => id }));
-import { alignDelta, turnProblem, turnVector } from '../src/engine/design/transform';
+import { alignDelta, alignDeltas, distributeDeltas, turnProblem, turnVector } from '../src/engine/design/transform';
 import type { VectorLayer } from '../src/engine/types';
 
 const base = { id: 'v', name: 'V', visible: true, locked: false, opacity: 1, blend: 'normal' as const, type: 'vector' as const };
@@ -28,5 +28,25 @@ describe('Edit: align and transform a layer', () => {
     expect(turnProblem({ ...rectLayer(), locked: true }, 'flip-h')).toMatch(/locked/);
     expect(turnProblem({ ...rectLayer(), shapes: [{ ...rectLayer().shapes[0], type: 'path', d: 'M0 0L1 1' }] }, 'rotate-cw')).toMatch(/paths/);
     expect(turnProblem({ ...base, type: 'text' } as never, 'flip-h')).toMatch(/Text/);
+  });
+});
+
+const rect = (id: string, x: number, y: number, w: number, h: number): VectorLayer => ({ ...base, id, name: id, shapes: [{ id: `${id}s`, type: 'rect', x, y, w, h, fill: '#fff', stroke: null, strokeWidth: 0, radius: 0 }] });
+
+describe('Edit with several layers: relative to and distribute', () => {
+  const doc = { width: 1000, height: 1000 };
+  const a = rect('a', 100, 0, 50, 50), b = rect('b', 300, 0, 200, 200), c = rect('c', 800, 0, 20, 20);
+  it('aligns to the selection, the first or last picked, the biggest or the smallest', () => {
+    expect(alignDeltas(doc, [a, b, c], 'left', 'selection').get('b')).toEqual({ dx: -200, dy: 0 });
+    expect(alignDeltas(doc, [a, b, c], 'left', 'first').has('a')).toBe(false);
+    expect(alignDeltas(doc, [a, b, c], 'left', 'last').get('a')).toEqual({ dx: 700, dy: 0 });
+    expect(alignDeltas(doc, [a, b, c], 'bottom', 'biggest').get('a')).toEqual({ dx: 0, dy: 150 });
+    expect(alignDeltas(doc, [a, b, c], 'right', 'smallest').get('b')).toEqual({ dx: 320, dy: 0 });
+    expect(alignDeltas(doc, [a, b, c], 'right', 'page').get('c')).toEqual({ dx: 180, dy: 0 });
+  });
+  it('spaces 3+ layers evenly, the outer two staying', () => {
+    const d = distributeDeltas([a, b, c], 'h');
+    expect(d.has('a') || d.has('c')).toBe(false);
+    expect(d.get('b')).toEqual({ dx: 75, dy: 0 }); // span 100..820, used 270 → gaps of 225: b starts at 375
   });
 });

@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ChevronDown, FlipHorizontal2, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
-import { alignLayer, fitLayer, turnLayer, turnProblem, type AlignTo, type Turn } from '../../engine/design/transform';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, FlipHorizontal2, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
+import { layerSelection, useLayerSelection } from '../../engine/design/selection';
+import { useState } from 'react';
 import { MenuItem } from '../ui/primitives';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
@@ -60,29 +62,55 @@ const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof FlipHorizontal2 
   { id: 'rotate-180', label: 'Rotate 180°', icon: RefreshCw },
 ];
 
-/** Edit tool: Align (to the page; fit or fill for images) and Transform (flip, quarter turns) for the active layer. */
+const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
+  { value: 'page', label: 'Page' },
+  { value: 'selection', label: 'Selection' },
+  { value: 'first', label: 'First selected' },
+  { value: 'last', label: 'Last selected' },
+  { value: 'biggest', label: 'Biggest' },
+  { value: 'smallest', label: 'Smallest' },
+];
+
+/**
+ * Edit tool: Align (to the page, or with several layers picked relative to the selection, the first or last picked,
+ * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
+ * picked layer about its own center).
+ */
 function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const align = usePopover();
   const turn = usePopover();
-  const layer = doc.layers.find((l) => l.id === doc.activeLayerId);
-  if (!layer) return null;
+  const [rel, setRel] = useState<RelativeTo>('selection');
+  useLayerSelection((st) => st.byDoc[doc.id]);
+  const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
+  if (!layers.length) return null;
+  const many = layers.length > 1;
+  const one = layers[0];
+  const locked = layers.some((l) => l.locked);
   return <>
-    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={layer.locked}><AlignCenterVertical size={13} />Align<ChevronDown size={12} /></button>
-    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={220} label="Align to the page">
+    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked}><AlignCenterVertical size={13} />Align{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
+    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
-        <div className="menu-sep-label">To the page</div>
-        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => alignLayer(sessionId, doc.id, layer.id, a.id)} />)}
-        {layer.type === 'raster' ? <>
+        {many ? (
+          <label className="menu-field"><span>Relative to</span><select value={rel} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
+        ) : <div className="menu-sep-label">To the page</div>}
+        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => alignLayers(sessionId, doc.id, ids, a.id, many ? rel : 'page')} />)}
+        {layers.length >= 3 ? <>
+          <div className="menu-sep-label">Distribute</div>
+          <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" onClick={() => distributeLayers(sessionId, doc.id, ids, 'h')} />
+          <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" onClick={() => distributeLayers(sessionId, doc.id, ids, 'v')} />
+        </> : null}
+        {!many && one.type === 'raster' ? <>
           <div className="menu-sep-label">Size</div>
-          <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, layer.id, 'contain'); align.close(); }} />
-          <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, layer.id, 'cover'); align.close(); }} />
+          <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
+          <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
         </> : null}
       </div>
     </Popover>
-    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={layer.locked}><FlipHorizontal2 size={13} />Transform<ChevronDown size={12} /></button>
+    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked}><FlipHorizontal2 size={13} />Transform{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
-        {TURN_ITEMS.map((t) => { const why = turnProblem(layer, t.id); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(why)} tip={why ?? undefined} onClick={() => turnLayer(sessionId, doc.id, layer.id, t.id)} />; })}
+        {TURN_ITEMS.map((t) => { const why = layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(why)} tip={why ?? undefined} onClick={() => turnLayers(sessionId, doc.id, ids, t.id)} />; })}
       </div>
     </Popover>
   </>;

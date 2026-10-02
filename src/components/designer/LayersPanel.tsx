@@ -7,6 +7,7 @@ import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
+import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { Button, Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -67,6 +68,9 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
+  // Several layers picked with Ctrl/Shift-click (Edit's Align and Transform act on all of them).
+  useLayerSelection((st) => st.byDoc[doc.id]);
+  const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.
   const rows = useRef<Array<HTMLDivElement | null>>([]);
   const [drag, setDrag] = useState<{ id: string; from: number; y: number; active: boolean; slot: number; locked?: boolean } | null>(null);
@@ -111,7 +115,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     </div>
     <div className="layer-list">
       {[...doc.layers].reverse().map((l, d) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} ref={(el) => { rows.current[d] = el; }}
-        className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
+        className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${picked.length > 1 && picked.includes(l.id) ? 'is-picked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
         onPointerDown={(e) => { if (e.button !== 0 || (e.target as HTMLElement).closest('input, .layer-toggle')) return; setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d, locked: l.locked }); }}
         onPointerMove={(e) => {
           if (!drag || drag.id !== l.id) return;
@@ -124,7 +128,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
         }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
-        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={() => { if (drag?.active) return; setActiveLayer(sessionId, doc.id, l.id); pop.close(); }}>
+        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={(e) => { if (drag?.active) return; pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey || e.shiftKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close(); }} title="Ctrl or Shift-click to select several">
           <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /></span>
           <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
         </button>
