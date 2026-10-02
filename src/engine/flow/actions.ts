@@ -4,7 +4,7 @@ import { mentionSubjects } from '../params';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
 import { isAutoOption, matchInputOption, nearestAspect, paramByRole, routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
-import { graphEditProblem, lockedNodes, lockNodes, lockAssets } from './locks';
+import { graphEditProblem, lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { uid } from '../../lib/id';
 import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
@@ -260,7 +260,9 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
-    if (lockedNodes(sessionId).has(id) || (runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status))) errors.push(`“${n.data.title}” is already running.`);
+    // A node this run writes must be free; an input only needs not to be generating (other runs may read it too).
+    const busyGen = runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status);
+    if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) errors.push(`“${n.data.title}” is already running.`);
     if (n.data.kind === 'tool' && n.data.op === 'video_upscale') {
       const ref = typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : opModelFor('video_upscale').ref;
       if (!st.catalog.models[ref] || !isVideoUpscaler(st.catalog.models[ref]) || !isConnected(st.catalog.models[ref].provider)) errors.push(`“${n.data.title}”: choose an available dedicated video upscaler.`);
@@ -330,7 +332,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   const problem = budgetProblem(preview.estimate);
   if (problem) { toast(problem, 'error'); return null; }
   if (!preview.count) return { outputs: new Map(), failed: [], skipped: [] };
-  const release = lockNodes(sessionId, preview.inputIds);
+  const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   const assetIds = preview.inputIds.flatMap(id => {
     const st = get(), n = st.sessions[sessionId].graph.nodes.find(n => n.id === id)!;
     const asset = nodeOutputAsset(n, st.generations);

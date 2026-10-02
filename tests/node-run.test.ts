@@ -103,6 +103,14 @@ describe('node Run freshness', () => {
     copy.edges.pop(); expect(graphEditProblem('test',graph,copy)).toBeNull();
     copy.edges.shift(); expect(graphEditProblem('test',graph,copy)).toContain('in use'); release();
   });
+  it('two runs may read the same input; a node being generated is neither run nor read by another', () => {
+    const a = lockNodes('share', ['n1'], ['n1', 'src']);
+    const b = lockNodes('share', ['n1copy'], ['n1copy', 'src']); // the duplicate reads the same source
+    expect(() => lockNodes('share', ['src'])).toThrow('already running'); // writing a node others read
+    expect(() => lockNodes('share', ['after'], ['after', 'n1'])).toThrow('already running'); // reading a node being written
+    a(); b();
+    expect(() => lockNodes('share', ['src'])()).not.toThrow();
+  });
   it('previews include ancestors and revalidate inputs and prices before spending', async () => {
     const st = useStore.getState(), sid = st.activeSessionId;
     (graph.nodes[0].data as any).prompt = 'new';

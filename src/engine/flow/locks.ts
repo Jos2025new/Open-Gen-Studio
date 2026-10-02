@@ -1,14 +1,27 @@
 import type { Graph } from '../types';
-const locks = new Map<string, Set<string>[]>();
+
+/*
+ * A node run holds the nodes it writes (the nodes it runs) and the nodes it reads (their inputs, up the graph).
+ * Writing is exclusive; reading is shared: two runs may read the same input (a node and its duplicate share their
+ * sources), but a node being written is never written or read by another run. Editing any held node waits.
+ */
+interface Held { writes: Set<string>; reads: Set<string> }
+const locks = new Map<string, Held[]>();
+
+/** Every node a run holds (read or written): these cannot be edited until it ends. */
 export function lockedNodes(sessionId: string): Set<string> {
-  return new Set((locks.get(sessionId) ?? []).flatMap(s => [...s]));
+  return new Set((locks.get(sessionId) ?? []).flatMap(h => [...h.writes, ...h.reads]));
 }
-export function lockNodes(sessionId: string, ids: string[]): () => void {
-  const held = lockedNodes(sessionId);
-  if (ids.some(id => held.has(id))) throw new Error('These nodes or their inputs are already running.');
-  const set = new Set(ids);
-  locks.set(sessionId, [...(locks.get(sessionId) ?? []), set]);
-  return () => { locks.set(sessionId, (locks.get(sessionId) ?? []).filter(s => s !== set)); };
+/** Nodes some run is writing (generating now). */
+export function writingNodes(sessionId: string): Set<string> {
+  return new Set((locks.get(sessionId) ?? []).flatMap(h => [...h.writes]));
+}
+export function lockNodes(sessionId: string, writes: string[], reads: string[] = writes): () => void {
+  const all = lockedNodes(sessionId), writing = writingNodes(sessionId);
+  if (writes.some(id => all.has(id)) || reads.some(id => writing.has(id))) throw new Error('These nodes or their inputs are already running.');
+  const held: Held = { writes: new Set(writes), reads: new Set(reads.filter(id => !writes.includes(id))) };
+  locks.set(sessionId, [...(locks.get(sessionId) ?? []), held]);
+  return () => { locks.set(sessionId, (locks.get(sessionId) ?? []).filter(h => h !== held)); };
 }
 export function graphEditProblem(sessionId: string, before: Graph, after: Graph): string | null {
   const held = lockedNodes(sessionId);

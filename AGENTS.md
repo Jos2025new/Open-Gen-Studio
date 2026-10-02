@@ -35,6 +35,7 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 
 ## Tarea — duplicar con conexiones y conexiones visibles (2026-10-02)
 - [x] N1. Duplicate: copia parámetros y prompt, título "(copy)", sin resultado propio (la generación del original, en curso o terminada, se queda con él; sin sketch, salida 1) y con las conexiones: todas las entradas, y las salidas hacia puertos de varias entradas (un puerto de una sola entrada conserva su origen). *Dónde:* `flow/actions.ts` (`duplicateNode`). Test en `chat-to-nodes`.
+- [x] N3. (usuario) La copia no podía generarse mientras el original generaba: el bloqueo de una ejecución abarcaba el nodo y todas sus entradas, y la copia comparte entradas. Bloqueos separados (`flow/locks.ts`): escritura (nodos que corre) exclusiva, lectura (sus entradas) compartida; choca solo correr un nodo retenido por otra ejecución o leer uno que se está generando. Editar un nodo retenido sigue esperando. Test en `node-run`.
 - [x] N2. Conexiones más visibles (gris #8e8e98, 1,6 px; al pasar el ratón más claras) y la seleccionada en lima (2,6 px); las que alimentan un nodo en curso, en lima. *Dónde:* `node.css`. Sin navegador.
 
 ## Tarea — importar del Chat: cerrar el aviso y acceso fijo (2026-10-02)
