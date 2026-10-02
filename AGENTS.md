@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — ordenar apartados de Spending (2026-10-02)
+- [x] Ordenar tipo, proveedor, modelo, sesión y cargos mediante iconos de fecha, nombre e importe, con dirección reversible. Añadir al resumen la fecha del último cargo por grupo; no modificar importes ni datos guardados. Ordenar antes de recortar y conservar la escala de las barras. Cabeceras adaptables al panel estrecho. Cambios en SpendingPanel, spending.ts y shell.css; sin pruebas por instrucción del usuario. Commit reversible. Models/Sessions conservan su orden al cambiar pestaña o periodo; Charges ordena los últimos 30 cargos disponibles, tal como indica su título.
+
 ## Tarea — Spending más legible (2026-10-02)
 - [x] S1. Reorganizar solo `SpendingPanel.tsx` y su CSS: resumen por tipo/proveedor, detalle Models/Sessions/Charges y cinco mayores gastos ampliables; facilitar lectura sin cambiar cálculos ni persistencia.
 - [x] S2. Aclarar límite desde Reset frente al periodo, identificar sesiones eliminadas por id y presentar cargos en tabla con precisión monetaria local. Conservar tipografía, tarjetas y espaciado existentes; barras neutras para reservar lima al presupuesto (energía 1, ritmo 2, movimiento 1).

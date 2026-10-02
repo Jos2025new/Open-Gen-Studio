@@ -77,6 +77,12 @@
 .spend-tile .num { font-size: 16px; font-weight: 600; }
 .spend-overview { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 20px; align-items: start; }
 .spend-group { min-width: 0; }
+.spend-group-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.spend-group .spend-group-head h4 { margin: 0; }
+.spend-sort { display: flex; gap: 2px; }
+.spend-sort button { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 28px; min-height: 28px; padding: 4px; border-radius: var(--radius-s); color: var(--text-2); }
+.spend-sort button:hover { background: var(--surface-3); }
+.spend-sort button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); }
 .spending .spend-group .bar > span { background: var(--text-3); }
 .spend-more { margin-top: 10px; }
 .spend-table-wrap { max-width: 100%; overflow-x: auto; }

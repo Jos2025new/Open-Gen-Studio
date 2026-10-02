@@ -27,6 +27,7 @@ export interface SpendRow {
   key: string;
   usd: number;
   count: number;
+  lastAt: number;
   /** Some of the amount comes from published prices, not from the provider's bill. */
   estimated: boolean;
 }
@@ -48,7 +49,8 @@ function group(entries: SpendEntry[], key: (e: SpendEntry) => string): SpendRow[
   const rows = new Map<string, SpendRow>();
   for (const e of entries) {
     const k = key(e);
-    const r = rows.get(k) ?? { key: k, usd: 0, count: 0, estimated: false };
+    const r = rows.get(k) ?? { key: k, usd: 0, count: 0, lastAt: 0, estimated: false };
+    r.lastAt = Math.max(r.lastAt, e.at);
     r.usd += e.usd;
     r.count += 1;
     r.estimated ||= e.estimated;

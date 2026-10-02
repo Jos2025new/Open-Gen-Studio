@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Maximize2, Minimize2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, DollarSign, ArrowDownAZ, Maximize2, Minimize2, X } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
 import { CATEGORY_LABELS, periodStart, summarizeSpend, type SpendPeriod, type SpendRow } from '../../engine/spending';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -16,6 +16,20 @@ const PERIODS: Array<{ value: SpendPeriod; label: string }> = [
   { value: 'all', label: 'All' },
 ];
 
+type Sort = { by: 'date' | 'name' | 'amount'; asc: boolean };
+
+function SortControls({ value, onChange, grouped = false }: { value: Sort; onChange: (sort: Sort) => void; grouped?: boolean }) {
+  return <div className="spend-sort" role="group" aria-label="Sort order">
+    {([{ by: 'date', icon: Calendar, label: grouped ? 'Latest charge date' : 'Date' }, { by: 'name', icon: ArrowDownAZ, label: 'Name' }, { by: 'amount', icon: DollarSign, label: 'Amount (USD)' }] as const).map(({ by, icon: Icon, label }) => {
+      const active = value.by === by;
+      const description = `${label}${active ? ` · ${value.asc ? 'ascending' : 'descending'} · click to reverse` : ''}`;
+      return <button key={by} type="button" title={description} aria-label={description} aria-pressed={active} onClick={() => onChange({ by, asc: active ? !value.asc : by === 'name' })}>
+        <Icon size={14} />{active && (value.asc ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+      </button>;
+    })}
+  </div>;
+}
+
 /** Where the money goes: agent calls and paid generations, from the spend log. */
 export function SpendingPanel() {
   const log = useStore((s) => s.spendLog);
@@ -27,6 +41,7 @@ export function SpendingPanel() {
   const expanded = useStore((s) => s.ui.panelExpanded);
   const [period, setPeriod] = usePref<SpendPeriod>('ogs:spending-period', '7d');
   const [detail, setDetail] = useState<'models' | 'sessions' | 'charges'>('models');
+  const [chargeSort, setChargeSort] = useState<Sort>({ by: 'date', asc: false });
   const sum = useMemo(() => summarizeSpend(log, periodStart(period)), [log, period]);
 
   const providerName = (p: string) => PROVIDER_LABELS[p as keyof typeof PROVIDER_LABELS] ?? LLM_LABELS[p as keyof typeof LLM_LABELS] ?? p;
@@ -90,15 +105,15 @@ export function SpendingPanel() {
             <Group title="By provider" rows={sum.byProvider} name={providerName} />
           </div>
           <Segmented value={detail} options={[{ value: 'models', label: 'Models' }, { value: 'sessions', label: 'Sessions' }, { value: 'charges', label: 'Charges' }]} onChange={setDetail} size="sm" />
-          {detail === 'models' && <Group key={`models-${period}`} title="Highest spending by model" rows={sum.byModel} name={modelName} limit={5} />}
-          {detail === 'sessions' && <Group key={`sessions-${period}`} title="Highest spending by session" rows={sum.bySession} name={(id) => sessions[id]?.title ?? `Deleted session · ${id.slice(-8)}`} limit={5} />}
+          <div hidden={detail !== 'models'}><Group title="By model" rows={sum.byModel} name={modelName} limit={5} /></div>
+          <div hidden={detail !== 'sessions'}><Group title="By session" rows={sum.bySession} name={(id) => sessions[id]?.title ?? `Deleted session · ${id.slice(-8)}`} limit={5} /></div>
           {detail === 'charges' && <section className="spend-group">
-              <h4>Latest {sum.recent.length} charges</h4>
+              <div className="spend-group-head"><h4>Latest {sum.recent.length} charges</h4><SortControls value={chargeSort} onChange={setChargeSort} /></div>
               <div className="spend-table-wrap" tabIndex={0} role="region" aria-label="Latest charges">
               <table className="spend-table">
                 <thead><tr><th scope="col">Date</th><th scope="col">Model</th><th scope="col">Type</th><th scope="col">Amount</th></tr></thead>
                 <tbody>
-                {sum.recent.map((e, i) => (
+                {[...sum.recent].sort((a, b) => (chargeSort.asc ? 1 : -1) * (chargeSort.by === 'date' ? a.at - b.at : chargeSort.by === 'amount' ? a.usd - b.usd : modelName(a.model).localeCompare(modelName(b.model), undefined, { numeric: true, sensitivity: 'base' }))).map((e, i) => (
                   <tr key={`${e.at}-${i}`}>
                     <td className="faint num">{new Date(e.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
                     <td>{modelName(e.model)}</td>
@@ -137,12 +152,14 @@ function Tile({ label, usd, note }: { label: string; usd: number; note?: string 
 
 function Group({ title, rows, name, limit = Infinity }: { title: string; rows: SpendRow[]; name: (key: string) => string; limit?: number }) {
   const [showAll, setShowAll] = useState(false);
+  const [sort, setSort] = useState<Sort>({ by: 'amount', asc: false });
+  const sorted = [...rows].sort((a, b) => (sort.asc ? 1 : -1) * (sort.by === 'date' ? a.lastAt - b.lastAt : sort.by === 'amount' ? a.usd - b.usd : name(a.key).localeCompare(name(b.key), undefined, { numeric: true, sensitivity: 'base' })));
   const max = rows[0]?.usd || 1;
   return (
     <section className="spend-group">
-      <h4>{title}</h4>
+      <div className="spend-group-head"><h4>{title}</h4><SortControls value={sort} onChange={setSort} grouped /></div>
       <ul>
-        {rows.slice(0, showAll ? rows.length : limit).map((r) => (
+        {sorted.slice(0, showAll ? rows.length : limit).map((r) => (
           <li key={r.key}>
             <span className="spend-what" title={`${name(r.key)} · ${r.key}`}>
               {name(r.key)} <span className="faint num">×{r.count}</span>
@@ -154,7 +171,7 @@ function Group({ title, rows, name, limit = Infinity }: { title: string; rows: S
           </li>
         ))}
       </ul>
-      {rows.length > limit ? <button type="button" className="link-btn spend-more" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>{showAll ? 'Show top 5' : `View all (${rows.length})`}</button> : null}
+      {rows.length > limit ? <button type="button" className="link-btn spend-more" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>{showAll ? `Show first ${limit}` : `View all (${rows.length})`}</button> : null}
     </section>
   );
 }
