@@ -15,3 +15,4 @@
 @media (max-width: 767px) { .tool-rail .zoom-value { width: auto; }.tool-settings { max-width: 55vw; } }
 .topbar-slot .designer-new-document { order: -2; }
 .topbar-slot .designer-import-chat { order: -1; }
+.topbar-slot > .tool-settings { order: -3; }

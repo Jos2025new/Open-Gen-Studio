@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
-import { Download, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, selectDoc, undoDoc } from '../../engine/design/actions';
@@ -93,7 +93,7 @@ export function DesignerWorkspace() {
       {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <>
         <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
-        <Button ref={exportMenu.ref} icon={Download} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
+        <Button ref={exportMenu.ref} icon={ArrowUpFromLine} size="sm" disabled={busy} onClick={exportMenu.toggle}>Export</Button>
         <Popover open={exportMenu.open} anchor={exportMenu.ref} onClose={exportMenu.close} label="Export format">
           {EXPORT_FORMATS.map((f) => <MenuItem key={f.id} label={f.label} detail={f.detail} onClick={() => { exportMenu.close(); void output(false, f.id); }} />)}
         </Popover>

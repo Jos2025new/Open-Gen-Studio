@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — ajustes primero e icono Export (2026-10-02)
+- [x] Ajustes contextuales antes de New document, seguido de Import from Chat y lienzos; Export con flecha arriba. Solo orden visual e icono, sin modificar acciones. Sin pruebas por petición del usuario; commit reversible.
+
 ## Tarea — confirmar Gallery y adelantar importación (2026-10-02)
 - [x] Confirmación antes de Save to gallery; cancelar no guarda. Orden explícito New document → Import from Chat → lienzos solo en Designer; conservar diálogo y aviso existentes. Cambios puntuales, sin pruebas por petición del usuario; commit reversible.
 
