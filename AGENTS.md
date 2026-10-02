@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — miniaturas flotantes (2026-10-02)
+- [x] Quitar fondo, borde, sombra y padding exterior solo del panel de miniaturas; mantener botón sólido y tarjetas visibles. Sin pruebas por petición del usuario.
+
 ## Tarea — ancho y margen del selector de lienzos (2026-10-02)
 - [x] Igualar botón y panel a 190 px; reducir padding de lista a 3 px y tarjetas a 4 px. Solo presentación; sin pruebas por petición del usuario.
 

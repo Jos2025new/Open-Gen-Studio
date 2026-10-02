@@ -30,7 +30,7 @@ export function DocumentPicker({ sessionId, docs, active }: { sessionId: string;
   const pop = usePopover();
   return <div className="document-picker">
     <button type="button" ref={pop.ref} className="document-picker-toggle" aria-label="Choose canvas" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}><span>{active.name}</span><ChevronDown size={14} /></button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} label="Canvases">
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} className="document-picker-popover" label="Canvases">
       <div className="document-thumbnails">
         {docs.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => { selectDoc(sessionId, doc.id); pop.close(); }}>
           <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>
