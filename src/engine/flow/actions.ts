@@ -91,7 +91,8 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
 }
 
 /** Add a node to the right of `fromId`, wired to its first input that accepts the source's output. */
-export function addConnected(sessionId: string, fromId: string, data: GraphNodeData): string | null {
+/** `at`: where to put it (a connection dropped on empty canvas); otherwise to the right of the source, below its other children. */
+export function addConnected(sessionId: string, fromId: string, data: GraphNodeData, at?: { x: number; y: number }): string | null {
   const st = get();
   const graph = st.sessions[sessionId].graph;
   const from = graph.nodes.find((n) => n.id === fromId);
@@ -109,7 +110,7 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   // Stack below the nodes this one already feeds, so new cards never land on top of them.
   const children = graph.edges.filter((e) => e.source === fromId).map((e) => graph.nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => Boolean(n));
   const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
-  const id = addNode(sessionId, data, { x: from.position.x + NODE_WIDTH + 100, y });
+  const id = addNode(sessionId, data, at ?? { x: from.position.x + NODE_WIDTH + 100, y });
   if (port) tryConnect(sessionId, { source: fromId, target: id, targetHandle: port.id });
   return id;
 }

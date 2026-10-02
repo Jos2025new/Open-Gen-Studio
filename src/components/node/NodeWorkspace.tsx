@@ -13,7 +13,7 @@ import {
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Upload } from 'lucide-react';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
-import { addAssetAsNode, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
+import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -314,7 +314,7 @@ function Canvas() {
 
   // Right-click menu, anchored to an invisible point at the cursor.
   const menuAnchor = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string; from?: string } | null>(null);
   const openMenu = (e: React.MouseEvent | MouseEvent, nodeId?: string) => {
     e.preventDefault();
     const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
@@ -365,6 +365,13 @@ function Canvas() {
           openMenu(e, n.id);
         }}
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null })}
+        onConnectEnd={(e, state) => {
+          // Dropped on empty canvas from an output: offer the nodes that take it, at the drop point.
+          if (state.isValid || state.toNode || state.fromHandle?.type !== 'source' || !state.fromNode) return;
+          const p = 'changedTouches' in e ? e.changedTouches[0] : e;
+          const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+          setMenu({ x: p.clientX - (r?.left ?? 0), y: p.clientY - (r?.top ?? 0), from: state.fromNode.id });
+        }}
         isValidConnection={isValidConnection}
         colorMode="dark"
         fitView
@@ -394,6 +401,7 @@ function Canvas() {
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
+        {menu?.from ? <div className="menu-sep-label">Add node</div> : null}
         {menuNode ? (
           <div className="menu">
             <MenuItem icon={Copy} label="Duplicate" onClick={() => (duplicateNode(sessionId, menuNode), setMenu(null))} />
@@ -411,17 +419,20 @@ function Canvas() {
           </div>
         ) : menu ? (
           <>
-          <div className="menu"><MenuItem icon={Upload} label="Import images" onClick={() => {
+          {menu.from ? null : <div className="menu"><MenuItem icon={Upload} label="Import images" onClick={() => {
             const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
             importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
             fileInput.current?.click();
             setMenu(null);
-          }} /></div>
+          }} /></div>}
           <AddNodeItems
+            accepts={menu.from ? outputPort(graph.nodes.find((n) => n.id === menu.from)!.data, assets) : undefined}
             onPick={(data) => {
               const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
-              setSelected(new Set([addNode(sessionId, data, pos)]));
+              // From a dropped connection: the new node lands there, wired to the port that takes the source.
+              const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }) : addNode(sessionId, data, pos);
+              if (id) setSelected(new Set([id]));
               setMenu(null);
             }}
             onAsset={() => {
