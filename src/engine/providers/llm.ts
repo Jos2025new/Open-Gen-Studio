@@ -165,6 +165,9 @@ export function limitedLlmFallback(models: LlmModel[]): LlmModel | undefined {
   return cheapest(models.filter((m) => m.tools && m.vision === undefined)) ?? cheapest(models.filter((m) => m.tools && m.vision === false));
 }
 
+/** Silence after which an agent call counts as stalled (no headers yet, or no chunk while streaming). */
+export const STALL_MS = 120_000;
+
 /** Stream a chat completion, reporting text deltas. */
 export async function chat(opts: {
   provider: LlmProviderId;
@@ -195,6 +198,32 @@ export async function chat(opts: {
   if (opts.provider !== 'openrouter') body.stream_options = { include_usage: true };
   const reasoning = reasoningBody(opts.provider, opts.effort, opts.showReasoning === true);
 
+  // A provider that goes silent (no headers, or no chunk mid-stream) would hang the turn forever: after STALL_MS of
+  // silence the call ends as a network error, which the agent offers to Retry.
+  const watch = new AbortController();
+  let stalled = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const arm = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      watch.abort();
+    }, STALL_MS);
+  };
+  const onAbort = () => watch.abort();
+  opts.signal.addEventListener('abort', onAbort);
+  arm();
+  try {
+    return await stream();
+  } catch (err) {
+    if (stalled && !opts.signal.aborted) throw new NetworkError(`no response for ${STALL_MS / 1000} s (the provider stalled)`);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+    opts.signal.removeEventListener('abort', onAbort);
+  }
+
+  async function stream(): Promise<ChatResult> {
   const t0 = Date.now();
   const send = async (withReasoning: boolean): Promise<Response> => {
     try {
@@ -202,7 +231,7 @@ export async function chat(opts: {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers(opts.provider, opts.apiKey) },
         body: JSON.stringify(withReasoning ? { ...body, ...reasoning } : body),
-        signal: opts.signal,
+        signal: watch.signal,
       });
     } catch (err) {
       if (isAbort(err)) throw new AbortedError();
@@ -238,7 +267,8 @@ export async function chat(opts: {
   let finishReason: string | null = null;
   let usage: ChatResult['usage'];
   const calls = new Map<number, { id: string; name: string; arguments: string }>();
-  for await (const payload of readSse(res.body, opts.signal)) {
+  for await (const payload of readSse(res.body, watch.signal)) {
+    arm();
     if (payload === '[DONE]') break;
     let chunk: Loose;
     try {
@@ -296,4 +326,5 @@ export async function chat(opts: {
     .map(([i, c]) => ({ ...c, id: c.id || `call_${Date.now().toString(36)}_${i}` }))
     .filter((c) => c.name);
   return { text, toolCalls, finishReason, usage, timing: { ttfbMs, reasoningMs, outputMs, toolMs, totalMs: Date.now() - t0 } };
+  }
 }

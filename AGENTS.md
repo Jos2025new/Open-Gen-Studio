@@ -33,6 +33,10 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — el agente se quedaba esperando para siempre (2026-10-02)
+Origen (sesión real, deepseek v4.1 flash · NanoGPT): 2+ min en "Working" sin un solo byte del proveedor (lo normal: 5–10 s); la llamada al LLM no tenía límite de espera, así que el turno no terminaba nunca.
+- [x] W1. Vigilante de silencio en `chat()` (`providers/llm.ts`, `STALL_MS` = 120 s): sin cabeceras o sin fragmento durante 120 s, la llamada acaba como error de red ("no response for 120 s") y sale el aviso con Retry que ya existía. Cada fragmento rearma el reloj; Stop del usuario sigue siendo "Stopped.". Límite: un modelo que piensa >120 s con el razonamiento oculto (sin fragmentos) se cortaría. Test en `agent-retry`.
+
 ## Tarea — el agente respondió sin plan y parecía congelado (2026-10-02)
 Origen (sesión real, Grok 4.7, Auto): a "crea una chica 3D tipo Overwatch" respondió una frase; la propuesta y "¿la genero?" quedaron en su razonamiento. Sin plan ni tarjeta, el turno acababa sin nada. Decidido (usuario): que el agente lo sepa por el prompt (sin llamada extra de empujón) y una pista visible solo si falla.
 - [x] P1. MUST en el prompt: una petición de crear, editar o animar termina con `propose_plan` (Auto) o `ask_questions`; el texto solo es para preguntas reales; el usuario no ve el razonamiento. *Dónde:* `agent/context.ts`.

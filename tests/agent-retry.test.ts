@@ -92,3 +92,19 @@ describe('a request answered without a plan (auto)', () => {
     expect((await run('guided', 'Crea una chica 3D tipo overwatch')).type).toBe('assistant');
   });
 });
+
+describe('a provider that goes silent', () => {
+  it('ends the call after the stall time with Retry instead of hanging', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', (_u: string, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))));
+    const sid = useStore.getState().activeSessionId;
+    const turn = sendAgentMessage('hola');
+    await vi.advanceTimersByTimeAsync(120_000);
+    await turn;
+    vi.useRealTimers();
+    const note = useStore.getState().sessions[sid].feed.at(-1) as NoticeFeedItem;
+    expect(note.text).toMatch(/no response for 120 s/);
+    expect(note.retry).toBeDefined();
+    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
+  });
+});
