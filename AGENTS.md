@@ -33,6 +33,11 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] V3. Orden fijo de las refs: lugar o escenario → personajes → objetos/productos → estilo, cada una citada con su papel. *Dónde:* `agent/context.ts`.
 - [x] V4. Sin nombres propios en los prompts: rol + descriptor corto o la sintaxis de referencia del modelo (los nombres dentro de un diálogo sí). En modelos sin imagen del sujeto, `@Nombre` pasa a su descripción en la primera mención y a "the <primer rasgo>" en las siguientes (antes: "Nombre (descripción)" y luego "Nombre"); sin descripción se queda el nombre. *Dónde:* `agent/context.ts`, `params.ts` (`describeMentions`), test en `clip-chain`.
 
+## Tarea — elegir entre varios resultados (2026-10-02)
+Origen (usuario, 4 hojas candidatas): no sabía cómo decirle al agente cuál quería.
+- [x] N1. Con varios resultados, cada uno lleva su número arriba a la izquierda (1, 2…; en lima el seleccionado). *Dónde:* `GenerationCard.tsx`, `chat.css`.
+- [x] N2. El agente recibe los resultados numerados igual ("s1 → #1 asset:…, #2 asset:…") y la regla: "la 2" = #2; una imagen adjuntada es la elección del usuario; si el paso siguiente depende de una elección no hecha, preguntar en la tarjeta. *Dónde:* `runtime.ts` (notas del plan), `context.ts`. Ya existía: clip "Attach to prompt" bajo la tarjeta adjunta el resultado seleccionado. Sin navegador.
+
 ## Tarea — huecos en tarjetas de varios resultados anchos (2026-10-02)
 - [x] T1. (usuario, captura: 4 resultados 3:2 en curso, uno por fila con media tarjeta vacía) Con varios resultados, cada uno ocupa como mucho la mitad del ancho (`chat.css`): los anchos van de dos en dos y la altura sigue su proporción. Sin navegador.
 

@@ -196,6 +196,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
               onKeyDown={(e) => e.key === 'Enter' && openLightbox(i)}
             >
               <AssetMedia assetId={id} controls={g.kind === 'audio'} autoPlay={false} />
+              {outputs.length > 1 ? <span className="tile-num">{i + 1}</span> : null}
               <button
                 type="button"
                 className="tile-expand"

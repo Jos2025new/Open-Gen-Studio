@@ -704,7 +704,7 @@ async function runPlanItem(
       // O3: what came back different from what was asked, for the closing message.
       const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
       const delivery = genId ? get().generations[genId]?.delivery : undefined;
-      if (out.assetIds.length) return `${st.id} → ${out.assetIds.map((a) => `asset:${a}`).join(', ')}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
+      if (out.assetIds.length) return `${st.id} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
       return `${st.id} done`;
     })

@@ -75,6 +75,9 @@
 /* Several results: same rule as one (own shape, no bars), a lower shared height, wrapping with a small gap. */
 .tiles.is-single.is-multi { --tile-h: min(260px, 40vh); flex-wrap: wrap; gap: 5px; }
 .tiles.is-single.is-multi .tile.is-selected { outline-offset: -2px; }
+/* Number of each result (1, 2…), as the agent knows them: "use the 2". */
+.tile-num { position: absolute; left: 6px; top: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: grid; place-items: center; background: var(--overlay); backdrop-filter: blur(8px); color: var(--text); font-size: 11px; font-weight: 600; pointer-events: none; }
+.tile.is-selected .tile-num { background: var(--accent); color: var(--accent-ink, #111); }
 /* Wide results (3:2, 16:9) in a narrow card: at most half the width each, so they pair up instead of one per row. */
 .tiles.is-single.is-multi .tile { max-width: calc(50% - 2.5px); }
 
