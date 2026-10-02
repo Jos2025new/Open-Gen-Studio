@@ -43,7 +43,8 @@ export async function chatToDesigner(sessionId: string, opts: { assetIds?: strin
     const k = Math.min(1, 4096 / Math.max(a.width, a.height));
     return [Math.round(a.width * k), Math.round(a.height * k)] as const;
   };
-  if (opts.as === 'layers' && images.length) {
+  // One design with every image as a layer by default; a design per image only when asked ("documents").
+  if (opts.as !== 'documents' && images.length) {
     const doc = D.createDoc(nameOf(images[0]), ...sized(images[0]), null);
     addDoc(sessionId, doc);
     for (const [i, a] of images.entries()) {

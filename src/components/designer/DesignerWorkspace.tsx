@@ -147,8 +147,8 @@ export function DesignerWorkspace() {
       canvas="designer"
       items={fromChat}
       noun="image"
-      modes={[{ id: 'documents', label: 'Each as a design' }, { id: 'layers', label: 'As layers of one' }]}
-      onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'layers' ? 'layers' : 'documents' })}
+      modes={[{ id: 'layers', label: 'As layers of one' }, { id: 'documents', label: 'Each as a design' }]}
+      onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'documents' ? 'documents' : 'layers' })}
     />
     {doc ? <><DocumentPicker sessionId={session.id} docs={session.docs} active={doc} /><ToolRail doc={doc}>
         <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />

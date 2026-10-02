@@ -78,7 +78,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'continue_in_designer',
       description:
-        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default each image its own design (as "documents"), or all as layers of one design (as "layers"). Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user\'s view switches to the Designer.',
+        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default all as layers of one design (as "layers"); each image its own design (as "documents") only when the user asks for separate canvases. Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user\'s view switches to the Designer.',
       parameters: {
         type: 'object',
         properties: {

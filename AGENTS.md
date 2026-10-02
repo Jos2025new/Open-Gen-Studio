@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — al Designer, todo como capas de un lienzo (2026-10-02)
+- [x] L1. (usuario) Por defecto `chatToDesigner` pone todas las imágenes como capas raster de un solo diseño; un diseño por imagen solo si se pide (`as: "documents"`). Herramienta, regla del agente, aviso y diálogo de importación con "As layers of one" primero. Test `chat-to-designer` ajustado. Descartado (usuario: frágil): regla de palabras "hazla/ella → último resultado como entrada".
+
 ## Tarea — find_models dijo que Nano Banana 2 Lite no existe (2026-10-02)
 - [x] F1. Sesión real (Designer): "con nano banana 2 lite" → `find_models` respondió "No supported model matches" y el agente usó Nano Banana 2, pero Lite existe en Atlas (5 variantes), NanoGPT y fal (red de regresión y otra sesión que sí lo encontró). Causa probable: el catálogo de la pestaña aún cargaba (o había fallado) tras recargar, y la búsqueda solo ve lo cargado. `findModelsResult` espera `loadCatalogs()` y, si un proveedor conectado no quedó listo, lo nombra y prohíbe decir que el modelo no existe. Sin navegador ni LLM real.
 

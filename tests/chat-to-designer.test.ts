@@ -38,7 +38,7 @@ describe('chat → Designer', () => {
     });
     expect(chatImagesNotInDesigner(sid).map((a) => a.id)).toEqual(['a1', 'a22']);
 
-    const r = await chatToDesigner(sid, { assetIds: ['a1', 'v333'] });
+    const r = await chatToDesigner(sid, { assetIds: ['a1', 'v333'], as: 'documents' });
     expect(r.docs).toHaveLength(1);
     expect(r.docs[0]).toMatchObject({ name: 'Planta g1', layers: 1 });
     expect(r.skipped).toEqual(['asset:v333 (video)']);
