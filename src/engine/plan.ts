@@ -407,6 +407,40 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     }
     return undefined;
   };
+  /**
+   * O1 (OpenMontage: repair, log, do not block): a video where an image is needed becomes one of its frames, a
+   * free local extract_frame step. One step per clip and frame, shared by every step that needs it.
+   */
+  const frames = new Map<string, string>();
+  const isVideo = (ref: string | undefined): boolean => {
+    const p = ref ? parseRef(ref) : null;
+    return p?.type === 'step' ? kindById.get(p.id) === 'video' : p?.type === 'asset' ? ctx.asset(p.id)?.kind === 'video' : false;
+  };
+  const frameOf = (ref: string, which: 'first' | 'last', forId: string): string => {
+    const known = frames.get(`${ref}|${which}`);
+    if (known) return known;
+    let id = `${forId}_${which}`;
+    for (let n = 2; ids.has(id); n++) id = `${forId}_${which}${n}`;
+    ids.add(id);
+    kindById.set(id, 'image');
+    const src = parseRef(ref);
+    steps.push({ id, kind: 'op', title: `${which === 'last' ? 'Last' : 'First'} frame of ${src?.type === 'step' ? src.id : 'the clip'}`, op: 'extract_frame', input: ref, params: { which, seconds: '' } } satisfies OpStep);
+    frames.set(`${ref}|${which}`, id);
+    return id;
+  };
+  // A clip chained to a clip starts where the previous one ends (its last frame) and ends where the next one
+  // starts (its first frame).
+  for (const s of rawSteps) {
+    if (s.kind !== 'video') continue;
+    if (isVideo(s.first_frame)) {
+      adjustments.push(`${s.id}: first_frame ${s.first_frame} is a clip → its last frame`);
+      s.first_frame = frameOf(s.first_frame!, 'last', s.id!);
+    }
+    if (isVideo(s.last_frame)) {
+      adjustments.push(`${s.id}: last_frame ${s.last_frame} is a clip → its first frame`);
+      s.last_frame = frameOf(s.last_frame!, 'first', s.id!);
+    }
+  }
   for (const s of rawSteps) {
     const where = `Step ${s.id}`;
     const title = (s.title ?? '').trim() || s.id!;
@@ -437,33 +471,53 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           expectImage(s.first_frame, `${where} first_frame`);
           expectImage(s.last_frame, `${where} last_frame`);
         }
-        const needsImage = refs.length > 0 || Boolean(s.first_frame);
-        let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, adjustments);
-        let pickedRoute: RouteMode | undefined;
-        const routeRefs = imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0);
-        if (!modelRef && kind === 'video') {
-          const route = routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
-          const override = ctx.routeModel?.(route);
-          if (override) {
-            modelRef = override;
-            pickedRoute = route;
-            adjustments.push(`${s.id}: ${route} video → user model (${override.split('::')[0]})`);
-          // No exact override: preserve C2. A global composer pick still wins; otherwise use the purpose table.
-          } else if (ctx.composerChosen && !ctx.composerChosen('video')) {
-            const purpose: VideoPurpose = VIDEO_PURPOSES.includes(s.purpose as VideoPurpose) ? (s.purpose as VideoPurpose) : 'normal';
-            const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: routeRefs, duration: s.duration }, ctx.getModel);
-            if (routed) {
-              modelRef = routed.ref;
-              adjustments.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
+        // Model choice depends on the image inputs; it runs again if video refs become frames (O1).
+        const pickModel = async (pickNotes: string[]) => {
+          const needsImage = refs.length > 0 || Boolean(s.first_frame);
+          let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, pickNotes);
+          let pickedRoute: RouteMode | undefined;
+          const routeRefs = imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0);
+          if (!modelRef && kind === 'video') {
+            const route = routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
+            const override = ctx.routeModel?.(route);
+            if (override) {
+              modelRef = override;
+              pickedRoute = route;
+              pickNotes.push(`${s.id}: ${route} video → user model (${override.split('::')[0]})`);
+            // No exact override: preserve C2. A global composer pick still wins; otherwise use the purpose table.
+            } else if (ctx.composerChosen && !ctx.composerChosen('video')) {
+              const purpose: VideoPurpose = VIDEO_PURPOSES.includes(s.purpose as VideoPurpose) ? (s.purpose as VideoPurpose) : 'normal';
+              const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: routeRefs, duration: s.duration }, ctx.getModel);
+              if (routed) {
+                modelRef = routed.ref;
+                pickNotes.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
+              }
             }
           }
+          modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
+          return { modelRef, pickedRoute, routeRefs, needsImage, resolved: modelRef ? await ctx.getModel(modelRef) : null };
+        };
+        let pickNotes: string[] = [];
+        let pick = await pickModel(pickNotes);
+        // O1: a model without video inputs gets each video ref's last frame (free, local) instead of a rejection.
+        const takesVideo = (sl: ModelSchema['slots']) => Boolean(sl.clips ?? sl.refVideos ?? sl.mixedRefs);
+        if (kind === 'video' && videoRefs.length && pick.resolved?.model.kind === 'video' && !takesVideo(pick.resolved.schema.slots)) {
+          const frames = videoRefs.map((r) => frameOf(r, 'last', s.id!));
+          refs.splice(0, refs.length, ...refs.map((r) => (videoRefs.includes(r) ? frames[videoRefs.indexOf(r)] : r)));
+          imageRefs.push(...frames);
+          videoRefs.length = 0;
+          adjustments.push(`${s.id}: ${frames.length > 1 ? `${frames.length} reference videos → their last frames` : 'reference video → its last frame'} (${pick.resolved.model.name} takes no videos)`);
+          if (!s.model) {
+            pickNotes = [];
+            pick = await pickModel(pickNotes);
+          }
         }
-        modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
+        adjustments.push(...pickNotes);
+        const { modelRef, pickedRoute, routeRefs, needsImage, resolved } = pick;
         if (!modelRef) {
           errors.push(`${where}: no ${kind} model is available. Ask the user to connect a provider.`);
           continue;
         }
-        const resolved = await ctx.getModel(modelRef);
         if (!resolved) {
           errors.push(`${where}: model "${modelRef}" was not found in the catalog.${didYouMean(ctx, modelRef, kind, needsImage)}`);
           continue;

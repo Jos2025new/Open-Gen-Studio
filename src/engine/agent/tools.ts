@@ -188,7 +188,7 @@ export const TOOLS: ToolSpec[] = [
                   items: { type: ['number', 'null'] },
                   description: 'video keyframe models: second of each ref, parallel to refs; null = spread evenly. Needs an explicit duration.',
                 },
-                first_frame: { type: 'string', description: 'video: start image reference.' },
+                first_frame: { type: 'string', description: 'video: start image reference (a clip step starts from its last frame).' },
                 last_frame: { type: 'string', description: 'video: end image reference.' },
                 op: { type: 'string', enum: [...AGENT_OP_IDS] },
                 input: { type: 'string', description: 'op: the image or video to transform (join_clips: the first clip).' },

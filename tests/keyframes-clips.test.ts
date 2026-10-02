@@ -138,6 +138,8 @@ describe('agent plans with references and keyframes', () => {
     const { errors } = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'x', model: 'atlas::veo-i2v', refs: ['asset:a', 'asset:b'] }] }, ctx, 'p');
     expect(errors.join(' ')).toMatch(/takes one start image/);
     const video = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'x', model: 'atlas::veo-i2v', refs: ['asset:v1'] }] }, ctx, 'p');
-    expect(video.errors.join(' ')).toMatch(/does not accept reference videos/);
+    // O1: a video ref on a model without video inputs is repaired (its last frame), not rejected.
+    expect(video.errors).toEqual([]);
+    expect(video.plan!.steps.find((s) => s.id === 's1_last')).toMatchObject({ op: 'extract_frame', input: 'asset:v1' });
   });
 });
