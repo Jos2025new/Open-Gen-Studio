@@ -1,5 +1,5 @@
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   defaultModelFor,
   modelSummary,
@@ -12,6 +12,7 @@ import {
   resetComposerModel,
 } from '../../engine/catalog';
 import { routeHead, type RouteMode } from '../../engine/routing';
+import { variantRoute } from '../../engine/variants';
 import type { ModelSummary } from '../../engine/types';
 import { setComposer, setSettings, useStore } from '../../store/store';
 import { Chip } from '../ui/primitives';
@@ -63,7 +64,14 @@ const plainImage = (m: ModelSummary) =>
 const imageEdit = (m: ModelSummary) => m.acceptsImage && !m.tags.length;
 const textVideo = (m: ModelSummary) => m.acceptsText && !m.needsVideo && !/(?:image|reference)-to-video/i.test(m.id);
 const imageVideo = (m: ModelSummary) => m.acceptsImage && !m.needsVideo && !/reference-to-video/i.test(m.id);
-const referenceVideo = (m: ModelSummary) => m.acceptsImage && !m.needsVideo;
+// Reference-to-video: a reference variant, or a model whose schema takes two or more reference images.
+const referenceVideo = (m: ModelSummary) => {
+  if (!m.acceptsImage || m.needsVideo) return false;
+  if (variantRoute(m) === 'reference') return true;
+  const slots = useStore.getState().catalog.schemas[m.ref]?.slots;
+  return Boolean(slots?.mixedRefs || (slots?.images?.max ?? 0) >= 2);
+};
+const ROUTE_FILTER = { text: textVideo, image: imageVideo, reference: referenceVideo } as const;
 const editVideo = (m: ModelSummary) => Boolean(m.acceptsVideo);
 
 function SummaryRow({ id, name, state, onClick }: { id: PickerId; name: string; state: 'auto' | 'manual' | 'default'; onClick: () => void }) {
@@ -142,6 +150,13 @@ export function AgentModelControls() {
   const models = useStore((s) => s.catalog.models);
 
   const routeManual = composer.videoRoutes ?? {};
+  // A route model saved before this check that cannot do its route goes back to Auto.
+  useEffect(() => {
+    for (const mode of Object.keys(routeManual) as RouteMode[]) {
+      const m = routeManual[mode] ? models[routeManual[mode]!] : undefined;
+      if (m && !ROUTE_FILTER[mode](m)) setRouteModel(mode, null);
+    }
+  }, [routeManual, models]);
   const manualCount =
     Number(Boolean(agent.modelPinned)) +
     Number(Boolean(composer.userPicked?.image)) +
@@ -192,7 +207,7 @@ export function AgentModelControls() {
       : picker === 'videoEdit'
         ? { kind: 'video' as const, value: ops.videoEdit, filter: editVideo, auto: `Best connected video edit model (${modelName(opModelFor('video_edit').ref)})` }
         : picker && modeOf[picker]
-          ? { kind: 'video' as const, value: routeManual[modeOf[picker]!], filter: modeOf[picker] === 'text' ? textVideo : modeOf[picker] === 'image' ? imageVideo : referenceVideo, auto: `Agent routing for ${modeOf[picker]} input (${modelName(routeDefault(modeOf[picker]!))})` }
+          ? { kind: 'video' as const, value: routeManual[modeOf[picker]!], filter: ROUTE_FILTER[modeOf[picker]!], auto: `Agent routing for ${modeOf[picker]} input (${modelName(routeDefault(modeOf[picker]!))})` }
           : null;
 
   const resetAll = () => {
