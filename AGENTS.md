@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — find_models dijo que Nano Banana 2 Lite no existe (2026-10-02)
+- [x] F1. Sesión real (Designer): "con nano banana 2 lite" → `find_models` respondió "No supported model matches" y el agente usó Nano Banana 2, pero Lite existe en Atlas (5 variantes), NanoGPT y fal (red de regresión y otra sesión que sí lo encontró). Causa probable: el catálogo de la pestaña aún cargaba (o había fallado) tras recargar, y la búsqueda solo ve lo cargado. `findModelsResult` espera `loadCatalogs()` y, si un proveedor conectado no quedó listo, lo nombra y prohíbe decir que el modelo no existe. Sin navegador ni LLM real.
+
 ## Tarea — tarjetas comprimidas en Generations (2026-10-02)
 - [x] Impedir flex-shrink en generation-entry para conservar altura de contenido y dejar scroll a generations-list. Una regla CSS, sin modificar datos ni acciones; sin pruebas por petición del usuario.
 

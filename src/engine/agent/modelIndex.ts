@@ -1,7 +1,9 @@
 import { guideForModel } from '../guides';
 import families from '../../../scripts/model-families.json';
 import { formatUsd } from '../../lib/format';
-import { isConnected } from '../catalog';
+import { isConnected, loadCatalogs } from '../catalog';
+import { PROVIDER_LABELS } from '../providers/types';
+import { REMOTE_PROVIDERS } from '../providers/registry';
 import { modelFit } from '../modelRules';
 import type { MediaKind, ModelSchema, ModelSummary } from '../types';
 import { useStore } from '../../store/store';
@@ -97,10 +99,19 @@ export function describeIndexed(m: ModelSummary): string {
 }
 
 /** find_models tool result: one line per match, or a short "nothing found" the agent can act on. */
-export function findModelsResult(query: string, kind: MediaKind | undefined): string {
+/**
+ * Search after the catalogs have loaded: right after a reload they may still be arriving, and an empty answer
+ * then would wrongly tell the user a model does not exist. A provider whose catalog failed is named, so "no
+ * match" is never claimed for models that could not be listed.
+ */
+export async function findModelsResult(query: string, kind: MediaKind | undefined): Promise<string> {
+  await loadCatalogs().catch(() => undefined);
+  const { status } = useStore.getState().catalog;
+  const failed = REMOTE_PROVIDERS.filter((p) => isConnected(p) && status[p] !== 'ready');
   const found = searchIndex(indexedModels(), query, { kind });
-  if (!found.length) return `No supported model matches "${query}". Tell the user it is not available in the app and offer the closest listed model.`;
-  return found.map(describeIndexed).join('\n');
+  const note = failed.length ? `\n(The model list of ${failed.map((p) => PROVIDER_LABELS[p]).join(', ')} could not be loaded: a model there cannot be confirmed or ruled out — tell the user that, never that it does not exist.)` : '';
+  if (!found.length) return failed.length ? `No match in the lists that loaded for "${query}".${note}` : `No supported model matches "${query}". Tell the user it is not available in the app and offer the closest listed model.`;
+  return found.map(describeIndexed).join('\n') + note;
 }
 
 /** Closest indexed ref for a wrong model id, for the validator's "did you mean" (same kind, fitting inputs). */

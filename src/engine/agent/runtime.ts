@@ -1191,7 +1191,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const v = findModelsSchema.safeParse(parsed.value);
           recordMetric(sessionId, { type: 'findModels' });
           if (v.success) log.action({ icon: 'search', label: 'Explored models', detail: v.data.query });
-          respond(v.success ? findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
+          respond(v.success ? await findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
           continue;
         }
         if (call.name === 'recover_plan') {
