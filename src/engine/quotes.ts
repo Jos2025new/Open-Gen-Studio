@@ -1,5 +1,5 @@
 import { parseModelRef } from './providers/types';
-import { wireParams } from './params';
+import { maxCountPerRequest, wireParams } from './params';
 import type { GenSettings, ModelSchema } from './types';
 import { useStore } from '../store/store';
 
@@ -75,8 +75,18 @@ export function knownAtlasQuote(ref: string, settings: GenSettings): number | un
   if (parsed?.provider !== 'atlas') return undefined;
   const schema = get().catalog.schemas[ref];
   if (!schema) return undefined;
-  const body = atlasQuoteBody(parsed.id, schema, settings);
-  const q = get().quotes[keyOf(body)];
-  if (q === undefined && !inflight.has(keyOf(body))) queueMicrotask(() => void fetchAtlasQuote(body));
-  return q ?? undefined;
+  // The run splits the count into requests the model accepts (one image each when it has no count field):
+  // the price is each request's quote, added up — the same sum the run charges.
+  const total = Math.max(1, settings.count);
+  const per = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
+  const sizes = [...Array(Math.floor(total / per)).fill(per), ...(total % per ? [total % per] : [])];
+  let sum = 0;
+  for (const n of [...new Set(sizes)]) {
+    const body = atlasQuoteBody(parsed.id, schema, settings, n);
+    const q = get().quotes[keyOf(body)];
+    if (q === undefined && !inflight.has(keyOf(body))) queueMicrotask(() => void fetchAtlasQuote(body));
+    if (q == null) return undefined;
+    sum += q * sizes.filter((x) => x === n).length;
+  }
+  return sum;
 }

@@ -1,3 +1,4 @@
+import { lineKey } from './variants';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
@@ -523,7 +524,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (named && userPicked && ctx.userText) {
           const found = await ctx.getModel(named);
           if (!userNamed([named, found?.model.name ?? ''], ctx.userText())) {
-            adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${found?.model.name ?? named})`);
+            // Noted only when the plan named another real model: a name that matches nothing, or the user's own line, changes nothing.
+            const mine = ctx.defaultModel(kind, imageRefs.length > 0 || Boolean(s.first_frame));
+            const mineModel = mine ? (await ctx.getModel(mine))?.model : undefined;
+            if (found && (!mineModel || lineKey(found.model) !== lineKey(mineModel))) adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${found.model.name})`);
             s.model = undefined;
           }
         }

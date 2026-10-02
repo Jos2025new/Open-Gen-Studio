@@ -63,6 +63,15 @@ describe('exact Atlas price (C3)', () => {
     expect(bodies).toHaveLength(1);
   });
 
+  it('×2 on a model that makes one image per request: two requests, the quote counted twice (as charged)', async () => {
+    const two = { ...settings, count: 2 };
+    estimateMedia(REF, 'video', two, false);
+    await vi.waitFor(() => expect(knownAtlasQuote(REF, two)).toBeCloseTo(0.8));
+    expect(estimateMedia(REF, 'video', two, false)).toMatchObject({ exact: true });
+    expect(estimateMedia(REF, 'video', two, false).usd).toBeCloseTo(0.8);
+    expect(bodies).toHaveLength(1); // the same body for each request: asked once
+  });
+
   it('other providers are not quoted', () => {
     expect(knownAtlasQuote('nanogpt::minimax-h3', settings)).toBeUndefined();
     expect(bodies).toHaveLength(0);

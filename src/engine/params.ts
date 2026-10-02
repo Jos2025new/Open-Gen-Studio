@@ -828,7 +828,9 @@ export function coerceSettings(schema: ModelSchema | undefined, kind: MediaKind,
     const near = exact != null ? String(exact) : nearestAspect(aspect.options, input.aspect, base.aspect);
     if (near) {
       out.aspect = near;
-      if (near !== String(input.aspect)) changes.push(`aspect ${input.aspect} → ${aspectLabel(near)}`);
+      // Only a real change is noted: "1776x2368" and "1776*2368" are the same size.
+      const same = (v: unknown) => String(v).toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
+      if (same(near) !== same(input.aspect)) changes.push(`aspect ${input.aspect} → ${aspectLabel(near)}`);
     }
   }
   const res = paramByRole(schema, 'resolution');

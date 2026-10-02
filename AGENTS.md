@@ -38,6 +38,8 @@ Origen: síntesis que compara un flujo de vídeo por fases con una skill de refe
 - [x] F2. Aviso falso "The agent replied without a plan" bajo esa respuesta: solo sale si la petición pide hacer o cambiar algo (`MAKE_WORDS`: crea, haz, genera, edita, anima, añade, quita, create, make…), además de no ser pregunta. Test en `agent-retry`.
 - [x] F3. Rechazo "op edit needs params.instruction" (una vuelta extra): el agente puso `instruction` en el paso. Un campo de la operación escrito en el paso cuenta como dado (`plan.ts`). Test en `clip-chain`.
 - [x] F4. Cierre "…con todo lo demás intacto" sin haberlo visto: `WRAPUP_RULE` pide decir lo que pidió ("pedí que conservara todo lo demás"), nunca que salió bien o intacto.
+- [x] F5. Precio de Atlas antes de generar: Seedream v5.0 Pro ×2 mostró "est $0.072 · charged $0.14". El modelo no tiene campo de cantidad, así que se hacen 2 peticiones; la cotización en vivo era de una petición y se mostraba como el total. `knownAtlasQuote` suma la cotización de cada petición (mismo reparto que la ejecución, `maxCountPerRequest`). Test en `quotes`.
+- [x] F6. Notas de ajuste sin contenido: "aspect 1776x2368 → 1776×2368" (mismo tamaño, otro separador: ya no se anota) y "kept your image model (the plan had named Seedream 5)" (un nombre que no corresponde a ningún modelo, o de la misma línea que el del usuario, no se anota; el modelo del usuario se usa igual).
 No es fallo de la app: Tripo rechazó la imagen por su verificador de contenido; el agente lo explicó y ofreció alternativas.
 
 ## Tarea — "pásalo al Designer" (2026-10-02)
