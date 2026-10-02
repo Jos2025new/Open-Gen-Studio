@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — lienzos como miniaturas desplegables (2026-10-02)
+- [x] Sustituir selector superior por desplegable en esquina izquierda del área de trabajo junto a ToolRail. Miniaturas con renderer existente, nombre y tamaño; selección usa selectDoc. Cargar buffers al mostrar miniaturas, mantener lienzos/datos intactos. Sin pruebas por petición del usuario; commit reversible.
+
 ## Tarea — ajustes primero e icono Export (2026-10-02)
 - [x] Ajustes contextuales antes de New document, seguido de Import from Chat y lienzos; Export con flecha arriba. Solo orden visual e icono, sin modificar acciones. Sin pruebas por petición del usuario; commit reversible.
 

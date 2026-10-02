@@ -4,7 +4,7 @@ import { ImportFromChat } from '../ui/ImportFromChat';
 import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
-import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, selectDoc, undoDoc } from '../../engine/design/actions';
+import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, subscribeHistory } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -13,6 +13,7 @@ import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
 import { ToolRail } from './ToolRail';
+import { DocumentPicker } from './DocumentPicker';
 import { ToolSettings } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 
@@ -89,7 +90,6 @@ export function DesignerWorkspace() {
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
-      {doc && <select aria-label="Document" className="doc-select" value={doc.id} onChange={(e) => selectDoc(session.id, e.target.value)}>{session.docs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>}
       {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <>
         <IconButton icon={Images} label="Save to gallery" size="sm" disabled={busy} onClick={() => void output(true)} />
@@ -107,7 +107,7 @@ export function DesignerWorkspace() {
       modes={[{ id: 'documents', label: 'Each as a design' }, { id: 'layers', label: 'As layers of one' }]}
       onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'layers' ? 'layers' : 'documents' })}
     />
-    {doc ? <><ToolRail doc={doc}>
+    {doc ? <><DocumentPicker sessionId={session.id} docs={session.docs} active={doc} /><ToolRail doc={doc}>
         <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
         <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
         <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
