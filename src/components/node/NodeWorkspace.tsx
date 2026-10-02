@@ -12,7 +12,7 @@ import {
   type EdgeChange,
 } from '@xyflow/react';
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Upload } from 'lucide-react';
-import { setGraph, setUi, useStore } from '../../store/store';
+import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
@@ -24,6 +24,8 @@ import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
 import { CanvasNavigation } from './CanvasNavigation';
+import { GroupFrames, Operations } from './Operations';
+import { copyNodes, cutNodes, groupNodes, hasNodeClipboard, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 
@@ -233,13 +235,38 @@ function Canvas() {
     const paste = (e: ClipboardEvent) => {
       if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
-      if (!files.length) return;
+      if (!files.length) {
+        // Nodes copied in the app (Ctrl+C / Cut): pasted with their links.
+        if (!hasNodeClipboard()) return;
+        e.preventDefault();
+        const ids = pasteNodes(sessionId);
+        if (ids.length) setSelected(new Set(ids));
+        return;
+      }
       e.preventDefault();
       void importImages(files);
     };
     document.addEventListener('paste', paste);
     return () => document.removeEventListener('paste', paste);
-  }, [importImages]);
+  }, [importImages, sessionId]);
+
+  // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
+      const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id) ?? [];
+      const k = e.key.toLowerCase();
+      if (!ids.length || window.getSelection()?.toString()) return;
+      if (k === 'c') { copyNodes(sessionId, ids); toast(`Copied ${ids.length} node${ids.length === 1 ? '' : 's'}`, 'success'); }
+      else if (k === 'x') { cutNodes(sessionId, ids); setSelected(new Set()); }
+      else if (k === 'g' && e.shiftKey) { const g = wholeGroup(useStore.getState().sessions[sessionId].graph, ids); if (g) ungroup(sessionId, g.id); }
+      else if (k === 'g' && ids.length > 1) groupNodes(sessionId, ids);
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [sessionId, selected]);
 
   const runIds = runnableIds(graph.nodes);
 
@@ -310,6 +337,8 @@ function Canvas() {
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
+        <GroupFrames sessionId={sessionId} graph={graph} sizes={measured} onSelect={(ids) => setSelected(new Set(ids))} />
+        <Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
           onSelect={(id) => setSelected(new Set([id]))}

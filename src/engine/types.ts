@@ -661,9 +661,17 @@ export interface GraphEdge {
   sourceHandle: string;
 }
 
+/** A named frame around some nodes (each node is in one group at most). */
+export interface GraphGroup {
+  id: string;
+  title: string;
+  nodeIds: string[];
+}
+
 export interface Graph {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  groups?: GraphGroup[];
   viewport?: { x: number; y: number; zoom: number };
 }
 
