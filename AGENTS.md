@@ -1,5 +1,9 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Edit: alinear, ajustar, voltear y girar la capa (2026-10-02)
+- [x] E1. (usuario) `design/transform.ts`: alinear la capa activa con la página (izq., centro, der., arriba, medio, abajo; sobre lo pintado en capas de pincel), ajustar dentro / llenar la página (imágenes), voltear horizontal/vertical y girar 90° a cada lado y 180°. Raster: gira los píxeles (los trazos de pincel de esa capa se funden en la imagen); vector: formas y trazos (voltear = `scaleLayer` ×−1; los `path` no giran un cuarto); texto: solo alinear (sin rotación en el modelo). Bloqueada → aviso. Un Undo por operación.
+- [x] E2. En la barra de Edit, dos desplegables con icono: "Align" (a la página + tamaño) y "Transform"; una opción que no aplica sale desactivada con el motivo. Tests `layer-transform` (3). Sin navegador. Propuesta pendiente: rotación libre por ángulo (exige rotación en el modelo de capas, render, selección y exportación).
+
 ## Tarea — Assets y Generations con la estética de Sesiones (2026-10-02)
 - [x] (usuario) Filtro Canvas (All · Chat · Nodes · Designer, con icono y recuento, desactivado si está vacío) en Assets y Generations, el mismo de Sesiones (`CanvasFilter`), con su etiqueta quitable. `canvasLookup` (`canvas.ts`) da el lienzo de cada asset o generación en cualquier sesión (subida sin usar = Chat).
 - [x] (usuario: "no comparten estética; minimalismo, agrupar funciones, desplegables e iconos que se entiendan") Mismo patrón que el panel de Sesiones (S5): buscador con el botón "Filter, sort and view" dentro (punto si algo no es lo normal), menú con segmentados e interruptores, y solo etiquetas quitables de los filtros activos. Generations: Show, Type (con iconos y recuentos), Status, Sort, Thumbnails; filas sin caja, con separador y "Go to" como icono que aparece al pasar el ratón. Assets: Show, Type, Sort, Favorites only, Grid size; Select junto al buscador. Sin navegador.

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, ChevronDown, FlipHorizontal2, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { alignLayer, fitLayer, turnLayer, turnProblem, type AlignTo, type Turn } from '../../engine/design/transform';
+import { MenuItem } from '../ui/primitives';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
@@ -42,6 +44,50 @@ export function InlineSelect<T extends string | number>({ label, value, options,
   return <label className="opt"><span className="opt-label">{label}</span><select className="opt-select" aria-label={label} value={String(value)} onChange={(e) => { const hit = options.map((o) => (typeof o === 'object' ? o.value : o)).find((o) => String(o) === e.target.value); if (hit !== undefined) onChange(hit); }}>{options.map((o) => { const v = typeof o === 'object' ? o.value : o; return <option key={String(v)} value={String(v)}>{typeof o === 'object' ? o.label : String(o)}</option>; })}</select></label>;
 }
 
+const ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVertical }> = [
+  { id: 'left', label: 'Align left', icon: AlignStartVertical },
+  { id: 'center', label: 'Center horizontally', icon: AlignCenterVertical },
+  { id: 'right', label: 'Align right', icon: AlignEndVertical },
+  { id: 'top', label: 'Align top', icon: AlignStartHorizontal },
+  { id: 'middle', label: 'Center vertically', icon: AlignCenterHorizontal },
+  { id: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal },
+];
+const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof FlipHorizontal2 }> = [
+  { id: 'flip-h', label: 'Flip horizontal', icon: FlipHorizontal2 },
+  { id: 'flip-v', label: 'Flip vertical', icon: FlipVertical2 },
+  { id: 'rotate-cw', label: 'Rotate 90° right', icon: RotateCw },
+  { id: 'rotate-ccw', label: 'Rotate 90° left', icon: RotateCcw },
+  { id: 'rotate-180', label: 'Rotate 180°', icon: RefreshCw },
+];
+
+/** Edit tool: Align (to the page; fit or fill for images) and Transform (flip, quarter turns) for the active layer. */
+function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+  const align = usePopover();
+  const turn = usePopover();
+  const layer = doc.layers.find((l) => l.id === doc.activeLayerId);
+  if (!layer) return null;
+  return <>
+    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={layer.locked}><AlignCenterVertical size={13} />Align<ChevronDown size={12} /></button>
+    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={220} label="Align to the page">
+      <div className="menu">
+        <div className="menu-sep-label">To the page</div>
+        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => alignLayer(sessionId, doc.id, layer.id, a.id)} />)}
+        {layer.type === 'raster' ? <>
+          <div className="menu-sep-label">Size</div>
+          <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, layer.id, 'contain'); align.close(); }} />
+          <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, layer.id, 'cover'); align.close(); }} />
+        </> : null}
+      </div>
+    </Popover>
+    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={layer.locked}><FlipHorizontal2 size={13} />Transform<ChevronDown size={12} /></button>
+    <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
+      <div className="menu">
+        {TURN_ITEMS.map((t) => { const why = turnProblem(layer, t.id); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(why)} tip={why ?? undefined} onClick={() => turnLayer(sessionId, doc.id, layer.id, t.id)} />; })}
+      </div>
+    </Popover>
+  </>;
+}
+
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -61,7 +107,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
