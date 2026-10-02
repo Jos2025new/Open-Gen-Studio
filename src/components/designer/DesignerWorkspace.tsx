@@ -76,6 +76,7 @@ export function DesignerWorkspace() {
 
   const output = async (gallery: boolean, format: ExportFormat = 'png') => {
     if (!doc || busy) return;
+    if (gallery && !window.confirm(`Save "${doc.name}" to Gallery as an image?`)) return;
     setBusy(true);
     try { await (gallery ? saveDocToGallery(session.id, doc.id) : exportDocFile(session.id, doc.id, format)); }
     catch (err) { toast(err instanceof Error ? err.message : 'Export failed', 'error'); }
@@ -84,7 +85,7 @@ export function DesignerWorkspace() {
 
   return <div className="designer">
     <TopbarActions>
-      <IconButton ref={presets.ref} icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
+      <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>

@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — confirmar Gallery y adelantar importación (2026-10-02)
+- [x] Confirmación antes de Save to gallery; cancelar no guarda. Orden explícito New document → Import from Chat → lienzos solo en Designer; conservar diálogo y aviso existentes. Cambios puntuales, sin pruebas por petición del usuario; commit reversible.
+
 ## Tarea — orden superior y estilo de curva seleccionada (2026-10-02)
 - [x] New document antes del selector, ajustes entre documentos y salida. Compartir selección de curva entre Stage y ajustes mediante DesignerWorkspace; reutilizar StrokeStyleFields para modificar solo el trazo seleccionado con historial. Cerrar selección al cambiar documento; bloquear cambios en capas ocultas/bloqueadas. Sin pruebas por petición del usuario. Commit reversible. Los ajustes superiores de Edit afectan solo a la curva elegida; Properties conserva su alcance sobre toda la capa.
 

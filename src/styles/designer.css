@@ -13,3 +13,5 @@
 .tool-rail > * { flex-shrink: 0; }
 .tool-rail .zoom-value { font-size: 10px; width: 100%; text-align: center; }
 @media (max-width: 767px) { .tool-rail .zoom-value { width: auto; }.tool-settings { max-width: 55vw; } }
+.topbar-slot .designer-new-document { order: -2; }
+.topbar-slot .designer-import-chat { order: -1; }

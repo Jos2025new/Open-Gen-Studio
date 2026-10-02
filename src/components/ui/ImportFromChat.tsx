@@ -57,7 +57,7 @@ export function ImportFromChat({ sessionId, canvas, items, noun, modes, onImport
   return (
     <>
       <TopbarActions>
-      <IconButton ref={pop.ref} icon={ArrowDownToLine} label="Import from Chat" size="sm" active={pop.open} onClick={pop.toggle} />
+      <IconButton ref={pop.ref} className={canvas === 'designer' ? 'designer-import-chat' : undefined} icon={ArrowDownToLine} label="Import from Chat" size="sm" active={pop.open} onClick={pop.toggle} />
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label="Import from Chat">
         <PopoverHeader title="Import from Chat" sub={items.length ? `${plural(items.length)} not here yet` : 'Everything from Chat is already here'} />
         {items.length ? (
