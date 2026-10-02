@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — ayudas recortadas arriba (2026-10-02)
+- [x] Ajustar solo TooltipLayer: medir la ayuda y colocarla debajo si no cabe encima; limitar posición a la ventana también en lateral. Mantener eventos y demora. Sin pruebas por petición del usuario; reversible con revert.
+
 ## Tarea — controles contextuales visibles arriba (2026-10-02)
 - [x] Extraer ajustes a controles compactos junto al selector de documento, cada uno con desplegable inferior y solo opciones aplicables a la herramienta. Reutilizar estado y campos de Lineart. Mover Undo/Redo, zoom y Fit a ToolRail sin cambiar acciones. Retirar icono global de ajustes. Prever desbordamiento con scroll en controles y rail; sin pruebas por petición del usuario. Commit reversible. Texto usa su estilo existente para nuevos textos; Mover/Mano sin ajustes irrelevantes, borrador sin color, línea sin relleno y radio solo en rectángulo.
 
