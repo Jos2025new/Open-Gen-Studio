@@ -1024,6 +1024,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   const clock = turnClock(sessionId);
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
+  let transferredToDesigner = false;
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
       let textItemId: string | null = null;
@@ -1121,7 +1122,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       });
       if (!result.toolCalls.length) {
         if (!result.text.trim()) notice(sessionId, workspace, 'The model returned an empty answer. Try rephrasing.');
-        else if (!opts.textOnly && endedWithoutPlan(sessionId, workspace)) {
+        else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, workspace)) {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level: 'info', text: 'The agent replied without a plan.', proposePlan: true });
         }
         return;
@@ -1273,11 +1274,12 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const v = continueInDesignerSchema.safeParse(parsed.value ?? {});
           if (!v.success) respond(`Invalid continue_in_designer input: ${formatZodError(v.error)}`);
           else {
-            const r = await chatToDesigner(sessionId, v.data);
-            if (r.docs.length && get().ui.workspace !== 'designer') setUi({ workspace: 'designer', panel: null, lightbox: null });
+            const r = await chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as });
+            transferredToDesigner = r.docs.length > 0 || !!r.openedExisting;
+            if (transferredToDesigner) setUi({ workspace: 'designer', panel: null, lightbox: null });
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
             const lines = [
-              r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : 'No image to send: every chat image is already in a design, or none was given.',
+              r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : r.openedExisting ? `No duplicates added. Chat images are already imported; opened existing design ${r.openedExisting} in the Designer.` : 'No image was sent. Do not claim anything was imported.',
               r.skipped.length ? `Skipped, no such layers yet: ${r.skipped.join(', ')}.` : '',
               r.missing.length ? `Unknown ids: ${r.missing.join(', ')}.` : '',
             ];

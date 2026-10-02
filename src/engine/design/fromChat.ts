@@ -7,14 +7,14 @@ import { addDoc, placeAsset } from './actions';
 const get = () => useStore.getState();
 
 /** Chat image results of the session not in any design yet (as a layer's source), oldest first. */
-export function chatImagesNotInDesigner(sessionId: string): Asset[] {
+export function chatImagesNotInDesigner(sessionId: string, includePlaced = false): Asset[] {
   const st = get();
   const s = st.sessions[sessionId];
   if (!s) return [];
   const index = canvasIndex(s, st.generations);
   const placed = new Set(s.docs.flatMap((d) => d.layers.map((l) => ('sourceAssetId' in l ? l.sourceAssetId : undefined)).filter(Boolean)));
   return Object.values(st.assets)
-    .filter((a) => a.sessionId === sessionId && a.kind === 'image' && a.origin === 'generated' && !placed.has(a.id) && index.asset(a) === 'chat')
+    .filter((a) => a.sessionId === sessionId && a.kind === 'image' && a.origin === 'generated' && (includePlaced || !placed.has(a.id)) && index.asset(a) === 'chat')
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
@@ -37,6 +37,8 @@ export async function chatToDesigner(sessionId: string, opts: { assetIds?: strin
   const missing = (opts.assetIds ?? []).filter((id) => !st.assets[id]);
   const docs: Array<{ id: string; name: string; layers: number }> = [];
   const previous = st.sessions[sessionId]?.activeDocId;
+  const chatIds = new Set(chatImagesNotInDesigner(sessionId, true).map((a) => a.id));
+  const existing = st.sessions[sessionId]?.docs.find((d) => d.layers.some((l) => l.type === 'raster' && l.sourceAssetId && chatIds.has(l.sourceAssetId)));
   const sized = (a: Asset) => {
     const k = Math.min(1, 4096 / Math.max(a.width, a.height));
     return [Math.round(a.width * k), Math.round(a.height * k)] as const;
@@ -44,18 +46,20 @@ export async function chatToDesigner(sessionId: string, opts: { assetIds?: strin
   if (opts.as === 'layers' && images.length) {
     const doc = D.createDoc(nameOf(images[0]), ...sized(images[0]), null);
     addDoc(sessionId, doc);
-    for (const [i, a] of images.entries()) await placeAsset(sessionId, doc.id, a.id, i ? 'new' : 'base', `${i + 1}. ${nameOf(a)}`);
+    for (const [i, a] of images.entries()) {
+      if (!await placeAsset(sessionId, doc.id, a.id, i ? 'new' : 'base', `${i + 1}. ${nameOf(a)}`)) throw new Error(`Could not place image ${a.id} in the Designer.`);
+    }
     docs.push({ id: doc.id, name: doc.name, layers: images.length });
   } else {
     for (const a of images) {
       const doc = D.createDoc(nameOf(a), ...sized(a), null);
       addDoc(sessionId, doc);
-      await placeAsset(sessionId, doc.id, a.id, 'base', 'Layer 1');
+      if (!await placeAsset(sessionId, doc.id, a.id, 'base', 'Layer 1')) throw new Error(`Could not place image ${a.id} in the Designer.`);
       docs.push({ id: doc.id, name: doc.name, layers: 1 });
     }
   }
   // The first new design is the one the Designer opens on; with nothing added the active one stays.
-  const active = docs[0]?.id ?? previous;
+  const active = docs[0]?.id ?? (!opts.assetIds?.length ? existing?.id : undefined) ?? previous;
   if (active) patchSession(sessionId, (s0) => ({ ...s0, activeDocId: active }));
-  return { docs, skipped, missing };
+  return { docs, skipped, missing, openedExisting: !docs.length && !opts.assetIds?.length ? existing?.id : undefined };
 }
