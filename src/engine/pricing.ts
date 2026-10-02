@@ -9,6 +9,8 @@ export interface EstimateContext {
   audio?: boolean;
   mode?: 'text' | 'image';
   megapixels?: number;
+  /** The model's quality setting (FLUX 3 on NanoGPT: full | draft); a sku with a quality needs it, "full" when unset. */
+  quality?: string;
 }
 
 export const FREE: Estimate = { usd: 0, approximate: false };
@@ -24,11 +26,12 @@ function matches(sku: PriceSku, ctx: EstimateContext, ignoreRes: boolean): boole
   if (sku.audio != null && sku.audio !== Boolean(ctx.audio)) return false;
   if (sku.mode != null && ctx.mode != null && sku.mode !== ctx.mode) return false;
   if (sku.duration != null && sku.duration !== ctx.duration) return false;
+  if (sku.quality != null && sku.quality !== (ctx.quality || 'full')) return false;
   return true;
 }
 
 function specificity(s: PriceSku): number {
-  return (s.resolution != null ? 1 : 0) + (s.audio != null ? 1 : 0) + (s.mode != null ? 1 : 0) + (s.duration != null ? 2 : 0);
+  return (s.resolution != null ? 1 : 0) + (s.audio != null ? 1 : 0) + (s.mode != null ? 1 : 0) + (s.duration != null ? 2 : 0) + (s.quality != null ? 1 : 0);
 }
 
 /** Estimate the USD cost of a request from a normalized price rule. */

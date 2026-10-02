@@ -124,6 +124,8 @@ export interface PriceSku {
   audio?: boolean;
   mode?: 'text' | 'image';
   duration?: number;
+  /** Render quality the price applies to (NanoGPT FLUX 3: "full" or "draft"); unset = any. */
+  quality?: string;
 }
 
 export interface PriceRule {

@@ -491,6 +491,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const needsImage = refs.length > 0 || Boolean(s.first_frame);
           let modelRef = familyRef(ctx, s.model, kind, needsImage, s.id!, pickNotes);
           let pickedRoute: RouteMode | undefined;
+          let routeParams: Record<string, string> | undefined;
           const routeRefs = imageRefs.length + (imageRefs.length && s.first_frame ? 1 : 0);
           if (!modelRef && kind === 'video') {
             const route = routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
@@ -505,12 +506,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
               const routed = await routeVideo(purpose, { firstFrame: Boolean(s.first_frame), refs: routeRefs, duration: s.duration }, ctx.getModel);
               if (routed) {
                 modelRef = routed.ref;
+                routeParams = routed.entry.params;
                 pickNotes.push(`${s.id}: ${purpose} video → ${routed.entry.name} (${routed.ref.split('::')[0]})`);
               }
             }
           }
           modelRef ||= ctx.defaultModel(kind, needsImage) ?? undefined;
-          return { modelRef, pickedRoute, routeRefs, needsImage, resolved: modelRef ? await ctx.getModel(modelRef) : null };
+          return { modelRef, pickedRoute, routeParams, routeRefs, needsImage, resolved: modelRef ? await ctx.getModel(modelRef) : null };
         };
         let pickNotes: string[] = [];
         let pick = await pickModel(pickNotes);
@@ -528,6 +530,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           }
         }
         adjustments.push(...pickNotes);
+        // A routed entry's own settings (FLUX 3 Draft: quality "draft"); the step's params win.
+        if (pick.routeParams) s.params = { ...pick.routeParams, ...(s.params ?? {}) };
         const { modelRef, pickedRoute, routeRefs, needsImage, resolved } = pick;
         if (!modelRef) {
           errors.push(`${where}: no ${kind} model is available. Ask the user to connect a provider.`);

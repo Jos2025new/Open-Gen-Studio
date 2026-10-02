@@ -34,7 +34,7 @@ describe('FLUX 3 guide', () => {
     for (const id of ['black-forest-labs/flux-3/keyframes-to-video', 'blackforestlabs/flux-3/edit-video', 'blackforestlabs/flux-3/text-to-video/draft', 'flux-3']) expect(guideForModel(id)?.id).toBe('flux');
     expect(guideForModel('fal-ai/flux-3-action/so101')).toBeUndefined();
     const t = readGuide('model:flux')!;
-    for (const rule of ['5–20 s', 'Audio is on by default', 'change instruction', 'on twos', 'do not describe the style again', '/draft']) expect(t).toContain(rule);
+    for (const rule of ['5–20 s', 'Audio is on by default', 'change instruction', 'on twos', 'do not describe the style again', 'quality "draft"', 'DRAFT → FINAL']) expect(t).toContain(rule);
   });
 });
 

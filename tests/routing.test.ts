@@ -52,6 +52,16 @@ describe('video model by purpose (C1)', () => {
     expect(await pick('draft', { refs: 1 })).toBe('atlas::minimax/h3-developer/reference-to-video');
   });
 
+  it('draft on NanoGPT alone: FLUX 3 with quality "draft", priced at the draft rate; a 20 s draft too', async () => {
+    expect(await pick('draft', {}, ['nanogpt'])).toBe('nanogpt::flux-3');
+    expect(await pick('draft', { firstFrame: true, duration: 20 }, ['nanogpt'])).toBe('nanogpt::flux-3');
+    expect(await pick('draft', { duration: 20 })).toBe('nanogpt::flux-3'); // H3 Max Turbo stops at 15 s
+    const { estimate } = await import('../src/engine/pricing');
+    const price = lists.nanogpt.find((m) => m.ref === 'nanogpt::flux-3')!.price;
+    expect(estimate(price, { count: 1, duration: 10, resolution: '720p', quality: 'draft' }).usd).toBeCloseTo(0.6);
+    expect(estimate(price, { count: 1, duration: 10, resolution: '720p' }).usd).toBeCloseTo(1.7);
+  });
+
   it('a length a cheaper model cannot make moves down the row; long is Wan 3', async () => {
     const twenty = await pick('normal', { duration: 20 });
     expect(twenty).toMatch(/wan-3\.0/);
@@ -88,6 +98,13 @@ describe('the plan follows the table unless the user picked the composer model (
     const r = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'x', purpose: 'normal' }] }, ctx(false), 'p');
     expect(r.plan!.adjustments.join(' ')).toMatch(/normal video → MiniMax H3 Developer \(atlas\)/);
     expect(await model(false, { model: 'atlas::alibaba/wan-3.0/text-to-video' })).toBe('atlas::alibaba/wan-3.0/text-to-video');
+  });
+
+  it('a 20 s draft goes to FLUX 3 on NanoGPT with quality "draft" set on the step', async () => {
+    const r = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', purpose: 'draft', duration: 20 }] }, ctx(false), 'p');
+    const st = r.plan!.steps[0] as { modelRef: string; settings: { advanced: Record<string, unknown> } };
+    expect(st.modelRef).toBe('nanogpt::flux-3');
+    expect(st.settings.advanced.quality).toBe('draft');
   });
 
   it('picked by hand: the composer model, as before', async () => {

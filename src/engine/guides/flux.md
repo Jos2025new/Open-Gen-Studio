@@ -3,7 +3,8 @@ Source: production practice supplied by the user (2026-09-26), adapted to Atlas 
 
 ROUTES ON OUR PROVIDERS (the app picks the route and fills the frame inputs)
 - Text-to-video, image-to-video (start frame), first + last frame, keyframes-to-video (up to 10 images pinned at positions — the storyboard mode; the app places them), extend (continues from the last frames of a clip) and edit (Edit video operation).
-- fal also has "/draft" variants of most routes: a cheaper preview, the natural pick for drafts and tests.
+- Draft: on NanoGPT, FLUX 3 with quality "draft" (about a third of the full price, fixed 720p, same 5–20 s and modes); the app picks it for draft-purpose video steps. Atlas has no draft.
+- One continuous shot per clip: no shots or cuts inside one generation (use keyframes for a storyboard, or several clips).
 - Duration 5–20 s (keyframes need an explicit duration). Resolution 720p / 1080p: medium by default. Aspect from auto to 21:9, 2:1, 16:9, 9:16, 1:1, 4:3, 3:4.
 - Size the actions to the duration: in 5 s, one clear action.
 - Audio is on by default (voice, SFX and ambience synced to the image, with lip-sync on written dialogue): always write the audio section; ask for silence explicitly if wanted.
@@ -39,3 +40,9 @@ Same shot in three styles (a woman opens a letter in the kitchen):
 - 2D: Medium shot. A woman at a kitchen table opens a cream envelope. Hand-drawn ink outlines with varying weight, flat three-value cel shading, muted warm palette, halftone accents in the shadows, painted matte background. Her motion on twos with a held key pose as the flap opens; a smear frame on the tear. No photographic depth, no soft gradients. Audio: paper tearing, light piano.
 - 3D: Medium shot. A woman at a kitchen table opens a cream envelope. Stylised 3D animated-feature look — rounded forms, satin materials, soft shadows, subtle ambient occlusion, volumetric window light. Smooth 24 fps motion with secondary hair and cloth movement. Audio: paper tearing, room tone, light score.
 The action and camera block is identical; only the medium, the vocabulary and the timing change.
+
+DRAFT → FINAL
+- FLUX 3 has no reproducible seed across tiers: the final render is a new take of the same idea, never the draft's frames made sharper.
+- A draft validates composition, camera move, pacing, subject behaviour and whether the prompt wording works; it does not validate exact frames, micro-timing or face and fabric detail. Draft looks soft by design (720p): never reject an idea for softness.
+- Loop: draft short (5 s) → refine the wording, not the settings → stretch the duration in draft if the idea must hold longer → final with the same prompt, aspect and duration.
+- When a look must be locked before motion, make the still first and use image-to-video: the still is the anchor the seed cannot be.

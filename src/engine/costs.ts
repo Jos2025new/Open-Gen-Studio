@@ -52,6 +52,7 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
     resolution: settings.resolution,
     audio: settings.audio,
     mode: withImage ? 'image' : 'text',
+    quality: typeof settings.advanced?.quality === 'string' ? settings.advanced.quality : undefined,
   });
 }
 

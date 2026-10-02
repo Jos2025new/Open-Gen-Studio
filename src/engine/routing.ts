@@ -21,9 +21,13 @@ export interface RouteEntry {
   refs: Partial<Record<RouteMode, string>>;
   /** USD per second at medium quality, for reading the order (unset: not checked); the app shows the provider's own price. */
   usdPerSecond?: number;
+  /** Parameters the entry needs on top of the step's (FLUX 3 Draft = NanoGPT FLUX 3 with quality "draft"). */
+  params?: Record<string, string>;
 }
 
 const h3MaxTurboAtlas: RouteEntry = { name: 'MiniMax H3 Max Turbo', usdPerSecond: 0.038, refs: { text: 'atlas::minimax/h3-max-turbo/text-to-video', image: 'atlas::minimax/h3-max-turbo/image-to-video' } };
+// One NanoGPT model for every FLUX 3 route; draft is a quality setting (0.06 $/s, catalog 2026-09-25), 5–20 s, 720p.
+const fluxDraftNano: RouteEntry = { name: 'FLUX 3 Draft', usdPerSecond: 0.06, params: { quality: 'draft' }, refs: { text: 'nanogpt::flux-3', image: 'nanogpt::flux-3' } };
 const h3MaxTurboNano: RouteEntry = { name: 'MiniMax H3 Max Turbo', refs: { text: 'nanogpt::minimax/h3-max-turbo', image: 'nanogpt::minimax/h3-max-turbo' } };
 const h3DevAtlas: RouteEntry = {
   name: 'MiniMax H3 Developer',
@@ -49,7 +53,7 @@ const wanNano: RouteEntry = {
 };
 
 export const VIDEO_ROUTES: Record<VideoPurpose, RouteEntry[]> = {
-  draft: [h3MaxTurboAtlas, h3MaxTurboNano],
+  draft: [h3MaxTurboAtlas, fluxDraftNano, h3MaxTurboNano],
   normal: [h3DevAtlas, seedanceFastAtlas, seedanceFastNano, wanAtlas, h3Nano, wanNano],
   // Takes over 15 s (up to 30 s): Seedance 2.0 Fast stops at 15 s.
   long: [wanAtlas, wanNano],

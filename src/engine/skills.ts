@@ -361,7 +361,7 @@ export const WORKFLOWS: Workflow[] = [
       'tone or genre (offer 2–3 treatments as options when the brief is abstract or the user has no idea; recommend the one that fits the image)',
       'sound: dialogue or voice-over, music and ambience, or silent (only for models with audio)',
       'format: the attached image\'s aspect (recommended) or another',
-      'one clip with timed shots (recommended when the total fits the model: up to 30 s on Seedance 2.5 / Wan 3, 20 s on FLUX 3, 15 s on MiniMax H3) or several separate clips joined; both use the same fixed character sources in every clip',
+      'one clip with timed shots (recommended when the total fits the model: up to 30 s on Seedance 2.5 / Wan 3, 15 s on MiniMax H3) or several separate clips joined; both use the same fixed character sources in every clip',
       'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (a cheap first plan; the user picks one, then the clips)',
     ],
     continuity:

@@ -170,6 +170,10 @@ export function parseNanoVideoPrice(p: Loose | undefined): PriceRule | undefined
   skus.push(...tableSkus(p.text_to_video_per_second, 'second', { mode: 'text' }));
   skus.push(...tableSkus(p.image_to_video_per_second, 'second', { mode: 'image' }));
   skus.push(...tableSkus(p.standard_prices_per_second, 'second'));
+  // FLUX 3: full quality by resolution, draft at one rate (fresh footage; extension is billed apart).
+  skus.push(...tableSkus((p.full_per_second_by_mode_and_resolution as Loose | undefined)?.standard, 'second', { quality: 'full' }));
+  const draft = num((p.draft_per_second_by_mode as Loose | undefined)?.standard);
+  if (draft != null) skus.push({ unit: 'second', usd: draft, quality: 'draft' });
   if (p.per_duration && typeof p.per_duration === 'object') {
     for (const [d, v] of Object.entries(p.per_duration as Loose)) {
       const usd = num(v);
