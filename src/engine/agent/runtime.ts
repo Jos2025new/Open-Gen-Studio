@@ -1248,7 +1248,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             const found = findAssets(session(sessionId), workspace, st.assets, st.generations, v.data);
             log.action({ icon: 'search', label: v.data.view ? 'Looked at results' : 'Searched results', detail: [v.data.kind?.join(','), v.data.query, v.data.since].filter(Boolean).join(' · ') || undefined });
             if (!v.data.view || !found.rows.length) respond(found.text);
-            else if (!agentSeesImages()) respond(`${found.text}\n\nThe selected agent model cannot see images: none sent.`);
+            else if (!agentSeesImages()) respond(`${found.text}\n\nNone sent: the agent model the user picked (${get().settings.agent.model}) cannot see images, on any canvas. Tell the user exactly that, and that a model with vision (chosen in Settings → Agent) can look; never describe the results.`);
             else {
               const parts: LlmContentPart[] = [];
               for (const t of viewTargets(found.rows)) {
