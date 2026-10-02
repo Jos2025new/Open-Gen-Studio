@@ -129,7 +129,7 @@
 .generations-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .generations-filters .select { flex: 1; min-width: 120px; font-size: 11px; }
 .generations-list { overflow: auto; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.generation-entry { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.generation-entry { flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
 .generation-entry-meta { padding: 10px 12px 0; font-size: 10px; }
 .generation-entry-status.status-done { color: var(--accent); }
 .generation-entry-status.status-error { color: var(--danger); }

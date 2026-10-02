@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — tarjetas comprimidas en Generations (2026-10-02)
+- [x] Impedir flex-shrink en generation-entry para conservar altura de contenido y dejar scroll a generations-list. Una regla CSS, sin modificar datos ni acciones; sin pruebas por petición del usuario.
+
 ## Tarea — copiar y pegar imágenes en Designer (2026-10-02)
 - [x] Pegar imágenes externas como capas mediante uploadFiles/placeAsset; crear lienzo si falta. Ctrl+C copia píxeles de capa raster seleccionada como PNG, Ctrl+V los importa. Respetar campos de texto/selección de texto y evitar sesiones cruzadas durante importación async. Reutilizar Undo de colocación. Sin pruebas por petición del usuario; commit reversible.
 
