@@ -30,3 +30,6 @@
 .document-picker-popover .document-thumbnails { padding: 0; }
 .document-picker-popover .document-choice { background: var(--surface); }
 .document-picker-popover .document-choice.is-active { background: var(--surface-2); }
+
+/* Layer operations first, at the left edge; order, duplicate and delete stay on the right. */
+.layer-actions-gap { flex: 1; }

@@ -66,11 +66,12 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     {layer && <div className="layer-actions">
+        {layer.type === 'raster' && <IconButton ref={pop.ref} icon={Sparkles} label="Layer operations" size="sm" disabled={layer.locked} onClick={() => { setOp(null); pop.toggle(); }} />}
+        <span className="layer-actions-gap" />
         <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={layer.locked || index === doc.layers.length - 1} onClick={() => moveLayer(sessionId, doc.id, layer.id, 1)} />
         <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={layer.locked || index === 0} onClick={() => moveLayer(sessionId, doc.id, layer.id, -1)} />
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         <IconButton icon={Trash} label="Delete layer" size="sm" tone="danger" disabled={layer.locked} onClick={() => deleteLayer(sessionId, doc.id, layer.id)} />
-        {layer.type === 'raster' && <IconButton ref={pop.ref} icon={Sparkles} label="Layer operations" size="sm" disabled={layer.locked} onClick={() => { setOp(null); pop.toggle(); }} />}
       </div>}
     </Section>
     {layer && <>

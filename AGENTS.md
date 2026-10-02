@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — operaciones de capa a la izquierda (2026-10-02)
+- [x] Botón "Layer operations" (✦) primero en la fila de acciones de la capa, pegado al borde izquierdo; subir, bajar, duplicar y borrar siguen a la derecha. `LayersPanel.tsx`, `designer.css`. Sin navegador.
+
 ## Tarea — sin saldo: cambiar a un equivalente, ofrecer opciones o pedir recarga; avisos sobre el prompt (2026-10-02)
 Origen (usuario): "insufficient credit" fallaba sin más, y los avisos en la conversación no se ven.
 - [x] S1. Generación sin saldo (`engine/credit.ts`, en `runGeneration`, así que composer, planes, nodos y operaciones): el mismo modelo (misma línea, `lineKey`, mismas entradas) en otro proveedor conectado con saldo y precio igual o menor (misma unidad) → cambia y reintenta solo, con aviso. Si no: hasta 3 opciones con saldo (misma línea o familia, con precio) como botones; si ninguna: "recarga". Nunca cambia solo a uno más caro. Saldos con `balance()` del proveedor (caché 1 min; un "sin saldo" marca el proveedor vacío; saldo desconocido cuenta como posible).
