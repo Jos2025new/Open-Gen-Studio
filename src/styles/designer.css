@@ -143,3 +143,10 @@
 .swatch-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
 .swatch { aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--border); padding: 0; cursor: pointer; }
 .swatch.is-on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.canvas-size { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.canvas-size-dims { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.canvas-size-dims label:not(.check-row) { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-2); }
+.canvas-size-dims input[type='number'] { width: 70px; }
+.anchor-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+.anchor-grid button { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); padding: 0; cursor: pointer; }
+.anchor-grid button.is-on { background: var(--accent); border-color: var(--accent); }
