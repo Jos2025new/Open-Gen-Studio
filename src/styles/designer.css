@@ -181,3 +181,9 @@
 @container layers (max-width: 300px) { .layer-ops-label { display: none; } .layer-ops-btn { padding: 0 6px; } }
 .layer-add { align-items: center; padding: 6px 8px; gap: 4px; }
 .layer-new-btn { border: 1px solid var(--border-strong); border-radius: 6px; transition: color .12s, border-color .12s, background .12s; }.layer-new-btn:hover, .layer-new-btn[aria-expanded='true'] { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.geometry { display: flex; flex-direction: column; gap: 6px; }
+.geometry-row { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); align-items: center; gap: 4px; }
+.geometry-lock { justify-self: center; }
+.xywh-scrub { cursor: ew-resize; user-select: none; padding: 6px 2px 6px 0; touch-action: none; }
+.xywh-scrub:hover { color: var(--accent); }
+.geometry-empty { font-size: 11px; margin: 0; }
