@@ -92,10 +92,21 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const [railHover, setHoverNow] = useState(false);
   // Leaving waits a moment, so the pointer can cross from the thumbnail to the column beside the card.
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // After a click closes it, hovering does not reopen it until the pointer has left and come back.
+  const hoverMuted = useRef(false);
   const setRailHover = (on: boolean) => {
     clearTimeout(leaveTimer.current);
-    if (on) setHoverNow(true);
-    else leaveTimer.current = setTimeout(() => setHoverNow(false), 250);
+    if (on) { if (!hoverMuted.current) setHoverNow(true); }
+    else { hoverMuted.current = false; leaveTimer.current = setTimeout(() => setHoverNow(false), 250); }
+  };
+  const toggleRail = () => {
+    if (railPinned) {
+      // Pinned: a click closes it now (also while the pointer is still on the thumbnail).
+      setRailPinned(false);
+      clearTimeout(leaveTimer.current);
+      setHoverNow(false);
+      hoverMuted.current = true;
+    } else setRailPinned(true);
   };
   const rail = !compact && inputs.length > 0 && (railPinned || railHover);
   // Left of the card when the chat has room there; else on its right (the chat's scroll area clips what sticks out).
@@ -160,7 +171,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         {inputs.length ? (
           // What was sent: the first input, with a count when there were several. Hover shows them all beside the
           // card (like the Designer's canvas thumbnails); a click keeps them open; a thumbnail opens the viewer.
-          <button type="button" className="gen-source" onClick={() => setRailPinned((v) => !v)} onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)} aria-expanded={railPinned} aria-label={inputs.length > 1 ? `${inputs.length} inputs` : g.op ? 'Source' : 'Reference'}>
+          <button type="button" className="gen-source" onClick={toggleRail} onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)} aria-expanded={railPinned} aria-label={inputs.length > 1 ? `${inputs.length} inputs` : g.op ? 'Source' : 'Reference'}>
             <AssetMedia assetId={inputs[0]} hoverPlay={false} draggable={false} />
             {inputs.length > 1 ? <span className="gen-source-count num">{inputs.length}</span> : null}
           </button>
