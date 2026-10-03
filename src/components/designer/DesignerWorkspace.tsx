@@ -131,6 +131,9 @@ export function DesignerWorkspace() {
       if (mod && k === 'z') {
         e.preventDefault();
         (e.shiftKey ? redoDoc : undoDoc)(session.id, doc.id);
+      } else if (!mod && !e.altKey && e.shiftKey && k === 'r') {
+        e.preventDefault();
+        setUi({ rulers: !useStore.getState().ui.rulers });
       } else if (mod && k === 'g') {
         // Ctrl+G: the selected layers into a folder.
         e.preventDefault();

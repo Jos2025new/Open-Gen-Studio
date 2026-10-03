@@ -15,6 +15,7 @@ import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
+import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
@@ -31,6 +32,7 @@ type Drag =
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'rasterMove'; layerId: string; strokeIds: string[]; startX: number; startY: number; base: RasterLayer }
   | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
@@ -38,10 +40,60 @@ type Drag =
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
 
 const HANDLE = 8;
+const RULER = 18;
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
 
 type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
+
+/** A ruler along the top or left edge of the stage: page units, ticks that follow the zoom. Drag from it to make a guide. */
+function Ruler({ side, view, size, guides, ...handlers }: { side: 'top' | 'left'; view: View; size: { w: number; h: number }; guides?: DesignDoc['guides'] } & Pick<React.HTMLAttributes<HTMLCanvasElement>, 'onPointerDown' | 'onPointerMove' | 'onPointerUp' | 'onPointerCancel' | 'onContextMenu'>) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const len = side === 'top' ? size.w : size.h;
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = side === 'top' ? len : RULER, h = side === 'top' ? RULER : len;
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    const ctx = c.getContext('2d')!;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#18181c';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#8e8e98';
+    ctx.strokeStyle = '#55555e';
+    ctx.font = '9px system-ui, sans-serif';
+    const step = rulerStep(view.zoom);
+    const origin = side === 'top' ? view.x : view.y;
+    const first = Math.floor(-origin / view.zoom / step) * step;
+    ctx.beginPath();
+    for (let v = first; origin + v * view.zoom < len; v += step / 5) {
+      const at = Math.round(origin + v * view.zoom) + 0.5;
+      const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+      const tick = major ? RULER : RULER / 3;
+      if (side === 'top') { ctx.moveTo(at, RULER); ctx.lineTo(at, RULER - tick); }
+      else { ctx.moveTo(RULER, at); ctx.lineTo(RULER - tick, at); }
+      if (major) {
+        const label = String(Math.round(v));
+        if (side === 'top') ctx.fillText(label, at + 2, 9);
+        else { ctx.save(); ctx.translate(9, at + 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'right'; ctx.fillText(label, 0, 0); ctx.restore(); }
+      }
+    }
+    ctx.stroke();
+    // Guide marks on the ruler.
+    ctx.fillStyle = '#2fb8ff';
+    for (const g of (side === 'top' ? guides?.x : guides?.y) ?? []) {
+      const at = origin + g * view.zoom;
+      if (side === 'top') ctx.fillRect(at - 1, RULER - 5, 3, 5);
+      else ctx.fillRect(RULER - 5, at - 1, 5, 3);
+    }
+  }, [side, len, view, guides]);
+  const style: React.CSSProperties = side === 'top'
+    ? { position: 'absolute', left: 0, top: 0, width: len, height: RULER, cursor: 'row-resize' }
+    : { position: 'absolute', left: 0, top: 0, width: RULER, height: len, cursor: 'col-resize' };
+  return <canvas ref={ref} className="stage-ruler" style={style} data-tip={side === 'top' ? 'Drag down for a guide · right-click clears guides' : 'Drag right for a guide · right-click clears guides'} {...handlers} />;
+}
 
 let tile: HTMLCanvasElement | null = null;
 /** The transparency checkerboard: two 12 px cells of each tone. */
@@ -90,6 +142,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const textStyle = useStore((s) => s.ui.text);
   const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
   const selVersion = useSelectionVersion();
+  const rulers = useStore((s) => s.ui.rulers ?? false);
+  // A guide being dragged (from a ruler or an existing guide), shown until pointer up.
+  const [guidePreview, setGuidePreview] = useState<{ axis: GuideAxis; at: number; index?: number } | null>(null);
   const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
   const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
   const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color };
@@ -217,6 +272,21 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
+    // Ruler guides across the whole view (the one being dragged replaces its saved position).
+    if (rulers) {
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#2fb8ff';
+      const line = (axis: GuideAxis, at: number) => {
+        ctx.beginPath();
+        if (axis === 'x') { const x = Math.round(sx(at)) + 0.5; ctx.moveTo(x, 0); ctx.lineTo(x, size.h); }
+        else { const y = Math.round(sy(at)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(size.w, y); }
+        ctx.stroke();
+      };
+      for (const axis of ['x', 'y'] as const) (doc.guides?.[axis] ?? []).forEach((at, i) => { if (!(guidePreview?.axis === axis && guidePreview.index === i)) line(axis, at); });
+      if (guidePreview) { ctx.setLineDash([5, 4]); line(guidePreview.axis, guidePreview.at); }
+      ctx.restore();
+    }
     // Snap guides: the line the moving layer sticks to, across the view.
     const g = guideLines;
     if (g.x != null || g.y != null) {
@@ -337,7 +407,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke();
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -405,6 +475,20 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity, { threshold: brush.fillThreshold, expand: brush.fillExpand, smooth: brush.fillSmooth }); }
       catch (error) { toast(error instanceof Error ? error.message : 'Could not fill this region.', 'error'); }
       return;
+    }
+
+    // Edit tool on a guide: drag it (back onto its ruler removes it).
+    if (tool === 'move' && rulers) {
+      const r = canvasRef.current!.getBoundingClientRect();
+      const px = e.clientX - r.left, py = e.clientY - r.top;
+      for (const axis of ['x', 'y'] as const) {
+        const index = (current.guides?.[axis] ?? []).findIndex((at) => Math.abs((axis === 'x' ? view.x + at * view.zoom - px : view.y + at * view.zoom - py)) <= 4);
+        if (index >= 0) {
+          drag.current = { kind: 'guide', axis, index, at: current.guides![axis][index] };
+          setGuidePreview({ axis, index, at: current.guides![axis][index] });
+          return;
+        }
+      }
     }
 
     if (tool === 'move') {
@@ -665,6 +749,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, d.influence ?? Math.max(24, s.size * 4)) : s));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
+    } else if (d.kind === 'guide') {
+      d.at = d.axis === 'x' ? p.x : p.y;
+      setGuidePreview({ axis: d.axis, index: d.index, at: d.at });
     } else if (d.kind === 'gradient') {
       let x1 = p.x, y1 = p.y;
       // Shift: the line snaps to 45° steps, as in SAI.
@@ -704,10 +791,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (e?: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
     if (!d) return;
+    // A guide lands where the pointer is released (a quick drag may send no move in between).
+    if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
     showGuides({});
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
@@ -735,6 +824,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         layer.strokes = [stroke];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
       }
+      return;
+    }
+    if (d.kind === 'guide') {
+      setGuidePreview(null);
+      // Dropped back on its ruler: a new guide is not made, an existing one is removed.
+      const onRuler = (d.axis === 'x' ? view.x + d.at * view.zoom : view.y + d.at * view.zoom) < RULER;
+      if (onRuler) { if (d.index != null) removeGuide(sessionId, doc.id, d.axis, d.index); }
+      else placeGuide(sessionId, doc.id, d.axis, d.at, d.index);
       return;
     }
     if (d.kind === 'gradient') {
@@ -868,6 +965,21 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           }}
         />
       ) : null}
+      {rulers && (['top', 'left'] as const).map((side) => (
+        <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            e.currentTarget.setPointerCapture(e.pointerId);
+            const p = toDoc(e.clientX, e.clientY);
+            // The top ruler makes horizontal guides (y), the left one vertical guides (x).
+            const axis: GuideAxis = side === 'top' ? 'y' : 'x';
+            drag.current = { kind: 'guide', axis, at: axis === 'x' ? p.x : p.y };
+            setGuidePreview({ axis, at: drag.current.at });
+          }}
+          onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}
+          onContextMenu={(e) => { e.preventDefault(); if (doc.guides && (doc.guides.x.length || doc.guides.y.length)) { clearGuides(sessionId, doc.id); toast('Guides cleared', 'info'); } }}
+        />
+      ))}
       {editingLayer ? (
         <TextEditor
           layer={editingLayer}

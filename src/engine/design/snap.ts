@@ -17,12 +17,15 @@ export const SNAP_DEFAULT: SnapOptions = { on: true, page: true, layers: true };
 type Box = { x: number; y: number; w: number; h: number };
 
 /** The lines a moving box can stick to. */
-export function snapTargets(doc: Pick<DesignDoc, 'width' | 'height' | 'layers'>, movingId: string, opts: SnapOptions): { xs: number[]; ys: number[] } {
+export function snapTargets(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, opts: SnapOptions): { xs: number[]; ys: number[] } {
   const xs: number[] = [], ys: number[] = [];
   if (opts.page) {
     xs.push(0, doc.width / 2, doc.width);
     ys.push(0, doc.height / 2, doc.height);
   }
+  // The user's own guides always count while snapping is on.
+  xs.push(...(doc.guides?.x ?? []));
+  ys.push(...(doc.guides?.y ?? []));
   if (opts.layers) {
     for (const l of doc.layers) {
       if (l.id === movingId || !l.visible) continue;

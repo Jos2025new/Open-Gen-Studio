@@ -1,4 +1,4 @@
-import { Brush, Pipette, SquareDashed, Blend, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { Brush, Pipette, SquareDashed, Blend, Ruler, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
@@ -19,9 +19,11 @@ const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
 
 export function ToolRail({ doc, children }: { doc: DesignDoc; children?: ReactNode }) {
   const tool = useStore((s) => s.ui.tool);
+  const rulers = useStore((s) => s.ui.rulers ?? false);
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
     {TOOLS.map((t) => { const reason = toolBlockReason(t.id, activeLayer(doc)); return <IconButton key={t.id} icon={t.icon} label={t.label} active={tool === t.id} aria-pressed={tool === t.id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: t.id })} />; })}
     <div className="side-sep" />
+    <IconButton icon={Ruler} label={`${rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={rulers} aria-pressed={rulers} onClick={() => setUi({ rulers: !rulers })} />
     {children}
   </div>;
 }
