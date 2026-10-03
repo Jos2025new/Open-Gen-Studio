@@ -50,9 +50,9 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
+import { confirmSettings, sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
-import type { FeedItem, PlanFeedItem, QuestionsFeedItem } from '../src/engine/types';
+import type { FeedItem, PlanFeedItem, QuestionsFeedItem, SettingsFeedItem } from '../src/engine/types';
 
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
@@ -102,6 +102,13 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(card).toMatchObject({ status: 'pending', maxRounds: 1 });
     expect(card!.questions[0].default).toBe('Acción');
 
+    // Phase 2: the structure is decided, the user confirms model and values before any prompt is written.
+    replies = [{ name: 'confirm_settings', args: { kind: 'video', summary: '3 clips de 7 s', count: 3, duration: 7, model: 'local::studio-video' } }];
+    await submitAnswers(useStore.getState().activeSessionId, card!.id, { tone: 'Acción' });
+    const settings = feed().find((f): f is SettingsFeedItem => f.type === 'settings');
+    expect(settings).toMatchObject({ status: 'pending', count: 3, recommended: { modelRef: 'local::studio-video' } });
+    expect(feed().some((f) => f.type === 'plan')).toBe(false);
+
     replies = [
       {
         name: 'propose_plan',
@@ -113,7 +120,8 @@ describe('story request in Auto mode (F1–F4 together)', () => {
         },
       },
     ];
-    await submitAnswers(useStore.getState().activeSessionId, card!.id, { tone: 'Acción' });
+    await confirmSettings(useStore.getState().activeSessionId, settings!.id, settings!.recommended);
+    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings confirmed by the user: video Local/);
     await vi.waitFor(() => expect(feed().find((f): f is PlanFeedItem => f.type === 'plan')?.status).toBe('done'), { timeout: 5000 });
 
     const plan = feed().find((f): f is PlanFeedItem => f.type === 'plan')!;
@@ -124,9 +132,9 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(videos.every((r) => r.subjects.includes('Reto'))).toBe(true);
     const join = runs.find((r) => r.clips)!;
     expect(join.clips!.split(',')).toHaveLength(3);
-    // guide, questions, plan, then the one text-only wrap-up after the plan ran (S4): no other model calls.
-    await vi.waitFor(() => expect(sent).toHaveLength(4));
-    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^\[app\] Plan "Turno de guardia" finished \(done\)/);
+    // guide, questions, settings, plan, then the one text-only wrap-up after the plan ran (S4): no other model calls.
+    await vi.waitFor(() => expect(sent).toHaveLength(5));
+    expect(String(sent[4].messages.at(-1)!.content)).toMatch(/^\[app\] Plan "Turno de guardia" finished \(done\)/);
   });
 
   it('a clear request in Auto still goes straight to the plan: a second card is refused', async () => {

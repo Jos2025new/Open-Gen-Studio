@@ -29,6 +29,7 @@ import type {
   VideoStep,
   Workspace,
   SubjectKind,
+  SettingsChoice,
 } from './types';
 
 /** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
@@ -157,6 +158,8 @@ export interface PlanContext {
   requestImages?: () => string[];
   /** Names of the session's subjects: a plan subject with one of these names reuses it. */
   subjectNames?: () => string[];
+  /** Settings the user confirmed (phase 2): model, resolution, duration and aspect for every step of that kind. */
+  confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -518,8 +521,27 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           expectImage(s.first_frame, `${where} first_frame`);
           expectImage(s.last_frame, `${where} last_frame`);
         }
+        // Phase 2: what the user confirmed wins over what the plan wrote (the prompts were written for it).
+        const conf = kind === 'video' || kind === 'image' ? ctx.confirmed?.(kind) : undefined;
+        if (conf) {
+          const confName = (await ctx.getModel(conf.modelRef))?.model.name ?? conf.modelRef;
+          const stepNeedsImage = refs.length > 0 || Boolean(s.first_frame);
+          const wrote = s.model?.trim();
+          // The same model line in the variant these inputs need (the card was made for other inputs).
+          s.model = stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
+          if (wrote && wrote !== conf.modelRef && wrote !== confName) adjustments.push(`${s.id}: model ${wrote} → ${confName} (confirmed)`);
+          const keep = (field: 'resolution' | 'aspect' | 'duration', value: string | number | undefined) => {
+            if (value == null) return;
+            const had = (s as Record<string, unknown>)[field];
+            if (had != null && String(had) !== String(value)) adjustments.push(`${s.id}: ${field} ${String(had)} → ${String(value)} (confirmed)`);
+            (s as Record<string, unknown>)[field] = value;
+          };
+          keep('resolution', conf.resolution);
+          keep('aspect', conf.aspect);
+          if (kind === 'video') keep('duration', conf.duration);
+        }
         // The user's own model pick (composer, or a video route) wins over a model only the plan names.
-        const named = s.model?.trim();
+        const named = conf ? undefined : s.model?.trim();
         const userPicked = ctx.composerChosen?.(kind) || (kind === 'video' && Boolean(ctx.routeModel?.(routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length }))));
         if (named && userPicked && ctx.userText) {
           const found = await ctx.getModel(named);

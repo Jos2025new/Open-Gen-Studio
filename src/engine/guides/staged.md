@@ -2,11 +2,11 @@
 
 Applies to stories, series, UGC, ads, sets of views or renders, walkthroughs, tours and any plan with 2+ clips. A workflow, when one fits, sets the structure; these rules hold inside it. The user's words always win.
 
-## The questions card for a staged piece
+## The questions card for a staged piece (phase 1: content)
 One card, at most 4 questions, the most important first, each with your recommended option as default; skip what the request already settles. Ask the user's data first (see "Deciding what to ask" in your instructions); the questions below are the usual ones for a staged piece.
 1. Who or what exactly: the open dimension of the user's own words, with options spanning its real range — "an influencer" → which kind (lifestyle, tech, beauty, gaming streamer, cooking, fitness…) and age range including young adults; "a building" → type and style. Not generic demographics the user did not ask about.
 2. How to start, one question with the stages as options: invented identity → "sheet first → a short test → the final piece" (recommended), "sheet → final", "all at once". A final video of 10 s or more, or several clips, gets the short test stage (5 s, purpose draft, cheaper) before the full length. The user's own images are used as is (default); add "also a product / character sheet from my image first" as an extra option for whoever wants it.
-3–4. Only what is still missing: language, length, claims, sound, and for a video the format and quality — aspect and resolution as options with their cost difference (medium is the recommended default).
+3–4. Only what is still missing about the content: language, claims, sound, and the total length when the story needs it. Model, resolution, duration per clip and aspect are not asked here: they go on the settings card (confirm_settings) before the prompts are written.
 
 ## The look
 Unless the request or an attached reference already sets it, let the user pick the look in the questions card (also in auto): 3–4 concrete looks fitting the domain (e.g. photoreal, watercolor illustration, clay/3D model, 2D anime), your recommended one as default; copy the chosen look into "style" unchanged. Every later plan of the same piece reuses that exact "style"; a technical step (a floor plan, a sheet on a neutral background) may leave it out but never takes a different look.

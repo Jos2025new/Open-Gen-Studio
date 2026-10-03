@@ -538,6 +538,33 @@ export interface QuestionsFeedItem extends FeedBase {
   answers?: Record<string, string>;
 }
 
+/** Settings confirmed before prompts are written (phase 2): the model and its main values. */
+export interface SettingsChoice {
+  modelRef: string;
+  resolution?: string;
+  /** Seconds per clip (video). */
+  duration?: number;
+  /** Unset: the input image's shape (a start image), else the model's default. */
+  aspect?: string;
+  /** The inputs the card was made for: a start or reference image. */
+  needsImage: boolean;
+}
+
+export interface SettingsFeedItem extends FeedBase {
+  type: 'settings';
+  kind: 'video' | 'image';
+  /** What the plan will make, in the agent's words (one line). */
+  summary?: string;
+  /** Clips or images the plan will make with these settings. */
+  count: number;
+  recommended: SettingsChoice;
+  /** A few other models that take the same inputs. */
+  alternatives: string[];
+  /** The selection while the card is open (kept so typing a message confirms it), then the confirmed one. */
+  chosen?: SettingsChoice;
+  status: 'pending' | 'confirmed' | 'skipped';
+}
+
 export interface PlanFeedItem extends FeedBase {
   /** Approval of existing node IDs; never materialized again. */
   nodeRun?: { targets: string[]; force: boolean; signature: string };
@@ -592,6 +619,7 @@ export type FeedItem =
   | AssistantFeedItem
   | ActivityFeedItem
   | QuestionsFeedItem
+  | SettingsFeedItem
   | PlanFeedItem
   | GenerationFeedItem
   | NoticeFeedItem;
@@ -816,7 +844,9 @@ export interface LlmMessage {
 
 export interface AgentState {
   history: LlmMessage[];
-  pending?: { toolCallId: string | null; kind: 'questions' | 'plan'; feedItemId: string };
+  pending?: { toolCallId: string | null; kind: 'questions' | 'settings' | 'plan'; feedItemId: string };
+  /** Settings the user confirmed for this work (phase 2); plans apply them, follow-ups reuse them. */
+  settings?: Partial<Record<'video' | 'image', SettingsChoice>>;
   questionRound: number;
   /** Facts to hand to the model with the next user turn (e.g. execution results). */
   notes: string[];

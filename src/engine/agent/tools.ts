@@ -137,6 +137,29 @@ export const TOOLS: ToolSpec[] = [
   {
     type: 'function',
     function: {
+      name: 'confirm_settings',
+      description:
+        'Phase 2, before writing any prompt: for video or animation, or a plan with 2+ images, show the user the settings card (recommended model with a few others, resolution, duration, aspect, preselected; the app picks the model and the values the way a plan would). The user confirms or changes them; you then get the confirmed values and the prompting guide of that model, and write the plan with them. Not for a single image, not on the node canvas. Settings stay confirmed for the follow-ups of the same work: call it again only for new work or when the user wants to change them.',
+      parameters: {
+        type: 'object',
+        properties: {
+          kind: { type: 'string', enum: ['video', 'image'] },
+          summary: { type: 'string', description: 'What the plan will make, one short line in the user\'s language ("3 clips of the girl walking to the camera").' },
+          purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video: draft (a test), normal (default), long (over 15 s).' },
+          start_image: { type: 'boolean', description: 'Video starts from an image (first_frame).' },
+          refs: { type: 'integer', description: 'How many reference images each step takes (identity, product, style).' },
+          count: { type: 'integer', description: 'How many clips or images the plan makes with these settings.' },
+          duration: { type: 'number', description: 'Seconds per clip you recommend.' },
+          aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
+          model: { type: 'string', description: 'Only a model the user named, or an image model of the short list for this task. Leave out otherwise.' },
+        },
+        required: ['kind'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'ask_questions',
       description:
         'Ask 1-4 short, decisive questions that remove real ambiguity before planning, all needed ones together in one card. Each question has 2-5 concrete options and a default: the option you recommend, preselected so one click continues. Never ask about details you can settle with a sensible choice or the user already settled. Auto mode: at most one card, only when a missing answer changes the result or the cost.',
@@ -316,6 +339,18 @@ export const viewCanvasSchema = z.object({ layer_id: z.string().min(1).max(80).o
 export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
 
 export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'retry']) });
+
+export const confirmSettingsSchema = z.object({
+  kind: z.enum(['video', 'image']),
+  summary: z.string().max(300).optional(),
+  purpose: z.enum(['draft', 'normal', 'long']).optional(),
+  start_image: z.boolean().optional(),
+  refs: z.number().int().min(0).max(20).optional(),
+  count: z.number().int().min(1).max(24).optional(),
+  duration: z.number().min(0).max(120).optional(),
+  aspect: z.string().max(20).optional(),
+  model: z.string().max(200).optional(),
+});
 
 export const askQuestionsSchema = z.object({
   intro: z.string().max(400).optional(),

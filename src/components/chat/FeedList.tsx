@@ -9,6 +9,7 @@ import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
 import { ActivityBlock } from './ActivityBlock';
 import { QuestionsCard } from './QuestionsCard';
+import { SettingsCard } from './SettingsCard';
 
 const WS = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
 
@@ -165,6 +166,8 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
       return <ActivityBlock item={item} sessionId={sessionId} />;
     case 'questions':
       return <QuestionsCard item={item} sessionId={sessionId} />;
+    case 'settings':
+      return <SettingsCard item={item} sessionId={sessionId} />;
     case 'plan':
       return <PlanCard item={item} sessionId={sessionId} />;
     case 'generation':

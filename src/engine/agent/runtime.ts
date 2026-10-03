@@ -37,6 +37,8 @@ import type {
   PlanFeedItem,
   PlanStep,
   QuestionsFeedItem,
+  SettingsChoice,
+  SettingsFeedItem,
   Session,
   StepState,
   Workspace,
@@ -54,18 +56,19 @@ import {
   updateFeedItem,
   useStore,
 } from '../../store/store';
-import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultImageGuideId, defaultVideoGuideId } from './context';
+import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultImageGuideId } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById, workflowMakesImage, workflowMakesVideo } from '../skills';
-import { modelGuide } from '../guides';
+import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById, workflowMakesImage } from '../skills';
+import { guideForModel, modelGuide } from '../guides';
+import { buildSettings, describeChoice } from './settingsCard';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 let controller: AbortController | null = null;
@@ -170,6 +173,8 @@ function planContext(sessionId: string, workspace: Workspace) {
     subjectNames: () => get().library.map((x) => x.name),
     userText: () => userWords(sessionId),
     requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
+    // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas).
+    confirmed: (kind: MediaKind) => (workspace !== 'node' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
   };
 }
 
@@ -200,6 +205,11 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
     await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
+    return;
+  }
+  // Typing while the settings card is open confirms what it shows, with the message as a note.
+  if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
+    await confirmSettings(sessionId, pendingItem.id, pendingItem.chosen ?? pendingItem.recommended, clean);
     return;
   }
   // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
@@ -269,10 +279,8 @@ function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
   const parts: string[] = [];
   // Every workflow is a staged piece: its shared rules come in the same result, once per conversation.
   if (workflowGuideId.startsWith('workflow:') && !inConversation(sessionId, STAGED_GUIDE)) parts.push(`\n\n---\n${STAGED_GUIDE}`);
-  for (const [kind, id] of [
-    ['video', workflowMakesVideo(workflowGuideId) ? defaultVideoGuideId() : undefined],
-    ['image', workflowMakesImage(workflowGuideId) ? defaultImageGuideId() : undefined],
-  ] as const) {
+  // The video model's guide comes with the confirmed settings (phase 2), for the model actually chosen.
+  for (const [kind, id] of [['image', workflowMakesImage(workflowGuideId) ? defaultImageGuideId() : undefined]] as const) {
     const t = id ? readGuide(`model:${id}`) : undefined;
     if (t && !inConversation(sessionId, t)) parts.push(`\n\n---\nPrompting guide of the ${kind} model this plan will use (model:${id}); write those prompts in its format:\n${t}`);
   }
@@ -280,16 +288,12 @@ function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
 }
 
 /**
- * Model guides travel with the request, so prompts are written for the model that will run them without the agent
- * having to load them: a picked workflow brings those of its steps; otherwise the video model the plan would use
- * (its prompt format matters most). Each guide goes once per conversation; a later change of model brings the new one.
+ * A workflow picked in the composer brings its shared rules and its image model's guide with the request. The video
+ * model's guide comes later, with the confirmed settings (phase 2), so it is the model the user actually chose.
  */
 function pickedWorkflowGuides(sessionId: string): string {
   const id = get().composer.workflowId;
-  if (id) return modelGuidesFor(sessionId, `workflow:${id}`);
-  const video = defaultVideoGuideId();
-  const t = video ? readGuide(`model:${video}`) : undefined;
-  return t && !inConversation(sessionId, t) ? `\n\n---\nPrompting guide of the video model a video step would use now (model:${video}); write video prompts in its format:\n${t}` : '';
+  return id ? modelGuidesFor(sessionId, `workflow:${id}`) : '';
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
@@ -313,6 +317,7 @@ function resolvePendingAsSuperseded(sessionId: string): void {
   if (!p) return;
   const item = s.feed.find((f) => f.id === p.feedItemId);
   if (item?.type === 'questions' && item.status === 'pending') updateFeedItem<QuestionsFeedItem>(sessionId, item.id, { status: 'skipped' });
+  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, item.id, { status: 'skipped' });
   if (item?.type === 'plan' && item.status === 'awaiting') {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'canceled' });
     removeDraftNodes(sessionId, item.plan.id);
@@ -375,6 +380,44 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
     return;
   }
   await offlineTurn(sessionId, item.workspace);
+}
+
+/** The selection on an open settings card, kept so a typed message confirms what the user sees. */
+export function selectSettings(sessionId: string, itemId: string, chosen: SettingsChoice): void {
+  const item = session(sessionId)?.feed.find((f) => f.id === itemId);
+  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { chosen });
+}
+
+/** "Continue" on the settings card (phase 2): the agent gets the confirmed values and that model's prompting guide. */
+export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice, note?: string): Promise<void> {
+  toCanvasOfItem(sessionId, itemId);
+  const s = session(sessionId);
+  const item = s.feed.find((f) => f.id === itemId);
+  if (!item || item.type !== 'settings' || item.status !== 'pending') return;
+  updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', chosen });
+  const pending = s.agent.pending;
+  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, [item.kind]: chosen } }));
+  if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
+  const name = (ref: string) => modelSummary(ref)?.name ?? ref;
+  const rec = item.recommended;
+  const changes = [
+    chosen.modelRef !== rec.modelRef ? `model ${name(rec.modelRef)} → ${name(chosen.modelRef)}` : '',
+    chosen.resolution !== rec.resolution ? `resolution ${rec.resolution ?? 'default'} → ${chosen.resolution ?? 'default'}` : '',
+    chosen.duration !== rec.duration ? `duration ${rec.duration ?? '?'} s → ${chosen.duration ?? '?'} s` : '',
+    chosen.aspect !== rec.aspect ? `aspect ${rec.aspect ?? 'the image\'s'} → ${chosen.aspect ?? 'the image\'s'}` : '',
+  ].filter(Boolean);
+  const id = chosen.modelRef.split('::')[1] ?? '';
+  const guide = guideForModel(id);
+  const text = guide ? readGuide(`model:${guide.id}`) : undefined;
+  const attach = text && !inConversation(sessionId, text) ? `\n\n---\nPrompting guide of ${name(chosen.modelRef)} (model:${guide!.id}); write the prompts in its format:\n${text}` : '';
+  const ctx = buildContext(session(sessionId), contextOpts(sessionId, item.workspace, s.agent.draft?.attachments ?? []));
+  pushHistory(sessionId, {
+    role: 'tool',
+    tool_call_id: pending.toolCallId,
+    content: `Settings confirmed by the user: ${item.kind} ${describeChoice(name(chosen.modelRef), chosen)} (${chosen.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'}${note ? `\nUser note: ${note}` : ''}\nThe app applies these to every ${item.kind} step; write the prompts for this model, this length and this shape, and call propose_plan.${attach}\n\n${ctx}`,
+  });
+  patchAgent(sessionId, { notes: [] });
+  await llmTurn(sessionId, item.workspace);
 }
 
 /**
@@ -1184,6 +1227,25 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           respond(parsed.error);
           continue;
         }
+        if (call.name === 'confirm_settings') {
+          const v = confirmSettingsSchema.safeParse(parsed.value);
+          if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
+          if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
+          const d = v.data;
+          const built = await buildSettings(
+            { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
+            { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },
+          );
+          if ('error' in built) { respond(built.error); continue; }
+          log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: modelSummary(built.recommended.modelRef)?.name });
+          ignoreRest(index);
+          flushToolResults(sessionId, toolResults);
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', kind: d.kind, summary: d.summary, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives, status: 'pending' };
+          appendFeed(sessionId, item);
+          patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
+          if (get().ui.workspace !== 'chat') setThreadOpen(true);
+          return;
+        }
         if (call.name === 'ask_questions') {
           const style = get().composer.agentStyle;
           const s = session(sessionId);
@@ -1375,6 +1437,16 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             recordMetric(sessionId, { type: 'rejected' });
             planFailures++;
             continue;
+          }
+          // Phase 2 first: prompts for video, or for 2+ images, are written only after the user confirms the settings.
+          if (workspace !== 'node' && !v.data.revision) {
+            const kinds = v.data.steps.map((st) => st.kind);
+            const need = kinds.includes('video') && !session(sessionId).agent.settings?.video ? 'video' : kinds.filter((k) => k === 'image').length >= 2 && !session(sessionId).agent.settings?.image ? 'image' : null;
+            if (need) {
+              recordMetric(sessionId, { type: 'rejected' });
+              respond(`Not shown: call confirm_settings first (kind "${need}") so the user confirms the model, resolution${need === 'video' ? ', duration' : ''} and aspect; then write the prompts for the confirmed model and call propose_plan.`);
+              continue;
+            }
           }
           patchAgent(sessionId, { phase: 'checking' });
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
