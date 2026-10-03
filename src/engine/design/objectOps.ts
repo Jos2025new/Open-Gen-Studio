@@ -182,3 +182,17 @@ export function distributePickedObjects(sessionId: string, docId: string, layerI
   const deltas = distributeObjectDeltas(l, ids, axis);
   if (deltas.size) commitObjects(sessionId, docId, moveEach(l, deltas));
 }
+
+/** Delete the picked objects of a layer (painted strokes, shapes, Lineart strokes); the rest stays editable. One undo step. */
+export function deletePickedObjects(sessionId: string, docId: string, layerId: string, ids: string[]): void {
+  const l = picked(sessionId, docId, layerId);
+  if (!l || !ids.length) return;
+  const gone = new Set(ids);
+  const next: Layer = l.type === 'raster'
+    ? { ...l, paintStrokes: (l.paintStrokes ?? []).filter((s) => !gone.has(s.id)) }
+    : l.type === 'vector'
+      ? { ...l, shapes: l.shapes.filter((s) => !gone.has(s.id)), ...(l.strokes ? { strokes: l.strokes.filter((s) => !gone.has(s.id)) } : {}) }
+      : l;
+  if (next === l) return;
+  commitObjects(sessionId, docId, next);
+}

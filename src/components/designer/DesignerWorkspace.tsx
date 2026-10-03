@@ -1,3 +1,6 @@
+import type { DesignDoc } from '../../engine/types';
+import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
+import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
@@ -34,6 +37,13 @@ const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string; detail: string }>
   { id: 'svg', label: 'SVG', detail: 'Editable layers, text and shapes' },
   { id: 'pdf', label: 'PDF', detail: 'Vector; text in standard fonts' },
 ];
+
+/** Objects picked on the canvas in a layer that still has them. */
+function pickedHere(doc: DesignDoc): boolean {
+  const pk = objectPick(doc.id);
+  const l = pk && doc.layers.find((x) => x.id === pk.layerId);
+  return Boolean(pk && l && pk.ids.length && layerObjects(l).some((o) => pk.ids.includes(o.id)));
+}
 
 export function DesignerWorkspace() {
   const session = useStore((s) => s.sessions[s.activeSessionId]);
@@ -150,11 +160,18 @@ export function DesignerWorkspace() {
         else if (k === 'd') setSelection(doc.id, null);
         else if (k === 'i') invertSelection(doc);
         else { const err = selectionToLayer(session.id, doc); if (err) toast(err, 'error'); }
-      } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && getSelection(doc.id)) {
-        // With a selection, Delete erases its pixels instead of deleting the layer.
+      } else if (!e.altKey && ((!mod && (e.key === 'Delete' || e.key === 'Backspace')) || (mod && k === 'x')) && getSelection(doc.id)) {
+        // With a selection, Delete (or Ctrl+X, handled by cut) erases its pixels instead of deleting the layer.
+        if (mod) return;
         e.preventDefault();
         const err = clearSelected(session.id, doc);
         if (err) toast(err, 'error');
+      } else if (!e.altKey && ((!mod && (e.key === 'Delete' || e.key === 'Backspace')) || (mod && k === 'x')) && pickedHere(doc)) {
+        // Objects picked on the canvas (strokes, shapes): Delete, Backspace or Ctrl+X remove just them, not the layer.
+        e.preventDefault();
+        const pk = objectPick(doc.id)!;
+        deletePickedObjects(session.id, doc.id, pk.layerId, pk.ids);
+        setObjectPick(doc.id, null);
       } else if (!mod && !e.altKey) {
         if (e.key === 'Delete' && layer && !layer.locked) {
           e.preventDefault();

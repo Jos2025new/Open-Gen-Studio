@@ -56,3 +56,18 @@ describe('Edit in Objects mode: only the picked objects change', () => {
     expect(both.has('r1')).toBe(false);
   });
 });
+
+import { deletePickedObjects } from '../src/engine/design/objectOps';
+import { useStore } from '../src/store/store';
+
+describe('Delete removes only the picked objects of the active layer', () => {
+  it('a vector layer keeps its other shapes and the layer itself', () => {
+    const v: VectorLayer = { ...newVectorLayer('Shapes'), shapes: [rect('r1', 0, 0), rect('r2', 300, 300)] };
+    const sid = useStore.getState().activeSessionId;
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], docs: [{ id: 'dd', name: 'D', width: 1000, height: 1000, layers: [v], activeLayerId: v.id, createdAt: 0, updatedAt: 0 } as never] } } }));
+    deletePickedObjects(sid, 'dd', v.id, ['r1']);
+    const after = useStore.getState().sessions[sid].docs[0].layers;
+    expect(after).toHaveLength(1);
+    expect((after[0] as VectorLayer).shapes.map((s) => s.id)).toEqual(['r2']);
+  });
+});

@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Supr / Ctrl+X borran lo elegido en la capa activa, no la capa (2026-10-03)
+- [x] (usuario: "quiero borrar lo que tenga seleccionado en la capa activa; para borrar la capa ya hay una función") Orden de Supr/Retroceso: con selección de píxeles, borra esos píxeles (como antes; Ctrl+X los corta); si no, con objetos elegidos en el lienzo (trazos de pincel, formas, trazos de Lineart), Supr, Retroceso o Ctrl+X quitan solo esos objetos (`deletePickedObjects`, un paso de deshacer; el resto sigue editable); solo sin nada elegido Supr borra la capa como antes. `objectOps.ts`, `DesignerWorkspace.tsx`. Test `object-ops` (+1). Suite verde; sin navegador.
+
 ## Fallo — varias capas elegidas, solo se transformaba una (2026-10-03)
 - [x] (usuario) En modo Objects (el de por defecto) los tiradores solo tomaban la capa activa aunque hubiera 2+ capas elegidas en el panel. Ahora, sin objetos elegidos dentro de una capa y con varias capas elegidas, los tiradores las envuelven y transforman juntas (como en modo Layer). `Stage.tsx` (`xformTargets`). Navegador (copia aislada): Image 3 + Vista de perfil elegidas → una caja con tiradores para las dos; arrastrar la esquina cambia la matriz de las dos.
 - Revisado (sin cambio): "se reemplazó la imagen que pegué" — en `data/state.json` la imagen pegada (`ast_musutyajierw8n2171`, subida) solo está como adjunto del mensaje; nunca fue capa (los nombres "Image N" cuentan capas: la siguiente fue "Image 3"), y ningún paso del plan borró ni sustituyó capas (`target: "new"`). Pegar sobre el lienzo crea una capa y no adjunta nada (comprobado en la copia aislada); pegar con el cursor en la caja del prompt solo adjunta.
