@@ -16,6 +16,7 @@ import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, p
 import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
 import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
+import { pathBox, toolPath } from '../../engine/design/shapeTools';
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
@@ -35,14 +36,17 @@ type Drag =
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
-  | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
+  | { kind: 'shape'; tool: ShapeTool; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
 
 const HANDLE = 8;
 const RULER = 18;
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
-const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
+const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
+type ShapeTool = keyof typeof SHAPE_NAMES;
+/** Drawn between two points (stroke only), not inside a box. */
+const STROKE_ONLY = (t: ShapeTool) => t === 'line' || t === 'curve' || t === 'arrow';
 
 type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
 
@@ -399,20 +403,22 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.translate(view.x, view.y);
       ctx.scale(view.zoom, view.zoom);
       ctx.globalAlpha = 0.85;
-      ctx.beginPath();
-      if (preview.tool === 'rect') ctx.roundRect(x, y, w, h, Math.min(shapeStyle.radius, w / 2, h / 2));
-      else if (preview.tool === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      else {
-        ctx.moveTo(preview.x0, preview.y0);
-        ctx.lineTo(preview.x1, preview.y1);
-      }
-      if (preview.tool !== 'line' && shapeStyle.fill) {
+      const lineLike = STROKE_ONLY(preview.tool);
+      const path = preview.tool === 'polygon' || preview.tool === 'curve' || preview.tool === 'arrow'
+        ? new Path2D(toolPath(preview.tool, preview.x0, preview.y0, preview.x1, preview.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: shapeStyle.strokeWidth }))
+        : new Path2D();
+      if (preview.tool === 'rect') path.roundRect(x, y, w, h, Math.min(shapeStyle.radius, w / 2, h / 2));
+      else if (preview.tool === 'ellipse') path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      else if (preview.tool === 'line') { path.moveTo(preview.x0, preview.y0); path.lineTo(preview.x1, preview.y1); }
+      if (!lineLike && shapeStyle.fill) {
         ctx.fillStyle = shapeStyle.fill;
-        ctx.fill();
+        ctx.fill(path);
       }
-      ctx.strokeStyle = preview.tool === 'line' ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke ?? 'rgba(212,242,90,0.6)';
-      ctx.lineWidth = (preview.tool === 'line' || shapeStyle.stroke ? shapeStyle.strokeWidth : 1) || 1;
-      ctx.stroke();
+      ctx.strokeStyle = lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke ?? 'rgba(212,242,90,0.6)';
+      ctx.lineWidth = (lineLike || shapeStyle.stroke ? shapeStyle.strokeWidth : 1) || 1;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke(path);
       ctx.restore();
     }
   }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
@@ -649,8 +655,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       return;
     }
 
-    if (tool === 'rect' || tool === 'ellipse' || tool === 'line') {
-      drag.current = { kind: 'shape', tool, x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+    if (tool in SHAPE_NAMES) {
+      drag.current = { kind: 'shape', tool: tool as ShapeTool, x0: p.x, y0: p.y, x1: p.x, y1: p.y };
       setPreview(drag.current);
       return;
     }
@@ -787,7 +793,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       let x1 = p.x;
       let y1 = p.y;
       if (e.shiftKey) {
-        if (d.tool === 'line') {
+        if (STROKE_ONLY(d.tool)) {
           const ang = Math.round(Math.atan2(y1 - d.y0, x1 - d.x0) / (Math.PI / 4)) * (Math.PI / 4);
           const len = Math.hypot(x1 - d.x0, y1 - d.y0);
           x1 = d.x0 + Math.cos(ang) * len;
@@ -868,9 +874,23 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const w = d.x1 - d.x0;
       const h = d.y1 - d.y0;
       if (Math.hypot(w, h) * view.zoom < 4) return;
-      const shape = {
+      const lineLike = STROKE_ONLY(d.tool);
+      const d0 = d.tool === 'polygon' || d.tool === 'curve' || d.tool === 'arrow' ? toolPath(d.tool, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
+      const pbox = d0 ? pathBox(d0) : null;
+      if (d0 && !pbox) return;
+      const shape = pbox ? {
         id: uid('shp'),
-        type: d.tool,
+        type: 'path' as const,
+        d: d0!,
+        box0: pbox,
+        ...pbox,
+        fill: lineLike ? null : shapeStyle.fill,
+        stroke: lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
+        strokeWidth: lineLike ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
+        radius: 0,
+      } : {
+        id: uid('shp'),
+        type: d.tool as 'rect' | 'ellipse' | 'line',
         x: d.tool === 'line' ? d.x0 : Math.min(d.x0, d.x1),
         y: d.tool === 'line' ? d.y0 : Math.min(d.y0, d.y1),
         w: d.tool === 'line' ? w : Math.abs(w),

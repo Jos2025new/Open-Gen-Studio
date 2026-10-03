@@ -123,7 +123,7 @@ export interface UiState {
   snap?: { on: boolean; page: boolean; layers: boolean };
   /** Edit tool: Ctrl-click picks more objects of the active layer (default) or more layers. */
   selectMode?: 'objects' | 'layers';
-  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number };
+  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number };
   text: TextStyle;
   threadOpen: boolean;
   settingsOpen: boolean;

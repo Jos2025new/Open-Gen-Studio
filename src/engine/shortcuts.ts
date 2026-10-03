@@ -4,7 +4,7 @@ import type { DesignTool } from './design/rules';
 export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', m: 'select', i: 'eyedropper', b: 'brush', g: 'fill', u: 'gradient', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
 const TOOL_NAMES: Record<DesignTool, string> = {
-  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', text: 'Text',
+  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text',
 };
 
 export interface ShortcutGroup {

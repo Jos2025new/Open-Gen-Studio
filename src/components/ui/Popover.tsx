@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom';
  * growing upward. When there is not enough room above, it flips below.
  */
 
-export type Placement = 'top-start' | 'bottom-start' | 'right-end';
+export type Placement = 'top-start' | 'bottom-start' | 'right-start' | 'right-end';
 
 const GAP = 8;
 const MARGIN = 8;
@@ -44,7 +44,12 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     const w = Math.min(width, vw - MARGIN * 2);
     const contentH = el.scrollHeight;
     const next: CSSProperties = { width: w, visibility: 'visible' };
-    if (placement === 'right-end') {
+    if (placement === 'right-start') {
+      // Beside the anchor, aligned to its top (a rail's flyout).
+      next.left = Math.min(r.right + GAP, vw - w - MARGIN);
+      next.top = Math.max(MARGIN, Math.min(r.top, vh - contentH - MARGIN));
+      next.maxHeight = vh - next.top - MARGIN;
+    } else if (placement === 'right-end') {
       next.left = Math.min(r.right + GAP, vw - w - MARGIN);
       next.bottom = Math.max(MARGIN, vh - r.bottom);
       next.maxHeight = r.bottom - MARGIN;
