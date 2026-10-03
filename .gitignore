@@ -11,3 +11,6 @@ data.bak-*/
 # Local tool output (architecture diagrams, tool ids)
 .archify/
 .freebuff/
+
+# Live end-to-end runs (generated media and reports)
+e2e-runs/
