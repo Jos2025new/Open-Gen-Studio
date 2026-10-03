@@ -156,3 +156,6 @@
 .layer-group-icon { color: var(--text-3); flex-shrink: 0; }
 .layers-picked button { display: inline-flex; align-items: center; gap: 3px; }
 .selection-chip { gap: 6px; border: 1px dashed var(--border); }
+.preset { flex-direction: row; align-items: center; gap: 12px; }.preset-glyph { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }.preset-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.preset-glyph .aspect-glyph { max-width: none; max-height: none; border-width: 1.5px; }
+.preset-menu-label { display: inline-flex; align-items: center; gap: 8px; }.preset-menu-glyph { width: 18px; display: inline-flex; justify-content: center; }

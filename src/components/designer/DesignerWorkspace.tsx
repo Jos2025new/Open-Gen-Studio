@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { CanvasSize } from './CanvasSize';
+import { AspectGlyph } from '../composer/MediaControls';
 import { groupLayers } from '../../engine/design/groups';
 import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
@@ -178,7 +179,7 @@ export function DesignerWorkspace() {
     <TopbarActions>
       <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
-        {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
+        {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
       {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <SelectionChip docId={doc.id} />}
@@ -216,6 +217,6 @@ export function DesignerWorkspace() {
         <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
         <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
       </ToolRail><Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} /><LayersPanel sessionId={session.id} doc={doc} /></> :
-      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></button>)}</div></div>}
+      <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div></div>}
   </div>;
 }

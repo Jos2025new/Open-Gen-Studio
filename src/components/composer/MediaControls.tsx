@@ -12,11 +12,11 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { ModelList, priceHint } from './ModelList';
 
-export function AspectGlyph({ value }: { value: string }) {
+export function AspectGlyph({ value, size = 14 }: { value: string; size?: number }) {
   const r = ratioOf(value);
   if (r == null) return <span className="aspect-glyph is-auto" />;
-  const w = r >= 1 ? 14 : Math.max(5, 14 * r);
-  const h = r >= 1 ? Math.max(5, 14 / r) : 14;
+  const w = r >= 1 ? size : Math.max(5, size * r);
+  const h = r >= 1 ? Math.max(5, size / r) : size;
   return <span className="aspect-glyph" style={{ width: w, height: h }} />;
 }
 
