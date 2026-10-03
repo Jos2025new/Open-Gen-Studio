@@ -37,6 +37,21 @@ const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as c
 
 type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
 
+let tile: HTMLCanvasElement | null = null;
+/** The transparency checkerboard: two 12 px cells of each tone. */
+function checkerTile(): HTMLCanvasElement {
+  if (tile) return tile;
+  tile = document.createElement('canvas');
+  tile.width = tile.height = 24;
+  const c = tile.getContext('2d')!;
+  c.fillStyle = '#26262b';
+  c.fillRect(0, 0, 24, 24);
+  c.fillStyle = '#303036';
+  c.fillRect(0, 0, 12, 12); // the page corner starts with the light cell, as before
+  c.fillRect(12, 12, 12, 12);
+  return tile;
+}
+
 export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: CurveSelection; setSelectedCurve: (value: CurveSelection) => void }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,11 +165,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.beginPath();
       ctx.rect(0, 0, doc.width, doc.height);
       ctx.clip();
-      const cell = 12 / view.zoom;
-      ctx.fillStyle = '#26262b';
-      ctx.fillRect(0, 0, doc.width, doc.height);
-      ctx.fillStyle = '#303036';
-      for (let y = 0; y < doc.height; y += cell) for (let x = (Math.floor(y / cell) % 2) * cell; x < doc.width; x += cell * 2) ctx.fillRect(x, y, cell, cell);
+      // 12 px screen cells anchored at the page corner, as one repeated tile (one fill instead of a rect per cell,
+      // which grew with the square of the zoom). Drawn in screen space; the clip above still holds.
+      const pattern = ctx.createPattern(checkerTile(), 'repeat');
+      if (pattern) {
+        pattern.setTransform(new DOMMatrix().translate(view.x, view.y));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.fillStyle = pattern;
+        ctx.fillRect(view.x, view.y, doc.width * view.zoom, doc.height * view.zoom);
+      }
       ctx.restore();
     }
     drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
