@@ -23,7 +23,7 @@ describe('a failed job reported with an error status', () => {
   // Real Atlas answer (2026-10-03): HTTP 511, the prediction itself failed.
   const atlas511 = { code: 511, message: 'Upstream access denied, please contact administrator.', data: { id: '9fdd', status: 'failed', error: 'Upstream access denied, please contact administrator.', error_code: 1013002 } };
   it('is final: the error is shown at once instead of retrying forever', async () => {
-    expect(failedJobMessage(atlas511)).toBe('Upstream access denied, please contact administrator.');
+    expect(failedJobMessage(atlas511)).toBe('Upstream access denied, please contact administrator. [code 1013002]');
     let calls = 0;
     const p = pollJob({ kind: 'image', onStatus: () => undefined } as never, 'Atlas Cloud', 10, async () => {
       calls++;

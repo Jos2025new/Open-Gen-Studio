@@ -163,7 +163,10 @@ export function failedJobMessage(body: unknown): string | undefined {
     const status = String(b.status ?? '').toLowerCase();
     if (['failed', 'failure', 'error', 'canceled', 'cancelled'].includes(status)) {
       const why = b.error ?? b.message ?? (body as { message?: unknown }).message;
-      return typeof why === 'string' && why.trim() ? why.trim() : 'the job failed';
+      const text = typeof why === 'string' && why.trim() ? why.trim() : 'the job failed';
+      // The provider's own error code, when it gives one, travels with the message (for the log).
+      const code = b.error_code ?? (body as { error_code?: unknown }).error_code;
+      return code != null && code !== '' ? `${text} [code ${String(code)}]` : text;
     }
   }
   return undefined;
