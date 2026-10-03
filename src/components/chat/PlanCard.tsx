@@ -173,6 +173,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <span className="step-detail faint">{stepDetail(s, name, refName)}</span>
                 </span>
               )}
+              {awaiting && (s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d') ? <SuggestChange label={`"${s.title}"`} /> : null}
               {gen?.assetIds.length ? (
                 <button type="button" className="step-thumb" onClick={() => setUi({ lightbox: { assetIds: gen.assetIds, index: 0 } })} aria-label="Open result">
                   <AssetMedia assetId={gen.assetIds[0]} hoverPlay={false} draggable={false} />
@@ -258,40 +259,47 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
 }
 
 /**
- * The candidates of a step, each a slight variation of the shared prompt. While the plan waits, a pencil per option
- * sends "change this" to the agent as a comment on the plan: it revises that option only (the revision path).
+ * A pencil that opens a short field: what the user writes goes to the agent as a comment on the waiting plan, which
+ * revises only that step or option (the existing revision path).
  */
-function Variations({ title, variations, editable }: { title: string; variations: string[]; editable: boolean }) {
-  const [editing, setEditing] = useState<number | null>(null);
+function SuggestChange({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
-  const send = (i: number) => {
+  const send = () => {
     const t = text.trim();
     if (!t) return;
-    void sendAgentMessage(`"${title}", option ${i + 1}: ${t}`, { attachments: [] });
-    setEditing(null);
+    void sendAgentMessage(`${label}: ${t}`, { attachments: [] });
+    setOpen(false);
     setText('');
   };
+  return (
+    <>
+      <button type="button" className="icon-btn step-variation-edit" aria-label={`Suggest changes to ${label}`} data-tip="Suggest changes" onClick={() => { setOpen((o) => !o); setText(''); }}>
+        <Pencil size={12} />
+      </button>
+      {open ? (
+        <input
+          autoFocus
+          className="q-custom step-variation-input"
+          placeholder="What should change here?"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** The candidates of a step, each a slight variation of the shared prompt, each with its own pencil. */
+function Variations({ title, variations, editable }: { title: string; variations: string[]; editable: boolean }) {
   return (
     <ol className="step-variations">
       {variations.map((v, i) => (
         <li key={i}>
           <span className="num faint">{i + 1}</span>
           <span className="step-variation">{v}</span>
-          {editable ? (
-            <button type="button" className="icon-btn step-variation-edit" aria-label={`Suggest changes to option ${i + 1}`} data-tip="Suggest changes" onClick={() => { setEditing(editing === i ? null : i); setText(''); }}>
-              <Pencil size={12} />
-            </button>
-          ) : null}
-          {editing === i ? (
-            <input
-              autoFocus
-              className="q-custom step-variation-input"
-              placeholder="What should change in this option?"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') send(i); if (e.key === 'Escape') setEditing(null); }}
-            />
-          ) : null}
+          {editable ? <SuggestChange label={`"${title}", option ${i + 1}`} /> : null}
         </li>
       ))}
     </ol>

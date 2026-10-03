@@ -23,7 +23,7 @@ describe('candidates with their own variation', () => {
       return { outputs: [] };
     };
     try {
-      const g = createGeneration({ sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: 'gamer girl sheet', modelRef: LOCAL_IMAGE_REF, settings: { count: 2, advanced: {} }, origin: 'plan', variants: ['pink hair', 'black braids'] });
+      const g = createGeneration({ sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: 'gamer girl sheet', modelRef: LOCAL_IMAGE_REF, settings: { count: 2, advanced: {} }, origin: 'agent', variants: ['pink hair', 'black braids'] });
       await runGeneration(g.id).catch(() => undefined);
     } finally {
       ADAPTERS.local.generate = real;
