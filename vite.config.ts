@@ -45,7 +45,12 @@ function mediaRelay(): Plugin {
       res.statusCode = upstream?.status ?? 502;
       return res.end('upstream failed');
     }
-    res.setHeader('Content-Type', upstream.headers.get('content-type') ?? 'application/octet-stream');
+    // Relayed bytes are media, never a page of the app: only media types pass as they came, nothing is sniffed, and a
+    // document opened from here runs sandboxed (no effect on <img>, <video> or fetch).
+    const type = upstream.headers.get('content-type') ?? '';
+    res.setHeader('Content-Type', /^(image|video|audio|model)\/|^application\/(octet-stream|zip)\b/i.test(type) ? type : 'application/octet-stream');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', 'sandbox');
     res.end(new Uint8Array(await upstream.arrayBuffer()));
   };
   return {

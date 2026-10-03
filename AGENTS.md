@@ -1,5 +1,14 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — frontera del servidor local (auditoría GPT 6 Astra, contrastada, 2026-10-03) · rama `better-worflows-xyz765` · punto de retorno: `478b767`
+Aplicados por orden de gravedad real (el usuario eligió 1–3, 5 y 6; omitidos 4 enlaces firmados en debug, 7 límites de recursos, 8 autenticación local). Vite 8 ya escucha solo en localhost, rechaza Host ajenos y no deja leer respuestas a otros orígenes: el riesgo real era **enviar**, no leer.
+- [x] 1. Escrituras solo desde la app: `X-OGS: 1` y Origin propio en todo lo que no es GET/HEAD (`local-store.js`; cliente con `LOCAL_WRITE` en `disk.ts`, `log.ts`, `jobs.ts`). *Por qué:* un POST simple desde cualquier web llegaba a `/wipe` (204 sin el arreglo).
+- [x] 2. `server.fs.deny` con `data/**` y `data.bak-*/**` (más los valores por defecto de Vite). *Por qué:* `GET /data/state.json` devolvía 200 con todo el estado y las claves (comprobado con el servidor).
+- [x] 3. `PUT /state` solo acepta un estado con `savedAt`, `baseAt` y cierre `}` (sin analizar el JSON entero); si no, 400 y el archivo intacto.
+- [x] 5. `keyedUrl` (`providers/shared.ts`): la clave solo va a `https://queue.fal.run` (fal) o `https://api.atlascloud.ai` (Atlas, `pollUrl`); otra dirección falla sin enviarla.
+- [x] 6. Blobs y relay `/x/media`: `nosniff` y `Content-Security-Policy: sandbox`; el relay solo deja pasar tipos de medio. No afecta a `<img>`, `<video>` ni `fetch`.
+Tests: `store-server` (4), `keyed-url` (2); cada uno falla sin su arreglo. Suite completa verde. Sin navegador: comprobar en uso que guardar, borrar, unir clips y el registro siguen funcionando (una pestaña abierta con el JS anterior recibirá 403 al guardar hasta recargar).
+
 ## Tarea — carreras y trazabilidad (auditoría Claude + GPT 6 Astra, 2026-10-03) · rama `better-worflows-xyz765` · punto de retorno: `7e25945`
 Plan acordado entre los dos auditores; un commit por paso, test que falla sin el arreglo.
 - [x] A. Cancelación por sesión: `controllers` por sesión en `runtime.ts`; Stop, el tope de 5 min y la limpieza solo tocan su propio turno. *Por qué:* con un controlador global, Stop o el tope de una sesión cortaban el turno de otra y al terminar uno el otro quedaba sin Stop. Test `agent-cancel`.

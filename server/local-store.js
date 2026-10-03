@@ -209,6 +209,10 @@ export function localStore(root = process.cwd()) {
       const existing = await findBlob(key.ns, key.id);
       if (req.method === 'GET') {
         if (!existing) return send(404);
+        // Stored media is served as data, never as a page of the app: no type sniffing, and a document opened
+        // straight from here (an SVG with a script) runs sandboxed. <img>, <video> and fetch are not affected.
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', 'sandbox');
         return send(200, await readFile(existing), EXT_MIME[existing.split('.').pop()] ?? 'application/octet-stream');
       }
       if (req.method === 'PUT') {

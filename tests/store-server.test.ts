@@ -4,11 +4,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { localStore } from '../server/local-store.js';
 
+const last = { headers: {} as Record<string, string> };
 /** Drive the plugin's middleware with a fake request; resolves with the status code. */
 function call(mw: (req: unknown, res: unknown, next: () => void) => void, method: string, url: string, body = '', headers: Record<string, string> = { 'x-ogs': '1', host: 'localhost:5173' }): Promise<number> {
   return new Promise((resolve) => {
     const req = { method, url, headers, async *[Symbol.asyncIterator]() { if (body) yield new TextEncoder().encode(body); } };
-    const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
+    const res = { statusCode: 0, headers: {} as Record<string, string>, setHeader: (k: string, v: string) => { res.headers[k.toLowerCase()] = v; }, end: () => { last.headers = res.headers; resolve(res.statusCode); } };
     mw(req, res, () => resolve(404));
   });
 }
@@ -43,6 +44,22 @@ describe('local store: only a whole saved state replaces the file', () => {
     expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":')).toBe(400);
     expect(String(readFileSync(join(root, 'data', 'state.json')))).toBe('{"savedAt":100,"x":0}');
     expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":1}')).toBe(204);
+  });
+});
+
+describe('local store: media is served as data', () => {
+  it('an SVG with a script comes back sandboxed and without sniffing', async () => {
+    const { mw } = setup();
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
+    const put = await new Promise<number>((resolve) => {
+      const req = { method: 'PUT', url: '/x/store/blob/asset%3Aa1', headers: { 'x-ogs': '1', host: 'localhost:5173', 'content-type': 'image/svg+xml' }, async *[Symbol.asyncIterator]() { yield new TextEncoder().encode(svg); } };
+      const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
+      mw(req, res, () => resolve(404));
+    });
+    expect(put).toBe(204);
+    expect(await call(mw, 'GET', '/x/store/blob/asset%3Aa1', '', { host: 'localhost:5173' })).toBe(200);
+    expect(last.headers['content-security-policy']).toBe('sandbox');
+    expect(last.headers['x-content-type-options']).toBe('nosniff');
   });
 });
 
