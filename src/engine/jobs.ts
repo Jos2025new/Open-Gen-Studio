@@ -893,7 +893,13 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
     } catch (err) {
       const remoteJob = keptJob(err, job);
       if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
-      else patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
+      else {
+        patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
+        // A job that was sent and then failed while being followed (after a reload or Check status): same trail as
+        // a failure on the first run (T5).
+        const cur = get().generations[id];
+        logEvent('provider-error', { generation: id, model: cur?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: cur?.sent, resumed: true });
+      }
       return [];
     } finally {
       running.delete(id);
