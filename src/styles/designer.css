@@ -150,3 +150,4 @@
 .anchor-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
 .anchor-grid button { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); padding: 0; cursor: pointer; }
 .anchor-grid button.is-on { background: var(--accent); border-color: var(--accent); }
+.opt-hint { font-size: 11px; color: var(--text-3); white-space: nowrap; }

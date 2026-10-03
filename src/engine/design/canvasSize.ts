@@ -2,6 +2,7 @@ import type { DesignDoc } from '../types';
 import { getDoc, mutateDoc, rebasePaintLayer } from './actions';
 import { translateLayer, unionBox } from './doc';
 import { layerBox } from './render';
+import { setSelection } from './pixelSelection';
 
 /* Page size of a design: set it with an anchor, or trim it to what is drawn. Layers keep their pixels; they move so
    the anchored part of the page stays where it was. One undo step. */
@@ -20,6 +21,8 @@ export function anchorOffset(from: { width: number; height: number }, to: { widt
 
 function resizeBy(sessionId: string, docId: string, width: number, height: number, dx: number, dy: number): void {
   mutateDoc(sessionId, docId, (d: DesignDoc) => ({ ...d, width, height, updatedAt: Date.now(), layers: d.layers.map((l) => translateLayer(l, dx, dy)) }));
+  // A pixel selection was drawn on the old page: it no longer matches.
+  setSelection(docId, null);
   // Page-sized paint layers follow the new page, so the brush reaches all of it.
   const doc = getDoc(sessionId, docId);
   for (const l of doc?.layers ?? []) if (l.type === 'raster' && !l.sourceAssetId) rebasePaintLayer(sessionId, docId, l.id);

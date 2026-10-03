@@ -219,6 +219,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
   };
   if (tool === 'hand') return null;
   if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} />;
+  if (tool === 'eyedropper') return <div className="tool-settings" role="toolbar" aria-label="Eyedropper settings"><InlineColor label="Picked" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} /><span className="opt-hint">Click the page to pick its visible color</span></div>;
   if (tool === 'gradient') {
     const g = gradient ?? { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
     const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
