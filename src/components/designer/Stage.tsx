@@ -721,6 +721,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
             return;
           }
           setActiveLayer(sessionId, doc.id, layer.id);
+          // A plain click on an object: layers picked before (Ctrl/Shift in the panel) are let go.
+          pickLayer(doc.id, layer.id, false, []);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
           const again = cur?.layerId === layer.id && cur.ids.includes(id);
           const ids = again ? cur!.ids : [id];
@@ -745,6 +747,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
         const whole = hitTestPixel(current, p.x, p.y);
         setObjectPick(doc.id, null);
+        // Plain click outside the picked layers (or on empty canvas): start over with just what was clicked.
+        const pickedNow = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+        if (!whole || !pickedNow.includes(whole.id)) pickLayer(doc.id, whole?.id ?? '', false, pickedNow);
         if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
           const again = current.activeLayerId === whole.id;
           setActiveLayer(sessionId, doc.id, whole.id);
@@ -774,7 +779,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         }
         return;
       }
-      if (act && !act.locked && act.visible) {
+      const onTop = hitTestPixel(current, p.x, p.y);
+      const picks = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+      // Another layer drawn on top at this point, not picked: the click is for it, not the active layer's box.
+      const otherOnTop = Boolean(onTop && onTop.id !== act?.id && !picks.includes(onTop.id));
+      if (act && !act.locked && act.visible && !otherOnTop) {
         const b = layerBox(act);
         if (b) {
           const tol = HANDLE / view.zoom;
