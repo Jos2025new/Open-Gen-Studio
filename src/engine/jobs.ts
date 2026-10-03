@@ -1,3 +1,4 @@
+import { logged } from '../lib/log';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
@@ -109,7 +110,7 @@ async function ensureAssetBlob(assetId: string): Promise<Blob> {
 /** Keep results that are still only at the provider (e.g. after a download was blocked). Best effort. */
 export async function adoptRemoteAssets(): Promise<void> {
   for (const a of Object.values(get().assets)) {
-    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(() => undefined);
+    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(logged('keep a remote result'));
   }
 }
 
@@ -173,7 +174,7 @@ export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Pr
   const files = await Promise.all(
     outputs.map(async (o) => {
       let blob = o.blob;
-      if (!blob && o.url) blob = await fetchBlob(o.url).catch(() => undefined);
+      if (!blob && o.url) blob = await fetchBlob(o.url).catch(logged('download result'));
       const mime = blob ? await sniffModelMime(blob, o.mime) : (o.mime ?? modelMime(o.url ?? '') ?? 'application/octet-stream');
       return { o, blob: blob && blob.type !== mime ? new Blob([blob], { type: mime }) : blob, mime };
     }),

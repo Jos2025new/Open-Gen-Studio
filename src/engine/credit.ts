@@ -1,3 +1,4 @@
+import { logged } from '../lib/log';
 import { HttpError } from '../lib/http';
 import { formatUsd } from '../lib/format';
 import { apiKeyFor, isConnected, modelSummary } from './catalog';
@@ -118,7 +119,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model), run: () => { dismissAlert(id); void switchTo(o.model).catch(() => undefined); } })),
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
     });
     return false;
   }

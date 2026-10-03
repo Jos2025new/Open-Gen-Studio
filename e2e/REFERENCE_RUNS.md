@@ -26,6 +26,8 @@ Por qué existen: de 30 correcciones (AGENTS.md F1–F30) casi todas se descubri
 
 ## Ejecuciones
 
+**Línea base de referencia: R1 (2026-10-03, Sonnet en el navegador, commit `99c70d2`).** Es la medida del comportamiento real **antes** del bloque de poda T1–T6 (`8590306`…`8716fc7`). Por qué sirve de base: guion fijo, configuración fija (abajo), 4 escenarios de los flujos que más han fallado, generaciones reales, y datos guardados (log, capturas, informe). Cifras clave: agente 31–181 s por petición (13–30 s por llamada), imagen ~40–60 s, vídeo 480p 5 s ~3,5 min, $0.18 en medios, 3 de 4 escenarios completos. Cualquier ejecución posterior se compara con R1 con `tests/e2e/compare.test.ts`; si empeora en flujo, fallos o tiempos, se revisan primero los commits de T1–T6.
+
 ### R1 · 2026-10-03 00:13–00:47 · commit `99c70d2` · `e2e-runs/2026-10-03-0013/`
 
 **Resultado:** S1, S3, S4 completos y como se esperaba; S2 cortado por Atlas ("Upstream access denied", y el reintento también). Coste: $0.18 en medios (estimado $0.21) + $0.03 del agente de la app; el subagente contó $0.24 por los botones Run.

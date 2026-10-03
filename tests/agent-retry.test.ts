@@ -133,8 +133,11 @@ describe('an answer with nothing in it', () => {
     expect(note.text).toMatch(/reasoning/i);
     expect(note.retry).toBeDefined();
     // Retrying works: the same turn runs again and the answer is used.
-    vi.stubGlobal('fetch', async () => sse([text('Aquí va la propuesta.')]));
+    let sent: { messages: Array<{ role: string; content: unknown }> } | undefined;
+    vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => { sent = JSON.parse(String(init?.body)); return sse([text('Aquí va la propuesta.')]); });
     await retryAgentTurn(sid, note.id);
+    // The retry ends with the user's request, not with the empty answer.
+    expect(sent!.messages.at(-1)!.role).toBe('user');
     const feed = useStore.getState().sessions[sid].feed;
     expect(feed.some((f) => f.type === 'assistant' && f.text.includes('propuesta'))).toBe(true);
     expect(feed.some((f) => f.type === 'notice')).toBe(false);

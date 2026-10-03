@@ -1,3 +1,4 @@
+import { logged } from '../../lib/log';
 import { blobDb } from '../../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import { uid } from '../../lib/id';
@@ -188,8 +189,8 @@ export async function ensureBuffers(layers: RasterLayer[]): Promise<void> {
   await Promise.all(
     layers.flatMap((l) => l.paintBaseId ? [l, { ...l, id: l.paintBaseId, paintBaseId: undefined }] : [l]).map(async (l) => {
       if (buffers.has(l.id)) return;
-      const blob = await blobDb.get(keyFor(l.id)).catch(() => undefined);
-      const canvas = blob ? await blobToCanvas(blob).catch(() => null) : null;
+      const blob = await blobDb.get(keyFor(l.id)).catch(logged('read layer pixels'));
+      const canvas = blob ? await blobToCanvas(blob).catch((e) => (logged('decode layer pixels')(e), null)) : null;
       // A missing foundation must never be replaced by blank pixels when objects are moved.
       if (!canvas && baseIds.has(l.id)) return;
       if (buffers.has(l.id)) return;

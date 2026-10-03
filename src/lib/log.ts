@@ -32,3 +32,9 @@ export function logEvent(kind: LogKind, data: Record<string, unknown>): void {
 export function logSettled(): Promise<void> {
   return chain;
 }
+
+/** A `.catch` that keeps going like `() => undefined` but leaves a line: for failures that lose something the user sees. */
+export const logged = (what: string) => (err: unknown): undefined => {
+  logEvent('app', { what, error: String((err as Error)?.message ?? err) });
+  return undefined;
+};

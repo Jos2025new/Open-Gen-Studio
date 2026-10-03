@@ -1325,7 +1325,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           usage: { inputTokens: s.usage.inputTokens + u.inputTokens, outputTokens: s.usage.outputTokens + u.outputTokens, llmUsd: s.usage.llmUsd + llmUsd },
         }));
       }
-      pushHistory(sessionId, {
+      // An empty answer stays out of the history: a Retry would otherwise end the request with an empty assistant message.
+      if (result.text || result.toolCalls.length) pushHistory(sessionId, {
         role: 'assistant',
         content: result.text || null,
         tool_calls: result.toolCalls.length ? result.toolCalls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.arguments } })) : undefined,
