@@ -4,7 +4,7 @@
 Elegidas por el usuario. Una fase por commit; reutilizar render (`drawDoc`), buffers copy-on-write, historial (`record`) e imán (`snap.ts`).
 - [x] D1. Cuentagotas (I; Alt+clic con pincel o cubo) y muestras de color: el selector de color de la barra abre recientes y guardadas (`ui.swatches`, persistidas). *Por qué:* hoy hay que copiar el hex a mano.
 - [x] D2. Tamaño del lienzo: ancho/alto con ancla y "Recortar al contenido". *Por qué:* el documento queda fijo al crearlo.
-- [ ] D3. Selección de píxeles (rectángulo y lazo): borrar, copiar, cortar, rellenar, copiar a capa nueva, invertir, Ctrl+A/Ctrl+D. Las ediciones aplanan la capa raster (como girar). *Por qué:* editar una zona sin Sketch.
+- [x] D3. Selección de píxeles (rectángulo y lazo): borrar, copiar, cortar, rellenar, copiar a capa nueva, invertir, Ctrl+A/Ctrl+D. Las ediciones aplanan la capa raster (como girar). *Por qué:* editar una zona sin Sketch.
 - [ ] D4. Degradado al estilo SAI 2: herramienta (lineal/radial, color→fondo o color→transparente, invertir) en capa nueva, recortado a la selección si la hay.
 - [ ] D5. Grupos de capas: carpetas con nombre; el ojo y el candado del grupo actúan sobre sus capas; clic en el grupo selecciona sus capas (se mueven juntas).
 - [ ] D6. Reglas y guías: reglas arriba/izquierda, arrastrar desde ellas crea una guía (por documento), arrastrarla fuera la borra; el imán se pega a las guías.

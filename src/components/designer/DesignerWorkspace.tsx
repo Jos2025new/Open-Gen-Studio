@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { CanvasSize } from './CanvasSize';
+import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
@@ -75,8 +76,27 @@ export function DesignerWorkspace() {
         }
       })().catch((err) => toast(err instanceof Error ? err.message : 'Could not paste image.', 'error'));
     };
+    const toClipboard = (canvas: HTMLCanvasElement, done: string) => {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') { toast('This browser cannot copy images to the clipboard.', 'error'); return false; }
+      void navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasToBlob(canvas, 'image/png') })])
+        .then(() => toast(done, 'success'))
+        .catch(() => toast('Could not copy image to the clipboard.', 'error'));
+      return true;
+    };
     const copy = (e: ClipboardEvent) => {
       if (e.defaultPrevented || inField(e) || window.getSelection()?.toString() || !doc) return;
+      // With a pixel selection: only the selected pixels of the active layer (Ctrl+X also erases them).
+      if (getSelection(doc.id)) {
+        e.preventDefault();
+        const crop = selectedCrop(doc);
+        if (typeof crop === 'string') { toast(crop, 'error'); return; }
+        if (toClipboard(crop, e.type === 'cut' ? 'Selection cut' : 'Selection copied') && e.type === 'cut') {
+          const err = clearSelected(session.id, doc);
+          if (err) toast(err, 'error');
+        }
+        return;
+      }
+      if (e.type === 'cut') return;
       const layer = activeLayer(doc);
       if (layer?.type !== 'raster') return;
       const buffer = getBuffer(layer.id);
@@ -90,7 +110,8 @@ export function DesignerWorkspace() {
     };
     document.addEventListener('paste', paste);
     document.addEventListener('copy', copy);
-    return () => { document.removeEventListener('paste', paste); document.removeEventListener('copy', copy); };
+    document.addEventListener('cut', copy);
+    return () => { document.removeEventListener('paste', paste); document.removeEventListener('copy', copy); document.removeEventListener('cut', copy); };
   }, [doc, session.id]);
 
   useEffect(() => {
@@ -103,10 +124,24 @@ export function DesignerWorkspace() {
     const onKey = (e: KeyboardEvent) => {
       if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover, .lightbox')) return;
       const layer = activeLayer(doc);
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      const k = e.key.toLowerCase();
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && k === 'z') {
         e.preventDefault();
         (e.shiftKey ? redoDoc : undoDoc)(session.id, doc.id);
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      } else if (mod && (k === 'a' || k === 'd' || k === 'j' || (k === 'i' && e.shiftKey))) {
+        // Pixel selection: all, deselect, to a new layer, invert.
+        e.preventDefault();
+        if (k === 'a') selectAll(doc);
+        else if (k === 'd') setSelection(doc.id, null);
+        else if (k === 'i') invertSelection(doc);
+        else { const err = selectionToLayer(session.id, doc); if (err) toast(err, 'error'); }
+      } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && getSelection(doc.id)) {
+        // With a selection, Delete erases its pixels instead of deleting the layer.
+        e.preventDefault();
+        const err = clearSelected(session.id, doc);
+        if (err) toast(err, 'error');
+      } else if (!mod && !e.altKey) {
         if (e.key === 'Delete' && layer && !layer.locked) {
           e.preventDefault();
           deleteLayer(session.id, doc.id, layer.id);

@@ -109,6 +109,8 @@ export interface UiState {
   brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
   /** Designer colors: the last ones used (newest first) and the ones the user saved. */
   swatches?: { recent: string[]; saved: string[] };
+  /** Pixel selection tool: rectangle (default) or lasso. */
+  selectShape?: 'rect' | 'lasso';
   /** Style of new Lineart strokes (editable afterwards per layer). */
   lineart: StrokeStyle;
   lineartMode?: 'draw' | 'edit';

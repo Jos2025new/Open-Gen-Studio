@@ -15,6 +15,7 @@ import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
+import { getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
 
 interface View {
@@ -29,6 +30,7 @@ type Drag =
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'rasterMove'; layerId: string; strokeIds: string[]; startX: number; startY: number; base: RasterLayer }
   | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
@@ -84,6 +86,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const shapeStyle = useStore((s) => s.ui.shape);
   const textStyle = useStore((s) => s.ui.text);
   const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
+  const selVersion = useSelectionVersion();
+  const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
+  // The selection being drawn (page coordinates), shown until pointer up.
+  const [selDraft, setSelDraft] = useState<Array<[number, number]> | null>(null);
   const fitted = useRef<string | null>(null);
 
   const active = activeLayer(doc);
@@ -178,6 +184,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.restore();
     }
     drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
+    // Pixel selection: a dashed two-tone outline (dark under light) that reads on any artwork.
+    const sel = selDraft ? { points: selDraft } : getSelection(doc.id);
+    if (sel && sel.points.length > 1) {
+      ctx.save();
+      selectionPath(ctx, doc, { points: sel.points });
+      ctx.lineWidth = 1 / view.zoom;
+      ctx.strokeStyle = '#000000';
+      ctx.stroke();
+      ctx.setLineDash([4 / view.zoom, 4 / view.zoom]);
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.restore();
+    }
     // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
     ctx.strokeStyle = '#55555e';
     ctx.lineWidth = 1 / view.zoom;
@@ -290,7 +309,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke();
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -332,6 +351,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const current = getDoc(sessionId, doc.id);
     if (!current) return;
     const act = activeLayer(current);
+
+    if (tool === 'select') {
+      drag.current = { kind: 'select', lasso: selectShape === 'lasso', points: [[p.x, p.y]] };
+      setSelDraft([[p.x, p.y]]);
+      return;
+    }
 
     // Eyedropper, or Alt-click with the brush or the fill: the visible color under the pointer becomes the color.
     if (tool === 'eyedropper' || (e.altKey && (tool === 'brush' || tool === 'fill'))) {
@@ -606,6 +631,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, d.influence ?? Math.max(24, s.size * 4)) : s));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
+    } else if (d.kind === 'select') {
+      if (d.lasso) {
+        const last = d.points[d.points.length - 1];
+        if (Math.hypot(p.x - last[0], p.y - last[1]) * view.zoom >= 2) d.points.push([p.x, p.y]);
+        setSelDraft([...d.points]);
+      } else setSelDraft(rectPoints(d.points[0][0], d.points[0][1], p.x, p.y));
     } else if (d.kind === 'shape') {
       let x1 = p.x;
       let y1 = p.y;
@@ -658,6 +689,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         layer.strokes = [stroke];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
       }
+      return;
+    }
+    if (d.kind === 'select') {
+      const pts = selDraft ?? [];
+      setSelDraft(null);
+      // A click without a drag clears the selection.
+      const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+      const tiny = !pts.length || (Math.max(...xs) - Math.min(...xs)) * view.zoom < 3 || (Math.max(...ys) - Math.min(...ys)) * view.zoom < 3;
+      setSelection(doc.id, tiny ? null : { points: pts });
       return;
     }
     if (d.kind === 'shape') {

@@ -26,7 +26,7 @@ export function isProtectedImage(l: Layer | null | undefined): boolean {
   return !!l && l.type === 'raster' && !!l.sourceAssetId && !l.allowPaint;
 }
 
-export type DesignTool = 'move' | 'hand' | 'eyedropper' | 'brush' | 'fill' | 'lineart' | 'eraser' | 'rect' | 'ellipse' | 'line' | 'text';
+export type DesignTool = 'move' | 'hand' | 'select' | 'eyedropper' | 'brush' | 'fill' | 'lineart' | 'eraser' | 'rect' | 'ellipse' | 'line' | 'text';
 
 export const TOOL_LAYER: Partial<Record<DesignTool, LayerType>> = {
   brush: 'raster',
@@ -43,7 +43,7 @@ export const TOOL_LAYER: Partial<Record<DesignTool, LayerType>> = {
  * layer of their type when needed; paint tools only work on raster layers.
  */
 export function toolBlockReason(tool: DesignTool, active: Layer | null): string | null {
-  if (tool === 'hand') return null;
+  if (tool === 'hand' || tool === 'select' || tool === 'eyedropper') return null;
   if (tool === 'move') {
     if (!active) return 'Select a layer to move.';
     if (active.locked) return `"${active.name}" is locked.`;

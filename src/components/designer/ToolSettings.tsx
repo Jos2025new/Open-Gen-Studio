@@ -12,6 +12,8 @@ import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
+import { clearSelected, fillSelection, getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { toast } from '../../store/store';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -176,6 +178,25 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   </>;
 }
 
+/** Pixel selection: its shape, and what to do with what is selected. */
+function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+  useSelectionVersion();
+  const shape = useStore((s) => s.ui.selectShape ?? 'rect');
+  const brush = useStore((s) => s.ui.brush);
+  const sel = getSelection(doc.id);
+  const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
+  const cur = () => getDoc(sessionId, doc.id)!;
+  return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
+    <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }]} onChange={(v) => setUi({ selectShape: v })} />
+    <button type="button" className="opt" onClick={() => selectAll(cur())} data-tip="Ctrl+A">All</button>
+    <button type="button" className="opt" onClick={() => invertSelection(cur())} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => setSelection(doc.id, null)} data-tip="Ctrl+D">Deselect</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => clearSelected(sessionId, cur()))} data-tip="Delete · erases the selected pixels of the active raster layer">Delete</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => fillSelection(sessionId, cur(), brush.color, brush.opacity))} data-tip="Fills the selection with the brush color, on a new layer">Fill</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
+  </div>;
+}
+
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
   const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
@@ -196,6 +217,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
+  if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} />;
   if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><span data-tip="Ctrl-click picks more strokes of the active layer (Objects) or more layers (Layers)"><InlineSelect label="Select" value={selectMode} options={[{ value: 'objects' as const, label: 'Objects' }, { value: 'layers' as const, label: 'Layers' }]} onChange={(v) => setUi({ selectMode: v })} /></span><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
