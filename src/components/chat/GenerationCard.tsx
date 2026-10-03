@@ -179,7 +179,20 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           <span className={`kind-icon k-${g.kind}`}>{g.kind === 'video' ? <Film size={13} /> : g.kind === 'audio' ? <Music size={13} /> : g.kind === 'text' ? <FileText size={13} /> : <ImageIcon size={13} />}</span>
         )}
         <div className="gen-title">
-          <p className={`gen-prompt ${expanded ? 'is-expanded' : ''}`} onClick={() => setExpanded((v) => !v)} title={expanded ? undefined : title}>
+          <p
+            className={`gen-prompt ${expanded ? 'is-expanded' : ''}`}
+            role="button"
+            tabIndex={0}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
+              e.stopPropagation();
+              setExpanded((v) => !v);
+            }}
+            title={expanded ? undefined : title}
+          >
             {title || <span className="faint">No prompt</span>}
           </p>
           {g.prompt ? <IconButton icon={Copy} label="Copy prompt" size="sm" className="gen-copy" onClick={() => void copyText(g.prompt)} /> : null}

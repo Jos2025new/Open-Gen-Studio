@@ -16,7 +16,10 @@ export function ChatWorkspace() {
     const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === 'chat');
     const last = f?.[f.length - 1];
     if (!last) return '';
-    return last.type === 'assistant' ? `${last.id}:${last.text.length}` : last.id;
+    if (last.type === 'assistant') return `${last.id}:${last.text.length}`;
+    // The activity block keeps its id while the reasoning grows: follow its size too.
+    if (last.type === 'activity') return `${last.id}:${last.entries.length}:${last.entries.reduce((n, e) => n + (e.kind === 'thinking' ? e.text.length : 0), 0)}:${last.endedAt ?? ''}`;
+    return last.id;
   });
   const scrollRef = useRef<HTMLDivElement>(null);
   const stick = useRef(true);

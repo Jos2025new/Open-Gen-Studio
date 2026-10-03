@@ -7,7 +7,7 @@ import type { ExportFormat } from '../../engine/design/export';
 import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, subscribeHistory } from '../../engine/design/history';
-import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
+import { toolBlockReason } from '../../engine/design/rules';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -20,8 +20,8 @@ import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
 import { ToolSettings } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
+import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 
-const SHORTCUTS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', g: 'fill', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string; detail: string }> = [
   { id: 'png', label: 'PNG', detail: 'Image, keeps transparency' },
@@ -110,7 +110,7 @@ export function DesignerWorkspace() {
           e.preventDefault();
           deleteLayer(session.id, doc.id, layer.id);
         } else {
-          const tool = SHORTCUTS[e.key.toLowerCase()];
+          const tool = DESIGN_TOOL_KEYS[e.key.toLowerCase()];
           if (tool && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }
         }
       }

@@ -15,6 +15,7 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
+import { shortcutGroups } from '../../engine/shortcuts';
 
 function ProviderRow({ id }: { id: RemoteProviderId }) {
   const saved = useStore((s) => s.settings.keys[id]);
@@ -286,7 +287,7 @@ export function SettingsPanel() {
     if (changed || !settings.agent.model) void repickAgentModel();
   };
 
-  const [tab, setTab] = usePref<'providers' | 'agent' | 'ops' | 'budget' | 'data'>('ogs:settings-tab', 'providers');
+  const [tab, setTab] = usePref<'providers' | 'agent' | 'ops' | 'budget' | 'data' | 'keys'>('ogs:settings-tab', 'providers');
   // Load missing catalogs when Settings opens.
   useEffect(() => {
     void loadCatalogs();
@@ -296,7 +297,7 @@ export function SettingsPanel() {
     <div className="settings">
       <PopoverHeader title="Settings" sub="Keys are kept on this computer and sent only to their provider." />
       <div className="set-tabs">
-        <Segmented size="sm" value={tab} onChange={setTab} options={[{ value: 'providers', label: 'Providers' }, { value: 'agent', label: 'Agent' }, { value: 'ops', label: 'Operations' }, { value: 'budget', label: 'Budget' }, { value: 'data', label: 'Data' }]} />
+        <Segmented size="sm" value={tab} onChange={setTab} options={[{ value: 'providers', label: 'Providers' }, { value: 'agent', label: 'Agent' }, { value: 'ops', label: 'Operations' }, { value: 'budget', label: 'Budget' }, { value: 'data', label: 'Data' }, { value: 'keys', label: 'Shortcuts' }]} />
       </div>
 
       {tab === 'providers' ? <section className="set-section">
@@ -457,6 +458,23 @@ export function SettingsPanel() {
           </button>
           .
         </p>
+      </section> : null}
+
+      {tab === 'keys' ? <section className="set-section">
+        {shortcutGroups().map((g) => (
+          <div key={g.title} className="set-keys">
+            <span className="set-label">{g.title}</span>
+            <dl>
+              {g.items.map((it) => (
+                <div key={it.keys + it.action} className="set-key-row">
+                  <dt><kbd className="kbd">{it.keys}</kbd></dt>
+                  <dd>{it.action}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+        <p className="set-note">Mod is Ctrl, or ⌘ on a Mac. Shortcuts don't fire while you type in a field.</p>
       </section> : null}
 
       {tab === 'data' ? <section className="set-section">

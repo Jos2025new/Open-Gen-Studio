@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { askForPlan, deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
-import { toast, useStore } from '../../store/store';
+import { copyText } from '../../engine/actions';
+import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationCard } from './GenerationCard';
@@ -100,7 +101,7 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
       {!editing ? (
         <div className="msg-actions">
           {tag}
-          <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void navigator.clipboard.writeText(item.text).then(() => toast('Copied', 'success'))} />
+          <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void copyText(item.text)} />
           {item.workspace === current ? (
             <IconButton icon={Pencil} label="Edit" size="sm" disabled={busy} onClick={() => { setDraft(item.text); setEditing(true); }} />
           ) : null}
@@ -182,7 +183,7 @@ export function FeedList({ sessionId, compact }: { sessionId: string; compact?: 
   const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const canvas = useStore((s) => s.ui.workspace);
   const [everywhere, setEverywhere] = useState(false);
-  const others = useMemo(() => all.filter((f) => f.workspace !== canvas && f.type !== 'activity').length, [all, canvas]);
+  const others = useMemo(() => all.filter((f) => f.workspace !== canvas).length, [all, canvas]);
   const feed = useMemo(() => (everywhere ? all : all.filter((f) => f.workspace === canvas)), [all, canvas, everywhere]);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
