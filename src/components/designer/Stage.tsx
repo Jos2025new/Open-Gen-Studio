@@ -927,7 +927,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     } else if (d.kind === 'xform' && d.op === 'pivot') {
       setPivot({ x: p.x, y: p.y });
     } else if (d.kind === 'xform') {
-      xformAt.current = { d, m: xformMatrix(d, p, e.shiftKey) };
+      // Scale handles snap too: the dragged side or corner meets page edges, guides and other layers (Alt: free).
+      let q = p;
+      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
+      if (d.op === 'scale' && snap.on && !e.altKey) {
+        const ids = new Set(d.bases.map((b) => b.layer.id));
+        const t = snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap);
+        const tol = 6 / view.zoom;
+        const near = (v: number, lines: number[]) => lines.reduce<number | undefined>((best, l) => (Math.abs(l - v) <= tol && (best === undefined || Math.abs(l - v) < Math.abs(best - v)) ? l : best), undefined);
+        const gx = d.h.fx ? near(p.x, t.xs) : undefined, gy = d.h.fy ? near(p.y, t.ys) : undefined;
+        q = { x: gx ?? p.x, y: gy ?? p.y };
+        showGuides({ x: gx, y: gy });
+      }
+      xformAt.current = { d, m: xformMatrix(d, q, e.shiftKey) };
       xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
     } else if (d.kind === 'objMove') {
       if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;

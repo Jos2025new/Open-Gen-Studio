@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — el imán también al escalar con los tiradores (2026-10-03)
+- [x] (usuario) Con los 8 tiradores de escala el lado o esquina arrastrado se pega a bordes y centro de la página, guías y otras capas (mismas opciones y tolerancia de 6 px que al mover; Alt = libre), con la guía magenta. Solo en los ejes que mueve ese tirador. Rotar e inclinar no se imantan. `Stage.tsx` (rama `xform`). Typecheck y suite; sin navegador.
+
 ## Tarea — Snap solo con icono (2026-10-03)
 - [x] (usuario) El botón Snap de la barra de Edit: imán + flecha, sin texto (el nombre y si está activo van en el tooltip; sigue en lima cuando está activo). `ToolSettings.tsx`. Typecheck; sin navegador.
 
