@@ -3,7 +3,7 @@ import { extractErrorMessage, fetchJsonWithRelay, JobFailedError, requestJson } 
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, numberOrUndefined, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -286,7 +286,7 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'audio' : ctx.kind; // text jobs are lyrics (audio models)
   return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' || ctx.kind === 'text' ? 2000 : 5000, async () => {
     const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] | null; files?: AtlasFile[]; thumbnail?: string; lyrics_result?: LyricsResult | null } }>(
-      job.meta.pollUrl ?? `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
+      job.meta.pollUrl ? keyedUrl(job.meta.pollUrl, BASE, 'Atlas Cloud') : `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
       { headers: { Authorization: `Bearer ${ctx.apiKey}` }, signal: ctx.signal, timeoutMs: POLL_TIMEOUT_MS },
     );
     const status = String(res.data?.status ?? '').toLowerCase();

@@ -208,3 +208,19 @@ export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: 
     if (woke) failures = 0;
   }
 }
+
+/**
+ * A URL the provider (or the saved job) gave us, checked before the API key is attached to it: https and on the
+ * provider's own origin. A job record changed on disk or a provider answer pointing elsewhere never receives the key.
+ */
+export function keyedUrl(url: string, origin: string, provider: string): string {
+  let ok = false;
+  try {
+    const u = new URL(url);
+    ok = u.protocol === 'https:' && u.origin === origin;
+  } catch {
+    ok = false;
+  }
+  if (!ok) throw new JobFailedError(`${provider}: the job points to an unexpected address (${url.slice(0, 80)}); the API key was not sent.`);
+  return url;
+}

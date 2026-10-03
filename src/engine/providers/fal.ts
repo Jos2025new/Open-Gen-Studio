@@ -3,7 +3,7 @@ import { fetchJsonWithRelay, HttpError, isTransient, JobFailedError, requestJson
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, promptExpansion, type JsonProp } from '../params';
 import type { MediaKind, ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
-import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, keyedUrl, POLL_TIMEOUT_MS, pollJob, splitSource, structuredInputs } from './shared';
 import type { GenOutput, GenRequest, GenResult, MediaInput, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 import { takesSourceAsReference } from '../modelRules';
@@ -249,7 +249,7 @@ export const fal: ProviderAdapter = {
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'image' : ctx.kind;
   return pollJob(ctx, 'fal.ai', ctx.kind === 'image' ? 1500 : 4000, async () => {
-    const st = await requestJson<{ status: string; queue_position?: number }>(job.meta.status_url, {
+    const st = await requestJson<{ status: string; queue_position?: number }>(keyedUrl(job.meta.status_url, QUEUE, 'fal.ai'), {
       headers: falHeaders(ctx.apiKey),
       signal: ctx.signal,
       timeoutMs: POLL_TIMEOUT_MS,
@@ -258,7 +258,7 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
       // fal reports model errors (e.g. 422) when the response is fetched, not in the status.
       let res: unknown;
       try {
-        res = await requestJson<unknown>(job.meta.response_url, { headers: falHeaders(ctx.apiKey), signal: ctx.signal, timeoutMs: 2 * POLL_TIMEOUT_MS });
+        res = await requestJson<unknown>(keyedUrl(job.meta.response_url, QUEUE, 'fal.ai'), { headers: falHeaders(ctx.apiKey), signal: ctx.signal, timeoutMs: 2 * POLL_TIMEOUT_MS });
       } catch (err) {
         if (err instanceof HttpError && !isTransient(err) && err.status !== 401 && err.status !== 403) throw new JobFailedError(err.message);
         throw err;
