@@ -189,3 +189,13 @@
 .geometry-empty { font-size: 11px; margin: 0; }
 .edit-mode { gap: 6px; }.edit-mode-field .edit-mode { padding: 0; border: 0; background: none; }.edit-mode-field .opt-label { display: none; }
 .menu-target { font-size: 10px; color: var(--text-3, var(--text-2)); padding: 4px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Layers panel as docked tabs (Inkscape-like): the open tab shows icon and name, the others only the icon. */
+.panel-tabs { display: flex; align-items: center; gap: 2px; padding: 4px 6px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.panel-tab { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid transparent; border-bottom: 0; border-radius: 7px 7px 0 0; color: var(--text-2); font-size: 12px; white-space: nowrap; min-width: 0; margin-bottom: -1px; }
+.panel-tab span { overflow: hidden; text-overflow: ellipsis; }
+.panel-tab:hover { color: var(--text); background: var(--surface-2); }
+.panel-tab.is-active { color: var(--text); background: var(--surface); border-color: var(--border); font-weight: 550; }
+.panel-tabs-gap { flex: 1; min-width: 4px; }
+.panel-tabs .panel-head-actions { flex-shrink: 1; }
+.panel-tab-body { display: flex; flex-direction: column; flex: 1; min-height: 0; border-bottom: 0; }
+.panel-tab-body .layer-list { max-height: none; flex: 1; min-height: 0; }

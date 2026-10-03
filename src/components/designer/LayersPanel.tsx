@@ -1,5 +1,5 @@
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { restyleStrokes } from '../../engine/design/strokes';
@@ -21,12 +21,6 @@ import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGrou
 const MIN_W = 200;
 const MAX_W = 520;
 
-function Section({ title, open, onToggle, extra, children }: { title: ReactNode; open: boolean; onToggle: () => void; extra?: ReactNode; children: ReactNode }) {
-  return <section className="panel-section">
-    <div className="panel-head"><button type="button" className="section-toggle" aria-expanded={open} onClick={onToggle}>{open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}<strong>{title}</strong></button>{extra}</div>
-    {open && children}
-  </section>;
-}
 
 const BLENDS: Layer['blend'][] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'soft-light', 'hard-light', 'difference', 'color', 'luminosity'];
 
@@ -85,7 +79,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const [op, setOp] = useState<OpId | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
-  const [sections, setSections] = usePref('ogs:layers-sections', { layers: true, props: true });
+  const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'layers');
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
@@ -127,9 +121,18 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onPointerMove={(e) => { const r = resize.current; if (r) setWidth(Math.round(Math.min(MAX_W, Math.max(MIN_W, r.w + r.x - e.clientX)))); }}
       onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }}
       onDoubleClick={() => setWidth(260)} />
+    <div className="panel-tabs" role="tablist" aria-label="Layers panel">
+      {/* Inkscape-style docked tabs: the open one shows its icon and name, the others only their icon. */}
+      {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, layer ? `Properties — ${layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}` : 'Properties']] as const).map(([id, Icon, label]) => (
+        <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
+          <Icon size={14} />{tab === id && <span>{label}</span>}
+        </button>
+      ))}
+      <span className="panel-tabs-gap" />
+      {tab === 'layers' ? <div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div> : <IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} />}
+    </div>
     <div className="layers-body">
-    <Section title="Layers" open={sections.layers} onToggle={() => setSections({ ...sections, layers: !sections.layers })}
-      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
+    {tab === 'layers' && <section className="panel-section panel-tab-body">
     <div className="layer-add">
       {/* One "+" for a new layer (its kind in the menu); the order and folder tools sit beside it. */}
       <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" className="layer-new-btn" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
@@ -185,9 +188,10 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         <IconButton icon={Trash} label="Delete layer" size="sm" tone="danger" disabled={layer.locked} onClick={() => deleteLayer(sessionId, doc.id, layer.id)} />
       </div>}
-    </Section>
+    </section>}
+    {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
     {layer && <>
-      <Section title={<>Properties <span className="props-kind">— {layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}</span></>} open={sections.props} onToggle={() => setSections({ ...sections, props: !sections.props })} extra={layer.locked ? <span className="faint">Locked</span> : null}>
+      {tab === 'props' && <section className="panel-section panel-tab-body">
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         <Field label="Name"><input key={layer.id + layer.name} defaultValue={layer.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== layer.name) patch({ name: e.target.value.trim() }); }} /></Field>
         <div className="prop-row">
@@ -210,7 +214,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         </> : null}
         {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><input type="color" value={s.fill ?? '#d4f25a'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill: e.target.value } : x) })} /></Field><Field label="Stroke"><input type="color" value={s.stroke ?? '#ffffff'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke: e.target.value } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
       </fieldset>
-      </Section>
+      </section>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>
         {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image').map((o) => <MenuItem key={o.id} label={o.label} detail={o.description} onClick={() => setOp(o.id)} />)}
       </Popover>
