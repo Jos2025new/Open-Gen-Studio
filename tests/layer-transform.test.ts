@@ -26,7 +26,7 @@ describe('Edit: align and transform a layer', () => {
 
   it('says why when it cannot', () => {
     expect(turnProblem({ ...rectLayer(), locked: true }, 'flip-h')).toMatch(/locked/);
-    expect(turnProblem({ ...rectLayer(), shapes: [{ ...rectLayer().shapes[0], type: 'path', d: 'M0 0L1 1' }] }, 'rotate-cw')).toMatch(/paths/);
+    expect(turnProblem({ ...rectLayer(), shapes: [{ ...rectLayer().shapes[0], type: 'path', d: 'M0 0L1 1' }] }, 'rotate-cw')).toBeNull(); // drawn paths now turn a quarter too (their points are rotated)
     expect(turnProblem({ ...base, type: 'text' } as never, 'flip-h')).toMatch(/Text/);
   });
 });

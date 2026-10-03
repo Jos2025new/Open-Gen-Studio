@@ -1,3 +1,4 @@
+import { mapPathShape } from './path';
 import type { DesignDoc, Layer, VectorLayer, VectorShape } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc, toast, useStore } from '../../store/store';
@@ -19,10 +20,9 @@ const get = () => useStore.getState();
 const docOf = (sessionId: string, docId: string) => get().sessions[sessionId]?.docs.find((d) => d.id === docId);
 
 /** Why the layer cannot take this operation, or null. */
-export function turnProblem(layer: Layer, turn: Turn): string | null {
+export function turnProblem(layer: Layer, _turn: Turn): string | null {
   if (layer.locked) return `"${layer.name}" is locked.`;
   if (layer.type === 'text') return 'Text layers cannot be flipped or rotated.';
-  if (layer.type === 'vector' && (turn === 'rotate-cw' || turn === 'rotate-ccw') && layer.shapes.some((s) => s.type === 'path')) return 'Drawn paths cannot turn a quarter: flip them or rotate 180° instead.';
   return null;
 }
 
@@ -40,12 +40,21 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
   const b = layerBox(layer);
   if (!b) return layer;
   const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
-  if (turn === 'flip-h') return D.scaleLayer(layer, -1, 1, cx, cy) as VectorLayer;
-  if (turn === 'flip-v') return D.scaleLayer(layer, 1, -1, cx, cy) as VectorLayer;
-  if (turn === 'rotate-180') return D.scaleLayer(layer, -1, -1, cx, cy) as VectorLayer;
+  // Drawn paths (polygon, curve, arrow, the agent's paths) move their points, for every turn: exact, and no
+  // negative sizes left behind.
+  const pointFn = (x: number, y: number): [number, number] =>
+    turn === 'flip-h' ? [2 * cx - x, y]
+      : turn === 'flip-v' ? [x, 2 * cy - y]
+        : turn === 'rotate-180' ? [2 * cx - x, 2 * cy - y]
+          : turn === 'rotate-cw' ? [cx - (y - cy), cy + (x - cx)] : [cx + (y - cy), cy - (x - cx)];
+  const withPaths = (l: VectorLayer): VectorLayer => ({ ...l, shapes: l.shapes.map((s, i) => (layer.shapes[i]?.type === 'path' ? mapPathShape(layer.shapes[i], pointFn) : s)) });
+  if (turn === 'flip-h') return withPaths(D.scaleLayer(layer, -1, 1, cx, cy) as VectorLayer);
+  if (turn === 'flip-v') return withPaths(D.scaleLayer(layer, 1, -1, cx, cy) as VectorLayer);
+  if (turn === 'rotate-180') return withPaths(D.scaleLayer(layer, -1, -1, cx, cy) as VectorLayer);
   const cw = turn === 'rotate-cw';
   const rot = (x: number, y: number): [number, number] => (cw ? [cx - (y - cy), cy + (x - cx)] : [cx + (y - cy), cy - (x - cx)]);
   const shapes = layer.shapes.map((s): VectorShape => {
+    if (s.type === 'path') return mapPathShape(s, pointFn);
     if (s.type === 'line') {
       const [x1, y1] = rot(s.x, s.y);
       const [x2, y2] = rot(s.x + s.w, s.y + s.h);

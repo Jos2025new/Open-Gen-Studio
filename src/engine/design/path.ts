@@ -45,3 +45,28 @@ export function pathTransform(s: ShapeSpec): { sx: number; sy: number; tx: numbe
   const sy = b.h ? s.h / b.h : 1;
   return { sx, sy, tx: s.x - b.x * sx, ty: s.y - b.y * sy };
 }
+
+/**
+ * A path shape with every point moved by `fn` (page coordinates): its current placement is baked into the points
+ * first, so the result is a plain path whose own box is where it sits. Flips and turns of drawn shapes use this
+ * (exact for the absolute commands allowed: M L C Q S T Z are all affine).
+ */
+export function mapPathShape<T extends ShapeSpec>(s: T, fn: (x: number, y: number) => [number, number]): T {
+  if (s.type !== 'path' || !s.d) return s;
+  const t = pathTransform(s);
+  const tokens = s.d.match(/[A-Za-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/g) ?? [];
+  const out: string[] = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const tok = tokens[i];
+    if (/[A-Za-z]/.test(tok)) { out.push(tok); i++; continue; }
+    const [x, y] = fn(Number(tok) * t.sx + t.tx, Number(tokens[i + 1]) * t.sy + t.ty);
+    out.push(String(Math.round(x * 100) / 100), String(Math.round(y * 100) / 100));
+    i += 2;
+  }
+  const d = out.join(' ');
+  const r = parsePath(d);
+  if ('error' in r) return s;
+  const box = { x: r.box.x, y: r.box.y, w: Math.max(1, r.box.w), h: Math.max(1, r.box.h) };
+  return { ...s, d, box0: box, ...box };
+}
