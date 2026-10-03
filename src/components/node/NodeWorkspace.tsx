@@ -94,8 +94,55 @@ function Canvas() {
     [sessionId, graph, generations, feed],
   );
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [tool, setTool] = useState<'select' | 'pan'>(() => { try { return localStorage.getItem('ogs.nodeTool') === 'pan' ? 'pan' : 'select'; } catch { return 'select'; } });
-  const pickTool = (t: 'select' | 'pan') => { setTool(t); try { localStorage.setItem('ogs.nodeTool', t); } catch { /* storage blocked */ } };
+  // Default (pan): drag moves the canvas, wheel/touchpad scrolls it, double-press-and-drag draws a selection box.
+  // Select: a plain drag draws the box (the previous behaviour). New key so everyone starts on the new default.
+  const [tool, setTool] = useState<'select' | 'pan'>(() => { try { return localStorage.getItem('ogs.nodeTool.v2') === 'select' ? 'select' : 'pan'; } catch { return 'pan'; } });
+  const pickTool = (t: 'select' | 'pan') => { setTool(t); try { localStorage.setItem('ogs.nodeTool.v2', t); } catch { /* storage blocked */ } };
+  // Double-press on the empty canvas and hold: a selection box (screen coordinates inside .node-canvas).
+  const lastPress = useRef<{ t: number; x: number; y: number } | null>(null);
+  const [box, setBox] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  // d3-zoom pans on mousedown, which follows pointerdown: block it too while a box is being drawn.
+  const boxing = useRef(false);
+  const onBoxDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (tool !== 'pan' || e.button !== 0) return;
+    const target = e.target as HTMLElement;
+    if (!target.closest('.react-flow__pane') || target.closest('.react-flow__node, .react-flow__panel, .react-flow__edge')) { lastPress.current = null; return; }
+    const prev = lastPress.current;
+    const now = performance.now();
+    lastPress.current = { t: now, x: e.clientX, y: e.clientY };
+    if (!prev || now - prev.t > 350 || Math.hypot(e.clientX - prev.x, e.clientY - prev.y) > 12) return;
+    // Second press: take the pointer away from React Flow's pan for this gesture.
+    e.stopPropagation();
+    e.preventDefault();
+    lastPress.current = null;
+    boxing.current = true;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setBox({ x0: x, y0: y, x1: x, y1: y });
+  };
+  const onBoxMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!box) return;
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    setBox({ ...box, x1: e.clientX - r.left, y1: e.clientY - r.top });
+  };
+  const onBoxUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!box) return;
+    e.stopPropagation();
+    boxing.current = false;
+    const r = e.currentTarget.getBoundingClientRect();
+    const a = rf.screenToFlowPosition({ x: r.left + Math.min(box.x0, box.x1), y: r.top + Math.min(box.y0, box.y1) });
+    const b = rf.screenToFlowPosition({ x: r.left + Math.max(box.x0, box.x1), y: r.top + Math.max(box.y0, box.y1) });
+    setBox(null);
+    if (b.x - a.x < 2 && b.y - a.y < 2) return;
+    // Partial overlap counts, as with the Select tool.
+    const hit = graph.nodes.filter((n) => {
+      const m = measuredRef.current.get(n.id) ?? { width: NODE_WIDTH, height: 120 };
+      return n.position.x < b.x && n.position.x + m.width > a.x && n.position.y < b.y && n.position.y + m.height > a.y;
+    }).map((n) => n.id);
+    setSelected(e.shiftKey || e.ctrlKey || e.metaKey ? new Set([...selected, ...hit]) : new Set(hit));
+  };
   const [selectedEdges, setSelectedEdges] = useState<Set<string>>(new Set());
   // Shared with the agent (not persisted): what "this" means in a request.
   useEffect(() => setNodeSelection(sessionId, selected), [sessionId, selected]);
@@ -325,6 +372,10 @@ function Canvas() {
   return (
     <div
       className="node-canvas"
+      onPointerDownCapture={onBoxDown}
+      onMouseDownCapture={(e) => { if (boxing.current) e.stopPropagation(); }}
+      onPointerMoveCapture={onBoxMove}
+      onPointerUpCapture={onBoxUp}
       onDragOver={(e) => {
         if (e.dataTransfer.types.includes('application/x-ogs-asset')) {
           e.preventDefault();
@@ -381,10 +432,13 @@ function Canvas() {
         deleteKeyCode={['Backspace', 'Delete']}
         selectionOnDrag={tool === 'select'}
         panOnDrag={tool === 'select' ? [1, 2] : true}
+        panOnScroll
+        zoomOnDoubleClick={false}
         selectionMode={SelectionMode.Partial}
         defaultEdgeOptions={{ type: 'default' }}
         proOptions={{ hideAttribution: false }}
       >
+        {box ? <div className="node-box-select" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} /> : null}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
         <Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation

@@ -104,8 +104,8 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
     <>
       {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="rgba(10,10,11,0.7)" nodeColor="var(--accent)" /> : null}
       <Panel ref={panelRef} position="bottom-left" className="canvas-navigation" style={{ bottom: lift }}>
-        <IconButton icon={MousePointer2} label="Select (drag a box; middle or right drag pans)" active={tool === 'select'} onClick={() => onTool('select')} />
-        <IconButton icon={Hand} label="Pan" active={tool === 'pan'} onClick={() => onTool('pan')} />
+        <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
+        <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />
         <IconButton icon={Trash} label={selectedCount ? `Delete ${selectedCount} selected (Del)` : 'Delete selected (Del)'} tone="danger" disabled={!selectedCount} onClick={onDelete} />
         <span className="canvas-nav-sep" />
         <IconButton icon={Map} label="Map" active={mapOpen} onClick={() => setMapOpen(v => !v)} />
