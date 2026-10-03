@@ -2,6 +2,7 @@ import { MODEL_GUIDES, modelGuide } from './guides';
 import type { Workspace } from './types';
 import productGuide from './guides/product.md?raw';
 import socialGuide from './guides/social.md?raw';
+import stagedGuide from './guides/staged.md?raw';
 import directingGuide from './guides/directing.md?raw';
 import photographyGuide from './guides/photography.md?raw';
 import archvizGuide from './guides/archviz.md?raw';
@@ -537,10 +538,19 @@ export function describeWorkflow(w: Workflow): string {
   return [`${w.name}: ${w.description}`, ...lines, ...extra.map((e) => `  ${e}`)].join('\n');
 }
 
+/**
+ * Rules shared by every piece with 2+ results, clips or stages (questions card, look, pre-production, sheets, pilot,
+ * one clip or several, sequence). One source of truth: not repeated in the system prompt, not a pickable skill.
+ * It travels with any workflow the agent loads (same tool result, no extra round).
+ */
+export const STAGED_ID = 'staged';
+export const STAGED_GUIDE = stagedGuide;
+
 /** One line per workflow and skill, for the agent's system prompt: name and when to use it. */
 export function guideIndex(): string {
   return [
     ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}${canvasNote(w)}`),
+    `  skill:${STAGED_ID} — Staged pieces: the rules for any piece with 2+ results, clips or stages (questions card, look, pre-production, sheets, pilot, one clip or several, sequence). Comes with every workflow; load it yourself only when no workflow fits.`,
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
     ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}${g.optional ? ' (optional)' : ''}`),
   ].join('\n');
@@ -568,6 +578,7 @@ export function readGuide(id: string): string | undefined {
   const [type, rest = ''] = id.trim().split(':');
   if (type === 'model') return modelGuide(rest)?.text;
   if (type === 'skill') {
+    if (rest === STAGED_ID) return stagedGuide;
     const k = skillById(rest);
     return k ? `${k.name}: ${k.guidance}${k.guide ? `\n\n${k.guide}` : ''}` : undefined;
   }

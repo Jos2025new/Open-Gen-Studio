@@ -60,7 +60,7 @@ import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, guideWorkspaceProblem, skillById, workflowMakesImage, workflowMakesVideo } from '../skills';
+import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById, workflowMakesImage, workflowMakesVideo } from '../skills';
 import { modelGuide } from '../guides';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -267,6 +267,8 @@ function inConversation(sessionId: string, t: string): boolean {
 /** Model guides for the plan's image and video steps, as a block for a message; '' when none is new. */
 function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
   const parts: string[] = [];
+  // Every workflow is a staged piece: its shared rules come in the same result, once per conversation.
+  if (workflowGuideId.startsWith('workflow:') && !inConversation(sessionId, STAGED_GUIDE)) parts.push(`\n\n---\n${STAGED_GUIDE}`);
   for (const [kind, id] of [
     ['video', workflowMakesVideo(workflowGuideId) ? defaultVideoGuideId() : undefined],
     ['image', workflowMakesImage(workflowGuideId) ? defaultImageGuideId() : undefined],
