@@ -311,7 +311,12 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
       return { outputs };
     }
     if (status === 'failed' || status === 'canceled' || status === 'cancelled') {
-      throw new JobFailedError(extractErrorMessage(res.data, 'Generation failed'));
+      // Keep Atlas's own error code with the message (e.g. 1013002 "Upstream access denied"): it tells a refusal by
+      // the upstream model from a quota or account problem when the log is read later.
+      const raw = res.data as { error_code?: unknown; code?: unknown } | undefined;
+      const code = raw?.error_code ?? raw?.code;
+      const msg = extractErrorMessage(res.data, 'Generation failed');
+      throw new JobFailedError(code != null && code !== '' ? `${msg} [Atlas code ${String(code)}]` : msg);
     }
     return status === 'processing' ? 'Rendering' : 'Queued';
   });
