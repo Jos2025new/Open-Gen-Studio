@@ -151,3 +151,10 @@
 .q-card:hover .card-edit, .card-edit:focus-visible { opacity: 1; }
 .card-edit:hover { color: var(--text); background: var(--surface-2); }
 @media (hover: none) { .card-edit { opacity: 1; } }
+/* Inputs beside a generation card (hover or click on its input thumbnail): the Designer's canvas thumbnails, stacked. */
+.gen-card.has-rail { position: relative; overflow: visible; }
+.gen-inputs-rail { position: absolute; top: 0; width: max-content; max-height: none; z-index: 3; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); }
+.gen-input-choice { background: var(--surface); width: calc(var(--thumb-h, 120px) * 1.6 + 10px); }
+.gen-input-choice > .media, .gen-input-choice img, .gen-input-choice video { width: 100%; height: var(--thumb-h, 120px); object-fit: contain; border-radius: 4px; background: var(--bg); }
+.gen-inputs-rail.is-left { right: calc(100% + 8px); }
+.gen-inputs-rail.is-right { left: calc(100% + 8px); }

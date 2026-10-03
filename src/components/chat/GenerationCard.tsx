@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
@@ -88,6 +88,32 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const g = useStore((s) => s.generations[generationId]);
   // Inputs still in the library (deleted ones are skipped).
   const inputs = useStore(useShallow((s) => (g ? generationInputs(g).filter((id) => s.assets[id]) : [])));
+  const [railPinned, setRailPinned] = useState(false);
+  const [railHover, setHoverNow] = useState(false);
+  // Leaving waits a moment, so the pointer can cross from the thumbnail to the column beside the card.
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const setRailHover = (on: boolean) => {
+    clearTimeout(leaveTimer.current);
+    if (on) setHoverNow(true);
+    else leaveTimer.current = setTimeout(() => setHoverNow(false), 250);
+  };
+  const rail = !compact && inputs.length > 0 && (railPinned || railHover);
+  // Left of the card when the chat has room there; else on its right (the chat's scroll area clips what sticks out).
+  const cardRef = useRef<HTMLElement>(null);
+  const [railSide, setRailSide] = useState<'left' | 'right'>('left');
+  const [thumbH, setThumbH] = useState(120);
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+    if (!rail || !card) return;
+    const box = card.getBoundingClientRect();
+    let clip = card.parentElement;
+    while (clip && getComputedStyle(clip).overflowY === 'visible') clip = clip.parentElement;
+    const room = box.left - (clip?.getBoundingClientRect().left ?? 0);
+    // Each thumbnail is 30% of the card's height (at least 96 px), its width follows the image.
+    const h = Math.max(96, Math.round(box.height * 0.3));
+    setThumbH(h);
+    setRailSide(room >= h * 1.6 + 30 ? 'left' : 'right');
+  }, [rail]);
   const [selected, setSelected] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const regen = usePopover();
@@ -119,11 +145,22 @@ export function GenerationCard({ generationId, compact = false }: { generationId
   const cols = compact ? Math.min(2, Math.max(1, outputs.length + pendingSlots)) : Math.min(4, Math.max(1, outputs.length + pendingSlots));
 
   return (
-    <article id={`gen-${g.id}`} className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''}`}>
+    <article ref={cardRef} id={`gen-${g.id}`} className={`gen-card status-${g.status} ${compact ? 'is-compact' : ''} ${single ? 'is-fit' : ''} ${rail ? 'has-rail' : ''}`}>
+      {rail ? (
+        <div className={`gen-inputs-rail document-thumbnails is-${railSide}`} style={{ ['--thumb-h' as string]: `${thumbH}px` }} role="list" aria-label="Inputs" onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)}>
+          {inputs.map((id, i) => (
+            <button key={id} type="button" role="listitem" className="document-choice gen-input-choice" onClick={() => openInputs(inputs, i)}>
+              <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+              <small>{inputLabel(g, id, i)}</small>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <header className="gen-head">
         {inputs.length ? (
-          // What was sent: the first input, with a count when there were several; click to see them all.
-          <button type="button" className="gen-source" onClick={() => openInputs(inputs, 0)} data-tip={inputs.length > 1 ? `${inputs.length} inputs` : g.op ? 'Source' : 'Reference'}>
+          // What was sent: the first input, with a count when there were several. Hover shows them all beside the
+          // card (like the Designer's canvas thumbnails); a click keeps them open; a thumbnail opens the viewer.
+          <button type="button" className="gen-source" onClick={() => setRailPinned((v) => !v)} onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)} aria-expanded={railPinned} aria-label={inputs.length > 1 ? `${inputs.length} inputs` : g.op ? 'Source' : 'Reference'}>
             <AssetMedia assetId={inputs[0]} hoverPlay={false} draggable={false} />
             {inputs.length > 1 ? <span className="gen-source-count num">{inputs.length}</span> : null}
           </button>
@@ -296,4 +333,13 @@ export function GenerationCard({ generationId, compact = false }: { generationId
 /** The provider charged something other than the estimate shown before running (NanoGPT, OpenRouter): show both. */
 function billedDiffers(g: { estimate: { usd: number | null }; actualUsd?: number }): boolean {
   return g.actualUsd != null && g.estimate.usd != null && Math.abs(g.actualUsd - g.estimate.usd) > Math.max(0.0005, g.estimate.usd * 0.01);
+}
+
+/** What an input was for: the operation's source, the start or end frame, or a numbered reference. */
+function inputLabel(g: Generation, id: string, i: number): string {
+  if (g.op?.sourceAssetId === id) return 'Source';
+  if (g.inputs.firstFrame === id) return 'Start frame';
+  if (g.inputs.lastFrame === id) return 'End frame';
+  const n = g.inputs.refs.indexOf(id);
+  return n >= 0 ? `Reference ${n + 1}` : `Input ${i + 1}`;
 }
