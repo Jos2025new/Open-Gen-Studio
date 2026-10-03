@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — tarjeta de ajustes sin solapes en panel estrecho (2026-10-03)
+- [x] (usuario, captura: Conversación del Designer) Fila de modelo: nombre y precio en una línea (precio sin cortar), proveedor debajo; pie con el texto y Continue que pasan de línea en vez de apretarse; la tarjeta no desborda en horizontal. Solo CSS (`chat.css`). Sin navegador.
+
 ## Tarea — el imán también al escalar con los tiradores (2026-10-03)
 - [x] (usuario) Con los 8 tiradores de escala el lado o esquina arrastrado se pega a bordes y centro de la página, guías y otras capas (mismas opciones y tolerancia de 6 px que al mover; Alt = libre), con la guía magenta. Solo en los ejes que mueve ese tirador. Rotar e inclinar no se imantan. `Stage.tsx` (rama `xform`). Typecheck y suite; sin navegador.
 
