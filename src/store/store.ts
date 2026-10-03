@@ -111,6 +111,8 @@ export interface UiState {
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */
   selectShape?: 'rect' | 'lasso';
+  /** Gradient tool (the main color is the brush color). */
+  gradient?: { shape: 'linear' | 'radial'; mode: 'two' | 'fade'; color2: string; reverse?: boolean; opacity: number };
   /** Style of new Lineart strokes (editable afterwards per layer). */
   lineart: StrokeStyle;
   lineartMode?: 'draw' | 'edit';
@@ -282,7 +284,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient'>;
 };
 
 export const useStore = create<AppState>()(
@@ -300,7 +302,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;

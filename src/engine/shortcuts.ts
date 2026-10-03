@@ -1,10 +1,10 @@
 import type { DesignTool } from './design/rules';
 
 /** Designer tool keys: the keyboard handler and Settings → Shortcuts both read this map, so they never drift. */
-export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', m: 'select', i: 'eyedropper', b: 'brush', g: 'fill', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
+export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', m: 'select', i: 'eyedropper', b: 'brush', g: 'fill', u: 'gradient', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
 const TOOL_NAMES: Record<DesignTool, string> = {
-  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', text: 'Text',
+  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', text: 'Text',
 };
 
 export interface ShortcutGroup {

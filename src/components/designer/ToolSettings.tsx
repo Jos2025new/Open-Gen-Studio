@@ -206,6 +206,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
   const influence = useStore((s) => s.ui.lineartInfluence ?? 80);
   const shape = useStore((s) => s.ui.shape);
   const text = useStore((s) => s.ui.text);
+  const gradient = useStore((s) => s.ui.gradient);
   const paint = tool === 'brush' || tool === 'eraser';
   const layer = doc.layers.find((l) => l.id === selectedCurve?.layerId && l.id === doc.activeLayerId);
   const curve = layer?.type === 'vector' && layer.visible && !layer.locked ? layer.strokes?.find((s) => s.id === selectedCurve?.strokeId) : undefined;
@@ -218,6 +219,19 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
   };
   if (tool === 'hand') return null;
   if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} />;
+  if (tool === 'gradient') {
+    const g = gradient ?? { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
+    const set = (patch: Partial<typeof g>) => setUi({ gradient: { ...g, ...patch } });
+    return <div className="tool-settings" role="toolbar" aria-label="Gradient settings">
+      <InlineSelect label="Shape" value={g.shape} options={[{ value: 'linear' as const, label: 'Linear' }, { value: 'radial' as const, label: 'Radial' }]} onChange={(v) => set({ shape: v })} />
+      <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
+      <InlineSelect label="To" value={g.mode} options={[{ value: 'two' as const, label: 'Second color' }, { value: 'fade' as const, label: 'Transparent' }]} onChange={(v) => set({ mode: v })} />
+      {g.mode === 'two' && <InlineColor label="Second" value={g.color2} onChange={(v) => set({ color2: v })} />}
+      <button type="button" className="opt" onClick={() => setUi({ brush: { ...brush, color: g.color2 }, gradient: { ...g, color2: brush.color } })} data-tip="Swap the two colors">⇄</button>
+      <label className="opt check-row"><input type="checkbox" checked={!!g.reverse} onChange={(e) => set({ reverse: e.target.checked })} />Reverse</label>
+      <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
+    </div>;
+  }
   if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><span data-tip="Ctrl-click picks more strokes of the active layer (Objects) or more layers (Layers)"><InlineSelect label="Select" value={selectMode} options={[{ value: 'objects' as const, label: 'Objects' }, { value: 'layers' as const, label: 'Layers' }]} onChange={(v) => setUi({ selectMode: v })} /></span><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>

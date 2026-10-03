@@ -15,6 +15,7 @@ import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
+import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
 
@@ -30,12 +31,14 @@ type Drag =
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'rasterMove'; layerId: string; strokeIds: string[]; startX: number; startY: number; base: RasterLayer }
   | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
   | { kind: 'shape'; tool: 'rect' | 'ellipse' | 'line'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
 
 const HANDLE = 8;
+const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line' } as const;
 
 type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
@@ -88,6 +91,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
   const selVersion = useSelectionVersion();
   const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
+  const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
+  const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color };
   // The selection being drawn (page coordinates), shown until pointer up.
   const [selDraft, setSelDraft] = useState<Array<[number, number]> | null>(null);
   const fitted = useRef<string | null>(null);
@@ -184,6 +189,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.restore();
     }
     drawDoc(ctx, doc, { hideLayerId: editingText ?? undefined });
+    // Gradient being dragged: drawn live over the page, as it will land.
+    if (preview?.kind === 'gradient') paintGradient(ctx, doc, gradientSpec, preview.x0, preview.y0, preview.x1, preview.y1, getSelection(doc.id));
     // Pixel selection: a dashed two-tone outline (dark under light) that reads on any artwork.
     const sel = selDraft ? { points: selDraft } : getSelection(doc.id);
     if (sel && sel.points.length > 1) {
@@ -284,6 +291,27 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         }
       }
     }
+    if (preview?.kind === 'gradient') {
+      // The drag line with its two ends, so the direction and length read clearly.
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(sx(preview.x0), sy(preview.y0));
+      ctx.lineTo(sx(preview.x1), sy(preview.y1));
+      ctx.strokeStyle = '#16161a';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      for (const [x, y] of [[preview.x0, preview.y0], [preview.x1, preview.y1]]) {
+        ctx.beginPath();
+        ctx.arc(sx(x), sy(y), 4, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     if (preview?.kind === 'shape') {
       const x = Math.min(preview.x0, preview.x1);
       const y = Math.min(preview.y0, preview.y1);
@@ -309,7 +337,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke();
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -351,6 +379,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const current = getDoc(sessionId, doc.id);
     if (!current) return;
     const act = activeLayer(current);
+
+    if (tool === 'gradient') {
+      drag.current = { kind: 'gradient', x0: p.x, y0: p.y, x1: p.x, y1: p.y };
+      setPreview(drag.current);
+      return;
+    }
 
     if (tool === 'select') {
       drag.current = { kind: 'select', lasso: selectShape === 'lasso', points: [[p.x, p.y]] };
@@ -631,6 +665,18 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       const strokes = d.base.map((s, i) => (i === d.stroke ? bendStroke(s, d.point, p.x - d.startX, p.y - d.startY, d.influence ?? Math.max(24, s.size * 4)) : s));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'vector' ? { ...l, strokes } : l)) }));
+    } else if (d.kind === 'gradient') {
+      let x1 = p.x, y1 = p.y;
+      // Shift: the line snaps to 45° steps, as in SAI.
+      if (e.shiftKey) {
+        const ang = Math.round(Math.atan2(y1 - d.y0, x1 - d.x0) / (Math.PI / 4)) * (Math.PI / 4);
+        const len = Math.hypot(x1 - d.x0, y1 - d.y0);
+        x1 = d.x0 + Math.cos(ang) * len;
+        y1 = d.y0 + Math.sin(ang) * len;
+      }
+      d.x1 = x1;
+      d.y1 = y1;
+      setPreview({ ...d });
     } else if (d.kind === 'select') {
       if (d.lasso) {
         const last = d.points[d.points.length - 1];
@@ -689,6 +735,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         layer.strokes = [stroke];
         setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
       }
+      return;
+    }
+    if (d.kind === 'gradient') {
+      setPreview(null);
+      if (Math.hypot(d.x1 - d.x0, d.y1 - d.y0) * view.zoom < 4) return;
+      const current = getDoc(sessionId, doc.id);
+      if (current) applyGradient(sessionId, current, gradientSpec, d.x0, d.y0, d.x1, d.y1);
       return;
     }
     if (d.kind === 'select') {
