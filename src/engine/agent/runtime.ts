@@ -10,6 +10,7 @@ import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
 import { chatToNodes } from '../flow/fromChat';
+import { nodesToChat } from '../flow/fromNodes';
 import { isCreditError, onAgentCredit } from '../credit';
 import { pushAlert } from '../alerts';
 import { chatToDesigner } from '../design/fromChat';
@@ -73,7 +74,7 @@ import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 /** One controller per turn, by session: a turn in one session never stops or clears another's. */
@@ -1540,6 +1541,19 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             respond(added.length
               ? `Added ${added.length} nodes from the chat (up to date, nothing ran): ${added.map((n) => `${n.id} ${n.data.kind} "${n.data.title}"`).join('; ')}. They are in the node index from now on.`
               : 'Every chat result is already on the node canvas; nothing added. The user\'s view is now the node canvas.');
+          }
+          continue;
+        }
+        if (call.name === 'continue_in_chat') {
+          const v = continueInChatSchema.safeParse(parsed.value ?? {});
+          if (!v.success) respond(`Invalid continue_in_chat input: ${formatZodError(v.error)}`);
+          else {
+            const { added } = nodesToChat(sessionId, v.data.node_ids);
+            if (get().ui.workspace !== 'chat') setUi({ workspace: 'chat', panel: null, lightbox: null });
+            log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} node results to Chat` : 'Nothing new from Nodes' });
+            respond(added.length
+              ? `Shown in Chat (same generations, selected results, nothing ran): ${added.map((item) => `${item.nodeId} → ${item.generationId} result ${item.outputIndex + 1}`).join('; ')}.`
+              : 'No node result was added. The requested results are already in Chat or those nodes have no current file result. The user\'s view is now Chat.');
           }
           continue;
         }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Asset, Generation, GraphNode, Session } from '../src/engine/types';
 
 vi.hoisted(() => {
@@ -12,6 +12,9 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { canvasIndex } from '../src/engine/canvas';
+import { SYSTEM_PROMPT } from '../src/engine/agent/context';
+import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { TOOLS } from '../src/engine/agent/tools';
 import { nodeWorkNotInChat, nodesToChat } from '../src/engine/flow/fromNodes';
 import { createSession, useStore } from '../src/store/store';
 
@@ -73,6 +76,7 @@ beforeEach(() => {
     assets: { a1: asset('a1', 'g1'), a2: asset('a2', 'g1'), a3: asset('a3', 'g1') },
   });
 });
+afterEach(() => vi.unstubAllGlobals());
 
 describe('node results → chat', () => {
   it('lists only current node results backed by a real selected asset', () => {
@@ -99,5 +103,41 @@ describe('node results → chat', () => {
     nodesToChat('s');
     const st = useStore.getState();
     expect(canvasIndex(st.sessions.s, st.generations).generation(st.generations.g1)).toBe('node');
+  });
+});
+
+describe('agent Nodes → Chat action', () => {
+  it('exposes the action and tells the agent to use it for returning to Chat', () => {
+    expect(TOOLS.some((tool) => tool.function.name === 'continue_in_chat')).toBe(true);
+    expect(SYSTEM_PROMPT).toMatch(/continue_in_chat/);
+  });
+
+  it('runs the same import as the button, keeps the selected output and switches to Chat', async () => {
+    const replies: Array<{ tool: { name: string; args: unknown } } | { text: string }> = [
+      { tool: { name: 'continue_in_chat', args: { node_ids: ['image-node'] } } },
+      { text: 'Listo, seguimos en Chat.' },
+    ];
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+      const reply = replies.shift() ?? { text: 'Listo.' };
+      const delta = 'tool' in reply
+        ? { tool_calls: [{ index: 0, id: 'continue-chat', function: { name: reply.tool.name, arguments: JSON.stringify(reply.tool.args) } }] }
+        : { content: reply.text };
+      return new Response(`data: ${JSON.stringify({ choices: [{ delta, ...('tool' in reply ? { finish_reason: 'tool_calls' } : {}) }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+    });
+    const st = useStore.getState();
+    useStore.setState({
+      ui: { ...st.ui, workspace: 'node' },
+      settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test' } },
+      composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
+    });
+
+    await sendAgentMessage('Lleva este resultado al chat');
+
+    const next = useStore.getState();
+    expect(next.ui.workspace).toBe('chat');
+    expect(next.sessions.s.feed).toContainEqual(expect.objectContaining({ type: 'generation', generationId: 'g1', mirroredFrom: 'node', outputIndex: 2 }));
+    expect(next.sessions.s.graph.nodes.find((node) => node.id === 'image-node')?.data).toMatchObject({ generationId: 'g1', outputIndex: 2 });
   });
 });
