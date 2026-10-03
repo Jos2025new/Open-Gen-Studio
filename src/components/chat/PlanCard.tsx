@@ -1,7 +1,7 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette } from 'lucide-react';
-import { approvePlan, cancelPlan } from '../../engine/agent/runtime';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette, Pencil } from 'lucide-react';
+import { approvePlan, cancelPlan, sendAgentMessage } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
@@ -182,6 +182,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               ) : null}
               <StateIcon state={state} />
               {script && shown ? <p className="step-script">{script}</p> : null}
+              {s.kind === 'image' && s.variations?.length ? <Variations title={s.title} variations={s.variations} editable={awaiting} /> : null}
             </li>
           );
         })}
@@ -253,5 +254,46 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         )}
       </footer>
     </article>
+  );
+}
+
+/**
+ * The candidates of a step, each a slight variation of the shared prompt. While the plan waits, a pencil per option
+ * sends "change this" to the agent as a comment on the plan: it revises that option only (the revision path).
+ */
+function Variations({ title, variations, editable }: { title: string; variations: string[]; editable: boolean }) {
+  const [editing, setEditing] = useState<number | null>(null);
+  const [text, setText] = useState('');
+  const send = (i: number) => {
+    const t = text.trim();
+    if (!t) return;
+    void sendAgentMessage(`"${title}", option ${i + 1}: ${t}`, { attachments: [] });
+    setEditing(null);
+    setText('');
+  };
+  return (
+    <ol className="step-variations">
+      {variations.map((v, i) => (
+        <li key={i}>
+          <span className="num faint">{i + 1}</span>
+          <span className="step-variation">{v}</span>
+          {editable ? (
+            <button type="button" className="icon-btn step-variation-edit" aria-label={`Suggest changes to option ${i + 1}`} data-tip="Suggest changes" onClick={() => { setEditing(editing === i ? null : i); setText(''); }}>
+              <Pencil size={12} />
+            </button>
+          ) : null}
+          {editing === i ? (
+            <input
+              autoFocus
+              className="q-custom step-variation-input"
+              placeholder="What should change in this option?"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') send(i); if (e.key === 'Escape') setEditing(null); }}
+            />
+          ) : null}
+        </li>
+      ))}
+    </ol>
   );
 }

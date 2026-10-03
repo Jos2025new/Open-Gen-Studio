@@ -36,6 +36,7 @@ export interface GenerationSpec {
   planId?: string;
   stepId?: string;
   estimate?: Estimate;
+  variants?: string[];
 }
 
 export function modelName(ref: string): string {
@@ -78,6 +79,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     parentId: spec.parentId,
     planId: spec.planId,
     stepId: spec.stepId,
+    ...(spec.variants?.length ? { variants: spec.variants } : {}),
     createdAt: Date.now(),
   };
   upsertGeneration(g);
@@ -486,8 +488,10 @@ async function execute(id: string): Promise<string[]> {
       refVideos = [];
     }
 
-    const total = Math.max(1, g.settings.count);
-    const perRequest = Math.max(1, Math.min(total, maxCountPerRequest(schema)));
+    // Candidates with their own variation: one request each, the variation appended to the shared prompt.
+    const variants = g.variants?.length ? g.variants : undefined;
+    const total = variants ? variants.length : Math.max(1, g.settings.count);
+    const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];
@@ -503,7 +507,7 @@ async function execute(id: string): Promise<string[]> {
         kind,
         model,
         schema,
-        prompt,
+        prompt: variants ? `${prompt}\n${variants[done]}` : prompt,
         settings,
         count: n,
         refs,

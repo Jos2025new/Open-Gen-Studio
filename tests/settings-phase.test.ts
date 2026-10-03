@@ -78,6 +78,18 @@ describe('images to generate', () => {
   });
 });
 
+describe('candidates that differ', () => {
+  it('one variation per result sets the count; a mismatch with the confirmed number is sent back to fix', async () => {
+    const steps = [{ id: 's1', kind: 'image', prompt: 'gamer girl, 18-24, sheet', variations: ['short pink hair, oversized hoodie', 'black braids, bomber jacket', 'silver bob, track jacket'] }];
+    const ok = await normalizePlan({ steps }, base, 'p');
+    expect(ok.errors).toEqual([]);
+    expect(ok.plan!.steps[0]).toMatchObject({ variations: steps[0].variations, settings: { count: 3 } });
+    const confirmed: SettingsChoice = { modelRef: LOCAL_IMAGE_REF, needsImage: false, count: 2 };
+    const bad = await normalizePlan({ steps }, { ...base, confirmed: (k) => (k === 'image' ? confirmed : undefined) }, 'p');
+    expect(bad.errors.join(' ')).toMatch(/3 variations but the user confirmed 2 images/);
+  });
+});
+
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
   let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };

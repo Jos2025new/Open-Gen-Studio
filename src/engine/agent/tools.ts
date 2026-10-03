@@ -250,6 +250,7 @@ export const TOOLS: ToolSpec[] = [
                 aspect: { type: 'string', description: 'e.g. "16:9", "9:16", "1:1", "4:5".' },
                 resolution: { type: 'string', description: 'A value from the model options (e.g. "2K", "1080p").' },
                 count: { type: 'integer', minimum: 1, maximum: 4 },
+                variations: { type: 'array', items: { type: 'string' }, description: 'image with several results to choose from: one short line per result (as many as count), each a slight variation of what is still open (look, outfit, hair, palette, pose…) inside what the user decided; the prompt holds what they share. Leave out for one result or for copies that must match.' },
                 duration: { type: 'number', description: 'video seconds.' },
                 audio: { type: 'boolean', description: 'video: generate audio when supported.' },
                 refs: {
@@ -378,6 +379,7 @@ const stepSchema = z
     id: z.string().max(40).optional(),
     kind: z.string(),
     title: z.string().max(120).optional(),
+    variations: z.array(z.string().max(400)).max(4).optional(),
     prompt: z.string().max(4000).optional(),
     prompt_from: z.string().optional(),
     lyrics_from: z.string().optional(),

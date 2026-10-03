@@ -155,7 +155,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           const a = await resolveAsset(r);
           if (a) refs.push(a);
         }
-        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
+        const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }), variants: s.variations });
         ctx.onState(s.id, 'running', { generationId: g.id });
         return { assetIds: await runGeneration(g.id) };
       }

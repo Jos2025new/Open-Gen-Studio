@@ -51,6 +51,8 @@ export interface RawStep {
   aspect?: string;
   resolution?: string;
   count?: number;
+  /** Image: one short variation per result (candidates that differ). */
+  variations?: string[];
   duration?: number;
   audio?: boolean;
   seed?: number;
@@ -685,8 +687,15 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         changes.forEach((c) => adjustments.push(`${s.id}: ${c}`));
         const shotProblem = kind === 'video' && schema.slots.shots ? shotsProblem(settings.shots, settings.duration) : null;
         if (shotProblem) errors.push(`${where}: ${shotProblem}`);
+        // Candidates that differ: one variation per result; their number is the count (the confirmed one wins).
+        const variations = kind === 'image' && Array.isArray(s.variations) ? s.variations.map((v) => String(v).trim()).filter(Boolean) : [];
+        if (variations.length > 1) {
+          const want = conf?.count;
+          if (want && variations.length !== want) errors.push(`${where}: ${variations.length} variations but the user confirmed ${want} image${want === 1 ? '' : 's'}. Fix: write exactly ${want} variation${want === 1 ? '' : 's'}${want === 1 ? ' (or none)' : ''}.`);
+          else settings.count = variations.length;
+        }
         if (kind === 'image' || kind === 'model3d') {
-          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings, refs } satisfies ImageStep | Model3dStep);
+          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings, refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
         } else {
           steps.push({
             id: s.id!,

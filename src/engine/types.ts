@@ -297,6 +297,8 @@ export interface RemoteJob {
 }
 
 export interface Generation {
+  /** One variation per result, appended to the prompt of its own request (candidates that differ). */
+  variants?: string[];
   /** Logical node request at execution time; provider transformations do not affect freshness. */
   nodeRequest?: string;
   id: string;
@@ -404,6 +406,8 @@ export interface TextStep extends StepBase {
 export interface ImageStep extends StepBase {
   kind: 'image';
   prompt: string;
+  /** Several candidates: one short variation per result, appended to the shared prompt (one request each). */
+  variations?: string[];
   promptFrom?: StepRef;
   modelRef: string;
   settings: GenSettings;
