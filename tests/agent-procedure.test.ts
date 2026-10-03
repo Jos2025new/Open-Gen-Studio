@@ -14,6 +14,13 @@ describe('one procedure instead of per-case rules', () => {
     expect(head).toContain('Creative decisions');
     expect(SYSTEM_PROMPT).not.toContain('plan directly');
   });
+  it('cast before motion: anything invented gets its image before a video, also the product in UGC', () => {
+    expect(SYSTEM_PROMPT.slice(0, 6000)).toContain('Cast before motion');
+    expect(SYSTEM_PROMPT).toContain('A video prompt never invents a cast member that has no image.');
+    const ugc = readGuide('workflow:ugc')!;
+    expect(ugc).toContain('when invented — a product image made from text only');
+    expect(ugc).toContain('plan 1 is the creator sheet and, for an invented product, its product image');
+  });
   it('staged-piece rules live once, in skill:staged, not in the prompt', () => {
     const staged = readGuide('skill:staged')!;
     for (const rule of ['Pilot first', 'Pre-production first', 'One clip or several', 'Sequence rules', 'The look']) {
