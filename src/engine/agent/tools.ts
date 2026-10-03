@@ -139,21 +139,31 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'confirm_settings',
       description:
-        'Phase 2, before writing any prompt: for video or animation, or a plan with 2+ images, show the user the settings card (recommended model with a few others, resolution, duration, aspect, preselected; the app picks the model and the values the way a plan would). The user confirms or changes them; you then get the confirmed values and the prompting guide of that model, and write the plan with them. Not for a single image, not on the node canvas. Settings stay confirmed for the follow-ups of the same work: call it again only for new work or when the user wants to change them.',
+        'Phase 2, before writing any prompt: show the user one settings card for the plan you will propose NOW — only the kinds of steps it has (a sheet or product image stage → image only; the clips stage → video; a key frame + clip plan → both, images first). For each kind the app shows the recommended model with a few others, and its resolution, duration (video) and aspect, preselected. The user confirms or changes them; you get back the confirmed values and each model\'s prompting guide, then write the plan for exactly that. Not for a single image, not on the node canvas. A later stage of the same piece calls it again for its own kinds. Settings stay confirmed for the follow-ups of the same work.',
       parameters: {
         type: 'object',
         properties: {
+          summary: { type: 'string', description: 'What this plan will make, one short line in the user\'s language ("ficha de la creadora (3 opciones) y la corneta").' },
+          parts: {
+            type: 'array',
+            description: 'One entry per kind of step in this plan.',
+            items: {
+              type: 'object',
+              properties: {
           kind: { type: 'string', enum: ['video', 'image'] },
-          summary: { type: 'string', description: 'What the plan will make, one short line in the user\'s language ("3 clips of the girl walking to the camera").' },
           purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video: draft (a test), normal (default), long (over 15 s).' },
           start_image: { type: 'boolean', description: 'Video starts from an image (first_frame).' },
-          refs: { type: 'integer', description: 'How many reference images each step takes (identity, product, style).' },
-          count: { type: 'integer', description: 'How many clips or images the plan makes with these settings.' },
-          duration: { type: 'number', description: 'Seconds per clip you recommend.' },
+          refs: { type: 'integer', description: 'How many reference or source images each step takes (identity, product, style).' },
+          count: { type: 'integer', description: 'How many clips or images of this kind the plan makes.' },
+          duration: { type: 'number', description: 'Video: seconds per clip you recommend.' },
           aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
           model: { type: 'string', description: 'Only a model the user named, or an image model of the short list for this task. Leave out otherwise.' },
+              },
+              required: ['kind'],
+            },
+          },
         },
-        required: ['kind'],
+        required: ['parts'],
       },
     },
   },
@@ -340,9 +350,8 @@ export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
 
 export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'retry']) });
 
-export const confirmSettingsSchema = z.object({
+const settingsPartSchema = z.object({
   kind: z.enum(['video', 'image']),
-  summary: z.string().max(300).optional(),
   purpose: z.enum(['draft', 'normal', 'long']).optional(),
   start_image: z.boolean().optional(),
   refs: z.number().int().min(0).max(20).optional(),
@@ -351,6 +360,11 @@ export const confirmSettingsSchema = z.object({
   aspect: z.string().max(20).optional(),
   model: z.string().max(200).optional(),
 });
+// One card per plan: its parts (a single object without "parts" is read as one part, for older calls).
+export const confirmSettingsSchema = z.preprocess(
+  (v) => (v && typeof v === 'object' && !('parts' in v) && 'kind' in v ? { summary: (v as { summary?: unknown }).summary, parts: [v] } : v),
+  z.object({ summary: z.string().max(300).optional(), parts: z.array(settingsPartSchema).min(1).max(2) }),
+);
 
 export const askQuestionsSchema = z.object({
   intro: z.string().max(400).optional(),

@@ -39,6 +39,7 @@ import type {
   QuestionsFeedItem,
   SettingsChoice,
   SettingsFeedItem,
+  SettingsSection,
   Session,
   StepState,
   Workspace,
@@ -209,7 +210,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   }
   // Typing while the settings card is open confirms what it shows, with the message as a note.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
-    await confirmSettings(sessionId, pendingItem.id, pendingItem.chosen ?? pendingItem.recommended, clean);
+    await confirmSettings(sessionId, pendingItem.id, pendingItem.sections.map((x) => x.chosen ?? x.recommended), clean);
     return;
   }
   // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
@@ -389,38 +390,44 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
 }
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
-export function selectSettings(sessionId: string, itemId: string, chosen: SettingsChoice): void {
+export function selectSettings(sessionId: string, itemId: string, index: number, chosen: SettingsChoice): void {
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
-  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { chosen });
+  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: item.sections.map((x, i) => (i === index ? { ...x, chosen } : x)) });
 }
 
-/** "Continue" on the settings card (phase 2): the agent gets the confirmed values and that model's prompting guide. */
-export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice, note?: string): Promise<void> {
+/** "Continue" on the settings card (phase 2): the agent gets the confirmed values and each model's prompting guide. */
+export async function confirmSettings(sessionId: string, itemId: string, chosen: SettingsChoice[], note?: string): Promise<void> {
   toCanvasOfItem(sessionId, itemId);
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'settings' || item.status !== 'pending') return;
-  updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', chosen });
+  const sections = item.sections.map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
+  updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', sections });
   const pending = s.agent.pending;
-  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, [item.kind]: chosen } }));
+  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(sections.map((x) => [x.kind, x.chosen])) } }));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const name = (ref: string) => modelSummary(ref)?.name ?? ref;
-  const rec = item.recommended;
-  const changes = [
-    chosen.modelRef !== rec.modelRef ? `model ${name(rec.modelRef)} → ${name(chosen.modelRef)}` : '',
-    chosen.resolution !== rec.resolution ? `resolution ${rec.resolution ?? 'default'} → ${chosen.resolution ?? 'default'}` : '',
-    chosen.duration !== rec.duration ? `duration ${rec.duration ?? '?'} s → ${chosen.duration ?? '?'} s` : '',
-    chosen.aspect !== rec.aspect ? `aspect ${rec.aspect ?? 'the image\'s'} → ${chosen.aspect ?? 'the image\'s'}` : '',
-  ].filter(Boolean);
-  const id = chosen.modelRef.split('::')[1] ?? '';
-  const guide = guideForModel(id);
-  const text = guide ? readGuide(`model:${guide.id}`) : undefined;
-  const attach = text && !inConversation(sessionId, text) ? `\n\n---\nPrompting guide of ${name(chosen.modelRef)} (model:${guide!.id}); write the prompts in its format:\n${text}` : '';
+  const lines: string[] = [];
+  let guides = '';
+  for (const x of sections) {
+    const c = x.chosen;
+    const rec = x.recommended;
+    const changes = [
+      c.modelRef !== rec.modelRef ? `model ${name(rec.modelRef)} → ${name(c.modelRef)}` : '',
+      c.resolution !== rec.resolution ? `resolution ${rec.resolution ?? 'default'} → ${c.resolution ?? 'default'}` : '',
+      c.duration !== rec.duration ? `duration ${rec.duration ?? '?'} s → ${c.duration ?? '?'} s` : '',
+      c.aspect !== rec.aspect ? `aspect ${rec.aspect ?? "the image's"} → ${c.aspect ?? "the image's"}` : '',
+    ].filter(Boolean);
+    lines.push(`- ${x.kind}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}.`);
+    const guide = guideForModel(c.modelRef.split('::')[1] ?? '');
+    const text = guide ? readGuide(`model:${guide.id}`) : undefined;
+    if (text && !inConversation(sessionId, text) && !guides.includes(text)) guides += `\n\n---\nPrompting guide of ${name(c.modelRef)} (model:${guide!.id}); write its prompts in this format:\n${text}`;
+  }
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, item.workspace, s.agent.draft?.attachments ?? []));
   pushHistory(sessionId, {
     role: 'tool',
     tool_call_id: pending.toolCallId,
-    content: `Settings confirmed by the user: ${item.kind} ${describeChoice(name(chosen.modelRef), chosen)} (${chosen.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'}${note ? `\nUser note: ${note}` : ''}\nThe app applies these to every ${item.kind} step. Write the prompts now for ${name(chosen.modelRef)}, in its format${item.kind === 'video' && chosen.duration ? `; each clip lasts exactly ${chosen.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${chosen.aspect ? `; frame for ${chosen.aspect}` : ''}. Then call propose_plan.${attach}\n\n${ctx}`,
+    content: `Settings confirmed by the user (the app applies them to every step of each kind):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
   });
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, item.workspace);
@@ -1237,16 +1244,24 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
           if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
-          const d = v.data;
-          const built = await buildSettings(
-            { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
-            { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },
-          );
-          if ('error' in built) { respond(built.error); continue; }
-          log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: modelSummary(built.recommended.modelRef)?.name });
+          // One card for the plan that comes now: images first, then video.
+          const parts = [...v.data.parts].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'image' ? -1 : 1));
+          const sections: SettingsSection[] = [];
+          let failed = '';
+          for (const d of parts) {
+            if (sections.some((x) => x.kind === d.kind)) continue;
+            const built = await buildSettings(
+              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
+              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },
+            );
+            if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
+            sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
+          }
+          if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
+          log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', kind: d.kind, summary: d.summary, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives, status: 'pending' };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, sections, status: 'pending' };
           appendFeed(sessionId, item);
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
           if (get().ui.workspace !== 'chat') setThreadOpen(true);

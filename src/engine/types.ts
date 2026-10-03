@@ -550,11 +550,9 @@ export interface SettingsChoice {
   needsImage: boolean;
 }
 
-export interface SettingsFeedItem extends FeedBase {
-  type: 'settings';
+/** One kind of step on the settings card (images first, then video). */
+export interface SettingsSection {
   kind: 'video' | 'image';
-  /** What the plan will make, in the agent's words (one line). */
-  summary?: string;
   /** Clips or images the plan will make with these settings. */
   count: number;
   recommended: SettingsChoice;
@@ -562,6 +560,14 @@ export interface SettingsFeedItem extends FeedBase {
   alternatives: string[];
   /** The selection while the card is open (kept so typing a message confirms it), then the confirmed one. */
   chosen?: SettingsChoice;
+}
+
+export interface SettingsFeedItem extends FeedBase {
+  type: 'settings';
+  /** What the plan will make, in the agent's words (one line). */
+  summary?: string;
+  /** Only the kinds of the plan that comes now, images before video. */
+  sections: SettingsSection[];
   status: 'pending' | 'confirmed' | 'skipped';
 }
 

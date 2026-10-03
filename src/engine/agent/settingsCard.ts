@@ -49,8 +49,32 @@ export function settingsOptions(schema: ModelSchema | undefined, kind: 'video' |
   const all = kind === 'video' ? durationChoices(schema).filter((d) => d > 0) : [];
   // A range (2–30 s) becomes a few usual lengths; a short list stays as is.
   const durations = all.length > 7 ? DURATION_STEPS.filter((d) => all.includes(d)) : all;
-  const aspects = (paramByRole(schema, 'aspect')?.options ?? []).filter((o) => !isAutoOption(o)).map(String);
+  const aspects = groupBySize((paramByRole(schema, 'aspect')?.options ?? []).filter((o) => !isAutoOption(o)).map(String));
   return { resolutions: res, durations, aspects };
+}
+
+const STANDARD: Array<[string, number]> = [['21:9', 21 / 9], ['16:9', 16 / 9], ['3:2', 3 / 2], ['4:3', 4 / 3], ['5:4', 5 / 4], ['1:1', 1], ['4:5', 4 / 5], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16], ['9:21', 9 / 21]];
+const pixels = (v: string) => /^(\d{3,5})\s*[x×*]\s*(\d{3,5})$/i.exec(v.trim());
+
+/** "2816×1584" → "16:9": a size named by its shape (the nearest usual ratio within 3%); other values as the app shows them. */
+export function aspectName(v: string): string {
+  const m = pixels(v);
+  if (!m) return aspectLabel(v);
+  const r = Number(m[1]) / Number(m[2]);
+  const near = STANDARD.reduce((a, b) => (Math.abs(b[1] - r) < Math.abs(a[1] - r) ? b : a));
+  return Math.abs(near[1] - r) / r <= 0.03 ? near[0] : aspectLabel(v);
+}
+
+/** Pixel sizes (Seedream: 13 of them) become one option per shape, the medium size of each; ratios stay as they are. */
+function groupBySize(options: string[]): string[] {
+  if (!options.length || !options.every((o) => pixels(o))) return options;
+  const area = (o: string) => { const m = pixels(o)!; return Number(m[1]) * Number(m[2]); };
+  const groups = new Map<string, string[]>();
+  for (const o of options) groups.set(aspectName(o), [...(groups.get(aspectName(o)) ?? []), o]);
+  const order = STANDARD.map((x) => x[0]);
+  return [...groups.entries()]
+    .sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99))
+    .map(([, g]) => g.sort((a, b) => area(a) - area(b))[Math.floor((g.length - 1) / 2)]);
 }
 
 /** The values a model starts with on the card: medium resolution, the asked length and shape snapped to what it has. */
@@ -76,7 +100,7 @@ export function choiceEstimate(choice: SettingsChoice, kind: 'video' | 'image', 
 
 /** "Seedance 2.0 Fast · 720p · 8 s · 9:16" (model name given by the caller). */
 export function describeChoice(name: string, c: SettingsChoice): string {
-  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.aspect ? aspectLabel(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
+  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.aspect ? aspectName(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
 }
 
 /** The recommended model and a few others for the card; an error the agent gets when nothing fits. */

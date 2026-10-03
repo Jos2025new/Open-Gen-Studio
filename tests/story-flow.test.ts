@@ -106,7 +106,7 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     replies = [{ name: 'confirm_settings', args: { kind: 'video', summary: '3 clips de 7 s', count: 3, duration: 7, model: 'local::studio-video' } }];
     await submitAnswers(useStore.getState().activeSessionId, card!.id, { tone: 'Acción' });
     const settings = feed().find((f): f is SettingsFeedItem => f.type === 'settings');
-    expect(settings).toMatchObject({ status: 'pending', count: 3, recommended: { modelRef: 'local::studio-video' } });
+    expect(settings).toMatchObject({ status: 'pending', sections: [{ kind: 'video', count: 3, recommended: { modelRef: 'local::studio-video' } }] });
     expect(feed().some((f) => f.type === 'plan')).toBe(false);
 
     replies = [
@@ -120,8 +120,8 @@ describe('story request in Auto mode (F1–F4 together)', () => {
         },
       },
     ];
-    await confirmSettings(useStore.getState().activeSessionId, settings!.id, settings!.recommended);
-    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings confirmed by the user: video Local/);
+    await confirmSettings(useStore.getState().activeSessionId, settings!.id, settings!.sections.map((x) => x.recommended));
+    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings confirmed by the user[\s\S]*- video: Local[\s\S]*each clip lasts exactly 8 s/);
     await vi.waitFor(() => expect(feed().find((f): f is PlanFeedItem => f.type === 'plan')?.status).toBe('done'), { timeout: 5000 });
 
     const plan = feed().find((f): f is PlanFeedItem => f.type === 'plan')!;

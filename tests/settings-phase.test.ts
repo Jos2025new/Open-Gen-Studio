@@ -38,6 +38,15 @@ describe('confirmed settings win over what the plan wrote', () => {
 });
 
 describe('the settings card', () => {
+  it('names pixel sizes by their shape, one option per shape', async () => {
+    const { aspectName, settingsOptions } = await import('../src/engine/agent/settingsCard');
+    expect(aspectName('2816*1584')).toBe('16:9');
+    expect(aspectName('1152×2048')).toBe('9:16');
+    const sizes = ['2048*2048', '2368*1776', '1776*2368', '2816*1584', '1584*2816', '1024*1024', '1536*1536', '2048*1152', '1152*2048'];
+    const opts = settingsOptions({ ref: 'x', params: [{ key: 'size', label: 'Size', role: 'aspect', type: 'enum', options: sizes }], slots: {} } as never, 'image');
+    expect(opts.aspects.map(aspectName)).toEqual(['16:9', '4:3', '1:1', '3:4', '9:16']);
+    expect(opts.aspects).toContain('1536*1536');
+  });
   it('recommends a model the user named and lists only models that take the same inputs', async () => {
     const built = await buildSettings(
       { kind: 'video', purpose: 'normal', startImage: false, refs: 0, count: 2, duration: 5, model: LOCAL_VIDEO_REF },
@@ -107,7 +116,7 @@ describe('the settings card renders', () => {
     const { SettingsCard } = await import('../src/components/chat/SettingsCard');
     const html = (renderToString(createElement(SettingsCard, {
       sessionId: useStore.getState().activeSessionId,
-      item: { id: 'x', createdAt: 0, workspace: 'chat', type: 'settings', kind: 'video', summary: '3 clips', count: 3, recommended: { modelRef: LOCAL_VIDEO_REF, duration: 5, needsImage: false }, alternatives: [LOCAL_IMAGE_REF], status: 'pending' },
+      item: { id: 'x', createdAt: 0, workspace: 'chat', type: 'settings', summary: '3 clips', sections: [{ kind: 'image', count: 2, recommended: { modelRef: LOCAL_IMAGE_REF, needsImage: false }, alternatives: [] }, { kind: 'video', count: 3, recommended: { modelRef: LOCAL_VIDEO_REF, duration: 5, needsImage: false }, alternatives: [LOCAL_IMAGE_REF] }], status: 'pending' },
     }))).replace(/<!-- -->/g, '');
     expect(html).toContain('Settings · before the plan is written');
     expect(html).toContain('recommended');
@@ -115,5 +124,8 @@ describe('the settings card renders', () => {
     expect(html).toContain('The exact cost is shown with the plan');
     expect(html).toContain('from ');
     expect(html).toContain('3 clips');
+    // Images before video, each in its own section.
+    expect(html.indexOf('Images · 2')).toBeGreaterThan(-1);
+    expect(html.indexOf('Images · 2')).toBeLessThan(html.indexOf('Video · 3 clips'));
   });
 });

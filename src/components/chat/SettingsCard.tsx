@@ -1,9 +1,9 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
-import { choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
-import { aspectLabel, durationChoices } from '../../engine/params';
-import type { SettingsChoice, SettingsFeedItem } from '../../engine/types';
+import { aspectName, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { durationChoices } from '../../engine/params';
+import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
@@ -11,9 +11,49 @@ import { AspectGlyph } from '../composer/MediaControls';
 
 /**
  * Phase 2: the model and its main values, preselected by the app, confirmed before the agent writes any prompt.
- * Every change is kept on the card (a typed message confirms what it shows) and reported to the agent.
+ * Only the kinds of the plan that comes now, images first. Every change is kept on the card (a typed message
+ * confirms what it shows) and reported to the agent.
  */
 export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sessionId: string }) {
+  const models = useStore((s) => s.catalog.models);
+  const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
+  const titled = item.sections.length > 1;
+  if (item.status !== 'pending') {
+    return (
+      <article className="q-card is-done">
+        <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}</div>
+        {item.status === 'confirmed' ? (
+          <ul className="q-summary">
+            {item.sections.map((x) => {
+              const c = x.chosen ?? x.recommended;
+              return <li key={x.kind}>{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{describeChoice(name(c.modelRef), c)}</li>;
+            })}
+          </ul>
+        ) : null}
+      </article>
+    );
+  }
+  return (
+    <article className="q-card set-card">
+      <div className="q-kicker">Settings · before the plan is written</div>
+      {item.summary ? <p className="q-intro">{item.summary}</p> : null}
+      {item.sections.map((x, i) => (
+        <div key={x.kind} className={titled ? 'set-section' : undefined}>
+          {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}</div> : null}
+          <SettingsSectionBlock section={x} index={i} itemId={item.id} sessionId={sessionId} />
+        </div>
+      ))}
+      <footer className="q-foot">
+        <span className="set-total faint">The exact cost is shown with the plan, once the prompts are written.</span>
+        <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, item.sections.map((x) => x.chosen ?? x.recommended))}>
+          Continue <ArrowRight size={13} />
+        </Button>
+      </footer>
+    </article>
+  );
+}
+
+function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { section: SettingsSection; index: number; itemId: string; sessionId: string }) {
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
@@ -27,19 +67,9 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     return e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
   };
 
-  if (item.status !== 'pending') {
-    const c = item.chosen ?? item.recommended;
-    return (
-      <article className="q-card is-done">
-        <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}</div>
-        {item.status === 'confirmed' ? <p className="q-summary">{describeChoice(name(c.modelRef), c)}</p> : null}
-      </article>
-    );
-  }
-
   const update = (next: SettingsChoice) => {
     setChoice(next);
-    selectSettings(sessionId, item.id, next);
+    selectSettings(sessionId, itemId, index, next);
   };
   // Another model keeps the values the user picked when it has them, else its own medium ones.
   const pickModel = (ref: string) => update({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage });
@@ -76,10 +106,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     });
 
   return (
-    <article className="q-card set-card">
-      <div className="q-kicker">Settings · before the plan is written</div>
-      {item.summary ? <p className="q-intro">{item.summary}</p> : null}
-
+    <>
       {item.kind === 'video' && allSecs.length ? (
         <div className="q-block">
           <div className="q-question">Duration{item.count > 1 ? ' per clip' : ''}</div>
@@ -134,7 +161,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
           <div className="q-question">Aspect ratio</div>
           <div className="q-options">
             {item.recommended.needsImage ? chips<string>(['__image'], choice.aspect ?? '__image', () => 'Like the image', () => update({ ...choice, aspect: undefined })) : null}
-            {chips(opts.aspects, choice.aspect, (v) => aspectLabel(v), (v) => update({ ...choice, aspect: v }), (v) => <AspectGlyph value={v} />)}
+            {chips(opts.aspects, choice.aspect, (v) => aspectName(v), (v) => update({ ...choice, aspect: v }), (v) => <AspectGlyph value={v} />)}
           </div>
         </div>
       ) : null}
@@ -152,12 +179,6 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
         </div>
       </div>
 
-      <footer className="q-foot">
-        <span className="set-total faint">The exact cost is shown with the plan, once the prompts are written.</span>
-        <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, choice)}>
-          Continue <ArrowRight size={13} />
-        </Button>
-      </footer>
-    </article>
+    </>
   );
 }
