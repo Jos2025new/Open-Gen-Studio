@@ -53,3 +53,14 @@ describe('model variants across providers (ids from the live snapshot)', () => {
     expect(modelFamily(text).label).toBe('Wan 3');
   });
 });
+
+describe('the same video model on two providers', () => {
+  it('a multimode model and another provider\'s text-to-video variant are one row (cheapest picked by price)', async () => {
+    const { variantKey } = await import('../src/engine/variants');
+    const nano = { provider: 'nanogpt', id: 'bytedance-seedance-2-0-fast', kind: 'video', ref: 'nanogpt::bytedance-seedance-2-0-fast' } as const;
+    const atlas = { provider: 'atlas', id: 'bytedance/seedance-2.0-fast/text-to-video', kind: 'video', ref: 'atlas::bytedance/seedance-2.0-fast/text-to-video' } as const;
+    expect(variantKey(nano)).toBe(variantKey(atlas));
+    // Image-to-video stays its own variant.
+    expect(variantKey({ ...atlas, id: 'bytedance/seedance-2.0-fast/image-to-video' })).not.toBe(variantKey(atlas));
+  });
+});

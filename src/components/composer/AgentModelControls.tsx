@@ -255,7 +255,7 @@ export function AgentModelControls() {
         {picker ? (
           <>
             <button type="button" className="agent-model-back" onClick={() => setPicker(null)}><ArrowLeft size={14} /> Models</button>
-            <PopoverHeader title={label[picker]} sub={`Auto keeps the established routing; a choice affects only this row.${routeHint(picker)}`} />
+            <PopoverHeader title={label[picker]} sub={`Auto keeps the established routing.${modeOf[picker] ? ' A video model also fills the other video rows with its own variants, when it has them.' : ' A choice affects only this row.'}${routeHint(picker)}`} />
             {picker === 'director' ? <DirectorList done={() => setPicker(null)} /> : pickerConfig ? (
               <ModelList kind={pickerConfig.kind} value={pickerConfig.value ?? null} filter={pickerConfig.filter} autoOption={pickerConfig.auto} familyTree onSelect={choose} />
             ) : null}

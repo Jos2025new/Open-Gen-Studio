@@ -383,6 +383,8 @@ export function lineRoutes(ref: string): Partial<Record<VariantRoute, string>> {
     const r = variantRoute(m);
     if (!out[r]) out[r] = m.ref;
   }
+  // One video model that takes text and a start image (NanoGPT Seedance, Wan…) covers image-to-video itself.
+  if (me.kind === 'video' && me.acceptsImage && me.acceptsText && !out.image) out.image = me.ref;
   return out;
 }
 

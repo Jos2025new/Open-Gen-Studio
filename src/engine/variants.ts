@@ -54,7 +54,7 @@ export function variantKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'r
     .toLowerCase()
     .replace(/(\d)\.0(?!\d)/g, '$1') // v5.0 → v5
     .replace(/(\d)-0(?=-|\/|$)/g, '$1') // seedance-2-0-fast → seedance-2-fast
-    .replace(/text-to-image/g, ' ') // the base variant: "x/text-to-image" = "x"
+    .replace(/text-to-(image|video)/g, ' ') // the base variant: "x/text-to-image" or "x/text-to-video" = "x"
     .replace(/(\d)[.-](\d)/g, '$1_$2'); // keep versions whole: 1.1 ≠ 1, 2.5 ≠ 2 5
   const words = id
     .replace(/([a-z])(\d)/g, '$1 $2')
