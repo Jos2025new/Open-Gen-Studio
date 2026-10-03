@@ -934,6 +934,8 @@ export interface AgentRequestMetrics {
    * tool call, and the end; plus reasoning tokens and prompt tokens served from the provider's cache.
    */
   callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; toolMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
+  /** Calls that ended in an error: what failed and how long it took (no token sample, there was none). */
+  failedCalls?: Array<{ error: string; seconds: number }>;
   /** App time per plan card: from the end of the model call to the card in the chat (validation, model schemas, estimate). */
   planCheckMs?: number[];
   /** Agent time until the first plan card. */

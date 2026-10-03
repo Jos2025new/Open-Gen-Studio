@@ -1232,6 +1232,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
+        // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
+        recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clock.elapsed() });
         notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry);
         return;
       }
@@ -1288,8 +1290,11 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         tool_calls: result.toolCalls.length ? result.toolCalls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.arguments } })) : undefined,
       });
       if (!result.toolCalls.length) {
-        if (!result.text.trim()) notice(sessionId, workspace, 'The model returned an empty answer. Try rephrasing.');
-        else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, workspace)) {
+        // Nothing to show and nothing to run (T2): say what actually happened, and leave the turn retryable.
+        if (!result.text.trim()) {
+          const cut = result.finishReason === 'length';
+          notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {});
+        } else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, workspace)) {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level: 'info', text: 'The agent replied without a plan.', proposePlan: true });
         }
         return;

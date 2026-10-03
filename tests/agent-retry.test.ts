@@ -110,6 +110,50 @@ describe('a provider that goes silent', () => {
   });
 });
 
+describe('an answer with nothing in it', () => {
+  /** A stream with no text and no tool call, only a reason for ending (the 16 000-token case of ses_murtssey7y). */
+  const empty = (finish: string) => sse([{ choices: [{ delta: {}, finish_reason: finish }] }]);
+
+  it('cut off by the output limit: says the model spent its budget thinking, and offers Retry', async () => {
+    vi.stubGlobal('fetch', async () => empty('length'));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('Crea una chica para vender una corneta bluetooth');
+    const note = useStore.getState().sessions[sid].feed.at(-1) as NoticeFeedItem;
+    expect(note.type).toBe('notice');
+    expect(note.text).toMatch(/output budget/i);
+    expect(note.text).toMatch(/reasoning/i);
+    expect(note.retry).toBeDefined();
+    // Retrying works: the same turn runs again and the answer is used.
+    vi.stubGlobal('fetch', async () => sse([text('Aquí va la propuesta.')]));
+    await retryAgentTurn(sid, note.id);
+    const feed = useStore.getState().sessions[sid].feed;
+    expect(feed.some((f) => f.type === 'assistant' && f.text.includes('propuesta'))).toBe(true);
+    expect(feed.some((f) => f.type === 'notice')).toBe(false);
+  });
+
+  it('stopped with nothing: says the model did not answer, and offers Retry', async () => {
+    vi.stubGlobal('fetch', async () => empty('stop'));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('hola');
+    const note = useStore.getState().sessions[sid].feed.at(-1) as NoticeFeedItem;
+    expect(note.text).toMatch(/did not answer|empty answer/i);
+    expect(note.retry).toBeDefined();
+  });
+
+  it('a call that fails is counted in the metrics, with its seconds and error', async () => {
+    vi.stubGlobal('fetch', async () => dropped([text('Empiezo:')]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('un vídeo UGC de este conjunto');
+    const m = useStore.getState().sessions[sid].agentMetrics!.at(-1)!;
+    expect(m.llmCalls).toBe(1);
+    expect(m.failedCalls).toHaveLength(1);
+    expect(m.failedCalls![0].error).toMatch(/connection lost/i);
+    expect(Number.isFinite(m.failedCalls![0].seconds)).toBe(true);
+    // The failed call adds no timing sample: averages over callTimings stay numbers.
+    expect(m.callTimings ?? []).toHaveLength(0);
+  });
+});
+
 describe('a tool call written as text (DeepSeek DSML)', () => {
   it('unreadable: hides the markup, keeps it out of the history and offers Retry and Delete', async () => {
     vi.stubGlobal('fetch', async () => sse([text('La rehago con la cara más joven.\n\n<｜DSML｜ calls>\n<｜DSML｜ invoke name="propose_plan">\n<｜DSML｜ parameter name="steps" string="false">[{"id": broken</｜DSML｜ parameter>\n</｜DSML｜ invoke>')]));

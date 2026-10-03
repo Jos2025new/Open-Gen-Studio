@@ -75,6 +75,8 @@ export function openMetrics(sessionId: string): AgentRequestMetrics | undefined 
 type Event =
   | { type: 'output'; ms: number }
   | { type: 'call'; inputTokens: number; outputTokens: number; usd: number; timing?: NonNullable<AgentRequestMetrics['callTimings']>[number] }
+  /** A call that ended in an error: it counts as a call and keeps its seconds and message, but adds no timing sample. */
+  | { type: 'failedCall'; error: string; ms: number }
   | { type: 'questions' }
   | { type: 'findModels' }
   | { type: 'guide'; id: string }
@@ -93,6 +95,11 @@ export function recordMetric(sessionId: string, e: Event): void {
           outputTokens: m.outputTokens + e.outputTokens,
           llmUsd: m.llmUsd + e.usd,
           ...(e.timing ? { callTimings: [...(m.callTimings ?? []), e.timing].slice(-12) } : {}),
+        };
+      case 'failedCall':
+        return {
+          llmCalls: m.llmCalls + 1,
+          failedCalls: [...(m.failedCalls ?? []), { error: e.error.slice(0, 200), seconds: Math.round(e.ms / 100) / 10 }].slice(-12),
         };
       case 'questions':
         return { questionRounds: m.questionRounds + 1 };
