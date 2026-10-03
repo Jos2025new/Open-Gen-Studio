@@ -124,5 +124,8 @@
 .set-model-price { margin-left: auto; }
 .set-more { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 11px; color: var(--text-3); padding: 2px 0; }
 .set-more .is-flipped { transform: rotate(180deg); }
-.set-secs { width: 84px; margin-top: 0; }
+.set-duration { display: flex; align-items: center; gap: 12px; }
+.set-slider { flex: 1; min-width: 0; accent-color: var(--accent); }
+.set-secs { display: inline-flex; align-items: center; gap: 4px; }
+.set-secs input { width: 64px; }
 .set-total { margin-right: auto; align-self: center; font-size: 12px; }

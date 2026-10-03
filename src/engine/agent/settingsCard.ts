@@ -60,7 +60,9 @@ export function defaultChoice(ref: string, schema: ModelSchema | undefined, req:
   const wantRes = prev?.resolution;
   const resolution = o.resolutions.length ? (wantRes && o.resolutions.includes(wantRes) ? wantRes : mediumResolution(o.resolutions, resParam?.default)) : undefined;
   const wantDur = prev?.duration ?? req.duration ?? Number(paramByRole(schema, 'duration')?.default ?? 5);
-  const duration = o.durations.length ? o.durations.reduce((a, b) => (Math.abs(b - wantDur) < Math.abs(a - wantDur) ? b : a)) : undefined;
+  // Snapped to every length the model takes (the card's chips are only a few of them).
+  const secs = req.kind === 'video' ? durationChoices(schema).filter((d) => d > 0) : [];
+  const duration = secs.length ? secs.reduce((a, b) => (Math.abs(b - wantDur) < Math.abs(a - wantDur) ? b : a)) : undefined;
   const wantAspect = prev ? prev.aspect : req.aspect;
   // With a start image and no asked shape, the clip keeps the image's (aspect left unset).
   const aspect = wantAspect && o.aspects.length ? nearestAspect(o.aspects, wantAspect) : req.startImage || !o.aspects.length ? undefined : String(paramByRole(schema, 'aspect')?.default ?? o.aspects[0]);
