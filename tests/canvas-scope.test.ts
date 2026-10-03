@@ -23,6 +23,7 @@ function setup(): Session {
   s.feed = [
     { ...base('chat'), type: 'user', text: 'hi', mode: 'agent', attachments: ['up_chat'] },
     { ...base('chat'), type: 'generation', generationId: 'chat1' },
+    { ...base('chat'), type: 'generation', generationId: 'nodeGen', mirroredFrom: 'node', outputIndex: 0 },
     { ...base('node'), type: 'plan', plan: { id: 'p_node', title: '', summary: '', workspace: 'node', steps: [], adjustments: [] } } as never,
     { ...base('chat'), type: 'plan', plan: { id: 'p_chat', title: '', summary: '', workspace: 'chat', steps: [], adjustments: [] } } as never,
   ];

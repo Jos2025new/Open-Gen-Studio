@@ -84,8 +84,9 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
   );
 }
 
-export function GenerationCard({ generationId, compact = false }: { generationId: string; compact?: boolean }) {
+export function GenerationCard({ generationId, compact = false, initialOutputIndex = 0, mirroredFrom }: { generationId: string; compact?: boolean; initialOutputIndex?: number; mirroredFrom?: 'node' }) {
   const g = useStore((s) => s.generations[generationId]);
+  const linkedToNode = useStore((s) => Boolean(mirroredFrom === 'node' && s.sessions[g?.sessionId ?? '']?.graph.nodes.some((n) => 'generationId' in n.data && n.data.generationId === generationId)));
   // Inputs still in the library (deleted ones are skipped).
   const inputs = useStore(useShallow((s) => (g ? generationInputs(g).filter((id) => s.assets[id]) : [])));
   const [railPinned, setRailPinned] = useState(false);
@@ -125,7 +126,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
     setThumbH(h);
     setRailSide(room >= h * 1.6 + 30 ? 'left' : 'right');
   }, [rail]);
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState(initialOutputIndex);
   const [expanded, setExpanded] = useState(false);
   const regen = usePopover();
   const del = usePopover();
@@ -200,6 +201,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
       </header>
       <div className="gen-meta faint">
         <span className="truncate">{metaLine(g)}</span>
+        {mirroredFrom === 'node' ? <span className="ws-badge">Nodes</span> : null}
         <CostTag estimate={g.actualUsd != null ? { usd: g.actualUsd, approximate: false } : g.estimate} />
       </div>
       {billedDiffers(g) ? (
@@ -334,6 +336,7 @@ export function GenerationCard({ generationId, compact = false }: { generationId
         <div className="confirm">
           <p>
             Delete this generation{outputs.length ? ` and its ${outputs.length} file${outputs.length === 1 ? '' : 's'}` : ''}? {busy ? 'It will be canceled.' : ''}
+            {linkedToNode ? ' Also removes this result from the node.' : ''}
           </p>
           <div className="spend-actions">
             <Button variant="ghost" onClick={del.close}>

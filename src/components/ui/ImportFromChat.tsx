@@ -11,23 +11,27 @@ export interface ChatItem {
   label: string;
 }
 
+interface ImportResultsProps {
+  sessionId: string;
+  canvas: 'node' | 'designer' | 'chat';
+  source: 'Chat' | 'Nodes';
+  items: ChatItem[];
+  noun: string;
+  modes?: Array<{ id: string; label: string }>;
+  onImport: (ids: string[], mode?: string) => void;
+  notice?: boolean;
+}
+
 /**
  * Import from Chat, on the node canvas and in the Designer: a toolbar button with a dialog to pick what to bring
  * (all checked by default), plus a notice above the canvas while something new is waiting. The notice closes
  * with ✕ and stays closed until more results arrive (remembered per session and canvas in this browser).
  */
-export function ImportFromChat({ sessionId, canvas, items, noun, modes, onImport }: {
-  sessionId: string;
-  canvas: 'node' | 'designer';
-  items: ChatItem[];
-  noun: string;
-  modes?: Array<{ id: string; label: string }>;
-  onImport: (ids: string[], mode?: string) => void;
-}) {
+function ImportResults({ sessionId, canvas, source, items, noun, modes, onImport, notice = true }: ImportResultsProps) {
   const pop = usePopover();
   const [picked, setPicked] = useState<string[]>([]);
   const [mode, setMode] = useState(modes?.[0]?.id);
-  const key = `ogs.fromChat.${canvas}.${sessionId}`;
+  const key = source === 'Chat' ? `ogs.fromChat.${canvas}.${sessionId}` : `ogs.fromNodes.${canvas}.${sessionId}`;
   const [closedAt, setClosedAt] = useState(0);
   useEffect(() => {
     try {
@@ -57,9 +61,9 @@ export function ImportFromChat({ sessionId, canvas, items, noun, modes, onImport
   return (
     <>
       <TopbarActions>
-      <IconButton ref={pop.ref} className={canvas === 'designer' ? 'designer-import-chat' : undefined} icon={ArrowDownToLine} label="Import from Chat" size="sm" active={pop.open} onClick={pop.toggle} />
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label="Import from Chat">
-        <PopoverHeader title="Import from Chat" sub={items.length ? `${plural(items.length)} not here yet` : 'Everything from Chat is already here'} />
+      <IconButton ref={pop.ref} className={canvas === 'designer' ? 'designer-import-chat' : undefined} icon={ArrowDownToLine} label={`Import from ${source}`} size="sm" active={pop.open} onClick={pop.toggle} />
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label={`Import from ${source}`}>
+        <PopoverHeader title={`Import from ${source}`} sub={items.length ? `${plural(items.length)} not here yet` : `Everything from ${source} is already here`} />
         {items.length ? (
           <>
             <div className="import-list">
@@ -97,15 +101,15 @@ export function ImportFromChat({ sessionId, canvas, items, noun, modes, onImport
         ) : null}
       </Popover>
       </TopbarActions>
-      {items.length > closedAt ? (
+      {notice && items.length > closedAt ? (
         <div className="node-from-chat" role="status">
-          <span>{plural(items.length)} from Chat</span>
+          <span>{plural(items.length)} from {source}</span>
           {modes ? (
             modes.map((m) => (
               <Button key={m.id} size="sm" onClick={() => onImport(items.map((i) => i.id), m.id)}>{m.label}</Button>
             ))
           ) : (
-            <Button size="sm" onClick={() => onImport(items.map((i) => i.id))}>Add as nodes</Button>
+            <Button size="sm" onClick={() => onImport(items.map((i) => i.id))}>{canvas === 'chat' ? 'Add to Chat' : 'Add as nodes'}</Button>
           )}
           <Button size="sm" variant="ghost" onClick={pop.toggle}>Choose…</Button>
           <IconButton icon={X} label="Close" size="sm" onClick={close} />
@@ -113,4 +117,12 @@ export function ImportFromChat({ sessionId, canvas, items, noun, modes, onImport
       ) : null}
     </>
   );
+}
+
+export function ImportFromChat(props: Omit<ImportResultsProps, 'source' | 'canvas'> & { canvas: 'node' | 'designer' }) {
+  return <ImportResults {...props} source="Chat" />;
+}
+
+export function ImportFromNodes(props: Omit<ImportResultsProps, 'source' | 'canvas' | 'notice'>) {
+  return <ImportResults {...props} canvas="chat" source="Nodes" notice={false} />;
 }

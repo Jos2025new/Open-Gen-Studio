@@ -620,6 +620,10 @@ export interface PlanFeedItem extends FeedBase {
 export interface GenerationFeedItem extends FeedBase {
   type: 'generation';
   generationId: string;
+  /** A second view of an existing Nodes generation; it never changes which canvas owns the result. */
+  mirroredFrom?: 'node';
+  /** Result selected by the source node when this feed reference was added. */
+  outputIndex?: number;
 }
 
 export interface NoticeFeedItem extends FeedBase {

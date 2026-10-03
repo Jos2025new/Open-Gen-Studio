@@ -1,7 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown } from 'lucide-react';
 import { setComposer, setUi, useStore } from '../../store/store';
+import { nodeWorkNotInChat, nodesToChat } from '../../engine/flow/fromNodes';
+import { ImportFromNodes } from '../ui/ImportFromChat';
 import { FeedList } from './FeedList';
+import { useShallow } from 'zustand/react/shallow';
 
 const SUGGESTIONS = [
   { text: 'Hero product shot of a matte black perfume bottle on wet stone, then animate a slow orbit', mode: 'agent' as const },
@@ -11,6 +14,11 @@ const SUGGESTIONS = [
 
 export function ChatWorkspace() {
   const sessionId = useStore((s) => s.activeSessionId);
+  const [session, generations, assets] = useStore(useShallow((s) => [s.sessions[s.activeSessionId], s.generations, s.assets]));
+  const fromNodes = useMemo(
+    () => nodeWorkNotInChat(sessionId).map((item) => ({ id: item.nodeId, assetId: item.assetId, label: item.label })),
+    [sessionId, session, generations, assets],
+  );
   const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === 'chat').length ?? 0);
   const lastKey = useStore((s) => {
     const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === 'chat');
@@ -44,7 +52,8 @@ export function ChatWorkspace() {
     setShowJump(!atBottom);
   };
 
-  return (
+  return <>
+    <ImportFromNodes sessionId={sessionId} items={fromNodes} noun="result" onImport={(ids) => nodesToChat(sessionId, ids)} />
     <div className="chat" ref={scrollRef} onScroll={onScroll}>
       {count ? (
         <div className="chat-column">
@@ -87,5 +96,5 @@ export function ChatWorkspace() {
         </button>
       ) : null}
     </div>
-  );
+  </>;
 }

@@ -173,7 +173,7 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
     case 'plan':
       return <PlanCard item={item} sessionId={sessionId} />;
     case 'generation':
-      return <GenerationCard generationId={item.generationId} compact={compact} />;
+      return <GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />;
     case 'notice':
       return <NoticeView item={item} sessionId={sessionId} />;
   }
