@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Fallo — el pincel no se veía hasta soltar (2026-10-03) · introducido en `1122d3b`
+- [x] (usuario: "muevo y no aparece nada sino suelto") Al pasar el anillo del pincel a un elemento DOM se quitó `cursor` de las dependencias del dibujo, y el pincel dependía de él: cada movimiento pinta en el buffer de la capa pero el lienzo solo se redibujaba por el cambio de `cursor`. Ahora un contador propio (`paintFrame`) se incrementa en cada movimiento del pincel y redibuja; mover el puntero sin pintar sigue sin redibujar el documento. Navegador (copia aislada, eventos de puntero a mitad de arrastre, sin soltar): pincel, línea y Lineart cambian el píxel durante el arrastre. **Lección:** antes de quitar una dependencia de un efecto de dibujo, buscar quién dependía de ella para redibujar.
+
 ## Tarea — claridad de las herramientas nuevas (2026-10-03) · punto de retorno: `67412c1`
 Elegido por el usuario (descartado: aviso la primera vez que se usa cada herramienta, "puede ser peligroso").
 - [x] Cursor `col-resize`/`row-resize` sobre una guía con Edit y mientras se arrastra.

@@ -128,6 +128,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
   const [editingText, setEditingText] = useState<string | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
+  const [paintFrame, setPaintFrame] = useState(0);
   const [preview, setPreview] = useState<Drag | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   // Picked strokes of one raster layer (Ctrl-click adds more of the same layer in Objects mode).
@@ -421,7 +423,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke(path);
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, paintFrame, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -750,6 +752,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         d.time = sample.timeStamp;
       }
       setCursor(d.last);
+      setPaintFrame((f) => f + 1);
       window.dispatchEvent(new Event('ogs:paint'));
     } else if (d.kind === 'stroke') {
       const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
