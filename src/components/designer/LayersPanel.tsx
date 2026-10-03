@@ -6,7 +6,7 @@ import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayers, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
-import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
+import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { Button, Field, IconButton, MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -173,7 +173,12 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
         }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
-        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={(e) => { if (drag?.active) return; pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey || e.shiftKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close(); }} title="Ctrl or Shift-click to select several">
+        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={(e) => {
+          if (drag?.active) return;
+          // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
+          if (e.shiftKey && !(e.ctrlKey || e.metaKey)) { pickLayerRange(doc.id, doc.activeLayerId, l.id, doc.layers.map((x) => x.id)); pop.close(); return; }
+          pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
+        }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
           <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /></span>
           <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
         </button>

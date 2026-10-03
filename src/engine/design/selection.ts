@@ -21,3 +21,11 @@ export function pickLayer(docId: string, id: string, additive: boolean, current:
   useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: next } }));
   return next;
 }
+
+/** Shift-click: every layer between the anchor (the active layer) and this one, as in a file list. */
+export function pickLayerRange(docId: string, anchorId: string | null, id: string, order: string[]): string[] {
+  const a = anchorId ? order.indexOf(anchorId) : -1, b = order.indexOf(id);
+  const next = a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1);
+  useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: next } }));
+  return next;
+}

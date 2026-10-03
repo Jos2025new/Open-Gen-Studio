@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Shift-clic elige un rango de capas (2026-10-03)
+- [x] (usuario: "Shift hace lo mismo que Ctrl") En el panel de capas, Shift-clic elige todas las capas entre la activa (el ancla, que no cambia) y la pulsada, como en una lista de archivos; Ctrl-clic sigue añadiendo o quitando una. `pickLayerRange` (`selection.ts`), `LayersPanel.tsx`. Test `layer-range` (2). Sin navegador.
+
 ## Tarea — mover y borrar varias cosas elegidas a la vez (2026-10-03)
 - [x] (usuario) Ctrl + arrastrar mueve todo lo elegido: en Objects, Ctrl-pulsar un objeto lo añade (si no estaba) y arrastrar mueve todos los objetos elegidos; un Ctrl-clic sin arrastrar sobre uno ya elegido lo quita. Con capas enteras (imágenes, texto) igual: Ctrl-pulsar añade la capa y arrastrar mueve todas las capas elegidas; también en modo Layer. Arrastrar sin Ctrl una de varias capas elegidas también mueve todas (como Inkscape). `Stage.tsx` (`ctrlToggle` en `objMove`/`move`).
 - [x] En Objects el clic lo decide la capa más alta bajo el puntero (antes ganaba un trazo de la capa activa o de una capa de abajo frente a una imagen encima). Ctrl sigue limitado a la capa activa para elegir objetos.
