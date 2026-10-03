@@ -59,6 +59,7 @@ describe('the settings card', () => {
 
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
+  let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };
   beforeEach(() => {
     sent.length = 0;
     let n = 0;
@@ -66,9 +67,7 @@ describe('a video plan before the settings are confirmed', () => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       if (!body.messages) return new Response(JSON.stringify({ data: [] }));
       sent.push(body);
-      const call = n++ === 0
-        ? { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } }
-        : null;
+      const call = n++ === 0 ? first : null;
       const chunk = call
         ? { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] }
         : { choices: [{ delta: { content: 'ok' } }] };
@@ -90,6 +89,14 @@ describe('a video plan before the settings are confirmed', () => {
     expect(feed.some((f) => f.type === 'plan')).toBe(false);
     const tool = sent[1].messages.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
     expect(tool).toMatch(/call confirm_settings first \(kind "video"\)/);
+  });
+
+  it('a video model guide is not loaded before the model is confirmed', async () => {
+    first = { name: 'read_guide', args: { id: 'model:minimax' } };
+    await sendAgentMessage('Haz un video UGC');
+    const tool = sent[1].messages.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    expect(tool).toMatch(/^Not loaded: the video model is not confirmed yet/);
+    expect(tool).not.toContain('MiniMax H3');
   });
 });
 

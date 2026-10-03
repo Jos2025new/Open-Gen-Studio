@@ -56,13 +56,13 @@ import {
   updateFeedItem,
   useStore,
 } from '../../store/store';
-import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext, defaultImageGuideId } from './context';
+import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
-import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById, workflowMakesImage } from '../skills';
+import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { buildSettings, describeChoice } from './settingsCard';
 import { readGraph } from '../flow/graphView';
@@ -276,15 +276,21 @@ function inConversation(sessionId: string, t: string): boolean {
 
 /** Model guides for the plan's image and video steps, as a block for a message; '' when none is new. */
 function modelGuidesFor(sessionId: string, workflowGuideId: string): string {
-  const parts: string[] = [];
-  // Every workflow is a staged piece: its shared rules come in the same result, once per conversation.
-  if (workflowGuideId.startsWith('workflow:') && !inConversation(sessionId, STAGED_GUIDE)) parts.push(`\n\n---\n${STAGED_GUIDE}`);
-  // The video model's guide comes with the confirmed settings (phase 2), for the model actually chosen.
-  for (const [kind, id] of [['image', workflowMakesImage(workflowGuideId) ? defaultImageGuideId() : undefined]] as const) {
-    const t = id ? readGuide(`model:${id}`) : undefined;
-    if (t && !inConversation(sessionId, t)) parts.push(`\n\n---\nPrompting guide of the ${kind} model this plan will use (model:${id}); write those prompts in its format:\n${t}`);
-  }
-  return parts.join('');
+  // Every workflow is a staged piece: its shared rules come in the same result, once per conversation. Model guides
+  // do not: they come with the confirmed settings (phase 2), for the model the user actually chose.
+  return workflowGuideId.startsWith('workflow:') && !inConversation(sessionId, STAGED_GUIDE) ? `\n\n---\n${STAGED_GUIDE}` : '';
+}
+
+/** Why a video model's guide cannot be loaded yet (phase 2 not confirmed, or another model was confirmed); undefined when it can. */
+function earlyModelGuide(sessionId: string, id: string): string | undefined {
+  const [type, gid] = id.trim().split(':');
+  const guide = type === 'model' ? modelGuide(gid ?? '') : undefined;
+  if (!guide || guide.optional || guide.id === 'video-edit') return undefined;
+  const confirmed = session(sessionId).agent.settings?.video;
+  const confirmedGuide = confirmed ? guideForModel(confirmed.modelRef.split('::')[1] ?? '')?.id : undefined;
+  if (!confirmed) return `Not loaded: the video model is not confirmed yet. Call confirm_settings first; the prompting guide of the model the user confirms comes with the confirmation.`;
+  if (confirmedGuide !== guide.id) return `Not loaded: the confirmed video model is ${modelSummary(confirmed.modelRef)?.name ?? confirmed.modelRef}${confirmedGuide ? ` (its guide is model:${confirmedGuide})` : ''}. To use another model, call confirm_settings again.`;
+  return undefined;
 }
 
 /**
@@ -1411,6 +1417,12 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const wrongCanvas = v.success ? guideWorkspaceProblem(v.data.id, workspace) : undefined;
           if (wrongCanvas) {
             respond(wrongCanvas);
+            continue;
+          }
+          // A video model's prompting guide waits for phase 2: only the confirmed model's, which comes with the confirmation.
+          const early = v.success && workspace !== 'node' ? earlyModelGuide(sessionId, v.data.id) : undefined;
+          if (early) {
+            respond(early);
             continue;
           }
           const text = v.success ? readGuide(v.data.id) : undefined;
