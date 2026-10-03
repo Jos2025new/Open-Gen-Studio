@@ -1,6 +1,6 @@
 import { getAssetBlob } from '../../lib/idb';
 import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, fetchBlob, blobToCanvas, videoFrameSheet } from '../../lib/media';
-import type { LlmContentPart, LlmMessage } from '../types';
+import type { Asset, LlmContentPart, LlmMessage } from '../types';
 import { useStore } from '../../store/store';
 
 /*
@@ -12,6 +12,11 @@ import { useStore } from '../../store/store';
 
 /** Longest side sent to the model: enough to read subject, style and framing, cheap in tokens. */
 export const VISION_MAX_SIDE = 768;
+
+/** Stable, human-readable metadata for an attachment; quoted by callers before it enters model context. */
+export function assetContextName(asset: Pick<Asset, 'id' | 'kind' | 'name'>): string {
+  return asset.name?.trim() || `${asset.kind}-${asset.id.slice(-8)}`;
+}
 
 /** Whether the selected agent model takes images. Unknown counts as yes (Settings already prefers vision models). */
 export function agentSeesImages(): boolean {
@@ -60,7 +65,7 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
     } catch {
       url = null;
     }
-    const label = `asset:${id} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
+    const label = `asset:${id} name=${JSON.stringify(assetContextName(a))} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
     parts.push({ type: 'text', text: url ? `${label}:` : `${label}: could not be shown.` });
     if (url) parts.push({ type: 'image_url', image_url: { url } });
   }

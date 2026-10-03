@@ -19,6 +19,7 @@ import { AspectGlyph } from '../composer/MediaControls';
 import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
 export type FlowNodeData = { node: GraphNode; solo: boolean };
@@ -164,7 +165,10 @@ function HistoryOutput({ node, generation: g, assetId, index, number, onOpen }: 
   const asset = useStore(s => s.assets[assetId]);
   const info = usePopover();
   return <div className="nc-history-output">
-    <button type="button" className="nc-history-preview" style={{ aspectRatio: asset?.width && asset?.height ? `${asset.width} / ${asset.height}` : '1' }} aria-label={`View generation ${number}, output ${index + 1}`} onClick={() => { onOpen(); setUi({ lightbox: { assetIds: g.assetIds, index } }); }}><AssetMedia assetId={assetId} hoverPlay draggable={false} /></button>
+    <div className="nc-history-thumb">
+      <button type="button" className="nc-history-preview" style={{ aspectRatio: asset?.width && asset?.height ? `${asset.width} / ${asset.height}` : '1' }} aria-label={`View generation ${number}, output ${index + 1}`} onClick={() => { onOpen(); setUi({ lightbox: { assetIds: g.assetIds, index } }); }}><AssetMedia assetId={assetId} hoverPlay draggable={false} /></button>
+      <AgentAttachToggle assetId={assetId} />
+    </div>
     <div className="nc-history-actions">
       <IconButton ref={info.ref} icon={Info} size="sm" label={`Details for generation ${number}, output ${index + 1}`} active={info.open} onClick={info.toggle} />
       <IconButton icon={RotateCcw} size="sm" label={`Restore parameters from generation ${number}`} onClick={() => { const error = restoreNodeGeneration(sessionId, node.id, g.id); toast(error ?? 'Parameters restored. Run when ready.', error ? 'error' : 'success'); }} />
@@ -243,6 +247,7 @@ function Preview({ node }: { node: GraphNode }) {
         <>
           <div className="nc-media">
             <AssetMedia assetId={g.assetIds[g.assetIds.length - 1]} draggable={false} />
+            <AgentAttachToggle assetId={g.assetIds[g.assetIds.length - 1]} />
           </div>
           <span className="nc-badge"><LoaderCircle size={10} className="spin" /> {g.assetIds.length}/{Math.max(g.settings.count, g.assetIds.length)}</span>
         </>
@@ -271,6 +276,7 @@ function Preview({ node }: { node: GraphNode }) {
     <>
       <div className="nc-media">
         <AssetMedia assetId={assetId} draggable={false} />
+        <AgentAttachToggle assetId={assetId} />
       </div>
       {sketch ? (
         <span className="nc-badge" data-tip="Sketched · Reset image restores the original">

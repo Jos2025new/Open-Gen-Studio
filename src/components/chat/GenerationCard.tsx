@@ -18,6 +18,7 @@ import { AssetActions, AttachButton, DownloadButton, FavoriteButton, SendToMenu 
 import { GenerationInfo, generationInputs, generationTitle, openInputs } from '../assets/GenerationInfo';
 import { useShallow } from 'zustand/react/shallow';
 import { GenerationRecovery } from './RecoveryActions';
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 
 function metaLine(g: Generation): string {
   const s = g.settings;
@@ -161,10 +162,13 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
       {rail ? (
         <div className={`gen-inputs-rail document-thumbnails is-${railSide}`} style={{ ['--thumb-h' as string]: `${thumbH}px` }} role="list" aria-label="Inputs" onMouseEnter={() => setRailHover(true)} onMouseLeave={() => setRailHover(false)}>
           {inputs.map((id, i) => (
-            <button key={id} type="button" role="listitem" className="document-choice gen-input-choice" onClick={() => openInputs(inputs, i)}>
-              <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-              <small>{inputLabel(g, id, i)}</small>
-            </button>
+            <div key={id} role="listitem" className="attach-host">
+              <button type="button" className="document-choice gen-input-choice" onClick={() => openInputs(inputs, i)}>
+                <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+                <small>{inputLabel(g, id, i)}</small>
+              </button>
+              <AgentAttachToggle assetId={id} />
+            </div>
           ))}
         </div>
       ) : null}
@@ -271,6 +275,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
             >
               <AssetMedia assetId={id} controls={g.kind === 'audio'} autoPlay={false} />
               {outputs.length > 1 ? <span className="tile-num">{i + 1}</span> : null}
+              <AgentAttachToggle assetId={id} />
               <button
                 type="button"
                 className="tile-expand"

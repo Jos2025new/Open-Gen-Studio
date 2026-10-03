@@ -599,6 +599,17 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
+/** Toggle an existing image in the agent's attachment list. No asset is created or copied. */
+export function toggleAgentAttachment(assetId: string): void {
+  const asset = get().assets[assetId];
+  if (asset?.kind !== 'image') return;
+  setComposer((c) => ({
+    attachments: c.attachments.includes(assetId)
+      ? c.attachments.filter((id) => id !== assetId)
+      : [...c.attachments, assetId],
+  }));
+}
+
 /** Audio files the app stores and the providers read (MP3, WAV, M4A, AAC, OGG, FLAC, WebM). */
 export const AUDIO_MIME = /^audio\/(mpeg|mp3|wav|x-wav|mp4|x-m4a|aac|ogg|flac|webm)$/;
 

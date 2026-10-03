@@ -16,6 +16,7 @@ import { describeChoice } from './settingsCard';
 import { nodeOutputAsset } from '../flow/graph';
 import { graphIndex } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
+import { assetContextName } from './attachments';
 
 const get = useStore.getState;
 
@@ -279,10 +280,10 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(`other models:\n${alternatives()}`);
   if (opts.attachments.length) {
     lines.push(
-      `attached by the user: ${opts.attachments
+      `attached by the user in selection order: ${opts.attachments
         .map((id) => {
           const a = st.assets[id];
-          return a ? `asset:${id} (${assetShape(a)})` : '';
+          return a ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (${assetShape(a)})` : '';
         })
         .filter(Boolean)
         .join(', ')}`,

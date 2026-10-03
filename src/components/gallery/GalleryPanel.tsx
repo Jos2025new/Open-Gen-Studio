@@ -1,3 +1,4 @@
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, SlidersHorizontal, Star, Trash, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
@@ -285,7 +286,7 @@ function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; sel
         </span>
       ) : null}
       {asset.favorite ? <Star size={12} className="g-fav" fill="currentColor" /> : null}
-      {selecting ? <span className={`g-check ${selected ? 'is-on' : ''}`} /> : null}
+      {selecting ? <span className={`g-check ${selected ? 'is-on' : ''}`} /> : <AgentAttachToggle assetId={asset.id} />}
       {!asset.stored ? (
         <span className="g-remote" data-tip="Stored at the provider only; it may expire">
           <Clock size={11} />

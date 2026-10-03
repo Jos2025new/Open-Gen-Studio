@@ -1,3 +1,4 @@
+import { AgentAttachToggle } from './AgentAttachToggle';
 import { useState } from 'react';
 import { ChevronDown, Copy, Info, Sparkles, Wrench } from 'lucide-react';
 import { OPS } from '../../engine/ops';
@@ -98,9 +99,12 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
             {inputs.length ? (
               <div className="info-inputs">
                 {inputs.map((id, i) => (
-                  <button type="button" key={id} className="info-thumb" onClick={() => openInputs(inputs, i)} data-tip={id === g.op?.sourceAssetId ? 'Source' : id === g.inputs.firstFrame ? 'Start frame' : id === g.inputs.lastFrame ? 'End frame' : 'Reference'}>
-                    <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-                  </button>
+                  <span key={id} className="attach-host is-small">
+                    <button type="button" className="info-thumb" onClick={() => openInputs(inputs, i)} data-tip={id === g.op?.sourceAssetId ? 'Source' : id === g.inputs.firstFrame ? 'Start frame' : id === g.inputs.lastFrame ? 'End frame' : 'Reference'}>
+                      <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+                    </button>
+                    <AgentAttachToggle assetId={id} />
+                  </span>
                 ))}
               </div>
             ) : null}
