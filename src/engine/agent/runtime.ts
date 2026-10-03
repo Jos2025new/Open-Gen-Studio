@@ -65,7 +65,7 @@ import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
-import { buildSettings, describeChoice } from './settingsCard';
+import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
@@ -210,7 +210,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   }
   // Typing while the settings card is open confirms what it shows, with the message as a note.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
-    await confirmSettings(sessionId, pendingItem.id, pendingItem.sections.map((x) => x.chosen ?? x.recommended), clean);
+    await confirmSettings(sessionId, pendingItem.id, sectionsOf(pendingItem).map((x) => x.chosen ?? x.recommended), clean);
     return;
   }
   // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
@@ -392,7 +392,7 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
 export function selectSettings(sessionId: string, itemId: string, index: number, chosen: SettingsChoice): void {
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
-  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: item.sections.map((x, i) => (i === index ? { ...x, chosen } : x)) });
+  if (item?.type === 'settings' && item.status === 'pending') updateFeedItem<SettingsFeedItem>(sessionId, itemId, { sections: sectionsOf(item).map((x, i) => (i === index ? { ...x, chosen } : x)) });
 }
 
 /** "Continue" on the settings card (phase 2): the agent gets the confirmed values and each model's prompting guide. */
@@ -401,7 +401,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'settings' || item.status !== 'pending') return;
-  const sections = item.sections.map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
+  const sections = sectionsOf(item).map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', sections });
   const pending = s.agent.pending;
   patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(sections.map((x) => [x.kind, x.chosen])) } }));

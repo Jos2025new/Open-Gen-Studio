@@ -1,12 +1,13 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
-import { choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
 import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
+import { ensureSchema } from '../../engine/catalog';
 import { AspectGlyph } from '../composer/MediaControls';
 
 /**
@@ -17,14 +18,15 @@ import { AspectGlyph } from '../composer/MediaControls';
 export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sessionId: string }) {
   const models = useStore((s) => s.catalog.models);
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
-  const titled = item.sections.length > 1;
+  const sections = sectionsOf(item);
+  const titled = sections.length > 1;
   if (item.status !== 'pending') {
     return (
       <article className="q-card is-done">
         <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}</div>
         {item.status === 'confirmed' ? (
           <ul className="q-summary">
-            {item.sections.map((x) => {
+            {sections.map((x) => {
               const c = x.chosen ?? x.recommended;
               return <li key={x.kind}>{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{describeChoice(name(c.modelRef), c)}</li>;
             })}
@@ -37,7 +39,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     <article className="q-card set-card">
       <div className="q-kicker">Settings · before the plan is written</div>
       {item.summary ? <p className="q-intro">{item.summary}</p> : null}
-      {item.sections.map((x, i) => (
+      {sections.map((x, i) => (
         <div key={x.kind} className={titled ? 'set-section' : undefined}>
           {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}</div> : null}
           <SettingsSectionBlock section={x} index={i} itemId={item.id} sessionId={sessionId} />
@@ -45,7 +47,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       ))}
       <footer className="q-foot">
         <span className="set-total faint">The exact cost is shown with the plan, once the prompts are written.</span>
-        <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, item.sections.map((x) => x.chosen ?? x.recommended))}>
+        <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, sections.map((x) => x.chosen ?? x.recommended))}>
           Continue <ArrowRight size={13} />
         </Button>
       </footer>
@@ -58,6 +60,10 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
   const [secsDraft, setSecsDraft] = useState<string | null>(null);
+  // After a reload the models' schemas are not in memory yet: load them, the options come from there.
+  useEffect(() => {
+    for (const ref of [item.recommended.modelRef, ...item.alternatives, item.chosen?.modelRef]) if (ref) void ensureSchema(ref);
+  }, [item]);
   const [moreOpen, setMoreOpen] = useState(choice.modelRef !== item.recommended.modelRef);
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
   const provider = (ref: string) => ref.split('::')[0];

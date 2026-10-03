@@ -1,7 +1,7 @@
 import { estimateMedia } from '../costs';
 import { aspectLabel, durationChoices, isAutoOption, mediumResolution, nearestAspect, paramByRole, pixelSizes } from '../params';
 import { routeFits, routeMode, routeVideo, VIDEO_ROUTES, type VideoPurpose } from '../routing';
-import type { Estimate, ModelSchema, ModelSummary, SettingsChoice } from '../types';
+import type { Estimate, ModelSchema, ModelSummary, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 
 /*
  * Phase 2 (settings before prompts): the agent says what the plan will make; the app picks the recommended model
@@ -140,4 +140,11 @@ export async function buildSettings(req: SettingsRequest, deps: SettingsDeps): P
   }
   const schema = (await deps.getModel(recommended))?.schema;
   return { recommended: { ...defaultChoice(recommended, schema, req), needsImage }, alternatives };
+}
+
+/** A card saved before sections existed (one kind: kind, count, recommended, alternatives, chosen) read as one section. */
+export function sectionsOf(item: SettingsFeedItem): SettingsSection[] {
+  if (Array.isArray(item.sections)) return item.sections;
+  const old = item as unknown as Partial<SettingsSection>;
+  return old.recommended ? [{ kind: old.kind ?? 'video', count: old.count ?? 1, recommended: old.recommended, alternatives: old.alternatives ?? [], chosen: old.chosen }] : [];
 }
