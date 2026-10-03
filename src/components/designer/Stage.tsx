@@ -430,7 +430,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
       ctx.restore();
     }
-    if (active && active.visible && !editingText) {
+    if (active && active.visible && !editingText && drag.current?.kind !== 'xform') {
       const objectsMode = tool === 'move' && !editLayers && !shiftDown;
       const objects = objectsMode ? layerObjects(active) : [];
       if (objectsMode && objects.length) {
@@ -461,7 +461,27 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
     // Transform handles around what Edit acts on: squares to scale; in rotate mode, round corners to rotate,
     // diamonds on the sides to skew, and the rotation center (drag it to move it).
-    if (tBox && handles.length && !editingText) {
+    const xformLive = drag.current?.kind === 'xform' && drag.current.op !== 'pivot' ? drag.current : null;
+    if (tBox && xformLive) {
+      // While a handle is held (as in Inkscape): no handles in the way, only a thin dashed box around the shape as
+      // it turns, and the center it turns about.
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = 'rgba(236,236,239,0.6)';
+      ctx.strokeRect(Math.round(sx(tBox.x)) + 0.5, Math.round(sy(tBox.y)) + 0.5, Math.round(tBox.w * view.zoom), Math.round(tBox.h * view.zoom));
+      ctx.setLineDash([]);
+      if (xformLive.op !== 'scale') {
+        const px = Math.round(sx(xformLive.cx)) + 0.5, py = Math.round(sy(xformLive.cy)) + 0.5;
+        ctx.strokeStyle = '#0a0a0b';
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py); ctx.moveTo(px, py - 6); ctx.lineTo(px, py + 6); ctx.stroke();
+        ctx.strokeStyle = '#ececef';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (tBox && handles.length && !editingText) {
       ctx.save();
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(212,242,90,0.7)';
@@ -1242,8 +1262,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         />
       ) : null}
       {tool === 'move' && selectedCurve ? <div className="stage-hint">Drag points to edit · Click away to move again</div> : tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
-      {tool === 'move' && !selectedCurve && tBox ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Shift: 15° steps) · move the center · click again to resize'}</div>
-        : tool === 'move' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
+      {tool === 'move' && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Shift: 15° steps) · move the center · click again to resize'}</div>
+        : tool === 'move' && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
