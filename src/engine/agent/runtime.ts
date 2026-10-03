@@ -76,7 +76,8 @@ import { nodeSelection } from '../flow/selection';
 import { TOOLS, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
-let controller: AbortController | null = null;
+/** One controller per turn, by session: a turn in one session never stops or clears another's. */
+const controllers = new Map<string, AbortController>();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -457,8 +458,9 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
   await llmTurn(sessionId, item.workspace);
 }
 
-export function stopAgent(): void {
-  controller?.abort();
+/** Stop the agent of the given session (by default the one on screen). */
+export function stopAgent(sessionId: string = get().activeSessionId): void {
+  controllers.get(sessionId)?.abort();
 }
 
 // ---------------------------------------------------------------------------
@@ -1191,7 +1193,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   patchAgent(sessionId, { busy: true, phase: 'working' });
   const log = activityLog(sessionId, workspace);
   const showThinking = get().settings.agent.showThinking !== false;
-  controller = new AbortController();
+  const controller = new AbortController();
+  controllers.set(sessionId, controller);
   const signal = controller.signal;
   const clock = turnClock(sessionId);
   const turnStart = Date.now();
@@ -1213,7 +1216,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   const cut = () => {
     cutTurn = true;
     logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: TURN_CAP_MS });
-    controller?.abort();
+    controller.abort();
   };
   const capTimer = setTimeout(cut, TURN_CAP_MS);
   armSilence();
@@ -1639,7 +1642,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
     log.end();
     clock.end();
     patchAgent(sessionId, { busy: false, phase: undefined });
-    controller = null;
+    if (controllers.get(sessionId) === controller) controllers.delete(sessionId);
   }
 }
 

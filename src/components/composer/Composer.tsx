@@ -456,7 +456,7 @@ export function Composer() {
             />
             {mode === 'agent' ? (
               busy ? (
-                <button type="button" className="send-btn is-stop" onClick={stopAgent} aria-label="Stop" data-tip="Stop the agent">
+                <button type="button" className="send-btn is-stop" onClick={() => stopAgent()} aria-label="Stop" data-tip="Stop the agent">
                   <CircleStop size={16} />
                 </button>
               ) : (
