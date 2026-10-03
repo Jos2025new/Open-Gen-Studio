@@ -1,6 +1,6 @@
 # Open Gen Studio — estado del trabajo (handoff)
 
-Última sesión: 2026-09-28. App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
+Última sesión: 2026-10-02 (rama `better-worflows-xyz765`). App React 19 + Vite 8 + TS 7 + zustand 5 + @xyflow/react 12, sin backend.
 Proveedores: **OpenRouter, fal.ai, NanoGPT, Atlas Cloud** (+ "Local demo" procedural para usar sin claves).
 Sin backend: corre en el navegador; el servidor de Vite solo la sirve en local y aporta rutas `/x/*` (relays y copia en disco). Opciones de despliegue discutidas en `PROPUESTAS.md`.
 El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas (sin SDK de Anthropic; se desinstaló `@anthropic-ai/sdk`).
@@ -13,6 +13,13 @@ El agente LLM usa chat completions OpenAI-compatible de OpenRouter/NanoGPT/Atlas
 - `engine/agent/`: tools.ts (ask_questions, propose_plan + zod), context.ts (system prompt + contexto), offline.ts (planificador local bilingüe), runtime.ts (auto/guiado con límite de rondas, validación de coste antes de gastar, aprobación, ejecución por workspace).
 - `src/store/store.ts` (zustand + persistencia IndexedDB debounced, wipeAllData).
 - UI escrita: App, main, shell (Sidebar, TopBar+slot, SettingsPanel, SidePanel, SessionsPanel), gallery/GalleryPanel, ui (Popover arriba-derecha, TooltipLayer, primitives, SpendConfirm, AssetMedia, Toasts, hooks), assets (OpForm, GenerationInfo, AssetActions, Lightbox), composer (Composer, ModeMenu, AgentControls, MediaControls, ModelList, ThreadPeek), chat (ChatWorkspace, FeedList, GenerationCard, PlanCard, QuestionsCard), node (NodeWorkspace, nodes), designer/Stage.tsx.
+
+## Procedimiento único del agente y fases — 2026-10-02 (Claude; rama `better-worflows-xyz765`, punto de retorno `4173f76`)
+Detalle, porqués, riesgos y destino de cada regla movida en `AGENTS.md` (planes "procedimiento único" y "fase de ajustes", F1–F18). Estado: 405 tests + 1 omitido, typecheck limpio, suite sin errores no manejados. Probado por el usuario con LLM real (GPT 6 Luna) en varias vueltas; banco sin medir.
+- Instrucciones del agente: procedimiento único arriba (conversación o encargo · inventario · datos del usuario frente a decisiones creativas · fase 1 contenido · fase 2 ajustes · plan · cierre honesto), reglas de piezas por etapas en `guides/staged.md` (`skill:staged`, llega con cualquier workflow), contexto descriptivo sin órdenes; 7 552 → ~5 900 tokens fijos.
+- Fase 2: `confirm_settings` + tarjeta de ajustes (una por plan, imágenes antes que vídeo; duración, resolución, aspect, imágenes a generar, modelo con alternativas incl. económicas y precio "from"); el plan aplica lo confirmado en código; las guías de modelo de vídeo solo llegan con la confirmación.
+- Candidatas que varían (`variations`, una petición por resultado), lápiz "Suggest changes" en cada paso/opción del plan, "Edit" para reabrir una tarjeta ya respondida (`editLog` para nosotros).
+- Otros: modelo y prompt del agente respetados en operaciones; cierre con el modelo real y medidas; editar nodos durante una ejecución (copia del grafo); Ajustes → Data con resumen y ZIP; avisos repetidos agrupados.
 
 ## Fotografía de producto, social ad y cierre del agente — 2026-09-28 (Claude, nube; rama `claude/stoic-davinci-xt7o4z`)
 Detalle, porqués, riesgos y pendientes en `AGENTS.md` (secciones "fotografía de producto" y "social ad"). Estado: 257 tests, typecheck y build correctos. Sin navegador ni LLM real.

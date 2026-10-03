@@ -231,7 +231,7 @@ const initial: AppState = {
 // ---------------------------------------------------------------------------
 // Persistence (IndexedDB, debounced)
 
-let writeTimer: number | undefined;
+let writeTimer: ReturnType<typeof setTimeout> | undefined;
 // The latest state to save. Held as the (immutable) object and turned into JSON only when the debounced write runs:
 // stringifying the whole state on every change cost a full serialization per store update, which grows with the
 // history and piled up where many updates come together (the end of an agent turn, when its card appears).
@@ -253,8 +253,9 @@ const idbStorage: PersistStorage<Persisted> = {
   setItem: (name, value) => {
     if (wiping) return;
     pendingWrite = { name, value };
-    window.clearTimeout(writeTimer);
-    writeTimer = window.setTimeout(flushWrite, 350);
+    // The global timers, not window's: tests (Node) write state too.
+    clearTimeout(writeTimer);
+    writeTimer = setTimeout(flushWrite, 350);
   },
   removeItem: (name) => stateDb.del(name),
 };
@@ -489,7 +490,7 @@ export function autoTitleSession(id: string, text: string): void {
 export async function wipeAllData(): Promise<void> {
   wiping = true;
   pendingWrite = null;
-  window.clearTimeout(writeTimer);
+  clearTimeout(writeTimer);
   await stateDb.del('ogs-app').catch(() => undefined);
   // The disk copy moves to data.bak-<date>: otherwise the next load would restore it, and nothing is lost for good.
   await disk.wipe();

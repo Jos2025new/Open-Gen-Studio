@@ -52,7 +52,7 @@ No corregido: el agente prometió "4 candidatas" sin poner `count` (salió 1); e
 
 ## Tarea — terminar Ajustes por apartados (2026-10-02)
 - [x] Conservar los cambios pendientes de SettingsPanel y shell.css; ajustar estilos solo dentro de Ajustes y textos coherentes con las pestañas y el borrado real. Riesgo: distribución sin validación visual; reversible con revert.
-- [x] Typecheck correcto; suite: 390 pasan, 1 omitida, pero termina con un rechazo no manejado `window is not defined` en `store.ts:256` durante `snap.test.ts`. Sin navegador por petición del usuario. Cambios guardados en un commit de esta tarea.
+- [x] Typecheck correcto; suite: 390 pasan, 1 omitida, pero termina con un rechazo no manejado `window is not defined` en `store.ts:256` durante `snap.test.ts` (**arreglado 2026-10-02**, auditoría de DeepSeek: el guardado usa los temporizadores globales, no los de `window`). Sin navegador por petición del usuario. Cambios guardados en un commit de esta tarea.
 
 ## Tarea — Edit: alinear, ajustar, voltear y girar la capa (2026-10-02)
 - [x] E8. (usuario: Ctrl-clic sobre un trazo cogía además la capa de encima) "Select: Objects / Layers" en la barra de Edit (`ui.selectMode`, Objects por defecto). Objects: Ctrl/Cmd-clic añade o quita trazos de la capa activa (pincel) y nunca toca otras capas; arrastrar uno de los elegidos mueve todos; sus cajas se marcan y la caja del conjunto lleva las asas. Layers: el Ctrl-clic de capas (E6). Shift sigue siendo "mover la capa entera". Navegador: el interruptor y el aviso nuevo se ven; los clics sobre trazos no se probaron (los trazos quedaban fuera de la vista). Pendiente: elegir varias formas/trazos de una capa vector.
