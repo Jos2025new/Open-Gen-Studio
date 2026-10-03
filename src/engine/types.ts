@@ -299,6 +299,8 @@ export interface RemoteJob {
 }
 
 export interface Generation {
+  /** Its session was deleted while it ran: it finishes (its charge goes to Spending once) and is then removed with its results. */
+  discard?: boolean;
   /** One variation per result, appended to the prompt of its own request (candidates that differ). */
   variants?: string[];
   /** Logical node request at execution time; provider transformations do not affect freshness. */

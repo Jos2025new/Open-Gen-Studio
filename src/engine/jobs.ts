@@ -287,6 +287,7 @@ export function runGeneration(id: string): Promise<string[]> {
   const p = attempt(id).finally(() => {
     running.delete(id);
     controllers.delete(id);
+    purgeDiscarded(id);
   });
   running.set(id, p);
   return p;
@@ -730,6 +731,27 @@ function spendEntry(g: Generation, estimated: boolean) {
   return { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated };
 }
 
+/**
+ * A generation whose session was deleted while it ran, now ended (done, error or canceled): its charge is already in
+ * Spending (finish / chargePartial), so remove it and every result it stored, including those saved after the delete.
+ */
+export function purgeDiscarded(id: string): void {
+  const g = get().generations[id];
+  if (!g?.discard || running.has(id) || g.status === 'running' || g.status === 'queued') return;
+  const st = get();
+  const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
+  const ids = Object.values(st.assets).filter((a) => (a.generationId === id || g.assetIds.includes(a.id)) && !kept.has(a.id)).map((a) => a.id);
+  useStore.setState((cur) => {
+    const generations = { ...cur.generations };
+    delete generations[id];
+    const assets = { ...cur.assets };
+    ids.forEach((a) => delete assets[a]);
+    return { generations, assets };
+  });
+  // Loaded here, only when there is something to delete: the runner itself never touches stored files otherwise.
+  if (ids.length) void import('../lib/idb').then((m) => m.deleteAssetBlobs(ids));
+}
+
 export function cancelGeneration(id: string): void {
   controllers.get(id)?.abort();
   const g = get().generations[id];
@@ -748,6 +770,7 @@ export async function resumeInterrupted(): Promise<void> {
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
       const error = job ? `Interrupted by a page reload. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload. Regenerate to try again.';
       patchGeneration(g.id, { status: 'error', error, statusText: undefined, finishedAt: Date.now() });
+      purgeDiscarded(g.id);
       continue;
     }
     patchGeneration(g.id, { statusText: 'Resuming' });
@@ -875,6 +898,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
     } finally {
       running.delete(id);
       controllers.delete(id);
+      purgeDiscarded(id);
     }
   })();
   running.set(id, p);

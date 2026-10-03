@@ -9,7 +9,7 @@ import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, pickComposerModel, selectComposerModel } from './catalog';
 import { estimateMedia } from './costs';
 import { autoLayout, graphBounds, runsGeneration } from './flow/graph';
-import { createGeneration, opSpec, runGeneration, type GenerationSpec } from './jobs';
+import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec } from './jobs';
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
@@ -752,8 +752,11 @@ export function deleteSession(sessionId: string): void {
   if (!s) return;
   // Images of library items outlive the session that made them.
   const kept = new Set(st.library.flatMap((x) => [x.frontalAssetId, ...x.refAssetIds, x.videoAssetId]));
-  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id)).map((a) => a.id);
-  const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId).map((g) => g.id);
+  // Generations still running are not canceled (the provider may charge anyway): they finish, their charge goes to
+  // Spending once, and jobs.purgeDiscarded removes them and their results then.
+  const active = new Set(Object.values(st.generations).filter((g) => g.sessionId === sessionId && isRunning(g.id)).map((g) => g.id));
+  const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);
+  const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId && !active.has(g.id)).map((g) => g.id);
   const rasterIds = rasterBufferIds(s.docs.flatMap((d) => d.layers.filter((l) => l.type === 'raster')));
   useStore.setState((cur) => {
     const sessions = { ...cur.sessions };
@@ -762,6 +765,7 @@ export function deleteSession(sessionId: string): void {
     assetIds.forEach((id) => delete assets[id]);
     const generations = { ...cur.generations };
     genIds.forEach((id) => delete generations[id]);
+    active.forEach((id) => { if (generations[id]) generations[id] = { ...generations[id], discard: true }; });
     let activeSessionId = cur.activeSessionId;
     if (activeSessionId === sessionId || !sessions[activeSessionId]) {
       const next = Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt)[0];

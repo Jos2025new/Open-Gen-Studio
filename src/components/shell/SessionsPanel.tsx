@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, Maximize2, MessageSquare, Minimize2, Pencil, PenTool, Pin, PinOff, Plus, Search, SlidersHorizontal, Trash, Workflow, X } from 'lucide-react';
 import { newSession, renameSession, selectSession, setUi, togglePinSession, useStore } from '../../store/store';
 import { deleteSession } from '../../engine/actions';
+import { isRunning } from '../../engine/jobs';
 import { formatRelative, formatUsd, groupByDate } from '../../lib/format';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
@@ -25,6 +26,12 @@ export function sessionCanvases(s: Session): Workspace[] {
 }
 
 type Sort = 'recent' | 'created' | 'name';
+
+function RunningNote({ ids }: { ids: string[] }) {
+  const n = useStore((st) => Object.values(st.generations).filter((g) => ids.includes(g.sessionId) && isRunning(g.id)).length);
+  if (!n) return null;
+  return <p className="muted">{n} generation{n === 1 ? ' is' : 's are'} still running: {n === 1 ? 'it' : 'they'} will finish, any charge is recorded in Spending, and the results are discarded.</p>;
+}
 
 export function SessionsPanel() {
   const sessions = useStore((s) => s.sessions);
@@ -216,6 +223,7 @@ export function SessionsPanel() {
           <Popover open={bulkDel.open} anchor={bulkDel.ref} onClose={bulkDel.close} width={300} label="Delete sessions">
             <div className="confirm">
               <p>Delete {picked.length} session{picked.length === 1 ? '' : 's'} with their conversations, nodes, designs and assets? Library items are kept.</p>
+              <RunningNote ids={picked.map((x) => x.id)} />
               <div className="spend-actions">
                 <Button variant="ghost" onClick={bulkDel.close}>Cancel</Button>
                 <Button variant="danger" onClick={() => { bulkDel.close(); picked.forEach((x) => deleteSession(x.id)); stopSelecting(); }}>
@@ -360,6 +368,7 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
         <Popover open={del.open} anchor={del.ref} onClose={del.close} width={280} label="Delete session">
           <div className="confirm">
             <p>Delete “{session.title}” with its conversation, nodes, designs and assets?</p>
+            <RunningNote ids={[session.id]} />
             <div className="spend-actions">
               <Button variant="ghost" onClick={del.close}>
                 Cancel
