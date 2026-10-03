@@ -1,6 +1,6 @@
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
 import type { ImageInputFormat, InputSlots, MediaKind } from '../types';
-import { isTransient, sleep } from '../../lib/http';
+import { HttpError, isTransient, JobFailedError, sleep } from '../../lib/http';
 import type { GenOutput, GenResult, MediaInput, ResumeContext } from './types';
 
 /** Encode an input image for a JSON body (data URL, or an OpenAI-style content part). */
@@ -156,6 +156,19 @@ export const POLL_TIMEOUT_MS = 30_000;
  * Only `check` decides that the job failed (by throwing JobFailedError). Past the local time limit the wait
  * stops with a plain error, and the caller keeps the job so it can be checked again later.
  */
+/** The provider's own words when a response body reports the job as failed (top level or under data); else undefined. */
+export function failedJobMessage(body: unknown): string | undefined {
+  const levels = [body, (body as { data?: unknown } | null)?.data].filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object');
+  for (const b of levels) {
+    const status = String(b.status ?? '').toLowerCase();
+    if (['failed', 'failure', 'error', 'canceled', 'cancelled'].includes(status)) {
+      const why = b.error ?? b.message ?? (body as { message?: unknown }).message;
+      return typeof why === 'string' && why.trim() ? why.trim() : 'the job failed';
+    }
+  }
+  return undefined;
+}
+
 /** Waits of the running polls; "Check status" ends them so every job is asked about now (and backoff restarts). */
 const pollWaits = new Set<() => void>();
 export function checkJobsNow(): void {
@@ -174,6 +187,9 @@ export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: 
       failures = 0;
       ctx.onStatus(`${r} · ${Math.round((Date.now() - started) / 1000)}s`);
     } catch (err) {
+      // An error status whose body says the job failed (Atlas: HTTP 511 with status "failed") is final, not a retry.
+      const failed = err instanceof HttpError ? failedJobMessage(err.body) : undefined;
+      if (failed) throw new JobFailedError(`${provider}: ${failed}`);
       if (!isTransient(err)) throw err;
       failures++;
       wait = Math.min(60_000, intervalMs * 2 ** failures);
