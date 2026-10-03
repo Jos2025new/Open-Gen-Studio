@@ -173,3 +173,9 @@
   .layer-select { gap: 6px; }
   .layers-picked-label { display: none; }
 }
+.layer-group-row .layer-toggle:not(.is-on):not(:first-child) { opacity: 0; }.layer-group-row:hover .layer-toggle { opacity: 1; }.layer-group-row .layer-name { font-weight: 550; }
+.layer-group-row .layer-select .faint { flex: 0 0 auto; }.layer-group-row .layer-toggle:not(.is-on):not(:first-child) { display: none; }.layer-group-row:hover .layer-toggle { display: inline-flex; }
+/* The actions row starts at the left (the gap pushes the icons right): if it ever runs out of room it never cuts Operations. */
+.layer-actions { justify-content: flex-start; min-width: 0; }
+.layer-actions > * { flex-shrink: 0; }
+@container layers (max-width: 300px) { .layer-ops-label { display: none; } .layer-ops-btn { padding: 0 6px; } }

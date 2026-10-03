@@ -71,7 +71,6 @@ function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc:
       <LayerName name={group.name} onRename={(name) => patchGroup(sessionId, doc.id, group.id, { name })} />
       <span className="faint num">{members.length}</span>
     </button>
-    <IconButton className="layer-toggle" icon={FolderOutput} label={`Ungroup ${group.name}`} size="sm" onClick={() => ungroup(sessionId, doc.id, group.id)} />
     <IconButton className={`layer-toggle ${visible ? '' : 'is-on'}`} icon={visible ? Eye : EyeOff} label={`${visible ? 'Hide' : 'Show'} ${group.name}`} size="sm" onClick={() => setGroupFlag(sessionId, doc.id, group.id, 'visible', !visible)} />
     <IconButton className={`layer-toggle ${locked ? 'is-on' : ''}`} icon={locked ? Lock : Unlock} label={`${locked ? 'Unlock' : 'Lock'} ${group.name}`} size="sm" onClick={() => setGroupFlag(sessionId, doc.id, group.id, 'locked', !locked)} />
   </div>;
@@ -127,7 +126,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onDoubleClick={() => setWidth(260)} />
     <div className="layers-body">
     <Section title="Layers" open={sections.layers} onToggle={() => setSections({ ...sections, layers: !sections.layers })}
-      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => groupLayers(sessionId, doc.id, picked)} data-tip="Ctrl+G · put the selected layers in a folder" aria-label="Group"><FolderInput size={12} /><span className="layers-picked-label">Group</span></button><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
+      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
     <div className="layer-add">
       <Button size="sm" icon={Image} onClick={() => addEmptyLayer(sessionId, doc.id, 'raster')}>Raster</Button>
       <Button size="sm" icon={Shapes} onClick={() => addEmptyLayer(sessionId, doc.id, 'vector')}>Vector</Button>
@@ -164,8 +163,12 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     {layer && <div className="layer-actions">
-        {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} data-tip="Relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}>Operations</Button>}
+        {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} aria-label="Operations" data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}><span className="layer-ops-label">Operations</span></Button>}
         <span className="layer-actions-gap" />
+        {/* Folders: always here. Group the picked layers (2+), or take the active one's folder apart. */}
+        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
+          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
+          : <IconButton icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'} size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
         <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, 1))} />
         <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, -1))} />
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
