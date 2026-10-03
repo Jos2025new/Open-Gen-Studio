@@ -5,7 +5,7 @@ import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFrom
 import { createGeneration, opSpec, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS } from './ops';
-import { parseRef, topoOrder } from './plan';
+import { parseRef, stepDeps, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
 import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Subject, Workspace } from './types';
@@ -85,31 +85,24 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const state = new Map<string, StepState>(order.map((id) => [id, 'pending']));
   const limit = Math.max(1, ctx.concurrency ?? 2);
 
+  // The same inputs the plan card uses (plan.stepDeps: refs as `step:` refs, `after` as plain ids), computed once.
+  const depsOf = new Map<string, string[]>();
   const deps = (s: PlanStep): string[] => {
-    const refs: Array<string | undefined> =
-      s.kind === 'image' || s.kind === 'model3d'
-        ? [s.promptFrom, ...s.refs]
-        : s.kind === 'video'
-          ? [s.promptFrom, s.firstFrame, s.lastFrame, ...(s.refs ?? [])]
-          : s.kind === 'audio'
-            ? [s.promptFrom, s.lyricsFrom]
-            : s.kind === 'op'
-            ? [s.input, ...(s.more ?? []), ...(typeof s.params?.music === 'string' && s.params.music ? [s.params.music] : [])]
-            : s.kind === 'layer'
-              ? [s.source]
-              : [];
+    const known = depsOf.get(s.id);
+    if (known) return known;
     const ids: string[] = [];
-    for (const r of refs) {
+    for (const r of stepDeps(s)) {
       const p = r ? parseRef(r) : null;
-      if (p?.type === 'step' && byId.has(p.id)) ids.push(p.id);
+      const id = p?.type === 'step' ? p.id : !p && r && byId.has(r) ? r : null;
+      if (id && byId.has(id) && !ids.includes(id)) ids.push(id);
     }
-    for (const a of s.after ?? []) if (byId.has(a)) ids.push(a);
     // Layer steps apply in plan order so the stack matches the plan.
     if (s.kind === 'layer') {
       const idx = order.indexOf(s.id);
       const prevLayer = order.slice(0, idx).reverse().find((id) => byId.get(id)?.kind === 'layer');
-      if (prevLayer) ids.push(prevLayer);
+      if (prevLayer && !ids.includes(prevLayer)) ids.push(prevLayer);
     }
+    depsOf.set(s.id, ids);
     return ids;
   };
 
