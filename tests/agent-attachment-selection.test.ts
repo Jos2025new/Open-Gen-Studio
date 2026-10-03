@@ -54,8 +54,28 @@ describe('agent image selection', () => {
     toggleAgentAttachment('clip');
     toggleAgentAttachment('missing');
 
-    expect(useStore.getState().composer.attachments).toEqual(['first', 'second']);
+    expect(useStore.getState().composer.attachments).toEqual(['first', 'second', 'clip']);
     expect(useStore.getState().assets).toBe(assets);
+  });
+
+  it('shows a 3D model to the agent by its current view image', async () => {
+    useStore.setState((st) => ({
+      assets: {
+        ...st.assets,
+        hero: { ...image('hero', 'Heroine'), kind: 'model3d', mime: 'model/gltf-binary', viewImageId: 'heroView' },
+        heroView: image('heroView', 'Heroine view'),
+        song: { ...image('song', 'Song'), kind: 'audio', mime: 'audio/mpeg', duration: 12 },
+      },
+    }));
+    toggleAgentAttachment('hero');
+    toggleAgentAttachment('song');
+    expect(useStore.getState().composer.attachments).toContain('hero');
+    expect(useStore.getState().composer.attachments).toContain('song');
+    const parts = await attachmentParts(['hero', 'song'], { dataUrl: async (id) => `data:image/jpeg;base64,${id}` });
+    expect((parts[0] as { text: string }).text).toMatch(/^asset:hero name="Heroine" \(3D model, shown by its current view image asset:heroView/);
+    expect(parts[1]).toEqual({ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,heroView' } });
+    // Audio stays text: no image part for it.
+    expect(parts).toHaveLength(2);
   });
 
   it('names attached images in selection order in both text and vision context', async () => {

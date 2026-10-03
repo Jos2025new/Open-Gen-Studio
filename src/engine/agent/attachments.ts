@@ -40,16 +40,23 @@ async function assetBlob(id: string): Promise<Blob | undefined> {
   return (await getAssetBlob(id)) ?? (a?.remoteUrl ? await fetchBlob(a.remoteUrl).catch(() => undefined) : undefined);
 }
 
-/** Image parts for the attached images and videos (a 2×2 sheet of four moments); audio and 3D stay as text in the context. */
+/** Image parts for the attached images, videos (a 2×2 sheet of four moments) and 3D models (the view image the app renders
+ *  from the viewer, the angle the user left it at); audio stays as text in the context. */
 export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: string) => Promise<string | null> } = {}): Promise<LlmContentPart[]> {
   const assets = useStore.getState().assets;
   const parts: LlmContentPart[] = [];
   for (const id of ids) {
     const a = assets[id];
-    if (!a || (a.kind !== 'image' && a.kind !== 'video')) continue;
+    if (!a || (a.kind !== 'image' && a.kind !== 'video' && a.kind !== 'model3d')) continue;
     let url: string | null = null;
     try {
-      if (deps.dataUrl) url = await deps.dataUrl(id);
+      if (a.kind === 'model3d') {
+        // Its view image: rendered when the user moves the model in the viewer (or on first show).
+        const view = a.viewImageId;
+        if (view && deps.dataUrl) url = await deps.dataUrl(view);
+        else if (view) { const blob = await assetBlob(view); if (blob) url = await reducedDataUrl(blob); }
+        if (!url && a.thumbnailUrl?.startsWith('data:')) url = a.thumbnailUrl;
+      } else if (deps.dataUrl) url = await deps.dataUrl(id);
       else {
         const blob = await assetBlob(id);
         if (blob && a.kind === 'image') url = await reducedDataUrl(blob);
@@ -65,7 +72,9 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
     } catch {
       url = null;
     }
-    const label = `asset:${id} name=${JSON.stringify(assetContextName(a))} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
+    const label = a.kind === 'model3d'
+      ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (3D model, shown by its current view image${a.viewImageId ? ` asset:${a.viewImageId}` : ''}: the angle the user left it at in the viewer)`
+      : `asset:${id} name=${JSON.stringify(assetContextName(a))} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
     parts.push({ type: 'text', text: url ? `${label}:` : `${label}: could not be shown.` });
     if (url) parts.push({ type: 'image_url', image_url: { url } });
   }

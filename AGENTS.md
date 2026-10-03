@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — la casilla de contexto también en vídeo, audio y 3D (2026-10-03)
+- [x] (usuario) `AGENT_ATTACHABLE` (`engine/actions.ts`): imagen, vídeo, audio y 3D se pueden marcar con la casilla (antes solo imágenes). Lo que ve el agente (`attachmentParts`): vídeo como hoja 2×2 (como antes), **3D por su imagen de vista** (`viewImageId`, la que la app renderiza al mover el modelo en el visor; si falta, la miniatura `thumbnailUrl`), audio solo como texto. Tests `agent-attachment-selection` (+1: 3D por su vista, audio sin imagen) y `agent-attach-toggle` ajustado. Suite 497 + 5. Navegador (copia aislada): casilla en 2 vídeos de nodos y en la Library (3D, vídeos, imágenes); marcar el 3D lo pone en la pila del composer. Sin audio en los datos de prueba para verlo.
+
 ## Tarea — botón Import from Chat con caja y antes de Add node (2026-10-03)
 - [x] (usuario) El icono ⤓ de la barra superior (Import from Chat; en Chat, Import from Nodes) lleva caja como los botones secundarios (fondo, borde, acento al pasar el ratón; `.import-chat-btn` en `ui.css`) y en Nodos va delante de Add node (`.node-import-chat`, `order: -1`). Typecheck; sin navegador.
 

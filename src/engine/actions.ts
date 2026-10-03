@@ -599,10 +599,13 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
-/** Toggle an existing image in the agent's attachment list. No asset is created or copied. */
+/** Kinds the agent-context checkbox can name: images and videos are shown to the agent, a 3D model by its view image, audio as text. */
+export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
+
+/** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */
 export function toggleAgentAttachment(assetId: string): void {
   const asset = get().assets[assetId];
-  if (asset?.kind !== 'image') return;
+  if (!asset || !AGENT_ATTACHABLE.includes(asset.kind)) return;
   setComposer((c) => ({
     attachments: c.attachments.includes(assetId)
       ? c.attachments.filter((id) => id !== assetId)

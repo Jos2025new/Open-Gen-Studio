@@ -84,8 +84,8 @@ describe('the overlay checkbox', () => {
     expect(useStore.getState().composer.attachments).toEqual(['second']);
     expect((await renderBox('second'))?.textContent).toBe('1');
 
-    // A video, a deleted asset and an unknown id have no checkbox: only existing images can be named.
-    expect(await renderBox('clip')).toBeNull();
+    // Videos (and audio, 3D) have the box too; a deleted asset and an unknown id do not.
+    expect(await renderBox('clip')).not.toBeNull();
     expect(await renderBox('missing')).toBeNull();
   });
 

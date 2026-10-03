@@ -1,13 +1,13 @@
 import { useStore } from '../../store/store';
-import { toggleAgentAttachment } from '../../engine/actions';
+import { AGENT_ATTACHABLE, toggleAgentAttachment } from '../../engine/actions';
 
 /**
- * A small checkbox over an image (a chat result, a node result, a reference thumbnail): it adds that asset to the
- * agent's attachment list, or removes it, in the order the boxes were ticked. Only images, and only existing assets:
+ * A small checkbox over a result (image, video, audio or 3D; chat, node or reference thumbnail): it adds that asset to the
+ * agent's attachment list, or removes it, in the order the boxes were ticked. Only existing assets:
  * nothing is imported, copied or sent — the checkbox just names an asset the agent may reuse from the chat.
  */
 export function AgentAttachToggle({ assetId, className }: { assetId: string; className?: string }) {
-  const attachable = useStore((s) => s.assets[assetId]?.kind === 'image');
+  const attachable = useStore((s) => AGENT_ATTACHABLE.includes(s.assets[assetId]?.kind ?? ''));
   const order = useStore((s) => s.composer.attachments.indexOf(assetId));
   if (!attachable) return null;
   const on = order >= 0;
