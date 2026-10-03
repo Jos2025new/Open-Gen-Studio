@@ -192,6 +192,7 @@ export const fal: ProviderAdapter = {
     }
     Object.assign(body, await structuredInputs(schema.slots, req, (i) => encodeImage(i, 'data-url'), (v) => encodeVideo(v)));
     req.onStatus('Submitting');
+    req.onRequest?.({ url: `${QUEUE}/${req.model.id}`, body });
     const submit = await requestJson<{ request_id: string; status_url?: string; response_url?: string }>(`${QUEUE}/${req.model.id}`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, ...falHeaders(req.apiKey) },

@@ -5,6 +5,7 @@ import { persist, type PersistStorage, type StorageValue } from 'zustand/middlew
 import { uid } from '../lib/id';
 import { stateDb } from '../lib/idb';
 import { disk } from '../lib/disk';
+import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
 import { formatUsd } from '../lib/format';
 import type { AgentTier, LlmModel } from '../engine/providers/llm';
@@ -501,6 +502,8 @@ export async function wipeAllData(): Promise<void> {
 // Another tab (or window) saved newer work after this one loaded: this tab stops saving, its browser copy becomes the
 // disk's again, and it says so. Reloading shows the newer work; nothing this tab did after that point is kept.
 disk.onStateConflict(() => {
+  // A tab that saves an older state over a newer one loses work (seen 2026-10-03): the trail says when it happened (T5).
+  logEvent('save-conflict', { at: new Date().toISOString(), sessions: Object.keys(get().sessions).length });
   void stateDb.adoptDisk('ogs-app');
   toast('Another tab saved newer work. This tab is out of date and no longer saves: reload it to continue.', 'error', 24 * 3600_000);
 });

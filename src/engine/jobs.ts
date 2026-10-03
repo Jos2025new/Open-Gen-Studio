@@ -4,6 +4,8 @@ import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
+import { describeRequest, type MediaInfoLite } from '../lib/debug';
+import { logEvent } from '../lib/log';
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
@@ -313,6 +315,7 @@ async function attempt(id: string, deniedOnce = false): Promise<string[]> {
         statusText: `Atlas refused access; trying once more in ${ATLAS_RETRY_MS / 1000} s`,
         notes: [...(get().generations[id]?.notes ?? []), note],
       });
+      logEvent('retry', { generation: id, model: get().generations[id]?.modelName, reason: 'upstream access denied', waitMs: ATLAS_RETRY_MS, attempt: 2 });
       await sleep(ATLAS_RETRY_MS, controllers.get(id)?.signal);
       return attempt(id, true);
     }
@@ -326,7 +329,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined });
   let g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -540,6 +543,8 @@ async function execute(id: string): Promise<string[]> {
     let cost = 0;
     let costKnown = true;
     let done = 0;
+    // Which request this is, counting from 1: the retry the app makes on its own and each candidate count too (T5).
+    let requests = 0;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
@@ -567,7 +572,15 @@ async function execute(id: string): Promise<string[]> {
         apiKey,
         signal,
         onStatus: (text, progress) => patchGeneration(id, { statusText: total > 1 ? `${text} · ${done + 1}/${total}` : text, progress }),
-        onRemoteJob: (job) => patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id } : { remoteJob: undefined }),
+        onRemoteJob: (job) => {
+          const sent = get().generations[id]?.sent;
+          patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
+        },
+        // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
+        onRequest: (info) => {
+          requests += 1;
+          patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
+        },
       });
       const serial = seriesKey(model);
       const result = serial ? await oneAtATime(serial, send) : await send();
@@ -599,8 +612,16 @@ async function execute(id: string): Promise<string[]> {
     // The connection failed before any job id came back: the request may still have reached the provider.
     const lostJob = !remoteJob && err instanceof NetworkError;
     patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob, lostJob });
+    // A refusal says nothing about what it received: leave the trail for the log (T5). A problem the app
+    // caught before sending (a missing key, a bad input) never left the browser and the card already says so.
+    if (cur?.sent) logEvent('provider-error', { generation: id, model: cur?.modelName, provider: cur?.provider, jobId: remoteJob?.id, message: (err as Error).message, sent: cur.sent });
     throw err;
   }
+}
+
+/** What a piece of media looked like, so the debug record can say "<image 1024×1024>" instead of its bytes (T5). */
+function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
+  return input ? [{ mime: input.mime, width: input.width, height: input.height }] : undefined;
 }
 
 /**

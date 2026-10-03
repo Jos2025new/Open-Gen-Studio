@@ -53,6 +53,11 @@ export interface GenRequest {
   signal: AbortSignal;
   onStatus: (text: string, progress?: number) => void;
   onRemoteJob: (job: RemoteJob) => void;
+  /**
+   * Called with what is about to go out, before the fetch (T5): the app records it on the generation so a refusal
+   * can be read afterwards. The adapter never sends the key here and the app drops keys and media anyway.
+   */
+  onRequest?: (info: { url: string; body: unknown }) => void;
 }
 
 export interface GenOutput {

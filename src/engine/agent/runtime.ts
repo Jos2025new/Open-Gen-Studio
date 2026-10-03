@@ -5,6 +5,7 @@ import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
 import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
+import { logEvent } from '../../lib/log';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
@@ -906,7 +907,11 @@ async function runPlanItem(
       for (const a of result.outputs.get(st.id)?.assetIds ?? []) {
         const doc = getDoc(sessionId, docId);
         if (!doc || doc.layers.some((l) => 'sourceAssetId' in l && l.sourceAssetId === a)) continue;
-        await placeAsset(sessionId, docId, a, doc.layers.length ? 'new' : 'base', 'title' in st && st.title ? st.title : 'Image').catch(() => null);
+        // A result that never lands on the canvas is otherwise invisible (T5).
+        await placeAsset(sessionId, docId, a, doc.layers.length ? 'new' : 'base', 'title' in st && st.title ? st.title : 'Image').catch((e: Error) => {
+          logEvent('app', { session: sessionId, event: 'designer-place-failed', doc: docId, asset: a, message: e.message });
+          return null;
+        });
       }
     }
   }
@@ -1205,6 +1210,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   };
   const cut = () => {
     cutTurn = true;
+    logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: TURN_CAP_MS });
     controller?.abort();
   };
   const capTimer = setTimeout(cut, TURN_CAP_MS);
@@ -1213,6 +1219,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
     for (let iteration = 0; iteration < 5; iteration++) {
       // The cap can also fall between two calls, where there is nothing to abort.
       if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
+        if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
         notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
         return;
       }
@@ -1578,6 +1585,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           if (!v.success) {
             respond(`Invalid propose_plan input: ${formatZodError(v.error)}`);
             recordMetric(sessionId, { type: 'rejected' });
+            logEvent('harness', { session: sessionId, where: 'propose_plan', problems: formatZodError(v.error) });
             planFailures++;
             continue;
           }
@@ -1599,6 +1607,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             recordMetric(sessionId, { type: 'rejected' });
             log.action({ icon: 'fix', label: `Checked the plan: ${presented.errors.length} problem${presented.errors.length === 1 ? '' : 's'} to fix`, detail: presented.errors[0] });
             planFailures++;
+            logEvent('harness', { session: sessionId, where: 'plan', problems: presented.errors });
             respond(`Plan rejected by the validator. Fix these problems and call propose_plan again:\n- ${presented.errors.join('\n- ')}`);
             continue;
           }

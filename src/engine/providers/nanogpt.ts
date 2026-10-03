@@ -476,6 +476,7 @@ export const nanogpt: ProviderAdapter = {
         body[req.schema.slots.images.key] = await Promise.all(req.refs.slice(0, req.schema.slots.images.max).map((r) => encodeImage(r, 'data-url')));
       }
       req.onStatus('Generating');
+      req.onRequest?.({ url: `${BASE}/v1/images`, body });
       const res = await requestJson<Loose>(`${BASE}/v1/images`, {
         method: 'POST',
         headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
@@ -495,6 +496,7 @@ export const nanogpt: ProviderAdapter = {
         if (slots.images.multiple) body[slots.images.key] = urls;
       }
       req.onStatus('Submitting');
+      req.onRequest?.({ url: `${BASE}/generate-video`, body });
       const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
         method: 'POST',
         headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },
@@ -520,6 +522,7 @@ export const nanogpt: ProviderAdapter = {
     // Some aspect params are orientation based; keep the ratio-derived value only when valid.
     if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto') delete body.aspect_ratio;
     req.onStatus('Submitting');
+    req.onRequest?.({ url: `${BASE}/generate-video`, body });
     const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, ...nanoHeaders(req.apiKey) },

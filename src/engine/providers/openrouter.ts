@@ -252,6 +252,7 @@ export const openrouter: ProviderAdapter = {
         body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
       }
       req.onStatus('Generating');
+      req.onRequest?.({ url: `${BASE}/images`, body });
       const res = await requestJson<Record<string, unknown>>(`${BASE}/images`, {
         method: 'POST',
         headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) },
@@ -273,6 +274,7 @@ export const openrouter: ProviderAdapter = {
     }
     if (frames.length) body.frame_images = frames;
     req.onStatus('Submitting');
+    req.onRequest?.({ url: `${BASE}/videos`, body });
     const submit = await requestJson<{ id: string; polling_url?: string; status: string }>(`${BASE}/videos`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, ...orHeaders(req.apiKey) },

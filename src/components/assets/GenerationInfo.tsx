@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown, Copy, Info, Sparkles } from 'lucide-react';
+import { ChevronDown, Copy, Info, Sparkles, Wrench } from 'lucide-react';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -23,6 +23,16 @@ export function generationTitle(g: Generation): string {
     .filter(Boolean)
     .join(' · ');
   return detail ? `${def.label} · ${detail}` : def.label;
+}
+
+/** What went out to the provider, as one block of text to paste into an issue (T5): no key, no media. */
+export function debugText(g: Generation): string {
+  return [
+    `generation: ${g.id}`,
+    `model: ${g.modelName} (${g.modelRef})`,
+    `status: ${g.status}${g.error ? ` · ${g.error}` : ''}`,
+    g.sent ? JSON.stringify(g.sent, null, 2) : 'no request record',
+  ].join('\n');
 }
 
 /** What went into a generation: the operation's source, the start/end frames and the references. */
@@ -60,6 +70,7 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
     if (g.actualUsd != null) rows.push(['Billed', <span className="num">{formatUsd(g.actualUsd)}</span>]);
     rows.push(['Created', formatDateTime(g.createdAt)]);
     if (g.startedAt && g.finishedAt) rows.push(['Took', formatDuration(g.finishedAt - g.startedAt)]);
+    if (g.sent) rows.push(['Request', `${g.sent.url.replace(/^https?:\/\//, '')} · try ${g.sent.attempt}${g.sent.jobId ? ` · job ${g.sent.jobId}` : ''}`]);
     rows.push(['Origin', g.origin]);
   }
   if (asset) {
@@ -109,6 +120,11 @@ export function GenerationInfo({ generation: g, asset }: { generation?: Generati
             <Info size={13} />
             Details
           </span>
+          {g?.sent ? (
+            <Button size="sm" variant="secondary" icon={Wrench} onClick={() => void copyText(debugText(g))}>
+              Copy debug info
+            </Button>
+          ) : null}
         </div>
         <dl className="info-box info-rows">
           {rows.map(([k, v]) => (

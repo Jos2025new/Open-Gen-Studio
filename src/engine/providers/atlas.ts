@@ -238,6 +238,7 @@ export const atlas: ProviderAdapter = {
     }
     req.onStatus('Submitting');
     const endpoint = req.kind === 'image' || req.kind === 'model3d' ? 'generateImage' : req.kind === 'audio' ? 'generateAudio' : 'generateVideo';
+    req.onRequest?.({ url: `${BASE}/api/v1/model/${endpoint}`, body });
     const submit = await requestJson<{ data?: { id?: string; urls?: { get?: string } } }>(`${BASE}/api/v1/model/${endpoint}`, {
       method: 'POST',
       headers: { ...JSON_HEADERS, Authorization: `Bearer ${req.apiKey}` },

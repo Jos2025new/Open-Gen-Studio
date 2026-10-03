@@ -2,11 +2,13 @@
 // The app has no backend: this only exists while `npm run dev` / `npm run preview` runs. Files live in
 // <project>/data (git-ignored): state.json (contains API keys, mode 600) and <ns>/<id>.<ext> media files.
 import { execFile } from 'node:child_process';
-import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
+/** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
+const LOG_MAX_BYTES = 5 * 1024 * 1024;
 
 /**
  * ffmpeg arguments that join clips in order into one MP4 (join_clips). Every clip is scaled and padded to the
@@ -157,8 +159,7 @@ export function localStore(root = process.cwd()) {
       }
     }
 
-    if (path === '/blobs' && req.method === 'GET') {
-      const keys = [];
+    if (path === '/blobs' && req.method === 'GET') {      const keys = [];
       for (const ns of await readdir(dir).catch(() => [])) {
         if (!SAFE.test(ns)) continue;
         for (const f of await readdir(join(dir, ns)).catch(() => [])) {
@@ -219,6 +220,18 @@ export function localStore(root = process.cwd()) {
       } finally {
         await rm(out, { force: true });
       }
+    }
+
+    // One JSON line per event that matters (T5). Rotated at 5 MB: app.log becomes app.log.1 and a fresh one starts.
+    if (path === '/log' && req.method === 'POST') {
+      const text = (await body(req)).toString('utf8').slice(0, 4000).replace(/[\r\n]+/g, ' ');
+      const logDir = join(dir, 'logs');
+      const logFile = join(logDir, 'app.log');
+      await mkdir(logDir, { recursive: true });
+      const size = await stat(logFile).then((s) => s.size).catch(() => 0);
+      if (size > LOG_MAX_BYTES) await rename(logFile, join(logDir, 'app.log.1')).catch(() => undefined);
+      await appendFile(logFile, `${text}\n`, { mode: 0o600 });
+      return send(204);
     }
 
     // What is on disk: the folder and the size of each part (Settings → Data).

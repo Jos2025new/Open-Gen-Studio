@@ -1,5 +1,7 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
+import type { SentRequest } from '../lib/debug';
+
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
 export type AgentStyle = 'auto' | 'guided';
@@ -349,6 +351,8 @@ export interface Generation {
   delivery?: string[];
   /** What the app did about this request on its own (a retry it made), kept after it ends (T4). */
   notes?: string[];
+  /** What the last request to the provider looked like: endpoint, mapped parameters, which try and job id (T5). Never a key, never the media. */
+  sent?: SentRequest;
 }
 
 // ---------------------------------------------------------------------------
