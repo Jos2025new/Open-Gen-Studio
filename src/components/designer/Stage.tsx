@@ -289,17 +289,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke();
       ctx.restore();
     }
-    if (cursor && (tool === 'brush' || tool === 'eraser')) {
-      ctx.beginPath();
-      ctx.arc(sx(cursor.x), sy(cursor.y), Math.max(2, (brush.size / 2) * view.zoom), 0, Math.PI * 2);
-      ctx.strokeStyle = '#16161a';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  }, [doc, size, view, active, tool, preview, cursor, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, selectedRaster, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -747,6 +737,18 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         onWheel={onWheel}
         onDoubleClick={onDoubleClick}
       />
+      {cursor && (tool === 'brush' || tool === 'eraser') ? (
+        // The brush ring is an element, not part of the canvas: moving the pointer never redraws the document.
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute', left: 0, top: 0, pointerEvents: 'none', borderRadius: '50%',
+            width: 2 * Math.max(2, (brush.size / 2) * view.zoom), height: 2 * Math.max(2, (brush.size / 2) * view.zoom),
+            transform: `translate(${view.x + cursor.x * view.zoom - Math.max(2, (brush.size / 2) * view.zoom)}px, ${view.y + cursor.y * view.zoom - Math.max(2, (brush.size / 2) * view.zoom)}px)`,
+            boxSizing: 'border-box', border: '1px solid #ffffff', boxShadow: '0 0 0 1px #16161a, inset 0 0 0 1px #16161a',
+          }}
+        />
+      ) : null}
       {editingLayer ? (
         <TextEditor
           layer={editingLayer}
