@@ -3,6 +3,7 @@
 // <project>/data (git-ignored): state.json (contains API keys, mode 600) and <ns>/<id>.<ext> media files.
 import { execFile } from 'node:child_process';
 import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -103,12 +104,27 @@ export function localStore(root = process.cwd()) {
   const dir = join(root, 'data');
   const stateFile = join(dir, 'state.json');
 
+  // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
+  // before either writes. A failed write does not stop the queue.
+  let stateQueue = Promise.resolve();
+  function serialState(fn) {
+    const run = stateQueue.then(fn);
+    stateQueue = run.catch(() => undefined);
+    return run;
+  }
+
   /** Write via a temp file + rename, so an interrupted write never leaves a broken file. */
   async function atomic(path, data, mode) {
     await mkdir(dirname(path), { recursive: true });
-    const tmp = `${path}.tmp`;
-    await writeFile(tmp, data, { mode });
-    await rename(tmp, path);
+    // Each write has its own temp file: two writes at once never share (or rename away) each other's.
+    const tmp = `${path}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(tmp, data, { mode });
+      await rename(tmp, path);
+    } catch (err) {
+      await rm(tmp, { force: true }).catch(() => undefined);
+      throw err;
+    }
     if (mode) await chmod(path, mode);
   }
 
@@ -149,12 +165,16 @@ export function localStore(root = process.cwd()) {
         // the write is refused instead of overwriting newer work with an older copy. No baseAt: accepted (older app).
         const next = await body(req);
         const base = /^\{"savedAt":\d+,"baseAt":(\d+)/.exec(next.toString('utf8', 0, 80))?.[1];
-        if (base != null) {
-          const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
-          const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
-          if (current && current !== base) return send(409, JSON.stringify({ savedAt: Number(current) }), 'application/json');
-        }
-        await atomic(stateFile, next, 0o600);
+        const conflict = await serialState(async () => {
+          if (base != null) {
+            const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
+            const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
+            if (current && current !== base) return Number(current);
+          }
+          await atomic(stateFile, next, 0o600);
+          return null;
+        });
+        if (conflict != null) return send(409, JSON.stringify({ savedAt: conflict }), 'application/json');
         return send(204);
       }
     }

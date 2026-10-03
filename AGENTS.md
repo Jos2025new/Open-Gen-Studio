@@ -3,7 +3,7 @@
 ## Tarea — carreras y trazabilidad (auditoría Claude + GPT 6 Astra, 2026-10-03) · rama `better-worflows-xyz765` · punto de retorno: `7e25945`
 Plan acordado entre los dos auditores; un commit por paso, test que falla sin el arreglo.
 - [x] A. Cancelación por sesión: `controllers` por sesión en `runtime.ts`; Stop, el tope de 5 min y la limpieza solo tocan su propio turno. *Por qué:* con un controlador global, Stop o el tope de una sesión cortaban el turno de otra y al terminar uno el otro quedaba sin Stop. Test `agent-cancel`.
-- [ ] B. Servidor: comprobar `baseAt` y escribir en la misma cola, temporal único por escritura. *Por qué:* dos PUT podían pasar la comprobación y compartían `state.json.tmp`.
+- [x] B. Servidor: comprobar `baseAt` y escribir en la misma cola, temporal único por escritura. *Por qué:* dos PUT podían pasar la comprobación y compartían `state.json.tmp`. Test `store-server` (sin el arreglo: 204 + 500 por el temporal compartido).
 - [ ] C. Borrar una sesión con generaciones en curso: no se cancelan; se marcan `discard`, terminan, apuntan su gasto una vez (real o estimado) y se borran con sus archivos. *Por qué:* los resultados tardíos quedaban huérfanos y el gasto no llegaba a Spending.
 - [ ] P2. Espera máxima del guardado (~2 s) además del debounce de 350 ms. ⚠️ guardado frágil (`feffc15`): revertir este commit primero si algo del guardado empeora.
 - [ ] D. El ejecutor usa `stepDeps` (una sola lista de dependencias).
