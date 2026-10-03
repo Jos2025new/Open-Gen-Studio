@@ -82,6 +82,8 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
     }
     const style = l.blend !== 'normal' ? ` style="mix-blend-mode:${l.blend}"` : '';
     const opacity = l.opacity < 1 ? ` opacity="${n(l.opacity)}"` : '';
+    // A rotated or skewed image or text keeps its transform, as Inkscape writes it (inner group: the layer stays plain).
+    if (l.transform && l.type !== 'vector') inner = `<g transform="matrix(${l.transform.map(n).join(' ')})">${inner}</g>`;
     body.push(`<g id="${xmlEscape(l.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(l.name)}"${opacity}${style}>${inner}</g>`);
   }
   return [

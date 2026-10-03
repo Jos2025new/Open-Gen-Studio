@@ -1,3 +1,4 @@
+import { multiply, scaleAbout, translation } from './matrix';
 import { uid } from '../../lib/id';
 import { scaleStroke, translateStroke } from './strokes';
 import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
@@ -136,6 +137,8 @@ export function cloneLayer(layer: Layer): Layer {
 }
 
 export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
+  // A rotated image or text moves its transform, so it moves on the page however it is turned.
+  if (layer.transform && layer.type !== 'vector') return { ...layer, transform: multiply(translation(dx, dy), layer.transform) };
   if (layer.type === 'vector') return { ...layer, shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => translateStroke(s, dx, dy)) } : {}) };
   return { ...layer, x: layer.x + dx, y: layer.y + dy };
 }
@@ -165,6 +168,7 @@ export function unionBox(boxes: Box[]): Box | null {
 
 /** Scale a layer about an anchor point (used by the transform handles). */
 export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay: number): Layer {
+  if (layer.transform && layer.type !== 'vector') return { ...layer, transform: multiply(scaleAbout(sx, sy, ax, ay), layer.transform) };
   const fx = (x: number) => ax + (x - ax) * sx;
   const fy = (y: number) => ay + (y - ay) * sy;
   if (layer.type === 'raster') {

@@ -5,6 +5,7 @@ import { setDoc, toast } from '../../store/store';
 import { activeLayer, insertLayer, newRasterLayer } from './doc';
 import { isProtectedImage } from './rules';
 import { getBuffer, setBuffer } from './raster';
+import { invert } from './matrix';
 import { record } from './history';
 
 /*
@@ -92,6 +93,7 @@ function selectedPixels(doc: DesignDoc, layer: RasterLayer, sel: PixelSelection)
   const ctx = ctx2d(out);
   selectionPath(ctx, doc, sel);
   ctx.clip('evenodd');
+  if (layer.transform) ctx.transform(...layer.transform);
   ctx.drawImage(getBuffer(layer.id)!, layer.x, layer.y, layer.width, layer.height);
   return out;
 }
@@ -111,6 +113,8 @@ export function clearSelected(sessionId: string, doc: DesignDoc): string | null 
   ctx.drawImage(buf, 0, 0);
   // Page coordinates → this layer's pixels.
   ctx.setTransform(buf.width / layer.width, 0, 0, buf.height / layer.height, (-layer.x * buf.width) / layer.width, (-layer.y * buf.height) / layer.height);
+  // A rotated image: page coordinates go back through its transform first.
+  if (layer.transform) ctx.transform(...invert(layer.transform));
   ctx.globalCompositeOperation = 'destination-out';
   selectionPath(ctx, doc, sel);
   ctx.fill('evenodd');

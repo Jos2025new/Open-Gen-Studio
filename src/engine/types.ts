@@ -762,6 +762,11 @@ interface LayerBase {
   name: string;
   /** The folder this layer belongs to (DesignDoc.groups), if any. */
   groupId?: string;
+  /**
+   * Images and text only: an affine matrix [a, b, c, d, e, f] applied after the layer's own placement (rotation, skew,
+   * flips), like an SVG transform. Absent = none. Vector content and painted strokes have it baked into their points.
+   */
+  transform?: [number, number, number, number, number, number];
   visible: boolean;
   locked: boolean;
   opacity: number;

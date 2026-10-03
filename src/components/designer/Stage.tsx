@@ -4,7 +4,7 @@ import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel } from '../../engine/design/render';
+import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel, toLayerSpace } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
@@ -707,6 +707,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (!buf) return;
     const kx = layer.pxWidth / layer.width;
     const ky = layer.pxHeight / layer.height;
+    // A rotated image: the pointer is taken back into the image's own space, so the stroke lands under it.
+    if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
     const segment: [number, number, number, number, number] = [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (brush.size * (kx + ky)) / 2];
     const d = drag.current;
     if (d?.kind !== 'paint') return;

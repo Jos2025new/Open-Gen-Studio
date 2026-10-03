@@ -1,3 +1,4 @@
+import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
@@ -112,6 +113,17 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
 }
 
 export function layerBox(l: Layer): Box | null {
+  const b = untransformedBox(l);
+  // Images and text that were rotated or skewed: the box around where they show.
+  return b && l.transform && l.type !== 'vector' ? mapBox(l.transform, b) : b;
+}
+
+/** A point on the page, in the layer's own coordinates (before its transform). */
+export function toLayerSpace(l: Layer, x: number, y: number): [number, number] {
+  return l.transform && l.type !== 'vector' ? apply(invert(l.transform), x, y) : [x, y];
+}
+
+function untransformedBox(l: Layer): Box | null {
   switch (l.type) {
     case 'raster':
       return paintedBox(l) ?? { x: l.x, y: l.y, w: l.width, h: l.height };
@@ -190,6 +202,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer): void {
   ctx.save();
   ctx.globalAlpha = l.opacity;
   ctx.globalCompositeOperation = GCO[l.blend] ?? 'source-over';
+  if (l.transform && l.type !== 'vector') ctx.transform(...l.transform);
   if (l.type === 'raster') {
     const buf = getBuffer(l.id);
     if (buf) {
@@ -261,7 +274,8 @@ export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null
     if (l.type !== 'raster') return l;
     const buf = getBuffer(l.id);
     if (!buf) continue;
-    const px = Math.floor(((x - l.x) / l.width) * buf.width), py = Math.floor(((y - l.y) / l.height) * buf.height);
+    const [lx, ly] = toLayerSpace(l, x, y);
+    const px = Math.floor(((lx - l.x) / l.width) * buf.width), py = Math.floor(((ly - l.y) / l.height) * buf.height);
     if (px < 0 || py < 0 || px >= buf.width || py >= buf.height) continue;
     // A small neighbourhood, so thin strokes can be picked.
     const r = Math.max(1, Math.round(buf.width / Math.max(1, l.width) * 3));
