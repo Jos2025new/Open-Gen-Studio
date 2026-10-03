@@ -78,26 +78,6 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       <div className="q-kicker">Settings · before the plan is written</div>
       {item.summary ? <p className="q-intro">{item.summary}</p> : null}
 
-      <div className="q-block">
-        <div className="q-question">Model</div>
-        <div className="set-models">
-          {modelRow(item.recommended.modelRef, 'recommended')}
-          {item.alternatives.length ? (
-            <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
-              Other models ({item.alternatives.length}) <ChevronDown size={12} className={moreOpen ? 'is-flipped' : ''} />
-            </button>
-          ) : null}
-          {moreOpen ? item.alternatives.map((ref) => modelRow(ref)) : null}
-        </div>
-      </div>
-
-      {opts.resolutions.length ? (
-        <div className="q-block">
-          <div className="q-question">Resolution</div>
-          <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => update({ ...choice, resolution: v }))}</div>
-        </div>
-      ) : null}
-
       {item.kind === 'video' && opts.durations.length ? (
         <div className="q-block">
           <div className="q-question">Duration{item.count > 1 ? ' per clip' : ''}</div>
@@ -110,6 +90,13 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
         </div>
       ) : null}
 
+      {opts.resolutions.length ? (
+        <div className="q-block">
+          <div className="q-question">Resolution</div>
+          <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => update({ ...choice, resolution: v }))}</div>
+        </div>
+      ) : null}
+
       {opts.aspects.length ? (
         <div className="q-block">
           <div className="q-question">Aspect ratio</div>
@@ -119,6 +106,19 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
           </div>
         </div>
       ) : null}
+
+      <div className="q-block">
+        <div className="q-question">Model <span className="faint">· price with the values above</span></div>
+        <div className="set-models">
+          {modelRow(item.recommended.modelRef, 'recommended')}
+          {item.alternatives.length ? (
+            <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+              Other models ({item.alternatives.length}) <ChevronDown size={12} className={moreOpen ? 'is-flipped' : ''} />
+            </button>
+          ) : null}
+          {moreOpen ? item.alternatives.map((ref) => modelRow(ref)) : null}
+        </div>
+      </div>
 
       <footer className="q-foot">
         <span className="faint set-total">
