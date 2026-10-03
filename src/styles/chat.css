@@ -127,9 +127,7 @@
 .set-more .is-flipped { transform: rotate(180deg); }
 .set-duration { display: flex; align-items: center; gap: 10px; }
 /* Short track with the seconds right beside it; a slightly thinner track than the browser's, filled up to the thumb. */
-.set-slider { flex: 0 1 300px; min-width: 120px; height: 4px; -webkit-appearance: none; appearance: none; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border-strong) var(--fill, 0%)); cursor: pointer; }
-.set-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; }
-.set-slider::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: none; }
+.set-slider { flex: 0 1 300px; min-width: 120px; }
 .set-card .q-opt { display: inline-flex; align-items: center; gap: 6px; }
 .set-secs { display: inline-flex; align-items: center; gap: 4px; }
 .set-secs input { width: 64px; }

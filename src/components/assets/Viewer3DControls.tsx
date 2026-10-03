@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Box, Camera, ChevronDown, ChevronRight, Hand, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import { Chip, IconButton, MenuItem, Segmented, Toggle } from '../ui/primitives';
+import { Chip, IconButton, MenuItem, Segmented, Toggle, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { resetView, setOrbit, setView3d, snapshot3d, useViewer3d, VIEW3D_DEFAULT, VIEWS, zoomBy } from './viewer3d';
 
@@ -32,7 +32,7 @@ function Slider({ label, value, min, max, step, onChange }: { label: string; val
   return (
     <label className="v3d-row">
       <span>{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <Range min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
       <span className="num">{value.toFixed(2)}</span>
     </label>
   );

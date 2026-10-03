@@ -9,7 +9,7 @@ import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
-import { Button, Field, IconButton, MenuItem } from '../ui/primitives';
+import { Button, Field, IconButton, MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
@@ -189,7 +189,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         <Field label="Name"><input key={layer.id + layer.name} defaultValue={layer.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== layer.name) patch({ name: e.target.value.trim() }); }} /></Field>
         <div className="prop-row">
-          <Field label="Opacity"><div className="opacity-field"><input type="range" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
+          <Field label="Opacity"><div className="opacity-field"><Range min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
           <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
         {layer.type !== 'vector' && <div className="xywh">{(['x', 'y', 'width', ...(layer.type === 'raster' ? ['height'] as const : [])] as const).map((key) => <label key={key} className="xywh-cell"><span>{key === 'width' ? 'W' : key === 'height' ? 'H' : key.toUpperCase()}</span><input type="number" value={Math.round((layer as unknown as Record<string, number>)[key])} min={key === 'width' || key === 'height' ? 1 : undefined} onChange={(e) => patch({ [key]: key === 'width' ? Math.max(layer.type === 'text' ? 0 : 1, +e.target.value) : key === 'height' ? Math.max(1, +e.target.value) : +e.target.value })} /></label>)}</div>}

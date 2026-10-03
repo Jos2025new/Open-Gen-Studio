@@ -72,3 +72,12 @@ svg { flex-shrink: 0; }
 .text-area { width: 100%; }.num-input { width: 75px; }.wide-chip { width: 100%; justify-content: space-between; }select.wide-chip { font-size: 11px; padding: 5px 8px; }
 .link-btn { color: var(--accent); font-size: 11px; padding: 5px; }
 .shimmer { background: linear-gradient(90deg, var(--surface) 25%, var(--surface-3) 50%, var(--surface) 75%); background-size: 200% 100%; animation: shimmer 2s infinite; }
+/* Every slider in the app: a thin track (like the app's lines) filled with the accent up to a small thumb.
+   The fill comes from --fill (the Range component sets it). */
+input[type=range] {
+  -webkit-appearance: none; appearance: none; height: 14px; cursor: pointer; background: linear-gradient(to right, var(--accent) var(--fill, 0%), var(--border-strong) var(--fill, 0%)) center / 100% 3px no-repeat; border-radius: 2px; outline-offset: 2px;
+}
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: none; box-shadow: 0 0 0 2px var(--surface); transition: transform .1s; }
+input[type=range]::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--accent); border: none; box-shadow: 0 0 0 2px var(--surface); }
+input[type=range]:hover::-webkit-slider-thumb, input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
+input[type=range]:disabled { opacity: .45; cursor: default; }

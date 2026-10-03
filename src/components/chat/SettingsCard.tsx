@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
@@ -6,7 +6,7 @@ import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
-import { Button } from '../ui/primitives';
+import { Button, Range } from '../ui/primitives';
 import { ensureSchema } from '../../engine/catalog';
 import { AspectGlyph } from '../composer/MediaControls';
 import { EditAnswerButton } from './EditAnswerButton';
@@ -178,14 +178,12 @@ function StepSlider({ values, value, unit, label, onChange }: { values: number[]
   const i = Math.max(0, values.indexOf(value));
   return (
     <div className="set-duration">
-      <input
-        type="range"
+      <Range
         className="set-slider"
         min={0}
         max={values.length - 1}
         step={1}
         value={i}
-        style={{ '--fill': `${values.length > 1 ? (i / (values.length - 1)) * 100 : 0}%` } as CSSProperties}
         onChange={(e) => onChange(values[Number(e.target.value)])}
         aria-label={label}
       />

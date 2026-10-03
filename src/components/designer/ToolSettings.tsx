@@ -4,7 +4,7 @@ import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type 
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
 import { SNAP_DEFAULT } from '../../engine/design/snap';
-import { MenuItem } from '../ui/primitives';
+import { MenuItem, Range } from '../ui/primitives';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
@@ -34,7 +34,7 @@ export function InlineSlider({ label, value, min, max, step = 1, unit = '', scal
   const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
   return <label className="opt" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
     <span className="opt-label">{label}</span>
-    <input className="opt-range" type="range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
+    <Range className="opt-range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
     <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
     {unit && <span className="opt-unit">{unit}</span>}
   </label>;

@@ -3,7 +3,7 @@ import { AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimiz
 import { setUi, useStore } from '../../store/store';
 import { deleteAssets, deleteSubject, downloadAsset, SUBJECT_KINDS, useAsReference } from '../../engine/actions';
 import { formatDuration, groupByDate } from '../../lib/format';
-import { IconButton, Button, Segmented, Toggle } from '../ui/primitives';
+import { IconButton, Button, Segmented, Toggle, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
@@ -199,7 +199,7 @@ function GeneratedAssets() {
             <label className="sv-switch"><span>Favorites only</span><Toggle checked={favOnly} onChange={setFavOnly} label="Favorites only" /></label>
             <div className="sv-row">
               <span className="sv-label">Grid size</span>
-              <input className="density-range" type="range" min={2} max={expanded ? 8 : 5} value={cols} onChange={(e) => setCols(Number(e.target.value))} aria-label="Columns" />
+              <Range className="density-range" min={2} max={expanded ? 8 : 5} value={cols} onChange={(e) => setCols(Number(e.target.value))} aria-label="Columns" />
             </div>
           </div>
         </Popover>

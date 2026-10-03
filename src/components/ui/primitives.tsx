@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react';
+import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, ReactNode, Ref } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { LoaderCircle } from 'lucide-react';
 import { formatUsd } from '../../lib/format';
@@ -154,4 +154,14 @@ export function MenuItem({
       {right ? <span className="menu-right">{right}</span> : null}
     </button>
   );
+}
+
+/**
+ * The app's slider: a thin track filled with the accent up to the thumb (the same in every panel). The fill is
+ * passed as --fill, because only Firefox can paint "progress" from CSS alone.
+ */
+export function Range({ min = 0, max = 100, value, style, className, ...rest }: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'>) {
+  const lo = Number(min), hi = Number(max), v = Number(value);
+  const fill = hi > lo && Number.isFinite(v) ? Math.min(100, Math.max(0, ((v - lo) / (hi - lo)) * 100)) : 0;
+  return <input type="range" min={min} max={max} value={value} className={`range${className ? ` ${className}` : ''}`} style={{ '--fill': `${fill}%`, ...style } as CSSProperties} {...rest} />;
 }

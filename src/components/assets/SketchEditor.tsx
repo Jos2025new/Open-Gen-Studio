@@ -7,7 +7,7 @@ import { strokeSegment } from '../../engine/design/raster';
 import { setSketch } from '../../engine/flow/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { Button, IconButton } from '../ui/primitives';
+import { Button, IconButton, Range } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import type { Estimate } from '../../engine/types';
 
@@ -249,7 +249,7 @@ export function SketchEditor() {
         ) : null}
         <label className="sketch-size" data-tip="Brush size">
           <span className="sketch-dot" style={{ width: Math.min(22, Math.max(4, brush.size / 2)), height: Math.min(22, Math.max(4, brush.size / 2)) }} />
-          <input type="range" min={2} max={120} value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} aria-label="Brush size" />
+          <Range min={2} max={120} value={brush.size} onChange={(e) => setBrush({ size: Number(e.target.value) })} aria-label="Brush size" />
         </label>
         <IconButton icon={Undo2} label="Undo (Ctrl+Z)" size="sm" disabled={!strokes.length} onClick={undo} />
         <IconButton icon={Redo2} label="Redo (Ctrl+Shift+Z)" size="sm" disabled={!redo.length} onClick={redoOne} />
