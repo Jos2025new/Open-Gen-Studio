@@ -4,7 +4,9 @@ import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type 
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
 import { SNAP_DEFAULT } from '../../engine/design/snap';
-import { MenuItem, Range } from '../ui/primitives';
+import { MenuItem, Range, Segmented } from '../ui/primitives';
+import { useObjectSelection } from '../../engine/design/objectSelection';
+import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
 import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
@@ -118,6 +120,15 @@ const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
 ];
 
 /** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
+/** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
+export function EditModeToggle() {
+  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
+  return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
+    { value: 'objects', label: 'Objects', tip: 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' },
+    { value: 'layers', label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
+  ]} /></span>;
+}
+
 function SnapControl() {
   const pop = usePopover();
   const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
@@ -145,36 +156,57 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const turn = usePopover();
   const [rel, setRel] = useState<RelativeTo>('selection');
   useLayerSelection((st) => st.byDoc[doc.id]);
-  const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
+  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
+  const layerIds = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const active = doc.layers.find((l) => l.id === doc.activeLayerId);
+  // Objects mode: the objects picked inside the active layer. A layer with no parts (an image, a text) is its own
+  // object, so it acts on that layer; a layer with parts and none picked acts on nothing (it says so).
+  const objLayer = objPickNow && doc.layers.find((l) => l.id === objPickNow.layerId);
+  const objIds = objLayer ? objPickNow!.ids.filter((id) => layerObjects(objLayer).some((o) => o.id === id)) : [];
+  const onObjects = mode === 'objects' && Boolean(objLayer && objIds.length);
+  const noParts = mode === 'objects' && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
+  const ids = mode === 'layers' ? layerIds : noParts ? [active!.id] : [];
   const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
-  if (!layers.length) return null;
-  const many = layers.length > 1;
+  const emptyPick = mode === 'objects' && !onObjects && !layers.length;
+  if (!layers.length && !onObjects && !emptyPick) return null;
+  const count = onObjects ? objIds.length : layers.length;
+  const many = count > 1;
   const one = layers[0];
-  const locked = layers.some((l) => l.locked);
+  const locked = onObjects ? Boolean(objLayer?.locked) : layers.some((l) => l.locked);
+  const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
+  // What the menus act on, said at the top of each menu (not on the buttons).
+  const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
+  const why = emptyPick ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : undefined;
+  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, many ? rel : 'page') : alignLayers(sessionId, doc.id, ids, to, many ? rel : 'page'));
+  const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
+  const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
-    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked}><AlignCenterVertical size={13} />Align{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
+    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why}><AlignCenterVertical size={13} />Align<ChevronDown size={12} /></button>
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
+        <div className="menu-target">{target}</div>
         {many ? (
           <label className="menu-field"><span>Relative to</span><select value={rel} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
         ) : <div className="menu-sep-label">To the page</div>}
-        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => alignLayers(sessionId, doc.id, ids, a.id, many ? rel : 'page')} />)}
-        {layers.length >= 3 ? <>
+        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => doAlign(a.id)} />)}
+        {count >= 3 ? <>
           <div className="menu-sep-label">Distribute</div>
-          <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" onClick={() => distributeLayers(sessionId, doc.id, ids, 'h')} />
-          <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" onClick={() => distributeLayers(sessionId, doc.id, ids, 'v')} />
+          <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" onClick={() => doDistribute('h')} />
+          <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" onClick={() => doDistribute('v')} />
         </> : null}
-        {!many && one.type === 'raster' ? <>
+        {!onObjects && !many && one?.type === 'raster' ? <>
           <div className="menu-sep-label">Size</div>
           <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
           <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
         </> : null}
       </div>
     </Popover>
-    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked}><TrianglesCenterlineDashedVertical size={13} />Transform{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
+    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why}><TrianglesCenterlineDashedVertical size={13} />Transform<ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
-        {TURN_ITEMS.map((t) => { const why = layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(why)} tip={why ?? undefined} onClick={() => turnLayers(sessionId, doc.id, ids, t.id)} />; })}
+        <div className="menu-target">{target}</div>
+        {TURN_ITEMS.map((t) => { const no = onObjects ? null : layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(no)} tip={no ?? undefined} onClick={() => doTurn(t.id)} />; })}
       </div>
     </Popover>
   </>;
@@ -213,7 +245,6 @@ function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
 
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const tool = useStore((s) => s.ui.tool);
-  const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
@@ -247,7 +278,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><span data-tip="Ctrl-click picks more strokes of the active layer (Objects) or more layers (Layers)"><InlineSelect label="Select" value={selectMode} options={[{ value: 'objects' as const, label: 'Objects' }, { value: 'layers' as const, label: 'Layers' }]} onChange={(v) => setUi({ selectMode: v })} /></span><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />

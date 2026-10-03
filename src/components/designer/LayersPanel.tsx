@@ -15,6 +15,7 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
+import { EditModeToggle } from './ToolSettings';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 
 const MIN_W = 200;
@@ -193,6 +194,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           <Field label="Opacity"><div className="opacity-field"><Range min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
           <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
+        <div className="field edit-mode-field"><span className="field-label">Edit tool acts on</span><EditModeToggle /></div>
         <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
         {layer.type === 'text' && <>

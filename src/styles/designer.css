@@ -187,3 +187,5 @@
 .xywh-scrub { cursor: ew-resize; user-select: none; padding: 6px 2px 6px 0; touch-action: none; }
 .xywh-scrub:hover { color: var(--accent); }
 .geometry-empty { font-size: 11px; margin: 0; }
+.edit-mode { gap: 6px; }.edit-mode-field .edit-mode { padding: 0; border: 0; background: none; }.edit-mode-field .opt-label { display: none; }
+.menu-target { font-size: 10px; color: var(--text-3, var(--text-2)); padding: 4px 10px 6px; border-bottom: 1px solid var(--border); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
