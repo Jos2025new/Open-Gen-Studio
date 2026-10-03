@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — los consejos del lienzo del Designer se pueden cerrar (2026-10-03)
+- [x] (usuario) Los consejos de uso sobre el lienzo (tiradores, objetos, puntos de curva, Lineart) llevan una × y, cerrado, cada uno no vuelve (localStorage `ogs.designer.hintsClosed`). Los avisos de bloqueo (capa protegida) siguen sin × porque explican por qué no pinta. `Stage.tsx` (`StageHint`), `designer.css`. Typecheck; sin navegador.
+
 ## Tarea — Ctrl mantiene las proporciones al escalar, como Inkscape (2026-10-03)
 - [x] (usuario) Con los tiradores de escala, Ctrl (o Cmd, o Shift como antes) mantiene la proporción: en una esquina, ancho y alto juntos; en un lateral, escala los dos ejes desde el centro del lado opuesto. Al girar/inclinar, Ctrl también da pasos de 15°. Textos de ayuda del lienzo actualizados. `Stage.tsx` (`xformMatrix`). Typecheck y suite; sin navegador.
 

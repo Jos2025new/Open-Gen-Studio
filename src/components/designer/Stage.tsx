@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
@@ -1277,9 +1278,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           }}
         />
       ) : null}
-      {tool === 'move' && selectedCurve ? <div className="stage-hint">Drag points to edit · Click away to move again</div> : tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
-      {tool === 'move' && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize'}</div>
-        : tool === 'move' && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
+      {tool === 'move' && selectedCurve ? <StageHint id="curve-points">Drag points to edit · Click away to move again</StageHint> : tool === 'lineart' && lineartMode === 'edit' ? <StageHint id="lineart-edit">Select a stroke · Drag its points · Influence controls the bend</StageHint> : null}
+      {tool === 'move' && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? (handleMode === 'scale' ? <StageHint id="handles-scale" subtle>Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate</StageHint> : <StageHint id="handles-rotate" subtle>Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize</StageHint>)
+        : tool === 'move' && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</StageHint> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
@@ -1361,3 +1362,21 @@ function beginEditCurrent(layerId: string): HTMLCanvasElement | undefined {
 }
 
 export type { DesignTool };
+
+
+/** A how-to tip over the canvas with an × to close it; once closed it stays closed (this browser). */
+const HINTS_KEY = 'ogs.designer.hintsClosed';
+function closedHints(): string[] {
+  try { return JSON.parse(localStorage.getItem(HINTS_KEY) ?? '[]'); } catch { return []; }
+}
+function StageHint({ id, subtle, children }: { id: string; subtle?: boolean; children: React.ReactNode }) {
+  const [closed, setClosed] = useState(() => closedHints().includes(id));
+  if (closed) return null;
+  return <div className={`stage-hint has-close ${subtle ? 'subtle' : ''}`}>
+    <span>{children}</span>
+    <button type="button" className="stage-hint-close" aria-label="Close this tip" data-tip="Close this tip" onClick={() => {
+      setClosed(true);
+      try { localStorage.setItem(HINTS_KEY, JSON.stringify([...new Set([...closedHints(), id])])); } catch { /* storage blocked */ }
+    }}><X size={12} /></button>
+  </div>;
+}
