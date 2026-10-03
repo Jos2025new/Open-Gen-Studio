@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — la barra de Edit no cambia de ancho (2026-10-03)
+- [x] (usuario: "se mueve de lugar") En modo Layer sin capa elegida, Align y Transform desaparecían y la barra (Snap, Influence…) se desplazaba al alternar Objects/Layer. Ahora siempre están, desactivados con el motivo ("Select a layer first" / "Pick objects…"). `ToolSettings.tsx` (`EditOps`). Typecheck y suite; sin navegador.
+
 ## Tarea — confirmar al quitar de Library; título del grupo de Nodos fuera del marco (2026-10-03)
 - [x] (usuario) Library → Saved: la papelera abre "Remove @Nombre from the library? Its images stay in Generated." con Cancel/Remove (antes borraba al instante). `GalleryPanel.tsx`.
 - [x] (usuario) Grupo de Nodos: título y punto de color salen encima del marco, en una pastilla con fondo y borde (ya no tapan los nodos); título 14 px, punto y muestras de 18 px. `node.css`. Navegador (copia aislada): la cabecera queda por encima del marco.

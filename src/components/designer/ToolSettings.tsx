@@ -168,8 +168,8 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const noParts = mode === 'objects' && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
   const ids = mode === 'layers' ? layerIds : noParts ? [active!.id] : [];
   const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
-  const emptyPick = mode === 'objects' && !onObjects && !layers.length;
-  if (!layers.length && !onObjects && !emptyPick) return null;
+  // Nothing to act on: the buttons stay (disabled, with the reason) so the bar never changes width or shifts.
+  const emptyPick = !onObjects && !layers.length;
   const count = onObjects ? objIds.length : layers.length;
   const many = count > 1;
   const one = layers[0];
@@ -177,7 +177,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
   const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
-  const why = emptyPick ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : undefined;
+  const why = !emptyPick ? undefined : mode === 'objects' ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
   const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, many ? rel : 'page') : alignLayers(sessionId, doc.id, ids, to, many ? rel : 'page'));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
