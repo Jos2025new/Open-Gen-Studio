@@ -24,15 +24,29 @@ export const stateDb = {
       await set(key, onDisk, stateStore);
       return onDisk;
     }
-    if (local && savedAt(local) > savedAt(onDisk)) disk.setState(local);
+    if (local && onDisk && savedAt(local) > savedAt(onDisk)) {
+      // The browser copy is newer: it goes to disk only if it was built on the disk's current state. A copy another
+      // tab left behind after newer work reached the disk is refused, and the disk's copy is used.
+      if ((await disk.putState(local, savedAt(onDisk))) === 'conflict') {
+        await set(key, onDisk, stateStore);
+        return onDisk;
+      }
+    } else if (local && !onDisk) disk.setState(local);
     return local ?? undefined;
   },
   async set(key: string, value: string): Promise<void> {
+    // Another tab saved newer work: this one keeps neither copy, so a reload shows the newer work.
+    if (disk.isStale()) return;
     const stamped = value.startsWith('{') ? stamp(value) : value;
     disk.setState(stamped);
     await set(key, stamped, stateStore);
   },
   del: (key: string) => del(key, stateStore),
+  /** After a refused write: the browser copy becomes the disk's again (this tab's last save there was the older one). */
+  async adoptDisk(key: string): Promise<void> {
+    const onDisk = await disk.getState();
+    if (onDisk) await set(key, onDisk, stateStore);
+  },
 };
 
 export const blobDb = {

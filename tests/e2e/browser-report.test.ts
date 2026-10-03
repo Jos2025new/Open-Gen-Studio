@@ -116,7 +116,7 @@ function reportSession(s: Session, gens: Record<string, Generation>) {
       const g = gens[p.stepGenerations[st.id]];
       const refs = 'refs' in st ? (st.refs ?? []) : [];
       const settings = 'settings' in st ? st.settings : undefined;
-      lines.push(`  - ${st.id} ${st.kind}${st.kind === 'op' ? `(${st.op})` : ''} "${st.title}" · ${'modelRef' in st ? name(st.modelRef) : '—'}${settings ? ` · ${settings.resolution ?? '—'}${settings.duration ? ` · ${settings.duration}s` : ''} · ×${settings.count}` : ''}${refs.length ? ` · refs ${refs.join(', ')}` : ''}${'firstFrame' in st && st.firstFrame ? ` · start ${st.firstFrame}` : ''}${'variations' in st && st.variations?.length ? ` · ${st.variations.length} variations` : ''}${g ? ` → ${g.status}${g.error ? ` (${clip(g.error, 120)})` : ''} · ${usd(g.actualUsd ?? null)} charged / ${usd(g.estimate?.usd ?? null)} est` : ''}`);
+      lines.push(`  - ${st.id} ${st.kind}${st.kind === 'op' ? `(${st.op})` : ''} "${st.title}" · ${'modelRef' in st ? name(st.modelRef) : '—'}${settings ? ` · ${settings.resolution ?? '—'}${settings.duration ? ` · ${settings.duration}s` : ''} · ×${settings.count}` : ''}${refs.length ? ` · refs ${refs.join(', ')}` : ''}${'firstFrame' in st && st.firstFrame ? ` · start ${st.firstFrame}` : ''}${'variations' in st && st.variations?.length ? ` · ${st.variations.length} variations` : ''}${g ? ` → ${g.status}${g.error ? ` (${clip(g.error, 120)})` : ''} · ${usd(g.actualUsd ?? null)} charged / ${usd(g.estimate?.usd ?? null)} est${g.startedAt && g.finishedAt ? ` · ${Math.round((g.finishedAt - g.startedAt) / 1000)} s` : ''}` : ''}`);
       if ('prompt' in st && st.prompt) lines.push(`    > ${clip(st.prompt, 260)}`);
     }
     if (p.plan.adjustments.length) lines.push(`  - Adjustments: ${p.plan.adjustments.map((a) => clip(a, 140)).join(' · ')}`);
@@ -156,7 +156,7 @@ function reportSession(s: Session, gens: Record<string, Generation>) {
   }
 
   for (const r of refusals) add(`harness: ${r.kind}`, false, `request ${r.req}: ${r.text}`);
-  const metrics = (s.agentMetrics ?? []).map((m) => ({ request: clip(m.request, 60), engine: m.engine, calls: m.llmCalls, seconds: +(m.agentMs / 1000).toFixed(1), llmUsd: +m.llmUsd.toFixed(4), questionRounds: m.questionRounds, rejected: m.rejectedPlans, outcome: m.outcome }));
+  const metrics = (s.agentMetrics ?? []).map((m) => ({ request: clip(m.request, 60), engine: m.engine, calls: m.llmCalls, seconds: +(m.agentMs / 1000).toFixed(1), llmUsd: +m.llmUsd.toFixed(4), questionRounds: m.questionRounds, rejected: m.rejectedPlans, outcome: m.outcome, firstOutputS: m.callTimings?.[0] ? +(((m.callTimings[0].outputMs ?? m.callTimings[0].toolMs ?? m.callTimings[0].totalMs) / 1000).toFixed(1)) : null, calls_ms: m.callTimings ?? [] }));
   const generations = Object.values(gens).filter((g) => g.sessionId === s.id);
   const charged = generations.reduce((a, g) => a + (g.actualUsd ?? 0), 0);
   const estimated = generations.reduce((a, g) => a + (g.estimate?.usd ?? 0), 0);
@@ -193,9 +193,9 @@ describe.skipIf(!process.env.E2E_REPORT)('report of real sessions (from data/sta
         '',
         `Checks: ${r.checks.filter((c) => c.ok).length} passed, ${r.checks.filter((c) => !c.ok).length} failed. Generations ${r.generations} · charged ${usd(r.charged)} / est ${usd(r.estimated)} · agent ${usd(r.agentUsd)}.`,
         '',
-        '| Request | Agent model | LLM calls | Seconds | Agent $ | Question rounds | Rejected plans | Outcome |',
-        '|---|---|---|---|---|---|---|---|',
-        ...r.metrics.map((m) => `| ${m.request.replace(/\|/g, '/')} | ${m.engine} | ${m.calls} | ${m.seconds} | ${m.llmUsd} | ${m.questionRounds} | ${m.rejected} | ${m.outcome ?? '—'} |`),
+        '| Request | Agent model | LLM calls | Seconds | First output s | Agent $ | Question rounds | Rejected plans | Outcome |',
+        '|---|---|---|---|---|---|---|---|---|',
+        ...r.metrics.map((m) => `| ${m.request.replace(/\|/g, '/')} | ${m.engine} | ${m.calls} | ${m.seconds} | ${m.firstOutputS ?? '—'} | ${m.llmUsd} | ${m.questionRounds} | ${m.rejected} | ${m.outcome ?? '—'} |`),
         '',
         '### Timeline',
         ...r.lines,
@@ -208,6 +208,10 @@ describe.skipIf(!process.env.E2E_REPORT)('report of real sessions (from data/sta
     ].join('\n');
     writeFileSync(join(out, 'report.md'), md);
     writeFileSync(join(out, 'report.json'), JSON.stringify({ date, commit, since: since ? new Date(since).toISOString() : null, reports }, null, 2));
+    // The sessions themselves (history, feed, metrics) and their generations, without settings or keys: the run can be
+    // read again (or replayed) even if the app's state is later overwritten, as happened on 2026-10-03.
+    const gensOf = Object.fromEntries(Object.entries(saved.generations).filter(([, g]) => sessions.some((x) => x.id === g.sessionId)));
+    writeFileSync(join(out, 'sessions.json'), JSON.stringify({ sessions, generations: gensOf }));
     console.log(`Report: ${join(out, 'report.md')} · ${reports.length} sessions · ${failed.length} failed checks`);
   });
 });

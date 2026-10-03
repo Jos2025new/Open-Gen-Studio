@@ -497,3 +497,10 @@ export async function wipeAllData(): Promise<void> {
   for (const name of ['ogs-state', 'ogs-blobs', 'ogs-cache']) indexedDB.deleteDatabase(name);
   window.setTimeout(() => location.reload(), 150);
 }
+
+// Another tab (or window) saved newer work after this one loaded: this tab stops saving, its browser copy becomes the
+// disk's again, and it says so. Reloading shows the newer work; nothing this tab did after that point is kept.
+disk.onStateConflict(() => {
+  void stateDb.adoptDisk('ogs-app');
+  toast('Another tab saved newer work. This tab is out of date and no longer saves: reload it to continue.', 'error', 24 * 3600_000);
+});

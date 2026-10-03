@@ -143,7 +143,16 @@ export function localStore(root = process.cwd()) {
     if (path === '/state') {
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
       if (req.method === 'PUT') {
-        await atomic(stateFile, await body(req), 0o600);
+        // A tab says which saved state it worked from (baseAt). If the file has moved on since (another tab saved),
+        // the write is refused instead of overwriting newer work with an older copy. No baseAt: accepted (older app).
+        const next = await body(req);
+        const base = /^\{"savedAt":\d+,"baseAt":(\d+)/.exec(next.toString('utf8', 0, 80))?.[1];
+        if (base != null) {
+          const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
+          const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
+          if (current && current !== base) return send(409, JSON.stringify({ savedAt: Number(current) }), 'application/json');
+        }
+        await atomic(stateFile, next, 0o600);
         return send(204);
       }
     }
