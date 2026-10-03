@@ -127,6 +127,21 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     return out?.assetIds[p.index] ?? null;
   };
 
+  /**
+   * A step counts as done only if its generation made something (T1). The plan card, the closing message and what a
+   * later step can use are all built from these states, so a step that "succeeded" without making anything would
+   * have the agent telling the user it delivered a result that does not exist (ses_mursnwichu).
+   * Text results (a transcription, lyrics, a voice, a style) finish with text and no files, so they are exempt.
+   * A runner that resolves without recording anything is taken at its word (some callers answer with assets only).
+   */
+  const stepOutputs = (generationId: string, assetIds: string[]): StepOutput => {
+    const g = useStore.getState().generations[generationId];
+    if (!g || g.kind === 'text') return { assetIds };
+    if (g.status === 'error' || g.status === 'canceled') throw new Error(g.error || `${g.modelName} did not finish (${g.status}).`);
+    if (!assetIds.length && !g.assetIds.length) throw new Error(`${g.modelName} returned no result.`);
+    return { assetIds };
+  };
+
   const promptFor = (s: { prompt: string; promptFrom?: string }): string => {
     if (!s.promptFrom) return s.prompt;
     const p = parseRef(s.promptFrom);
@@ -157,7 +172,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         }
         const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }), variants: s.variations });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return { assetIds: await runGeneration(g.id) };
+        return stepOutputs(g.id, await runGeneration(g.id));
       }
       case 'model3d': {
         const refs: string[] = [];
@@ -167,7 +182,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         }
         const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return { assetIds: await runGeneration(g.id) };
+        return stepOutputs(g.id, await runGeneration(g.id));
       }
       case 'video': {
         const firstFrame = (await resolveAsset(s.firstFrame)) ?? undefined;
@@ -184,7 +199,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const inputs = inputsFor({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
         const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return { assetIds: await runGeneration(g.id) };
+        return stepOutputs(g.id, await runGeneration(g.id));
       }
       case 'audio': {
         // Lyrics from an earlier step (a lyrics result keeps only the song text) into the model's lyrics field.
@@ -199,8 +214,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const kind = s.textOutput ? 'text' : 'audio';
         const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: inputsFor({ refs: [] }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        const assetIds = await runGeneration(g.id);
-        return { assetIds, text: get().generations[g.id]?.text };
+        const out = stepOutputs(g.id, await runGeneration(g.id));
+        return { ...out, text: get().generations[g.id]?.text };
       }
       case 'op': {
         const source = await resolveAsset(s.input);
@@ -219,9 +234,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
-        const assetIds = await runGeneration(g.id);
+        const out = stepOutputs(g.id, await runGeneration(g.id));
         // Text results (Transcribe) feed later prompts through prompt_from.
-        return { assetIds, text: useStore.getState().generations[g.id]?.text };
+        return { ...out, text: useStore.getState().generations[g.id]?.text };
       }
       case 'layer': {
         if (!ctx.docId) throw new Error('No design document to place layers in.');
