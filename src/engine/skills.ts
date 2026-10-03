@@ -529,6 +529,8 @@ export function describeWorkflow(w: Workflow): string {
     return `  - ${parts.join(', ')}`;
   });
   const extra = [
+    // One cast rule for every workflow, so none can assume the user brought every image (UGC once assumed a product photo).
+    `cast (every workflow): each person, character, product or place this flow shows has one visual source — the user's image as is, a library @Name, or, when the user wants it invented, its own reference image made from text in the first plan (a sheet, the product alone on a plain background, a key view); later steps carry it in refs. Wherever this workflow says "photo" or "attached image", read "or its invented reference image". Never invent it inside a later prompt.`,
     w.fixed ? `fixed (do not ask): ${Object.entries(w.fixed).map(([k, v]) => `${k} ${v}`).join(', ')}` : '',
     w.needs?.length ? `needs (ask the missing ones in the one questions card): ${w.needs.join('; ')}` : '',
     w.continuity ? `continuity: ${w.continuity}` : '',

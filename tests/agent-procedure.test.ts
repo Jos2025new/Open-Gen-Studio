@@ -20,6 +20,8 @@ describe('one procedure instead of per-case rules', () => {
     const ugc = readGuide('workflow:ugc')!;
     expect(ugc).toContain('when invented — a product image made from text only');
     expect(ugc).toContain('plan 1 is the creator sheet and, for an invented product, its product image');
+    // Every workflow carries the same cast rule, not only UGC.
+    for (const id of ['product-pack', 'story', 'shot-sequence', 'ugc']) expect(readGuide(`workflow:${id}`)).toContain('cast (every workflow)');
   });
   it('staged-piece rules live once, in skill:staged, not in the prompt', () => {
     const staged = readGuide('skill:staged')!;
