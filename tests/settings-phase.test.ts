@@ -111,7 +111,8 @@ describe('the settings card renders', () => {
     }))).replace(/<!-- -->/g, '');
     expect(html).toContain('Settings · before the plan is written');
     expect(html).toContain('recommended');
-    expect(html).toContain('Other models (1)');
+    expect(html).toContain('Show 1 other model');
+    expect(html).toContain('Estimated cost:');
     expect(html).toContain('3 clips');
   });
 });

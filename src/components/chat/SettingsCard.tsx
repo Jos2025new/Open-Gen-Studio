@@ -139,12 +139,12 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       ) : null}
 
       <div className="q-block">
-        <div className="q-question">Model <span className="faint">· price with the values above</span></div>
+        <div className="q-question">Model</div>
         <div className="set-models">
           {modelRow(item.recommended.modelRef, 'recommended')}
           {item.alternatives.length ? (
             <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
-              Other models ({item.alternatives.length}) <ChevronDown size={12} className={moreOpen ? 'is-flipped' : ''} />
+              {moreOpen ? 'Hide other models' : `Show ${item.alternatives.length} other model${item.alternatives.length === 1 ? '' : 's'}`} <ChevronDown size={13} className={moreOpen ? 'is-flipped' : ''} />
             </button>
           ) : null}
           {moreOpen ? item.alternatives.map((ref) => modelRow(ref)) : null}
@@ -152,9 +152,9 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       </div>
 
       <footer className="q-foot">
-        <span className="faint set-total">
-          {item.count > 1 ? `${item.count} ${item.kind === 'video' ? 'clips' : 'images'} · ` : ''}
-          {price(choice)}
+        <span className="set-total">
+          Estimated cost: <strong className="num">{price(choice)}</strong>
+          {item.count > 1 ? <span className="faint"> · {item.count} {item.kind === 'video' ? 'clips' : 'images'}</span> : null}
         </span>
         <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, choice)}>
           Continue <ArrowRight size={13} />
