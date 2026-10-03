@@ -63,7 +63,7 @@ import {
 import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
-import { agentSeesImages, attachmentParts, stripImages, userMessage } from './attachments';
+import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById } from '../skills';
@@ -266,8 +266,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     const view = await canvasParts(sessionId).catch(() => 'The page could not be rendered.');
     if (typeof view !== 'string') parts.push(...view);
   }
-  // A new request: images of earlier requests become a note instead of being sent again.
-  patchAgent(sessionId, (a) => ({ history: stripImages(a.history) }));
+  // A new request: images of earlier requests become a note instead of being sent again, and so do the results of
+  // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
+  // history grow without bound (T6).
+  patchAgent(sessionId, (a) => ({ history: trimReferenceResults(stripImages(a.history)) }));
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);

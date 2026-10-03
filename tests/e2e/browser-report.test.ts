@@ -156,7 +156,8 @@ function reportSession(s: Session, gens: Record<string, Generation>) {
   }
 
   for (const r of refusals) add(`harness: ${r.kind}`, false, `request ${r.req}: ${r.text}`);
-  const metrics = (s.agentMetrics ?? []).map((m) => ({ request: clip(m.request, 60), engine: m.engine, calls: m.llmCalls, seconds: +(m.agentMs / 1000).toFixed(1), llmUsd: +m.llmUsd.toFixed(4), questionRounds: m.questionRounds, rejected: m.rejectedPlans, outcome: m.outcome, firstOutputS: m.callTimings?.[0] ? +(((m.callTimings[0].outputMs ?? m.callTimings[0].toolMs ?? m.callTimings[0].totalMs) / 1000).toFixed(1)) : null, calls_ms: m.callTimings ?? [] }));
+  // Prompt tokens are the cost that grew with the history (T6): the total and how many the provider served from cache.
+  const metrics = (s.agentMetrics ?? []).map((m) => ({ request: clip(m.request, 60), engine: m.engine, calls: m.llmCalls, seconds: +(m.agentMs / 1000).toFixed(1), llmUsd: +m.llmUsd.toFixed(4), questionRounds: m.questionRounds, rejected: m.rejectedPlans, outcome: m.outcome, inputTokens: m.inputTokens, cachedTokens: (m.callTimings ?? []).reduce((a, c) => a + (c.cachedTokens ?? 0), 0), firstOutputS: m.callTimings?.[0] ? +(((m.callTimings[0].outputMs ?? m.callTimings[0].toolMs ?? m.callTimings[0].totalMs) / 1000).toFixed(1)) : null, calls_ms: m.callTimings ?? [] }));
   const generations = Object.values(gens).filter((g) => g.sessionId === s.id);
   const charged = generations.reduce((a, g) => a + (g.actualUsd ?? 0), 0);
   const estimated = generations.reduce((a, g) => a + (g.estimate?.usd ?? 0), 0);
@@ -193,9 +194,9 @@ describe.skipIf(!process.env.E2E_REPORT)('report of real sessions (from data/sta
         '',
         `Checks: ${r.checks.filter((c) => c.ok).length} passed, ${r.checks.filter((c) => !c.ok).length} failed. Generations ${r.generations} · charged ${usd(r.charged)} / est ${usd(r.estimated)} · agent ${usd(r.agentUsd)}.`,
         '',
-        '| Request | Agent model | LLM calls | Seconds | First output s | Agent $ | Question rounds | Rejected plans | Outcome |',
-        '|---|---|---|---|---|---|---|---|---|',
-        ...r.metrics.map((m) => `| ${m.request.replace(/\|/g, '/')} | ${m.engine} | ${m.calls} | ${m.seconds} | ${m.firstOutputS ?? '—'} | ${m.llmUsd} | ${m.questionRounds} | ${m.rejected} | ${m.outcome ?? '—'} |`),
+        '| Request | Agent model | LLM calls | Seconds | First output s | Input tokens | Cached | Agent $ | Question rounds | Rejected plans | Outcome |',
+        '|---|---|---|---|---|---|---|---|---|---|---|',
+        ...r.metrics.map((m) => `| ${m.request.replace(/\|/g, '/')} | ${m.engine} | ${m.calls} | ${m.seconds} | ${m.firstOutputS ?? '—'} | ${m.inputTokens} | ${m.cachedTokens} | ${m.llmUsd} | ${m.questionRounds} | ${m.rejected} | ${m.outcome ?? '—'} |`),
         '',
         '### Timeline',
         ...r.lines,

@@ -11,7 +11,7 @@ import { describe, it } from 'vitest';
  * that failed in one run and not in the other. Writes compare.md in the first folder (or E2E_OUT).
  */
 
-interface Report { title: string; checks: Array<{ check: string; ok: boolean; detail: string }>; metrics: Array<{ request: string; calls: number; seconds: number; firstOutputS?: number | null }>; lines: string[]; generations: number; failedGenerations: number; charged: number; estimated: number; agentUsd: number }
+interface Report { title: string; checks: Array<{ check: string; ok: boolean; detail: string }>; metrics: Array<{ request: string; calls: number; seconds: number; inputTokens?: number; cachedTokens?: number; firstOutputS?: number | null }>; lines: string[]; generations: number; failedGenerations: number; charged: number; estimated: number; agentUsd: number }
 
 const norm = (t: string) => t.toLowerCase().replace(/[^a-záéíóúñ0-9 ]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
 const short = (ref: string) => ref.split('/').pop() ?? ref;
@@ -59,13 +59,16 @@ describe.skipIf(!process.env.E2E_COMPARE)('compare two reference runs', () => {
       }
       const fa = ra.checks.filter((c) => !c.ok).map((c) => `${c.check}: ${c.detail}`);
       const fb = rb.checks.filter((c) => !c.ok).map((c) => `${c.check}: ${c.detail}`);
-      md.push('', `Failed checks — A: ${fa.length ? fa.map((f) => `\n  - ${f}`).join('') : 'none'}`, `Failed checks — B: ${fb.length ? fb.map((f) => `\n  - ${f}`).join('') : 'none'}`);
-      const secs = (r: Report) => r.metrics.map((m) => `${m.seconds} s/${m.calls} calls`).join(', ');
-      md.push('', `Agent — A: ${secs(ra)} · B: ${secs(rb)}`, `Generations — A: ${ra.generations} (${ra.failedGenerations} failed) · B: ${rb.generations} (${rb.failedGenerations} failed)`, '');
-      summary.push([ra.title.slice(0, 40), flowSame ? 'same' : 'differs', `${fa.length} / ${fb.length}`, `${ra.metrics.reduce((s, m) => s + m.seconds, 0).toFixed(0)} / ${rb.metrics.reduce((s, m) => s + m.seconds, 0).toFixed(0)}`]);
+      md.push('', `Failed checks — A: ${fa.length ? fa.map((f) => `\n  - ${f}`).join('') : 'none'}`, `Failed checks — B: ${fb.length ? fb.map((f) => `\n  - ${f}`).join('') : 'none'}`);const secs = (r: Report) => r.metrics.map((m) => `${m.seconds} s/${m.calls} calls`).join(', ');
+      const tok = (r: Report) => r.metrics.map((m) => `${m.inputTokens ?? '—'}${m.cachedTokens ? ` (${m.cachedTokens} cached)` : ''}`).join(', ');
+      md.push('', `Agent — A: ${secs(ra)} · B: ${secs(rb)}`,
+        `Input tokens — A: ${tok(ra)} · B: ${tok(rb)}`,
+        `Generations — A: ${ra.generations} (${ra.failedGenerations} failed) · B: ${rb.generations} (${rb.failedGenerations} failed)`, '');
+      const sum = (r: Report, k: 'inputTokens' | 'cachedTokens') => r.metrics.reduce((s, m) => s + (m[k] ?? 0), 0);
+      summary.push([ra.title.slice(0, 40), flowSame ? 'same' : 'differs', `${fa.length} / ${fb.length}`, `${ra.metrics.reduce((s, m) => s + m.seconds, 0).toFixed(0)} / ${rb.metrics.reduce((s, m) => s + m.seconds, 0).toFixed(0)}`, `${sum(ra, 'inputTokens')} / ${sum(rb, 'inputTokens')}`]);
     }
     for (const rb of B.reports) if (!A.reports.some((x) => norm(x.title) === norm(rb.title))) md.push(`## ${rb.title}`, '', 'Only in B.', '');
-    md.splice(4, 0, '| Scenario | Flow | Failed checks A / B | Agent s A / B |', '|---|---|---|---|', ...summary.map((r) => `| ${r.join(' | ')} |`), '');
+    md.splice(4, 0, '| Scenario | Flow | Failed checks A / B | Agent s A / B | Input tokens A / B |', '|---|---|---|---|---|', ...summary.map((r) => `| ${r.join(' | ')} |`), '');
     const out = process.env.E2E_OUT ?? a;
     writeFileSync(join(out, 'compare.md'), md.join('\n'));
     console.log(`Compare: ${join(out, 'compare.md')}`);

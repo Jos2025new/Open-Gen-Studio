@@ -89,3 +89,24 @@ Lo que dice:
 - **El valor inválido de `purpose` no se repitió en la automática.** El agente no responde siempre igual a la misma entrada. Una sola ejecución no basta para decir que un fallo del agente ha desaparecido: hay que repetirla varias veces.
 - **Tiempos:** el mismo modelo tardó 132 s frente a 229 s en S1, y 34 s frente a 181 s en S2. Parte es la vuelta perdida y parte la variación del proveedor. Hay que medir varias veces antes de culpar al código.
 - **Diferencia del montaje:** la versión automática usa el catálogo grabado (`tests/fixtures/live`), en el que el Nano Banana más barato era `nano-banana-2` de NanoGPT, no el Lite developer de Atlas que había en vivo. Hay que refrescarlo con `npm run snapshot:models` (gratis) antes de comparar modelos y precios.
+
+### Medición de T6 (2026-10-03, `e2e-runs/2026-10-03-t6-*`)
+
+Seis ejecuciones del gemelo: **antes**, **después** (recorte siempre activo) y **con umbral**, con DeepSeek V4.1 Flash y GPT 6 Luna. Todas con S1–S4, generations de relleno y la misma clave.
+
+| | llamadas | s | tokens de entrada | en caché | $ agente | comprobaciones falladas |
+|---|---|---|---|---|---|---|
+| DeepSeek antes (1) | 16 | 166 | 380 617 | 234 240 | 0,0297 | 0 |
+| DeepSeek antes (2) | 18 | 325 | 505 814 | 443 008 | 0,0276 | 1 |
+| DeepSeek después | 22 | 227 | 491 695 | 197 632 | 0,0399 | 2 |
+| DeepSeek después (2) | 19 | 222 | 434 250 | 229 376 | 0,0350 | 0 |
+| DeepSeek con umbral | 17 | 236 | 342 587 | 242 432 | 0,0217 | 1 |
+| Luna antes | 19 | 172 | 406 551 | 285 931 | 0,0184 | 1 |
+| Luna después | 19 | 144 | 382 264 | 216 175 | 0,0230 | 1 |
+| Luna con umbral | 21 | 180 | 450 271 | 348 822 | 0,0157 | 1 |
+
+Qué dice:
+- **El recorte siempre activo empeoraba el coste**: el prompt por llamada bajaba ~13 %, pero la caché del proveedor caía de 234 k a 198 k tokens (DeepSeek) porque el prefijo cambia una vez por petición, y lo que se ahorra ahí es menos de lo que se deja de ahorrar en caché. De ahí el umbral de 40 000 caracteres (`attachments.ts`).
+- **La variación entre ejecuciones del mismo guion es enorme**: 342 k–506 k de tokens de entrada con el mismo código (el agente pregunta de más o de menos; en una ejecución-deepseek S4 preguntó dos cosas que no debía y el plan fue rechazado dos veces). Dos ejecuciones por brazo no bastan para resolver diferencias por debajo del ~20 %.
+- **Las comprobaciones falladas no dependen del recorte**: son las de siempre (plan con un asset inventado, guía de vídeo antes de los ajustes, candidatos en el mismo plan).
+- El informe (`report.md`) y `compare.md` ahora llevan tokens de entrada y tokens en caché por petición, que es lo que hay que mirar para esto.

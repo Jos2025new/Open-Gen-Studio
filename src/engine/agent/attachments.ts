@@ -82,3 +82,56 @@ export function stripImages(history: LlmMessage[]): LlmMessage[] {
     return { ...m, content: text };
   });
 }
+
+/**
+ * Tools whose answer is a reference the agent can ask for again (T6): a guide, the model list, the library. Their
+ * results travelled with every later message of the conversation (a follow-up reached 155k input tokens), so at the
+ * start of a new request each one becomes a line saying what it was. Nothing is lost: the call and its result stay
+ * in the history (repairHistory still pairs them) and any of them can be read again.
+ */
+const REFERENCE_TOOLS: Record<string, string> = {
+  read_guide: 'guide',
+  find_models: 'model list',
+  find_assets: 'library',
+};
+
+/**
+ * Only when the reference text is worth trading for. Measured with the automatic twin (e2e/REFERENCE_RUNS.md,
+ * 2026-10-03): in a normal conversation those results are ~12k of ~80k characters of prompt, so trimming them saved
+ * ~13 % of what each call sends but invalidated the provider's cache prefix on every request, and the two models
+ * spent *more* (DeepSeek $0.057 → $0.075, GPT 6 Luna $0.018 → $0.023). Past this size the prompt they travel in
+ * costs more than the cache prefix they cost, which is the case the change exists for (~10k tokens of guides read
+ * in one conversation, and far more in a long one).
+ */
+export const TRIM_MIN_CHARS = 40_000;
+
+/** One line in place of a reference tool's result: what it was about (from the call, never from the result). */
+export function trimmedResult(tool: string, args: string | undefined): string | undefined {
+  const what = REFERENCE_TOOLS[tool];
+  if (!what) return undefined;
+  let about = '';
+  try {
+    const a = JSON.parse(args ?? '{}') as Record<string, unknown>;
+    const said = [a.id, a.query, a.kind, a.subject].find((v) => typeof v === 'string' && v) as string | undefined;
+    if (said) about = ` ${said}`;
+  } catch {
+    // Arguments that are not JSON: the line says what it is and nothing more.
+  }
+  return `[${what}${about} loaded earlier; ${tool} again if you need it]`;
+}
+
+/** History with the results of earlier reference tools replaced by a line, once they are big enough to be worth it. */
+export function trimReferenceResults(history: LlmMessage[], minChars = TRIM_MIN_CHARS): LlmMessage[] {
+  // Which tool each call id belongs to, and what it asked for.
+  const asked = new Map<string, { tool: string; args?: string }>();
+  for (const m of history) for (const c of m.tool_calls ?? []) asked.set(c.id, { tool: c.function.name, args: c.function.arguments });
+  const isRef = (m: LlmMessage) => m.role === 'tool' && !!m.tool_call_id && REFERENCE_TOOLS[asked.get(m.tool_call_id!)?.tool ?? ''] != null;
+  const chars = history.reduce((a, m) => a + (isRef(m) && typeof m.content === 'string' ? m.content.length : 0), 0);
+  if (chars < minChars) return history;
+  return history.map((m) => {
+    if (!isRef(m)) return m;
+    const call = asked.get(m.tool_call_id!)!;
+    const note = trimmedResult(call.tool, call.args);
+    return note ? { ...m, content: note } : m;
+  });
+}
