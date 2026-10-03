@@ -130,7 +130,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
     <div className="layer-add">
       {/* One "+" for a new layer (its kind in the menu); the order and folder tools sit beside it. */}
-      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
+      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" className="layer-new-btn" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
       <Popover open={addPop.open} anchor={addPop.ref} onClose={addPop.close} placement="bottom-start" width={180} label="New layer">
         <div className="menu" role="menu">
           <MenuItem icon={Image} label="Raster" detail="Pixels: paint, images" onClick={() => { addEmptyLayer(sessionId, doc.id, 'raster'); addPop.close(); }} />
