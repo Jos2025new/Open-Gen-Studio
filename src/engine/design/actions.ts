@@ -253,6 +253,15 @@ export function deleteLayer(sessionId: string, docId: string, layerId: string): 
   mutateDoc(sessionId, docId, (d) => D.removeLayer(d, layerId));
 }
 
+/** Delete several layers at once (one undo step); locked ones stay. Returns how many were kept because locked. */
+export function deleteLayers(sessionId: string, docId: string, layerIds: string[]): number {
+  const doc = getDoc(sessionId, docId);
+  if (!doc) return 0;
+  const gone = layerIds.filter((id) => doc.layers.some((l) => l.id === id && !l.locked));
+  if (gone.length) mutateDoc(sessionId, docId, (d) => gone.reduce((acc, id) => D.removeLayer(acc, id), d));
+  return layerIds.length - gone.length;
+}
+
 export function duplicateLayer(sessionId: string, docId: string, layerId: string): void {
   const doc = getDoc(sessionId, docId);
   const l = doc?.layers.find((x) => x.id === layerId);

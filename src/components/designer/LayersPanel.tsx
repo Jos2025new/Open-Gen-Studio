@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as Lay
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
-import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
+import { addEmptyLayer, deleteLayers, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
@@ -187,7 +187,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} aria-label="Operations" data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}><span className="layer-ops-label">Operations</span></Button>}
         <span className="layer-actions-gap" />
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
-        <IconButton icon={Trash} label="Delete layer" size="sm" tone="danger" disabled={layer.locked} onClick={() => deleteLayer(sessionId, doc.id, layer.id)} />
+        <IconButton icon={Trash} label={picked.length > 1 ? `Delete ${picked.length} layers` : 'Delete layer'} size="sm" tone="danger" disabled={picked.every((id) => doc.layers.find((l) => l.id === id)?.locked)} onClick={() => deleteLayers(sessionId, doc.id, picked)} />
       </div>}
     </section>}
     {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}

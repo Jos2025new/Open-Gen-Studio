@@ -12,7 +12,7 @@ import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, 
 import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
-import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
+import { deleteLayers, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, record, subscribeHistory } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
@@ -173,9 +173,12 @@ export function DesignerWorkspace() {
         deletePickedObjects(session.id, doc.id, pk.layerId, pk.ids);
         setObjectPick(doc.id, null);
       } else if (!mod && !e.altKey) {
-        if (e.key === 'Delete' && layer && !layer.locked) {
+        if ((e.key === 'Delete' || e.key === 'Backspace') && layer) {
+          // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
           e.preventDefault();
-          deleteLayer(session.id, doc.id, layer.id);
+          const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+          const kept = deleteLayers(session.id, doc.id, ids);
+          if (kept) toast(kept === ids.length ? `"${layer.name}" is locked. Unlock it to delete it.` : `${kept} locked layer${kept === 1 ? '' : 's'} kept.`, 'info');
         } else {
           const tool = DESIGN_TOOL_KEYS[e.key.toLowerCase()];
           if (tool && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }

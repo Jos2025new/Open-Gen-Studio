@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — mover y borrar varias cosas elegidas a la vez (2026-10-03)
+- [x] (usuario) Ctrl + arrastrar mueve todo lo elegido: en Objects, Ctrl-pulsar un objeto lo añade (si no estaba) y arrastrar mueve todos los objetos elegidos; un Ctrl-clic sin arrastrar sobre uno ya elegido lo quita. Con capas enteras (imágenes, texto) igual: Ctrl-pulsar añade la capa y arrastrar mueve todas las capas elegidas; también en modo Layer. Arrastrar sin Ctrl una de varias capas elegidas también mueve todas (como Inkscape). `Stage.tsx` (`ctrlToggle` en `objMove`/`move`).
+- [x] En Objects el clic lo decide la capa más alta bajo el puntero (antes ganaba un trazo de la capa activa o de una capa de abajo frente a una imagen encima). Ctrl sigue limitado a la capa activa para elegir objetos.
+- [x] (usuario) Supr y Retroceso borran todas las capas elegidas de una vez (un solo paso de deshacer; las bloqueadas se quedan, con aviso), igual que la papelera del panel ("Delete N layers"). Antes Supr borraba solo la activa y Retroceso nada. `deleteLayers` (`design/actions.ts`), `DesignerWorkspace.tsx`, `LayersPanel.tsx`.
+Navegador (copia aislada): 2 capas elegidas + Retroceso → quedan solo las demás; Ctrl+Z devuelve las dos. El arrastre con Ctrl no se pudo comprobar en la copia (el arrastre simulado no llevaba la tecla y el punto de pantalla no caía sobre la imagen); la prueba de impacto devuelve la imagen correcta en su centro. Suite verde.
+
 ## Tarea — Supr / Ctrl+X borran lo elegido en la capa activa, no la capa (2026-10-03)
 - [x] (usuario: "quiero borrar lo que tenga seleccionado en la capa activa; para borrar la capa ya hay una función") Orden de Supr/Retroceso: con selección de píxeles, borra esos píxeles (como antes; Ctrl+X los corta); si no, con objetos elegidos en el lienzo (trazos de pincel, formas, trazos de Lineart), Supr, Retroceso o Ctrl+X quitan solo esos objetos (`deletePickedObjects`, un paso de deshacer; el resto sigue editable); solo sin nada elegido Supr borra la capa como antes. `objectOps.ts`, `DesignerWorkspace.tsx`. Test `object-ops` (+1). Suite verde; sin navegador.
 
