@@ -21,6 +21,15 @@ const dropped = (chunks: unknown[]) =>
   new Response(new ReadableStream({ start(c) { chunks.forEach((x) => c.enqueue(line(x))); }, pull(c) { c.error(new TypeError('network error')); } }), { headers: { 'content-type': 'text/event-stream' } });
 const sse = (chunks: unknown[]) =>
   new Response(new ReadableStream({ start(c) { chunks.forEach((x) => c.enqueue(line(x))); c.enqueue(enc.encode('data: [DONE]\n\n')); c.close(); } }), { headers: { 'content-type': 'text/event-stream' } });
+/** A provider that keeps the connection alive with empty chunks and never says anything (no per-call stall). */
+const alive = (signal?: AbortSignal) =>
+  new Response(new ReadableStream({
+    start(c) {
+      c.enqueue(line({ choices: [{ delta: {} }] }));
+      const beat = setInterval(() => c.enqueue(line({ choices: [{ delta: {} }] })), 30_000);
+      signal?.addEventListener('abort', () => { clearInterval(beat); c.error(new DOMException('aborted', 'AbortError')); });
+    },
+  }), { headers: { 'content-type': 'text/event-stream' } });
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -151,6 +160,57 @@ describe('an answer with nothing in it', () => {
     expect(Number.isFinite(m.failedCalls![0].seconds)).toBe(true);
     // The failed call adds no timing sample: averages over callTimings stay numbers.
     expect(m.callTimings ?? []).toHaveLength(0);
+  });
+});
+
+describe('a turn that goes quiet (T3)', () => {
+  it('after 60 s without a word the activity block says so, and the turn keeps going', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))));
+    const sid = useStore.getState().activeSessionId;
+    const turn = sendAgentMessage('hola');
+    await vi.advanceTimersByTimeAsync(60_000);
+    const act = useStore.getState().sessions[sid].feed.find((f) => f.type === 'activity');
+    expect(JSON.stringify(act)).toMatch(/no answer for 60 s/);
+    // Nothing was cut: the turn is still working and can be stopped from the composer.
+    expect(useStore.getState().sessions[sid].agent.busy).toBe(true);
+    expect(useStore.getState().sessions[sid].feed.some((f) => f.type === 'notice')).toBe(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    await turn;
+    vi.useRealTimers();
+  });
+
+  it('a turn that reaches 5 min is cut with an error notice and Retry', async () => {
+    vi.useFakeTimers();
+    // The provider keeps the connection alive (no per-call stall) but says nothing at all.
+    vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => alive(init?.signal ?? undefined));
+    const sid = useStore.getState().activeSessionId;
+    const turn = sendAgentMessage('hola');
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await turn;
+    vi.useRealTimers();
+    const note = useStore.getState().sessions[sid].feed.at(-1) as NoticeFeedItem;
+    expect(note.type).toBe('notice');
+    expect(note.level).toBe('error');
+    expect(note.text).toMatch(/5 min/);
+    expect(note.text).not.toMatch(/^Stopped\.$/);
+    expect(note.retry).toBeDefined();
+    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
+  });
+
+  it('no clock survives the turn: a finished turn leaves nothing running', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', async () => sse([text('Listo.')]));
+    const sid = useStore.getState().activeSessionId;
+    await sendAgentMessage('hola');
+    vi.useRealTimers();
+    // Past the silence mark and past the cap, nothing new appears in the feed.
+    const before = useStore.getState().sessions[sid].feed.length;
+    vi.useFakeTimers();
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    vi.useRealTimers();
+    expect(useStore.getState().sessions[sid].feed).toHaveLength(before);
+    expect(useStore.getState().sessions[sid].agent.busy).toBe(false);
   });
 });
 

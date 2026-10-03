@@ -1173,6 +1173,10 @@ export function askForPlan(sessionId: string, noticeId: string): void {
   void sendAgentMessage('Propose the plan now.');
 }
 
+/** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
+const SILENCE_MS = 60_000;
+const TURN_CAP_MS = 5 * 60_000;
+
 async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
@@ -1183,11 +1187,35 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   controller = new AbortController();
   const signal = controller.signal;
   const clock = turnClock(sessionId);
+  const turnStart = Date.now();
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
   let transferredToDesigner = false;
+  // The turn is not mute: if nothing comes out for a minute the activity block says so, and Stop is in the composer.
+  // Every piece of output re-arms it. The five-minute cap is the only thing that ends a turn by force (T3).
+  let silenceTimer: ReturnType<typeof setTimeout> | undefined;
+  let armedAt = 0;
+  let cutTurn = false;
+  const armSilence = () => {
+    const now = Date.now();
+    if (now - armedAt < 5_000) return; // a stream of deltas must not churn timers
+    armedAt = now;
+    clearTimeout(silenceTimer);
+    silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
+  };
+  const cut = () => {
+    cutTurn = true;
+    controller?.abort();
+  };
+  const capTimer = setTimeout(cut, TURN_CAP_MS);
+  armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
+      // The cap can also fall between two calls, where there is nothing to abort.
+      if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
+        notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
+        return;
+      }
       let textItemId: string | null = null;
       let result: ChatResult;
       try {
@@ -1201,13 +1229,15 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           tools: TOOLS,
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
-          onReasoning: showThinking ? (_d, full) => log.thinking(full) : undefined,
+          onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
           signal,
           onToolCall: () => {
             firstOutput();
+            armSilence();
             patchAgent(sessionId, { phase: 'drafting' });
           },
           onText: (_delta, full) => {
+            armSilence();
             if (!textItemId) {
               firstOutput();
               const item: FeedItem = { ...feedBase(workspace), type: 'assistant', text: full, streaming: true, engine: engineLabel() };
@@ -1221,7 +1251,9 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       } catch (err) {
         if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
         if (isAbort(err)) {
-          notice(sessionId, workspace, 'Stopped.', 'info');
+          // Cut by the cap, or by the user pressing Stop: they are not the same thing and must not read the same.
+          if (cutTurn) notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
+          else notice(sessionId, workspace, 'Stopped.', 'info');
           return;
         }
         // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
@@ -1587,6 +1619,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
     }
     notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
   } finally {
+    clearTimeout(silenceTimer);
+    clearTimeout(capTimer);
     // No revision came (a text answer, questions, an error or a stop): the commented plan stays as it was, waiting —
     // the user can still run it or comment again. Only a new plan replaces it.
     keepCommentedPlan(sessionId);
