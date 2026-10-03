@@ -102,6 +102,9 @@ describe('candidates end a plan', () => {
     // One result feeding the next step is fine.
     const one = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'front view' }, steps[1]] }, base, 'p');
     expect(one.errors).toEqual([]);
+    // An op that makes several (Variations ×2) is candidates too.
+    const ops = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'a girl' }, { id: 's2', kind: 'op', op: 'variations', input: 's1', params: { count: '2' } }, { id: 's3', kind: 'op', op: 'angle', input: 's2', params: { angle: 'back' } }] }, base, 'p');
+    expect(ops.errors.join(' ')).toMatch(/s3: uses s2, which makes several images/);
   });
 });
 

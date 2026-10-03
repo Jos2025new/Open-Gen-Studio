@@ -892,11 +892,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   // Candidates end a plan: a step that makes several results for the user to choose from cannot feed another step of
   // the same plan (it would silently take #1 before the user picks). The node canvas picks per node, so not there.
   if (ctx.workspace !== 'node') {
-    const candidates = new Set(steps.filter((st) => (st.kind === 'image' || st.kind === 'video') && (st.settings.count ?? 1) > 1).map((st) => st.id));
+    // Image/video steps with count > 1, and ops that make several (reference_sheet candidates, variations).
+    const several = (st: PlanStep) => ((st.kind === 'image' || st.kind === 'video') && (st.settings.count ?? 1) > 1) || (st.kind === 'op' && Number(st.params.count ?? 1) > 1);
+    const candidates = new Set(steps.filter(several).map((st) => st.id));
     for (const st of steps) {
       const uses = stepDeps(st).map((r) => parseRef(r)).filter((p) => p?.type === 'step' && candidates.has(p.id)).map((p) => p!.id);
       for (const id of new Set(uses)) {
-        errors.push(`${st.id}: uses ${id}, which makes ${steps.find((x) => x.id === id)!.kind === 'image' ? 'several images' : 'several clips'} for the user to choose from — the user has not picked one yet. Fix: end this plan at ${id} (drop ${st.id} and every step after it that needs ${id}); after the user picks, the next plan uses the chosen result.`);
+        errors.push(`${st.id}: uses ${id}, which makes ${steps.find((x) => x.id === id)!.kind === 'video' ? 'several clips' : 'several images'} for the user to choose from — the user has not picked one yet. Fix: end this plan at ${id} (drop ${st.id} and every step after it that needs ${id}); after the user picks, the next plan uses the chosen result.`);
       }
     }
   }
