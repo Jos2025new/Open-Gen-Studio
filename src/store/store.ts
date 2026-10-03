@@ -107,6 +107,8 @@ export interface UiState {
   toasts: Toast[];
   tool: DesignTool;
   brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
+  /** Designer colors: the last ones used (newest first) and the ones the user saved. */
+  swatches?: { recent: string[]; saved: string[] };
   /** Style of new Lineart strokes (editable afterwards per layer). */
   lineart: StrokeStyle;
   lineartMode?: 'draw' | 'edit';
@@ -278,7 +280,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches'>;
 };
 
 export const useStore = create<AppState>()(
@@ -296,7 +298,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;

@@ -11,6 +11,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
+import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -37,9 +38,37 @@ export function InlineSlider({ label, value, min, max, step = 1, unit = '', scal
   </label>;
 }
 
-/** A color swatch in the bar: click to pick. */
+/**
+ * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
+ * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
+ */
 export function InlineColor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return <label className="opt opt-color" data-tip={label}><span className="opt-label">{label}</span><input type="color" value={value} aria-label={label} onChange={(e) => onChange(e.target.value)} /></label>;
+  const pop = usePopover();
+  const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
+  const [hex, setHex] = useState(value);
+  const close = () => { rememberColor(value); pop.close(); };
+  const pick = (c: string) => { onChange(c); setHex(c); };
+  const chip = (c: string, saved: boolean) => (
+    <button key={`${saved}${c}`} type="button" className={`swatch${c === value.toLowerCase() ? ' is-on' : ''}`} style={{ background: c }} aria-label={c} data-tip={saved ? `${c} · right-click to remove` : c}
+      onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
+  );
+  return <>
+    <button type="button" ref={pop.ref} className="opt opt-color" data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
+      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={232} label={label}>
+      <div className="swatch-panel">
+        <div className="swatch-row">
+          <input type="color" value={value} aria-label={label} onChange={(e) => pick(e.target.value)} />
+          <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} />
+          <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
+        </div>
+        {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
+        <span className="field-label">Saved</span>
+        {sw.saved.length ? <div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div> : <span className="field-hint">Save colors here to reuse them in any design.</span>}
+      </div>
+    </Popover>
+  </>;
 }
 
 /** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */

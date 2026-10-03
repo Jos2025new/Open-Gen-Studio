@@ -1,10 +1,10 @@
 import type { DesignTool } from './design/rules';
 
 /** Designer tool keys: the keyboard handler and Settings → Shortcuts both read this map, so they never drift. */
-export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', b: 'brush', g: 'fill', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
+export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', i: 'eyedropper', b: 'brush', g: 'fill', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text' };
 
 const TOOL_NAMES: Record<DesignTool, string> = {
-  move: 'Edit', hand: 'Pan', brush: 'Brush', fill: 'Fill', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', text: 'Text',
+  move: 'Edit', hand: 'Pan', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', line: 'Line', text: 'Text',
 };
 
 export interface ShortcutGroup {
@@ -45,6 +45,7 @@ export function shortcutGroups(): ShortcutGroup[] {
       items: [
         ...Object.entries(DESIGN_TOOL_KEYS).map(([key, tool]) => ({ keys: key.toUpperCase(), action: TOOL_NAMES[tool] })),
         { keys: 'Space (hold)', action: 'Pan' },
+        { keys: 'Alt-click (Brush, Fill)', action: 'Pick a color from the canvas' },
         { keys: 'Mod + Z', action: 'Undo' },
         { keys: 'Mod + Shift + Z', action: 'Redo' },
         { keys: 'Delete', action: 'Delete the active layer' },

@@ -26,7 +26,7 @@ export function isProtectedImage(l: Layer | null | undefined): boolean {
   return !!l && l.type === 'raster' && !!l.sourceAssetId && !l.allowPaint;
 }
 
-export type DesignTool = 'move' | 'hand' | 'brush' | 'fill' | 'lineart' | 'eraser' | 'rect' | 'ellipse' | 'line' | 'text';
+export type DesignTool = 'move' | 'hand' | 'eyedropper' | 'brush' | 'fill' | 'lineart' | 'eraser' | 'rect' | 'ellipse' | 'line' | 'text';
 
 export const TOOL_LAYER: Partial<Record<DesignTool, LayerType>> = {
   brush: 'raster',

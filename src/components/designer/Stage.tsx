@@ -13,7 +13,8 @@ import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, get
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
-import { setDoc, toast, useStore } from '../../store/store';
+import { setDoc, setUi, toast, useStore } from '../../store/store';
+import { rememberColor, sampleColor } from '../../engine/design/swatches';
 import { uid } from '../../lib/id';
 
 interface View {
@@ -331,6 +332,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const current = getDoc(sessionId, doc.id);
     if (!current) return;
     const act = activeLayer(current);
+
+    // Eyedropper, or Alt-click with the brush or the fill: the visible color under the pointer becomes the color.
+    if (tool === 'eyedropper' || (e.altKey && (tool === 'brush' || tool === 'fill'))) {
+      const color = sampleColor(current, p.x, p.y);
+      if (!color) return void toast('Nothing to pick here: the page is transparent at this point.', 'info');
+      setUi({ brush: { ...useStore.getState().ui.brush, color } });
+      rememberColor(color);
+      return;
+    }
 
     if (tool === 'fill') {
       try { fillRegion(sessionId, current, p.x, p.y, brush.color, brush.opacity, { threshold: brush.fillThreshold, expand: brush.fillExpand, smooth: brush.fillSmooth }); }

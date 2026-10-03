@@ -135,3 +135,11 @@
 .document-picker-panel { margin-top: 6px; width: 190px; max-height: calc(100dvh - 220px); overflow: auto; padding: 0; }
 .document-picker-panel .document-choice { background: var(--surface); }
 .document-picker-panel .document-choice.is-active { background: var(--surface-2); }
+.opt-swatch { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-strong, #55555e); display: inline-block; }
+.swatch-panel { display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.swatch-row { display: flex; align-items: center; gap: 6px; }
+.swatch-row input[type='color'] { width: 32px; height: 28px; padding: 0; border: none; background: none; }
+.swatch-hex { flex: 1; min-width: 0; font-family: var(--font-mono, monospace); font-size: 12px; }
+.swatch-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+.swatch { aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--border); padding: 0; cursor: pointer; }
+.swatch.is-on { outline: 2px solid var(--accent); outline-offset: 1px; }
