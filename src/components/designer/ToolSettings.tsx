@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, FlipHorizontal2, Magnet, FlipVertical2, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Magnet, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
@@ -98,9 +98,11 @@ const ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVe
   { id: 'middle', label: 'Center vertically', icon: AlignCenterHorizontal },
   { id: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal },
 ];
-const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof FlipHorizontal2 }> = [
-  { id: 'flip-h', label: 'Flip horizontal', icon: FlipHorizontal2 },
-  { id: 'flip-v', label: 'Flip vertical', icon: FlipVertical2 },
+// Icons by their drawing, not by lucide's old alias names: in this lucide version "FlipHorizontal2" is the triangles
+// split by a horizontal line (a top↔bottom mirror), so the names alone pointed at the wrong icon.
+const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof TrianglesCenterlineDashedVertical }> = [
+  { id: 'flip-h', label: 'Mirror left ↔ right', icon: TrianglesCenterlineDashedVertical },
+  { id: 'flip-v', label: 'Mirror top ↕ bottom', icon: TrianglesCenterlineDashedHorizontal },
   { id: 'rotate-cw', label: 'Rotate 90° right', icon: RotateCw },
   { id: 'rotate-ccw', label: 'Rotate 90° left', icon: RotateCcw },
   { id: 'rotate-180', label: 'Rotate 180°', icon: RefreshCw },
@@ -169,7 +171,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
         </> : null}
       </div>
     </Popover>
-    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked}><FlipHorizontal2 size={13} />Transform{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
+    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked}><TrianglesCenterlineDashedVertical size={13} />Transform{many ? ` · ${layers.length}` : ''}<ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
         {TURN_ITEMS.map((t) => { const why = layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(why)} tip={why ?? undefined} onClick={() => turnLayers(sessionId, doc.id, ids, t.id)} />; })}
