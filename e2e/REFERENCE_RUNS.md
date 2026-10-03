@@ -59,3 +59,33 @@ Los tiempos por llamada (primer byte, razonamiento, salida) se perdieron con las
 - El informe tiene que guardar una copia de los datos de la ejecución, no depender del estado de la app.
 - El guion debe pedir tiempos por paso; el subagente los anotó solo a medias.
 - Probar como usuario obediente no es estrés. Una tanda de estrés queda pendiente: cambios de idea, recargar durante una generación, dos pestañas, peticiones ambiguas, cambiar el modelo en la tarjeta, comentarios encadenados y errores forzados.
+
+## Versión automática y comparación
+
+Qué es: el mismo guion sin navegador ni generaciones (`tests/e2e/twin.test.ts`). Usa el motor real de la app y el agente real (DeepSeek V4.1 Flash en NanoGPT, con la clave de `data/state.json`, que nunca se imprime). Las tarjetas se responden con las mismas reglas del guion. Las generaciones terminan al momento con resultados de relleno. Cuesta céntimos de tokens y tarda unos 4 min.
+
+```
+TWIN=1 E2E_OUT=e2e-runs/<fecha>-twin npx vitest run tests/e2e/twin.test.ts
+E2E_REPORT=1 E2E_STATE=e2e-runs/<fecha>-twin/state.json E2E_OUT=e2e-runs/<fecha>-twin npx vitest run tests/e2e/browser-report.test.ts
+E2E_COMPARE=e2e-runs/<navegador>,e2e-runs/<fecha>-twin npx vitest run tests/e2e/compare.test.ts
+```
+
+`compare.md` muestra, por escenario y por petición, el flujo (preguntas → ajustes → plan → respuesta), los pasos (tipo, modelo, cantidad, variaciones, referencias), las comprobaciones que fallaron en cada ejecución y los segundos y llamadas del agente.
+
+Cómo leerla: lo que sale igual en las dos lo cubre la versión automática, que es barata y se puede repetir en cada cambio. Lo que solo falla en el navegador es lo que la simulación no ve (proveedores, recargas, pestañas, la interfaz) y pide una ejecución real.
+
+### Primera comparación: R1 (navegador) frente a la versión automática del 2026-10-03
+
+| Escenario | Flujo | Fallos navegador / automática | Agente, s navegador / automática |
+|---|---|---|---|
+| S1 corneta | igual | 0 / 0 | 229 / 132 |
+| S2 hoja | igual | 2 / 0 | 181 / 34 |
+| S3 animar | igual | 0 / 0 | 31 / 27 |
+| S4 perfume | distinto: la automática preguntó 4 cosas antes; el navegador fue directo a ajustes | 0 / 0 | 38 / 55 |
+
+Lo que dice:
+- **El flujo del harness se reproduce sin navegador.** Las fases, las candidatas, la tarjeta en cada petición y el comentario que deja el plan esperando salen iguales. Para esto basta la versión automática.
+- **Solo los vio el navegador:** el error de Atlas, el reintento colgado y la pérdida de datos por la otra pestaña. Esto exige la prueba real.
+- **El valor inválido de `purpose` no se repitió en la automática.** El agente no responde siempre igual a la misma entrada. Una sola ejecución no basta para decir que un fallo del agente ha desaparecido: hay que repetirla varias veces.
+- **Tiempos:** el mismo modelo tardó 132 s frente a 229 s en S1, y 34 s frente a 181 s en S2. Parte es la vuelta perdida y parte la variación del proveedor. Hay que medir varias veces antes de culpar al código.
+- **Diferencia del montaje:** la versión automática usa el catálogo grabado (`tests/fixtures/live`), en el que el Nano Banana más barato era `nano-banana-2` de NanoGPT, no el Lite developer de Atlas que había en vivo. Hay que refrescarlo con `npm run snapshot:models` (gratis) antes de comparar modelos y precios.
