@@ -179,3 +179,4 @@
 .layer-actions { justify-content: flex-start; min-width: 0; }
 .layer-actions > * { flex-shrink: 0; }
 @container layers (max-width: 300px) { .layer-ops-label { display: none; } .layer-ops-btn { padding: 0 6px; } }
+.layer-add { align-items: center; padding: 6px 8px; gap: 4px; }

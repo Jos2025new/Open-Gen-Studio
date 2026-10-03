@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { restyleStrokes } from '../../engine/design/strokes';
@@ -79,6 +79,7 @@ function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc:
 export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const layer = activeLayer(doc);
   const pop = usePopover();
+  const addPop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
@@ -128,9 +129,23 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     <Section title="Layers" open={sections.layers} onToggle={() => setSections({ ...sections, layers: !sections.layers })}
       extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
     <div className="layer-add">
-      <Button size="sm" icon={Image} onClick={() => addEmptyLayer(sessionId, doc.id, 'raster')}>Raster</Button>
-      <Button size="sm" icon={Shapes} onClick={() => addEmptyLayer(sessionId, doc.id, 'vector')}>Vector</Button>
-      <Button size="sm" icon={Type} onClick={() => addEmptyLayer(sessionId, doc.id, 'text')}>Text</Button>
+      {/* One "+" for a new layer (its kind in the menu); the order and folder tools sit beside it. */}
+      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
+      <Popover open={addPop.open} anchor={addPop.ref} onClose={addPop.close} placement="bottom-start" width={180} label="New layer">
+        <div className="menu" role="menu">
+          <MenuItem icon={Image} label="Raster" detail="Pixels: paint, images" onClick={() => { addEmptyLayer(sessionId, doc.id, 'raster'); addPop.close(); }} />
+          <MenuItem icon={Shapes} label="Vector" detail="Shapes and lineart" onClick={() => { addEmptyLayer(sessionId, doc.id, 'vector'); addPop.close(); }} />
+          <MenuItem icon={Type} label="Text" onClick={() => { addEmptyLayer(sessionId, doc.id, 'text'); addPop.close(); }} />
+        </div>
+      </Popover>
+      <span className="layer-actions-gap" />
+      {layer && <>
+        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
+          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
+          : <IconButton icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'} size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
+        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, 1))} />
+        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, -1))} />
+      </>}
     </div>
     <div className="layer-list">
       {[...doc.layers].reverse().map((l, d, shown) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes;
@@ -165,12 +180,6 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     {layer && <div className="layer-actions">
         {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} aria-label="Operations" data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}><span className="layer-ops-label">Operations</span></Button>}
         <span className="layer-actions-gap" />
-        {/* Folders: always here. Group the picked layers (2+), or take the active one's folder apart. */}
-        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
-          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
-          : <IconButton icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'} size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
-        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, 1))} />
-        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, -1))} />
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         <IconButton icon={Trash} label="Delete layer" size="sm" tone="danger" disabled={layer.locked} onClick={() => deleteLayer(sessionId, doc.id, layer.id)} />
       </div>}
