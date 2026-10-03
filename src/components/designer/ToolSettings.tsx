@@ -182,7 +182,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
-    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why}><AlignCenterVertical size={13} />Align<ChevronDown size={12} /></button>
+    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Align'} aria-label="Align"><AlignCenterVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
         <div className="menu-target">{target}</div>
@@ -202,7 +202,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
         </> : null}
       </div>
     </Popover>
-    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why}><TrianglesCenterlineDashedVertical size={13} />Transform<ChevronDown size={12} /></button>
+    <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
         <div className="menu-target">{target}</div>
