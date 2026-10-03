@@ -58,7 +58,9 @@ function mediaRelay(): Plugin {
 export default defineConfig({
   // localStore: disk copy of state and media in ./data (dev/preview only; the app has no backend).
   plugins: [react(), mediaRelay(), localStore()],
-  server: { port: 5173, proxy },
+  // data/ (state with the API keys, media, backups) lives in the project folder: never serve it as a static file.
+  // Vite's own defaults are kept (the list replaces them).
+  server: { port: 5173, proxy, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/**', '**/data.bak-*/**'] } },
   preview: { port: 4173, proxy },
   test: {
     environment: 'node',
