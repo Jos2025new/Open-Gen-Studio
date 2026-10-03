@@ -1,5 +1,13 @@
 # AGENTS.md — Open Gen Studio
 
+## Plan — Edit: objetos o capa (2026-10-03) · punto de retorno: `d37f1e5`
+Origen (usuario): Transform y Align actuaban siempre sobre capas enteras aunque en el lienzo hubiera trazos u objetos seleccionados (y aplanaban la capa de pincel). Decisión del usuario: un interruptor **Objects | Layer** en Edit (barra y Propiedades de la capa).
+- [x] O1. Selección de objetos compartida (`design/objectSelection.ts`, sin persistir, por documento): trazos de pincel de una capa raster; formas y trazos de Lineart de una capa vectorial. Sustituye el estado local `selectedRaster` del lienzo.
+- [x] O2. Operaciones de objetos (`design/objectOps.ts`): caja, mover, alinear (a la página con uno; a la selección con varios), distribuir y Transform (espejos y giros) solo sobre lo seleccionado. Trazos de pincel siguen editables (sin aplanar: se recomponen sobre la base).
+- [ ] O3. Modo Objects (por defecto): clic elige un objeto (Ctrl añade), arrastrar mueve los objetos elegidos; nunca mueve ni escala la capa. Capas sin partes (imagen, texto): el objeto es su contenido. Modo Layer: el comportamiento de capas de siempre (Ctrl-clic elige capas, arrastrar y escalar la capa).
+- [ ] O4. Align/Transform de la barra según el modo, con su objetivo a la vista ("· 2 objects", "· 3 layers"); en Objects sin nada elegido, desactivados con el motivo. Interruptor en la barra y en Propiedades.
+- [ ] O5. Tests (objetos girados y alineados, la capa y los demás objetos intactos, trazos aún editables), navegador; un commit por paso.
+
 ## Fallo — volteos que "se arreglaban uno y se rompía otro" (2026-10-03)
 Análisis con los datos reales: (1) **iconos intercambiados**: en esta versión de lucide `FlipHorizontal2` es el alias de "triangles-centerline-dashed-horizontal" (triángulos separados por una línea horizontal = espejo arriba↔abajo) y `FlipVertical2` el de eje vertical; cada opción mostraba el icono de la otra. Ahora se usan por su dibujo (`TrianglesCenterlineDashedVertical` para izquierda↔derecha). (2) **Nombres ambiguos** ("horizontal" = dirección o eje): ahora "Mirror left ↔ right" / "Mirror top ↕ bottom". (3) Las capas de pincel giraban sobre el centro de la página (arreglado en `3fe68a9`). (4) El polígono de las pruebas era simétrico y quedó girado 90° (lo dice `data/state.json`), así que cada prueba partía de otra orientación: el código de formas no cambió entre arreglos. Test `turn-invariants` (12): por cada tipo (trazado, Lineart, línea), izquierda↔derecha solo cambia x, arriba↔abajo solo y, 180° ambas, 90° intercambia ancho y alto con el mismo centro. **Lección:** ante "arreglo uno y se rompe el otro", comprobar los datos reales y los iconos antes de tocar la lógica; y usar formas asimétricas al probar.
 
