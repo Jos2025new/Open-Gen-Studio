@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
@@ -90,6 +90,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
               max={allSecs.length - 1}
               step={1}
               value={Math.max(0, allSecs.indexOf(choice.duration ?? allSecs[0]))}
+              style={{ '--fill': `${allSecs.length > 1 ? (Math.max(0, allSecs.indexOf(choice.duration ?? allSecs[0])) / (allSecs.length - 1)) * 100 : 0}%` } as CSSProperties}
               onChange={(e) => setSecs(allSecs[Number(e.target.value)])}
               aria-label="Duration"
             />
