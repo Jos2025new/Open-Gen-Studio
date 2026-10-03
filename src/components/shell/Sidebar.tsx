@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Archive, FolderOpen, House, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
+import { FolderOpen, House, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
@@ -14,6 +14,18 @@ const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: 
   { id: 'node', label: 'Node', icon: Workflow, hint: 'Connected flows of cards' },
   { id: 'designer', label: 'Designer', icon: PenTool, hint: 'Layers: raster, vector and text' },
 ];
+
+/**
+ * Library: a drawer (a rounded box, the line of its top, a handle below it), drawn here: lucide's archive box has a
+ * lid wider than its body and reads as a bin.
+ */
+function LibraryIcon() {
+  return <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <rect x="3.5" y="4" width="17" height="16" rx="3" />
+    <path d="M3.5 9h17" />
+    <path d="M9.5 13.5h5" />
+  </svg>;
+}
 
 /** Home: one button for the three canvases (Chat, Node, Designer); the one open is marked in its menu. */
 function HomeMenu({ workspace }: { workspace: Workspace }) {
@@ -134,7 +146,7 @@ export function Sidebar() {
           aria-expanded={panel === 'gallery'}
           onClick={() => togglePanel('gallery')}
         >
-          <Archive size={18} strokeWidth={1.7} />
+          <LibraryIcon />
           <span className="side-label">Library</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>
