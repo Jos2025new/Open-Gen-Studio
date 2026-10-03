@@ -55,8 +55,11 @@ export function settingsOptions(schema: ModelSchema | undefined, kind: 'video' |
   return { resolutions: res, durations, aspects, px: pixelSizes(aspects) };
 }
 
+/** Images to generate per step: the composer's range. */
+export const IMAGE_COUNTS = [1, 2, 3, 4];
+
 /** The values a model starts with on the card: medium resolution, the asked length and shape snapped to what it has. */
-export function defaultChoice(ref: string, schema: ModelSchema | undefined, req: Pick<SettingsRequest, 'kind' | 'duration' | 'aspect' | 'startImage'>, prev?: SettingsChoice): SettingsChoice {
+export function defaultChoice(ref: string, schema: ModelSchema | undefined, req: Pick<SettingsRequest, 'kind' | 'duration' | 'aspect' | 'startImage'> & { count?: number }, prev?: SettingsChoice): SettingsChoice {
   const o = settingsOptions(schema, req.kind);
   const resParam = paramByRole(schema, 'resolution');
   const wantRes = prev?.resolution;
@@ -72,15 +75,21 @@ export function defaultChoice(ref: string, schema: ModelSchema | undefined, req:
     const tier = was?.tier && o.px.tiers.includes(was.tier) ? was.tier : mediumResolution(o.px.tiers);
     const want = was?.ratio ?? (wantAspect ? aspectLabel(wantAspect) : undefined);
     const ratio = want ? nearestAspect(o.px.ratios, want) : req.startImage ? undefined : o.px.ratios[0];
-    return { modelRef: ref, resolution, duration, aspect: ratio ? o.px.pick(tier, ratio) : undefined, needsImage: req.startImage || false };
+    return { modelRef: ref, resolution, duration, aspect: ratio ? o.px.pick(tier, ratio) : undefined, needsImage: req.startImage || false, ...imageCount(req, prev) };
   }
   // With a start image and no asked shape, the clip keeps the image's (aspect left unset).
   const aspect = wantAspect && o.aspects.length ? nearestAspect(o.aspects, wantAspect) : req.startImage || !o.aspects.length ? undefined : String(paramByRole(schema, 'aspect')?.default ?? o.aspects[0]);
-  return { modelRef: ref, resolution, duration, aspect, needsImage: req.startImage || false };
+  return { modelRef: ref, resolution, duration, aspect, needsImage: req.startImage || false, ...imageCount(req, prev) };
+}
+
+function imageCount(req: { kind: string; count?: number }, prev?: SettingsChoice): { count?: number } {
+  if (req.kind !== 'image') return {};
+  const n = prev?.count ?? req.count ?? 1;
+  return { count: Math.min(4, Math.max(1, Math.round(n))) };
 }
 
 export function choiceEstimate(choice: SettingsChoice, kind: 'video' | 'image', count: number): Estimate {
-  const e = estimateMedia(choice.modelRef, kind, { count: 1, advanced: {}, resolution: choice.resolution, duration: choice.duration, aspect: choice.aspect }, choice.needsImage);
+  const e = estimateMedia(choice.modelRef, kind, { count: kind === 'image' ? choice.count ?? 1 : 1, advanced: {}, resolution: choice.resolution, duration: choice.duration, aspect: choice.aspect }, choice.needsImage);
   return e.usd == null ? e : { ...e, usd: e.usd * Math.max(1, count) };
 }
 
@@ -92,7 +101,7 @@ export function sizeName(aspect: string): string {
 
 /** "Seedance 2.0 Fast · 720p · 8 s · 9:16" (model name given by the caller). */
 export function describeChoice(name: string, c: SettingsChoice): string {
-  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.aspect ? sizeName(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
+  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.count ? `×${c.count}` : '', c.aspect ? sizeName(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
 }
 
 /** The recommended model and a few others for the card; an error the agent gets when nothing fits. */

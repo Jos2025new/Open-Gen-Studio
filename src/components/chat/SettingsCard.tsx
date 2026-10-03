@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
-import { sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
 import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
@@ -59,7 +59,6 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
-  const [secsDraft, setSecsDraft] = useState<string | null>(null);
   // After a reload the models' schemas are not in memory yet: load them, the options come from there.
   useEffect(() => {
     for (const ref of [item.recommended.modelRef, ...item.alternatives, item.chosen?.modelRef]) if (ref) void ensureSchema(ref);
@@ -84,11 +83,6 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   const px = opts.px;
   const pxNow = px && choice.aspect ? px.of(choice.aspect) : undefined;
   const allSecs = item.kind === 'video' ? durationChoices(schemas[choice.modelRef]).filter((d) => d > 0) : [];
-  // Any length the model takes, snapped to the nearest one.
-  const setSecs = (n: number) => {
-    if (!Number.isFinite(n) || !allSecs.length) return;
-    update({ ...choice, duration: allSecs.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a)) });
-  };
 
   const modelRow = (ref: string, tag?: string) => {
     const on = choice.modelRef === ref;
@@ -119,42 +113,14 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
       {item.kind === 'video' && allSecs.length ? (
         <div className="q-block">
           <div className="q-question">Duration{item.count > 1 ? ' per clip' : ''}</div>
-          <div className="set-duration">
-            <input
-              type="range"
-              className="set-slider"
-              min={0}
-              max={allSecs.length - 1}
-              step={1}
-              value={Math.max(0, allSecs.indexOf(choice.duration ?? allSecs[0]))}
-              style={{ '--fill': `${allSecs.length > 1 ? (Math.max(0, allSecs.indexOf(choice.duration ?? allSecs[0])) / (allSecs.length - 1)) * 100 : 0}%` } as CSSProperties}
-              onChange={(e) => setSecs(allSecs[Number(e.target.value)])}
-              aria-label="Duration"
-            />
-            <label className="set-secs">
-              <input
-                type="number"
-                min={Math.min(...allSecs)}
-                max={Math.max(...allSecs)}
-                value={secsDraft ?? choice.duration ?? ''}
-                onChange={(e) => {
-                  // Arrows and valid lengths apply at once; a half-typed number waits for blur or Enter.
-                  const n = Number(e.target.value);
-                  const cur = choice.duration ?? allSecs[0];
-                  const i = allSecs.indexOf(cur);
-                  // An arrow step (±1) moves to the next length the model takes, even when it skips values (4, 6, 8).
-                  const stepped = secsDraft == null && Math.abs(n - cur) === 1 && i >= 0 ? allSecs[Math.min(allSecs.length - 1, Math.max(0, i + Math.sign(n - cur)))] : undefined;
-                  if (stepped != null) { setSecsDraft(null); setSecs(stepped); }
-                  else if (allSecs.includes(n)) { setSecsDraft(null); setSecs(n); }
-                  else setSecsDraft(e.target.value);
-                }}
-                onBlur={() => { if (secsDraft != null) setSecs(Number(secsDraft)); setSecsDraft(null); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-                aria-label="Seconds"
-              />
-              <span className="faint">s</span>
-            </label>
-          </div>
+          <StepSlider values={allSecs} value={choice.duration ?? allSecs[0]} unit="s" label="Duration" onChange={(n) => update({ ...choice, duration: n })} />
+        </div>
+      ) : null}
+
+      {item.kind === 'image' ? (
+        <div className="q-block">
+          <div className="q-question">Images to generate{item.count > 1 ? ' per step' : ''}</div>
+          <StepSlider values={IMAGE_COUNTS} value={choice.count ?? 1} label="Images to generate" onChange={(n) => update({ ...choice, count: n })} />
         </div>
       ) : null}
 
@@ -196,5 +162,50 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
       </div>
 
     </>
+  );
+}
+
+/**
+ * A slider over the values a setting takes (lengths the model accepts, images to generate) with a number field beside
+ * it: arrows step to the next valid value, a half-typed number applies on blur or Enter, snapped to the nearest one.
+ */
+function StepSlider({ values, value, unit, label, onChange }: { values: number[]; value: number; unit?: string; label: string; onChange: (n: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const snap = (n: number) => { if (Number.isFinite(n)) onChange(values.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a))); };
+  const i = Math.max(0, values.indexOf(value));
+  return (
+    <div className="set-duration">
+      <input
+        type="range"
+        className="set-slider"
+        min={0}
+        max={values.length - 1}
+        step={1}
+        value={i}
+        style={{ '--fill': `${values.length > 1 ? (i / (values.length - 1)) * 100 : 0}%` } as CSSProperties}
+        onChange={(e) => onChange(values[Number(e.target.value)])}
+        aria-label={label}
+      />
+      <label className="set-secs">
+        <input
+          type="number"
+          min={Math.min(...values)}
+          max={Math.max(...values)}
+          value={draft ?? value}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            // An arrow step (±1) moves to the next valid value, even when values skip (4, 6, 8).
+            const stepped = draft == null && Math.abs(n - value) === 1 ? values[Math.min(values.length - 1, Math.max(0, i + Math.sign(n - value)))] : undefined;
+            if (stepped != null) { setDraft(null); onChange(stepped); }
+            else if (values.includes(n)) { setDraft(null); onChange(n); }
+            else setDraft(e.target.value);
+          }}
+          onBlur={() => { if (draft != null) snap(Number(draft)); setDraft(null); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+          aria-label={label}
+        />
+        {unit ? <span className="faint">{unit}</span> : null}
+      </label>
+    </div>
   );
 }

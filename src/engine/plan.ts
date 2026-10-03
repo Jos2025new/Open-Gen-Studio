@@ -530,7 +530,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           // The same model line in the variant these inputs need (the card was made for other inputs).
           s.model = stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
           if (wrote && wrote !== conf.modelRef && wrote !== confName) adjustments.push(`${s.id}: model ${wrote} → ${confName} (confirmed)`);
-          const keep = (field: 'resolution' | 'aspect' | 'duration', value: string | number | undefined) => {
+          const keep = (field: 'resolution' | 'aspect' | 'duration' | 'count', value: string | number | undefined) => {
             if (value == null) return;
             const had = (s as Record<string, unknown>)[field];
             if (had != null && String(had) !== String(value)) adjustments.push(`${s.id}: ${field} ${String(had)} → ${String(value)} (confirmed)`);
@@ -539,6 +539,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           keep('resolution', conf.resolution);
           keep('aspect', conf.aspect);
           if (kind === 'video') keep('duration', conf.duration);
+          if (kind === 'image') keep('count', conf.count);
         }
         // The user's own model pick (composer, or a video route) wins over a model only the plan names.
         const named = conf ? undefined : s.model?.trim();

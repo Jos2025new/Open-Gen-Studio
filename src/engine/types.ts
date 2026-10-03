@@ -548,6 +548,8 @@ export interface SettingsChoice {
   aspect?: string;
   /** The inputs the card was made for: a start or reference image. */
   needsImage: boolean;
+  /** Images: how many to generate per image step (1–4, like the composer). */
+  count?: number;
 }
 
 /** One kind of step on the settings card (images first, then video). */

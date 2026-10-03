@@ -67,6 +67,17 @@ describe('the settings card', () => {
   });
 });
 
+describe('images to generate', () => {
+  it('the card starts at the agent\'s number (1–4) and the plan applies the confirmed one', async () => {
+    const { defaultChoice } = await import('../src/engine/agent/settingsCard');
+    expect(defaultChoice(LOCAL_IMAGE_REF, undefined, { kind: 'image', count: 3, startImage: false }).count).toBe(3);
+    expect(defaultChoice(LOCAL_IMAGE_REF, undefined, { kind: 'image', count: 9, startImage: false }).count).toBe(4);
+    const confirmed: SettingsChoice = { modelRef: LOCAL_IMAGE_REF, needsImage: false, count: 1 };
+    const { plan } = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'a sheet', count: 3 }] }, { ...base, confirmed: (k) => (k === 'image' ? confirmed : undefined) }, 'p');
+    expect(plan!.adjustments.join(' ')).toMatch(/s1: count 3 → 1 \(confirmed\)/);
+  });
+});
+
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
   let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };

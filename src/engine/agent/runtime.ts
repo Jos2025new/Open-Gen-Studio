@@ -417,8 +417,9 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
       c.resolution !== rec.resolution ? `resolution ${rec.resolution ?? 'default'} → ${c.resolution ?? 'default'}` : '',
       c.duration !== rec.duration ? `duration ${rec.duration ?? '?'} s → ${c.duration ?? '?'} s` : '',
       c.aspect !== rec.aspect ? `aspect ${rec.aspect ?? "the image's"} → ${c.aspect ?? "the image's"}` : '',
+      c.count !== rec.count ? `images per step ${rec.count ?? 1} → ${c.count ?? 1}` : '',
     ].filter(Boolean);
-    lines.push(`- ${x.kind}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}.`);
+    lines.push(`- ${x.kind}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}${x.kind === 'image' && c.count ? `; each image step makes ${c.count} image${c.count === 1 ? '' : 's'} (count ${c.count})` : ''}.`);
     const guide = guideForModel(c.modelRef.split('::')[1] ?? '');
     const text = guide ? readGuide(`model:${guide.id}`) : undefined;
     if (text && !inConversation(sessionId, text) && !guides.includes(text)) guides += `\n\n---\nPrompting guide of ${name(c.modelRef)} (model:${guide!.id}); write its prompts in this format:\n${text}`;

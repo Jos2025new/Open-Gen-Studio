@@ -154,7 +154,7 @@ export const TOOLS: ToolSpec[] = [
           purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video: draft (a test), normal (default), long (over 15 s).' },
           start_image: { type: 'boolean', description: 'Video starts from an image (first_frame).' },
           refs: { type: 'integer', description: 'How many reference or source images each step takes (identity, product, style).' },
-          count: { type: 'integer', description: 'How many clips or images of this kind the plan makes.' },
+          count: { type: 'integer', description: 'Video: how many clips the plan makes. Images: how many to generate per image step, 1–4 (your recommendation, e.g. 3 candidates for a sheet; the user can change it on the card).' },
           duration: { type: 'number', description: 'Video: seconds per clip you recommend.' },
           aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
           model: { type: 'string', description: 'Only a model the user named, or an image model of the short list for this task. Leave out otherwise.' },
