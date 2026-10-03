@@ -263,6 +263,8 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal, musi
 
 /** Atlas developer variants: one request at a time per model, in every canvas (T4). */
 export const ATLAS_RETRY_MS = 5_000;
+/** Waits before trying a refused Atlas request again (then the error stands). */
+export const ATLAS_RETRY_WAITS = [ATLAS_RETRY_MS, 20_000, 60_000];
 const ACCESS_DENIED = /upstream access denied/i;
 const series = new Map<string, Promise<unknown>>();
 
@@ -297,10 +299,10 @@ export function runGeneration(id: string): Promise<string[]> {
 /**
  * One run, with the two things the app retries by itself (T4):
  * no credit at the provider (the same model elsewhere at the same price or less runs instead, said above the
- * prompt box; otherwise the choices or "recharge" are shown there and the failure stands), and Atlas answering
- * "Upstream access denied" on a developer variant, which happens when two of them run at the same time.
+ * prompt box; otherwise the choices or "recharge" are shown there and the failure stands). Atlas's intermittent
+ * "Upstream access denied" is retried per request inside `execute`, so finished images are never redone.
  */
-async function attempt(id: string, deniedOnce = false): Promise<string[]> {
+async function attempt(id: string): Promise<string[]> {
   try {
     return await execute(id);
   } catch (err) {
@@ -309,18 +311,6 @@ async function attempt(id: string, deniedOnce = false): Promise<string[]> {
       await onGenerationCredit(id, (gid) => (rerun = execute(gid)));
       if (rerun) return rerun;
       throw err;
-    }
-    if (!deniedOnce && ACCESS_DENIED.test((err as Error).message)) {
-      const note = 'Atlas refused access ("Upstream access denied"); it was tried once more on its own.';
-      patchGeneration(id, {
-        status: 'running',
-        error: undefined,
-        statusText: `Atlas refused access; trying once more in ${ATLAS_RETRY_MS / 1000} s`,
-        notes: [...(get().generations[id]?.notes ?? []), note],
-      });
-      logEvent('retry', { generation: id, model: get().generations[id]?.modelName, reason: 'upstream access denied', waitMs: ATLAS_RETRY_MS, attempt: 2 });
-      await sleep(ATLAS_RETRY_MS, controllers.get(id)?.signal);
-      return attempt(id, true);
     }
     throw err;
   }
@@ -586,7 +576,26 @@ async function execute(id: string): Promise<string[]> {
         },
       });
       const serial = seriesKey(model);
-      const result = serial ? await oneAtATime(serial, send) : await send();
+      const once = () => (serial ? oneAtATime(serial, send) : send());
+      // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts the very same one
+      // later: only that request is tried again, spaced out; the images already made are kept and not paid again.
+      let result: Awaited<ReturnType<typeof send>> | undefined;
+      for (let retry = 0; ; retry++) {
+        try {
+          result = await once();
+          break;
+        } catch (err) {
+          const wait = ATLAS_RETRY_WAITS[retry];
+          if (wait == null || signal.aborted || !ACCESS_DENIED.test((err as Error).message)) throw err;
+          const which = total > 1 ? ` (image ${done + 1} of ${total})` : '';
+          patchGeneration(id, {
+            statusText: `Atlas refused access${which}; trying again in ${wait / 1000} s`,
+            notes: [...(get().generations[id]?.notes ?? []).filter((x) => !x.startsWith('Atlas refused access')), `Atlas refused access ("Upstream access denied")${which}; it was tried again on its own.`],
+          });
+          logEvent('retry', { generation: id, model: g.modelName, reason: 'upstream access denied', waitMs: wait, attempt: retry + 2, image: done + 1 });
+          await sleep(wait, signal);
+        }
+      }
       if (result.costUsd != null) cost += result.costUsd;
       else if (quote != null) cost += quote;
       else costKnown = false;

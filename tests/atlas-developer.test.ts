@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const events = vi.hoisted(() => [] as Array<{ model: string; at: string }>);
 const denials = vi.hoisted(() => new Map<string, number>());
+const denyNth = vi.hoisted(() => new Map<string, number>());
+const seen = vi.hoisted(() => new Map<string, number>());
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
@@ -32,6 +34,13 @@ vi.mock('../src/engine/providers/registry', async (orig) => {
         ...real.ADAPTERS.atlas,
         generate: async (req: { model: { id: string } }) => {
           events.push({ model: req.model.id, at: 'start' });
+          const nth = (seen.get(req.model.id) ?? 0) + 1;
+          seen.set(req.model.id, nth);
+          if (denyNth.get(req.model.id) === nth) {
+            denyNth.delete(req.model.id);
+            events.push({ model: req.model.id, at: 'end' });
+            throw new Error('Atlas Cloud: Upstream access denied, please contact administrator.');
+          }
           const left = denials.get(req.model.id) ?? 0;
           if (left > 0) {
             denials.set(req.model.id, left - 1);
@@ -47,7 +56,7 @@ vi.mock('../src/engine/providers/registry', async (orig) => {
   };
 });
 
-import { ATLAS_RETRY_MS, createGeneration, runGeneration } from '../src/engine/jobs';
+import { ATLAS_RETRY_WAITS, createGeneration, runGeneration } from '../src/engine/jobs';
 import { useStore } from '../src/store/store';
 import type { ModelSummary } from '../src/engine/types';
 
@@ -63,6 +72,8 @@ const order = () => events.map((e) => `${e.at}:${e.model.replace(/^.*\//, '')}`)
 beforeEach(() => {
   events.length = 0;
   denials.clear();
+  denyNth.clear();
+  seen.clear();
   // No network: the exact-price quote and anything else the runner asks for is refused at once.
   vi.stubGlobal('fetch', async () => new Response('{}', { status: 503 }));
   const st = useStore.getState();
@@ -101,16 +112,30 @@ describe('Atlas developer variants (T4)', () => {
     expect(done.notes?.join(' ')).toMatch(/access denied/i);
   }, 20_000);
 
-  it('denied twice: no third attempt, and the provider message stands', async () => {
+  it('denied on every try: three spaced retries (5 s, 20 s, 60 s), then the provider message stands', async () => {
     vi.useFakeTimers();
-    denials.set(DEV, 2);
+    denials.set(DEV, 9);
     const g = gen(DEV);
     const run = runGeneration(g.id).catch((e: Error) => e);
-    await vi.advanceTimersByTimeAsync(ATLAS_RETRY_MS * 3);
+    await vi.advanceTimersByTimeAsync(ATLAS_RETRY_WAITS.reduce((a, b) => a + b, 0) + 1000);
     const err = await run;
     vi.useRealTimers();
     expect((err as Error).message).toMatch(/Upstream access denied/);
-    expect(order().filter((e) => e === 'start:text-to-image-developer')).toHaveLength(2);
+    expect(order().filter((e) => e === 'start:text-to-image-developer')).toHaveLength(1 + ATLAS_RETRY_WAITS.length);
     expect(useStore.getState().generations[g.id].status).toBe('error');
   });
+
+  it('a batch where one request is refused: only that request is tried again; finished images are kept, not redone', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const g = createGeneration({ sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: 'chica', modelRef: DEV, settings: { count: 3, advanced: {} }, inputs: { refs: [] }, origin: 'agent', variants: ['a', 'b', 'c'] });
+    // The 2nd request is refused once (as in the real batch of 2026-10-03), the others go through.
+    denyNth.set(DEV, 2);
+    const run = runGeneration(g.id);
+    await run;
+    const done = useStore.getState().generations[g.id];
+    expect(done.status).toBe('done');
+    expect(done.assetIds).toHaveLength(3);
+    // 3 images, one retry: 4 requests in all; the first one was never sent twice.
+    expect(order().filter((e) => e === 'start:text-to-image-developer')).toHaveLength(4);
+  }, 30_000);
 });
