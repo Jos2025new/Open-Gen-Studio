@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined, setInterval, clearInterval }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
@@ -10,7 +10,6 @@ vi.mock('../src/lib/idb', () => ({
 
 import { sendAgentMessage, stopAgent } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
-import type { NoticeFeedItem } from '../src/engine/types';
 
 import { newSession } from '../src/store/store';
 
