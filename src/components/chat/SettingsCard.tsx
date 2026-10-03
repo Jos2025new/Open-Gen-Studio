@@ -85,6 +85,8 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   const pxNow = px && choice.aspect ? px.of(choice.aspect) : undefined;
   const allSecs = item.kind === 'video' ? durationChoices(schemas[choice.modelRef]).filter((d) => d > 0) : [];
 
+  // Other models in order of price with the values above, cheapest first (unknown prices last).
+  const usdOf = (ref: string) => choiceEstimate({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage }, item.kind, 1).usd ?? Infinity;
   const modelRow = (ref: string, tag?: string) => {
     const on = choice.modelRef === ref;
     return (
@@ -158,7 +160,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
               {moreOpen ? 'Hide other models' : `Show ${item.alternatives.length} other model${item.alternatives.length === 1 ? '' : 's'}`} <ChevronDown size={13} className={moreOpen ? 'is-flipped' : ''} />
             </button>
           ) : null}
-          {moreOpen ? item.alternatives.map((ref) => modelRow(ref)) : null}
+          {moreOpen ? [...item.alternatives].sort((a, b) => usdOf(a) - usdOf(b)).map((ref) => modelRow(ref)) : null}
         </div>
       </div>
 

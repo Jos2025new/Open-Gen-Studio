@@ -34,7 +34,9 @@ export interface SettingsDeps {
 
 /** The short list the agent may pick from without being asked (system prompt, "Image by task"). */
 const IMAGE_FAMILIES = ['GPT Image 2', 'Nano Banana 2', 'Seedream 5', 'Recraft', 'Ideogram'];
-const MAX_ALTERNATIVES = 4;
+/** Cheaper picks, so the card always has an economical option (the ones offered when someone asks for cheaper). */
+const IMAGE_BUDGET = ['Nano Banana 2 Lite', 'Z-Image', 'P-Image', 'Seedream 5 Lite'];
+const MAX_ALTERNATIVES = 6;
 const DURATION_STEPS = [4, 5, 6, 8, 10, 12, 15, 20, 30];
 
 export interface SettingsOptions {
@@ -136,7 +138,7 @@ export async function buildSettings(req: SettingsRequest, deps: SettingsDeps): P
   const candidates =
     req.kind === 'video'
       ? [...VIDEO_ROUTES[req.purpose], ...VIDEO_ROUTES.normal, ...VIDEO_ROUTES.draft, ...VIDEO_ROUTES.long].map((e) => e.refs[mode])
-      : IMAGE_FAMILIES.map(byName);
+      : [...IMAGE_FAMILIES, ...IMAGE_BUDGET].map(byName);
   const alternatives: string[] = [];
   const seenNames = new Set<string>([(await deps.getModel(recommended))?.model.name ?? recommended]);
   for (const ref of candidates) {
