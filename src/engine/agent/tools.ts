@@ -151,7 +151,7 @@ export const TOOLS: ToolSpec[] = [
               type: 'object',
               properties: {
           kind: { type: 'string', enum: ['video', 'image'] },
-          purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video: draft (a test), normal (default), long (over 15 s).' },
+          purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'Video only (leave out for images): draft (a test), normal (default), long (over 15 s).' },
           start_image: { type: 'boolean', description: 'Video starts from an image (first_frame).' },
           refs: { type: 'integer', description: 'How many reference or source images each step takes (identity, product, style).' },
           count: { type: 'integer', description: 'Video: how many clips the plan makes. Images: how many to generate per image step, 1–4 (your recommendation, e.g. 3 candidates for a sheet; the user can change it on the card).' },
@@ -353,7 +353,8 @@ export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'ret
 
 const settingsPartSchema = z.object({
   kind: z.enum(['video', 'image']),
-  purpose: z.enum(['draft', 'normal', 'long']).optional(),
+  // Video only; any other value (an image "purpose") is dropped instead of refusing the card.
+  purpose: z.unknown().optional().transform((v) => (v === 'draft' || v === 'normal' || v === 'long' ? v : undefined)),
   start_image: z.boolean().optional(),
   refs: z.number().int().min(0).max(20).optional(),
   count: z.number().int().min(1).max(24).optional(),

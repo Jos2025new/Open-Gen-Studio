@@ -9,7 +9,7 @@ import type { Asset, Generation } from './types';
 const COMMON: Array<[number, number]> = [[1, 1], [4, 3], [3, 4], [3, 2], [2, 3], [16, 9], [9, 16], [21, 9], [9, 21], [5, 4], [4, 5]];
 
 /** "1:1", "16:9"… for a pixel size; the reduced pair when no common ratio is close. */
-function shapeLabel(w: number, h: number): string {
+export function shapeLabel(w: number, h: number): string {
   const r = w / h;
   const near = COMMON.find(([a, b]) => Math.abs(Math.log(a / b / r)) < 0.03);
   if (near) return `${near[0]}:${near[1]}`;

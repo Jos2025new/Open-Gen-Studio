@@ -1,3 +1,4 @@
+import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
 import { restoreNodeDeletion } from '../flow/actions';
@@ -930,8 +931,8 @@ async function runPlanItem(
       const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
       // The confirmed model's own variant for these inputs (edit, image-to-video) is the same choice, said so.
       const conf = Object.values(session(sessionId).agent.settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
-      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
-      const by = facts.length ? ` [${facts.join(' · ')}]` : '';
+      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${shapeLabel(first.width, first.height)}, ${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
+      const by = facts.length ? ` (${facts.join(', ')})` : '';
       if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
       return `${st.id} done`;
@@ -1039,7 +1040,8 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         blocked.set(id, g.error ?? 'Failed');
         return;
       }
-      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id));
+      // A step that fails again rejects here; its card already shows the error, the plan must still settle.
+      await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
       const after = get().generations[g.id];
       if (after?.status === 'done') recovered.add(id);
       else blocked.set(id, after?.error ?? 'Failed');

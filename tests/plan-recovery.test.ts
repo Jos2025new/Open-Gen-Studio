@@ -121,6 +121,16 @@ describe('recovering a failed plan', () => {
     expect(summary).toMatch(/all steps done/);
   });
 
+  it('a retry that fails again settles the plan as failed (it never stays "running")', async () => {
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
+    await vi.waitFor(() => expect(planItem().status).toBe('error'));
+    failNext = new Set(['s1']);
+    const summary = await resumePlan(sid(), planItem().id, 'retry');
+    expect(planItem().status).toBe('error');
+    expect(planItem().stepStates).toMatchObject({ s1: 'error', s2: 'skipped' });
+    expect(summary).toMatch(/still failing/);
+  });
+
   it('Check status without a job id says why instead of running anything', async () => {
     await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
