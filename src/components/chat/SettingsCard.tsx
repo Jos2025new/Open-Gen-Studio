@@ -1,8 +1,8 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
-import { aspectName, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
-import { durationChoices } from '../../engine/params';
+import { choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
@@ -74,6 +74,9 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   // Another model keeps the values the user picked when it has them, else its own medium ones.
   const pickModel = (ref: string) => update({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage });
   const opts = settingsOptions(schemas[choice.modelRef], item.kind);
+  // Exact pixel sizes (Seedream): size tier + ratio, as the composer and the nodes show them (params.pixelSizes).
+  const px = opts.px;
+  const pxNow = px && choice.aspect ? px.of(choice.aspect) : undefined;
   const allSecs = item.kind === 'video' ? durationChoices(schemas[choice.modelRef]).filter((d) => d > 0) : [];
   // Any length the model takes, snapped to the nearest one.
   const setSecs = (n: number) => {
@@ -154,6 +157,11 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
           <div className="q-question">Resolution</div>
           <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => update({ ...choice, resolution: v }))}</div>
         </div>
+      ) : px && px.tiers.length > 1 ? (
+        <div className="q-block">
+          <div className="q-question">Resolution</div>
+          <div className="q-options">{chips(px.tiers, pxNow?.tier, (v) => v, (t) => update({ ...choice, aspect: px.pick(t, pxNow?.ratio) }))}</div>
+        </div>
       ) : null}
 
       {opts.aspects.length ? (
@@ -161,7 +169,9 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
           <div className="q-question">Aspect ratio</div>
           <div className="q-options">
             {item.recommended.needsImage ? chips<string>(['__image'], choice.aspect ?? '__image', () => 'Like the image', () => update({ ...choice, aspect: undefined })) : null}
-            {chips(opts.aspects, choice.aspect, (v) => aspectName(v), (v) => update({ ...choice, aspect: v }), (v) => <AspectGlyph value={v} />)}
+            {px
+              ? chips(px.ratios, pxNow?.ratio, (r) => r, (r) => update({ ...choice, aspect: px.pick(pxNow?.tier, r) }), (r) => <AspectGlyph value={r} />)
+              : chips(opts.aspects, choice.aspect, (v) => aspectLabel(v), (v) => update({ ...choice, aspect: v }), (v) => <AspectGlyph value={v} />)}
           </div>
         </div>
       ) : null}

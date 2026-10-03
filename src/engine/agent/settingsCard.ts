@@ -1,5 +1,5 @@
 import { estimateMedia } from '../costs';
-import { aspectLabel, durationChoices, isAutoOption, mediumResolution, nearestAspect, paramByRole } from '../params';
+import { aspectLabel, durationChoices, isAutoOption, mediumResolution, nearestAspect, paramByRole, pixelSizes } from '../params';
 import { routeFits, routeMode, routeVideo, VIDEO_ROUTES, type VideoPurpose } from '../routing';
 import type { Estimate, ModelSchema, ModelSummary, SettingsChoice } from '../types';
 
@@ -42,6 +42,8 @@ export interface SettingsOptions {
   durations: number[];
   /** Aspect values (wire) without "auto"-like ones; the card adds "match the image" when there is a start image. */
   aspects: string[];
+  /** Sizes given as exact pixels (Seedream): a size tier plus a ratio, as the composer and the nodes show them. */
+  px: ReturnType<typeof pixelSizes>;
 }
 
 export function settingsOptions(schema: ModelSchema | undefined, kind: 'video' | 'image'): SettingsOptions {
@@ -49,32 +51,8 @@ export function settingsOptions(schema: ModelSchema | undefined, kind: 'video' |
   const all = kind === 'video' ? durationChoices(schema).filter((d) => d > 0) : [];
   // A range (2–30 s) becomes a few usual lengths; a short list stays as is.
   const durations = all.length > 7 ? DURATION_STEPS.filter((d) => all.includes(d)) : all;
-  const aspects = groupBySize((paramByRole(schema, 'aspect')?.options ?? []).filter((o) => !isAutoOption(o)).map(String));
-  return { resolutions: res, durations, aspects };
-}
-
-const STANDARD: Array<[string, number]> = [['21:9', 21 / 9], ['16:9', 16 / 9], ['3:2', 3 / 2], ['4:3', 4 / 3], ['5:4', 5 / 4], ['1:1', 1], ['4:5', 4 / 5], ['3:4', 3 / 4], ['2:3', 2 / 3], ['9:16', 9 / 16], ['9:21', 9 / 21]];
-const pixels = (v: string) => /^(\d{3,5})\s*[x×*]\s*(\d{3,5})$/i.exec(v.trim());
-
-/** "2816×1584" → "16:9": a size named by its shape (the nearest usual ratio within 3%); other values as the app shows them. */
-export function aspectName(v: string): string {
-  const m = pixels(v);
-  if (!m) return aspectLabel(v);
-  const r = Number(m[1]) / Number(m[2]);
-  const near = STANDARD.reduce((a, b) => (Math.abs(b[1] - r) < Math.abs(a[1] - r) ? b : a));
-  return Math.abs(near[1] - r) / r <= 0.03 ? near[0] : aspectLabel(v);
-}
-
-/** Pixel sizes (Seedream: 13 of them) become one option per shape, the medium size of each; ratios stay as they are. */
-function groupBySize(options: string[]): string[] {
-  if (!options.length || !options.every((o) => pixels(o))) return options;
-  const area = (o: string) => { const m = pixels(o)!; return Number(m[1]) * Number(m[2]); };
-  const groups = new Map<string, string[]>();
-  for (const o of options) groups.set(aspectName(o), [...(groups.get(aspectName(o)) ?? []), o]);
-  const order = STANDARD.map((x) => x[0]);
-  return [...groups.entries()]
-    .sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99))
-    .map(([, g]) => g.sort((a, b) => area(a) - area(b))[Math.floor((g.length - 1) / 2)]);
+  const aspects = (paramByRole(schema, 'aspect')?.options ?? []).filter((o) => !isAutoOption(o)).map(String);
+  return { resolutions: res, durations, aspects, px: pixelSizes(aspects) };
 }
 
 /** The values a model starts with on the card: medium resolution, the asked length and shape snapped to what it has. */
@@ -88,6 +66,14 @@ export function defaultChoice(ref: string, schema: ModelSchema | undefined, req:
   const secs = req.kind === 'video' ? durationChoices(schema).filter((d) => d > 0) : [];
   const duration = secs.length ? secs.reduce((a, b) => (Math.abs(b - wantDur) < Math.abs(a - wantDur) ? b : a)) : undefined;
   const wantAspect = prev ? prev.aspect : req.aspect;
+  if (o.px) {
+    // Exact pixel sizes (pixelSizes, as in the composer and the nodes): the medium size tier, or the one picked before, and the nearest ratio.
+    const was = prev?.aspect ? pixelSizes([prev.aspect])?.of(prev.aspect) : undefined;
+    const tier = was?.tier && o.px.tiers.includes(was.tier) ? was.tier : mediumResolution(o.px.tiers);
+    const want = was?.ratio ?? (wantAspect ? aspectLabel(wantAspect) : undefined);
+    const ratio = want ? nearestAspect(o.px.ratios, want) : req.startImage ? undefined : o.px.ratios[0];
+    return { modelRef: ref, resolution, duration, aspect: ratio ? o.px.pick(tier, ratio) : undefined, needsImage: req.startImage || false };
+  }
   // With a start image and no asked shape, the clip keeps the image's (aspect left unset).
   const aspect = wantAspect && o.aspects.length ? nearestAspect(o.aspects, wantAspect) : req.startImage || !o.aspects.length ? undefined : String(paramByRole(schema, 'aspect')?.default ?? o.aspects[0]);
   return { modelRef: ref, resolution, duration, aspect, needsImage: req.startImage || false };
@@ -98,9 +84,15 @@ export function choiceEstimate(choice: SettingsChoice, kind: 'video' | 'image', 
   return e.usd == null ? e : { ...e, usd: e.usd * Math.max(1, count) };
 }
 
+/** "16:9", or "2K 16:9" for an exact pixel size (the composer's tier + ratio). */
+export function sizeName(aspect: string): string {
+  const p = pixelSizes([aspect])?.of(aspect);
+  return p?.ratio ? `${p.tier} ${p.ratio}` : aspectLabel(aspect);
+}
+
 /** "Seedance 2.0 Fast · 720p · 8 s · 9:16" (model name given by the caller). */
 export function describeChoice(name: string, c: SettingsChoice): string {
-  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.aspect ? aspectName(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
+  return [name, c.resolution, c.duration ? `${c.duration} s` : '', c.aspect ? sizeName(c.aspect) : c.needsImage ? 'shape of the image' : ''].filter(Boolean).join(' · ');
 }
 
 /** The recommended model and a few others for the card; an error the agent gets when nothing fits. */

@@ -38,14 +38,15 @@ describe('confirmed settings win over what the plan wrote', () => {
 });
 
 describe('the settings card', () => {
-  it('names pixel sizes by their shape, one option per shape', async () => {
-    const { aspectName, settingsOptions } = await import('../src/engine/agent/settingsCard');
-    expect(aspectName('2816*1584')).toBe('16:9');
-    expect(aspectName('1152×2048')).toBe('9:16');
+  it('pixel sizes show as size tier + ratio, the same split as the composer and the nodes', async () => {
+    const { defaultChoice, settingsOptions, sizeName } = await import('../src/engine/agent/settingsCard');
     const sizes = ['2048*2048', '2368*1776', '1776*2368', '2816*1584', '1584*2816', '1024*1024', '1536*1536', '2048*1152', '1152*2048'];
-    const opts = settingsOptions({ ref: 'x', params: [{ key: 'size', label: 'Size', role: 'aspect', type: 'enum', options: sizes }], slots: {} } as never, 'image');
-    expect(opts.aspects.map(aspectName)).toEqual(['16:9', '4:3', '1:1', '3:4', '9:16']);
-    expect(opts.aspects).toContain('1536*1536');
+    const schema = { ref: 'x', params: [{ key: 'size', label: 'Size', role: 'aspect', type: 'enum', options: sizes }], slots: {} } as never;
+    const opts = settingsOptions(schema, 'image');
+    expect(opts.px?.tiers).toEqual(['1K', '1.5K', '2K']);
+    expect(opts.px?.ratios).toContain('16:9');
+    const c = defaultChoice('m', schema, { kind: 'image', aspect: '16:9', startImage: false });
+    expect(sizeName(c.aspect!)).toBe('1.5K 16:9');
   });
   it('recommends a model the user named and lists only models that take the same inputs', async () => {
     const built = await buildSettings(
