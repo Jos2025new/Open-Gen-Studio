@@ -532,7 +532,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           // The same model line in the variant these inputs need (the card was made for other inputs).
           s.model = stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
           // A family name (e.g. Nano Banana 2) is the same choice written loosely: not worth a note.
-          if (wrote && wrote.includes('::') && wrote !== conf.modelRef) adjustments.push(`${s.id}: model ${wrote} → ${confName} (confirmed)`);
+          // Noted only when the plan named another model line: the confirmed model's own variant (edit, image-to-video) is the same choice.
+          const wroteModel = wrote?.includes('::') ? (await ctx.getModel(wrote))?.model : undefined;
+          const confModel = (await ctx.getModel(conf.modelRef))?.model;
+          if (wrote && wroteModel && confModel && lineKey(wroteModel) !== lineKey(confModel)) adjustments.push(`${s.id}: model ${wroteModel.name} → ${confName} (confirmed)`);
           const keep = (field: 'resolution' | 'aspect' | 'duration' | 'count', value: string | number | undefined) => {
             if (value == null) return;
             const had = (s as Record<string, unknown>)[field];

@@ -76,13 +76,15 @@ describe('commenting on a pending plan', () => {
     ]);
   });
 
-  it('a text answer without a new plan closes the old one (nothing left half-revised)', async () => {
+  it('a text answer without a new plan leaves the plan waiting, unchanged (the user can still run it)', async () => {
     replies = [{ plan: { title: 'Clips', texts: ['a'] } }];
     await sendAgentMessage('clips');
     replies = [{ text: 'Which model do you mean?' }];
     await sendAgentMessage('use the other one');
-    expect(plans().map((p) => p.status)).toEqual(['canceled']);
-    expect(useStore.getState().sessions[useStore.getState().activeSessionId].agent.revising).toBeUndefined();
+    expect(plans().map((p) => p.status)).toEqual(['awaiting']);
+    const agent = useStore.getState().sessions[useStore.getState().activeSessionId].agent;
+    expect(agent.revising).toBeUndefined();
+    expect(agent.pending).toMatchObject({ kind: 'plan', feedItemId: plans()[0].id });
   });
 });
 

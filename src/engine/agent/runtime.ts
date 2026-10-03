@@ -223,7 +223,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       pushHistory(sessionId, {
         role: 'tool',
         tool_call_id: pending.toolCallId,
-        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan.adjustments)}\nIf this adjusts the plan (a model, a step, duration, count, which steps to keep), call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false.\n\n${ctx}`,
+        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan.adjustments)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`,
       });
       // Images attached to the comment: a user message right after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
@@ -562,6 +562,13 @@ async function presentPlan(
  * The plan the user commented on: a revision replaces it (removed from the feed, the new card says "Revised");
  * any other outcome closes it as canceled, so two plans never mix. Returns whether it was replaced.
  */
+function keepCommentedPlan(sessionId: string): void {
+  const id = session(sessionId).agent.revising;
+  if (!id) return;
+  const plan = session(sessionId).feed.find((f) => f.id === id);
+  patchAgent(sessionId, (a) => ({ revising: undefined, ...(plan?.type === 'plan' && plan.status === 'awaiting' && !a.pending ? { pending: { toolCallId: null, kind: 'plan', feedItemId: id } } : {}) }));
+}
+
 function closeRevisedPlan(sessionId: string, replace: boolean): boolean {
   const id = session(sessionId).agent.revising;
   if (!id) return false;
@@ -1573,8 +1580,9 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
     }
     notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
   } finally {
-    // No revision came (text answer, questions, error or stop): the commented plan is closed.
-    closeRevisedPlan(sessionId, false);
+    // No revision came (a text answer, questions, an error or a stop): the commented plan stays as it was, waiting —
+    // the user can still run it or comment again. Only a new plan replaces it.
+    keepCommentedPlan(sessionId);
     log.end();
     clock.end();
     patchAgent(sessionId, { busy: false, phase: undefined });
