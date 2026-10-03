@@ -1,5 +1,5 @@
 import { uid } from '../lib/id';
-import { AbortedError, isAbort, JobFailedError, NetworkError } from '../lib/http';
+import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
@@ -257,26 +257,67 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal, musi
   return [asset.id];
 }
 
+/** Atlas developer variants: one request at a time per model, in every canvas (T4). */
+export const ATLAS_RETRY_MS = 5_000;
+const ACCESS_DENIED = /upstream access denied/i;
+const series = new Map<string, Promise<unknown>>();
+
+function seriesKey(model: { id: string; provider: string }): string | null {
+  return model.provider === 'atlas' && model.id.endsWith('-developer') ? `atlas:${model.id}` : null;
+}
+
+/** Run `send` when the previous request to the same model is done; different models never wait for each other. */
+function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
+  const previous = series.get(key) ?? Promise.resolve();
+  const mine = previous.then(send, send);
+  series.set(key, mine);
+  void mine.catch(() => undefined).then(() => {
+    if (series.get(key) === mine) series.delete(key);
+  });
+  return mine;
+}
+
 /** Execute a queued generation. Resolves with the created asset ids. */
 export function runGeneration(id: string): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
-  // No credit at the provider: the same model elsewhere at the same price or less runs instead (said above the
-  // prompt box); otherwise the choices or "recharge" are shown there and the failure stands.
-  const p = execute(id)
-    .catch(async (err) => {
-      if (!isCreditError(err)) throw err;
+  const p = attempt(id).finally(() => {
+    running.delete(id);
+    controllers.delete(id);
+  });
+  running.set(id, p);
+  return p;
+}
+
+/**
+ * One run, with the two things the app retries by itself (T4):
+ * no credit at the provider (the same model elsewhere at the same price or less runs instead, said above the
+ * prompt box; otherwise the choices or "recharge" are shown there and the failure stands), and Atlas answering
+ * "Upstream access denied" on a developer variant, which happens when two of them run at the same time.
+ */
+async function attempt(id: string, deniedOnce = false): Promise<string[]> {
+  try {
+    return await execute(id);
+  } catch (err) {
+    if (isCreditError(err)) {
       let rerun: Promise<string[]> | undefined;
       await onGenerationCredit(id, (gid) => (rerun = execute(gid)));
       if (rerun) return rerun;
       throw err;
-    })
-    .finally(() => {
-      running.delete(id);
-      controllers.delete(id);
-    });
-  running.set(id, p);
-  return p;
+    }
+    if (!deniedOnce && ACCESS_DENIED.test((err as Error).message)) {
+      const note = 'Atlas refused access ("Upstream access denied"); it was tried once more on its own.';
+      patchGeneration(id, {
+        status: 'running',
+        error: undefined,
+        statusText: `Atlas refused access; trying once more in ${ATLAS_RETRY_MS / 1000} s`,
+        notes: [...(get().generations[id]?.notes ?? []), note],
+      });
+      await sleep(ATLAS_RETRY_MS, controllers.get(id)?.signal);
+      return attempt(id, true);
+    }
+    throw err;
+  }
 }
 
 async function execute(id: string): Promise<string[]> {
@@ -504,7 +545,7 @@ async function execute(id: string): Promise<string[]> {
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
       // Atlas reports no cost: its exact quote for this request (same body, no media) is the real charge (C3).
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
-      const result = await ADAPTERS[model.provider].generate({
+      const send = () => ADAPTERS[model.provider].generate({
         kind,
         model,
         schema,
@@ -528,6 +569,8 @@ async function execute(id: string): Promise<string[]> {
         onStatus: (text, progress) => patchGeneration(id, { statusText: total > 1 ? `${text} · ${done + 1}/${total}` : text, progress }),
         onRemoteJob: (job) => patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id } : { remoteJob: undefined }),
       });
+      const serial = seriesKey(model);
+      const result = serial ? await oneAtATime(serial, send) : await send();
       if (result.costUsd != null) cost += result.costUsd;
       else if (quote != null) cost += quote;
       else costKnown = false;

@@ -200,6 +200,12 @@ export function GenerationCard({ generationId, compact = false }: { generationId
           <span>{g.delivery.join(' · ')}</span>
         </div>
       ) : null}
+      {g.notes?.length ? (
+        <div className="gen-delivery faint" data-tip="What the app did about this request on its own">
+          <Info size={12} />
+          <span>{g.notes.join(' · ')}</span>
+        </div>
+      ) : null}
 
       {g.status === 'error' || (g.status === 'canceled' && !outputs.length) ? (
         <div className={`gen-error ${g.status === 'canceled' ? 'is-canceled' : ''}`}>

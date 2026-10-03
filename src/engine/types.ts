@@ -347,6 +347,8 @@ export interface Generation {
   finishedAt?: number;
   /** What came back different from what was asked (O3: "asked 9:16, got 1:1 (640×640)"). */
   delivery?: string[];
+  /** What the app did about this request on its own (a retry it made), kept after it ends (T4). */
+  notes?: string[];
 }
 
 // ---------------------------------------------------------------------------
