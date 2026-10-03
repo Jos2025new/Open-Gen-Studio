@@ -540,6 +540,8 @@ export interface QuestionsFeedItem extends FeedBase {
   maxRounds: number;
   status: 'pending' | 'answered' | 'skipped';
   answers?: Record<string, string>;
+  /** The agent's call this card answers: lets the user reopen it later and answer again. */
+  toolCallId?: string;
 }
 
 /** Settings confirmed before prompts are written (phase 2): the model and its main values. */
@@ -575,6 +577,19 @@ export interface SettingsFeedItem extends FeedBase {
   /** Only the kinds of the plan that comes now, images before video. */
   sections: SettingsSection[];
   status: 'pending' | 'confirmed' | 'skipped';
+  /** The agent's call this card answers: lets the user reopen it later and confirm again. */
+  toolCallId?: string;
+}
+
+/** What the user changed back in the conversation (for us, never sent to the agent). */
+export interface EditLogEntry {
+  at: number;
+  kind: 'message' | 'questions' | 'settings';
+  itemId: string;
+  /** The text, answers or settings before the edit. */
+  before: string;
+  /** Feed items dropped with it (everything after). */
+  removed: number;
 }
 
 export interface PlanFeedItem extends FeedBase {
@@ -982,6 +997,8 @@ export interface Session {
   activeDocId: string | null;
   agent: AgentState;
   usage: { inputTokens: number; outputTokens: number; llmUsd: number };
+  /** Edits the user made back in the conversation, newest last (for us; the agent never sees it). */
+  editLog?: EditLogEntry[];
   /** Per-request agent counters (R0), newest last; see agent/metrics.ts. */
   agentMetrics?: AgentRequestMetrics[];
   subjects?: Subject[];

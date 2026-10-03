@@ -40,6 +40,7 @@ import type {
   SettingsChoice,
   SettingsFeedItem,
   SettingsSection,
+  EditLogEntry,
   Session,
   StepState,
   Workspace,
@@ -496,6 +497,7 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
     round,
     maxRounds: get().composer.agentStyle === 'auto' ? 1 : get().settings.guidedRounds,
     status: 'pending',
+    ...(toolCallId ? { toolCallId } : {}),
   };
   appendFeed(sessionId, item);
   patchAgent(sessionId, { questionRound: round, pending: { toolCallId, kind: 'questions', feedItemId: item.id } });
@@ -631,6 +633,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   if (!s || s.agent.busy || item?.type !== 'user' || (!text.trim() && !item.attachments.length)) return;
   const i = historyIndexOf(sessionId, itemId);
   const at = s.feed.indexOf(item);
+  logEdit(sessionId, { kind: 'message', itemId, before: item.text, removed: s.feed.length - at - 1 });
   for (const f of s.feed.slice(at)) {
     if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
     removeFeedItem(sessionId, f.id);
@@ -646,6 +649,67 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
   }));
   if (get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
   await sendAgentMessage(text, { attachments: item.attachments });
+}
+
+/** What the user changed back in the conversation: kept in the session for us, never sent to the agent. */
+function logEdit(sessionId: string, e: Omit<EditLogEntry, 'at'>): void {
+  patchSession(sessionId, (s) => ({ ...s, editLog: [...(s.editLog ?? []), { at: Date.now(), ...e }].slice(-100) }));
+}
+
+/** Whether an answered questions card or confirmed settings card can be opened again (the agent's call is known). */
+export function canReopenCard(sessionId: string, itemId: string): boolean {
+  const s = session(sessionId);
+  const item = s?.feed.find((f) => f.id === itemId);
+  if (!s || s.agent.busy || !item || (item.type !== 'questions' && item.type !== 'settings') || item.status === 'pending') return false;
+  const id = cardCallId(sessionId, item);
+  return Boolean(id) && s.agent.history.some((m) => m.role === 'tool' && m.tool_call_id === id);
+}
+
+/**
+ * The agent's call a card answers. Cards made before it was stored: matched by order with the calls of that tool in
+ * the conversation, only when both counts agree (otherwise the card cannot be reopened).
+ */
+function cardCallId(sessionId: string, item: QuestionsFeedItem | SettingsFeedItem): string | undefined {
+  if (item.toolCallId) return item.toolCallId;
+  const s = session(sessionId);
+  const tool = item.type === 'questions' ? 'ask_questions' : 'confirm_settings';
+  const calls = s.agent.history.flatMap((m) => (m.role === 'assistant' ? (m.tool_calls ?? []).filter((c) => c.function.name === tool).map((c) => c.id) : []));
+  const cards = s.feed.filter((f) => f.type === item.type && f.workspace === item.workspace && f.status !== 'pending');
+  return calls.length === cards.length ? calls[cards.indexOf(item)] : undefined;
+}
+
+/**
+ * Edit an earlier answer (questions or settings card): like editing a message, the card and the conversation go
+ * back to that point — everything after it leaves the chat and what the agent sees — and the card opens again with
+ * the earlier choices preselected. Results already made stay in Assets. The edit is logged for us (editLog).
+ */
+export function reopenCard(sessionId: string, itemId: string): void {
+  if (!canReopenCard(sessionId, itemId)) return;
+  const s = session(sessionId);
+  const item = s.feed.find((f) => f.id === itemId)! as QuestionsFeedItem | SettingsFeedItem;
+  const at = s.feed.indexOf(item);
+  const callId = cardCallId(sessionId, item)!;
+  const cut = s.agent.history.findIndex((m) => m.role === 'tool' && m.tool_call_id === callId);
+  const before = item.type === 'questions'
+    ? Object.entries(item.answers ?? {}).map(([k, v]) => `${item.questions.find((q) => q.id === k)?.question ?? k}: ${v}`).join(' | ')
+    : sectionsOf(item).map((x) => `${x.kind}: ${describeChoice(modelSummary((x.chosen ?? x.recommended).modelRef)?.name ?? '', x.chosen ?? x.recommended)}`).join(' | ');
+  logEdit(sessionId, { kind: item.type, itemId, before, removed: s.feed.length - at - 1 });
+  for (const f of s.feed.slice(at + 1)) {
+    if (f.type === 'plan' && f.status === 'awaiting') removeDraftNodes(sessionId, f.plan.id);
+    removeFeedItem(sessionId, f.id);
+  }
+  if (item.type === 'questions') updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'pending', toolCallId: callId });
+  else updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'pending', toolCallId: callId });
+  patchAgent(sessionId, (a) => ({
+    history: a.history.slice(0, cut),
+    pending: { toolCallId: callId, kind: item.type, feedItemId: itemId },
+    // Settings confirmed after this point no longer hold; a reopened settings card drops its own kinds too.
+    settings: item.type === 'questions' ? undefined : Object.fromEntries(Object.entries(a.settings ?? {}).filter(([k]) => !sectionsOf(item).some((x) => x.kind === k))),
+    questionRound: item.type === 'questions' ? item.round : a.questionRound,
+    revising: undefined,
+    notes: [],
+    phase: undefined,
+  }));
 }
 
 function removeDraftNodes(sessionId: string, planId: string): void {
@@ -1262,7 +1326,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, sections, status: 'pending' };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, sections, status: 'pending', toolCallId: call.id };
           appendFeed(sessionId, item);
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
           if (get().ui.workspace !== 'chat') setThreadOpen(true);

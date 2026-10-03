@@ -9,6 +9,7 @@ import { useStore } from '../../store/store';
 import { Button } from '../ui/primitives';
 import { ensureSchema } from '../../engine/catalog';
 import { AspectGlyph } from '../composer/MediaControls';
+import { EditAnswerButton } from './EditAnswerButton';
 
 /**
  * Phase 2: the model and its main values, preselected by the app, confirmed before the agent writes any prompt.
@@ -23,7 +24,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   if (item.status !== 'pending') {
     return (
       <article className="q-card is-done">
-        <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}</div>
+        <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}<EditAnswerButton sessionId={sessionId} itemId={item.id} /></div>
         {item.status === 'confirmed' ? (
           <ul className="q-summary">
             {sections.map((x) => {

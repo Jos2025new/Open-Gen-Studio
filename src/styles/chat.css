@@ -146,3 +146,8 @@
 .step-variation-input { flex-basis: 100%; margin-top: 4px; order: 99; }
 
 .plan-step { flex-wrap: wrap; }
+/* Edit on an answered card: visible on hover or focus, like a message's actions. */
+.card-edit { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 10px; letter-spacing: .04em; color: var(--text-2); padding: 2px 6px; border-radius: 4px; opacity: 0; transition: opacity .12s; }
+.q-card:hover .card-edit, .card-edit:focus-visible { opacity: 1; }
+.card-edit:hover { color: var(--text); background: var(--surface-2); }
+@media (hover: none) { .card-edit { opacity: 1; } }

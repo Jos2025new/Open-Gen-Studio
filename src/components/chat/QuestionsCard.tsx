@@ -1,13 +1,28 @@
 import { useState } from 'react';
 import { ArrowRight, Check, FastForward } from 'lucide-react';
+import { EditAnswerButton } from './EditAnswerButton';
 import { skipQuestions, submitAnswers } from '../../engine/agent/runtime';
 import type { QuestionsFeedItem } from '../../engine/types';
 import { Button } from '../ui/primitives';
 
 export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; sessionId: string }) {
   // The agent's recommended options start selected: one click on Continue accepts them.
-  const [answers, setAnswers] = useState<Record<string, string[]>>(() => Object.fromEntries(item.questions.flatMap((q) => (q.default ? [[q.id, [q.default]]] : []))));
-  const [custom, setCustom] = useState<Record<string, string>>({});
+  // A reopened card starts from the user's earlier answers (an option, or their own words); else the recommended ones.
+  const earlier = (q: (typeof item.questions)[number]) => item.answers?.[q.id];
+  const [answers, setAnswers] = useState<Record<string, string[]>>(() =>
+    Object.fromEntries(item.questions.flatMap((q) => {
+      const a = earlier(q);
+      if (a != null) return [[q.id, q.options.filter((o) => a.split(', ').includes(o))]];
+      return q.default ? [[q.id, [q.default]]] : [];
+    })),
+  );
+  const [custom, setCustom] = useState<Record<string, string>>(() =>
+    Object.fromEntries(item.questions.flatMap((q) => {
+      const a = earlier(q);
+      const own = a?.split(', ').filter((x) => !q.options.includes(x)).join(', ');
+      return own ? [[q.id, own]] : [];
+    })),
+  );
   const pending = item.status === 'pending';
 
   if (!pending) {
@@ -15,6 +30,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
       <article className="q-card is-done">
         <div className="q-kicker">
           Questions · round {item.round} of {item.maxRounds} · {item.status === 'skipped' ? 'skipped' : 'answered'}
+          <EditAnswerButton sessionId={sessionId} itemId={item.id} />
         </div>
         {item.answers ? (
           <ul className="q-summary">
