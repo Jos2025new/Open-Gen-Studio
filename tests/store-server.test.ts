@@ -35,6 +35,17 @@ describe('local store: writes only from the app', () => {
   });
 });
 
+describe('local store: only a whole saved state replaces the file', () => {
+  it('refuses a body that is not a stamped state, or one without baseAt, and keeps the file', async () => {
+    const { root, mw } = setup();
+    expect(await call(mw, 'PUT', '/x/store/state', 'not-json')).toBe(400);
+    expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"x":1}')).toBe(400);
+    expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":')).toBe(400);
+    expect(String(readFileSync(join(root, 'data', 'state.json')))).toBe('{"savedAt":100,"x":0}');
+    expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":1}')).toBe(204);
+  });
+});
+
 describe('local store: state writes', () => {
   it('two tabs saving on the same base: one is written, the other gets 409; no temp file is left', async () => {
     const root = mkdtempSync(join(tmpdir(), 'ogs-'));

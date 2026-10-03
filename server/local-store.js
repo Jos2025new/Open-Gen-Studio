@@ -172,15 +172,18 @@ export function localStore(root = process.cwd()) {
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
       if (req.method === 'PUT') {
         // A tab says which saved state it worked from (baseAt). If the file has moved on since (another tab saved),
-        // the write is refused instead of overwriting newer work with an older copy. No baseAt: accepted (older app).
+        // the write is refused instead of overwriting newer work with an older copy.
         const next = await body(req);
-        const base = /^\{"savedAt":\d+,"baseAt":(\d+)/.exec(next.toString('utf8', 0, 80))?.[1];
+        const base = /^\{"savedAt":\d+,"baseAt":(\d+),/.exec(next.toString('utf8', 0, 80))?.[1];
+        // Only a whole state the app wrote replaces the file: it starts with its stamps and ends its object. A cheap
+        // check (no parse of the whole document): a truncated or foreign body would leave the app unable to load.
+        if (base == null || next.toString('utf8', Math.max(0, next.length - 16)).trimEnd().slice(-1) !== '}') {
+          return send(400, 'not a saved state');
+        }
         const conflict = await serialState(async () => {
-          if (base != null) {
-            const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
-            const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
-            if (current && current !== base) return Number(current);
-          }
+          const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
+          const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
+          if (current && current !== base) return Number(current);
           await atomic(stateFile, next, 0o600);
           return null;
         });
