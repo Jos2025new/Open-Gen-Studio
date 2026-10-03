@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Fallo — el imán funcionaba unas veces sí y otras no (2026-10-03)
+- [x] (usuario) Mover objetos elegidos dentro de una capa (trazos de pincel, formas, Lineart; también una imagen con trazos pintados encima, que en Objects se mueve por objetos) no tenía imán: solo lo tenía mover capas enteras. Ahora el movimiento de objetos se pega igual (página, guías, otras capas; Alt = libre) y muestra la guía. Distancia de enganche de 6 a 8 px de pantalla (`SNAP_PX`) en mover y escalar. `Stage.tsx`. Typecheck y suite; sin navegador.
+
 ## Fallo — Edit: la selección se quedaba pegada y saltaba de capa (2026-10-03)
 - [x] (usuario: "a veces no se quita la selección y cambia entre capas y objetos sin Ctrl ni Shift") (1) En Objects un clic normal no soltaba las capas elegidas antes en el panel, y como arrastrar una de varias elegidas las mueve todas, se arrastraban capas no deseadas. Ahora un clic normal sobre un objeto, sobre una capa fuera de las elegidas o en el lienzo vacío empieza de nuevo con solo eso. (2) En Layer un clic dentro de la caja de la capa activa la agarraba aunque encima hubiera otra capa; ahora manda la capa más alta bajo el puntero si no está elegida. `Stage.tsx`. Typecheck y suite; sin navegador.
 

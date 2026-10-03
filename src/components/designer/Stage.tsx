@@ -49,6 +49,9 @@ type Drag =
 const HANDLE = 8;
 type XformOp = 'scale' | 'rotate' | 'skew' | 'pivot';
 /** A transform handle on the selection box: where it sits, what it does, and (for scale) which axes it moves. */
+/** How close (screen px) an edge or center must come to a target to snap to it. */
+const SNAP_PX = 8;
+
 interface Handle { op: XformOp; x: number; y: number; fx: number; fy: number }
 /** Inkscape's two sets: scale (corners and sides), or rotate (corners), skew (sides) and the rotation center. */
 function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'scale' | 'rotate', pivot: { x: number; y: number }): Handle[] {
@@ -1002,7 +1005,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (d.op === 'scale' && snap.on && !e.altKey) {
         const ids = new Set(d.bases.map((b) => b.layer.id));
         const t = snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap);
-        const tol = 6 / view.zoom;
+        const tol = SNAP_PX / view.zoom;
         const near = (v: number, lines: number[]) => lines.reduce<number | undefined>((best, l) => (Math.abs(l - v) <= tol && (best === undefined || Math.abs(l - v) < Math.abs(best - v)) ? l : best), undefined);
         const gx = d.h.fx ? near(p.x, t.xs) : undefined, gy = d.h.fy ? near(p.y, t.ys) : undefined;
         q = { x: gx ?? p.x, y: gy ?? p.y };
@@ -1014,7 +1017,17 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
       // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
-      rasterMoveAt.current = { d, x: p.x, y: p.y };
+      // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
+      let ox = p.x, oy = p.y;
+      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
+      const b0 = snap.on && !e.altKey ? objectsBox(d.base, d.ids) : null;
+      if (b0) {
+        const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
+        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => l.id !== d.layerId) }, d.layerId, snap), SNAP_PX / view.zoom);
+        ox += s.dx; oy += s.dy;
+        showGuides({ x: s.gx, y: s.gy });
+      }
+      rasterMoveAt.current = { d, x: ox, y: oy };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
     } else if (d.kind === 'move') {
       if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
@@ -1025,7 +1038,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));
-        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap), 6 / view.zoom);
+        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap), SNAP_PX / view.zoom);
         dx += s.dx;
         dy += s.dy;
         showGuides({ x: s.gx, y: s.gy });
