@@ -90,6 +90,21 @@ describe('candidates that differ', () => {
   });
 });
 
+describe('candidates end a plan', () => {
+  it('a step that uses candidates the user has not picked is sent back (front ×2 → angle views)', async () => {
+    const steps = [
+      { id: 's1', kind: 'image', prompt: 'front view', variations: ['warm light', 'cool light'] },
+      { id: 's2', kind: 'op', op: 'angle', input: 's1', params: { angle: 'back' } },
+    ];
+    const { plan, errors } = await normalizePlan({ steps }, base, 'p');
+    expect(plan).toBeNull();
+    expect(errors.join(' ')).toMatch(/s2: uses s1, which makes several images for the user to choose from[\s\S]*end this plan at s1/);
+    // One result feeding the next step is fine.
+    const one = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'front view' }, steps[1]] }, base, 'p');
+    expect(one.errors).toEqual([]);
+  });
+});
+
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
   let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };

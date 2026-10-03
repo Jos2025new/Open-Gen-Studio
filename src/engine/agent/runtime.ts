@@ -67,6 +67,7 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
+import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
@@ -918,7 +919,9 @@ async function runPlanItem(
       const ran = genId ? get().generations[genId]?.modelRef : undefined;
       // …and what came out (read from the files: size, length), a few words in the message that already goes.
       const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
-      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}` : '', first?.width && first.height ? `${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
+      // The confirmed model's own variant for these inputs (edit, image-to-video) is the same choice, said so.
+      const conf = Object.values(session(sessionId).agent.settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
+      const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
       const by = facts.length ? ` [${facts.join(' · ')}]` : '';
       if (out.assetIds.length) return `${st.id}${by} → ${out.assetIds.length > 1 ? out.assetIds.map((a, i) => `#${i + 1} asset:${a}`).join(', ') : `asset:${out.assetIds[0]}`}${delivery?.length ? ` (delivered differs: ${delivery.join('; ')})` : ''}`;
       if (out.layerId) return `${st.id} → layer ${out.layerId}`;
