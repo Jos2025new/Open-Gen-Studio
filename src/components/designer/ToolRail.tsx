@@ -9,7 +9,7 @@ import { Popover, usePopover } from '../ui/Popover';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move, double-click to edit' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
-  { id: 'select', icon: SquareDashed, label: 'Select pixels (M) · rectangle or lasso; Delete, Ctrl+C/X, Ctrl+J to a layer' },
+  { id: 'select', icon: SquareDashed, label: 'Select pixels (M) · rectangle, lasso or magic wand; Shift adds, Alt subtracts; Delete, Ctrl+C/X, Ctrl+J to a layer' },
   { id: 'eyedropper', icon: Pipette, label: 'Eyedropper (I) · picks the visible color; Alt-click does it with Brush or Fill' },
   { id: 'fill', icon: PaintBucket, label: 'Fill (G) · contiguous visible color, on a new layer' },
   { id: 'gradient', icon: Blend, label: 'Gradient (U) · drag a line; on a new layer, inside the selection if there is one' },

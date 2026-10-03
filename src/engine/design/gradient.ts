@@ -3,7 +3,7 @@ import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc } from '../../store/store';
 import { insertLayer, newRasterLayer } from './doc';
 import { record } from './history';
-import { getSelection, selectionPath, type PixelSelection } from './pixelSelection';
+import { getSelection, selectionMask, selectionPath, type PixelSelection } from './pixelSelection';
 import { setBuffer } from './raster';
 
 /* Gradient tool, as in Paint Tool SAI 2: drag a line; linear or radial; main color to second color or to transparent.
@@ -35,6 +35,21 @@ export function paintGradient(ctx: CanvasRenderingContext2D, doc: Pick<DesignDoc
   g.addColorStop(1, b);
   ctx.save();
   ctx.globalAlpha *= spec.opacity;
+  if (sel?.mask) {
+    // A pixel mask (magic wand, added selections) cannot clip: paint on a page-sized sheet and keep only the mask.
+    const sheet = createCanvas(Math.round(doc.width), Math.round(doc.height));
+    const sc = ctx2d(sheet);
+    const g2 = spec.shape === 'radial' ? sc.createRadialGradient(x0, y0, 0, x0, y0, Math.max(1, Math.hypot(x1 - x0, y1 - y0))) : sc.createLinearGradient(x0, y0, x1, y1);
+    g2.addColorStop(0, a);
+    g2.addColorStop(1, b);
+    sc.fillStyle = g2;
+    sc.fillRect(0, 0, sheet.width, sheet.height);
+    sc.globalCompositeOperation = 'destination-in';
+    sc.drawImage(selectionMask(doc, sel), 0, 0);
+    ctx.drawImage(sheet, 0, 0);
+    ctx.restore();
+    return;
+  }
   if (sel) {
     selectionPath(ctx, doc, sel);
     ctx.clip('evenodd');

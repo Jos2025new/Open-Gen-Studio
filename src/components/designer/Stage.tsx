@@ -23,7 +23,7 @@ import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/desig
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
-import { getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { combineSelection, getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
 
 interface View {
@@ -41,7 +41,7 @@ type Drag =
   | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
-  | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
+  | { kind: 'select'; lasso: boolean; points: Array<[number, number]>; combine: SelectCombine }
   | { kind: 'shape'; tool: ShapeTool; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'stroke'; layerId: string | null; points: Array<[number, number, number]>; pen: boolean }
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
@@ -362,6 +362,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (preview?.kind === 'gradient') paintGradient(ctx, doc, gradientSpec, preview.x0, preview.y0, preview.x1, preview.y1, getSelection(doc.id));
     // Pixel selection: a dashed two-tone outline (dark under light) that reads on any artwork.
     const sel = selDraft ? { points: selDraft } : getSelection(doc.id);
+    // A pixel mask (magic wand, combined selections): its precomputed dashed outline.
+    if (!selDraft && sel && 'edge' in sel && sel.edge) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sel.edge, 0, 0);
+      ctx.restore();
+    }
     if (sel && sel.points.length > 1) {
       ctx.save();
       // Inverted: the page edge is part of the outline too, so it reads as "everything but this".
@@ -618,7 +625,16 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
 
     if (tool === 'select') {
-      drag.current = { kind: 'select', lasso: selectShape === 'lasso', points: [[p.x, p.y]] };
+      // Shift adds to the selection, Alt cuts out of it (any shape); the wand also has its own default mode.
+      const wand = useStore.getState().ui.wand;
+      const combine: SelectCombine = e.altKey ? 'subtract' : e.shiftKey ? 'add' : selectShape === 'wand' ? wand?.mode ?? 'replace' : 'replace';
+      if (selectShape === 'wand') {
+        const next = wandSelection(current, p.x, p.y, wand ?? {});
+        if (typeof next === 'string') return void toast(next, 'error');
+        combineSelection(current, next, combine);
+        return;
+      }
+      drag.current = { kind: 'select', lasso: selectShape === 'lasso', points: [[p.x, p.y]], combine };
       setSelDraft([[p.x, p.y]]);
       return;
     }
@@ -1119,7 +1135,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // A click without a drag clears the selection.
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
       const tiny = !pts.length || (Math.max(...xs) - Math.min(...xs)) * view.zoom < 3 || (Math.max(...ys) - Math.min(...ys)) * view.zoom < 3;
-      setSelection(doc.id, tiny ? null : { points: pts });
+      if (d.combine === 'replace') setSelection(doc.id, tiny ? null : { points: pts });
+      else if (!tiny) combineSelection(doc, { points: pts }, d.combine);
       return;
     }
     if (d.kind === 'shape') {

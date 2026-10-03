@@ -224,16 +224,27 @@ export function SelectionChip({ docId }: { docId: string }) {
   </span>;
 }
 
+const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as 'replace' | 'add' | 'subtract', sample: 'all' as 'layer' | 'all' };
+
 /** Pixel selection: its shape, and what to do with what is selected. */
 function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   useSelectionVersion();
   const shape = useStore((s) => s.ui.selectShape ?? 'rect');
+  const wand = useStore((s) => s.ui.wand) ?? WAND_DEFAULT;
+  const setWand = (patch: Partial<typeof WAND_DEFAULT>) => setUi({ wand: { ...wand, ...patch } });
   const brush = useStore((s) => s.ui.brush);
   const sel = getSelection(doc.id);
   const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
   const cur = () => getDoc(sessionId, doc.id)!;
   return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
-    <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }]} onChange={(v) => setUi({ selectShape: v })} />
+    <InlineSelect label="Shape" value={shape} options={[{ value: 'rect' as const, label: 'Rectangle' }, { value: 'lasso' as const, label: 'Lasso' }, { value: 'wand' as const, label: 'Magic wand' }]} onChange={(v) => setUi({ selectShape: v })} />
+    {shape === 'wand' ? <>
+      <span data-tip="How different a color can be and still be picked: low = only that color, high = a wider range"><InlineSlider label="Tolerance" min={0} max={255} value={wand.threshold} onChange={(v) => setWand({ threshold: v })} /></span>
+      <InlineSlider label="Expand" unit="px" min={0} max={12} value={wand.expand} onChange={(v) => setWand({ expand: v })} />
+      <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={wand.smooth} onChange={(v) => setWand({ smooth: v })} />
+      <span data-tip="New replaces the selection; Add and Subtract change it (Shift adds, Alt subtracts with any shape)"><InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /></span>
+      <span data-tip="Active layer: only its own pixels and elements decide · All layers: the whole visible picture"><InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} /></span>
+    </> : null}
     <button type="button" className="opt" onClick={() => selectAll(cur())} data-tip="Ctrl+A">All</button>
     <button type="button" className="opt" onClick={() => invertSelection(cur())} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => setSelection(doc.id, null)} data-tip="Ctrl+D">Deselect</button>

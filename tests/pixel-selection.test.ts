@@ -21,3 +21,23 @@ describe('pixel selection', () => {
     expect(getSelection('d1')).toBeNull();
   });
 });
+
+import { floodMask } from '../src/engine/design/fill';
+
+describe('magic wand region (shared with the bucket)', () => {
+  // 5×1 strip: two reds, a near red, then blue twice. Opaque.
+  const px = (rgb: number[][]) => new Uint8ClampedArray(rgb.flatMap(([r, g, b]) => [r, g, b, 255]));
+  const strip = px([[200, 0, 0], [200, 0, 0], [180, 0, 0], [0, 0, 200], [0, 0, 200]]);
+  it('tolerance decides how wide a range of colors is picked', () => {
+    expect([...floodMask(strip, 5, 1, 0, 0, 10, 0)]).toEqual([1, 1, 0, 0, 0]);
+    expect([...floodMask(strip, 5, 1, 0, 0, 30, 0)]).toEqual([1, 1, 1, 0, 0]);
+  });
+  it('expand grows the region by whole pixels', () => {
+    expect([...floodMask(strip, 5, 1, 0, 0, 10, 1)]).toEqual([1, 1, 1, 0, 0]);
+    expect([...floodMask(strip, 5, 1, 0, 0, 10, 2)]).toEqual([1, 1, 1, 1, 0]);
+  });
+  it('only contiguous pixels: the same color past a gap is not picked', () => {
+    const gap = px([[200, 0, 0], [0, 0, 200], [200, 0, 0]]);
+    expect([...floodMask(gap, 3, 1, 0, 0, 10, 0)]).toEqual([1, 0, 0]);
+  });
+});

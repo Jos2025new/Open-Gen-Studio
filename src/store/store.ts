@@ -110,7 +110,9 @@ export interface UiState {
   /** Designer colors: the last ones used (newest first) and the ones the user saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */
-  selectShape?: 'rect' | 'lasso';
+  selectShape?: 'rect' | 'lasso' | 'wand';
+  /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
+  wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   /** Designer rulers (and the guides dragged from them) shown. */
   rulers?: boolean;
   /** Gradient tool (the main color is the brush color). */
@@ -286,7 +288,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand'>;
 };
 
 export const useStore = create<AppState>()(
@@ -304,7 +306,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;

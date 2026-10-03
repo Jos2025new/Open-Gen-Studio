@@ -1,5 +1,10 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — varita mágica (selección por color) (2026-10-03)
+- [x] (usuario) Select → Shape "Magic wand": clic = zona contigua de color parecido, con la misma lógica que el cubo (`floodMask` en `fill.ts`, ahora compartido; el cubo no cambia): Tolerance 0–255, Expand 0–12 px, Smooth 0–4 px; Mode New / Add / Subtract; Sample Active layer (solo sus píxeles y elementos) / All layers (lo visible). Shift suma y Alt resta también con rectángulo y lazo. Ajustes guardados (`ui.wand`, `ui.selectShape`).
+- Selecciones de máscara (`pixelSelection.ts`): `mask` (página, alfa = elegido) con `box` y `edge` (contorno a trazos blanco/negro) calculados una vez; `selectionMask` convierte cualquier selección en máscara (en caché); `combineSelection` suma/resta; invertir una máscara la invierte. Borrar, copiar, To layer, Fill y Degradado usan la máscara (composición en vez de recorte).
+Tests: `pixel-selection` (+3: tolerancia, expandir, solo contiguo). Suite 500 + 5. Navegador (copia aislada): dos cuadrados → varita = el primero (100×70), Add = los dos, Subtract = vuelve al primero; contorno a trazos visible; Delete dentro de la máscara borra solo el cuadrado de la capa activa; clic real con la herramienta elige el cuadrado; Sample "Active layer" ignora la capa de abajo. **Límites:** el contorno de una máscara es por píxel (más grueso con mucho zoom, sin hormigas animadas); la selección no se guarda (como antes).
+
 ## Tarea — los consejos del lienzo del Designer se pueden cerrar (2026-10-03)
 - [x] (usuario) Los consejos de uso sobre el lienzo (tiradores, objetos, puntos de curva, Lineart) llevan una × y, cerrado, cada uno no vuelve (localStorage `ogs.designer.hintsClosed`). Los avisos de bloqueo (capa protegida) siguen sin × porque explican por qué no pinta. `Stage.tsx` (`StageHint`), `designer.css`. Typecheck; sin navegador.
 
