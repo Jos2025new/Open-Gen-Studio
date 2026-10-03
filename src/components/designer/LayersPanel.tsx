@@ -2,7 +2,6 @@ import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'rea
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
-import { restyleStrokes } from '../../engine/design/strokes';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayer, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
@@ -16,6 +15,7 @@ import { usePref } from '../ui/hooks';
 import { toast } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { EditModeToggle } from './ToolSettings';
+import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 
 const MIN_W = 200;
@@ -86,6 +86,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   // Several layers picked with Ctrl/Shift-click (Edit's Align and Transform act on all of them).
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
   const groups = liveGroups(doc);
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.
   const rows = useRef<Array<HTMLDivElement | null>>([]);
@@ -208,10 +209,18 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           <Field label="Text color"><input type="color" value={layer.color} onChange={(e) => patch({ color: e.target.value })} /></Field>
           <Field label="Alignment"><select value={layer.align} onChange={(e) => patch({ align: e.target.value as 'left' | 'center' | 'right' })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
         </>}
-        {layer.type === 'vector' && layer.strokes?.length ? <>
-          <p className="muted">{layer.strokes.length} strokes · changes restyle every stroke in this layer. Alt-drag a stroke with Lineart to bend it.</p>
-          <StrokeStyleFields value={layer.strokes[layer.strokes.length - 1]} onChange={(p) => patch({ strokes: restyleStrokes(layer.strokes ?? [], p) })} />
-        </> : null}
+        {layer.type === 'vector' && layer.strokes?.length ? (() => {
+          // The strokes picked on the canvas (Edit, Objects mode) are the ones restyled; with none picked, all of them.
+          const pickedHere = objPick?.layerId === layer.id ? layer.strokes.filter((st) => objPick.ids.includes(st.id)) : [];
+          const targets = pickedHere.length ? pickedHere : layer.strokes;
+          const ids = new Set(targets.map((st) => st.id));
+          return <>
+            <p className="muted">{pickedHere.length
+              ? `Styling ${pickedHere.length} picked stroke${pickedHere.length === 1 ? '' : 's'} of ${layer.strokes.length}.`
+              : `No stroke picked: changes apply to all ${layer.strokes.length} strokes. Pick one with Edit (click; Ctrl-click for more) to style it alone.`}</p>
+            <StrokeStyleFields value={targets[targets.length - 1]} onChange={(p) => patch({ strokes: layer.strokes!.map((st) => (ids.has(st.id) ? { ...st, ...p } : st)) })} />
+          </>;
+        })() : null}
         {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><input type="color" value={s.fill ?? '#d4f25a'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill: e.target.value } : x) })} /></Field><Field label="Stroke"><input type="color" value={s.stroke ?? '#ffffff'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke: e.target.value } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
       </fieldset>
       </section>}

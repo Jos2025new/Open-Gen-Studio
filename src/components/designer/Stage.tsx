@@ -658,6 +658,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           if (!stroke) continue;
           setActiveLayer(sessionId, doc.id, layer.id);
           setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
+          // Editing a curve's points also picks it, so Properties styles just that stroke.
+          setObjectPick(doc.id, { layerId: layer.id, ids: [stroke.id] });
           return;
         }
         setSelectedCurve(null);
@@ -979,6 +981,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (!stroke) continue;
       setActiveLayer(sessionId, doc.id, layer.id);
       setSelectedCurve({ layerId: layer.id, strokeId: stroke.id, handles: strokeHandles(stroke) });
+      // Editing a curve's points also picks it, so Properties styles just that stroke.
+      setObjectPick(doc.id, { layerId: layer.id, ids: [stroke.id] });
       return;
     }
     const hit = hitTest(doc, p.x, p.y);
