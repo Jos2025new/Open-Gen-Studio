@@ -9,7 +9,8 @@ import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel } from '../../engi
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
-import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, strokeSegment, subscribeRaster } from '../../engine/design/raster';
+import { beginLiveStroke, paintLive, type LiveStroke } from '../../engine/design/raster';
+import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -32,7 +33,7 @@ type Drag =
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[] }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'rasterMove'; layerId: string; strokeIds: string[]; startX: number; startY: number; base: RasterLayer }
-  | { kind: 'paint'; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'select'; lasso: boolean; points: Array<[number, number]> }
@@ -130,6 +131,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
+  const paintRaf = useRef<number | null>(null);
+  const liveRaf = useRef<number | null>(null);
+  const paintCursor = useRef<{ x: number; y: number } | null>(null);
+  const flushPaintFrame = () => {
+    if (paintRaf.current != null) cancelAnimationFrame(paintRaf.current);
+    paintRaf.current = null;
+    if (paintCursor.current) setCursor(paintCursor.current);
+    setPaintFrame((f) => f + 1);
+  };
   const [preview, setPreview] = useState<Drag | null>(null);
   const [spaceDown, setSpaceDown] = useState(false);
   // Picked strokes of one raster layer (Ctrl-click adds more of the same layer in Objects mode).
@@ -609,10 +619,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       const prepared = withPaintBase(target);
       if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
+      // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
+      const before = getBuffer(target.id)!;
       beginEdit(prepared);
       const stroke: RasterStroke = { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase };
-      drag.current = { stroke, kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
-      paintSegment(target, p, p, erase);
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
+      paintSegment(target, p, p);
       return;
     }
 
@@ -676,19 +688,17 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
   };
 
-  const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }, erase: boolean) => {
+  const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }) => {
     if (layer.type !== 'raster') return;
     const buf = beginEditCurrent(layer.id);
     if (!buf) return;
-    const ctx = buf.getContext('2d');
-    if (!ctx) return;
     const kx = layer.pxWidth / layer.width;
     const ky = layer.pxHeight / layer.height;
     const segment: [number, number, number, number, number] = [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (brush.size * (kx + ky)) / 2];
     const d = drag.current;
     if (d?.kind !== 'paint') return;
     d.stroke.segments.push(segment);
-    strokeSegment(ctx, { x: segment[0], y: segment[1] }, { x: segment[2], y: segment[3] }, { width: segment[4], color: d.stroke.color, opacity: d.stroke.opacity, erase });
+    paintLive(buf, d.live, { x: segment[0], y: segment[1] }, { x: segment[2], y: segment[3] }, segment[4]);
   };
 
   const rasterMoveAt = useRef<{ d: Extract<Drag, { kind: 'rasterMove' }>; x: number; y: number } | null>(null);
@@ -746,13 +756,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       for (const sample of samples.length ? samples : [e.nativeEvent]) {
         const point = toDoc(sample.clientX, sample.clientY);
         const next = brushPoint(d.last, d.control, point, brush.smoothing ?? 0, brush.stabilization ?? 0, view.zoom, sample.timeStamp - d.time);
-        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint, d.erase);
+        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint);
         d.last = next.paint;
         d.control = next.control;
         d.time = sample.timeStamp;
       }
-      setCursor(d.last);
-      setPaintFrame((f) => f + 1);
+      // Pointer events can come faster than the screen: show the stroke (and move the ring) once per frame.
+      paintCursor.current = d.last;
+      paintRaf.current ??= requestAnimationFrame(flushPaintFrame);
       window.dispatchEvent(new Event('ogs:paint'));
     } else if (d.kind === 'stroke') {
       const events = e.nativeEvent.getCoalescedEvents?.() ?? [];
@@ -760,7 +771,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const q = toDoc(ev.clientX, ev.clientY);
         d.points.push([q.x, q.y, d.pen ? ev.pressure || 0.5 : 0.5]);
       }
-      setLive(newStroke([...d.points], lineart, !d.pen));
+      // Rebuilt and shown once per frame, however many pointer events come in between.
+      liveRaf.current ??= requestAnimationFrame(() => {
+        liveRaf.current = null;
+        const cur = drag.current;
+        if (cur?.kind === 'stroke') setLive(newStroke([...cur.points], lineart, !cur.pen));
+      });
     } else if (d.kind === 'bend') {
       if (!d.recorded) {
         if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom < 2) return;
@@ -828,11 +844,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }
     if (d.kind === 'paint') {
+      flushPaintFrame();
       if (!d.erase) setSelectedRaster({ layerId: d.layerId, strokeIds: [d.stroke.id] });
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintStrokes: [...(l.paintStrokes ?? []), d.stroke] } : l)) }));
     }
     if (d.kind === 'stroke') {
+      if (liveRaf.current != null) cancelAnimationFrame(liveRaf.current);
+      liveRaf.current = null;
       setLive(null);
       const current = getDoc(sessionId, doc.id);
       if (!current) return;

@@ -72,10 +72,67 @@ export function withPaintBase(layer: RasterLayer): RasterLayer {
   return { ...layer, paintBaseId, paintStrokes: [] };
 }
 
+/**
+ * Replay a saved stroke. Contiguous segments of the same width are one path, stroked once: with an opacity below
+ * 100 % the overlapping round ends of separate segments would add up into beads along the line.
+ */
 export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke): void {
-  for (const [ax, ay, bx, by, width] of stroke.segments) {
-    strokeSegment(ctx, { x: ax + stroke.x, y: ay + stroke.y }, { x: bx + stroke.x, y: by + stroke.y }, { width, color: stroke.color, opacity: stroke.opacity, erase: stroke.erase });
+  const segs = stroke.segments;
+  let i = 0;
+  while (i < segs.length) {
+    const width = segs[i][4];
+    ctx.save();
+    ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
+    ctx.globalAlpha = stroke.opacity;
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(segs[i][0] + stroke.x, segs[i][1] + stroke.y);
+    let j = i;
+    for (; j < segs.length && segs[j][4] === width && (j === i || (segs[j][0] === segs[j - 1][2] && segs[j][1] === segs[j - 1][3])); j++) {
+      // A tiny offset so a click without movement still leaves a dot.
+      ctx.lineTo(segs[j][2] + stroke.x + (j === i ? 0.01 : 0), segs[j][3] + stroke.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+    i = j;
   }
+}
+
+/**
+ * A stroke being painted, as SAI does it: segments go into a mask at full strength (overlaps cannot add up), and
+ * the layer is the pixels it had before the stroke with the mask laid over at the brush opacity. Only the area
+ * the new segment touches is recomposed, so a long stroke costs the same per move as a short one.
+ */
+export interface LiveStroke {
+  base: HTMLCanvasElement;
+  mask: HTMLCanvasElement;
+  color: string;
+  opacity: number;
+  erase: boolean;
+}
+
+export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean): LiveStroke {
+  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase };
+}
+
+export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number): void {
+  strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
+  const pad = width / 2 + 2;
+  const x = Math.max(0, Math.floor(Math.min(a.x, b.x) - pad)), y = Math.max(0, Math.floor(Math.min(a.y, b.y) - pad));
+  const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
+  const w = x1 - x, h = y1 - y;
+  if (w <= 0 || h <= 0) return;
+  const ctx = ctx2d(buf);
+  ctx.save();
+  ctx.clearRect(x, y, w, h);
+  ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
+  ctx.globalAlpha = live.opacity;
+  ctx.globalCompositeOperation = live.erase ? 'destination-out' : 'source-over';
+  ctx.drawImage(live.mask, x, y, w, h, x, y, w, h);
+  ctx.restore();
 }
 
 /** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */

@@ -1,5 +1,12 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — dibujar suave, en vivo y sin motas (2026-10-03) · punto de retorno: `eaba028`
+(usuario: "debe ser suave, live, sin motas; los settings del trazo se cumplen; 10 trazos de un tirón sin lag")
+- [x] Motas: cada segmento se pintaba aparte con la opacidad del pincel y las uniones solapadas sumaban opacidad (cuentas a lo largo del trazo). Ahora el trazo en curso va a una máscara a opacidad completa (`LiveStroke`, `paintLive` en `raster.ts`) y la capa es "píxeles de antes + máscara × opacidad", recompuesta solo en el rectángulo que toca el segmento nuevo. La base es el buffer anterior que ya guarda el paso de deshacer (sin copia extra); la única memoria nueva es la máscara mientras dura el trazo. Borrador igual (`destination-out`).
+- [x] Repetir un trazo guardado (mover trazos, recargar): los segmentos contiguos del mismo grosor son un solo trazado (`drawRasterStroke`), así que tampoco hay motas.
+- [x] El lienzo se redibuja como mucho una vez por fotograma (pincel y Lineart con `requestAnimationFrame`); al soltar se aplica siempre lo último.
+Navegador (copia aislada): 10 trazos seguidos de 80 movimientos al 50 %: 5–39 ms cada uno; el centro de un trazo recto da 136 en todo su largo (blanco al 50 % sobre el fondo, sin picos); a mitad de un trazo sin soltar, el trazo y el anillo se ven. Sin tableta real: comprobar con lápiz y presión.
+
 ## Fallo — el pincel no se veía hasta soltar (2026-10-03) · introducido en `1122d3b`
 - [x] (usuario: "muevo y no aparece nada sino suelto") Al pasar el anillo del pincel a un elemento DOM se quitó `cursor` de las dependencias del dibujo, y el pincel dependía de él: cada movimiento pinta en el buffer de la capa pero el lienzo solo se redibujaba por el cambio de `cursor`. Ahora un contador propio (`paintFrame`) se incrementa en cada movimiento del pincel y redibuja; mover el puntero sin pintar sigue sin redibujar el documento. Navegador (copia aislada, eventos de puntero a mitad de arrastre, sin soltar): pincel, línea y Lineart cambian el píxel durante el arrastre. **Lección:** antes de quitar una dependencia de un efecto de dibujo, buscar quién dependía de ella para redibujar.
 
