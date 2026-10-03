@@ -233,6 +233,10 @@ const initial: AppState = {
 // Persistence (IndexedDB, debounced)
 
 let writeTimer: ReturnType<typeof setTimeout> | undefined;
+// The debounce restarts with every change; this one does not: a long stream of changes (an agent turn, a job's
+// progress) still starts a save every MAX_WRITE_WAIT_MS instead of waiting for a quiet moment that may not come.
+let maxWaitTimer: ReturnType<typeof setTimeout> | undefined;
+const MAX_WRITE_WAIT_MS = 2000;
 // The latest state to save. Held as the (immutable) object and turned into JSON only when the debounced write runs:
 // stringifying the whole state on every change cost a full serialization per store update, which grows with the
 // history and piled up where many updates come together (the end of an agent turn, when its card appears).
@@ -240,6 +244,9 @@ let pendingWrite: { name: string; value: StorageValue<Persisted> } | null = null
 let wiping = false;
 
 function flushWrite(): void {
+  clearTimeout(writeTimer);
+  clearTimeout(maxWaitTimer);
+  writeTimer = maxWaitTimer = undefined;
   if (!pendingWrite || wiping) return;
   const { name, value } = pendingWrite;
   pendingWrite = null;
@@ -257,6 +264,7 @@ const idbStorage: PersistStorage<Persisted> = {
     // The global timers, not window's: tests (Node) write state too.
     clearTimeout(writeTimer);
     writeTimer = setTimeout(flushWrite, 350);
+    maxWaitTimer ??= setTimeout(flushWrite, MAX_WRITE_WAIT_MS);
   },
   removeItem: (name) => stateDb.del(name),
 };
@@ -492,6 +500,7 @@ export async function wipeAllData(): Promise<void> {
   wiping = true;
   pendingWrite = null;
   clearTimeout(writeTimer);
+  clearTimeout(maxWaitTimer);
   await stateDb.del('ogs-app').catch(() => undefined);
   // The disk copy moves to data.bak-<date>: otherwise the next load would restore it, and nothing is lost for good.
   await disk.wipe();
