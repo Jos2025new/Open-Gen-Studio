@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — la barra superior no se solapa con zoom alto (2026-10-03)
+- [x] (usuario, 133 %) La parte derecha de la barra no encogía (`flex-shrink: 0`) y se metía sobre "Designer / título". Ahora encoge: cede la barra de opciones de la herramienta (se desplaza en horizontal); botones, Export, Connected, Generations y el título (≤ 40 %) conservan su tamaño. Solo CSS (`shell.css`). Navegador (copia aislada, 1024 px con el pincel): título termina en 442 px y la derecha empieza en 448, sin desbordar.
+
 ## Tarea — varita mágica (selección por color) (2026-10-03)
 - [x] (usuario) Select → Shape "Magic wand": clic = zona contigua de color parecido, con la misma lógica que el cubo (`floodMask` en `fill.ts`, ahora compartido; el cubo no cambia): Tolerance 0–255, Expand 0–12 px, Smooth 0–4 px; Mode New / Add / Subtract; Sample Active layer (solo sus píxeles y elementos) / All layers (lo visible). Shift suma y Alt resta también con rectángulo y lazo. Ajustes guardados (`ui.wand`, `ui.selectShape`).
 - Selecciones de máscara (`pixelSelection.ts`): `mask` (página, alfa = elegido) con `box` y `edge` (contorno a trazos blanco/negro) calculados una vez; `selectionMask` convierte cualquier selección en máscara (en caché); `combineSelection` suma/resta; invertir una máscara la invierte. Borrar, copiar, To layer, Fill y Degradado usan la máscara (composición en vez de recorte).

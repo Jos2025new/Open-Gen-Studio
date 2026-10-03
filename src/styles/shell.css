@@ -11,6 +11,12 @@
 .side-group { display: flex; flex-direction: column; gap: 4px; width: 100%; }
 .side-btn { height: 48px; width: 100%; border-radius: 6px; color: var(--text-2); display: flex; flex-direction: column; gap: 4px; align-items: center; justify-content: center; position: relative; }
 .side-btn.is-active { color: var(--accent); background: var(--accent-soft); }.side-btn.is-open { background: var(--surface-3); color: var(--text); }
+.home-icon { stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.provider-pool-btn { gap: 6px; }
+.provider-key-mark { width: 26px; height: 26px; border: 1px solid var(--border-strong); border-radius: 50%; display: grid; place-items: center; color: var(--text-2); transition: color .14s ease, border-color .14s ease, background .14s ease; }
+.provider-key-mark svg { stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.provider-pool-btn:hover .provider-key-mark, .provider-pool-btn.is-open .provider-key-mark { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.provider-pool-btn .side-budget { line-height: 1; margin-top: 1px; }
 .side-label, .side-budget { font-size: 8px; }.side-badge { position: absolute; right: 2px; top: 2px; background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 0 4px; font-size: 9px; }
 .side-sep { border-top: 1px solid var(--border); width: 26px; margin: 12px auto; }.side-spacer { flex: 1; }.side-budget.is-empty { color: var(--danger); }
 .topbar { min-height: var(--topbar-h); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--border); background: var(--bg); z-index: 15; }
@@ -290,3 +296,12 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .set-key-row { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 10px; align-items: baseline; font-size: 12px; }
 .set-key-row dt { margin: 0; }
 .set-key-row dd { margin: 0; color: var(--text-2); }
+
+/* Top bar at large browser zoom: the right side may shrink instead of sliding over the canvas name. The tool options
+   (Designer) are what gives way, scrolling sideways; buttons and the rest keep their size. */
+.topbar-left { flex-shrink: 0; max-width: 40%; }
+.topbar-right { flex-shrink: 1; min-width: 0; }
+.topbar-slot { flex: 1 1 auto; min-width: 0; }
+.topbar-slot > * { flex-shrink: 0; }
+.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 0; overflow-x: auto; }
+.topbar-right > :not(.topbar-slot) { flex-shrink: 0; }
