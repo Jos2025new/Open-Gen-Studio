@@ -17,6 +17,8 @@ import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
 import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
 import { pathBox, toolPath } from '../../engine/design/shapeTools';
+import { gestureBuffers, transformLayer } from '../../engine/design/affine';
+import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/design/matrix';
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
@@ -31,9 +33,10 @@ interface View {
 
 type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[] }
+  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean }
+  | { kind: 'xform'; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
-  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer }
+  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean }
   | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
@@ -43,6 +46,21 @@ type Drag =
   | { kind: 'bend'; layerId: string; stroke: number; point: number; startX: number; startY: number; base: Stroke[]; influence?: number; recorded?: boolean };
 
 const HANDLE = 8;
+type XformOp = 'scale' | 'rotate' | 'skew' | 'pivot';
+/** A transform handle on the selection box: where it sits, what it does, and (for scale) which axes it moves. */
+interface Handle { op: XformOp; x: number; y: number; fx: number; fy: number }
+/** Inkscape's two sets: scale (corners and sides), or rotate (corners), skew (sides) and the rotation center. */
+function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'scale' | 'rotate', pivot: { x: number; y: number }): Handle[] {
+  const xs = [b.x, b.x + b.w / 2, b.x + b.w], ys = [b.y, b.y + b.h / 2, b.y + b.h];
+  const out: Handle[] = [];
+  for (const iy of [0, 1, 2]) for (const ix of [0, 1, 2]) {
+    if (ix === 1 && iy === 1) continue;
+    const corner = ix !== 1 && iy !== 1;
+    out.push({ op: mode === 'scale' ? 'scale' : corner ? 'rotate' : 'skew', x: xs[ix], y: ys[iy], fx: ix - 1, fy: iy - 1 });
+  }
+  if (mode === 'rotate') out.push({ op: 'pivot', x: pivot.x, y: pivot.y, fx: 0, fy: 0 });
+  return out;
+}
 const RULER = 18;
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
@@ -149,6 +167,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
   /** Edit acts on whole layers (Layer mode) instead of the objects inside them. */
   const editLayers = selectMode === 'layers';
+  // Transform handles (Inkscape): scale by default; clicking the selection again switches to rotate/skew and back.
+  const [handleMode, setHandleMode] = useState<'scale' | 'rotate'>('scale');
+  const [pivot, setPivot] = useState<{ x: number; y: number } | null>(null);
+  const [hoverHandle, setHoverHandle] = useState<string | null>(null);
+  const xformRaf = useRef<number | null>(null);
+  const xformAt = useRef<{ d: Extract<Drag, { kind: 'xform' }>; m: Mat } | null>(null);
   const [shiftDown, setShiftDown] = useState(false);
   const drag = useRef<Drag | null>(null);
   const tool = useStore((s) => s.ui.tool);
@@ -175,6 +199,28 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const fitted = useRef<string | null>(null);
 
   const active = activeLayer(doc);
+
+  /** What the transform handles act on: the picked objects (Objects mode; an image or a text is its own object), or
+      the picked layers (Layer mode). Locked and hidden layers are left out. */
+  const xformTargets = (d0: DesignDoc): Array<{ layer: Layer; ids: string[] | null }> => {
+    const ok = (l: Layer | undefined | null): l is Layer => Boolean(l && l.visible && !l.locked);
+    if (!editLayers) {
+      const pk = objectPick(d0.id);
+      const pl = pk ? d0.layers.find((l) => l.id === pk.layerId) : null;
+      if (ok(pl) && pk!.ids.length) return [{ layer: pl, ids: pk!.ids }];
+      const a = activeLayer(d0);
+      return ok(a) && a.type !== 'vector' && !layerObjects(a).length ? [{ layer: a, ids: null }] : [];
+    }
+    return layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
+  };
+  const targetsBox = (ts: Array<{ layer: Layer; ids: string[] | null }>) => unionBox(ts.map((t) => (t.ids ? objectsBox(t.layer, t.ids) : layerBox(t.layer))).filter((b): b is NonNullable<typeof b> => Boolean(b)));
+  const targets = tool === 'move' && !editingText ? xformTargets(doc) : [];
+  const tBox = targets.length ? targetsBox(targets) : null;
+  const targetSig = targets.map((t) => `${t.layer.id}:${t.ids?.join(',') ?? '*'}`).join('|');
+  // A new selection starts with the scale handles and its own center.
+  useEffect(() => { setHandleMode('scale'); setPivot(null); }, [targetSig]);
+  const pivotAt = tBox ? pivot ?? { x: tBox.x + tBox.w / 2, y: tBox.y + tBox.h / 2 } : null;
+  const handles = tBox && pivotAt ? boxHandles(tBox, handleMode, pivotAt) : [];
 
   // Load pixels of raster layers after a reload.
   useEffect(() => {
@@ -365,16 +411,31 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           ctx.strokeStyle = '#d4f25a';
           ctx.lineWidth = 1;
           ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
-          // Layer mode (or Shift held): the layer's own scale handles.
-          if (tool === 'move' && !active.locked && (editLayers || shiftDown)) {
-            ctx.fillStyle = '#0a0a0b';
-            for (const [hx, hy] of corners(b)) {
-              ctx.fillRect(sx(hx) - HANDLE / 2, sy(hy) - HANDLE / 2, HANDLE, HANDLE);
-              ctx.strokeRect(sx(hx) - HANDLE / 2 + 0.5, sy(hy) - HANDLE / 2 + 0.5, HANDLE - 1, HANDLE - 1);
-            }
-          }
         }
       }
+    }
+    // Transform handles around what Edit acts on: squares to scale; in rotate mode, round corners to rotate,
+    // diamonds on the sides to skew, and the rotation center (drag it to move it).
+    if (tBox && handles.length && !editingText) {
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(212,242,90,0.7)';
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(sx(tBox.x) - 0.5, sy(tBox.y) - 0.5, tBox.w * view.zoom + 1, tBox.h * view.zoom + 1);
+      ctx.setLineDash([]);
+      for (const h of handles) {
+        const hx = sx(h.x), hy = sy(h.y);
+        ctx.fillStyle = '#0a0a0b';
+        ctx.strokeStyle = '#d4f25a';
+        ctx.beginPath();
+        if (h.op === 'scale') ctx.rect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE);
+        else if (h.op === 'rotate') ctx.arc(hx, hy, HANDLE / 2 + 1, 0, Math.PI * 2);
+        else if (h.op === 'skew') { ctx.moveTo(hx, hy - 5); ctx.lineTo(hx + 5, hy); ctx.lineTo(hx, hy + 5); ctx.lineTo(hx - 5, hy); ctx.closePath(); }
+        else { ctx.arc(hx, hy, 5, 0, Math.PI * 2); ctx.moveTo(hx - 9, hy); ctx.lineTo(hx + 9, hy); ctx.moveTo(hx, hy - 9); ctx.lineTo(hx, hy + 9); }
+        if (h.op !== 'pivot') ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     if ((tool === 'move' || (tool === 'lineart' && lineartMode === 'edit')) && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
       const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
@@ -442,7 +503,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke(path);
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, paintFrame, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, paintFrame, targetSig, handleMode, pivot, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -527,6 +588,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
 
     if (tool === 'move') {
+      // Transform handles on the selection box come first.
+      const tol = (HANDLE + 4) / view.zoom;
+      const hHit = [...handles].reverse().find((h) => Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol);
+      if (hHit && tBox && pivotAt) {
+        const ts = xformTargets(current);
+        record(current);
+        drag.current = { kind: 'xform', op: hHit.op, h: hHit, startX: p.x, startY: p.y, cx: pivotAt.x, cy: pivotAt.y, box: tBox, bases: ts.map((t) => ({ ...t, buffers: gestureBuffers(t.layer) })) };
+        return;
+      }
       // Point editing of a picked Lineart curve comes first, in either mode.
       if (act?.type === 'vector' && act.visible && !act.locked && selectedCurve?.layerId === act.id) {
         const index = act.strokes?.findIndex((s) => s.id === selectedCurve.strokeId) ?? -1;
@@ -554,10 +624,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           if (ctrl) return void pickObject(doc.id, layer.id, id, true);
           setActiveLayer(sessionId, doc.id, layer.id);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
-          const ids = cur?.layerId === layer.id && cur.ids.includes(id) ? cur.ids : [id];
+          const again = cur?.layerId === layer.id && cur.ids.includes(id);
+          const ids = again ? cur!.ids : [id];
           setObjectPick(doc.id, { layerId: layer.id, ids });
           record(current);
-          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer };
+          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, again };
           return;
         }
         if (ctrl) return;
@@ -565,10 +636,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const whole = hitTestPixel(current, p.x, p.y);
         setObjectPick(doc.id, null);
         if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
+          const again = current.activeLayerId === whole.id;
           setActiveLayer(sessionId, doc.id, whole.id);
           if (!whole.locked) {
             record(current);
-            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole };
+            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, again };
           }
         }
         return;
@@ -597,7 +669,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
             record(current);
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: pickedOthers(current, act.id) };
+            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: pickedOthers(current, act.id), again: true };
             return;
           }
         }
@@ -731,10 +803,55 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
   };
 
+  /** The transform a handle drag means, in page coordinates (Shift: keep proportions / 15° steps). */
+  const xformMatrix = (d: Extract<Drag, { kind: 'xform' }>, p: { x: number; y: number }, shift: boolean): Mat => {
+    const { box, h } = d;
+    if (d.op === 'scale') {
+      // The opposite side or corner stays put.
+      const ax = box.x + box.w / 2 - (h.fx * box.w) / 2, ay = box.y + box.h / 2 - (h.fy * box.h) / 2;
+      let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
+      if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
+      const clamp = (v: number) => (Math.abs(v) < 0.01 ? Math.sign(v || 1) * 0.01 : v);
+      return scaleAbout(clamp(sx), clamp(sy), ax, ay);
+    }
+    if (d.op === 'rotate') {
+      let a = Math.atan2(p.y - d.cy, p.x - d.cx) - Math.atan2(d.startY - d.cy, d.startX - d.cx);
+      if (shift) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+      return rotateAbout(a, d.cx, d.cy);
+    }
+    if (d.op === 'skew') {
+      // Top/bottom sides slide sideways (skew x); left/right sides slide up and down (skew y). About the center.
+      if (h.fy) { let k = (p.x - d.startX) / (h.y - d.cy || 1); if (shift) k = Math.tan(Math.round(Math.atan(k) / (Math.PI / 12)) * (Math.PI / 12)); return skewAbout(k, 0, d.cx, d.cy); }
+      let k = (p.y - d.startY) / (h.x - d.cx || 1); if (shift) k = Math.tan(Math.round(Math.atan(k) / (Math.PI / 12)) * (Math.PI / 12));
+      return skewAbout(0, k, d.cx, d.cy);
+    }
+    return [1, 0, 0, 1, 0, 0];
+  };
+  /** Lay the latest handle transform onto the layers as they were when the drag began (once a frame). */
+  const applyXform = (persist: boolean) => {
+    if (xformRaf.current != null) cancelAnimationFrame(xformRaf.current);
+    xformRaf.current = null;
+    const at = xformAt.current;
+    if (!at) return;
+    if (persist) xformAt.current = null;
+    const { d, m } = at;
+    if (d.op === 'pivot') return;
+    const next = new Map(d.bases.map((b) => [b.layer.id, transformLayer(b.layer, b.ids, m, b.buffers, persist)] as const));
+    setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => { const n = next.get(l.id); return n ? (n.type === 'raster' ? { ...n, rev: n.rev + 1 } : n) : l; }) }));
+  };
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e.clientX, e.clientY);
     if (tool === 'brush' || tool === 'eraser') setCursor(p);
     const d = drag.current;
+    if (!d && tool === 'move') {
+      // The cursor says what a handle does before it is pressed.
+      const tol = (HANDLE + 4) / view.zoom;
+      const h = [...handles].reverse().find((k) => Math.abs(p.x - k.x) <= tol && Math.abs(p.y - k.y) <= tol);
+      const c = !h ? null : h.op === 'pivot' ? 'move' : h.op === 'rotate' ? 'grab'
+        : h.op === 'skew' ? (h.fy ? 'ew-resize' : 'ns-resize')
+          : h.fx && h.fy ? (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize') : h.fx ? 'ew-resize' : 'ns-resize';
+      if (c !== hoverHandle) setHoverHandle(c);
+    }
     if (!d && tool === 'move' && rulers) {
       const near = (axis: GuideAxis) => (doc.guides?.[axis] ?? []).some((at) => Math.abs((axis === 'x' ? p.x : p.y) - at) * view.zoom <= 4);
       const over = near('x') ? 'x' : near('y') ? 'y' : null;
@@ -743,12 +860,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (!d) return;
     if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
+    } else if (d.kind === 'xform' && d.op === 'pivot') {
+      setPivot({ x: p.x, y: p.y });
+    } else if (d.kind === 'xform') {
+      xformAt.current = { d, m: xformMatrix(d, p, e.shiftKey) };
+      xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
     } else if (d.kind === 'objMove') {
+      if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
       // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       rasterMoveAt.current = { d, x: p.x, y: p.y };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
     } else if (d.kind === 'move') {
+      if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
@@ -853,6 +977,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     // A guide lands where the pointer is released (a quick drag may send no move in between).
     if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
     showGuides({});
+    // Clicking the selection again (no drag) switches between scale and rotate/skew handles, as in Inkscape.
+    if ((d.kind === 'objMove' || d.kind === 'move') && d.again && !d.moved) setHandleMode((m) => (m === 'scale' ? 'rotate' : 'scale'));
+    if (d.kind === 'xform') {
+      if (d.op === 'pivot') return;
+      applyXform(true);
+      for (const b of d.bases) if (b.layer.type === 'raster') commitEdit(b.layer.id);
+      return;
+    }
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     if (d.kind === 'objMove') {
@@ -995,7 +1127,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   };
 
   const cursorStyle =
-    guidePreview || (guideHover && tool === 'move') ? ((guidePreview?.axis ?? guideHover) === 'x' ? 'col-resize' : 'row-resize') : tool === 'hand' || spaceDown ? 'grab' : tool === 'brush' || tool === 'eraser' ? (blocked ? 'not-allowed' : 'none') : tool === 'text' ? 'text' : tool === 'move' ? 'default' : 'crosshair';
+    drag.current?.kind === 'xform' && drag.current.op === 'rotate' ? 'grabbing' : hoverHandle && tool === 'move' ? hoverHandle : guidePreview || (guideHover && tool === 'move') ? ((guidePreview?.axis ?? guideHover) === 'x' ? 'col-resize' : 'row-resize') : tool === 'hand' || spaceDown ? 'grab' : tool === 'brush' || tool === 'eraser' ? (blocked ? 'not-allowed' : 'none') : tool === 'text' ? 'text' : tool === 'move' ? 'default' : 'crosshair';
 
   const editingLayer = editingText ? (doc.layers.find((l) => l.id === editingText) as TextLayer | undefined) : undefined;
 
@@ -1066,7 +1198,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         />
       ) : null}
       {tool === 'move' && selectedCurve ? <div className="stage-hint">Drag points to edit · Click away to move again</div> : tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
-      {tool === 'move' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
+      {tool === 'move' && !selectedCurve && tBox ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Shift: 15° steps) · move the center · click again to resize'}</div>
+        : tool === 'move' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
@@ -1102,6 +1235,11 @@ function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onD
       style={{
         left: view.x + layer.x * z,
         top: view.y + layer.y * z,
+        // A rotated or skewed text: the editor takes the same transform, so typing happens on the text as it shows.
+        ...(layer.transform ? {
+          transform: `matrix(${layer.transform[0]}, ${layer.transform[1]}, ${layer.transform[2]}, ${layer.transform[3]}, ${layer.transform[4] * z}, ${layer.transform[5] * z})`,
+          transformOrigin: `${-layer.x * z}px ${-layer.y * z}px`,
+        } : {}),
         width: Math.max(8, lay.width * z) + layer.fontSize * 0.3 * z,
         height: lay.height * z + 2,
         whiteSpace: layer.width > 0 ? 'pre-wrap' : 'pre',
