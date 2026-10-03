@@ -178,6 +178,18 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   </>;
 }
 
+/** With another tool active, a pixel selection still shows in the bar (it still clips Delete, copy and the gradient). */
+export function SelectionChip({ docId }: { docId: string }) {
+  useSelectionVersion();
+  const tool = useStore((s) => s.ui.tool);
+  const sel = getSelection(docId);
+  if (!sel || tool === 'select') return null;
+  return <span className="opt selection-chip" data-tip="Delete, copy, cut and the gradient act inside it">
+    <span className="opt-label">{sel.inverted ? 'Selection · inverted' : 'Selection'}</span>
+    <button type="button" className="sb-link" onClick={() => setSelection(docId, null)}>Deselect</button>
+  </span>;
+}
+
 /** Pixel selection: its shape, and what to do with what is selected. */
 function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   useSelectionVersion();

@@ -40,7 +40,22 @@ export function ungroup(sessionId: string, docId: string, groupId: string): void
 
 /** Show or hide, lock or unlock every layer of the group. */
 export function setGroupFlag(sessionId: string, docId: string, groupId: string, flag: 'visible' | 'locked', value: boolean): void {
-  mutateDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.groupId === groupId ? { ...l, [flag]: value } : l)) }));
+  // Hiding (or locking) the group remembers which layers already were; showing (or unlocking) it leaves those as they
+  // were, so a layer hidden on purpose inside the folder does not come back.
+  const keyOf = flag === 'visible' ? 'keptHidden' : 'keptLocked';
+  const turningOff = flag === 'visible' ? !value : value;
+  mutateDoc(sessionId, docId, (d) => {
+    const group = (d.groups ?? []).find((g) => g.id === groupId);
+    const members = d.layers.filter((l) => l.groupId === groupId);
+    const already = members.filter((l) => (flag === 'visible' ? !l.visible : l.locked)).map((l) => l.id);
+    const kept = new Set(turningOff ? already : group?.[keyOf] ?? []);
+    return {
+      ...d,
+      updatedAt: Date.now(),
+      groups: (d.groups ?? []).map((g) => (g.id === groupId ? { ...g, [keyOf]: turningOff ? already : undefined } : g)),
+      layers: d.layers.map((l) => (l.groupId === groupId && (turningOff || !kept.has(l.id)) ? { ...l, [flag]: value } : l)),
+    };
+  });
 }
 
 export function patchGroup(sessionId: string, docId: string, groupId: string, patch: Partial<Pick<LayerGroup, 'name' | 'collapsed'>>, record = true): void {

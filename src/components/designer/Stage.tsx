@@ -144,6 +144,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const selVersion = useSelectionVersion();
   const rulers = useStore((s) => s.ui.rulers ?? false);
   // A guide being dragged (from a ruler or an existing guide), shown until pointer up.
+  // Edit tool over a guide: the cursor says it can be dragged.
+  const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
   const [guidePreview, setGuidePreview] = useState<{ axis: GuideAxis; at: number; index?: number } | null>(null);
   const selectShape = useStore((s) => s.ui.selectShape ?? 'rect');
   const gradientUi = useStore((s) => s.ui.gradient) ?? GRADIENT_DEFAULT;
@@ -250,7 +252,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const sel = selDraft ? { points: selDraft } : getSelection(doc.id);
     if (sel && sel.points.length > 1) {
       ctx.save();
-      selectionPath(ctx, doc, { points: sel.points });
+      // Inverted: the page edge is part of the outline too, so it reads as "everything but this".
+      if ('inverted' in sel && sel.inverted) {
+        ctx.beginPath();
+        ctx.rect(0, 0, doc.width, doc.height);
+        sel.points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+        ctx.closePath();
+      } else selectionPath(ctx, doc, { points: sel.points });
       ctx.lineWidth = 1 / view.zoom;
       ctx.strokeStyle = '#000000';
       ctx.stroke();
@@ -692,6 +700,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const p = toDoc(e.clientX, e.clientY);
     if (tool === 'brush' || tool === 'eraser') setCursor(p);
     const d = drag.current;
+    if (!d && tool === 'move' && rulers) {
+      const near = (axis: GuideAxis) => (doc.guides?.[axis] ?? []).some((at) => Math.abs((axis === 'x' ? p.x : p.y) - at) * view.zoom <= 4);
+      const over = near('x') ? 'x' : near('y') ? 'y' : null;
+      if (over !== guideHover) setGuideHover(over);
+    }
     if (!d) return;
     if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
@@ -920,7 +933,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   };
 
   const cursorStyle =
-    tool === 'hand' || spaceDown ? 'grab' : tool === 'brush' || tool === 'eraser' ? (blocked ? 'not-allowed' : 'none') : tool === 'text' ? 'text' : tool === 'move' ? 'default' : 'crosshair';
+    guidePreview || (guideHover && tool === 'move') ? ((guidePreview?.axis ?? guideHover) === 'x' ? 'col-resize' : 'row-resize') : tool === 'hand' || spaceDown ? 'grab' : tool === 'brush' || tool === 'eraser' ? (blocked ? 'not-allowed' : 'none') : tool === 'text' ? 'text' : tool === 'move' ? 'default' : 'crosshair';
 
   const editingLayer = editingText ? (doc.layers.find((l) => l.id === editingText) as TextLayer | undefined) : undefined;
 

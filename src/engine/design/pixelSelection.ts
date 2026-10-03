@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { DesignDoc, RasterLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
-import { setDoc } from '../../store/store';
+import { setDoc, toast } from '../../store/store';
 import { activeLayer, insertLayer, newRasterLayer } from './doc';
 import { isProtectedImage } from './rules';
 import { getBuffer, setBuffer } from './raster';
@@ -117,6 +117,8 @@ export function clearSelected(sessionId: string, doc: DesignDoc): string | null 
   record(doc);
   setBuffer(layer.id, out);
   setDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === layer.id && l.type === 'raster' ? { ...l, paintBaseId: undefined, paintStrokes: undefined, rev: l.rev + 1 } : l)) }));
+  // Its strokes could be moved one by one; now they are pixels. Say so, and how to get them back.
+  if (layer.paintStrokes?.length) toast(`Pixels erased. The strokes of "${layer.name}" are now part of the image and can no longer be moved one by one. Ctrl+Z undoes it.`, 'info', 6500);
   return null;
 }
 

@@ -1,5 +1,14 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — claridad de las herramientas nuevas (2026-10-03) · punto de retorno: `67412c1`
+Elegido por el usuario (descartado: aviso la primera vez que se usa cada herramienta, "puede ser peligroso").
+- [x] Cursor `col-resize`/`row-resize` sobre una guía con Edit y mientras se arrastra.
+- [x] `SelectionChip` en la barra: con otra herramienta activa, "Selection" (o "Selection · inverted") con Deselect.
+- [x] Selección invertida: el borde de la página forma parte del contorno.
+- [x] Supr con selección en una capa con trazos editables: aviso de que pasaron a imagen y Ctrl+Z.
+- [x] Ojo y candado de un grupo recuerdan qué capas ya estaban ocultas/bloqueadas (`keptHidden`/`keptLocked`): mostrar el grupo no las enciende.
+Suite 461 + 5; navegador (copia aislada): la etiqueta aparece con el pincel tras Ctrl+A e invertir. Cursor de guía sin probar a mano.
+
 ## Plan — herramientas de diseñador en el Designer (2026-10-03) · punto de retorno: `3d593ab`
 Elegidas por el usuario. Una fase por commit; reutilizar render (`drawDoc`), buffers copy-on-write, historial (`record`) e imán (`snap.ts`).
 - [x] D1. Cuentagotas (I; Alt+clic con pincel o cubo) y muestras de color: el selector de color de la barra abre recientes y guardadas (`ui.swatches`, persistidas). *Por qué:* hoy hay que copiar el hex a mano.

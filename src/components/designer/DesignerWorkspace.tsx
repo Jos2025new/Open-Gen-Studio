@@ -22,7 +22,7 @@ import { uploadFiles } from '../../engine/actions';
 import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
 import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
-import { ToolSettings } from './ToolSettings';
+import { SelectionChip, ToolSettings } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 
@@ -181,6 +181,7 @@ export function DesignerWorkspace() {
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={p.label} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
       {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
+      {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
         <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
         <IconButton ref={saveConfirm.ref} icon={Images} label="Save to gallery" size="sm" disabled={busy} active={saveConfirm.open} onClick={saveConfirm.toggle} />

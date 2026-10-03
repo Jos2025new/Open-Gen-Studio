@@ -858,6 +858,9 @@ export interface LayerGroup {
   id: string;
   name: string;
   collapsed?: boolean;
+  /** Layers that were already hidden / locked when the group was hidden / locked: showing or unlocking it keeps them so. */
+  keptHidden?: string[];
+  keptLocked?: string[];
 }
 
 export interface DesignDoc {

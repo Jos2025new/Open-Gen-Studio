@@ -155,3 +155,4 @@
 .layer-group-row .layer-select { gap: 6px; }
 .layer-group-icon { color: var(--text-3); flex-shrink: 0; }
 .layers-picked button { display: inline-flex; align-items: center; gap: 3px; }
+.selection-chip { gap: 6px; border: 1px dashed var(--border); }
