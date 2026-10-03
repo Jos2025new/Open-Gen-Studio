@@ -299,9 +299,10 @@ button.info-thumb { padding: 0; cursor: pointer; }
 
 /* Top bar at large browser zoom: the right side may shrink instead of sliding over the canvas name. The tool options
    (Designer) are what gives way, scrolling sideways; buttons and the rest keep their size. */
-.topbar-left { flex-shrink: 0; max-width: 40%; }
+.topbar-left { flex: 0 1 auto; min-width: 140px; max-width: 40%; }
+.topbar-left .title-btn { min-width: 0; }
 .topbar-right { flex-shrink: 1; min-width: 0; }
 .topbar-slot { flex: 1 1 auto; min-width: 0; }
 .topbar-slot > * { flex-shrink: 0; }
-.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 0; overflow-x: auto; }
+.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 180px; overflow-x: auto; }
 .topbar-right > :not(.topbar-slot) { flex-shrink: 0; }

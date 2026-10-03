@@ -1,6 +1,7 @@
 # AGENTS.md — Open Gen Studio
 
 ## Tarea — la barra superior no se solapa con zoom alto (2026-10-03)
+- [x] (usuario, 175 %) Con más zoom las opciones de la herramienta se quedaban en 0 px (solo la raya). Ahora el título se acorta (mín. 140 px para "Designer / …") y las opciones conservan al menos 180 px, desplazables. Navegador (copia aislada, 1097 px ≈ 175 % de 1920, goma activa): título truncado hasta 350 px, opciones visibles (Size, Opacity) de 362 a 627, sin desbordar.
 - [x] (usuario, 133 %) La parte derecha de la barra no encogía (`flex-shrink: 0`) y se metía sobre "Designer / título". Ahora encoge: cede la barra de opciones de la herramienta (se desplaza en horizontal); botones, Export, Connected, Generations y el título (≤ 40 %) conservan su tamaño. Solo CSS (`shell.css`). Navegador (copia aislada, 1024 px con el pincel): título termina en 442 px y la derecha empieza en 448, sin desbordar.
 
 ## Tarea — varita mágica (selección por color) (2026-10-03)
