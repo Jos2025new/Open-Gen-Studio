@@ -20,6 +20,8 @@ export function logEvent(kind: LogKind, data: Record<string, unknown>): void {
         body: line,
         headers: { 'Content-Type': 'application/json' },
         keepalive: line.length < 60_000,
+        // A local server that stops answering must not hold up every later line.
+        signal: AbortSignal.timeout(5000),
       }).then(
         () => undefined,
         () => undefined,

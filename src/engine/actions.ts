@@ -16,6 +16,7 @@ import { needsSpendCheck } from './pricing';
 import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
+import { dropHistory } from './design/history';
 import { designerDims } from './agent/runtime';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
@@ -772,6 +773,7 @@ export function deleteSession(sessionId: string): void {
   if (!Object.keys(get().sessions).length) newSession();
   void deleteAssetBlobs(assetIds);
   void deleteBuffers(rasterIds);
+  s.docs.forEach((d) => dropHistory(d.id));
 }
 
 export async function assetObjectUrl(assetId: string): Promise<string | null> {

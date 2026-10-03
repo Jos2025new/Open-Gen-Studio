@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { askForPlan, deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
@@ -141,7 +141,8 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
   );
 }
 
-export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; sessionId: string; compact?: boolean }) {
+/** One row. Memoized: while the agent writes only its own bubble changes, so the rest of the conversation is not redrawn. */
+export const FeedItemView = memo(function FeedItemView({ item, sessionId, compact }: { item: FeedItem; sessionId: string; compact?: boolean }) {
   const current = useStore((s) => s.ui.workspace);
   const tag = item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
   switch (item.type) {
@@ -176,7 +177,7 @@ export function FeedItemView({ item, sessionId, compact }: { item: FeedItem; ses
     case 'notice':
       return <NoticeView item={item} sessionId={sessionId} />;
   }
-}
+});
 
 export function FeedList({ sessionId, compact }: { sessionId: string; compact?: boolean }) {
   // Each canvas shows its own messages; the agent's conversation is one per session, so the others can be shown too.

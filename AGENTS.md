@@ -1,5 +1,19 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — auditoría de memoria y rendimiento (2026-10-03) · rama `better-worflows-xyz765` · sobre `fefe9fe`
+Origen: auditoría de solo lectura pegada por el usuario, verificada en el código. Decidido con el usuario punto por punto.
+- [x] M1. Borrar una sesión libera también el historial de deshacer de sus diseños (`dropHistory` por documento, como ya hace `deleteDoc`). *Por qué:* los canvases de deshacer de una sesión borrada seguían en memoria mientras la pestaña estuviera abierta. `engine/actions.ts`. *Riesgo:* ninguno visible.
+- [x] M5. Chat: cada fila (`FeedItemView`) memorizada. `updateFeedItem` solo sustituye el elemento que cambia, así que mientras el agente escribe solo se vuelve a dibujar su burbuja, no toda la conversación. Las filas leen del store por su cuenta (lienzo actual, ocupado, último elemento), así que no dependen de que el padre las vuelva a dibujar. *Por qué:* en conversaciones largas cada fragmento volvía a dar formato a todos los mensajes. `FeedList.tsx`. *Riesgo:* bajo; si una fila dependiera de algo que no lee del store se quedaría sin actualizar (revisado: no hay).
+- [x] M7. Registro en disco: cada envío corta a los 5 s. *Por qué:* si el servidor local no respondiera, la cola de líneas esperaría para siempre y crecería en memoria. `lib/log.ts`. *Riesgo:* ninguno; una línea que tarda más se pierde, como ya pasa si falla.
+- [x] M8. Typecheck, suite; un commit.
+Hecho: test `delete-session-history` (falla sin el arreglo); typecheck; suite 441 + 5 omitidas; navegador: el chat de la sesión real se dibuja (29 filas, 3 tarjetas) sin errores. M5 no se probó con un turno real del agente escribiendo.
+Futuro, **solo si una medición lo justifica** (no se toca sin medir antes y después con el mismo documento o sesión):
+- (2) Deshacer del Designer sin límite de memoria: 40 pasos por documento, cada paso raster clona la capa editada (40 × 4096² RGBA ≈ 2,5 GiB en el peor caso; 2048² ≈ 640 MB). Si se mide un problema: presupuesto por bytes de buffers únicos, avisando antes de soltar pasos, nunca recortar en silencio.
+- (3) `urlCache` (`lib/idb.ts`) conserva las URL de objeto sin límite y `useAssetUrl` carga al montar aunque la imagen esté fuera de vista. Los Blob de IndexedDB los guarda el navegador en disco y lo decodificado se libera al desmontar, así que el coste esperado es bajo. Toca la carga de todos los medios: no se cambia sin medir.
+- (4) `RunButton` (`nodes.tsx`) se suscribe a todo el estado y recalcula `previewRun` en el botón principal del panel del nodo o con su menú abierto. Alcance pequeño (un botón); suscribirlo a dependencias concretas arriesga un precio desfasado si falta una. Solo si se mide un coste real.
+- (6) El guardado serializa todo el estado (1,31 MB, ~13 ms de mediana en Node, cada 350 ms como mucho). Guardado marcado como frágil (`feffc15`): lo último que se toca, y solo con medición.
+- Despliegue web: el servidor local (`server/local-store.js`: `data/state.json` con las claves, archivos, relay `/x/media` que carga cada respuesta entera en memoria) solo existe en dev/preview y es de un usuario. Una versión web necesita otro diseño (datos y claves por usuario, relay por streaming con límites y cancelación, concurrencia acotada). Opciones en `PROPUESTAS.md`.
+
 ## Tarea — cinco arreglos de la auditoría de lienzos + atajos en Ajustes (2026-10-03) · rama `better-worflows-xyz765`
 Origen: auditoría de los tres lienzos pegada por el usuario, verificada en el código. El usuario eligió solo estos; el resto (guardas de teclado de Nodos, zoom del Designer por eventos, unificar las descripciones de generación, flujo de nodos) se deja como está.
 - [x] A1. El chat baja también mientras crece el bloque de razonamiento: la clave de `ChatWorkspace` incluye las entradas y el largo del razonamiento de un bloque de actividad (antes solo su id, que no cambia). *Riesgo:* ninguno; solo añade scroll cuando la vista ya estaba abajo.
