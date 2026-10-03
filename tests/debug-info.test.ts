@@ -81,7 +81,7 @@ describe('the disk log', () => {
 
   it('appends one JSON line per event to data/logs/app.log', async () => {
     const post = async (payload: unknown) => {
-      const res = await fetch(`${base}/x/store/log`, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } });
+      const res = await fetch(`${base}/x/store/log`, { method: 'POST', body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json', 'X-OGS': '1' } });
       expect(res.status).toBe(204);
     };
     await post({ at: '2026-10-03T10:00:00.000Z', kind: 'provider-error', data: { message: 'Upstream access denied' } });
@@ -94,7 +94,7 @@ describe('the disk log', () => {
   it('rotates when the log grows past its size', async () => {
     const logFile = join(root, 'data', 'logs', 'app.log');
     writeFileSync(logFile, 'x'.repeat(6 * 1024 * 1024));
-    const res = await fetch(`${base}/x/store/log`, { method: 'POST', body: JSON.stringify({ kind: 'agent', data: { note: 'after rotation' } }), headers: { 'Content-Type': 'application/json' } });
+    const res = await fetch(`${base}/x/store/log`, { method: 'POST', body: JSON.stringify({ kind: 'agent', data: { note: 'after rotation' } }), headers: { 'Content-Type': 'application/json', 'X-OGS': '1' } });
     expect(res.status).toBe(204);
     expect(readFileSync(logFile, 'utf8')).toMatch(/after rotation/);
     expect(readFileSync(join(root, 'data', 'logs', 'app.log.1'), 'utf8').length).toBe(6 * 1024 * 1024);

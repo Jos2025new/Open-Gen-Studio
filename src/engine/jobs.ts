@@ -2,6 +2,7 @@ import { logged } from '../lib/log';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
+import { LOCAL_WRITE } from '../lib/disk';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
@@ -252,7 +253,7 @@ async function joinClips(g: Generation, ids: string[], signal: AbortSignal, musi
     if (get().assets[music]?.kind !== 'audio') throw new InputError('JOIN_CLIPS', 'The music under the joined video must be audio.');
     await disk.setBlob(assetBlobKey(music), await ensureAssetBlob(music));
   }
-  const res = await fetch('/x/store/join', { method: 'POST', signal, body: JSON.stringify({ keys: ids.map(assetBlobKey), ...(music ? { music: assetBlobKey(music) } : {}), ...(loudnorm ? { loudnorm: true } : {}) }), headers: { 'Content-Type': 'application/json' } });
+  const res = await fetch('/x/store/join', { method: 'POST', signal, body: JSON.stringify({ keys: ids.map(assetBlobKey), ...(music ? { music: assetBlobKey(music) } : {}), ...(loudnorm ? { loudnorm: true } : {}) }), headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
   if (!res.ok) throw new InputError(res.status === 501 ? 'JOIN_UNAVAILABLE' : 'JOIN_FAILED', `Could not join the clips: ${(await res.text()).slice(0, 300)}`);
   const first = get().assets[ids[0]];
   const asset = await storeOutput({ blob: await res.blob(), mime: 'video/mp4' }, g, 'video', { width: first?.width ?? 0, height: first?.height ?? 0 });

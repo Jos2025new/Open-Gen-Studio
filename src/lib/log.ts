@@ -1,4 +1,5 @@
 import { safeData } from './debug';
+import { LOCAL_WRITE } from './disk';
 
 /*
  * A line per event that matters, in the app's own data folder (T5): the local dev/preview server appends it to
@@ -18,7 +19,7 @@ export function logEvent(kind: LogKind, data: Record<string, unknown>): void {
       fetch('/x/store/log', {
         method: 'POST',
         body: line,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE },
         keepalive: line.length < 60_000,
         // A local server that stops answering must not hold up every later line.
         signal: AbortSignal.timeout(5000),

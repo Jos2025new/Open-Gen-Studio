@@ -158,6 +158,16 @@ export function localStore(root = process.cwd()) {
 
     if (path === '/ping') return send(200, 'ok');
 
+    // Writes (state, media, log, join, wipe) only from the app itself: they carry X-OGS, which a page on another site
+    // cannot send without a preflight the dev server refuses, and any Origin they carry is this server's own.
+    // A plain cross-site POST (no preflight needed) would otherwise reach /wipe.
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const origin = req.headers.origin;
+      if (req.headers['x-ogs'] !== '1' || (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`)) {
+        return send(403, 'writes only from the app');
+      }
+    }
+
     if (path === '/state') {
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
       if (req.method === 'PUT') {

@@ -6,6 +6,12 @@
 let available: Promise<boolean> | null = null;
 
 /** True when the local store answers. A static host's SPA fallback returns HTML, not "ok", so it counts as absent. */
+/**
+ * Sent with every write to the local server. A page on another site cannot add it without the browser asking the
+ * server first, and the dev server refuses that for other origins: a write from elsewhere never reaches the disk.
+ */
+export const LOCAL_WRITE = { 'X-OGS': '1' } as const;
+
 export function diskAvailable(): Promise<boolean> {
   available ??= fetch('/x/store/ping', { cache: 'no-store' })
     .then(async (r) => r.ok && (await r.text()) === 'ok')
@@ -43,7 +49,7 @@ export const disk = {
   async putState(value: string, base: number): Promise<'ok' | 'conflict' | 'fail'> {
     if (!(await diskAvailable())) return 'fail';
     const body = withBase(value, base);
-    const res = await fetch('/x/store/state', { method: 'PUT', body, headers: { 'Content-Type': 'application/json' } }).catch(() => null);
+    const res = await fetch('/x/store/state', { method: 'PUT', body, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(() => null);
     if (res?.status === 409) return 'conflict';
     if (!res?.ok) return 'fail';
     baseAt = savedAtOf(body);
@@ -66,7 +72,7 @@ export const disk = {
       const body = savedAtOf(latestState) ? withBase(latestState, baseAt) : latestState;
       latestState = null;
       // keepalive lets the last save survive a closing tab (browsers cap it at 64 KB).
-      const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: body.length < 60_000, headers: { 'Content-Type': 'application/json' } }).catch(report('save state'));
+      const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: body.length < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(report('save state'));
       if (res?.status === 409) {
         stale = true;
         onStale?.();
@@ -83,14 +89,14 @@ export const disk = {
   /** Resolves when written (callers that do not need to wait use `void`). */
   async setBlob(key: string, blob: Blob): Promise<void> {
     if (!(await diskAvailable())) return;
-    await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream' } })
+    await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream', ...LOCAL_WRITE } })
       .then(() => undefined)
       .catch(report(`save ${key}`));
   },
 
   delBlobs(keys: string[]): void {
     void diskAvailable().then((ok) => {
-      if (ok) for (const k of keys) fetch(`/x/store/blob/${encodeURIComponent(k)}`, { method: 'DELETE' }).catch(report(`delete ${k}`));
+      if (ok) for (const k of keys) fetch(`/x/store/blob/${encodeURIComponent(k)}`, { method: 'DELETE', headers: LOCAL_WRITE }).catch(report(`delete ${k}`));
     });
   },
 
@@ -102,6 +108,6 @@ export const disk = {
 
   /** Move the disk copy aside (data.bak-<date>) so a wipe does not come back on reload. */
   async wipe(): Promise<void> {
-    if (await diskAvailable()) await fetch('/x/store/wipe', { method: 'POST' }).catch(report('wipe'));
+    if (await diskAvailable()) await fetch('/x/store/wipe', { method: 'POST', headers: LOCAL_WRITE }).catch(report('wipe'));
   },
 };
