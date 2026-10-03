@@ -159,3 +159,17 @@
 .preset { flex-direction: row; align-items: center; gap: 12px; }.preset-glyph { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }.preset-text { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .preset-glyph .aspect-glyph { max-width: none; max-height: none; border-width: 1.5px; }
 .preset-menu-label { display: inline-flex; align-items: center; gap: 8px; }.preset-menu-glyph { width: 18px; display: inline-flex; justify-content: center; }
+/* The layers panel never scrolls sideways: a wide header (several layers picked) used to push every row left. */
+.layers-body { overflow-x: hidden; container-type: inline-size; container-name: layers; }
+.layers-panel .panel-head { min-width: 0; }
+.panel-head-actions { min-width: 0; display: flex; align-items: center; gap: 4px; }
+.layers-picked { display: inline-flex; align-items: center; min-width: 0; overflow: hidden; }
+.layers-picked-n { overflow: hidden; text-overflow: ellipsis; }
+/* Narrow panel: a smaller thumbnail and no type icon, so the name keeps its room; the picked header shortens. */
+@container layers (max-width: 300px) {
+  .layer-select .layer-thumb-wrap { flex: 0 0 44px; width: 44px; height: 28px; }
+  .layer-thumb { width: 44px; height: 28px; }
+  .layer-kind { display: none; }
+  .layer-select { gap: 6px; }
+  .layers-picked-label { display: none; }
+}
