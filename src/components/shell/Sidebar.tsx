@@ -1,17 +1,46 @@
 import { useEffect, useRef } from 'react';
-import { Folder, Images, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
+import { Archive, FolderOpen, House, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
+import { MenuItem } from '../ui/primitives';
+import { Popover, usePopover } from '../ui/Popover';
 
 const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: string }> = [
   { id: 'chat', label: 'Chat', icon: MessageSquare, hint: 'Conversation, questions and results' },
   { id: 'node', label: 'Node', icon: Workflow, hint: 'Connected flows of cards' },
   { id: 'designer', label: 'Designer', icon: PenTool, hint: 'Layers: raster, vector and text' },
 ];
+
+/** Home: one button for the three canvases (Chat, Node, Designer); the one open is marked in its menu. */
+function HomeMenu({ workspace }: { workspace: Workspace }) {
+  const pop = usePopover();
+  const current = WORKSPACES.find((w) => w.id === workspace);
+  return <>
+    <button
+      ref={pop.ref}
+      type="button"
+      className={`side-btn is-active`}
+      data-tip={`Home — ${current?.label ?? ''} canvas · Chat, Node or Designer`}
+      data-tip-side="right"
+      aria-label="Home"
+      aria-haspopup="menu"
+      aria-expanded={pop.open}
+      onClick={pop.toggle}
+    >
+      <House size={18} strokeWidth={1.7} />
+      <span className="side-label">Home</span>
+    </button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={240} label="Canvases">
+      <div className="menu" role="menu">
+        {WORKSPACES.map((w) => <MenuItem key={w.id} icon={w.icon} label={w.label} detail={w.hint} active={w.id === workspace} onClick={() => { setUi({ workspace: w.id }); pop.close(); }} />)}
+      </div>
+    </Popover>
+  </>;
+}
 
 export function Sidebar() {
   const workspace = useStore((s) => s.ui.workspace);
@@ -75,21 +104,7 @@ export function Sidebar() {
           <Plus size={18} strokeWidth={2} />
           <span className="side-label wide-only">New session</span>
         </button>
-        {WORKSPACES.map((w) => (
-          <button
-            key={w.id}
-            type="button"
-            className={`side-btn ${workspace === w.id ? 'is-active' : ''}`}
-            data-tip={`${w.label} — ${w.hint}`}
-            data-tip-side="right"
-            aria-label={w.label}
-            aria-current={workspace === w.id ? 'page' : undefined}
-            onClick={() => setUi({ workspace: w.id })}
-          >
-            <w.icon size={18} strokeWidth={1.7} />
-            <span className="side-label">{w.label}</span>
-          </button>
-        ))}
+        <HomeMenu workspace={workspace} />
       </div>
       <div className="side-sep" />
       <div className="side-group">
@@ -102,20 +117,20 @@ export function Sidebar() {
           aria-expanded={panel === 'sessions'}
           onClick={() => togglePanel('sessions')}
         >
-          <Folder size={18} strokeWidth={1.7} />
+          <FolderOpen size={18} strokeWidth={1.7} />
           <span className="side-label">Sessions</span>
         </button>
         <button
           type="button"
           className={`side-btn ${panel === 'gallery' ? 'is-open' : ''}`}
-          data-tip="Assets — generations and your library"
+          data-tip="Library — your generations, uploads and saved subjects"
           data-tip-side="right"
-          aria-label="Assets"
+          aria-label="Library"
           aria-expanded={panel === 'gallery'}
           onClick={() => togglePanel('gallery')}
         >
-          <Images size={18} strokeWidth={1.7} />
-          <span className="side-label">Assets</span>
+          <Archive size={18} strokeWidth={1.7} />
+          <span className="side-label">Library</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>
       </div>

@@ -21,7 +21,7 @@ export function GalleryPanel() {
   return (
     <div className="gallery">
       <div className="panel-head">
-        <div className="panel-title">Assets</div>
+        <div className="panel-title">Library</div>
         <div className="panel-head-actions">
           <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
@@ -34,7 +34,7 @@ export function GalleryPanel() {
           onChange={setTab}
           options={[
             { value: 'generated', label: 'Generated' },
-            { value: 'library', label: `Library${libraryCount ? ` · ${libraryCount}` : ''}`, tip: 'Saved as @Name, for every session' },
+            { value: 'library', label: `Saved${libraryCount ? ` · ${libraryCount}` : ''}`, tip: 'Saved as @Name, for every session' },
           ]}
         />
       </div>
