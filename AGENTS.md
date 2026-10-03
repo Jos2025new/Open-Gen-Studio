@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Snap solo con icono (2026-10-03)
+- [x] (usuario) El botón Snap de la barra de Edit: imán + flecha, sin texto (el nombre y si está activo van en el tooltip; sigue en lima cuando está activo). `ToolSettings.tsx`. Typecheck; sin navegador.
+
 ## Tarea — la barra de Edit no cambia de ancho (2026-10-03)
 - [x] (usuario: "se mueve de lugar") En modo Layer sin capa elegida, Align y Transform desaparecían y la barra (Snap, Influence…) se desplazaba al alternar Objects/Layer. Ahora siempre están, desactivados con el motivo ("Select a layer first" / "Pick objects…"). `ToolSettings.tsx` (`EditOps`). Typecheck y suite; sin navegador.
 

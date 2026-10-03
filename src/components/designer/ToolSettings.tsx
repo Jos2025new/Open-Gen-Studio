@@ -134,7 +134,7 @@ function SnapControl() {
   const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
   const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });
   return <>
-    <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip="Snap while moving"><Magnet size={13} />Snap<ChevronDown size={12} /></button>
+    <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip={`Snap while moving · ${snap.on ? "on" : "off"}`} aria-label="Snap"><Magnet size={14} /><ChevronDown size={12} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Snap">
       <div className="snap-pop">
         <label className="check-row"><input type="checkbox" checked={snap.on} onChange={(e) => set({ on: e.target.checked })} />Snap while moving</label>
