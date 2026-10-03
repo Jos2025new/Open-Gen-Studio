@@ -60,7 +60,8 @@ export function variantKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'r
     .replace(/([a-z])(\d)/g, '$1 $2')
     .replace(/(\d)([a-z])/g, '$1 $2')
     .split(/[^a-z0-9_]+/)
-    .filter((w) => w && !NOISE.has(w));
+    // The kind's own word repeats what the key already says ("veo3-1-fast-video", "kling-video/…", "video-edit").
+    .filter((w) => w && !NOISE.has(w) && w !== m.kind);
   return `${m.kind}|${[...new Set(words)].sort().join(' ')}`;
 }
 
@@ -111,7 +112,7 @@ export function groupVariants(models: ModelSummary[], order: ProviderId[]): Vari
  * A model line: one model (family + version + tier, e.g. "Nano Banana 2 Lite") and its input routes
  * (text-to-image, edit, reference-to-image; text-to-video, image-to-video, reference-to-video…).
  */
-const ROUTE_WORDS = new Set(['text', 'image', 'images', 'video', 'videos', 'to', 'edit', 'edits', 'reference', 'references', 'ref', 'refs', 'multi', 'extend', 'extended', 'extension', 'omni', 'layered', 'i2i', 't2i', 'i2v', 't2v', 'r2v', 'keyframes', 'keyframe', 'first', 'last', 'frame', 'frames', 'remix']);
+const ROUTE_WORDS = new Set(['text', 'image', 'images', 'video', 'videos', 'to', 'edit', 'edits', 'reference', 'references', 'ref', 'refs', 'multi', 'extend', 'extended', 'extension', 'omni', 'layered', 'i2i', 't2i', 'i2v', 't2v', 'r2v', 'keyframes', 'keyframe', 'first', 'last', 'start', 'end', 'frame', 'frames', 'remix']);
 
 function words(m: Pick<ModelSummary, 'id'>): string[] {
   return m.id
@@ -138,7 +139,7 @@ export function variantRoute(m: Pick<ModelSummary, 'id' | 'kind' | 'needsVideo' 
   const w = new Set(words(m));
   if (m.needsVideo) return 'video';
   if (w.has('reference') || w.has('references') || w.has('multi') || w.has('r2v')) return 'reference';
-  if (m.kind === 'video' && (w.has('image') || w.has('i2v') || w.has('first') || w.has('keyframes'))) return 'image';
+  if (m.kind === 'video' && (w.has('image') || w.has('i2v') || w.has('first') || w.has('start') || w.has('keyframes'))) return 'image';
   if (m.kind !== 'video' && (w.has('edit') || w.has('i2i') || w.has('remix') || (w.has('image') && w.has('to') && !w.has('text')))) return 'edit';
   return 'text';
 }
