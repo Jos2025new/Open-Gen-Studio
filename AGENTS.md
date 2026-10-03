@@ -1,5 +1,10 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — confirmar al quitar de Library; título del grupo de Nodos fuera del marco (2026-10-03)
+- [x] (usuario) Library → Saved: la papelera abre "Remove @Nombre from the library? Its images stay in Generated." con Cancel/Remove (antes borraba al instante). `GalleryPanel.tsx`.
+- [x] (usuario) Grupo de Nodos: título y punto de color salen encima del marco, en una pastilla con fondo y borde (ya no tapan los nodos); título 14 px, punto y muestras de 18 px. `node.css`. Navegador (copia aislada): la cabecera queda por encima del marco.
+- Revisado (sin cambio): "desaparecieron los paneles del Designer" en la sesión `ses_musl4umjdnnj7zh01h` = esa sesión no tiene ningún diseño (`docs: []` en `data/state.json`), así que se ve la pantalla "Start a design"; los paneles salen al crear o importar uno. Solo la sesión "animación para niños" tiene un diseño (32 capas). Sin rastro en el registro de un diseño borrado.
+
 ## Tarea — la casilla de contexto también en vídeo, audio y 3D (2026-10-03)
 - [x] (usuario) `AGENT_ATTACHABLE` (`engine/actions.ts`): imagen, vídeo, audio y 3D se pueden marcar con la casilla (antes solo imágenes). Lo que ve el agente (`attachmentParts`): vídeo como hoja 2×2 (como antes), **3D por su imagen de vista** (`viewImageId`, la que la app renderiza al mover el modelo en el visor; si falta, la miniatura `thumbnailUrl`), audio solo como texto. Tests `agent-attachment-selection` (+1: 3D por su vista, audio sin imagen) y `agent-attach-toggle` ajustado. Suite 497 + 5. Navegador (copia aislada): casilla en 2 vídeos de nodos y en la Library (3D, vídeos, imágenes); marcar el 3D lo pone en la pila del composer. Sin audio en los datos de prueba para verlo.
 

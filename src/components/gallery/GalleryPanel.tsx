@@ -72,6 +72,7 @@ function LibraryAssets() {
 
 function LibraryTile({ item }: { item: Subject }) {
   const cover = item.frontalAssetId ?? item.videoAssetId;
+  const del = usePopover();
   return (
     <div className="g-tile lib-tile">
       <button
@@ -84,8 +85,17 @@ function LibraryTile({ item }: { item: Subject }) {
       </button>
       <span className="lib-name">@{item.name}</span>
       <span className="lib-del">
-        <IconButton icon={Trash} label={`Remove @${item.name} from the library`} size="sm" tone="danger" onClick={() => deleteSubject(item.id)} />
+        <IconButton ref={del.ref} icon={Trash} label={`Remove @${item.name} from the library`} size="sm" tone="danger" active={del.open} onClick={del.toggle} />
       </span>
+      <Popover open={del.open} anchor={del.ref} onClose={del.close} width={280} label={`Remove @${item.name}`}>
+        <div className="confirm">
+          <p>Remove @{item.name} from the library? Its images stay in Generated.</p>
+          <div className="spend-actions">
+            <Button variant="ghost" onClick={del.close}>Cancel</Button>
+            <Button variant="danger" onClick={() => { deleteSubject(item.id); del.close(); }}>Remove</Button>
+          </div>
+        </div>
+      </Popover>
     </div>
   );
 }

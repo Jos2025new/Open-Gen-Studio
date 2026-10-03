@@ -136,12 +136,13 @@
 .react-flow__node-group { background: transparent; border: 0; padding: 0; }
 .group-frame { width: 100%; height: 100%; border: 1.5px dashed color-mix(in srgb, var(--text-2) 55%, transparent); border-radius: 14px; cursor: grab; }
 .group-frame.is-selected { border-color: var(--accent); }
-.group-head { position: absolute; left: 12px; top: 8px; display: flex; align-items: center; gap: 6px; }
-.group-title { font-size: 12px; font-weight: 550; color: var(--text); white-space: nowrap; }
+/* Title and colour sit above the frame, outside it, so they never overlap the nodes inside. */
+.group-head { position: absolute; left: 4px; bottom: calc(100% + 6px); display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 8px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
+.group-title { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
 input.group-title { background: var(--surface-2); border: 1px solid var(--accent); border-radius: 5px; padding: 1px 6px; outline: none; }
-.group-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px dashed var(--text-2); background: transparent; cursor: pointer; }
+.group-dot { width: 18px; height: 18px; border-radius: 50%; border: 1.5px dashed var(--text-2); background: transparent; cursor: pointer; }
 .group-palette { display: flex; gap: 4px; padding: 3px 5px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
-.group-swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border-strong); cursor: pointer; }
+.group-swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border-strong); cursor: pointer; }
 .group-swatch.is-none { background: linear-gradient(135deg, transparent 45%, var(--danger) 45%, var(--danger) 55%, transparent 55%); }
 .group-swatch.is-on { outline: 2px solid var(--text); outline-offset: 1px; }
 
