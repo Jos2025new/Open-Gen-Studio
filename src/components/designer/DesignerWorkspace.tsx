@@ -11,7 +11,7 @@ import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { deleteLayer, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
-import { canRedo, canUndo, subscribeHistory } from '../../engine/design/history';
+import { canRedo, canUndo, record, subscribeHistory } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
@@ -129,9 +129,10 @@ export function DesignerWorkspace() {
       const layer = activeLayer(doc);
       const k = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;
-      if (mod && k === 'z') {
+      if (mod && (k === 'z' || k === 'y')) {
+        // Ctrl+Z undo; Ctrl+Shift+Z and Ctrl+Y redo.
         e.preventDefault();
-        (e.shiftKey ? redoDoc : undoDoc)(session.id, doc.id);
+        (e.shiftKey || k === 'y' ? redoDoc : undoDoc)(session.id, doc.id);
       } else if (!mod && !e.altKey && e.shiftKey && k === 'r') {
         e.preventDefault();
         setUi({ rulers: !useStore.getState().ui.rulers });
@@ -144,6 +145,7 @@ export function DesignerWorkspace() {
       } else if (mod && (k === 'a' || k === 'd' || k === 'j' || (k === 'i' && e.shiftKey))) {
         // Pixel selection: all, deselect, to a new layer, invert.
         e.preventDefault();
+        if (k !== 'j') record(doc);
         if (k === 'a') selectAll(doc);
         else if (k === 'd') setSelection(doc.id, null);
         else if (k === 'i') invertSelection(doc);

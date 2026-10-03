@@ -112,10 +112,12 @@ export interface LiveStroke {
   color: string;
   opacity: number;
   erase: boolean;
+  /** The pixel selection in this layer's pixels: paint and erase land only inside it (as GIMP and Krita do). */
+  clip?: HTMLCanvasElement | null;
 }
 
-export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean): LiveStroke {
-  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase };
+export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null): LiveStroke {
+  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase, clip };
 }
 
 export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number): void {
@@ -125,6 +127,14 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
   const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
   const w = x1 - x, h = y1 - y;
   if (w <= 0 || h <= 0) return;
+  if (live.clip) {
+    // Keep the stroke only where the selection is (soft edges stay soft).
+    const m = ctx2d(live.mask);
+    m.save();
+    m.globalCompositeOperation = 'destination-in';
+    m.drawImage(live.clip, x, y, w, h, x, y, w, h);
+    m.restore();
+  }
   const ctx = ctx2d(buf);
   ctx.save();
   ctx.clearRect(x, y, w, h);

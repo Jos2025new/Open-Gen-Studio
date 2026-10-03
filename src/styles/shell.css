@@ -304,5 +304,5 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .topbar-right { flex-shrink: 1; min-width: 0; }
 .topbar-slot { flex: 1 1 auto; min-width: 0; }
 .topbar-slot > * { flex-shrink: 0; }
-.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 180px; overflow-x: auto; }
+.topbar-slot > .tool-settings { flex-shrink: 1; min-width: 110px; overflow-x: auto; }
 .topbar-right > :not(.topbar-slot) { flex-shrink: 0; }

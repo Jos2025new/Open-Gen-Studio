@@ -89,6 +89,18 @@ export function selectionMask(doc: Pick<DesignDoc, 'width' | 'height'>, sel: Pix
   return out;
 }
 
+/** The current selection in a raster layer's own pixels (for painting), or null when nothing is selected. */
+export function selectionClipFor(doc: DesignDoc, layer: RasterLayer): HTMLCanvasElement | null {
+  const sel = getSelection(doc.id);
+  if (!sel) return null;
+  const out = createCanvas(layer.pxWidth, layer.pxHeight);
+  const c = ctx2d(out);
+  c.setTransform(layer.pxWidth / layer.width, 0, 0, layer.pxHeight / layer.height, (-layer.x * layer.pxWidth) / layer.width, (-layer.y * layer.pxHeight) / layer.height);
+  if (layer.transform) c.transform(...invert(layer.transform));
+  c.drawImage(selectionMask(doc, sel), 0, 0);
+  return out;
+}
+
 /** A mask selection with its bounds and outline (pixels selected next to unselected ones, drawn as dashes). */
 export function maskSelection(mask: HTMLCanvasElement): PixelSelection | null {
   const w = mask.width, h = mask.height;

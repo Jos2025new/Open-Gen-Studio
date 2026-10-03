@@ -1,11 +1,14 @@
 import type { DesignDoc } from '../types';
 import { rasterBufferIds, restoreBuffers, snapshotBuffers } from './raster';
+import { getSelection, setSelection, type PixelSelection } from './pixelSelection';
 
 /* Undo/redo for Designer documents. Raster pixels are captured by reference (copy-on-write buffers). */
 
 interface Snapshot {
   doc: DesignDoc;
   buffers: Map<string, HTMLCanvasElement>;
+  /** The pixel selection then: undo and redo bring it back, as in GIMP and Krita. */
+  sel: PixelSelection | null;
 }
 
 interface Stack {
@@ -28,7 +31,7 @@ function stack(docId: string): Stack {
 
 function capture(doc: DesignDoc): Snapshot {
   const rasterIds = rasterBufferIds(doc.layers.filter((l) => l.type === 'raster'));
-  return { doc, buffers: snapshotBuffers(rasterIds) };
+  return { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id) };
 }
 
 /** Record the state *before* a change. */
@@ -46,6 +49,7 @@ export function undo(current: DesignDoc): DesignDoc | null {
   if (!prev) return null;
   s.future.push(capture(current));
   restoreBuffers(prev.buffers);
+  setSelection(current.id, prev.sel);
   listeners.forEach((l) => l());
   return prev.doc;
 }
@@ -56,6 +60,7 @@ export function redo(current: DesignDoc): DesignDoc | null {
   if (!next) return null;
   s.past.push(capture(current));
   restoreBuffers(next.buffers);
+  setSelection(current.id, next.sel);
   listeners.forEach((l) => l());
   return next.doc;
 }

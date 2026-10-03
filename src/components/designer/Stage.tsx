@@ -23,7 +23,7 @@ import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/desig
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
 import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
-import { combineSelection, getSelection, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
+import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
 import { uid } from '../../lib/id';
 
 interface View {
@@ -631,6 +631,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (selectShape === 'wand') {
         const next = wandSelection(current, p.x, p.y, wand ?? {});
         if (typeof next === 'string') return void toast(next, 'error');
+        record(current);
         combineSelection(current, next, combine);
         return;
       }
@@ -787,7 +788,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const before = getBuffer(target.id)!;
       beginEdit(prepared);
       const stroke: RasterStroke = { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase };
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
+      // With a pixel selection, the stroke lands only inside it.
+      const clip = selectionClipFor(current, prepared);
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
       paintSegment(target, p, p);
       return;
     }
@@ -1092,9 +1095,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
     if (d.kind === 'paint') {
       flushPaintFrame();
-      if (!d.erase) setObjectPick(doc.id, { layerId: d.layerId, ids: [d.stroke.id] });
       commitEdit(d.layerId);
-      setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintStrokes: [...(l.paintStrokes ?? []), d.stroke] } : l)) }));
+      if (d.live.clip) {
+        // A stroke cut by a selection cannot be replayed as a free stroke: the layer keeps it as pixels.
+        setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintBaseId: undefined, paintStrokes: undefined } : l)) }));
+      } else {
+        if (!d.erase) setObjectPick(doc.id, { layerId: d.layerId, ids: [d.stroke.id] });
+        setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintStrokes: [...(l.paintStrokes ?? []), d.stroke] } : l)) }));
+      }
     }
     if (d.kind === 'stroke') {
       if (liveRaf.current != null) cancelAnimationFrame(liveRaf.current);
@@ -1135,6 +1143,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // A click without a drag clears the selection.
       const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
       const tiny = !pts.length || (Math.max(...xs) - Math.min(...xs)) * view.zoom < 3 || (Math.max(...ys) - Math.min(...ys)) * view.zoom < 3;
+      // A selection change is an undo step of its own (as in GIMP and Krita), unless nothing changes.
+      if (!(tiny && (d.combine !== 'replace' || !getSelection(doc.id)))) record(getDoc(sessionId, doc.id) ?? doc);
       if (d.combine === 'replace') setSelection(doc.id, tiny ? null : { points: pts });
       else if (!tiny) combineSelection(doc, { points: pts }, d.combine);
       return;

@@ -5,6 +5,7 @@ import { insertLayer, newRasterLayer } from './doc';
 import { drawDoc } from './render';
 import { getBuffer, setBuffer } from './raster';
 import { record } from './history';
+import { getSelection, selectionMask } from './pixelSelection';
 
 /** Sample visible colors, keeping the fill separate from the source artwork. */
 export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: number, color: string, opacity: number, options: { threshold?: number; expand?: number; smooth?: number } = {}): void {
@@ -38,6 +39,13 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
     ctx.globalCompositeOperation = 'source-in';
     ctx.fillStyle = color;
     ctx.fillRect(0, 0, w, h);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+  // With a pixel selection, the fill stays inside it.
+  const sel = getSelection(doc.id);
+  if (sel) {
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(selectionMask(doc, sel), 0, 0);
     ctx.globalCompositeOperation = 'source-over';
   }
   const layer = { ...newRasterLayer('Fill', { x: 0, y: 0, width: doc.width, height: doc.height }, { width: w, height: h }), opacity };

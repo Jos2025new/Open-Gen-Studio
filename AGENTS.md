@@ -1,5 +1,10 @@
 # AGENTS.md — Open Gen Studio
 
+## Fallo — la selección no protegía al pintar ni volvía con deshacer (2026-10-03)
+- [x] (usuario: "borré lo que no estaba seleccionado; con Ctrl no volvió la selección"; referencia GIMP/Krita) Pincel y goma solo pintan dentro de la selección (rectángulo, lazo o varita): el trazo en curso se recorta con la selección en los píxeles de la capa (`LiveStroke.clip`, `selectionClipFor`); un trazo recortado queda como píxeles de la capa (no se puede reproducir como trazo libre). El cubo también se queda dentro. El historial guarda la selección en cada paso (`Snapshot.sel`): deshacer y rehacer la devuelven, y cambiar la selección (rectángulo, lazo, varita, All, Invert, Deselect, Ctrl+A/D/Shift+I) es un paso de deshacer propio. Ctrl+Y rehace (además de Ctrl+Shift+Z).
+- [x] Barra superior a 1024 px: Export se montaba sobre Connected (las opciones pedían 180 px); mínimo a 110 px, sin desborde.
+Navegador (copia aislada): capa roja, selección mitad izquierda, goma de lado a lado → alfa 0 dentro y 255 fuera; Ctrl+Z devuelve los píxeles y la selección; Ctrl+Y rehace; Ctrl+D y Ctrl+Z devuelven la selección. Suite 500 + 5.
+
 ## Tarea — la barra superior no se solapa con zoom alto (2026-10-03)
 - [x] (usuario, 175 %) Con más zoom las opciones de la herramienta se quedaban en 0 px (solo la raya). Ahora el título se acorta (mín. 140 px para "Designer / …") y las opciones conservan al menos 180 px, desplazables. Navegador (copia aislada, 1097 px ≈ 175 % de 1920, goma activa): título truncado hasta 350 px, opciones visibles (Size, Opacity) de 362 a 627, sin desbordar.
 - [x] (usuario, 133 %) La parte derecha de la barra no encogía (`flex-shrink: 0`) y se metía sobre "Designer / título". Ahora encoge: cede la barra de opciones de la herramienta (se desplaza en horizontal); botones, Export, Connected, Generations y el título (≤ 40 %) conservan su tamaño. Solo CSS (`shell.css`). Navegador (copia aislada, 1024 px con el pincel): título termina en 442 px y la derecha empieza en 448, sin desbordar.
