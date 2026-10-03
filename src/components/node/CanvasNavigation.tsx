@@ -113,7 +113,9 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
         <IconButton ref={undoPop.ref} icon={Undo2} label="Undo · right-click for history" disabled={blocked || !past.length} onClick={() => travel('undo')} onContextMenu={e => showHistory(e, 'undo')} />
         <IconButton ref={redoPop.ref} icon={Redo2} label="Redo · right-click for history" disabled={blocked || !future.length} onClick={() => travel('redo')} onContextMenu={e => showHistory(e, 'redo')} />
         <span className="canvas-nav-sep" />
+        <IconButton icon={Minus} label="Zoom out" onClick={() => void rf.zoomOut({ duration: 150 })} />
         <button ref={zoomPop.ref} type="button" className="canvas-zoom num" aria-label="Zoom" aria-expanded={zoomPop.open} onClick={zoomPop.toggle}>{Math.round(zoom * 100)}%</button>
+        <IconButton icon={Plus} label="Zoom in" onClick={() => void rf.zoomIn({ duration: 150 })} />
         <span className="canvas-nav-sep" />
         <IconButton ref={searchPop.ref} icon={Search} label="Search canvas" active={searchPop.open} onClick={searchPop.toggle} />
       </Panel>

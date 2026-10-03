@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Nodos: − y + a los lados del zoom (2026-10-03)
+- [x] (usuario) En el panel de navegación, botón − (alejar) a la izquierda del porcentaje y + (acercar) a la derecha; el porcentaje sigue abriendo su menú. `CanvasNavigation.tsx`. Typecheck; sin navegador (mismas acciones que ya usaba el menú).
+
 ## Tarea — Nodos: moverse por defecto, scroll que desplaza, doble clic sostenido = caja (2026-10-03)
 - [x] (usuario) Por defecto (herramienta Pan, clave nueva `ogs.nodeTool.v2` para que todos empiecen así): arrastrar mueve el lienzo; rueda y touchpad desplazan en x/y (`panOnScroll`; el zoom queda en Ctrl+rueda, pellizco y los botones); doble clic y mantener sobre el lienzo vacío dibuja una caja que selecciona los nodos que toca (parcial, como Select; Shift/Ctrl suma). Doble clic ya no hace zoom. La herramienta Select sigue con caja al arrastrar. `NodeWorkspace.tsx` (caja propia en captura; también se bloquea el mousedown de d3 durante la caja), `CanvasNavigation.tsx` (textos), `node.css`. Navegador (copia aislada): arrastre mueve, rueda vertical y horizontal desplazan sin cambiar la escala, doble pulsación + arrastre muestra la caja, no mueve el lienzo y deja "Operations · 2". Suite 496 + 5. Sin test nuevo (interacción del navegador).
 
