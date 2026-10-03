@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Ctrl mantiene las proporciones al escalar, como Inkscape (2026-10-03)
+- [x] (usuario) Con los tiradores de escala, Ctrl (o Cmd, o Shift como antes) mantiene la proporción: en una esquina, ancho y alto juntos; en un lateral, escala los dos ejes desde el centro del lado opuesto. Al girar/inclinar, Ctrl también da pasos de 15°. Textos de ayuda del lienzo actualizados. `Stage.tsx` (`xformMatrix`). Typecheck y suite; sin navegador.
+
 ## Tarea — tarjeta de ajustes sin solapes en panel estrecho (2026-10-03)
 - [x] (usuario, captura: Conversación del Designer) Fila de modelo: nombre y precio en una línea (precio sin cortar), proveedor debajo; pie con el texto y Continue que pasan de línea en vez de apretarse; la tarjeta no desborda en horizontal. Solo CSS (`chat.css`). Sin navegador.
 

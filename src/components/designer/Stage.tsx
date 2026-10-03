@@ -873,9 +873,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.op === 'scale') {
       // The opposite side or corner stays put.
       const ax = box.x + box.w / 2 - (h.fx * box.w) / 2, ay = box.y + box.h / 2 - (h.fy * box.h) / 2;
-      let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
-      if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
       const clamp = (v: number) => (Math.abs(v) < 0.01 ? Math.sign(v || 1) * 0.01 : v);
+      let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
+      // Ctrl or Shift (as Inkscape's Ctrl): width and height keep their ratio. A side handle then scales both axes,
+      // about the opposite side's middle.
+      if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
+      else if (shift && h.fx) return scaleAbout(clamp(sx), clamp(Math.abs(sx)), ax, box.y + box.h / 2);
+      else if (shift && h.fy) return scaleAbout(clamp(Math.abs(sy)), clamp(sy), box.x + box.w / 2, ay);
       return scaleAbout(clamp(sx), clamp(sy), ax, ay);
     }
     if (d.op === 'rotate') {
@@ -939,7 +943,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         q = { x: gx ?? p.x, y: gy ?? p.y };
         showGuides({ x: gx, y: gy });
       }
-      xformAt.current = { d, m: xformMatrix(d, q, e.shiftKey) };
+      xformAt.current = { d, m: xformMatrix(d, q, e.shiftKey || e.ctrlKey || e.metaKey) };
       xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
     } else if (d.kind === 'objMove') {
       if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
@@ -1274,7 +1278,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         />
       ) : null}
       {tool === 'move' && selectedCurve ? <div className="stage-hint">Drag points to edit · Click away to move again</div> : tool === 'lineart' && lineartMode === 'edit' ? <div className="stage-hint">Select a stroke · Drag its points · Influence controls the bend</div> : null}
-      {tool === 'move' && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Shift: 15° steps) · move the center · click again to resize'}</div>
+      {tool === 'move' && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? <div className="stage-hint subtle">{handleMode === 'scale' ? 'Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate' : 'Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize'}</div>
         : tool === 'move' && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <div className="stage-hint subtle">Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</div> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
