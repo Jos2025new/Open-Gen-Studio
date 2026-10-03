@@ -51,9 +51,9 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { resumePlan, sendAgentMessage } from '../src/engine/agent/runtime';
+import { resumePlan, sendAgentMessage, confirmSettings } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
-import type { PlanFeedItem } from '../src/engine/types';
+import type { PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
@@ -95,10 +95,18 @@ const ugcPlan = {
   },
 };
 
+// Phase 2 as in real use: the agent asks for the settings, the user confirms the recommended ones, then the plan.
+async function sendWithSettings(text: string) {
+  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }, { kind: 'video', start_image: true, model: 'local::studio-video' }] } }];
+  await sendAgentMessage(text);
+  const card = useStore.getState().sessions[sid()].feed.find((f): f is SettingsFeedItem => f.type === 'settings')!;
+  replies = [ugcPlan];
+  await confirmSettings(sid(), card.id, card.sections.map((x) => x.recommended));
+}
+
 describe('recovering a failed plan', () => {
   it('Retry failed runs the failed key frame again in its own card, then the clip that waited for it', async () => {
-    replies = [ugcPlan];
-    await sendAgentMessage('Quiero un anuncio UGC de este vestido');
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     expect(planItem().stepStates).toMatchObject({ s1: 'error', s2: 'skipped' });
     const s1Gen = planItem().stepGenerations.s1;
@@ -114,8 +122,7 @@ describe('recovering a failed plan', () => {
   });
 
   it('Check status without a job id says why instead of running anything', async () => {
-    replies = [ugcPlan];
-    await sendAgentMessage('Quiero un anuncio UGC de este vestido');
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     const msg = await resumePlan(sid(), planItem().id, 'check');
     expect(msg).toMatch(/no job id/);
@@ -124,8 +131,7 @@ describe('recovering a failed plan', () => {
   });
 
   it('Check status asks the provider about a job it received and then runs the clip', async () => {
-    replies = [ugcPlan];
-    await sendAgentMessage('Quiero un anuncio UGC de este vestido');
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     const genId = planItem().stepGenerations.s1;
     // The provider had given a job id before the connection dropped.
@@ -136,8 +142,7 @@ describe('recovering a failed plan', () => {
   });
 
   it('the agent retries when the user asks ("reinténtalo")', async () => {
-    replies = [ugcPlan];
-    await sendAgentMessage('Quiero un anuncio UGC de este vestido');
+    await sendWithSettings('Quiero un anuncio UGC de este vestido');
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     replies = [{ name: 'recover_plan', args: { action: 'retry' } }, 'Listo, lo reintento.'];
     await sendAgentMessage('reinténtalo');

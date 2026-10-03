@@ -139,7 +139,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'confirm_settings',
       description:
-        'Phase 2, before writing any prompt: show the user one settings card for the plan you will propose NOW — only the kinds of steps it has (a sheet or product image stage → image only; the clips stage → video; a key frame + clip plan → both, images first). For each kind the app shows the recommended model with a few others, and its resolution, duration (video) and aspect, preselected. The user confirms or changes them; you get back the confirmed values and each model\'s prompting guide, then write the plan for exactly that. Also for a single image (the user picks how many). Not for operations on an existing result, not on the node canvas. A later stage of the same piece calls it again for its own kinds. Settings stay confirmed for the follow-ups of the same work.',
+        'Phase 2, before writing any prompt: show the user one settings card for the plan you will propose NOW — only the kinds of steps it has (a sheet or product image stage → image only; the clips stage → video; a key frame + clip plan → both, images first). For each kind the app shows the recommended model with a few others, and its resolution, duration (video) and aspect, preselected. The user confirms or changes them; you get back the confirmed values and each model\'s prompting guide, then write the plan for exactly that. Also for a single image (the user picks how many). Not for operations on an existing result, not on the node canvas. Settings hold for this request and its plan revisions; each new request calls it again.',
       parameters: {
         type: 'object',
         properties: {

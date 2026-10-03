@@ -243,7 +243,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   // A fresh request.
   if (pending) resolvePendingAsSuperseded(sessionId);
-  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments } });
+  // Confirmed settings belong to one request (its plan and its revisions): a new request shows the card again,
+  // so old values (a sheet's 16:9 ×2) never silently apply to new work.
+  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settings: undefined });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;

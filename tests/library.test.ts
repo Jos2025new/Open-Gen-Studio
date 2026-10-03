@@ -56,7 +56,7 @@ describe('references first in plans', () => {
   it('rejects an @Name that is neither in the library nor saved by the plan; reference syntax passes', async () => {
     const bad = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: '@Ghost in the rain, like @Image1' }] }, ctx(), 'p');
     expect(bad.errors.join()).toMatch(/@Ghost is not in the library/);
-    expect(bad.errors.join()).not.toMatch(/@Image1/);
+    expect(bad.errors.filter((e) => !e.includes('cites')).join()).not.toMatch(/@Image1/);
     const ok = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: '@Ghost in the rain, mail me@example.com' }] }, ctx(['ghost']), 'p');
     expect(ok.errors).toEqual([]);
   });

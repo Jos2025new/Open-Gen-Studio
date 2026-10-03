@@ -657,6 +657,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
         const prompt = (s.prompt ?? '').trim();
+        // A prompt that cites an image the step does not carry would make something new (another person, another
+        // product): the reference was forgotten, not dropped on purpose.
+        const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
+        if (cited && !refs.length && !s.first_frame && !s.last_frame) errors.push(`${where}: the prompt cites "${cited}" but the step has no refs, so the model would invent it. Fix: put that image in refs (asset:<id> or a step id), or drop the citation if the step is really made from text.`);
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required. Fix: write "prompt" (what happens and how it looks).`);
         if (schema.slots.promptMax && prompt.length > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${prompt.length}). Shorten it. [PROMPT_TOO_LONG]`);
         if (kind === 'model3d') {

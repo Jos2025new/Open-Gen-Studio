@@ -90,6 +90,17 @@ describe('candidates that differ', () => {
   });
 });
 
+describe('a cited image the step does not carry', () => {
+  it('is sent back: the reference was forgotten (a text-to-image step would invent a new person)', async () => {
+    const { errors } = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'Using image 1 as the character reference, she sits on a sofa' }] }, base, 'p');
+    expect(errors.join(' ')).toMatch(/cites "image 1" but the step has no refs/);
+    const ok = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'a girl on a sofa, image 1 of a series' }] }, base, 'p');
+    expect(ok.errors.join(' ')).toMatch(/cites/);
+    const text = await normalizePlan({ steps: [{ id: 's1', kind: 'image', prompt: 'a girl on a sofa' }] }, base, 'p');
+    expect(text.errors).toEqual([]);
+  });
+});
+
 describe('candidates end a plan', () => {
   it('a step that uses candidates the user has not picked is sent back (front ×2 → angle views)', async () => {
     const steps = [
