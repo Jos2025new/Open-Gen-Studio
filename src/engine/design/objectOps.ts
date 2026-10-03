@@ -2,6 +2,7 @@ import type { DesignDoc, Layer, RasterLayer, VectorLayer } from '../types';
 import { setDoc, toast, useStore } from '../../store/store';
 import { record } from './history';
 import { shapeBox } from './doc';
+import { looksUnchanged, noChangeNote } from './symmetry';
 import { strokeBox, translateStroke } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
 import { composeRaster } from './raster';
@@ -156,7 +157,10 @@ function picked(sessionId: string, docId: string, layerId: string): Layer | null
 
 export function turnPickedObjects(sessionId: string, docId: string, layerId: string, ids: string[], turn: Turn): void {
   const l = picked(sessionId, docId, layerId);
-  if (l) commitObjects(sessionId, docId, turnObjects(l, ids, turn));
+  if (!l) return;
+  const next = turnObjects(l, ids, turn);
+  commitObjects(sessionId, docId, next);
+  if (looksUnchanged(l, next, ids)) toast(noChangeNote(ids.length === 1 && l.type === 'vector' ? l.name : 'the selection', turn), 'info', 5000);
 }
 
 function moveEach(layer: Layer, deltas: Map<string, { dx: number; dy: number }>): Layer {

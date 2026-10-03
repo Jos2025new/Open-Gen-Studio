@@ -1,4 +1,5 @@
 import { mapPathShape } from './path';
+import { looksUnchanged, noChangeNote } from './symmetry';
 import type { DesignDoc, Layer, VectorLayer, VectorShape } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc, toast, useStore } from '../../store/store';
@@ -113,7 +114,11 @@ export function turnLayer(sessionId: string, docId: string, layerId: string, tur
   if (problem) return void toast(problem, 'error');
   record(doc);
   if (layer.type === 'raster') turnRaster(sessionId, docId, layer, turn);
-  else if (layer.type === 'vector') setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === layerId && l.type === 'vector' ? turnVector(l, turn) : l)) }));
+  else if (layer.type === 'vector') {
+    const next = turnVector(layer, turn);
+    setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === layerId ? next : l)) }));
+    if (looksUnchanged(layer, next)) toast(noChangeNote(layer.name, turn), 'info', 5000);
+  }
 }
 
 export function alignLayer(sessionId: string, docId: string, layerId: string, to: AlignTo): void {
@@ -228,4 +233,6 @@ export function turnLayers(sessionId: string, docId: string, ids: string[], turn
     if (l.type === 'raster') turnRaster(sessionId, docId, docOf(sessionId, docId)!.layers.find((x) => x.id === l.id) as Extract<Layer, { type: 'raster' }>, turn);
     else if (l.type === 'vector') setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((x) => (x.id === l.id && x.type === 'vector' ? turnVector(x, turn) : x)) }));
   }
+  const still = layers.filter((l) => l.type === 'vector' && looksUnchanged(l, turnVector(l as VectorLayer, turn)));
+  if (still.length === layers.length && still.length) toast(noChangeNote(still.length === 1 ? still[0].name : 'the picked layers', turn), 'info', 5000);
 }
