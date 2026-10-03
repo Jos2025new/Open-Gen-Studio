@@ -49,6 +49,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Ctrl+A / Ctrl+D', action: 'Select all pixels / deselect' },
         { keys: 'Ctrl+Shift+I', action: 'Invert the selection' },
         { keys: 'Ctrl+J', action: 'Selected pixels to a new layer' },
+        { keys: 'Ctrl+G', action: 'Group the selected layers' },
         { keys: 'Delete (with a selection)', action: 'Erase the selected pixels' },
         { keys: 'Mod + Z', action: 'Undo' },
         { keys: 'Mod + Shift + Z', action: 'Redo' },

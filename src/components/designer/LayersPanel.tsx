@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { restyleStrokes } from '../../engine/design/strokes';
@@ -14,6 +14,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast } from '../../store/store';
+import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -58,6 +59,24 @@ function LayerName({ name, onRename }: { name: string; onRename: (n: string) => 
   return <span className="layer-name" title="Double-click to rename" onDoubleClick={(e) => { e.stopPropagation(); setDraft(name); }}>{name}</span>;
 }
 
+/** A folder's header: collapse, name (double-click to rename), its layers' eye and lock, and ungroup. */
+function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc: DesignDoc; group: NonNullable<DesignDoc['groups']>[number]; onSelect: () => void }) {
+  const members = groupMembers(doc, group.id);
+  const visible = members.some((l) => l.visible);
+  const locked = members.every((l) => l.locked);
+  return <div className={`layer-row layer-group-row ${visible ? '' : 'is-hidden'} ${locked ? 'is-locked' : ''}`}>
+    <IconButton className="layer-toggle" icon={group.collapsed ? ChevronRight : ChevronDown} label={group.collapsed ? 'Expand folder' : 'Collapse folder'} size="sm" onClick={() => patchGroup(sessionId, doc.id, group.id, { collapsed: !group.collapsed }, false)} />
+    <button className="layer-select" onClick={onSelect} title="Click to select every layer in the folder (Edit moves them together)">
+      <Folder size={14} className="layer-group-icon" />
+      <LayerName name={group.name} onRename={(name) => patchGroup(sessionId, doc.id, group.id, { name })} />
+      <span className="faint num">{members.length}</span>
+    </button>
+    <IconButton className="layer-toggle" icon={FolderOutput} label={`Ungroup ${group.name}`} size="sm" onClick={() => ungroup(sessionId, doc.id, group.id)} />
+    <IconButton className={`layer-toggle ${visible ? '' : 'is-on'}`} icon={visible ? Eye : EyeOff} label={`${visible ? 'Hide' : 'Show'} ${group.name}`} size="sm" onClick={() => setGroupFlag(sessionId, doc.id, group.id, 'visible', !visible)} />
+    <IconButton className={`layer-toggle ${locked ? 'is-on' : ''}`} icon={locked ? Lock : Unlock} label={`${locked ? 'Unlock' : 'Lock'} ${group.name}`} size="sm" onClick={() => setGroupFlag(sessionId, doc.id, group.id, 'locked', !locked)} />
+  </div>;
+}
+
 export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const layer = activeLayer(doc);
   const pop = usePopover();
@@ -71,6 +90,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   // Several layers picked with Ctrl/Shift-click (Edit's Align and Transform act on all of them).
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  const groups = liveGroups(doc);
   // Drag to reorder: press and move a row; a line shows where it lands. Locked layers stay put.
   const rows = useRef<Array<HTMLDivElement | null>>([]);
   const [drag, setDrag] = useState<{ id: string; from: number; y: number; active: boolean; slot: number; locked?: boolean } | null>(null);
@@ -107,15 +127,20 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onDoubleClick={() => setWidth(260)} />
     <div className="layers-body">
     <Section title="Layers" open={sections.layers} onToggle={() => setSections({ ...sections, layers: !sections.layers })}
-      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num">{picked.length} selected<button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
+      extra={<div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num">{picked.length} selected<button type="button" onClick={() => groupLayers(sessionId, doc.id, picked)} data-tip="Ctrl+G · put the selected layers in a folder"><FolderInput size={12} /> Group</button><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>}>
     <div className="layer-add">
       <Button size="sm" icon={Image} onClick={() => addEmptyLayer(sessionId, doc.id, 'raster')}>Raster</Button>
       <Button size="sm" icon={Shapes} onClick={() => addEmptyLayer(sessionId, doc.id, 'vector')}>Vector</Button>
       <Button size="sm" icon={Type} onClick={() => addEmptyLayer(sessionId, doc.id, 'text')}>Text</Button>
     </div>
     <div className="layer-list">
-      {[...doc.layers].reverse().map((l, d) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes; return <div key={l.id} ref={(el) => { rows.current[d] = el; }}
-        className={`layer-row ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${picked.length > 1 && picked.includes(l.id) ? 'is-picked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
+      {[...doc.layers].reverse().map((l, d, shown) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes;
+        // A folder's header sits above its topmost layer; a collapsed folder hides its layers' rows.
+        const group = l.groupId ? groups.find((g) => g.id === l.groupId) : undefined;
+        const header = group && shown.findIndex((x) => x.groupId === group.id) === d ? <GroupRow key={`g:${group.id}`} sessionId={sessionId} doc={doc} group={group} onSelect={() => { const top = selectGroup(doc, group.id); if (top) setActiveLayer(sessionId, doc.id, top); }} /> : null;
+        if (group?.collapsed) { rows.current[d] = null; return header; }
+        return <Fragment key={l.id}>{header}<div ref={(el) => { rows.current[d] = el; }}
+        className={`layer-row ${group ? 'in-group' : ''} ${layer?.id === l.id ? 'is-active' : ''} ${l.visible ? '' : 'is-hidden'} ${l.locked ? 'is-locked' : ''} ${picked.length > 1 && picked.includes(l.id) ? 'is-picked' : ''} ${drag?.active && drag.id === l.id ? 'is-dragging' : ''} ${drag?.active && drag.slot === d ? 'drop-before' : ''} ${drag?.active && drag.slot === doc.layers.length && d === doc.layers.length - 1 ? 'drop-after' : ''}`}
         onPointerDown={(e) => { if (e.button !== 0 || (e.target as HTMLElement).closest('input, .layer-toggle')) return; setDrag({ id: l.id, from: d, y: e.clientY, active: false, slot: d, locked: l.locked }); }}
         onPointerMove={(e) => {
           if (!drag || drag.id !== l.id) return;
@@ -135,7 +160,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         <span className="layer-kind" data-tip={`${l.type} layer`} aria-label={`${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
-      </div>; })}
+      </div></Fragment>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     {layer && <div className="layer-actions">

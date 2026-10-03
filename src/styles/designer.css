@@ -151,3 +151,7 @@
 .anchor-grid button { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface-2); padding: 0; cursor: pointer; }
 .anchor-grid button.is-on { background: var(--accent); border-color: var(--accent); }
 .opt-hint { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.layer-row.in-group { padding-left: 14px; }
+.layer-group-row .layer-select { gap: 6px; }
+.layer-group-icon { color: var(--text-3); flex-shrink: 0; }
+.layers-picked button { display: inline-flex; align-items: center; gap: 3px; }

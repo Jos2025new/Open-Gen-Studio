@@ -6,7 +6,7 @@ Elegidas por el usuario. Una fase por commit; reutilizar render (`drawDoc`), buf
 - [x] D2. Tamaño del lienzo: ancho/alto con ancla y "Recortar al contenido". *Por qué:* el documento queda fijo al crearlo.
 - [x] D3. Selección de píxeles (rectángulo y lazo): borrar, copiar, cortar, rellenar, copiar a capa nueva, invertir, Ctrl+A/Ctrl+D. Las ediciones aplanan la capa raster (como girar). *Por qué:* editar una zona sin Sketch.
 - [x] D4. Degradado al estilo SAI 2: herramienta (lineal/radial, color→fondo o color→transparente, invertir) en capa nueva, recortado a la selección si la hay.
-- [ ] D5. Grupos de capas: carpetas con nombre; el ojo y el candado del grupo actúan sobre sus capas; clic en el grupo selecciona sus capas (se mueven juntas).
+- [x] D5. Grupos de capas: carpetas con nombre; el ojo y el candado del grupo actúan sobre sus capas; clic en el grupo selecciona sus capas (se mueven juntas).
 - [ ] D6. Reglas y guías: reglas arriba/izquierda, arrastrar desde ellas crea una guía (por documento), arrastrarla fuera la borra; el imán se pega a las guías.
 
 ## Tarea — Designer más fluido (2026-10-03) · punto de retorno: `d7ab6a5`

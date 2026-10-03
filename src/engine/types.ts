@@ -760,6 +760,8 @@ export type BlendMode =
 interface LayerBase {
   id: string;
   name: string;
+  /** The folder this layer belongs to (DesignDoc.groups), if any. */
+  groupId?: string;
   visible: boolean;
   locked: boolean;
   opacity: number;
@@ -852,6 +854,12 @@ export interface TextLayer extends LayerBase, TextStyle {
 
 export type Layer = RasterLayer | VectorLayer | TextLayer;
 
+export interface LayerGroup {
+  id: string;
+  name: string;
+  collapsed?: boolean;
+}
+
 export interface DesignDoc {
   id: string;
   name: string;
@@ -859,6 +867,8 @@ export interface DesignDoc {
   height: number;
   background: string | null;
   layers: Layer[];
+  /** Layer folders: a name for a run of layers that hide, lock, select and move together. */
+  groups?: LayerGroup[];
   activeLayerId: string | null;
   createdAt: number;
   updatedAt: number;

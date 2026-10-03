@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { CanvasSize } from './CanvasSize';
+import { groupLayers } from '../../engine/design/groups';
+import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
@@ -129,6 +131,12 @@ export function DesignerWorkspace() {
       if (mod && k === 'z') {
         e.preventDefault();
         (e.shiftKey ? redoDoc : undoDoc)(session.id, doc.id);
+      } else if (mod && k === 'g') {
+        // Ctrl+G: the selected layers into a folder.
+        e.preventDefault();
+        const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+        if (ids.length < 2) toast('Select two or more layers (Ctrl or Shift-click) to group them.', 'info');
+        else groupLayers(session.id, doc.id, ids);
       } else if (mod && (k === 'a' || k === 'd' || k === 'j' || (k === 'i' && e.shiftKey))) {
         // Pixel selection: all, deselect, to a new layer, invert.
         e.preventDefault();
