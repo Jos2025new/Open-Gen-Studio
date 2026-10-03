@@ -7,3 +7,7 @@ dist/
 # Local disk copy of app state and media (contains API keys)
 data/
 data.bak-*/
+
+# Local tool output (architecture diagrams, tool ids)
+.archify/
+.freebuff/
