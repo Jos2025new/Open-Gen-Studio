@@ -522,6 +522,19 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     strokeSegment(ctx, { x: segment[0], y: segment[1] }, { x: segment[2], y: segment[3] }, { width: segment[4], color: d.stroke.color, opacity: d.stroke.opacity, erase });
   };
 
+  const rasterMoveAt = useRef<{ d: Extract<Drag, { kind: 'rasterMove' }>; x: number; y: number } | null>(null);
+  const rasterMoveFrame = useRef<number | null>(null);
+  const applyRasterMove = () => {
+    if (rasterMoveFrame.current != null) cancelAnimationFrame(rasterMoveFrame.current);
+    rasterMoveFrame.current = null;
+    const at = rasterMoveAt.current;
+    rasterMoveAt.current = null;
+    if (!at) return;
+    const { d } = at;
+    const moved = d.strokeIds.reduce((l, id) => moveRasterStroke(l, id, at.x - d.startX, at.y - d.startY), d.base);
+    if (composeRaster(moved, false)) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
+  };
+
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e.clientX, e.clientY);
     if (tool === 'brush' || tool === 'eraser') setCursor(p);
@@ -530,8 +543,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
     } else if (d.kind === 'rasterMove') {
-      const moved = d.strokeIds.reduce((l, id) => moveRasterStroke(l, id, p.x - d.startX, p.y - d.startY), d.base);
-      if (composeRaster(moved, false)) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
+      // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
+      // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
+      rasterMoveAt.current = { d, x: p.x, y: p.y };
+      rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
     } else if (d.kind === 'move') {
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
@@ -610,6 +625,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.kind === 'move' || d.kind === 'scale') rebasePaintLayer(sessionId, doc.id, d.layerId);
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     if (d.kind === 'rasterMove') {
+      applyRasterMove();
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }

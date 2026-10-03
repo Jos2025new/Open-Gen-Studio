@@ -1,5 +1,11 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — Designer más fluido (2026-10-03) · punto de retorno: `d7ab6a5`
+- [x] Damero: una baldosa de 24 px con `createPattern` anclada a la página (antes un `fillRect` por celda: ~230 k a 400 % en 2048 px). Mismo tamaño, tonos y fase.
+- [x] Anillo del pincel como elemento DOM sobre el canvas; `cursor` sale de las dependencias del dibujo (mover el puntero ya no redibuja el documento).
+- [x] Mover trazos raster: como mucho una composición por frame (`requestAnimationFrame`); al soltar se aplica siempre la última posición antes de cerrar el paso de deshacer.
+Typecheck y suite verdes. **Sin navegador:** comprobar el damero con zoom, el anillo (posición y tamaño) y el arrastre de trazos.
+
 ## Tarea — frontera del servidor local (auditoría GPT 6 Astra, contrastada, 2026-10-03) · rama `better-worflows-xyz765` · punto de retorno: `478b767`
 Aplicados por orden de gravedad real (el usuario eligió 1–3, 5 y 6; omitidos 4 enlaces firmados en debug, 7 límites de recursos, 8 autenticación local). Vite 8 ya escucha solo en localhost, rechaza Host ajenos y no deja leer respuestas a otros orígenes: el riesgo real era **enviar**, no leer.
 - [x] 1. Escrituras solo desde la app: `X-OGS: 1` y Origin propio en todo lo que no es GET/HEAD (`local-store.js`; cliente con `LOCAL_WRITE` en `disk.ts`, `log.ts`, `jobs.ts`). *Por qué:* un POST simple desde cualquier web llegaba a `/wipe` (204 sin el arreglo).
