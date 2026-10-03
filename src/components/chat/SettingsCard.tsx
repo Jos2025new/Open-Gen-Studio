@@ -21,9 +21,10 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   const [moreOpen, setMoreOpen] = useState(choice.modelRef !== item.recommended.modelRef);
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
   const provider = (ref: string) => ref.split('::')[0];
+  // Indicative: one clip or image with the values above. The exact cost comes on the plan card, once the prompts exist.
   const price = (c: SettingsChoice) => {
-    const e = choiceEstimate(c, item.kind, item.count);
-    return e.usd == null ? 'price unknown' : formatUsd(e.usd, { approx: e.approximate });
+    const e = choiceEstimate(c, item.kind, 1);
+    return e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
   };
 
   if (item.status !== 'pending') {
@@ -152,10 +153,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       </div>
 
       <footer className="q-foot">
-        <span className="set-total">
-          Estimated cost: <strong className="num">{price(choice)}</strong>
-          {item.count > 1 ? <span className="faint"> · {item.count} {item.kind === 'video' ? 'clips' : 'images'}</span> : null}
-        </span>
+        <span className="set-total faint">The exact cost is shown with the plan, once the prompts are written.</span>
         <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, choice)}>
           Continue <ArrowRight size={13} />
         </Button>

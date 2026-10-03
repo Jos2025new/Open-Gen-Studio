@@ -420,7 +420,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   pushHistory(sessionId, {
     role: 'tool',
     tool_call_id: pending.toolCallId,
-    content: `Settings confirmed by the user: ${item.kind} ${describeChoice(name(chosen.modelRef), chosen)} (${chosen.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'}${note ? `\nUser note: ${note}` : ''}\nThe app applies these to every ${item.kind} step; write the prompts for this model, this length and this shape, and call propose_plan.${attach}\n\n${ctx}`,
+    content: `Settings confirmed by the user: ${item.kind} ${describeChoice(name(chosen.modelRef), chosen)} (${chosen.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'}${note ? `\nUser note: ${note}` : ''}\nThe app applies these to every ${item.kind} step. Write the prompts now for ${name(chosen.modelRef)}, in its format${item.kind === 'video' && chosen.duration ? `; each clip lasts exactly ${chosen.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${chosen.aspect ? `; frame for ${chosen.aspect}` : ''}. Then call propose_plan.${attach}\n\n${ctx}`,
   });
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, item.workspace);
