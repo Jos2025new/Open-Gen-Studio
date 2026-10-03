@@ -1533,10 +1533,10 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           // Phase 2 first: prompts for video, or for 2+ images, are written only after the user confirms the settings.
           if (workspace !== 'node' && !v.data.revision) {
             const kinds = v.data.steps.map((st) => st.kind);
-            const need = kinds.includes('video') && !session(sessionId).agent.settings?.video ? 'video' : kinds.filter((k) => k === 'image').length >= 2 && !session(sessionId).agent.settings?.image ? 'image' : null;
+            const need = kinds.includes('video') && !session(sessionId).agent.settings?.video ? 'video' : kinds.includes('image') && !session(sessionId).agent.settings?.image ? 'image' : null;
             if (need) {
               recordMetric(sessionId, { type: 'rejected' });
-              respond(`Not shown: call confirm_settings first (kind "${need}") so the user confirms the model, resolution${need === 'video' ? ', duration' : ''} and aspect; then write the prompts for the confirmed model and call propose_plan.`);
+              respond(`Not shown: call confirm_settings first (kind "${need}") so the user confirms the model, resolution${need === 'video' ? ', duration' : ', how many images'} and aspect; then write the prompts for the confirmed model and call propose_plan.`);
               continue;
             }
           }

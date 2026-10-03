@@ -77,7 +77,7 @@ beforeEach(() => {
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
     composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
-    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { video: { modelRef: 'local::studio-video', needsImage: true } } } } },
+    sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { video: { modelRef: 'local::studio-video', needsImage: true }, image: { modelRef: 'local::studio-image', needsImage: false } } } } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

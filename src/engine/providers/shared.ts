@@ -156,6 +156,12 @@ export const POLL_TIMEOUT_MS = 30_000;
  * Only `check` decides that the job failed (by throwing JobFailedError). Past the local time limit the wait
  * stops with a plain error, and the caller keeps the job so it can be checked again later.
  */
+/** Waits of the running polls; "Check status" ends them so every job is asked about now (and backoff restarts). */
+const pollWaits = new Set<() => void>();
+export function checkJobsNow(): void {
+  for (const wake of [...pollWaits]) wake();
+}
+
 export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: number, check: () => Promise<GenResult | string>): Promise<GenResult> {
   const started = Date.now();
   const maxWaitMs = (ctx.kind === 'image' ? 10 : 30) * 60_000;
@@ -176,6 +182,13 @@ export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: 
     if (Date.now() - started + wait > maxWaitMs) {
       throw new Error(`Stopped waiting after ${maxWaitMs / 60_000} min; the job may still finish at ${provider}. Use Check again later.`);
     }
-    await sleep(wait, ctx.signal);
+    // A wait "Check status" can end early: the next question to the provider goes out now.
+    let woke = false;
+    await new Promise<void>((resolve, reject) => {
+      const wake = () => { woke = true; resolve(); };
+      pollWaits.add(wake);
+      sleep(wait, ctx.signal).then(resolve, reject).finally(() => pollWaits.delete(wake));
+    });
+    if (woke) failures = 0;
   }
 }

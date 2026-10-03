@@ -3,7 +3,7 @@ import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music,
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
-import { cancelGeneration } from '../../engine/jobs';
+import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
 import { canvasIndex } from '../../engine/canvas';
@@ -72,6 +72,11 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
             <span className="progress">
               <span style={{ width: `${Math.round(g.progress * 100)}%` }} />
             </span>
+          ) : null}
+          {g.status === 'running' && g.remoteJob ? (
+            <Button size="sm" variant="secondary" icon={RefreshCw} data-tip={`Ask ${g.remoteJob.provider} about this job now`} onClick={(e) => { e.stopPropagation(); checkStatusNow(g.id); }}>
+              Check status
+            </Button>
           ) : null}
         </div>
       ) : null}

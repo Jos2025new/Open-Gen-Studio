@@ -15,6 +15,7 @@ import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, describeMentions, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
+import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
@@ -704,7 +705,9 @@ export function retryGeneration(id: string): Promise<string[]> {
  * but the provider can look it up among its recent runs (NanoGPT video and 3D: generate-video/recover).
  */
 export function canRecheck(g: Generation): boolean {
-  if (g.status === 'running' || g.status === 'queued' || g.status === 'done') return false;
+  if (g.status === 'done') return false;
+  // In progress: only a job no loop follows any more (the app stalled or was reloaded mid-wait) is resumed here.
+  if (g.status === 'running' || g.status === 'queued') return Boolean(g.remoteJob && !running.has(g.id) && ADAPTERS[g.remoteJob.provider]?.resume);
   if (g.remoteJob) return Boolean(ADAPTERS[g.remoteJob.provider]?.resume);
   return canRecover(g);
 }
@@ -719,6 +722,17 @@ async function recoverJob(g: Generation): Promise<RemoteJob | null> {
   const parsed = parseModelRef(g.modelRef)!;
   const taken = new Set(Object.values(get().generations).flatMap((x) => [x.jobId, x.remoteJob?.id].filter((v): v is string => Boolean(v))));
   return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
+}
+
+/**
+ * "Check status" on a generation in progress: a followed job is asked about now (its wait ends early); a job no
+ * loop follows is resumed. Without a job id (a synchronous request still open) there is nothing to ask yet.
+ */
+export function checkStatusNow(id: string): void {
+  const g = get().generations[id];
+  if (!g?.remoteJob) return;
+  if (running.has(id)) checkJobsNow();
+  else void recheckGeneration(id);
 }
 
 /** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
