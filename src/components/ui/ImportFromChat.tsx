@@ -61,7 +61,7 @@ function ImportResults({ sessionId, canvas, source, items, noun, modes, onImport
   return (
     <>
       <TopbarActions>
-      <IconButton ref={pop.ref} className={canvas === 'designer' ? 'designer-import-chat' : undefined} icon={ArrowDownToLine} label={`Import from ${source}`} size="sm" active={pop.open} onClick={pop.toggle} />
+      <IconButton ref={pop.ref} className={`import-chat-btn ${canvas === 'designer' ? 'designer-import-chat' : 'node-import-chat'}`} icon={ArrowDownToLine} label={`Import from ${source}`} size="sm" active={pop.open} onClick={pop.toggle} />
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label={`Import from ${source}`}>
         <PopoverHeader title={`Import from ${source}`} sub={items.length ? `${plural(items.length)} not here yet` : `Everything from ${source} is already here`} />
         {items.length ? (

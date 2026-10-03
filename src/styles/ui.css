@@ -103,3 +103,7 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 /* Node media stretches its children; the box keeps its own size there. */
 .nc-media > .attach-toggle { width: 22px; height: 22px; top: auto; bottom: 8px; } /* top-left holds the node badge */
 @media (hover: none) { .attach-toggle { opacity: 1; } }
+
+/* Import from Chat / Nodes in the top bar: boxed like the secondary buttons beside it, so it reads as an action. */
+.import-chat-btn { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; }
+.import-chat-btn:hover { border-color: var(--accent-line); color: var(--accent); }

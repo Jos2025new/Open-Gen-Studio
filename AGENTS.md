@@ -1,5 +1,8 @@
 # AGENTS.md — Open Gen Studio
 
+## Tarea — botón Import from Chat con caja y antes de Add node (2026-10-03)
+- [x] (usuario) El icono ⤓ de la barra superior (Import from Chat; en Chat, Import from Nodes) lleva caja como los botones secundarios (fondo, borde, acento al pasar el ratón; `.import-chat-btn` en `ui.css`) y en Nodos va delante de Add node (`.node-import-chat`, `order: -1`). Typecheck; sin navegador.
+
 ## Tarea — Nodos: − y + a los lados del zoom (2026-10-03)
 - [x] (usuario) En el panel de navegación, botón − (alejar) a la izquierda del porcentaje y + (acercar) a la derecha; el porcentaje sigue abriendo su menú. `CanvasNavigation.tsx`. Typecheck; sin navegador (mismas acciones que ya usaba el menú).
 

@@ -147,3 +147,5 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 
 /* Selection box of the default pan mode (double-press and drag). */
 .node-box-select { position: absolute; z-index: 5; pointer-events: none; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); border-radius: 2px; }
+/* Nodes: Import from Chat goes before Add node. */
+.topbar-slot .node-import-chat { order: -1; }
