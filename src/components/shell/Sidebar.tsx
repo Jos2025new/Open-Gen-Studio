@@ -19,14 +19,19 @@ const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: 
 function HomeMenu({ workspace }: { workspace: Workspace }) {
   const pop = usePopover();
   const current = WORKSPACES.find((w) => w.id === workspace);
+  // Opens on hover (a click still toggles it, for touch); a short grace lets the pointer cross into the menu.
+  const closing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const keep = () => { if (closing.current) clearTimeout(closing.current); closing.current = null; };
+  const show = () => { keep(); pop.setOpen(true); };
+  const hide = () => { keep(); closing.current = setTimeout(pop.close, 220); };
   return <>
     <button
+      onPointerEnter={(e) => { if (e.pointerType === 'mouse') show(); }}
+      onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}
       ref={pop.ref}
       type="button"
       className={`side-btn is-active`}
-      data-tip={`Home — ${current?.label ?? ''} canvas · Chat, Node or Designer`}
-      data-tip-side="right"
-      aria-label="Home"
+      aria-label={`Home — ${current?.label ?? ''} canvas`}
       aria-haspopup="menu"
       aria-expanded={pop.open}
       onClick={pop.toggle}
@@ -35,7 +40,7 @@ function HomeMenu({ workspace }: { workspace: Workspace }) {
       <span className="side-label">Home</span>
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={240} label="Canvases">
-      <div className="menu" role="menu">
+      <div className="menu" role="menu" onPointerEnter={keep} onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}>
         {WORKSPACES.map((w) => <MenuItem key={w.id} icon={w.icon} label={w.label} detail={w.hint} active={w.id === workspace} onClick={() => { setUi({ workspace: w.id }); pop.close(); }} />)}
       </div>
     </Popover>
