@@ -1,5 +1,9 @@
 # AGENTS.md — Open Gen Studio
 
+## Fallo — varias capas elegidas, solo se transformaba una (2026-10-03)
+- [x] (usuario) En modo Objects (el de por defecto) los tiradores solo tomaban la capa activa aunque hubiera 2+ capas elegidas en el panel. Ahora, sin objetos elegidos dentro de una capa y con varias capas elegidas, los tiradores las envuelven y transforman juntas (como en modo Layer). `Stage.tsx` (`xformTargets`). Navegador (copia aislada): Image 3 + Vista de perfil elegidas → una caja con tiradores para las dos; arrastrar la esquina cambia la matriz de las dos.
+- Revisado (sin cambio): "se reemplazó la imagen que pegué" — en `data/state.json` la imagen pegada (`ast_musutyajierw8n2171`, subida) solo está como adjunto del mensaje; nunca fue capa (los nombres "Image N" cuentan capas: la siguiente fue "Image 3"), y ningún paso del plan borró ni sustituyó capas (`target: "new"`). Pegar sobre el lienzo crea una capa y no adjunta nada (comprobado en la copia aislada); pegar con el cursor en la caja del prompt solo adjunta.
+
 ## Fallo — la selección no protegía al pintar ni volvía con deshacer (2026-10-03)
 - [x] (usuario: "borré lo que no estaba seleccionado; con Ctrl no volvió la selección"; referencia GIMP/Krita) Pincel y goma solo pintan dentro de la selección (rectángulo, lazo o varita): el trazo en curso se recorta con la selección en los píxeles de la capa (`LiveStroke.clip`, `selectionClipFor`); un trazo recortado queda como píxeles de la capa (no se puede reproducir como trazo libre). El cubo también se queda dentro. El historial guarda la selección en cada paso (`Snapshot.sel`): deshacer y rehacer la devuelven, y cambiar la selección (rectángulo, lazo, varita, All, Invert, Deselect, Ctrl+A/D/Shift+I) es un paso de deshacer propio. Ctrl+Y rehace (además de Ctrl+Shift+Z).
 - [x] Barra superior a 1024 px: Export se montaba sobre Connected (las opciones pedían 180 px); mínimo a 110 px, sin desborde.

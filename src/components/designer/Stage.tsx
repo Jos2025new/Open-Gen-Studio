@@ -254,6 +254,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const pk = objectPick(d0.id);
       const pl = pk ? d0.layers.find((l) => l.id === pk.layerId) : null;
       if (ok(pl) && pk!.ids.length) return [{ layer: pl, ids: pk!.ids }];
+      // Several layers picked in the panel (Ctrl/Shift-click) and no objects picked: transform them together.
+      const picked = layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id));
+      if (picked.length > 1) return picked.map((id) => d0.layers.find((l) => l.id === id)).filter(ok).map((l) => ({ layer: l, ids: null }));
       const a = activeLayer(d0);
       return ok(a) && a.type !== 'vector' && !layerObjects(a).length ? [{ layer: a, ids: null }] : [];
     }
