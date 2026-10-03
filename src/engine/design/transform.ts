@@ -73,6 +73,25 @@ function turnRaster(sessionId: string, docId: string, layer: Extract<Layer, { ty
   const src = getBuffer(layer.id);
   if (!src) return;
   const quarter = turn === 'rotate-cw' || turn === 'rotate-ccw';
+  // A painted layer covers the whole page: turn what is painted about its own center, inside the same buffer.
+  // (Turning the page-sized frame made the strokes jump to the other side of the page.) Images turn their frame.
+  if (!layer.sourceAssetId) {
+    const b = layerBox(layer);
+    if (!b) return;
+    const kx = src.width / layer.width, ky = src.height / layer.height;
+    const cxp = (b.x + b.w / 2 - layer.x) * kx, cyp = (b.y + b.h / 2 - layer.y) * ky;
+    const out = createCanvas(src.width, src.height);
+    const c = ctx2d(out);
+    c.translate(cxp, cyp);
+    if (turn === 'flip-h') c.scale(-1, 1);
+    else if (turn === 'flip-v') c.scale(1, -1);
+    else c.rotate(turn === 'rotate-cw' ? Math.PI / 2 : turn === 'rotate-ccw' ? -Math.PI / 2 : Math.PI);
+    c.translate(-cxp, -cyp);
+    c.drawImage(src, 0, 0);
+    setBuffer(layer.id, out);
+    setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { paintBaseId: undefined, paintStrokes: undefined, rev: layer.rev + 1 }));
+    return;
+  }
   const out = createCanvas(quarter ? src.height : src.width, quarter ? src.width : src.height);
   const c = ctx2d(out);
   c.translate(out.width / 2, out.height / 2);
