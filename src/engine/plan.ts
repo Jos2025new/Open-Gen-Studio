@@ -162,6 +162,8 @@ export interface PlanContext {
   subjectNames?: () => string[];
   /** Settings the user confirmed (phase 2): model, resolution, duration and aspect for every step of that kind. */
   confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
+  /** Every confirmed part of that kind, in card order: several when the card compared models (A/B in one plan). */
+  confirmedParts?: (kind: MediaKind) => SettingsChoice[];
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -524,7 +526,16 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           expectImage(s.last_frame, `${where} last_frame`);
         }
         // Phase 2: what the user confirmed wins over what the plan wrote (the prompts were written for it).
-        const conf = kind === 'video' || kind === 'image' ? ctx.confirmed?.(kind) : undefined;
+        let conf = kind === 'video' || kind === 'image' ? ctx.confirmed?.(kind) : undefined;
+        // Several confirmed models of this kind (an A/B comparison): each step keeps the part of the model line it names.
+        const parts = kind === 'video' || kind === 'image' ? ctx.confirmedParts?.(kind) ?? [] : [];
+        if (parts.length > 1 && s.model?.trim()) {
+          const named = (await ctx.getModel(s.model.trim()))?.model;
+          for (const p of named ? parts : []) {
+            const m = (await ctx.getModel(p.modelRef))?.model;
+            if (m && lineKey(m) === lineKey(named!)) { conf = p; break; }
+          }
+        }
         if (conf) {
           const confName = (await ctx.getModel(conf.modelRef))?.model.name ?? conf.modelRef;
           const stepNeedsImage = refs.length > 0 || Boolean(s.first_frame);

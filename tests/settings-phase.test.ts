@@ -182,3 +182,21 @@ describe('the settings card renders', () => {
     expect(html.indexOf('Images · 2')).toBeLessThan(html.indexOf('Video · 3 clips'));
   });
 });
+
+describe('comparing two image models in one plan (A/B)', () => {
+  it('each step keeps the confirmed part of the model line it names; nothing folds into the first model', async () => {
+    const fake = (ref: string, id: string, name: string) => ({ ref, id, name, provider: 'atlas', kind: 'image' }) as never;
+    const table: Record<string, unknown> = {
+      'atlas::nb': fake('atlas::nb', 'google/nano-banana-2-lite/text-to-image', 'Nano Banana 2 Lite'),
+      'atlas::grok': fake('atlas::grok', 'xai/grok-imagine-image-2.0/text-to-image', 'Grok Imagine Image 2'),
+    };
+    const ctxModel = async (ref: string) => (table[ref] ? { model: table[ref] as never, schema: { ref, params: [], slots: {} } as never } : getModel(ref));
+    const nb: SettingsChoice = { modelRef: 'atlas::nb', needsImage: false, aspect: '3:4', count: 1 };
+    const grok: SettingsChoice = { modelRef: 'atlas::grok', needsImage: false, aspect: '3:4', count: 1 };
+    const steps = ['nb', 'nb', 'grok', 'grok'].map((m, i) => ({ id: `s${i + 1}`, kind: 'image', prompt: `sheet ${i}`, model: `atlas::${m}` }));
+    const { plan, errors } = await normalizePlan({ steps }, { ...base, getModel: ctxModel, confirmed: (k) => (k === 'image' ? nb : undefined), confirmedParts: (k) => (k === 'image' ? [nb, grok] : []) }, 'p');
+    expect(errors).toEqual([]);
+    expect(plan!.steps.map((s) => (s as { modelRef: string }).modelRef)).toEqual(['atlas::nb', 'atlas::nb', 'atlas::grok', 'atlas::grok']);
+    expect(plan!.adjustments.join(' ')).not.toMatch(/→ Nano Banana/);
+  });
+});

@@ -906,6 +906,8 @@ export interface AgentState {
   pending?: { toolCallId: string | null; kind: 'questions' | 'settings' | 'plan'; feedItemId: string };
   /** Settings the user confirmed for this work (phase 2); plans apply them, follow-ups reuse them. */
   settings?: Partial<Record<'video' | 'image', SettingsChoice>>;
+  /** Every part of the last confirmed card, in order (two image models when the user compares them). */
+  settingsParts?: Array<SettingsChoice & { kind: 'video' | 'image' }>;
   questionRound: number;
   /** Facts to hand to the model with the next user turn (e.g. execution results). */
   notes: string[];

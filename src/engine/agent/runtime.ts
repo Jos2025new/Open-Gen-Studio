@@ -182,6 +182,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
+    confirmedParts: (kind: MediaKind) => (workspace !== 'node' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
   };
 }
 
@@ -414,7 +415,9 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   const sections = sectionsOf(item).map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', sections });
   const pending = s.agent.pending;
-  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(sections.map((x) => [x.kind, x.chosen])) } }));
+  // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
+  const firstOfKind = sections.filter((x, i) => sections.findIndex((y) => y.kind === x.kind) === i);
+  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: sections.map((x) => ({ ...x.chosen!, kind: x.kind })) }));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const name = (ref: string) => modelSummary(ref)?.name ?? ref;
   const lines: string[] = [];
@@ -429,7 +432,8 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
       c.aspect !== rec.aspect ? `aspect ${rec.aspect ?? "the image's"} → ${c.aspect ?? "the image's"}` : '',
       c.count !== rec.count ? `images per step ${rec.count ?? 1} → ${c.count ?? 1}` : '',
     ].filter(Boolean);
-    lines.push(`- ${x.kind}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}${x.kind === 'image' && c.count ? (c.count > 1 ? `; ${c.count} candidates of the image being explored: ONE image step with ${c.count} "variations" (the shared prompt once, one short variation each), not one step per option` : '; one image per image step') : ''}.`);
+    const several = sections.filter((y) => y.kind === x.kind).length > 1;
+    lines.push(`- ${x.kind}${several ? ` (one of ${sections.filter((y) => y.kind === x.kind).length} compared models: its steps write "model": "${c.modelRef}")` : ''}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}${x.kind === 'image' && c.count ? (c.count > 1 ? `; ${c.count} candidates of the image being explored: ONE image step with ${c.count} "variations" (the shared prompt once, one short variation each), not one step per option` : '; one image per image step') : ''}.`);
     const guide = guideForModel(c.modelRef.split('::')[1] ?? '');
     const text = guide ? readGuide(`model:${guide.id}`) : undefined;
     if (text && !inConversation(sessionId, text) && !guides.includes(text)) guides += `\n\n---\nPrompting guide of ${name(c.modelRef)} (model:${guide!.id}); write its prompts in this format:\n${text}`;
@@ -438,7 +442,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   pushHistory(sessionId, {
     role: 'tool',
     tool_call_id: pending.toolCallId,
-    content: `Settings confirmed by the user (the app applies them to every step of each kind):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
+    content: `Settings confirmed by the user (the app applies them to every step of each kind; with several models of one kind, to the steps that name that model):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
   });
   patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, item.workspace);
@@ -1388,7 +1392,9 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const sections: SettingsSection[] = [];
           let failed = '';
           for (const d of parts) {
-            if (sections.some((x) => x.kind === d.kind)) continue;
+            // One part per kind, except to compare models: another part of that kind needs a model of its own.
+            const seen = parts.slice(0, parts.indexOf(d)).filter((x) => x.kind === d.kind);
+            if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
             const built = await buildSettings(
               { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
               { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },

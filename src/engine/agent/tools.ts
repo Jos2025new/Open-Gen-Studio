@@ -381,7 +381,7 @@ const settingsPartSchema = z.object({
 // One card per plan: its parts (a single object without "parts" is read as one part, for older calls).
 export const confirmSettingsSchema = z.preprocess(
   (v) => (v && typeof v === 'object' && !('parts' in v) && 'kind' in v ? { summary: (v as { summary?: unknown }).summary, parts: [v] } : v),
-  z.object({ summary: z.string().max(300).optional(), parts: z.array(settingsPartSchema).min(1).max(2) }),
+  z.object({ summary: z.string().max(300).optional(), parts: z.array(settingsPartSchema).min(1).max(4) }),
 );
 
 export const askQuestionsSchema = z.object({

@@ -21,15 +21,17 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
   const sections = sectionsOf(item);
   const titled = sections.length > 1;
+  // Two parts of one kind compare models (A/B): each title names its model.
+  const sameKind = (i: number) => sections.filter((y) => y.kind === sections[i].kind).length > 1;
   if (item.status !== 'pending') {
     return (
       <article className="q-card is-done">
         <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}<EditAnswerButton sessionId={sessionId} itemId={item.id} /></div>
         {item.status === 'confirmed' ? (
           <ul className="q-summary">
-            {sections.map((x) => {
+            {sections.map((x, i) => {
               const c = x.chosen ?? x.recommended;
-              return <li key={x.kind}>{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{describeChoice(name(c.modelRef), c)}</li>;
+              return <li key={`${x.kind}-${i}`}>{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{describeChoice(name(c.modelRef), c)}</li>;
             })}
           </ul>
         ) : null}
@@ -41,8 +43,8 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       <div className="q-kicker">Settings · before the plan is written</div>
       {item.summary ? <p className="q-intro">{item.summary}</p> : null}
       {sections.map((x, i) => (
-        <div key={x.kind} className={titled ? 'set-section' : undefined}>
-          {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}</div> : null}
+        <div key={`${x.kind}-${i}`} className={titled ? 'set-section' : undefined}>
+          {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}{sameKind(i) ? ` · ${name(x.recommended.modelRef)}` : ''}</div> : null}
           <SettingsSectionBlock section={x} index={i} itemId={item.id} sessionId={sessionId} />
         </div>
       ))}
