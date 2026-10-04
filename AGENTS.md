@@ -1,28 +1,25 @@
 # AGENTS.md — Open Gen Studio
 
-## REGLA CRÍTICA — datos del usuario
+1. **Datos protegidos con código:** no tocar data/ real; usar npm run dev:sandbox para probar la app. No debilitar las comprobaciones, copias ni rechazos del almacén.
+2. **Hecho = evidencia del caso reportado.** Distinguir lectura de código, tests, prueba visual y ejecución de proveedor. Una comprobación general no demuestra que el caso concreto funciona.
+3. **Pregunta antes de borrar o migrar datos, cambiar proveedores, gastar dinero, tocar una interfaz ambigua o hacer algo irreversible.** Respetar el alcance y las autorizaciones ya expresadas; una revisión no autoriza implementación.
 
-Los datos y las sesiones del usuario JAMÁS deben exponerse a pérdida. El 2026-10-03 un agente abrió la app real para "revisar una sesión" y su navegador guardó un estado vacío encima de 23 sesiones.
+## Dónde mirar
 
-- **Nunca abras la app real (localhost:5173/5174/5175 ni el puerto en uso) en ningún navegador, perfil, extensión, CDP o copia de IndexedDB.** Abrirla basta para que guarde.
-- Para revisar sesiones: lee `data/state.json` o `data/backups/` en solo lectura (`python3`/`jq`). Nunca escribas en `data/`.
-- Para probar en navegador: solo la copia aislada (otro puerto y otra carpeta `data/` en el scratchpad).
-- No toques `data/`, `data/backups/` ni el almacenamiento del navegador del usuario sin su permiso explícito.
-- El servidor guarda copias en `data/backups/` (cada 10 min y antes de cualquier guardado que reduzca sesiones) y aparta en `backups/rejected-*.json` un guardado que pierde más de la mitad. No debilites estas protecciones.
+- [Índice documental](docs/README.md): entrada a features, decisiones e historial.
+- [Features](docs/README.md#features): afirmaciones con código y test, o «sin test».
+- [Decisiones](docs/README.md#decisiones): datos, confirmaciones, sandbox y coste máximo.
+- [Historial](docs/README.md#historial): cargar solo los fragmentos pertinentes, en orden numérico. Es evidencia histórica, no descripción garantizada del código actual.
+- Persistencia: server/local-store.js, src/lib/disk.ts, src/lib/idb.ts y src/store/store.ts.
+- Salvaguardas: scripts/dev-sandbox.mjs, scripts/check-safeguards.mjs y scripts/check-docs.mjs. npm test ejecuta los controles antes de la suite.
 
-## Reglas activas
+## Reglas duras
 
-- Conserva el alcance y las decisiones ya expresadas por el usuario.
-- Antes de editar, revisa `git status`, el diff y el código actual; no sobrescribas cambios ajenos.
-- Para automatización web usa `agent-browser`: `open`, `snapshot -i`, interactúa con refs, repite el snapshot y termina con `agent-browser close`.
-- Si una herramienta `dk-*` cubre una operación multimedia, úsala en vez de reimplementarla. Consulta `--help` ante dudas y no sustituyas la herramienta si falla.
-- Usa una sola skill directora por tarea. Con `.specify/`, sigue Spec Kit; sin `.specify/`, no lo inicialices.
-- Una revisión no autoriza cambios. Una petición de implementación sí autoriza el cambio acotado y su verificación.
-- No ejecutes proveedores de pago sin mostrar el coste máximo y obtener aprobación explícita.
-- No confundas typecheck/tests con validación visual o con una ejecución real del proveedor.
-- Usa el historial solo cuando haga falta: `docs/AGENTS_HISTORY.md`.
-
-## Estado actual
-
-- Rama activa de trabajo: `better-worflows-xyz765`.
-- El historial detallado de tareas, commits, límites y pruebas está en `docs/AGENTS_HISTORY.md`; no lo cargues completo salvo que la tarea lo requiera.
+- Nada de navegadores automatizados, perfiles, CDP, extensiones ni copias de IndexedDB sobre la app real. No arrancarla para verificar cambios. Las pruebas de la app usan exclusivamente el sandbox y terminan deteniéndolo.
+- No escribir en data/, sus copias ni el almacenamiento del navegador del usuario. Cualquier borrado o migración requiere aprobación explícita. El sandbox usa .sandbox/data y el puerto 5183; otro puerto con los mismos datos no aísla nada.
+- Conservar serialización, baseAt, copias de seguridad, rechazo de pérdida masiva de sesiones y rechazo de escrituras automatizadas.
+- Ningún archivo de más de 30 KB. AGENTS.md se mantiene por debajo de 3 KB. Dividir documentación y mantener completo el índice.
+- Nada de secretos en docs/ ni en commits. No imprimir valores detectados. Si check-docs falla, parar y reportar.
+- Antes de usar proveedores de pago: coste máximo, selección concreta y aprobación explícita. Un coste estimado o mínimo no es un máximo.
+- No usar confirm() nativo para acciones de la app; conservar confirmaciones contextuales con cancelación.
+- Revisar instrucciones, estado y diff antes de editar; preservar trabajo ajeno. Usar una skill directora y el sistema de planificación existente. Usar dk-* cuando cubra la operación; sus fallos no autorizan reimplementarla.
