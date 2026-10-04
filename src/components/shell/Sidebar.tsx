@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FolderOpen, House, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PenTool, Plus, Workflow } from 'lucide-react';
+import { FolderOpen, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, PenTool, Plus, Workflow } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
@@ -27,6 +27,12 @@ function LibraryIcon() {
   </svg>;
 }
 
+function HomeIcon() {
+  return <svg className="home-icon" width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden>
+    <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>;
+}
+
 /** Home: one button for the three canvases (Chat, Node, Designer); the one open is marked in its menu. */
 function HomeMenu({ workspace }: { workspace: Workspace }) {
   const pop = usePopover();
@@ -48,7 +54,7 @@ function HomeMenu({ workspace }: { workspace: Workspace }) {
       aria-expanded={pop.open}
       onClick={pop.toggle}
     >
-      <House size={18} strokeWidth={1.7} />
+      <HomeIcon />
       <span className="side-label">Home</span>
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={240} label="Canvases">
@@ -67,11 +73,16 @@ export function Sidebar() {
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const sidebarRef = useRef<HTMLElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
+  const [folded, setFolded] = usePref('ogs:sidebar-folded', false);
 
-  // --sidebar-w drives the layout (side panels are anchored to it), so the mode lives on the root.
+  // --sidebar-w drives the layout (side panels are anchored to it), so both modes live on the root.
   useEffect(() => {
     document.documentElement.classList.toggle('sidebar-wide', wide);
-  }, [wide]);
+    document.documentElement.classList.toggle('sidebar-folded', folded);
+    return () => {
+      document.documentElement.classList.remove('sidebar-wide', 'sidebar-folded');
+    };
+  }, [wide, folded]);
 
   useEffect(() => {
     const sidebar = sidebarRef.current;
@@ -80,7 +91,7 @@ export function Sidebar() {
     const alignBudget = () => {
       const add = composer.querySelector('.composer-add svg');
       const footer = sidebar.querySelector<HTMLElement>('.side-footer');
-      const budget = footer?.querySelector('[aria-label="Provider pool"] svg, .pool-title');
+      const budget = footer?.querySelector('[aria-label="Provider pool"] .provider-key-mark, .pool-title');
       if (!add || !footer || !budget) return;
       const a = add.getBoundingClientRect(), b = budget.getBoundingClientRect();
       const current = parseFloat(getComputedStyle(footer).marginBottom) || 0;
@@ -95,24 +106,28 @@ export function Sidebar() {
     window.addEventListener('resize', alignBudget);
     alignBudget();
     return () => { observer.disconnect(); window.removeEventListener('resize', alignBudget); };
-  }, [workspace, wide]);
+  }, [workspace, wide, folded]);
 
   const togglePanel = (p: 'gallery' | 'sessions' | 'spending') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
-    <nav ref={sidebarRef} className="sidebar" aria-label="Main">
+    <nav ref={sidebarRef} className={`sidebar ${folded ? 'is-folded' : ''}`} aria-label="Main">
       <div className="brand">
         <span className="brand-mark" aria-hidden />
         <span className="brand-name">Open Gen Studio</span>
         <button
           type="button"
           className="side-collapse"
-          aria-label={wide ? 'Collapse panel' : 'Expand panel'}
-          data-tip={wide ? 'Collapse panel' : 'Expand panel'}
+          aria-label={folded ? 'Expand panel downward' : 'Collapse panel upward'}
+          aria-expanded={!folded}
+          data-tip={folded ? 'Expand panel downward' : 'Collapse panel upward'}
           data-tip-side="right"
-          onClick={() => setWide(!wide)}
+          onClick={() => {
+            if (!folded) setUi({ panel: null });
+            setFolded(!folded);
+          }}
         >
-          {wide ? <PanelLeftClose size={15} /> : <PanelLeftOpen size={15} />}
+          {folded ? <PanelTopOpen size={15} /> : <PanelTopClose size={15} />}
         </button>
       </div>
       <div className="side-group">
@@ -167,6 +182,17 @@ export function Sidebar() {
           {remaining != null && remaining < 0 ? <span className="side-badge is-warn" aria-label="Over the limit">!</span> : null}
         </button>
         <ProviderPool wide={wide} />
+        <button
+          type="button"
+          className="side-btn side-width-toggle"
+          aria-label={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
+          data-tip={wide ? 'Collapse panel to the left' : 'Expand panel to the right'}
+          data-tip-side="right"
+          onClick={() => setWide(!wide)}
+        >
+          {wide ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          <span className="side-label wide-only">Collapse panel</span>
+        </button>
       </div>
     </nav>
   );

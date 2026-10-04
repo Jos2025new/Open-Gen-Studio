@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw, Settings2, Coins } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw, Settings2 } from 'lucide-react';
 import { ADAPTERS, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { RemoteProviderId } from '../../engine/types';
@@ -79,7 +79,7 @@ export function ProviderPool({ wide }: { wide: boolean }) {
         <button
           ref={ref}
           type="button"
-          className={`side-btn ${pop ? 'is-open' : ''}`}
+          className={`side-btn provider-pool-btn ${pop ? 'is-open' : ''}`}
           data-tip={`Provider pool · ${total}`}
           data-tip-side="right"
           aria-label="Provider pool"
@@ -88,7 +88,7 @@ export function ProviderPool({ wide }: { wide: boolean }) {
             setPop(!pop);
           }}
         >
-          <Coins size={18} strokeWidth={1.7} />
+          <ProviderKeyIcon />
           <span className="side-budget num">{total}</span>
         </button>
         <Popover open={pop} anchor={ref} onClose={() => setPop(false)} placement="right-end" width={260} label="Provider pool">
@@ -123,5 +123,16 @@ export function ProviderPool({ wide }: { wide: boolean }) {
       </button>
       {open ? <PoolDetails pool={pool} /> : null}
     </div>
+  );
+}
+
+function ProviderKeyIcon() {
+  return (
+    <span className="provider-key-mark" aria-hidden>
+      <svg width={14} height={14} viewBox="0 0 20 20" fill="none">
+        <circle cx="6.5" cy="7" r="3" />
+        <path d="m8.8 9.2 6 6m-2.3-2.3 1.8-1.8m.3 4.1h1.7v-1.7" />
+      </svg>
+    </span>
   );
 }
