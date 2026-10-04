@@ -3,7 +3,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 
 const ORIGIN = 'http://localhost:5183';
 test.use({ viewport: { width: 1440, height: 1000 }, launchOptions: { executablePath: chromium.executablePath() } });
-test.setTimeout(180_000);
+// About 4 s per action (each one waits for the save), plus start-up.
+test.setTimeout(60_000 + 4_000 * Number(process.env.STEPS ?? 300));
 type State = { hydrated: boolean; sessionId: string; document: any; selection: { layers: string[]; objects: { layerId: string; ids: string[] } | null }; history: { undo: number; redo: number }; saving: { state: boolean; raster: string[] } };
 const errors = new WeakMap<Page, string[]>();
 const writes = new WeakMap<Page, Set<Request>>();
@@ -12,6 +13,7 @@ const summary = (state: State) => ({ document: state.document, selection: state.
 function assertSandbox(page: Page) {
   if (new URL(page.url()).origin !== ORIGIN) throw new Error(`Refusing non-sandbox URL: ${page.url()}`);
 }
+let lastMismatch = '';
 async function waitSaved(page: Page) {
   assertSandbox(page);
   await expect.poll(async () => {
@@ -22,8 +24,10 @@ async function waitSaved(page: Page) {
     const saved = (await response.json()).state?.sessions?.[state.sessionId]?.docs?.find((d: any) => d.id === state.document.id);
     if (!saved) return false;
     const { id, width, height, background, layers, groups = [], activeLayerId } = saved;
-    return JSON.stringify({ id, width, height, background, layers, groups, activeLayerId }) === JSON.stringify(state.document);
-  }, { timeout: 15_000, message: 'Sandbox state and raster writes must finish' }).toBe(true);
+    const a = JSON.stringify({ id, width, height, background, layers, groups, activeLayerId }), b = JSON.stringify(state.document);
+    if (a !== b) { let i = 0; while (a[i] === b[i]) i++; lastMismatch = `disk …${a.slice(i - 60, i + 80)}… vs memory …${b.slice(i - 60, i + 80)}…`; }
+    return a === b;
+  }, { timeout: 15_000, message: `Sandbox state and raster writes must finish ${lastMismatch}` }).toBe(true);
 }
 async function checkInvariants(state: State, page: Page, checkRaster = false): Promise<string[]> {
   assertSandbox(page);
@@ -69,16 +73,21 @@ async function roundTrip(page: Page, reload = false): Promise<string[]> {
   }
   if (reload) await waitSaved(page);
   const after = await readState(page);
-  const changed = Object.keys(summary(before)).filter(k => JSON.stringify((summary(before) as any)[k]) !== JSON.stringify((summary(after) as any)[k]));
+  // Selection and undo history are never saved (by design): a reload compares only the document.
+  const keys = reload ? ['document'] : Object.keys(summary(before));
+  const changed = keys.filter(k => JSON.stringify((summary(before) as any)[k]) !== JSON.stringify((summary(after) as any)[k]));
   return changed.length ? [`${reload ? 'Save/reload' : 'Undo/redo'} summary changed: ${changed.join(', ')}`] : [];
 }
+/** Network noise from other sites (a provider's schema blocked by CORS on the sandbox port) is not a Designer bug. */
+const external = (text: string, url: string) =>
+  /Access to fetch at 'https?:\/\/(?!localhost:5183)/.test(text) || (/Failed to load resource/.test(text) && !!url && !url.startsWith(ORIGIN));
 async function setup(page: Page) {
   await page.addInitScript(() => {
     // Saving is enabled ONLY in this isolated sandbox; never disable the real app's automation guard.
     if (location.port === '5183') Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
   errors.set(page, []); writes.set(page, new Set());
-  page.on('console', msg => { if (msg.type() === 'error') errors.get(page)!.push(`console: ${msg.text()}`); });
+  page.on('console', msg => { if (msg.type() === 'error' && !external(msg.text(), msg.location().url)) errors.get(page)!.push(`console: ${msg.text()}`); });
   page.on('pageerror', error => errors.get(page)!.push(`pageerror: ${error.message}`));
   page.on('request', request => { if (request.url().startsWith(`${ORIGIN}/x/store/`) && !['GET', 'HEAD'].includes(request.method())) writes.get(page)!.add(request); });
   for (const event of ['requestfinished', 'requestfailed'] as const) page.on(event, request => writes.get(page)!.delete(request));
