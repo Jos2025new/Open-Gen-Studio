@@ -8,8 +8,10 @@ import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extract
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
+import { approvedPriceForPlan, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
+import { variantRoute } from './variants';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { deliveryNotes } from './delivery';
 import { isCreditError, onGenerationCredit } from './credit';
@@ -347,8 +349,10 @@ async function execute(id: string): Promise<string[]> {
       const cur = modelSummary(g.modelRef);
       const twin = cur && !cur.acceptsImage ? opModelFromRef(g.modelRef, g.kind) : null;
       if (twin && twin !== g.modelRef) {
+        const before = { modelRef: g.modelRef, variant: cur ? variantRoute(cur) : 'unknown', inputRoles: { references: g.inputs.refs.length, firstFrame: Boolean(g.inputs.firstFrame), lastFrame: Boolean(g.inputs.lastFrame) } };
         patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName });
         g = get().generations[g.id];
+        recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late image-input twin resolution in job runner', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
       }
     }
     const resolved = await resolveModel(g.modelRef);
@@ -572,6 +576,9 @@ async function execute(id: string): Promise<string[]> {
         // What the provider is about to read: kept for "Copy debug info" (T5), without keys and without media.
         onRequest: (info) => {
           requests += 1;
+          const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame));
+          const approval = approvedPriceForPlan(g.planId);
+          recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { approvedUsd: approval.approvedUsd ?? null, currentEstimateUsd: estimate.usd } });
           patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
         },
       });

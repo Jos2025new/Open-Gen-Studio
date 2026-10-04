@@ -6,6 +6,7 @@ import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
 import { uid } from '../../lib/id';
 import { isAbort, isTransient } from '../../lib/http';
 import { logEvent } from '../../lib/log';
+import { beginJourney, journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
 import { ratioOf } from '../params';
 import { needsSpendCheck } from '../pricing';
 import { parseToolMarkup, toolMarkupAt } from './toolMarkup';
@@ -218,6 +219,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // Typing while the settings card is open never confirms it (a question or an objection is not a yes): the card
   // closes unconfirmed and the agent answers; if the work still stands it shows a new card with what was asked.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
+    recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.reply_received', reason: 'typed message is not confirmation', sessionId, approvalId: pendingItem.id, before: { status: pendingItem.status, confirmed: false }, after: { status: 'skipped', confirmed: false } });
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
     const engine = agentEngine();
     if (engine.kind === 'llm' && pending.toolCallId) {
@@ -235,6 +237,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   }
   // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
+    recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'plan-revision', event: 'plan.comment_received', reason: 'user replied while plan awaits approval', sessionId, planId: pendingItem.plan.id, approvalId: pendingItem.id, before: { status: pendingItem.status, adjustments: pendingItem.plan.adjustments } });
     const engine = agentEngine();
     if (engine.kind === 'llm' && pending.toolCallId) {
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
@@ -261,6 +264,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   // A fresh request.
   if (pending) resolvePendingAsSuperseded(sessionId);
+  beginJourney(sessionId, 'settings-response');
   // Confirmed settings belong to one request (its plan and its revisions): a new request shows the card again,
   // so old values (a sheet's 16:9 ×2) never silently apply to new work.
   patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settings: undefined, settingsParts: undefined });
@@ -368,6 +372,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'questions' || item.status !== 'pending') return;
   updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'answered', answers });
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.answered', reason: `answers submitted via ${how}`, sessionId, approvalId: itemId, before: { status: 'pending' }, after: { status: 'answered', answeredIds: item.questions.filter((q) => answers[q.id]?.trim()).map((q) => q.id), hasNote: Boolean(answers.note?.trim()) } });
   const workspace = item.workspace;
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined });
@@ -427,6 +432,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   if (!item || item.type !== 'settings' || item.status !== 'pending') return;
   const sections = sectionsOf(item).map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', sections });
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.confirmed', reason: 'user selected and continued', sessionId, approvalId: itemId, before: { status: item.status, choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.recommended.count, duration: x.recommended.duration })) }, after: { status: 'confirmed', choices: sections.map((x) => ({ kind: x.kind, modelRef: x.chosen!.modelRef, needsImage: x.chosen!.needsImage, count: x.chosen!.count, resolution: x.chosen!.resolution, duration: x.chosen!.duration, aspect: x.chosen!.aspect })) } });
   const pending = s.agent.pending;
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   const firstOfKind = sections.filter((x, i) => sections.findIndex((y) => y.kind === x.kind) === i);
@@ -527,6 +533,7 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
     ...(toolCallId ? { toolCallId } : {}),
   };
   appendFeed(sessionId, item);
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.presented', reason: 'agent asked for user information', sessionId, approvalId: item.id, after: { questionIds: questions.map((q) => q.id), round, maxRounds: item.maxRounds } });
   patchAgent(sessionId, { questionRound: round, pending: { toolCallId, kind: 'questions', feedItemId: item.id } });
   if (get().ui.workspace !== 'chat') setThreadOpen(true);
 }
@@ -544,6 +551,12 @@ async function presentPlan(
   const started = Date.now();
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
+  const journey = revision ? 'plan-revision' : 'settings-correction';
+  const summarizeInputs = (step: PlanStep) => step.kind === 'video'
+    ? { references: step.refs, firstFrame: step.firstFrame, lastFrame: step.lastFrame }
+    : step.kind === 'image' || step.kind === 'model3d' ? { references: step.refs }
+      : undefined;
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey, event: plan ? 'plan.normalized' : 'plan.rejected', reason: plan ? 'normalizer accepted resolved steps' : 'normalizer rejected plan', sessionId, planId, before: (raw.steps ?? []).map((step) => ({ stepId: step.id, kind: step.kind, model: step.model, references: step.refs, firstFrame: step.first_frame, lastFrame: step.last_frame })), after: plan ? plan.steps.map((step) => ({ stepId: step.id, kind: step.kind, modelRef: 'modelRef' in step ? step.modelRef : undefined, inputs: summarizeInputs(step), settings: 'settings' in step ? step.settings : undefined, adjustments: plan.adjustments.filter((a) => a.startsWith(`${step.id}:`)) })) : { errors } });
   if (!plan) return { errors };
   const { total } = estimateSteps(plan.steps);
   const style = get().composer.agentStyle;
@@ -777,6 +790,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
   const { total } = estimateSteps(chosen);
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'user approved the current estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { approvedUsd: item.estimate.usd, currentEstimateUsd: total.usd } });
   // Over an active limit, the card asks first ("Continue anyway"); approving without that stops here.
   if (overLimit(total)) {
     toast(overLimitText(total), 'error');
@@ -1421,6 +1435,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           flushToolResults(sessionId, toolResults);
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, sections, status: 'pending', toolCallId: call.id };
           appendFeed(sessionId, item);
+          recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
           if (get().ui.workspace !== 'chat') setThreadOpen(true);
           return;

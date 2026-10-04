@@ -7,7 +7,8 @@ import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
 import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
-import { clipTrim, paramByRole, placeKeyframes } from '../../engine/params';
+import { clipTrim, paramByRole, placeKeyframes, routeVideoInputs } from '../../engine/params';
+import { beginJourney, recordJourneyEvent } from '../../lib/journeyTrace';
 import type { MediaKind } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
@@ -250,6 +251,7 @@ export function Composer() {
   const workspace = useStore((s) => s.ui.workspace);
   const focusTick = useStore((s) => s.ui.focusComposer);
   const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
+  const sessionId = useStore((s) => s.activeSessionId);
   const assets = useStore((s) => s.assets);
   const acceptsImages = useStore((s) => {
     if (s.composer.mode === 'agent') return true;
@@ -299,8 +301,19 @@ export function Composer() {
     const before = lastCount.current;
     lastCount.current = imageCount;
     if ((mode !== 'image' && mode !== 'video') || before === imageCount) return;
+    const journeyId = beginJourney(sessionId, 'variant-inputs') ?? sessionId;
     const bucket = (n: number) => (n === 0 ? 0 : mode === 'video' && n > 1 ? 2 : 1);
-    if (bucket(before) === bucket(imageCount)) return;
+    const roleSnapshot = (ref: string, count: number) => {
+      if (mode !== 'video') return { references: count };
+      const slots = useStore.getState().catalog.schemas[ref]?.slots ?? {};
+      if (slots.keyframes) return { keyframes: count, start: count ? 'image 1' : undefined, end: count > 1 ? `image ${count}` : undefined };
+      const routed = routeVideoInputs(slots, Array.from({ length: count }, (_, i) => i + 1), []);
+      return { firstFrame: routed.firstFrame ? `image ${routed.firstFrame}` : undefined, references: routed.images.map((i) => `image ${i}`) };
+    };
+    if (bucket(before) === bucket(imageCount)) {
+      recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_retained', reason: 'attachment count changed within the same image/video route bucket', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: currentRef, imageCount, inputFunctions: roleSnapshot(currentRef, imageCount) } });
+      return;
+    }
     const routes = lineRoutes(currentRef);
     const want =
       imageCount === 0 ? routes.text
@@ -308,10 +321,13 @@ export function Composer() {
       : imageCount > 1 ? routes.reference ?? routes.image
       : routes.image ?? routes.reference;
     if (want && want !== currentRef) {
+      recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_switched', reason: 'React attachment-count effect selected an available same-line route', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: want, imageCount, inputFunctions: roleSnapshot(want, imageCount) } });
       void pickComposerModel(mode, want);
       toast(`Switched to ${modelSummary(want)?.name ?? 'the matching variant'} for ${imageCount ? 'the attached image' + (imageCount > 1 ? 's' : '') : 'text only'}.`, 'info');
+    } else {
+      recordJourneyEvent({ journeyId, journey: 'variant-inputs', event: 'composer.variant_retained', reason: want ? 'resolved route already selected' : 'no compatible same-line route was found', sessionId, before: { modelRef: currentRef, imageCount: before, inputFunctions: roleSnapshot(currentRef, before) }, after: { modelRef: currentRef, imageCount, inputFunctions: roleSnapshot(currentRef, imageCount) } });
     }
-  }, [imageCount, mode, currentRef]);
+  }, [imageCount, mode, currentRef, sessionId]);
   // A text-only variant still takes images when its line has an image route: attaching switches to it (above).
   const lineTwin = (() => {
     if (acceptsImages || (mode !== 'image' && mode !== 'video') || !currentRef) return undefined;
