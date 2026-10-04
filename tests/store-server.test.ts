@@ -107,3 +107,15 @@ describe('local store: automated writes', () => {
     expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":1}', { ...headers, 'x-ogs-automated': '0' })).toBe(204);
   });
 });
+
+describe('local store: automated writes in the sandbox', () => {
+  it('the sandbox (.sandbox/data) accepts them, so tests can save and reload', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'ogs-'));
+    mkdirSync(join(root, '.sandbox', 'data'), { recursive: true });
+    writeFileSync(join(root, '.sandbox', 'data', 'state.json'), '{"savedAt":100,"x":0}');
+    let mw: (req: unknown, res: unknown, next: () => void) => void = () => undefined;
+    (localStore(root, '.sandbox/data').configureServer as unknown as (s: unknown) => void)({ middlewares: { use: (fn: typeof mw) => (mw = fn) } });
+    const headers = { 'x-ogs': '1', 'x-ogs-automated': '1', host: 'localhost:5183' };
+    expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":1}', headers)).toBe(204);
+  });
+});

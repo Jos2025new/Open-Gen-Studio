@@ -105,6 +105,7 @@ const BACKUPS_KEPT = 20;
 export function localStore(root = process.cwd(), dataDir = 'data') {
   const dir = resolve(root, dataDir);
   const stateFile = join(dir, 'state.json');
+  const sandbox = dir === resolve(root, '.sandbox/data');
 
   // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
   // before either writes. A failed write does not stop the queue.
@@ -165,7 +166,8 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     // cannot send without a preflight the dev server refuses, and any Origin they carry is this server's own.
     // A plain cross-site POST (no preflight needed) would otherwise reach /wipe.
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      if (req.headers['x-ogs-automated'] === '1') return send(403, 'automated writes are forbidden');
+      // Automated browsers may write only to the sandbox (.sandbox/data): tests save and reload there, never on real data.
+      if (req.headers['x-ogs-automated'] === '1' && !sandbox) return send(403, 'automated writes are forbidden');
       const origin = req.headers.origin;
       if (req.headers['x-ogs'] !== '1' || (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`)) {
         return send(403, 'writes only from the app');
