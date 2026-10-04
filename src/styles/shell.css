@@ -10,6 +10,9 @@
 .sidebar-wide .sidebar { align-items: stretch; padding: 0 10px 12px; }.sidebar-wide .brand { justify-content: flex-start; padding: 0 4px; }.sidebar-wide .brand-name { display: block; font-size: 12px; font-weight: 600; white-space: nowrap; }.sidebar-wide .side-collapse { position: static; margin: 0 0 0 auto; width: 26px; height: 26px; opacity: 1; }.sidebar-wide .brand:hover .brand-mark { opacity: 1; }
 .sidebar.is-folded { height: var(--topbar-h); align-self: flex-start; padding: 0 5px; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .sidebar.is-folded::before { display: none; }
+/* Folded: the logo floats over the top bar's left end; the column takes no space, the workspace runs to the edge. */
+.sidebar.is-folded { position: absolute; top: 0; left: 0; margin: 0; }
+:root.sidebar-folded .topbar { padding-left: calc(var(--sidebar-w) + 8px); }
 .sidebar.is-folded > :not(.brand) { display: none; }
 .sidebar-wide .sidebar.is-folded { align-items: center; padding: 0 5px; }
 .sidebar-wide .sidebar.is-folded .brand { justify-content: center; padding: 0; }
