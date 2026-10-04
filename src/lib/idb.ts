@@ -28,6 +28,8 @@ export const stateDb = {
       // The browser copy is newer: it goes to disk only if it was built on the disk's current state. A copy another
       // tab left behind after newer work reached the disk is refused, and the disk's copy is used.
       if ((await disk.putState(local, savedAt(onDisk))) === 'conflict') {
+        // The refused browser copy is kept under its own key, never thrown away (AGENTS.md, critical rule).
+        await set(`${key}:conflict-${Date.now()}`, local, stateStore);
         await set(key, onDisk, stateStore);
         return onDisk;
       }
@@ -42,11 +44,6 @@ export const stateDb = {
     await set(key, stamped, stateStore);
   },
   del: (key: string) => del(key, stateStore),
-  /** After a refused write: the browser copy becomes the disk's again (this tab's last save there was the older one). */
-  async adoptDisk(key: string): Promise<void> {
-    const onDisk = await disk.getState();
-    if (onDisk) await set(key, onDisk, stateStore);
-  },
 };
 
 export const blobDb = {

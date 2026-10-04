@@ -98,6 +98,8 @@ const MIME_EXT = {
 };
 const EXT_MIME = Object.fromEntries(Object.entries(MIME_EXT).map(([m, e]) => [e, m]));
 const SAFE = /^[A-Za-z0-9_-]+$/;
+const BACKUP_EVERY_MS = 10 * 60_000;
+const BACKUPS_KEPT = 20;
 
 /** @param {string} [root] project folder (default: where Vite runs, i.e. the project root) */
 export function localStore(root = process.cwd()) {
@@ -107,6 +109,7 @@ export function localStore(root = process.cwd()) {
   // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
   // before either writes. A failed write does not stop the queue.
   let stateQueue = Promise.resolve();
+  let lastBackup = 0;
   function serialState(fn) {
     const run = stateQueue.then(fn);
     stateQueue = run.catch(() => undefined);
@@ -184,6 +187,24 @@ export function localStore(root = process.cwd()) {
           const head = await readFile(stateFile).then((b) => b.toString('utf8', 0, 40)).catch(() => '');
           const current = /^\{"savedAt":(\d+)/.exec(head)?.[1];
           if (current && current !== base) return Number(current);
+          // The user's data is never exposed to loss (AGENTS.md, critical rule). A write that drops more than half the
+          // sessions (an empty or foreign browser profile opening the app) is kept aside, never over the file; and the
+          // file goes to data/backups before a shrinking write and at most every 10 minutes (rename: no extra copy).
+          const sessions = (b) => (b.toString('utf8').match(/"id":"ses_/g) ?? []).length;
+          const old = await readFile(stateFile).catch(() => null);
+          const had = old ? sessions(old) : 0;
+          const has = sessions(next);
+          if (had >= 2 && has < had / 2) {
+            await atomic(join(dir, 'backups', `rejected-${Date.now()}.json`), next, 0o600);
+            return Number(current);
+          }
+          if (old && (has < had || Date.now() - lastBackup > BACKUP_EVERY_MS)) {
+            await mkdir(join(dir, 'backups'), { recursive: true });
+            await rename(stateFile, join(dir, 'backups', `state-${Date.now()}.json`));
+            lastBackup = Date.now();
+            const kept = (await readdir(join(dir, 'backups'))).filter((f) => f.startsWith('state-')).sort();
+            for (const f of kept.slice(0, -BACKUPS_KEPT)) await rm(join(dir, 'backups', f), { force: true });
+          }
           await atomic(stateFile, next, 0o600);
           return null;
         });

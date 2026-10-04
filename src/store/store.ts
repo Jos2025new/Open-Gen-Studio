@@ -519,10 +519,10 @@ export async function wipeAllData(): Promise<void> {
 }
 
 // Another tab (or window) saved newer work after this one loaded: this tab stops saving, its browser copy becomes the
-// disk's again, and it says so. Reloading shows the newer work; nothing this tab did after that point is kept.
+// disk's again, and it says so. Its browser copy is kept, never replaced.
 disk.onStateConflict(() => {
   // A tab that saves an older state over a newer one loses work (seen 2026-10-03): the trail says when it happened (T5).
   logEvent('save-conflict', { at: new Date().toISOString(), sessions: Object.keys(get().sessions).length });
-  void stateDb.adoptDisk('ogs-app');
+  // This tab keeps its own browser copy (closing it loses nothing); the disk keeps the other work.
   toast('Another tab saved newer work. This tab is out of date and no longer saves: reload it to continue.', 'error', 24 * 3600_000);
 });
