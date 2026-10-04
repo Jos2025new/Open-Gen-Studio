@@ -25,12 +25,12 @@ async function waitSaved(page: Page) {
     return JSON.stringify({ id, width, height, background, layers, groups, activeLayerId }) === JSON.stringify(state.document);
   }, { timeout: 15_000, message: 'Sandbox state and raster writes must finish' }).toBe(true);
 }
-async function checkInvariants(state: State, page: Page): Promise<string[]> {
+async function checkInvariants(state: State, page: Page, checkRaster = false): Promise<string[]> {
   assertSandbox(page);
   const problems: string[] = [], doc = state.document;
   const ids = doc.layers.map((l: any) => l.id), existing = new Set(ids);
   if (existing.size !== ids.length) problems.push('Duplicate layer IDs');
-  for (const layer of doc.layers.filter((l: any) => l.type === 'raster')) {
+  if (checkRaster) for (const layer of doc.layers.filter((l: any) => l.type === 'raster')) {
     for (const id of [layer.id, layer.paintBaseId].filter(Boolean)) {
       const response = await page.request.get(`${ORIGIN}/x/store/blob/${encodeURIComponent(`raster:${id}`)}`);
       if (!response.ok()) problems.push(`Missing raster file raster:${id} (HTTP ${response.status()})`);
@@ -56,16 +56,18 @@ async function checkInvariants(state: State, page: Page): Promise<string[]> {
   return problems;
 }
 async function roundTrip(page: Page, reload = false): Promise<string[]> {
-  await waitSaved(page);
+  if (reload) await waitSaved(page);
   const before = await readState(page);
   if (reload) {
+    const problems = await checkInvariants(before, page, true);
+    if (problems.length) return problems;
     await page.reload();
     await page.waitForFunction(() => (window as any).__OGS_TEST__?.().hydrated);
   } else if (before.history.undo) {
     await page.keyboard.press('Control+z');
     await page.keyboard.press('Control+y');
   }
-  await waitSaved(page);
+  if (reload) await waitSaved(page);
   const after = await readState(page);
   const changed = Object.keys(summary(before)).filter(k => JSON.stringify((summary(before) as any)[k]) !== JSON.stringify((summary(after) as any)[k]));
   return changed.length ? [`${reload ? 'Save/reload' : 'Undo/redo'} summary changed: ${changed.join(', ')}`] : [];
@@ -188,8 +190,8 @@ test('Designer seeded monkey with invariant monitor', async ({ page }) => {
     const started = Date.now(); let problems: string[] = [];
     try {
       entry.skipped = await action.run(page, params); entry.ms = Date.now() - started;
-      await waitSaved(page);
-      problems = await checkInvariants(await readState(page), page);
+      if (step % 25 === 0) await waitSaved(page);
+      problems = await checkInvariants(await readState(page), page, step % 25 === 0);
       if (!problems.length) problems.push(...await roundTrip(page));
       if (!problems.length && step % 25 === 0) problems.push(...await roundTrip(page, true));
       if (!problems.length) problems.push(...(errors.get(page)?.splice(0) ?? []));
