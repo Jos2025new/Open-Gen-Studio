@@ -165,6 +165,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     // cannot send without a preflight the dev server refuses, and any Origin they carry is this server's own.
     // A plain cross-site POST (no preflight needed) would otherwise reach /wipe.
     if (req.method !== 'GET' && req.method !== 'HEAD') {
+      if (req.headers['x-ogs-automated'] === '1') return send(403, 'automated writes are forbidden');
       const origin = req.headers.origin;
       if (req.headers['x-ogs'] !== '1' || (origin && origin !== `http://${req.headers.host}` && origin !== `https://${req.headers.host}`)) {
         return send(403, 'writes only from the app');

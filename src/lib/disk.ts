@@ -10,7 +10,13 @@ let available: Promise<boolean> | null = null;
  * Sent with every write to the local server. A page on another site cannot add it without the browser asking the
  * server first, and the dev server refuses that for other origins: a write from elsewhere never reaches the disk.
  */
-export const LOCAL_WRITE = { 'X-OGS': '1' } as const;
+export const LOCAL_WRITE = {
+  'X-OGS': '1',
+  // Evaluate at each write, including saves queued before webdriver was detected.
+  get 'X-OGS-Automated'() {
+    return typeof navigator !== 'undefined' && navigator.webdriver === true ? '1' : '0';
+  },
+} as const;
 
 export function diskAvailable(): Promise<boolean> {
   available ??= fetch('/x/store/ping', { cache: 'no-store' })

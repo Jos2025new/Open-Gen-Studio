@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -82,5 +82,28 @@ describe('local store: state writes', () => {
     expect(((await readdir(join(root, 'data'))) as string[]).filter((f) => f.endsWith('.tmp'))).toEqual([]);
     // The queue keeps working after a refusal.
     expect(await call(mw, 'PUT', '/x/store/state', `{"savedAt":300,"baseAt":${a === 204 ? 200 : 201},"tab":"c"}`)).toBe(204);
+  });
+});
+
+
+describe('local store: automated writes', () => {
+  it('rejects state, media, logs and wipe before reading the body or touching files', async () => {
+    const { root, mw } = setup();
+    const headers = { 'x-ogs': '1', 'x-ogs-automated': '1', host: 'localhost:5183' };
+    for (const [method, url] of [
+      ['PUT', '/x/store/state'], ['PUT', '/x/store/blob/asset%3Aprobe'],
+      ['DELETE', '/x/store/blob/asset%3Aprobe'], ['POST', '/x/store/log'], ['POST', '/x/store/wipe'],
+    ]) {
+      const req = { method, url, headers, async *[Symbol.asyncIterator]() { throw new Error('Body must not be read'); } };
+      const status = await new Promise<number>((resolve) => {
+        const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
+        mw(req, res, () => resolve(404));
+      });
+      expect(status).toBe(403);
+    }
+    expect(readFileSync(join(root, 'data/state.json'), 'utf8')).toBe('{"savedAt":100,"x":0}');
+    expect(readdirSync(join(root, 'data'))).toEqual(['state.json']);
+    expect(await call(mw, 'GET', '/x/store/state', '', headers)).toBe(200);
+    expect(await call(mw, 'PUT', '/x/store/state', '{"savedAt":200,"baseAt":100,"x":1}', { ...headers, 'x-ogs-automated': '0' })).toBe(204);
   });
 });
