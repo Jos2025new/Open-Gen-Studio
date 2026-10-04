@@ -17,3 +17,7 @@ e2e-runs/
 
 # Isolated development copy (contains private state)
 .sandbox/
+
+# Manual Playwright stress artifacts
+tests-e2e/failures/
+test-results/

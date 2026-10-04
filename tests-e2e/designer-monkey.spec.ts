@@ -92,12 +92,118 @@ async function setup(page: Page) {
   await waitSaved(page); errors.get(page)!.splice(0);
 }
 
-test('Designer invariants on real sandbox state', async ({ page }) => {
+function random(seed: number) {
+  return () => {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let n = Math.imul(seed ^ seed >>> 15, 1 | seed); n ^= n + Math.imul(n ^ n >>> 7, 61 | n);
+    return ((n ^ n >>> 14) >>> 0) / 4294967296;
+  };
+}
+type Params = { x: number; y: number; dx: number; dy: number; layer: number; choice: number };
+const layerPanel = (page: Page) => page.getByRole('complementary', { name: 'Layers', exact: true });
+async function drag(page: Page, x: number, y: number, dx: number, dy: number) {
+  await page.mouse.move(x, y); await page.mouse.down();
+  await page.mouse.move(x + dx, y + dy, { steps: 6 }); await page.mouse.up();
+}
+async function point(page: Page, x: number, y: number) {
+  const rect = (await page.locator('.stage-canvas').boundingBox())!;
+  const doc = (await readState(page)).document;
+  // Exact fit formula read from Stage.tsx; fixed desktop viewport, no zoom/pan actions.
+  const z = Math.max(.05, Math.min((rect.width - 144) / doc.width, (rect.height - 222) / doc.height, 4));
+  return { x: rect.x + (rect.width - doc.width * z) / 2 + x * z,
+    y: rect.y + Math.max(36, (rect.height - 150 - doc.height * z) / 2) + y * z, z };
+}
+async function geometry(page: Page, objects: boolean) {
+  return page.evaluate(async (objects) => {
+    const doc = (window as any).__OGS_TEST__().document;
+    const layer = doc.layers.find((l: any) => l.id === doc.activeLayerId);
+    if (!layer) return null;
+    // Read the app's actual geometry; no state mutation or copied hit-test implementation.
+    const source = objects ? '/src/engine/design/objectOps.ts' : '/src/engine/design/render.ts';
+    const module = await import(source);
+    return objects ? module.layerObjects(layer)[0]?.box ?? null : module.layerBox(layer);
+  }, objects);
+}
+const actions: Array<{ name: string; run: (page: Page, p: Params) => Promise<any> }> = [
+  { name: 'paint', run: async (page, p) => {
+    await page.getByRole('button', { name: 'Brush (B)', exact: true }).click();
+    const doc = (await readState(page)).document, a = await point(page, p.x * doc.width, p.y * doc.height);
+    await drag(page, a.x, a.y, p.dx, p.dy);
+  } },
+  { name: 'duplicate', run: async page => {
+    const button = layerPanel(page).getByRole('button', { name: 'Duplicate layer', exact: true });
+    if (await button.count() && await button.isEnabled()) await button.click(); else return 'no active layer';
+  } },
+  { name: 'move-object', run: async (page, p) => {
+    if (!(await readState(page)).document.layers.length) return 'no layers';
+    await page.getByRole('button', { name: 'Edit (V) · drag to move, double-click to edit', exact: true }).click();
+    await page.getByRole('radio', { name: 'Objects', exact: true }).first().check();
+    const box = await geometry(page, true); if (!box) return 'no selectable objects';
+    const a = await point(page, box.x + box.w / 2, box.y + box.h / 2); await drag(page, a.x, a.y, p.dx, p.dy);
+  } },
+  { name: 'scale-handle', run: async (page, p) => {
+    const rows = layerPanel(page).locator('.layer-select'); if (!await rows.count()) return 'no layers';
+    await rows.nth(p.layer % await rows.count()).click();
+    await page.getByRole('button', { name: 'Edit (V) · drag to move, double-click to edit', exact: true }).click();
+    await page.getByRole('radio', { name: 'Layer', exact: true }).first().check();
+    await page.getByRole('button', { name: 'Fit canvas', exact: true }).click();
+    const box = await geometry(page, false); if (!box) return 'empty layer has no handles';
+    const a = await point(page, box.x + box.w, box.y + box.h); await drag(page, a.x, a.y, p.dx, p.dy);
+  } },
+  { name: 'add-layer', run: async (page, p) => {
+    await layerPanel(page).getByRole('button', { name: 'New layer', exact: true }).click();
+    await page.getByRole('dialog', { name: 'New layer', exact: true }).getByRole('button', { name: ['Raster Pixels: paint, images', 'Vector Shapes and lineart', 'Text'][p.choice % 3], exact: true }).click();
+  } },
+  { name: 'delete-selection', run: async page => { await page.keyboard.press('Delete'); } },
+  { name: 'select-layers', run: async (page, p) => {
+    const rows = layerPanel(page).locator('.layer-select'); if (!await rows.count()) return 'no layers';
+    await rows.nth(p.layer % await rows.count()).click({ modifiers: [p.choice % 2 ? 'Control' : 'Shift'] });
+  } },
+  { name: 'group', run: async page => {
+    const rows = layerPanel(page).locator('.layer-select'); if (await rows.count() < 2) return 'needs two layers';
+    await rows.nth(0).click(); await rows.nth(1).click({ modifiers: ['Control'] });
+    await page.keyboard.press('Control+g');
+  } },
+  { name: 'mode', run: async (page, p) => {
+    if (!(await readState(page)).document.layers.length) return 'no layers';
+    await page.getByRole('button', { name: 'Edit (V) · drag to move, double-click to edit', exact: true }).click();
+    await page.getByRole('radio', { name: p.choice % 2 ? 'Objects' : 'Layer', exact: true }).first().check();
+  } },
+  { name: 'undo', run: async page => { await page.keyboard.press('Control+z'); } },
+];
+
+test('Designer seeded monkey with invariant monitor', async ({ page }) => {
+  const seed = process.env.SEED === undefined ? Date.now() >>> 0 : Number(process.env.SEED);
+  const count = Number(process.env.STEPS ?? 300), rng = random(seed);
+  if (!Number.isInteger(seed) || !Number.isInteger(count) || count < 1) throw new Error('SEED and STEPS must be integers; STEPS > 0');
+  console.log(`SEED=${seed} STEPS=${count} URL=${ORIGIN}`);
   await setup(page);
-  const problems = await checkInvariants(await readState(page), page);
-  problems.push(...await roundTrip(page));
-  // No edits between these round trips: the new document has one saved brush mark.
-  problems.push(...await roundTrip(page, true));
-  console.log(`INVARIANTS ${JSON.stringify(problems)}`);
-  expect(problems).toEqual([]);
+  const steps: any[] = [];
+  for (let step = 1; step <= count; step++) {
+    assertSandbox(page);
+    const action = actions[Math.floor(rng() * actions.length)];
+    const params = { x: .25 + rng() * .5, y: .25 + rng() * .4, dx: Math.round(rng() * 60 - 30), dy: Math.round(rng() * 60 - 30), layer: Math.floor(rng() * 100), choice: Math.floor(rng() * 6) };
+    const entry = { step, action: action.name, params, ms: 0, skipped: undefined as string | undefined };
+    steps.push(entry); if (steps.length > 50) steps.shift();
+    const started = Date.now(); let problems: string[] = [];
+    try {
+      entry.skipped = await action.run(page, params); entry.ms = Date.now() - started;
+      await waitSaved(page);
+      problems = await checkInvariants(await readState(page), page);
+      if (!problems.length) problems.push(...await roundTrip(page));
+      if (!problems.length && step % 25 === 0) problems.push(...await roundTrip(page, true));
+      if (!problems.length) problems.push(...(errors.get(page)?.splice(0) ?? []));
+    } catch (error) { entry.ms = Date.now() - started; problems.push(`Action/monitor error: ${String(error)}`); }
+    if (problems.length) {
+      const directory = `tests-e2e/failures/${seed}-${step}`;
+      await mkdir(directory, { recursive: true });
+      await writeFile(`${directory}/steps.json`, JSON.stringify({ seed, step, requestedSteps: count, steps }, null, 2));
+      await writeFile(`${directory}/state.json`, JSON.stringify(await readState(page), null, 2));
+      await writeFile(`${directory}/problems.txt`, problems.join('\n') + '\n');
+      await page.screenshot({ path: `${directory}/screenshot.png` });
+      console.log(`FAIL SEED=${seed} ACTIONS=${step}/${count} ${problems.join('; ')} ARTIFACTS=${directory}`);
+      throw new Error(problems.join('; '));
+    }
+  }
+  console.log(`PASS SEED=${seed} ACTIONS=${count}/${count}`);
 });
