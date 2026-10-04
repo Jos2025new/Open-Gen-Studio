@@ -23,9 +23,16 @@ const img = (id: string) => ({ id, sessionId: 'test', kind: 'image', name: id, m
 let dom: JSDOM | undefined;
 let root: Root | undefined;
 
-async function mountComposer() {
+async function mountComposer(initialMode: 'image' | 'video' = 'video', withImages = false) {
+  class TestResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
   dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', { url: 'http://localhost/' });
+  Object.assign(dom.window.HTMLElement.prototype, { attachEvent: () => undefined, detachEvent: () => undefined });
   Object.assign(globalThis, { window: dom.window, document: dom.window.document, HTMLElement: dom.window.HTMLElement, Element: dom.window.Element, Node: dom.window.Node, IS_REACT_ACT_ENVIRONMENT: true });
+  vi.stubGlobal('ResizeObserver', TestResizeObserver);
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: dom.window.navigator });
   vi.stubGlobal('fetch', async (url: string) => { throw new Error(`Blocked unapproved request in composer journey: ${url}`); });
   const [{ Composer }, { useStore }, { clearJourneyTrace, lastJourneyTrace }] = await Promise.all([
@@ -50,8 +57,8 @@ async function mountComposer() {
   useStore.setState({
     catalog: { ...st.catalog, models, schemas, status: { ...st.catalog.status, atlas: 'ready' } },
     settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'test-only' } },
-    composer: { ...st.composer, mode: 'video', video: { ...st.composer.video, modelRef: TEXT }, attachments: [], times: {} },
-    assets: {},
+    composer: { ...st.composer, mode: initialMode, image: { ...st.composer.image, modelRef: IMAGE_EDIT }, video: { ...st.composer.video, modelRef: TEXT }, attachments: withImages ? ['a', 'b'] : [], times: {} },
+    assets: withImages ? { a: img('a'), b: img('b') } as never : {},
   });
   const target = dom.window.document.getElementById('root')!;
   root = createRoot(target);
@@ -104,5 +111,22 @@ describe('the Composer React variant effect', () => {
     const retained = lastJourneyTrace().find((e) => e.event === 'composer.variant_retained' && (e.before as { imageCount?: number })?.imageCount === 1 && (e.after as { imageCount?: number })?.imageCount === 2);
     expect(retained).toBeDefined();
     expect(retained?.after).toMatchObject({ inputFunctions: { references: 2 } });
+  });
+
+  it('keeps an incompatible manual image model selected when images are already attached', async () => {
+    const { useStore } = await mountComposer('image', true);
+    const { checkDirect } = await import('../../src/engine/actions');
+    const modelChip = dom!.window.document.querySelector('.model-chip') as HTMLButtonElement;
+    await act(async () => modelChip.click());
+    const browse = [...dom!.window.document.querySelectorAll<HTMLButtonElement>('.ml-foot-main')].find((button) => button.textContent?.includes('Browse all models'));
+    if (browse) await act(async () => browse.click());
+    const rows = [...dom!.window.document.querySelectorAll<HTMLButtonElement>('.ml-row')];
+    const textRoute = rows.find((row) => row.textContent?.includes('Studio image text'));
+    expect(textRoute, `picker rows: ${rows.map((row) => row.textContent?.trim()).join(' | ')}`).toBeDefined();
+    await act(async () => textRoute!.click());
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(useStore.getState().composer.attachments).toEqual(['a', 'b']);
+    expect(useStore.getState().composer.image.modelRef).toBe(IMAGE_TEXT);
+    expect(checkDirect('image')).toMatchObject({ ok: false, reason: expect.stringMatching(/accept|input|image|reference|needs/i) });
   });
 });

@@ -79,7 +79,7 @@ describe('runtime request and card decisions', () => {
     expect(lastJourneyTrace().some((e) => e.event === 'settings.confirmed')).toBe(false);
   });
 
-  it('a model-preserving correction revises only its requested step and retains the other step settings', async () => {
+  it('presents a simulated revision that already preserves the unrequested step and its settings', async () => {
     const original = { title: 'Two options', steps: [
       { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
       { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
@@ -105,5 +105,35 @@ describe('runtime request and card decisions', () => {
     expect(after?.plan.steps[1]).toMatchObject({ settings: (before?.plan.steps[1] as { settings: unknown }).settings });
     expect(lastJourneyTrace().filter((e) => e.event === 'plan.normalized').length).toBe(2);
     expect(lastJourneyTrace().some((e) => e.event === 'plan.comment_received')).toBe(true);
+  });
+
+  it('accepts an unrequested change to step one and includes it in the revised plan for user review', async () => {
+    const original = { title: 'Two options', steps: [
+      { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
+      { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },
+    ] };
+    const revised = { ...original, revision: true, steps: [
+      { ...original.steps[0], prompt: 'portrait, red hat' },
+      { ...original.steps[1], prompt: 'back view, blue jacket' },
+    ] };
+    replies = [
+      { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF, count: 1 }] } },
+      { name: 'propose_plan', args: original },
+      { name: 'propose_plan', args: revised },
+    ];
+    await sendAgentMessage('Make two images');
+    const card = settingsCard();
+    expect(card).toBeDefined();
+    if (!card) return;
+    await confirmSettings(sessionId, card.id, [card.sections[0].recommended]);
+    const before = planCards().find((p) => p.status === 'awaiting');
+    expect(before).toBeDefined();
+    await sendAgentMessage('Change only the second jacket to blue');
+    const after = planCards().find((p) => p.status === 'awaiting');
+    expect(after?.revised).toBe(true);
+    expect(after?.plan.steps[0]).toMatchObject({ prompt: 'portrait, red hat' });
+    expect(after?.plan.steps[1]).toMatchObject({ prompt: 'back view, blue jacket' });
+    expect(after?.status).toBe('awaiting');
+    expect(lastJourneyTrace().some((e) => e.event === 'plan.rejected')).toBe(false);
   });
 });
