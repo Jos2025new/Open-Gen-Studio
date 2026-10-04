@@ -4,6 +4,9 @@ interface BenchFile extends Uint8Array {
 }
 declare module 'node:fs' {
   export function readFileSync(path: string): BenchFile;
+  export function readFileSync(path: string, encoding: 'utf8'): string;
+  export function readdirSync(path: string): string[];
+  export function symlinkSync(target: string, path: string): void;
   export function existsSync(path: string): boolean;
   export function mkdirSync(path: string, opts?: { recursive?: boolean }): void;
   export function writeFileSync(path: string, data: string): void;
@@ -20,4 +23,4 @@ declare module 'node:os' {
 declare module 'node:path' {
   export function join(...parts: string[]): string;
 }
-declare const process: { env: Record<string, string | undefined> };
+declare const process: { cwd(): string; env: Record<string, string | undefined> };
