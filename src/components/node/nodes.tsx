@@ -6,6 +6,7 @@ import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsPara
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, renameNode, setSketch, tryConnect } from '../../engine/flow/actions';
 import { nodeAttempt, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
+import { detachOutputs, detachedOutputGroup, reattachOutputs } from '../../engine/flow/arrange';
 import { extensionForMime } from '../../lib/media';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
 import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
@@ -231,7 +232,9 @@ function useNodeOutput(node: GraphNode) {
   const d = node.data;
   const genId = runsGeneration(d) ? d.generationId : undefined;
   const g = useStore((s) => (genId ? s.generations[genId] : undefined));
-  return nodeOutput(node, g && genId ? { [genId]: g } : {});
+  const detached = useStore(s => Boolean(detachedOutputGroup(s.sessions[s.activeSessionId]?.graph, node.id)));
+  const output = nodeOutput(node, g && genId ? { [genId]: g } : {});
+  return detached ? { ...output, all: output.assetId ? [output.assetId] : [] } : output;
 }
 
 /** Card content: the result first. Empty, running and error states keep the same footprint. */
@@ -350,10 +353,13 @@ function NodeActions({ node, out }: { node: GraphNode; out: PortType | null }) {
   const sessionId = useSessionId();
   const { assetId, all, sketch } = useNodeOutput(node);
   const runnable = runsGeneration(node.data);
+  const detached = useStore(s => detachedOutputGroup(s.sessions[sessionId]?.graph, node.id));
   const quick = assetId && out ? OP_IDS.filter((id) => OPS[id].quick && OPS[id].input === out).slice(0, 4) : [];
   return (
     <div className="nt-bar">
       {runnable ? <RunButton node={node} /> : null}
+      {detached ? <button type="button" className="nt-btn nodrag" onClick={() => reattachOutputs(sessionId, detached.id)}>Reattach outputs</button>
+        : runnable && all.length > 1 && !sketch ? <button type="button" className="nt-btn nodrag" onClick={() => detachOutputs(sessionId, node.id)}>Detach outputs</button> : null}
       {quick.map((id) => {
         const QIcon = OP_ICONS[id];
         return (

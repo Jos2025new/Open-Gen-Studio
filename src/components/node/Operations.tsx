@@ -41,7 +41,7 @@ export function Operations({ sessionId, graph, ids, sizes, onSelect }: { session
           <>
             {group ? (
               <button type="button" className="nt-btn" data-tip="Ctrl+Shift+G" onClick={() => ungroup(sessionId, group.id)}>
-                <Ungroup size={13} /> Ungroup
+                <Ungroup size={13} /> {'detachedOutputs' in group ? 'Reattach outputs' : 'Ungroup'}
               </button>
             ) : (
               <button type="button" className="nt-btn" data-tip="Ctrl+G" onClick={() => groupNodes(sessionId, ids)}>
@@ -124,6 +124,7 @@ export const GroupNode = memo(function GroupNode({ data, selected }: NodeProps<G
             {group.title}
           </span>
         )}
+        {'detachedOutputs' in group ? <button type="button" className="nt-btn nodrag" onClick={() => ungroup(sessionId, group.id)}>Reattach outputs</button> : null}
         <button type="button" className="group-dot nodrag" aria-label="Background color" data-tip="Background color" style={group.color ? { background: group.color } : undefined} onClick={() => setPalette((v) => !v)} />
         {palette ? (
           <span className="group-palette nodrag">

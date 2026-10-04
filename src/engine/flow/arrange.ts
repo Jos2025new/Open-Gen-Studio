@@ -1,8 +1,9 @@
 import { uid } from '../../lib/id';
 import type { Graph, GraphEdge, GraphGroup, GraphNode, GenNodeData } from '../types';
-import { setGraph, useStore } from '../../store/store';
+import { setGraph, toast, useStore } from '../../store/store';
 import { connect, connectionError, inputPorts, NODE_WIDTH, runsGeneration } from './graph';
 import { deleteNodes } from './actions';
+import { graphEditProblem } from './locks';
 
 /*
  * Several selected nodes: align and distribute them, group them under a frame, copy, cut and paste them.
@@ -73,14 +74,17 @@ export function wholeGroup(graph: Graph, ids: string[]): GraphGroup | undefined 
 export function groupNodes(sessionId: string, ids: string[], title?: string): string | null {
   const graph = get().sessions[sessionId]?.graph;
   if (!graph || ids.length < 2) return null;
+  if (ids.some(id => detachedOutputGroup(graph, id))) { toast('Reattach these outputs before changing their group.', 'error'); return null; }
   const id = uid('grp');
   const n = (graph.groups?.length ?? 0) + 1;
-  const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => g.nodeIds.length > 1);
+  const kept = (graph.groups ?? []).map((g) => ({ ...g, nodeIds: g.nodeIds.filter((x) => !ids.includes(x)) })).filter((g) => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
   setGraph(sessionId, (g) => ({ ...g, groups: [...kept, { id, title: title ?? `Group ${n}`, nodeIds: [...ids] }] }));
   return id;
 }
 
 export function ungroup(sessionId: string, groupId: string): void {
+  const graph = get().sessions[sessionId]?.graph;
+  if (graph?.groups?.some(g => g.id === groupId && 'detachedOutputs' in g)) { reattachOutputs(sessionId, groupId); return; }
   setGraph(sessionId, (g) => ({ ...g, groups: (g.groups ?? []).filter((x) => x.id !== groupId) }));
 }
 
@@ -172,4 +176,97 @@ export function pasteNodes(sessionId: string, at?: { x: number; y: number }): st
   }
   setGraph(sessionId, () => next);
   return added.map((n) => n.id);
+}
+
+// Detached cards share their existing generation, while the selected card keeps the original node ID.
+interface OutputSnapshot {
+  node: GraphNode;
+  nodeIndex: number;
+  edges: Array<{ edge: GraphEdge; index: number }>;
+  previousGroup?: { group: GraphGroup; index: number };
+  hadGroups: boolean;
+  copiedInputIds: string[];
+}
+export type DetachedOutputGroup = GraphGroup & { detachedOutputs: OutputSnapshot };
+
+export function detachedOutputGroup(graph: Graph | undefined, nodeId: string): DetachedOutputGroup | undefined {
+  return graph?.groups?.find(g => g.nodeIds.includes(nodeId) && 'detachedOutputs' in g) as DetachedOutputGroup | undefined;
+}
+
+export function detachOutputs(sessionId: string, nodeId: string): string[] {
+  const state = get(), graph = state.sessions[sessionId]?.graph;
+  const node = graph?.nodes.find(n => n.id === nodeId);
+  if (!graph || !node || !runsGeneration(node.data) || detachedOutputGroup(graph, nodeId)) return [];
+  const data = node.data as GenNodeData;
+  const generation = data.generationId && state.generations[data.generationId];
+  if (!generation || generation.status !== 'done' || generation.assetIds.length < 2 || data.sketchAssetId) return [];
+  if (data.outputIndex < 0 || data.outputIndex >= generation.assetIds.length) return [];
+  const cards: GraphNode[] = generation.assetIds.map((_, outputIndex) => ({
+    ...structuredClone(node),
+    id: outputIndex === data.outputIndex ? node.id : uid('nd'),
+    position: { x: node.position.x + (outputIndex - data.outputIndex) * (NODE_WIDTH + 60), y: node.position.y },
+    data: { ...structuredClone(data), outputIndex },
+  }));
+  const inputs = graph.edges.filter(e => e.target === nodeId);
+  const copied = cards.filter(n => n.id !== nodeId).flatMap(n => inputs.map(e => ({ ...e, id: uid('edge'), target: n.id })));
+  const previousIndex = graph.groups?.findIndex(g => g.nodeIds.includes(nodeId)) ?? -1;
+  const group: DetachedOutputGroup = {
+    id: uid('grp'), title: node.data.title, nodeIds: cards.map(n => n.id),
+    detachedOutputs: {
+      node: structuredClone(node), nodeIndex: graph.nodes.indexOf(node),
+      edges: graph.edges.flatMap((edge, index) => edge.source === nodeId || edge.target === nodeId ? [{ edge: structuredClone(edge), index }] : []),
+      previousGroup: previousIndex < 0 ? undefined : { group: structuredClone(graph.groups![previousIndex]), index: previousIndex },
+      hadGroups: graph.groups !== undefined, copiedInputIds: copied.map(e => e.id),
+    },
+  };
+  const groups = (graph.groups ?? []).map(g => g.nodeIds.includes(nodeId) ? { ...g, nodeIds: g.nodeIds.filter(id => id !== nodeId) } : g).filter(g => g.nodeIds.length > 1 || (g.nodeIds.length > 0 && 'detachedOutputs' in g));
+  const next = { ...graph, nodes: graph.nodes.flatMap(n => n.id === nodeId ? cards : [n]), edges: [...graph.edges, ...copied], groups: [...groups, group] };
+  const problem = graphEditProblem(sessionId, graph, next);
+  if (problem) { toast(problem, 'error'); return []; }
+  setGraph(sessionId, () => next);
+  return group.nodeIds;
+}
+
+export function reattachOutputs(sessionId: string, groupId: string): void {
+  const state = get(), graph = state.sessions[sessionId]?.graph;
+  const group = graph?.groups?.find(g => g.id === groupId && 'detachedOutputs' in g) as DetachedOutputGroup | undefined;
+  if (!graph || !group) return;
+  const saved = group.detachedOutputs, members = new Set(group.nodeIds);
+  const originalIds = new Set(saved.edges.map(e => e.edge.id));
+  const copiedIds = new Set(saved.copiedInputIds);
+  const touches = (edge: GraphEdge) => members.has(edge.source) || members.has(edge.target);
+  const additions = graph.edges.filter(e => touches(e) && !originalIds.has(e.id) && !copiedIds.has(e.id));
+  const next: Graph = { ...graph,
+    nodes: graph.nodes.filter(n => !members.has(n.id)),
+    edges: graph.edges.filter(e => !touches(e) && !originalIds.has(e.id) && !copiedIds.has(e.id)),
+    groups: graph.groups?.filter(g => g.id !== groupId),
+  };
+  next.nodes.splice(saved.nodeIndex, 0, structuredClone(saved.node));
+  const live = new Set(next.nodes.map(n => n.id));
+  for (const { edge, index } of saved.edges) {
+    if (live.has(edge.source) && live.has(edge.target)) next.edges.splice(index, 0, structuredClone(edge));
+  }
+  if (saved.previousGroup) {
+    const previous = saved.previousGroup.group;
+    const current = next.groups?.find(g => g.id === previous.id);
+    const restored = { ...structuredClone(previous), nodeIds: [...new Set([...previous.nodeIds, ...(current?.nodeIds ?? [])])].filter(id => live.has(id)) };
+    next.groups = next.groups?.filter(g => g.id !== previous.id) ?? [];
+    next.groups.splice(saved.previousGroup.index, 0, restored);
+  }
+  if (!saved.hadGroups && !next.groups?.length) delete next.groups;
+  const skipped: string[] = [];
+  for (const added of additions) {
+    const edge = { ...added, source: members.has(added.source) ? saved.node.id : added.source, target: members.has(added.target) ? saved.node.id : added.target };
+    if (next.edges.some(e => e.source === edge.source && e.target === edge.target && e.targetHandle === edge.targetHandle && e.sourceHandle === edge.sourceHandle)) continue;
+    const target = next.nodes.find(n => n.id === edge.target);
+    const port = target && inputPorts(target.data).find(p => p.id === edge.targetHandle);
+    const occupied = port && !port.multi && next.edges.some(e => e.target === edge.target && e.targetHandle === edge.targetHandle);
+    const problem = occupied ? 'input port already connected' : connectionError(next, state.assets, edge);
+    if (problem) skipped.push(`${edge.id}: ${problem}`);
+    else next.edges.push(edge);
+  }
+  const problem = graphEditProblem(sessionId, graph, next);
+  if (problem) { toast(problem, 'error'); return; }
+  setGraph(sessionId, () => next);
+  if (skipped.length) toast(`Could not keep ${skipped.length} new connection(s): ${skipped.join('; ')}`, 'error');
 }
