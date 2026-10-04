@@ -99,6 +99,10 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   if (!from) return null;
   const type = outputPort(from.data, st.assets);
   const port = inputPorts(data).find((p) => p.type === type) ?? inputPorts(data).find((p) => portFits(type, p.type));
+  // A node of the same kind keeps the model the source has *now* (and its settings), not the composer's default.
+  if ('modelRef' in data && 'modelRef' in from.data && from.data.kind === data.kind) {
+    data = { ...data, modelRef: from.data.modelRef, settings: { ...structuredClone(from.data.settings), seed: undefined } } as GraphNodeData;
+  }
   // A node made from an image keeps that image's shape, not the composer's format.
   const src = st.assets[nodeOutputAsset(from, st.generations) ?? ''];
   const view = src?.kind === 'model3d' ? st.assets[src.viewImageId ?? ''] : src;
