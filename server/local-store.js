@@ -4,7 +4,7 @@
 import { execFile } from 'node:child_process';
 import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -102,8 +102,8 @@ const BACKUP_EVERY_MS = 10 * 60_000;
 const BACKUPS_KEPT = 20;
 
 /** @param {string} [root] project folder (default: where Vite runs, i.e. the project root) */
-export function localStore(root = process.cwd()) {
-  const dir = join(root, 'data');
+export function localStore(root = process.cwd(), dataDir = 'data') {
+  const dir = resolve(root, dataDir);
   const stateFile = join(dir, 'state.json');
 
   // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
@@ -345,7 +345,7 @@ export function localStore(root = process.cwd()) {
     // "Wipe all data": keep a dated backup instead of deleting, so nothing is lost for good.
     if (path === '/wipe' && req.method === 'POST') {
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      await rename(dir, join(root, `data.bak-${stamp}`)).catch(() => undefined);
+      await rename(dir, join(dirname(dir), `data.bak-${stamp}`)).catch(() => undefined);
       return send(204);
     }
 

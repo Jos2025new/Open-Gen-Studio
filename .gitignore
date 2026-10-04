@@ -14,3 +14,6 @@ data.bak-*/
 
 # Live end-to-end runs (generated media and reports)
 e2e-runs/
+
+# Isolated development copy (contains private state)
+.sandbox/
