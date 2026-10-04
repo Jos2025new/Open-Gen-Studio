@@ -101,7 +101,8 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 /* A result number sits top-left on multi-result cards: the box goes right after it. */
 .tile-num ~ .attach-toggle { top: 5px; left: 32px; }
 /* Node media stretches its children; the box keeps its own size there. */
-.nc-media > .attach-toggle { width: 22px; height: 22px; top: auto; bottom: 8px; } /* top-left holds the node badge */
+.nc-media > .attach-toggle { width: 22px; height: 22px; top: 8px; left: 8px; }
+.nc-media:has(> .nc-badge) > .attach-toggle { top: 32px; } /* below the progress / sketched badge when it shows */
 @media (hover: none) { .attach-toggle { opacity: 1; } }
 
 /* Import from Chat / Nodes in the top bar: boxed like the secondary buttons beside it, so it reads as an action. */
