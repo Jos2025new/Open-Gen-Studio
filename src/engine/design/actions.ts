@@ -5,6 +5,9 @@ import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedVal
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
+import { useLayerSelection } from './selection';
+import { objectPick, setObjectPick } from './objectSelection';
+import { layerObjects } from './objectOps';
 import { composeRaster, rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { exportDoc, layoutText, textAscent } from './render';
@@ -33,6 +36,9 @@ export function mutateDoc(sessionId: string, docId: string, fn: (d: DesignDoc) =
   if (!doc) return;
   if (opts.record !== false) record(doc);
   setDoc(sessionId, docId, fn);
+  // Any change (delete, group, merge…) leaves no pick on a layer or object that is gone.
+  const next = getDoc(sessionId, docId);
+  if (next) prunePicks(next);
 }
 
 export function addDoc(sessionId: string, doc: DesignDoc): void {
@@ -283,14 +289,27 @@ export function undoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const prev = undo(doc);
-  if (prev) setDoc(sessionId, docId, () => prev);
+  if (prev) (setDoc(sessionId, docId, () => prev), prunePicks(prev));
 }
 
 export function redoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const next = redo(doc);
-  if (next) setDoc(sessionId, docId, () => next);
+  if (next) (setDoc(sessionId, docId, () => next), prunePicks(next));
+}
+
+/** After undo/redo the picks keep only what the restored document still has (a stale pick moved or deleted ghosts). */
+export function prunePicks(doc: DesignDoc): void {
+  const ids = new Set(doc.layers.map((l) => l.id));
+  const layers = useLayerSelection.getState().byDoc[doc.id];
+  if (layers?.some((id) => !ids.has(id))) useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [doc.id]: layers.filter((id) => ids.has(id)) } }));
+  const pick = objectPick(doc.id);
+  if (!pick) return;
+  const layer = doc.layers.find((l) => l.id === pick.layerId);
+  const alive = new Set(layer ? layerObjects(layer).map((o) => o.id) : []);
+  const kept = pick.ids.filter((id) => alive.has(id));
+  if (kept.length !== pick.ids.length) setObjectPick(doc.id, kept.length ? { layerId: pick.layerId, ids: kept } : null);
 }
 
 async function storeDesignAsset(sessionId: string, blob: Blob, width: number, height: number, origin: Asset['origin']): Promise<Asset> {

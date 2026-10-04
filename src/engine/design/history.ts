@@ -1,6 +1,8 @@
 import type { DesignDoc } from '../types';
 import { rasterBufferIds, restoreBuffers, snapshotBuffers } from './raster';
 import { getSelection, setSelection, type PixelSelection } from './pixelSelection';
+import { useLayerSelection } from './selection';
+import { objectPick, setObjectPick, type ObjectPick } from './objectSelection';
 
 /* Undo/redo for Designer documents. Raster pixels are captured by reference (copy-on-write buffers). */
 
@@ -9,6 +11,9 @@ interface Snapshot {
   buffers: Map<string, HTMLCanvasElement>;
   /** The pixel selection then: undo and redo bring it back, as in GIMP and Krita. */
   sel: PixelSelection | null;
+  /** The picked layers and objects then: redo brings back what the change had selected (a duplicate stays picked). */
+  layers: string[] | undefined;
+  objects: ObjectPick | null;
 }
 
 interface Stack {
@@ -29,9 +34,15 @@ function stack(docId: string): Stack {
   return s;
 }
 
+function restorePicks(docId: string, snap: Snapshot): void {
+  setSelection(docId, snap.sel);
+  useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: snap.layers ?? [] } }));
+  setObjectPick(docId, snap.objects);
+}
+
 function capture(doc: DesignDoc): Snapshot {
   const rasterIds = rasterBufferIds(doc.layers.filter((l) => l.type === 'raster'));
-  return { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id) };
+  return { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
 }
 
 /** Record the state *before* a change. */
@@ -49,7 +60,7 @@ export function undo(current: DesignDoc): DesignDoc | null {
   if (!prev) return null;
   s.future.push(capture(current));
   restoreBuffers(prev.buffers);
-  setSelection(current.id, prev.sel);
+  restorePicks(current.id, prev);
   listeners.forEach((l) => l());
   return prev.doc;
 }
@@ -60,7 +71,7 @@ export function redo(current: DesignDoc): DesignDoc | null {
   if (!next) return null;
   s.past.push(capture(current));
   restoreBuffers(next.buffers);
-  setSelection(current.id, next.sel);
+  restorePicks(current.id, next);
   listeners.forEach((l) => l());
   return next.doc;
 }
