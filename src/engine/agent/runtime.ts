@@ -1186,6 +1186,10 @@ export function askForPlan(sessionId: string, noticeId: string): void {
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
 const SILENCE_MS = 60_000;
 const TURN_CAP_MS = 5 * 60_000;
+/** Past this, the next call of the turn carries a short system warning (a running stream cannot be interrupted). */
+const HURRY_MS = 50_000;
+const HURRY_NOTE =
+  '<system_warning>The user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
 async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
@@ -1238,7 +1242,11 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           apiKey: engine.key,
           model: engine.model,
           system: SYSTEM_PROMPT,
-          messages: repairHistory(session(sessionId).agent.history),
+          // Only sent, never stored: the warning applies to this turn and does not pile up in the history.
+          messages:
+            Date.now() - turnStart > HURRY_MS
+              ? [...repairHistory(session(sessionId).agent.history), { role: 'user', content: HURRY_NOTE }]
+              : repairHistory(session(sessionId).agent.history),
           tools: TOOLS,
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
