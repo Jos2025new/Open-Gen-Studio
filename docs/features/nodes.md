@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | El ejecutor común pasa el candidato elegido a referencias, fotogramas y operaciones; si falta ese candidato, rechaza el dependiente. | [src/engine/executor.ts](../../src/engine/executor.ts) | [tests/node-execution.test.ts](../../tests/node-execution.test.ts) |
 | El historial separa sesiones, agrupa escritura y preserva resultados recientes y viewport al deshacer. | [src/engine/flow/history.ts](../../src/engine/flow/history.ts) | [tests/graph-history.test.ts](../../tests/graph-history.test.ts) |
+| Desacoplar conserva resultados y ajustes, copia entradas a todas las tarjetas y deja las salidas solo en el resultado seleccionado; reacoplar restaura el grafo y conserva conexiones nuevas compatibles, avisando de descartes. | [src/engine/flow/arrange.ts](../../src/engine/flow/arrange.ts), [src/components/node/nodes.tsx](../../src/components/node/nodes.tsx), [src/components/node/Operations.tsx](../../src/components/node/Operations.tsx) | [tests/arrange.test.ts](../../tests/arrange.test.ts) |
 
 ## Diseño aprobado: desacoplar resultados
 El nodo acoplado sigue siendo el comportamiento por defecto.
