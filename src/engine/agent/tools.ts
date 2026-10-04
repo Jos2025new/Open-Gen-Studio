@@ -428,6 +428,10 @@ const stepSchema = z
   })
   .passthrough();
 
+const STEPS_AS_TEXT = Symbol('steps sent as broken text');
+const STEPS_HELP =
+  'must be a JSON array of step objects, not a string (and no extra or missing brackets). Example: "steps": [{"id": "s1", "kind": "image", "prompt": "..."}, {"id": "s2", "kind": "image", "prompt": "..."}]';
+
 export const proposePlanSchema = z.object({
   title: z.string().max(200).optional(),
   summary: z.string().max(600).optional(),
@@ -438,7 +442,16 @@ export const proposePlanSchema = z.object({
     .array(z.object({ name: z.string().max(40), kind: z.enum(['character', 'object', 'product', 'location', 'style']).optional(), from: z.string().max(80), description: z.string().max(200).optional() }))
     .max(6)
     .optional(),
-  steps: z.array(stepSchema).min(1).max(MAX_PLAN_STEPS),
+  // Some models send the array as a JSON string: a valid one is read; a broken one gets an error that says how to fix it.
+  steps: z.preprocess(
+    (v) => {
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch { return STEPS_AS_TEXT; }
+    },
+    z.unknown().superRefine((v, ctx) => {
+      if (v === STEPS_AS_TEXT || !Array.isArray(v)) ctx.addIssue({ code: 'custom', message: STEPS_HELP });
+    }).pipe(z.array(stepSchema).min(1).max(MAX_PLAN_STEPS)),
+  ),
 });
 
 export function parseToolArgs(raw: string): { ok: true; value: unknown } | { ok: false; error: string } {
