@@ -1,3 +1,4 @@
+import { APP_GUIDES } from './app';
 import { MODEL_GUIDES, modelGuide } from '../guides';
 import type { Workspace } from '../types';
 import stagedGuide from '../guides/staged.md?raw';
@@ -20,6 +21,7 @@ export function guideIndex(): string {
     `  skill:${STAGED_ID} — Staged pieces: the rules for any piece with 2+ results, clips or stages (questions card, look, pre-production, sheets, pilot, one clip or several, sequence). Comes with every workflow; load it yourself only when no workflow fits.`,
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
     ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}${g.optional ? ' (optional)' : ''}`),
+    ...APP_GUIDES.map((g) => `  app:${g.id} — ${g.name}: ${g.description}`),
   ].join('\n');
 }
 
@@ -43,6 +45,7 @@ export function guideWorkspaceProblem(id: string, workspace: Workspace): string 
 /** The full text of a skill or workflow for read_guide ("skill:product", "workflow:storyboard", "workflow:ugc/unboxing"). */
 export function readGuide(id: string): string | undefined {
   const [type, rest = ''] = id.trim().split(':');
+  if (type === 'app') return APP_GUIDES.find((g) => g.id === rest)?.text;
   if (type === 'model') return modelGuide(rest)?.text;
   if (type === 'skill') {
     if (rest === STAGED_ID) return stagedGuide;
