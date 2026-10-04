@@ -15,6 +15,7 @@
 
 ## Reglas duras
 
+- Trabaja en un worktree propio (`git worktree add ../ogs-<tarea> -b task/<tarea>`), nunca en la carpeta original: de ella corre la app real. No fusiones: deja la rama lista con `npm test` y repórtala. Si el puerto del sandbox está ocupado, espera o pregunta; no mates el proceso de otro.
 - Nada de navegadores automatizados, perfiles, CDP, extensiones ni copias de IndexedDB sobre la app real. No arrancarla para verificar cambios. Las pruebas de la app usan exclusivamente el sandbox y terminan deteniéndolo.
 - No escribir en data/, sus copias ni el almacenamiento del navegador del usuario. Cualquier borrado o migración requiere aprobación explícita. El sandbox usa .sandbox/data y el puerto 5183; otro puerto con los mismos datos no aísla nada.
 - Conservar serialización, baseAt, copias de seguridad, rechazo de pérdida masiva de sesiones y rechazo de escrituras automatizadas.
