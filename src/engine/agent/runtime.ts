@@ -74,7 +74,7 @@ import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
-import { TOOLS, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
+import { TOOLS, CAPABILITIES, MUST, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
 /** One controller per turn, by session: a turn in one session never stops or clears another's. */
@@ -1186,6 +1186,7 @@ export function askForPlan(sessionId: string, noticeId: string): void {
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
 const SILENCE_MS = 60_000;
 const TURN_CAP_MS = 5 * 60_000;
+const AGENT_SYSTEM = `${MUST}\n\n${CAPABILITIES}\n\n${SYSTEM_PROMPT}\n\n${MUST}`;
 /** Past this, the next call of the turn carries a short system warning (a running stream cannot be interrupted). */
 const HURRY_MS = 50_000;
 const HURRY_NOTE =
@@ -1241,7 +1242,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           provider: engine.provider,
           apiKey: engine.key,
           model: engine.model,
-          system: SYSTEM_PROMPT,
+          system: AGENT_SYSTEM,
           // Only sent, never stored: the warning applies to this turn and does not pile up in the history.
           messages:
             Date.now() - turnStart > HURRY_MS

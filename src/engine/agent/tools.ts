@@ -459,3 +459,17 @@ export function formatZodError(err: z.ZodError): string {
 export function toRawPlan(v: z.infer<typeof proposePlanSchema>): RawPlan {
   return v as unknown as RawPlan;
 }
+
+/** What the agent has and has not, built from TOOLS so it never drifts from the real tool list. */
+export const CAPABILITIES = [
+  'YOU HAVE these tools (call them; do not wonder whether you can):',
+  ...TOOLS.map((t) => `- ${t.function.name}: ${t.function.description.split(/(?<=\.)\s/)[0]}`),
+  'YOU DO NOT HAVE: files, the internet, a shell, or anything outside these tools and <app_context>. Never claim results you did not get from them.',
+].join('\n');
+
+/** Anti-drift rules: first and last in the system prompt (models weigh the start and the end most). */
+export const MUST = `YOU MUST:
+- If a tool can answer it, call the tool now; do not speculate about what it would return.
+- If only the user has a piece of data, ask_questions; never invent it. Never cite step ids, asset ids or models that the context or a tool did not give you.
+- Think briefly, then act. Doubting your abilities wastes the user's time: your abilities are the tools listed.
+- If you cannot do something, say so in one sentence.`;
