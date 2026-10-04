@@ -215,10 +215,23 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
     return;
   }
-  // Typing while the settings card is open confirms what it shows, with the message as a note.
+  // Typing while the settings card is open never confirms it (a question or an objection is not a yes): the card
+  // closes unconfirmed and the agent answers; if the work still stands it shows a new card with what was asked.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
-    await confirmSettings(sessionId, pendingItem.id, sectionsOf(pendingItem).map((x) => x.chosen ?? x.recommended), clean);
-    return;
+    updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
+    const engine = agentEngine();
+    if (engine.kind === 'llm' && pending.toolCallId) {
+      const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
+      pushHistory(sessionId, {
+        role: 'tool',
+        tool_call_id: pending.toolCallId,
+        content: `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`,
+      });
+      patchAgent(sessionId, { pending: undefined, notes: [] });
+      await llmTurn(sessionId, workspace);
+      return;
+    }
+    patchAgent(sessionId, { pending: undefined });
   }
   // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
@@ -250,7 +263,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   if (pending) resolvePendingAsSuperseded(sessionId);
   // Confirmed settings belong to one request (its plan and its revisions): a new request shows the card again,
   // so old values (a sheet's 16:9 ×2) never silently apply to new work.
-  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settings: undefined });
+  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settings: undefined, settingsParts: undefined });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;

@@ -153,6 +153,19 @@ describe('a video plan before the settings are confirmed', () => {
     expect(tool).toMatch(/call confirm_settings first \(kind "video"\)/);
   });
 
+  it('typing while the settings card is open does not confirm it (16:04: a question confirmed Nano Banana)', async () => {
+    first = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF }] } };
+    await sendAgentMessage('Haz un gato');
+    const sid = useStore.getState().activeSessionId;
+    const card = () => useStore.getState().sessions[sid].feed.find((f) => f.type === 'settings') as { status: string } | undefined;
+    expect(card()?.status).toBe('pending');
+    await sendAgentMessage('¿Por qué ese modelo?');
+    expect(card()?.status).toBe('skipped');
+    expect(useStore.getState().sessions[sid].agent.settings).toBeUndefined();
+    const tool = sent.at(-1)!.messages.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    expect(tool).toMatch(/Nothing was confirmed/);
+  });
+
   it('a video model guide is not loaded before the model is confirmed', async () => {
     first = { name: 'read_guide', args: { id: 'model:minimax' } };
     await sendAgentMessage('Haz un video UGC');
