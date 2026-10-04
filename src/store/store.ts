@@ -1,3 +1,7 @@
+import { historyDepth } from '../engine/design/history';
+import { pendingRaster } from '../engine/design/raster';
+import { useLayerSelection } from '../engine/design/selection';
+import { objectPick } from '../engine/design/objectSelection';
 import { recordGraph } from '../engine/flow/history';
 import { graphEditProblem } from '../engine/flow/locks';
 import { create } from 'zustand';
@@ -526,3 +530,21 @@ disk.onStateConflict(() => {
   // This tab keeps its own browser copy (closing it loses nothing); the disk keeps the other work.
   toast('Another tab saved newer work. This tab is out of date and no longer saves: reload it to continue.', 'error', 24 * 3600_000);
 });
+
+
+/** Detached Designer state, exposed only on the sandbox port; no actions or credentials. */
+if (typeof window !== 'undefined' && window.location?.port === '5183') {
+  Object.assign(window, { __OGS_TEST__: () => {
+    const state = useStore.getState(), session = state.sessions[state.activeSessionId];
+    const doc = session?.docs.find((d) => d.id === session.activeDocId) ?? session?.docs[0];
+    return JSON.parse(JSON.stringify({
+      hydrated: state.hydrated,
+      sessionId: session?.id,
+      document: doc ? { id: doc.id, width: doc.width, height: doc.height, background: doc.background,
+        layers: doc.layers, groups: doc.groups ?? [], activeLayerId: doc.activeLayerId } : null,
+      selection: { layers: doc ? useLayerSelection.getState().byDoc[doc.id] ?? [] : [], objects: doc ? objectPick(doc.id) : null },
+      history: doc ? historyDepth(doc.id) : { undo: 0, redo: 0 },
+      saving: { state: Boolean(pendingWrite), raster: pendingRaster() },
+    }));
+  } });
+}

@@ -81,3 +81,8 @@ export function subscribeHistory(fn: () => void): () => void {
 export function dropHistory(docId: string): void {
   stacks.delete(docId);
 }
+
+/** Read-only stack sizes for the sandbox state hook. */
+export function historyDepth(docId: string): { undo: number; redo: number } {
+  return { undo: stacks.get(docId)?.past.length ?? 0, redo: stacks.get(docId)?.future.length ?? 0 };
+}

@@ -5,7 +5,7 @@ const events = vi.hoisted(() => {
   const handlers: Record<string, Array<(e: unknown) => void>> = {};
   const on = (type: string, fn: (e: unknown) => void) => ((handlers[type] ??= []).push(fn), undefined);
   const doc = { visibilityState: 'visible', addEventListener: on };
-  Object.assign(globalThis, { window: globalThis, document: doc, addEventListener: on });
+  Object.assign(globalThis, { window: globalThis, location: { port: '5173' }, document: doc, addEventListener: on });
   return { handlers, doc };
 });
 
@@ -115,4 +115,10 @@ describe('raster saving (D1–D3)', () => {
     expect(stored.has('raster:e')).toBe(false);
     expect(pendingRaster()).toEqual([]);
   });
+});
+
+
+it('does not expose the Designer test hook outside the sandbox', () => {
+  expect(window.location.port).toBe('5173');
+  expect('__OGS_TEST__' in window).toBe(false);
 });
