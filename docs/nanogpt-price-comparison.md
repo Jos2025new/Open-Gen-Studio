@@ -53,8 +53,13 @@ aproximado solicitado**, no una medición de tokens facturados por NanoGPT.
 
 [price-pilot.mjs](../scripts/price-pilot.mjs) se ejecuta por defecto en modo
 estimación, sin red: `node scripts/price-pilot.mjs`.
-La ejecución requiere autorización explícita para el hash del manifiesto y una
-credencial autorizada del sandbox; no se ha activado esa modalidad.
+La ejecución requiere autorización explícita para el hash del manifiesto y
+`NANOGPT_API_KEY` exportada en la terminal; no se ha activado esa modalidad.
+La clave se lee únicamente de esa variable. Si falta, aborta antes de leer o
+escribir archivos del piloto. No se buscan claves en data/, la app ni archivos
+de configuración. Solo se usa en el encabezado Authorization del POST a
+`https://nano-gpt.com/api/v1/chat/completions`; las redirecciones se rechazan.
+No se imprime, registra ni persiste la clave, ni se reproducen errores del proveedor.
 El script solo permite DeepSeek, 6 peticiones y max_tokens 500.
 
 Antes de cada POST, reserva la estimación máxima de esa llamada en un ledger local
@@ -75,8 +80,20 @@ Una garantía bancaria de cargo requeriría además un límite del lado del prov
 Por llamada se guarda: tiempo al primer texto (no razonamiento/herramienta), tiempo
 total, tokens de entrada/salida, cachedTokens o desconocido, coste informado o
 desconocido, y coste contabilizado. No se guardan textos de respuesta ni claves.
+Los resultados se escriben después de cada reserva y resultado en
+`.sandbox/pilot/results.json`, incluso si el piloto se interrumpe; el ledger está
+en `.sandbox/pilot/ledger.json`. Ambos usan permisos 0600 al crearse.
 No se concluye sobre p90, caché efectiva ni experiencia de producción con 3 pares.
 [Tests de presupuesto y streaming](../tests/price-pilot-budget.test.ts).
+[Tests de credencial, destino, reservas y ausencia de reintentos](../tests/price-pilot-execution.test.ts)
+usan una clave ficticia y fetch simulado; no invocan NanoGPT.
+
+Solo después de revisar y aprobar el script, con la variable ya exportada:
+
+```bash
+cd '/home/samuel/Documentos/Projects/My New App/ogs-price-auth'
+PRICE_PILOT_APPROVAL=264802108a2de6eaf654af8cf94feef95c73fa074ea3f1189ac1fe610f4b19ba node scripts/price-pilot.mjs --execute
+```
 
 ## Aviso de prisa de 50 s: explicación, sin cambios nuevos
 
