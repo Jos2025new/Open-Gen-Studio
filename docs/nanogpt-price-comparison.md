@@ -171,3 +171,50 @@ herramientas completos y prefijo serializado idéntico en las continuaciones.
 
 **Piloto finalizado: seis llamadas de DeepSeek, USD 0.0040175744 informados.
 Sin autorización para llamadas adicionales.**
+
+## Ampliación solicitada: cuatro modelos, pendiente de decisiones
+
+Consulta pública del catálogo el 2026-10-05, sin clave ni generación.
+Propuesta: las mismas tres parejas por modelo (24 llamadas adicionales),
+max_tokens=500 y reasoning_effort=medium solicitado en ambos brazos. No se ha
+modificado el ejecutor, su lista permitida, el límite USD 0.05 o el bloqueo del
+piloto anterior. No se han enviado peticiones a estos modelos.
+
+| Modelo / ID exacto | Esfuerzos anunciados | Suscripción según catálogo | Entrada / salida USD por millón | Reserva por tokens, 6 llamadas USD |
+| --- | --- | --- | ---: | ---: |
+| MiMo V2.6 Flash / xiaomi/mimo-v2.6-flash | none, high | Incluido | 0.14 / 0.28 | 0.029280 |
+| Grok 4.7 / x-ai/grok-4.7 | low, medium, high, xhigh | Fuera | 1.60 / 4.80 | 0.339361 |
+| GPT 6 Luna / openai/gpt-6-luna | none, low, medium, high, xhigh, max | Fuera | 0.10 / 0.50 | 0.021814 |
+| GLM 5.3 Flash / z-ai/glm-5.3-flash | low, high, max | Incluido | 0.10 / 0.30 | 0.021214 |
+
+Fuente: [catálogo NanoGPT](https://nano-gpt.com/api/v1/models?detailed=true).
+Se serializaron offline las seis fixtures existentes, sustituyendo únicamente
+model y reasoning_effort. Se aplicó ceil(caracteres Unicode / 3 × 1.50), sin
+tokenizer ni descuento de caché/suscripción. Entrada por petición: 30594–30686
+tokens estimados en primera respuesta y 35415–35507 en continuación; salida
+máxima reservada: 500. No son tokens medidos de estos cuatro proveedores.
+
+Las 24 llamadas reservan **USD 0.411669 por tokens**. El catálogo advierte de
+cargos de rechazo de Grok de hasta USD 0.055; para no asumir que sustituyen al
+cargo de tokens, una contingencia conservadora añade 6 × 0.055 = USD 0.330000.
+Techo calculado con esa contingencia: **USD 0.741669 adicionales**, o
+**USD 0.745689** contando USD 0.004020 del ledger ya consumido. Sigue siendo
+un presupuesto con la aproximación de caracteres, no un límite contractual de
+factura. No se ha autorizado aumentar el tope USD 0.05. Una sola llamada de
+Grok ya reserva más de ese tope con estas fixtures; no cabe en la ejecución actual.
+
+MiMo y GLM no anuncian medium nativo. La [documentación de reasoning](https://docs.nano-gpt.com/api-reference/miscellaneous/extended-thinking)
+acepta ese valor en la API, pero indica que algunas rutas adaptan niveles al más
+cercano soportado. Enviar medium no demuestra medium efectivo en ambos modelos;
+no se les sustituirá esfuerzo o variante sin resolver esta decisión.
+Los tokens de reasoning se facturan como salida y un límite de 500 puede agotar
+el presupuesto de salida antes del texto final. Una ampliación debe registrar
+finish_reason y reasoning_tokens si se informan, sin guardar contenido, para
+separar ausencia de texto o truncamiento de una respuesta terminada.
+
+La alternativa que cabe en USD 0.05 es Luna + GLM: USD 0.043028 adicionales,
+USD 0.047048 contando el ledger anterior, manteniendo n=3 por modelo; GLM
+seguiría teniendo medium solicitado con nivel efectivo no garantizado. Esta
+selección también requiere aprobación explícita y revisión del script modificado.
+No se convierte la comparación entre modelos en una prueba de causalidad: niveles
+adaptados, rutas, caché caliente/fría y longitudes de salida siguen siendo límites.
