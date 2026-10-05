@@ -26,6 +26,11 @@ const journeys = new Map<string, string>();
 let events: JourneyEvent[] = [];
 let sequence = 0;
 
+/** True only in tests and the sandbox: callers skip building trace data otherwise. */
+export function journeyActive(): boolean {
+  return active();
+}
+
 function active(): boolean {
   return import.meta.env.MODE === 'test' || (import.meta.env.DEV && typeof location !== 'undefined' && location.port === '5183');
 }
