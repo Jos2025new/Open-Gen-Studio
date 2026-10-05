@@ -1,9 +1,9 @@
-# NanoGPT expansion-2 — preparada, sin ejecución
+# NanoGPT expansion-2 — resultados y límites
 
 Preparación: 2026-10-05. El usuario solicita una nueva tanda después del fallo del
 primer calentamiento de MiMo; conserva el tope global aprobado de USD 1.00.
 El [informe anterior](nanogpt-price-comparison.md) documenta los resultados de
-DeepSeek y el intento detenido. Esta preparación no hace llamadas al proveedor.
+DeepSeek y el intento detenido. El usuario ejecutó la tanda; Codex analizó el archivo de métricas offline.
 
 ## Presupuesto y manifiesto
 
@@ -51,7 +51,8 @@ desconocidos. La lista es limitada: no promete identificar códigos futuros.
 Se analiza en memoria un cuerpo HTTP de error acotado, sin copiarlo al ledger.
 Nunca se guardan mensajes completos, cabeceras, clave, stacks ni texto de respuesta.
 
-Ejemplo con proveedor simulado, no diagnóstico retrospectivo de MiMo:
+Diagnóstico capturado en el calentamiento de MiMo de expansion-2 (no explica
+retroactivamente el intento anterior):
 
 ```json
 {
@@ -105,7 +106,7 @@ muestra; tampoco sobre causalidad, factura o experiencia completa de la app.
 El fallo anterior de MiMo continúa sin causa verificable; la nueva captura no
 reconstruye retroactivamente los diagnósticos que se perdieron.
 
-## Tests y comando pendiente
+## Tests y comando ejecutado por el usuario
 
 [price-pilot-expansion-2.test.ts](../tests/price-pilot-expansion-2.test.ts) usa solo
 fetch simulado: cinco fases, filtrado de code/type/clave, saldo previo único,
@@ -123,11 +124,116 @@ Nuevo hash (no vale el de expansion):
 b1bb89422248e85e5883869a6d913b83c501d64e3a064f8e83015f334bd891ff
 ```
 
-Después de revisar, con la clave exportada en la terminal del usuario:
+Comando ya ejecutado por el usuario con su clave exportada:
 
 ```bash
 cd '/home/samuel/Documentos/Projects/My New App/ogs-price-auth'
 PRICE_PILOT_APPROVAL=b1bb89422248e85e5883869a6d913b83c501d64e3a064f8e83015f334bd891ff node scripts/price-pilot-expansion-2.mjs --execute
 ```
 
-Estado: preparado para revisión; no ejecutado por Codex.
+Estado: finished_with_skips. No volver a ejecutar: el lock se conserva.
+
+
+## Resultados observados el 2026-10-05
+
+Fuente local: `.sandbox/pilot/expansion-2/results.json`, hash de aprobación anterior.
+Se enviaron 22 llamadas: cuatro calentamientos (uno fallido) y 18 medidas.
+Grok, GPT Luna y GLM completaron tres parejas cada uno; MiMo tiene cero parejas.
+Sus seis medidas quedaron not_sent tras HTTP 400 / unsupported_reasoning_effort /
+invalid_request_error. No hubo reintentos. El error confirma el rechazo de medium
+para esa petición; no determina qué ocurrió en el intento anterior sin diagnóstico.
+
+Coste informado por el proveedor en las 21 llamadas terminadas: **USD 0.16423365**.
+El calentamiento de MiMo no informó coste: se contabiliza su reserva de USD 0.004844,
+sin afirmar que se cobró. El redondeo conservador a microdólares da USD 0.169083
+adicionales; con USD 0.008864 previos, el total global contabilizado es
+**USD 0.177947**, por debajo del tope de USD 1.00. No se verificó una factura.
+
+| Modelo | Parejas | Coste informado, incluido calentamiento (USD) | Medidas con cachedTokens > 0 |
+| --- | ---: | ---: | ---: |
+| MiMo V2.6 Flash | 0 | desconocido | sin muestras |
+| Grok 4.7 | 3 | 0.14633800 | 6/6 |
+| GPT 6 Luna | 3 | 0.00669355 | 4/6 |
+| GLM 5.3 Flash | 3 | 0.01120210 | 1/6 |
+
+Medianas descriptivas de las tres peticiones distintas por brazo, en segundos;
+no son tres repeticiones del mismo caso. Los calentamientos se excluyen.
+
+| Modelo | Primer texto control | Primer texto aviso | Total control | Total aviso |
+| --- | ---: | ---: | ---: | ---: |
+| Grok 4.7 | 11.33 | 10.28 | 12.46 | 11.37 |
+| GPT 6 Luna | 3.58 | 4.37 | 3.70 | 4.82 |
+| GLM 5.3 Flash | 8.90 | 27.66 | 10.44 | 32.45 |
+
+El aviso añadió 44–55 tokens de entrada por pareja (mediana 51), aproximadamente
+50 tokens. Grok mejora en la primera pareja y empeora en las dos continuaciones.
+Luna tiene primer texto y total mayores con aviso en las tres parejas; el primer
+texto aumenta 0.03, 1.42 y 0.79 s. GLM tiene primer texto casi idéntico en la primera
+pareja, pero 44.94 frente a 8.90 s al continuar y 27.66 frente a 8.51 s al cancelar.
+En GLM, una de seis medidas supera 30 s hasta el primer texto (16.7 %) y dos
+superan 30 s hasta terminar (33.3 %); Grok y Luna tienen cero en ambos campos.
+No corresponde afirmar «sin retraso sistemático observable» para esta ampliación.
+El piloto DeepSeek anterior mantiene su resultado propio; no se agrupa con estos.
+
+El calentamiento no igualó la caché: Grok conserva solo 1152 tokens en el primer
+control frente a 16256 con aviso, pese al calentamiento idéntico. GLM muestra
+cero en cinco de seis medidas; Luna alterna aciertos y ceros. Hay aciertos con
+aviso, pero la conservación de la caché depende del proveedor y no está garantizada.
+La igualdad del prefijo se acredita por los tests de contexto, no por estos hits.
+
+Todas las peticiones solicitaron medium y max_tokens=2000. Las 21 terminadas
+informaron finishReason=stop; ninguna declaró agotamiento del límite. El esfuerzo
+efectivo permanece desconocido en todos los modelos; Luna informó cero tokens de
+razonamiento en sus siete llamadas. No se equipara medium solicitado a efectivo.
+
+Con n=3 parejas heterogéneas, orden alternado, caché desigual y salidas de distinta
+longitud/razonamiento, no se estima p90 ni se atribuye causalidad al aviso. Tampoco
+se demuestra el criterio de ausencia de empeoramiento consistente o la experiencia
+completa de 12–30 s de la app. Las primeras respuestas medidas: Grok 15.06/7.08 s,
+Luna 2.83/2.86 s y GLM 15.69/15.69 s (control/aviso). Son tiempos del primer texto
+en el stream del script, no una prueba visual de presentación en la app.
+
+## Métricas por llamada
+
+Orden de envío preservado. C = control; A = aviso; cal = calentamiento;
+primera = primera respuesta; seguir/cancelar = continuación correspondiente.
+Tiempos en segundos; entrada/salida y caché son tokens informados por el proveedor.
+Los calentamientos no miden latencia. La única llamada fallida tiene campos
+faltantes desconocidos; su reserva no se presenta como coste informado.
+
+| Modelo | Caso/brazo | Primer texto s | Total s | Entrada | Salida | cachedTokens | Coste informado USD |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| MiMo | cal | no medido | no medido | desconocido | desconocido | desconocido | desconocido |
+| Grok 4.7 | cal | no medido | no medido | 16356 | 1146 | 1152 | 0.03786 |
+| Grok 4.7 | primera / C | 15.06 | 19.95 | 16356 | 1181 | 1152 | 0.03807 |
+| Grok 4.7 | primera / A | 7.08 | 9.00 | 16407 | 582 | 16256 | 0.011922 |
+| GPT 6 Luna | cal | no medido | no medido | 13452 | 59 | 0 | 0.001710925 |
+| GPT 6 Luna | primera / C | 2.83 | 3.37 | 13452 | 52 | 13449 | 0.00016079 |
+| GPT 6 Luna | primera / A | 2.86 | 4.26 | 13507 | 50 | 13449 | 0.000166665 |
+| GLM 5.3 Flash | cal | no medido | no medido | 14992 | 280 | 0 | 0.0015832 |
+| GLM 5.3 Flash | primera / C | 15.69 | 20.47 | 14992 | 394 | 0 | 0.0016174 |
+| GLM 5.3 Flash | primera / A | 15.69 | 17.71 | 15044 | 466 | 14976 | 0.000521 |
+| Grok 4.7 | seguir / A | 10.28 | 11.37 | 18663 | 693 | 16256 | 0.0171 |
+| Grok 4.7 | seguir / C | 8.41 | 9.92 | 18610 | 575 | 18560 | 0.01283 |
+| GPT 6 Luna | seguir / A | 5.81 | 6.86 | 15760 | 51 | 0 | 0.001995425 |
+| GPT 6 Luna | seguir / C | 4.39 | 5.04 | 15705 | 60 | 13245 | 0.000469875 |
+| GLM 5.3 Flash | seguir / A | 44.94 | 51.81 | 17296 | 421 | 0 | 0.0018559 |
+| GLM 5.3 Flash | seguir / C | 8.90 | 10.44 | 17252 | 327 | 0 | 0.0018233 |
+| Grok 4.7 | cancelar / C | 11.33 | 12.46 | 18610 | 604 | 18560 | 0.013004 |
+| Grok 4.7 | cancelar / A | 12.82 | 14.12 | 18657 | 1013 | 18560 | 0.015552 |
+| GPT 6 Luna | cancelar / C | 3.58 | 3.70 | 15705 | 62 | 0 | 0.00199405 |
+| GPT 6 Luna | cancelar / A | 4.37 | 4.82 | 15753 | 65 | 15702 | 0.00019582 |
+| GLM 5.3 Flash | cancelar / C | 8.51 | 10.31 | 17244 | 464 | 0 | 0.0018636 |
+| GLM 5.3 Flash | cancelar / A | 27.66 | 32.45 | 17289 | 696 | 0 | 0.0019377 |
+
+## Evidencia y cierre
+
+Lectura offline: resultados y ledger de expansion-2 coherentes, 22 IDs únicos,
+seis omisiones y total de 177947 microUSD. Código: el salto por fallo y el bloqueo
+de repetición siguen en el runner existente; esta revisión solo cambia docs.
+Tests: npm test -- --maxWorkers=2, 627 aprobados y cinco omitidos; salvaguardas y
+check-docs en verde (33 archivos, máximo 29562 bytes).
+Sandbox: peticiones sintéticas capturadas por el test existente, sin sesión real
+ni prueba visual nueva. Proveedor: ejecución realizada por el usuario, examinada
+a través de las métricas locales. Codex no lanzó llamadas nuevas. No se verificaron
+factura, esfuerzo efectivo, p90 ni causalidad de los tiempos; no se fusionó la rama.
