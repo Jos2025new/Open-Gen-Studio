@@ -25,13 +25,9 @@ import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../..
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
 import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
+import { screenToDocument, zoomAt, type View, type Point } from '../../engine/design/viewCoordinates';
 import { uid } from '../../lib/id';
 
-interface View {
-  zoom: number;
-  x: number;
-  y: number;
-}
 
 type Drag =
   | { kind: 'pixelMove'; move: PixelMove }
@@ -197,16 +193,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const [guideLines, setGuideLines] = useState<{ x?: number; y?: number }>({});
   const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
   const [editingText, setEditingText] = useState<string | null>(null);
-  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const [pointer, setPointer] = useState<Point | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
   const paintRaf = useRef<number | null>(null);
   const liveRaf = useRef<number | null>(null);
-  const paintCursor = useRef<{ x: number; y: number } | null>(null);
   const flushPaintFrame = () => {
     if (paintRaf.current != null) cancelAnimationFrame(paintRaf.current);
     paintRaf.current = null;
-    if (paintCursor.current) setCursor(paintCursor.current);
     setPaintFrame((f) => f + 1);
   };
   const [preview, setPreview] = useState<Drag | null>(null);
@@ -226,6 +220,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const [shiftDown, setShiftDown] = useState(false);
   const drag = useRef<Drag | null>(null);
   const tool = useStore((s) => s.ui.tool);
+  const cursor = pointer && (tool === 'brush' || tool === 'eraser') && canvasRef.current ? screenToDocument(pointer, view, canvasRef.current.getBoundingClientRect()) : null;
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
@@ -326,7 +321,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
 
   const toDoc = useCallback((clientX: number, clientY: number) => {
     const r = canvasRef.current!.getBoundingClientRect();
-    return { x: (clientX - r.left - view.x) / view.zoom, y: (clientY - r.top - view.y) / view.zoom };
+    return screenToDocument({ x: clientX, y: clientY }, view, r);
   }, [view]);
 
   // ---------------------------------------------------------------------------
@@ -979,7 +974,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e.clientX, e.clientY);
-    if (tool === 'brush' || tool === 'eraser') setCursor(p);
+    if (tool === 'brush' || tool === 'eraser') setPointer({ x: e.clientX, y: e.clientY });
     const d = drag.current;
     if (!d && tool === 'move') {
       // The cursor says what a handle does before it is pressed.
@@ -1063,8 +1058,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         d.control = next.control;
         d.time = sample.timeStamp;
       }
-      // Pointer events can come faster than the screen: show the stroke (and move the ring) once per frame.
-      paintCursor.current = d.last;
+      // Pointer events can come faster than the screen: show the stroke once per frame.
       paintRaf.current ??= requestAnimationFrame(flushPaintFrame);
       window.dispatchEvent(new Event('ogs:paint'));
     } else if (d.kind === 'stroke') {
@@ -1329,7 +1323,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setCursor(null)}
+        onPointerLeave={() => setPointer(null)}
         onWheel={onWheel}
         onDoubleClick={onDoubleClick}
       />
@@ -1435,12 +1429,6 @@ function corners(b: { x: number; y: number; w: number; h: number }): Array<[numb
     [b.x + b.w, b.y + b.h],
     [b.x, b.y + b.h],
   ];
-}
-
-function zoomAt(v: View, px: number, py: number, factor: number): View {
-  const zoom = Math.min(8, Math.max(0.05, v.zoom * factor));
-  const k = zoom / v.zoom;
-  return { zoom, x: px - (px - v.x) * k, y: py - (py - v.y) * k };
 }
 
 function isTyping(e: KeyboardEvent): boolean {

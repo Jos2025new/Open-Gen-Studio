@@ -10,6 +10,8 @@
 
 | Mover dentro de una selección raster extrae sus píxeles a una capa encima y mueve solo esa capa, con alfa parcial y un único undo. Las capas bloqueadas rechazan la extracción; Ctrl+J sigue copiando. | [pixelMove.ts](../../src/engine/design/pixelMove.ts), [Stage.tsx](../../src/components/designer/Stage.tsx) | [pixel-move.test.ts](../../tests/pixel-move.test.ts) |
 
+| El círculo raster conserva la última posición de pantalla y recalcula coordenadas al desplazar o hacer zoom; no añade un bucle de frames. | [viewCoordinates.ts](../../src/engine/design/viewCoordinates.ts), [Stage.tsx](../../src/components/designer/Stage.tsx) | [view-coordinates.test.ts](../../tests/view-coordinates.test.ts) |
+
 ## Monkey test manual
 Arranca `npm run dev:sandbox` y ejecuta `npm run stress`; termina deteniendo el sandbox ([test](../../tests-e2e/designer-monkey.spec.ts)).
 Usa `SEED=101 STEPS=300 npm run stress` para repetir acciones y coordenadas; el valor por defecto es 300 ([test](../../tests-e2e/designer-monkey.spec.ts)).
