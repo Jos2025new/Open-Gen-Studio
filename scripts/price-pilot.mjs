@@ -49,25 +49,26 @@ export function estimatePilot(fixtures) {
     maximumUsd: maximumMicroUsd / 1e6, rows, approvalHash: sha(JSON.stringify(rows)) };
 }
 
-export function reserveCall(ledger, row) {
+export function reserveCall(ledger, row, limitMicroUsd = LIMIT_MICRO_USD) {
+  if (!Number.isSafeInteger(limitMicroUsd) || limitMicroUsd <= 0 || limitMicroUsd > 1_000_000) throw new Error('Invalid budget limit');
   if (!Number.isSafeInteger(ledger.chargedMicroUsd) || ledger.chargedMicroUsd < 0 ||
       !Number.isSafeInteger(row.maximumMicroUsd) || row.maximumMicroUsd < 0) throw new Error('Invalid budget');
   if (ledger.stopped || ledger.calls.some((c) => c.id === row.id)) throw new Error('Stopped pilot or already attempted request; no retry');
-  if (ledger.chargedMicroUsd + row.maximumMicroUsd > LIMIT_MICRO_USD) throw new Error('Insufficient remaining USD 0.05 budget');
+  if (ledger.chargedMicroUsd + row.maximumMicroUsd > limitMicroUsd) throw new Error('Insufficient remaining budget');
   ledger.chargedMicroUsd += row.maximumMicroUsd;
   ledger.calls.push({ id: row.id, reservedMicroUsd: row.maximumMicroUsd, chargedMicroUsd: row.maximumMicroUsd,
     costSource: 'reservation', status: 'reserved', firstTextMs: 'desconocido', totalMs: 'desconocido',
     inputTokens: 'desconocido', outputTokens: 'desconocido', cachedTokens: 'desconocido', reportedUsd: 'desconocido' });
 }
 
-export function settleCall(ledger, row, reportedUsd) {
+export function settleCall(ledger, row, reportedUsd, limitMicroUsd = LIMIT_MICRO_USD) {
   const call = ledger.calls.find((c) => c.id === row.id);
   if (!call || call.status !== 'reserved') throw new Error('No outstanding reservation');
   const known = typeof reportedUsd === 'number' && Number.isFinite(reportedUsd) && reportedUsd >= 0;
   const charge = known ? Math.ceil(reportedUsd * 1e6) : row.maximumMicroUsd;
   ledger.chargedMicroUsd += charge - call.reservedMicroUsd;
   Object.assign(call, { status: 'finished', chargedMicroUsd: charge, costSource: known ? 'provider' : 'highest-estimate' });
-  if (ledger.chargedMicroUsd > LIMIT_MICRO_USD || charge > row.maximumMicroUsd) ledger.stopped = true;
+  if (ledger.chargedMicroUsd > limitMicroUsd || charge > row.maximumMicroUsd) ledger.stopped = true;
 }
 
 export async function readPilot(root) {
@@ -87,6 +88,7 @@ export async function sampleRequest(body, key, fetcher = fetch) {
   const start = performance.now();
   let firstTextMs;
   let usage;
+  let finishReason;
   const response = await fetcher('https://nano-gpt.com/api/v1/chat/completions', {
     method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
     body: JSON.stringify(body), signal: AbortSignal.timeout(120_000), redirect: 'error', credentials: 'omit',
@@ -101,6 +103,8 @@ export async function sampleRequest(body, key, fetcher = fetch) {
     const chunk = JSON.parse(data);
     if (chunk.error) throw new Error('Provider error; no retry');
     if (chunk.usage) usage = chunk.usage;
+    const finish = chunk.choices?.[0]?.finish_reason;
+    if (['stop', 'length', 'tool_calls', 'function_call', 'content_filter', 'error'].includes(finish)) finishReason = finish;
     const text = chunk.choices?.[0]?.delta?.content;
     if (typeof text === 'string' && text.length && firstTextMs == null) firstTextMs = performance.now() - start;
   };
@@ -114,7 +118,8 @@ export async function sampleRequest(body, key, fetcher = fetch) {
   const numeric = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 'desconocido';
   return { firstTextMs: firstTextMs ?? 'desconocido', totalMs: performance.now() - start,
     inputTokens: numeric(usage?.prompt_tokens), outputTokens: numeric(usage?.completion_tokens),
-    cachedTokens: numeric(usage?.prompt_tokens_details?.cached_tokens), reportedUsd: numeric(usage?.cost) };
+    cachedTokens: numeric(usage?.prompt_tokens_details?.cached_tokens), reportedUsd: numeric(usage?.cost),
+    reasoningTokens: numeric(usage?.completion_tokens_details?.reasoning_tokens), finishReason: finishReason ?? 'desconocido' };
 }
 
 export async function runPilot(fixtures, ledger, save, env = process.env, fetcher = fetch) {
