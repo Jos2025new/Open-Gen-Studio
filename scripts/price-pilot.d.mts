@@ -5,4 +5,6 @@ export function settleCall(ledger: any, row: any, reportedUsd: unknown, limitMic
 export function sampleRequest(body: any, key: string, fetcher?: typeof fetch): Promise<any>;
 export function readPilot(root: string): Promise<any>;
 export function environmentKey(env?: Record<string, unknown>): string;
+export function requestFailure(error: unknown): { failureKind: string; httpStatus: number | string };
+export function failureSummary(error: unknown): string;
 export function runPilot(fixtures: any[], ledger: any, save: (ledger: any) => Promise<void>, env?: Record<string, unknown>, fetcher?: typeof fetch): Promise<any>;

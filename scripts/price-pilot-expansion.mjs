@@ -2,7 +2,7 @@ import { lstat, mkdir, open, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { environmentKey, estimatePilot, readPilot, reserveCall, sampleRequest, settleCall } from './price-pilot.mjs';
+import { environmentKey, estimatePilot, failureSummary, readPilot, requestFailure, reserveCall, sampleRequest, settleCall } from './price-pilot.mjs';
 
 export const LIMIT_MICRO_USD = 1_000_000;
 export const MAX_OUTPUT_TOKENS = 2000;
@@ -124,12 +124,13 @@ export async function runExpansion(fixtures, previousLedger, ledger, save, env =
       Object.assign(ledger.calls.at(-1), metering, row.measured ? { firstTextMs, totalMs } : {});
       await save(ledger);
       if (ledger.stopped) throw new Error('Reported cost exceeded reservation');
-    } catch {
+    } catch (error) {
       ledger.stopped = true;
+      Object.assign(ledger.calls.at(-1), requestFailure(error));
       if (ledger.calls.at(-1).status === 'reserved') Object.assign(ledger.calls.at(-1), {
         status: 'uncertain', costSource: 'highest-estimate', totalMs: row.measured ? performance.now() - start : 'no medido' });
       await save(ledger);
-      throw new Error('Expansion stopped; no automatic retry');
+      throw Object.assign(new Error('Expansion stopped; no automatic retry'), requestFailure(error));
     }
   }
   return ledger;
@@ -162,7 +163,7 @@ async function main() {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
     console.error(e.message === 'NANOGPT_API_KEY is required; no request sent' ? e.message :
-      'Expansion aborted. No retry. Review .sandbox/pilot/expansion/results.json if created.');
+      `Expansion aborted. No retry. ${failureSummary(e)} Review .sandbox/pilot/expansion/results.json if created.`);
     process.exitCode = 1;
   });
 }

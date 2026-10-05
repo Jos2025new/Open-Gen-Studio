@@ -83,35 +83,66 @@ export function environmentKey(env = process.env) {
   return key.trim();
 }
 
+const FAILURE_KINDS = ['http_error', 'missing_stream', 'transport_error', 'timeout', 'invalid_stream', 'provider_error', 'stream_error', 'local_error'];
+class PilotRequestError extends Error {
+  constructor(kind, httpStatus) {
+    super('Request failed; no retry');
+    this.failureKind = kind;
+    this.httpStatus = httpStatus;
+  }
+}
+export function requestFailure(error) {
+  return { failureKind: error instanceof PilotRequestError ? error.failureKind : 'local_error',
+    httpStatus: error instanceof PilotRequestError && Number.isInteger(error.httpStatus) &&
+      error.httpStatus >= 100 && error.httpStatus <= 599 ? error.httpStatus : 'desconocido' };
+}
+export function failureSummary(error) {
+  const kind = FAILURE_KINDS.includes(error?.failureKind) ? error.failureKind : 'local_error';
+  const status = Number.isInteger(error?.httpStatus) && error.httpStatus >= 100 && error.httpStatus <= 599 ? error.httpStatus : 'desconocido';
+  return `Failure: ${kind}; HTTP: ${status}.`;
+}
+
 // One POST per sample. Never invokes the runtime's reasoning/credit retries or tools.
 export async function sampleRequest(body, key, fetcher = fetch) {
   const start = performance.now();
   let firstTextMs;
   let usage;
   let finishReason;
-  const response = await fetcher('https://nano-gpt.com/api/v1/chat/completions', {
-    method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-    body: JSON.stringify(body), signal: AbortSignal.timeout(120_000), redirect: 'error', credentials: 'omit',
-  });
-  if (!response.ok || !response.body) throw new Error('Request failed; no retry');
+  let response;
+  try {
+    response = await fetcher('https://nano-gpt.com/api/v1/chat/completions', {
+      method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(120_000), redirect: 'error', credentials: 'omit',
+    });
+  } catch (error) {
+    throw new PilotRequestError(['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'transport_error');
+  }
+  if (!response.ok) throw new PilotRequestError('http_error', response.status);
+  if (!response.body) throw new PilotRequestError('missing_stream', response.status);
   let buffer = '';
   const decoder = new TextDecoder();
   const consume = (line) => {
     if (!line.startsWith('data:')) return;
     const data = line.slice(5).trim();
     if (!data || data === '[DONE]') return;
-    const chunk = JSON.parse(data);
-    if (chunk.error) throw new Error('Provider error; no retry');
+    let chunk;
+    try { chunk = JSON.parse(data); } catch { throw new PilotRequestError('invalid_stream', response.status); }
+    if (chunk.error) throw new PilotRequestError('provider_error', response.status);
     if (chunk.usage) usage = chunk.usage;
     const finish = chunk.choices?.[0]?.finish_reason;
     if (['stop', 'length', 'tool_calls', 'function_call', 'content_filter', 'error'].includes(finish)) finishReason = finish;
     const text = chunk.choices?.[0]?.delta?.content;
     if (typeof text === 'string' && text.length && firstTextMs == null) firstTextMs = performance.now() - start;
   };
-  for await (const bytes of response.body) {
-    buffer += decoder.decode(bytes, { stream: true });
-    let end;
-    while ((end = buffer.indexOf('\n')) >= 0) { consume(buffer.slice(0, end).trimEnd()); buffer = buffer.slice(end + 1); }
+  try {
+    for await (const bytes of response.body) {
+      buffer += decoder.decode(bytes, { stream: true });
+      let end;
+      while ((end = buffer.indexOf('\n')) >= 0) { consume(buffer.slice(0, end).trimEnd()); buffer = buffer.slice(end + 1); }
+    }
+  } catch (error) {
+    if (error instanceof PilotRequestError) throw error;
+    throw new PilotRequestError(['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'stream_error', response.status);
   }
   buffer += decoder.decode();
   if (buffer.trim()) consume(buffer.trimEnd());
@@ -138,11 +169,12 @@ export async function runPilot(fixtures, ledger, save, env = process.env, fetche
       Object.assign(ledger.calls.at(-1), result);
       await save(ledger);
       if (ledger.stopped) throw new Error('Cost exceeded reservation; stopped');
-    } catch {
+    } catch (error) {
       ledger.stopped = true;
+      Object.assign(ledger.calls.at(-1), requestFailure(error));
       if (ledger.calls.at(-1)?.status === 'reserved') Object.assign(ledger.calls.at(-1), { status: 'uncertain', costSource: 'highest-estimate' });
       await save(ledger);
-      throw new Error('Pilot stopped; no automatic retry');
+      throw Object.assign(new Error('Pilot stopped; no automatic retry'), requestFailure(error));
     }
   }
   return ledger;
@@ -175,7 +207,8 @@ async function main() {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
     // Print only our fixed messages; never echo provider bodies, fetch errors or credential values.
-    console.error(e.message === 'NANOGPT_API_KEY is required; no request sent' ? e.message : 'Pilot aborted. No automatic retry. Review .sandbox/pilot/results.json if created.');
+    console.error(e.message === 'NANOGPT_API_KEY is required; no request sent' ? e.message :
+      `Pilot aborted. No automatic retry. ${failureSummary(e)} Review .sandbox/pilot/results.json if created.`);
     process.exitCode = 1;
   });
 }

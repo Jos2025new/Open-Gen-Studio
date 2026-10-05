@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { estimatePilot, reserveCall, sampleRequest } from '../scripts/price-pilot.mjs';
+import { estimatePilot, failureSummary, reserveCall, sampleRequest } from '../scripts/price-pilot.mjs';
 import { buildExpansion, expansionResults, LIMIT_MICRO_USD, MODELS, newExpansionLedger, runExpansion } from '../scripts/price-pilot-expansion.mjs';
 
 const ids = ['first-control', 'first-notice', 'continuation-continue-control', 'continuation-continue-notice',
@@ -154,7 +154,30 @@ describe('expanded pilot with simulated providers; never uses a live credential'
     const fetcher = (async () => { sends++; return new Response(env.NANOGPT_API_KEY, { status: 400 }); }) as typeof fetch;
     await expect(runExpansion(fixtures, previous, ledger, async () => undefined, env, fetcher)).rejects.toThrow('no automatic retry');
     expect(sends).toBe(1); expect(ledger.calls[0]).toMatchObject({ status: 'uncertain', costSource: 'highest-estimate' });
+    expect(ledger.calls[0]).toMatchObject({ failureKind: 'http_error', httpStatus: 400 });
     expect(JSON.stringify(ledger)).not.toContain(env.NANOGPT_API_KEY);
+  });
+
+  it('preserves safe failure categories for transport, timeout and malformed/provider streams without raw errors', async () => {
+    for (const [kind, fetcher] of [
+      ['transport_error', async () => { throw new Error('dummy-expansion-secret raw transport error'); }],
+      ['timeout', async () => { throw new DOMException('dummy-expansion-secret raw timeout', 'TimeoutError'); }],
+      ['invalid_stream', async () => new Response('data: invalid dummy-expansion-secret\n\n')],
+      ['provider_error', async () => new Response('data: {"error":{"message":"dummy-expansion-secret"}}\n\n')],
+    ] as const) {
+      const { fixtures, previous, ledger, env } = setup();
+      const saved: string[] = [];
+      await expect(runExpansion(fixtures, previous, ledger, async (s) => { saved.push(JSON.stringify(s)); }, env, fetcher as typeof fetch)).rejects.toThrow('no automatic retry');
+      expect(ledger.calls).toHaveLength(1);
+      expect(ledger.calls[0].failureKind).toBe(kind);
+      expect(ledger.calls[0].httpStatus).toBe(['invalid_stream', 'provider_error'].includes(kind) ? 200 : 'desconocido');
+      expect(saved.join('')).not.toMatch(/dummy-expansion-secret|raw transport error|raw timeout/);
+    }
+  });
+
+  it('formats diagnostics from fixed categories and numeric HTTP status without echoing arbitrary strings', () => {
+    expect(failureSummary({ failureKind: 'http_error', httpStatus: 400, message: 'dummy-secret' })).toBe('Failure: http_error; HTTP: 400.');
+    expect(failureSummary({ failureKind: 'dummy-secret', httpStatus: 'dummy-secret', message: 'dummy-secret' })).toBe('Failure: local_error; HTTP: desconocido.');
   });
 
   it('persists only known finish reason values, not arbitrary provider strings', async () => {
