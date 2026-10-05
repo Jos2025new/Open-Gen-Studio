@@ -12,6 +12,8 @@
 
 | El círculo raster conserva la última posición de pantalla y recalcula coordenadas al desplazar o hacer zoom; no añade un bucle de frames. | [viewCoordinates.ts](../../src/engine/design/viewCoordinates.ts), [Stage.tsx](../../src/components/designer/Stage.tsx) | [view-coordinates.test.ts](../../tests/view-coordinates.test.ts) |
 
+| Un único círculo indica el tamaño raster y lineart a escala del zoom y el radio actual de edición o Alt-deformación. No cambia qué trazo se deforma; la influencia sigue medida a lo largo del trazo. | [cursorPreview.ts](../../src/engine/design/cursorPreview.ts), [BrushCursor.tsx](../../src/components/designer/BrushCursor.tsx) | [cursor-preview.test.ts](../../tests/cursor-preview.test.ts) |
+
 ## Monkey test manual
 Arranca `npm run dev:sandbox` y ejecuta `npm run stress`; termina deteniendo el sandbox ([test](../../tests-e2e/designer-monkey.spec.ts)).
 Usa `SEED=101 STEPS=300 npm run stress` para repetir acciones y coordenadas; el valor por defecto es 300 ([test](../../tests-e2e/designer-monkey.spec.ts)).

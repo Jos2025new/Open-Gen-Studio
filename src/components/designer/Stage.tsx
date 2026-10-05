@@ -25,7 +25,9 @@ import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../..
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
 import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
-import { screenToDocument, zoomAt, type View, type Point } from '../../engine/design/viewCoordinates';
+import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoordinates';
+import { useCursorPreview } from '../../engine/design/useCursorPreview';
+import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
 
 
@@ -193,7 +195,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const [guideLines, setGuideLines] = useState<{ x?: number; y?: number }>({});
   const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
   const [editingText, setEditingText] = useState<string | null>(null);
-  const [pointer, setPointer] = useState<Point | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
   const paintRaf = useRef<number | null>(null);
@@ -220,7 +221,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const [shiftDown, setShiftDown] = useState(false);
   const drag = useRef<Drag | null>(null);
   const tool = useStore((s) => s.ui.tool);
-  const cursor = pointer && (tool === 'brush' || tool === 'eraser') && canvasRef.current ? screenToDocument(pointer, view, canvasRef.current.getBoundingClientRect()) : null;
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
   const lineartMode = useStore((s) => s.ui.lineartMode ?? 'draw');
@@ -244,6 +244,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const fitted = useRef<string | null>(null);
 
   const active = activeLayer(doc);
+  const cursor = useCursorPreview(view, canvasRef, { tool, brushSize: brush.size, lineartSize: lineart.size, lineartMode, influence, active, curveSelected: Boolean(selectedCurve) }, drag.current?.kind === 'bend' ? drag.current : null);
 
   /** What the transform handles act on: the picked objects (Objects mode; an image or a text is its own object), or
       the picked layers (Layer mode). Locked and hidden layers are left out. */
@@ -609,6 +610,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (editingText) return;
+    cursor.move(e);
     const p = toDoc(e.clientX, e.clientY);
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     if (tool === 'hand' || spaceDown || e.button === 1) {
@@ -974,7 +976,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   };
   const onPointerMove = (e: React.PointerEvent) => {
     const p = toDoc(e.clientX, e.clientY);
-    if (tool === 'brush' || tool === 'eraser') setPointer({ x: e.clientX, y: e.clientY });
+    cursor.move(e);
     const d = drag.current;
     if (!d && tool === 'move') {
       // The cursor says what a handle does before it is pressed.
@@ -1323,22 +1325,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setPointer(null)}
+        onPointerLeave={cursor.leave}
         onWheel={onWheel}
         onDoubleClick={onDoubleClick}
       />
-      {cursor && (tool === 'brush' || tool === 'eraser') ? (
-        // The brush ring is an element, not part of the canvas: moving the pointer never redraws the document.
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute', left: 0, top: 0, pointerEvents: 'none', borderRadius: '50%',
-            width: 2 * Math.max(2, (brush.size / 2) * view.zoom), height: 2 * Math.max(2, (brush.size / 2) * view.zoom),
-            transform: `translate(${view.x + cursor.x * view.zoom - Math.max(2, (brush.size / 2) * view.zoom)}px, ${view.y + cursor.y * view.zoom - Math.max(2, (brush.size / 2) * view.zoom)}px)`,
-            boxSizing: 'border-box', border: '1px solid #ffffff', boxShadow: '0 0 0 1px #16161a, inset 0 0 0 1px #16161a',
-          }}
-        />
-      ) : null}
+      <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {
