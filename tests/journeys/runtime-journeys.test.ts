@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.hoisted(() => {
+  vi.stubGlobal('fetch', async (input: unknown) => { throw new Error(`Blocked request before journey imports: ${String(input)}`); });
+});
+
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
@@ -49,7 +53,7 @@ function setup() {
 }
 
 beforeEach(setup);
-afterEach(() => { clearJourneyTrace(); vi.unstubAllGlobals(); });
+afterEach(async () => { await (await import('../../src/lib/log')).logSettled(); clearJourneyTrace(); vi.unstubAllGlobals(); });
 
 const planCards = () => useStore.getState().sessions[sessionId].feed.filter((f): f is PlanFeedItem => f.type === 'plan');
 const settingsCard = () => useStore.getState().sessions[sessionId].feed.find((f): f is SettingsFeedItem => f.type === 'settings');
@@ -107,7 +111,7 @@ describe('runtime request and card decisions', () => {
     expect(lastJourneyTrace().some((e) => e.event === 'plan.comment_received')).toBe(true);
   });
 
-  it('accepts an unrequested change to step one and includes it in the revised plan for user review', async () => {
+  it('characterization: accepts an unrequested change to step one and includes it in the revised plan for user review', async () => {
     const original = { title: 'Two options', steps: [
       { id: 's1', kind: 'image', prompt: 'portrait', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 71, params: { quality: 'high' } },
       { id: 's2', kind: 'image', prompt: 'back view', model: LOCAL_IMAGE_REF, aspect: '3:2', resolution: '1024x1024', count: 1, seed: 72, params: { quality: 'high' } },

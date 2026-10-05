@@ -8,7 +8,7 @@ import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extract
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
-import { approvedPriceForPlan, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
+import { approvalEstimateForPlan, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
@@ -577,8 +577,8 @@ async function execute(id: string): Promise<string[]> {
         onRequest: (info) => {
           requests += 1;
           const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame));
-          const approval = approvedPriceForPlan(g.planId);
-          recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { approvedUsd: approval.approvedUsd ?? null, currentEstimateUsd: estimate.usd } });
+          const approval = approvalEstimateForPlan(g.planId);
+          recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } });
           patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
         },
       });

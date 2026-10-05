@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  vi.stubGlobal('fetch', async (input: unknown) => { throw new Error(`Blocked request before journey imports: ${String(input)}`); });
+});
 import atlasSnapshot from '../fixtures/live/atlas.json';
 import falSnapshot from '../fixtures/live/fal.json';
 import { createGeneration, runGeneration } from '../../src/engine/jobs';
@@ -82,7 +86,7 @@ function setup(kind: 'startEnd' | 'references' | 'keyframes') {
   return { sessionId: st.activeSessionId, modelRef };
 }
 
-afterEach(() => { vi.unstubAllGlobals(); blobs.clear(); });
+afterEach(async () => { await (await import('../../src/lib/log')).logSettled(); vi.unstubAllGlobals(); blobs.clear(); });
 
 async function submit(kind: 'startEnd' | 'references' | 'keyframes', inputs: { refs: string[]; firstFrame?: string; lastFrame?: string; times?: Record<string, number> }) {
   const { sessionId, modelRef } = setup(kind);

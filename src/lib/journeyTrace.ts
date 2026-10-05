@@ -18,7 +18,7 @@ export interface JourneyEvent {
   approvalId?: string;
   before?: unknown;
   after?: unknown;
-  prices?: { approvedUsd?: number | null; currentEstimateUsd?: number | null; simulatedRequestUsd?: number | null };
+  prices?: { storedEstimateUsd?: number | null; liveEstimateUsd?: number | null; acceptedEstimateUsd?: number | null; currentEstimateUsd?: number | null; simulatedRequestUsd?: number | null };
 }
 
 const MAX_EVENTS = 300;
@@ -42,10 +42,10 @@ export function journeyIdFor(sessionId: string): string | undefined {
   return active() ? journeys.get(sessionId) : undefined;
 }
 
-export function approvedPriceForPlan(planId: string | undefined): { approvalId?: string; approvedUsd?: number | null } {
+export function approvalEstimateForPlan(planId: string | undefined): { approvalId?: string; acceptedEstimateUsd?: number | null } {
   if (!planId || !active()) return {};
   const approval = [...events].reverse().find((event) => event.event === 'plan.approved' && event.planId === planId);
-  return approval ? { approvalId: approval.approvalId, approvedUsd: approval.prices?.approvedUsd } : {};
+  return approval ? { approvalId: approval.approvalId, acceptedEstimateUsd: approval.prices?.acceptedEstimateUsd } : {};
 }
 
 export function recordJourneyEvent(event: Omit<JourneyEvent, 'at'>): void {

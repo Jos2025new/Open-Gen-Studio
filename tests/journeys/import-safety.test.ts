@@ -11,7 +11,7 @@ vi.mock('../../src/lib/idb', () => ({
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('journey module import isolation', () => {
-  it('imports runtime and UI modules without network or persistent writes', async () => {
+  it('isolates imports, deferred hydration writes and queued logs', async () => {
     const requests: string[] = [];
     vi.useFakeTimers();
     vi.stubGlobal('fetch', async (input: string | URL) => {
@@ -27,6 +27,17 @@ describe('journey module import isolation', () => {
       import('../../src/lib/journeyTrace'), import('../../src/store/store'),
     ]);
     expect(requests).toEqual([]);
-    expect(persistence.writes).toBe(0);
+    const { useStore } = await import('../../src/store/store');
+    const { logEvent, logSettled } = await import('../../src/lib/log');
+    // Exercise hydration/debounce rather than leaving the persistence timers frozen.
+    useStore.setState({ hydrated: true });
+    await vi.advanceTimersByTimeAsync(2100);
+    expect(persistence.writes).toBeGreaterThan(0); // Writes terminate in the mock, never IndexedDB/disk.
+    expect(requests).toEqual([]);
+    logEvent('app', { what: 'isolation probe' });
+    await logSettled();
+    expect(requests).toEqual(['/x/store/log']);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(requests).toEqual(['/x/store/log']);
   });
 });

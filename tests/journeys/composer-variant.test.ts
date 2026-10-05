@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.hoisted(() => {
+  vi.stubGlobal('fetch', async (input: unknown) => { throw new Error(`Blocked request before journey imports: ${String(input)}`); });
+});
 // @ts-expect-error jsdom is already present in the test runtime; this checkout does not include its type package.
 import { JSDOM } from 'jsdom';
 import { act, createElement } from 'react';
@@ -71,10 +75,11 @@ afterEach(async () => {
   root = undefined;
   dom?.window.close();
   dom = undefined;
+  await (await import('../../src/lib/log')).logSettled();
   vi.unstubAllGlobals();
 });
 
-describe('the Composer React variant effect', () => {
+describe('characterization of the current Composer React variant effect', () => {
   it('switches text-to-video to keyframes for two attached images and records start/end meaning', async () => {
     const { useStore, lastJourneyTrace } = await mountComposer();
     const st = useStore.getState();
