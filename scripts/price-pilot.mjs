@@ -84,15 +84,52 @@ export function environmentKey(env = process.env) {
 }
 
 const FAILURE_KINDS = ['http_error', 'missing_stream', 'transport_error', 'timeout', 'invalid_stream', 'provider_error', 'stream_error', 'local_error'];
+const PHASES = { http_error: 'http', missing_stream: 'http', transport_error: 'fetch', timeout: 'timeout',
+  invalid_stream: 'parse', provider_error: 'provider-error', stream_error: 'fetch', local_error: 'desconocido' };
+const PROVIDER_LABELS = new Set(['invalid_request_error', 'invalid_request', 'invalid_parameter', 'invalid_parameters',
+  'unsupported_parameter', 'unsupported_value', 'unsupported_reasoning_effort', 'invalid_reasoning_effort', 'reasoning_required',
+  'authentication_error', 'invalid_api_key', 'unauthorized', 'permission_denied', 'permission_error',
+  'insufficient_balance', 'insufficient_credits', 'insufficient_quota', 'payment_required', 'billing_error',
+  'rate_limit_error', 'rate_limit_exceeded', 'model_not_found', 'not_found_error', 'context_length_exceeded',
+  'server_error', 'internal_server_error', 'api_error', 'overloaded_error', 'timeout_error', 'content_policy_violation',
+  'moderation_failed', 'validation_error', 'bad_request']);
+function providerDiagnostics(value, key) {
+  const safeLabel = (label) => {
+    if (String(label) === key) return 'desconocido';
+    if (typeof label === 'number' && Number.isSafeInteger(label) && label >= 0 && label <= 1_000_000) return label;
+    return typeof label === 'string' && PROVIDER_LABELS.has(label) ? label : 'desconocido';
+  };
+  const error = value?.error;
+  const reportedUsd = value?.usage?.cost;
+  return { providerErrorCode: safeLabel(error?.code), providerErrorType: safeLabel(error?.type),
+    ...(typeof reportedUsd === 'number' && Number.isFinite(reportedUsd) && reportedUsd >= 0 ? { reportedUsd } : {}) };
+}
+async function httpDiagnostics(response, key) {
+  // Parse a bounded error body in memory; retain only whitelisted identifiers and a numeric cost.
+  try {
+    let text = '';
+    const decoder = new TextDecoder();
+    for await (const bytes of response.body ?? []) {
+      text += decoder.decode(bytes, { stream: true });
+      if (text.length > 16_384) return providerDiagnostics(null, key);
+    }
+    return providerDiagnostics(JSON.parse(text + decoder.decode()), key);
+  } catch { return providerDiagnostics(null, key); }
+}
 class PilotRequestError extends Error {
-  constructor(kind, httpStatus) {
+  constructor(kind, httpStatus, diagnostics = {}) {
     super('Request failed; no retry');
     this.failureKind = kind;
     this.httpStatus = httpStatus;
+    Object.assign(this, diagnostics);
   }
 }
 export function requestFailure(error) {
   return { failureKind: error instanceof PilotRequestError ? error.failureKind : 'local_error',
+    failurePhase: error instanceof PilotRequestError ? PHASES[error.failureKind] : 'desconocido',
+    providerErrorCode: error instanceof PilotRequestError ? error.providerErrorCode ?? 'desconocido' : 'desconocido',
+    providerErrorType: error instanceof PilotRequestError ? error.providerErrorType ?? 'desconocido' : 'desconocido',
+    ...(error instanceof PilotRequestError && typeof error.reportedUsd === 'number' ? { reportedUsd: error.reportedUsd } : {}),
     httpStatus: error instanceof PilotRequestError && Number.isInteger(error.httpStatus) &&
       error.httpStatus >= 100 && error.httpStatus <= 599 ? error.httpStatus : 'desconocido' };
 }
@@ -117,7 +154,7 @@ export async function sampleRequest(body, key, fetcher = fetch) {
   } catch (error) {
     throw new PilotRequestError(['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'transport_error');
   }
-  if (!response.ok) throw new PilotRequestError('http_error', response.status);
+  if (!response.ok) throw new PilotRequestError('http_error', response.status, await httpDiagnostics(response, key));
   if (!response.body) throw new PilotRequestError('missing_stream', response.status);
   let buffer = '';
   const decoder = new TextDecoder();
@@ -126,8 +163,8 @@ export async function sampleRequest(body, key, fetcher = fetch) {
     const data = line.slice(5).trim();
     if (!data || data === '[DONE]') return;
     let chunk;
-    try { chunk = JSON.parse(data); } catch { throw new PilotRequestError('invalid_stream', response.status); }
-    if (chunk.error) throw new PilotRequestError('provider_error', response.status);
+    try { chunk = JSON.parse(data); } catch { throw new PilotRequestError('invalid_stream', response.status, providerDiagnostics({ usage }, key)); }
+    if (chunk.error) throw new PilotRequestError('provider_error', response.status, providerDiagnostics({ ...chunk, usage: chunk.usage ?? usage }, key));
     if (chunk.usage) usage = chunk.usage;
     const finish = chunk.choices?.[0]?.finish_reason;
     if (['stop', 'length', 'tool_calls', 'function_call', 'content_filter', 'error'].includes(finish)) finishReason = finish;
@@ -142,7 +179,7 @@ export async function sampleRequest(body, key, fetcher = fetch) {
     }
   } catch (error) {
     if (error instanceof PilotRequestError) throw error;
-    throw new PilotRequestError(['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'stream_error', response.status);
+    throw new PilotRequestError(['TimeoutError', 'AbortError'].includes(error?.name) ? 'timeout' : 'stream_error', response.status, providerDiagnostics({ usage }, key));
   }
   buffer += decoder.decode();
   if (buffer.trim()) consume(buffer.trimEnd());
@@ -171,7 +208,12 @@ export async function runPilot(fixtures, ledger, save, env = process.env, fetche
       if (ledger.stopped) throw new Error('Cost exceeded reservation; stopped');
     } catch (error) {
       ledger.stopped = true;
-      Object.assign(ledger.calls.at(-1), requestFailure(error));
+      const diagnostic = requestFailure(error);
+      if (ledger.calls.at(-1).status === 'reserved' && typeof diagnostic.reportedUsd === 'number') {
+        settleCall(ledger, row, diagnostic.reportedUsd);
+        ledger.calls.at(-1).status = 'failed';
+      }
+      Object.assign(ledger.calls.at(-1), diagnostic);
       if (ledger.calls.at(-1)?.status === 'reserved') Object.assign(ledger.calls.at(-1), { status: 'uncertain', costSource: 'highest-estimate' });
       await save(ledger);
       throw Object.assign(new Error('Pilot stopped; no automatic retry'), requestFailure(error));
