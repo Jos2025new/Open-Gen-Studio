@@ -337,6 +337,5 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   }
   const remaining = remainingBudget();
   lines.push(remaining == null ? 'budget: no limit' : `budget remaining: ${formatUsd(Math.max(0, remaining))}`);
-  if (session.agent.notes.length) lines.push(`since your last turn:\n${session.agent.notes.map((n) => `  - ${n}`).join('\n')}`);
   return `<studio_context>\n${lines.join('\n')}\n</studio_context>`;
 }

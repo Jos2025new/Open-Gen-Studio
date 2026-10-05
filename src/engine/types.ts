@@ -338,6 +338,8 @@ export interface Generation {
   text?: string;
   estimate: Estimate;
   actualUsd?: number;
+  /** Only cost reported in the provider result; never a quote or catalog estimate. */
+  providerReportedUsd?: number;
   parentId?: string;
   planId?: string;
   stepId?: string;
@@ -619,6 +621,8 @@ export interface StepCostReview {
   approved: StepAuthorization;
   proposed: StepAuthorization;
   message: string;
+  reason?: string;
+  decisions?: import('./agent/priceNotes').StepPriceDecision[];
 }
 
 export interface PlanFeedItem extends FeedBase {

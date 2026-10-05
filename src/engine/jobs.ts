@@ -341,7 +341,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -562,13 +562,15 @@ async function execute(id: string): Promise<string[]> {
     const delivered: Asset[] = [];
     let cost = 0;
     let costKnown = true;
+    let providerReportedCost = 0;
+    let providerReportedCostKnown = true;
     let done = 0;
     // Which request this is, counting from 1: the retry the app makes on its own and each candidate count too (T5).
     let requests = 0;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
-      // Atlas reports no cost: its exact quote for this request (same body, no media) is the real charge (C3).
+      // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
       const send = () => {
         if (proposed) checkStepAuthorization(g, proposed);
@@ -634,6 +636,8 @@ async function execute(id: string): Promise<string[]> {
       if (result.costUsd != null) cost += result.costUsd;
       else if (quote != null) cost += quote;
       else costKnown = false;
+      if (result.costUsd != null) providerReportedCost += result.costUsd;
+      else providerReportedCostKnown = false;
       if (g.kind === 'text') {
         finishText(id, result.text ?? '', result.costUsd);
         return [];
@@ -646,7 +650,7 @@ async function execute(id: string): Promise<string[]> {
       done += Math.max(1, Math.min(n, result.outputs.length));
       if (!result.outputs.length) break;
     }
-    finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered));
+    finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined);
     return assetIds;
   } catch (err) {
     if (err instanceof PriceReviewRequired) throw err;
@@ -739,7 +743,7 @@ async function runCreateStyle(g: Generation, signal: AbortSignal): Promise<void>
 function finishText(id: string, text: string, actualUsd: number | undefined): void {
   const g = get().generations[id];
   if (!g) return;
-  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, remoteJob: undefined });
+  patchGeneration(id, { status: 'done', text, statusText: undefined, progress: undefined, finishedAt: Date.now(), actualUsd, providerReportedUsd: actualUsd, remoteJob: undefined });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
 }
 
@@ -751,7 +755,7 @@ async function checkDelivery(id: string, assets: Asset[]): Promise<string[] | un
   return notes.length ? notes : undefined;
 }
 
-function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[]): void {
+function finish(id: string, assetIds: string[], actualUsd: number | undefined, delivery?: string[], providerReportedUsd?: number): void {
   const g = get().generations[id];
   if (!g) return;
   patchGeneration(id, {
@@ -762,6 +766,7 @@ function finish(id: string, assetIds: string[], actualUsd: number | undefined, d
     progress: undefined,
     finishedAt: Date.now(),
     actualUsd,
+    providerReportedUsd,
     remoteJob: undefined,
   });
   addSpend(actualUsd ?? g.estimate.usd ?? 0, spendEntry(g, actualUsd == null));
@@ -934,7 +939,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       const fallback = expectedDims(kind, g.settings);
       const assets = kind === 'model3d' ? await storeModelOutputs(result.outputs, g) : await Promise.all(result.outputs.map((o) => storeOutput(o, g, kind, fallback)));
       addAssets(assets);
-      finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets));
+      finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
       return assets.map((a) => a.id);
     } catch (err) {
       const remoteJob = keptJob(err, job);

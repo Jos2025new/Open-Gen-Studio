@@ -68,6 +68,7 @@ import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
+import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, STAGED_GUIDE, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
@@ -230,7 +231,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
         tool_call_id: pending.toolCallId,
         content: `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`,
       });
-      patchAgent(sessionId, { pending: undefined, notes: [] });
+      patchAgent(sessionId, { pending: undefined });
       await llmTurn(sessionId, workspace);
       return;
     }
@@ -251,7 +252,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       const parts = await visibleAttachments(sessionId, workspace, attachments);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
-      patchAgent(sessionId, { pending: undefined, notes: [], revising: pendingItem.id });
+      patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
       await llmTurn(sessionId, workspace);
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
@@ -292,7 +293,6 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(stripImages(a.history)) }));
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
-  patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, workspace);
 }
 
@@ -383,7 +383,6 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
     if (answers.note) lines.push(`- User note: ${answers.note}`);
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, s.agent.draft?.attachments ?? []));
     pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User answers (${how}):\n${lines.join('\n')}\n\n${ctx}` });
-    patchAgent(sessionId, { notes: [] });
     await llmTurn(sessionId, workspace);
     return;
   }
@@ -412,7 +411,6 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
       tool_call_id: pending.toolCallId,
       content: `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`,
     });
-    patchAgent(sessionId, { notes: [] });
     await llmTurn(sessionId, item.workspace);
     return;
   }
@@ -464,7 +462,6 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
     tool_call_id: pending.toolCallId,
     content: `Settings confirmed by the user (the app applies them to every step of each kind; with several models of one kind, to the steps that name that model):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
   });
-  patchAgent(sessionId, { notes: [] });
   await llmTurn(sessionId, item.workspace);
 }
 
@@ -935,6 +932,7 @@ async function executePlanItem(
         stepStates: { ...it.stepStates, [planStepId]: state },
         stepGenerations: info?.generationId ? { ...it.stepGenerations, [planStepId]: info.generationId } : it.stepGenerations,
       }));
+      if (state === 'done' || state === 'error') recordPriceResults(sessionId, itemId);
       if (info?.generationId) {
         // The Designer shows each generation's card in its conversation too (it also lands on the page, below).
         if (workspace === 'chat' || workspace === 'designer') {
@@ -1000,7 +998,8 @@ async function executePlanItem(
       return `${st.id} done`;
     })
     .join('; ');
-  patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`].slice(-6) }));
+  recordPriceResults(sessionId, itemId);
+  patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`] }));
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else if (status !== 'review') toast(`${plan.title} failed`, 'error');
@@ -1013,12 +1012,15 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
   if (!item || !review || item.stepStates[stepId] !== 'review' || !generationId) return;
+  const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,
+    stepCostReviews: { ...it.stepCostReviews, [stepId]: { ...review, decisions: [...(review.decisions ?? []), record] } },
     stepStates: { ...it.stepStates, [stepId]: decision === 'continue' ? 'running' : 'skipped' },
     stepAuthorizations: decision === 'continue' ? { ...it.stepAuthorizations, [stepId]: review.proposed } : it.stepAuthorizations,
     canceledSteps: decision === 'cancel' ? [...(it.canceledSteps ?? []), stepId] : it.canceledSteps,
   }));
+  patchAgent(sessionId, (a) => ({ notes: [...a.notes, priceDecisionNote(item.plan.id, stepId, record)] }));
   patchGeneration(generationId, { status: decision === 'continue' ? 'queued' : 'canceled', statusText: undefined });
   // Independent steps already in flight finish first; their results are then reused, including after reload.
   await planRuns.get(`${sessionId}:${itemId}`);
@@ -1055,6 +1057,7 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   const at = s.feed.findIndex((f) => f.id === itemId);
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];
+  drainAgentNotes(sessionId);
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
 ${WRAPUP_RULE}`, []));
   await llmTurn(sessionId, item.workspace, { textOnly: true });
@@ -1276,10 +1279,10 @@ export function askForPlan(sessionId: string, noticeId: string): void {
 const SILENCE_MS = 60_000;
 const TURN_CAP_MS = 5 * 60_000;
 const AGENT_SYSTEM = `${MUST}\n\n${CAPABILITIES}\n\n${SYSTEM_PROMPT}\n\n${MUST}`;
-/** Past this, the next call of the turn carries a short system warning (a running stream cannot be interrupted). */
+/** Past this, append one warning for this turn (a running stream cannot be interrupted). */
 const HURRY_MS = 50_000;
 const HURRY_NOTE =
-  '<system_warning>The user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
+  '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
 async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
   const engine = agentEngine();
@@ -1295,6 +1298,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
   const turnStart = Date.now();
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
+  let hurryNoted = false;
   let transferredToDesigner = false;
   // The turn is not mute: if nothing comes out for a minute the activity block says so, and Stop is in the composer.
   // Every piece of output re-arms it. The five-minute cap is the only thing that ends a turn by force (T3).
@@ -1327,16 +1331,17 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
       let result: ChatResult;
       try {
         if (session(sessionId).agent.phase !== 'working') patchAgent(sessionId, { phase: 'working' });
+        drainAgentNotes(sessionId);
+        if (!hurryNoted && Date.now() - turnStart > HURRY_MS) {
+          pushHistory(sessionId, { role: 'user', content: HURRY_NOTE });
+          hurryNoted = true;
+        }
         result = await chat({
           provider: engine.provider,
           apiKey: engine.key,
           model: engine.model,
           system: AGENT_SYSTEM,
-          // Only sent, never stored: the warning applies to this turn and does not pile up in the history.
-          messages:
-            Date.now() - turnStart > HURRY_MS
-              ? [...repairHistory(session(sessionId).agent.history), { role: 'user', content: HURRY_NOTE }]
-              : repairHistory(session(sessionId).agent.history),
+          messages: repairHistory(session(sessionId).agent.history),
           tools: TOOLS,
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
@@ -1816,6 +1821,7 @@ export function repairHistory(history: LlmMessage[]): LlmMessage[] {
  * Nothing is submitted again: steps that had not started before the reload are reported as not run.
  */
 export function settleInterruptedPlans(): void {
+  for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan') recordPriceResults(s.id, f.id);
   const open = new Set<string>();
   for (const s of Object.values(get().sessions)) for (const f of s.feed) if (f.type === 'plan' && f.status === 'running') open.add(`${s.id}|${f.id}`);
   if (!open.size) return;
@@ -1846,6 +1852,7 @@ export function settleInterruptedPlans(): void {
         status: review ? 'review' : done === all ? 'done' : done ? 'partial' : 'error',
         error: review || done === all ? undefined : 'Interrupted by a page reload; some steps did not run.',
       });
+      recordPriceResults(sessionId, itemId);
     }
     if (!open.size) unsubscribe();
   };

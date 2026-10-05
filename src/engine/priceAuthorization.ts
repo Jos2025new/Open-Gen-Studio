@@ -44,7 +44,7 @@ export function checkStepAuthorization(g: Generation, proposed: StepAuthorizatio
   const data = { event: 'plan-step-cost-stopped', planId: g.planId, stepId, generationId: g.id, approvedModel: approved.modelRef, newModel: proposed.modelRef, approvedEstimate: approved.estimate, newEstimate: proposed.estimate };
   if (changed && increased) {
     const message = `Este paso costaría $${after.toFixed(2)} en vez de $${before.toFixed(2)} aprobados: ${reason}.`;
-    updateFeedItem<PlanFeedItem>(g.sessionId, item.id, it => ({ ...it, stepCostReviews: { ...it.stepCostReviews, [stepId]: { approved, proposed, message } }, stepStates: { ...it.stepStates, [stepId]: 'review' } }));
+    updateFeedItem<PlanFeedItem>(g.sessionId, item.id, it => ({ ...it, stepCostReviews: { ...it.stepCostReviews, [stepId]: { approved, proposed, message, reason, decisions: it.stepCostReviews?.[stepId]?.decisions } }, stepStates: { ...it.stepStates, [stepId]: 'review' } }));
     patchGeneration(g.id, { status: 'review', statusText: 'Necesita revisión', error: undefined });
     logEvent('app', data);
     if (journeyActive()) recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'plan.step_cost_stopped', reason, sessionId: g.sessionId, planId: g.planId, stepId, generationId: g.id, prices: { acceptedEstimateUsd: before, currentEstimateUsd: after } });
