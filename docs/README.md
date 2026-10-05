@@ -48,6 +48,6 @@
 ## Verificación
 
 - [Línea base del agente: script, resultados y límites](agent-baseline.md).
-- [Comparación NanoGPT: resultados DeepSeek y ampliación propuesta, coste, caché y límites](nanogpt-price-comparison.md).
+- [Comparación NanoGPT: resultados DeepSeek y ampliación aprobada hasta USD 1, coste, caché y límites](nanogpt-price-comparison.md).
 
 `node scripts/check-docs.mjs` comprueba tamaños, índice, ADRs, enlaces de las fichas y posibles secretos. `npm test` ejecuta primero las salvaguardas y esta comprobación. La lectura de data/ real no forma parte de estos controles.

@@ -9,8 +9,8 @@ su finalización; esta revisión solo lee sus resultados, sin nuevas llamadas.
 Solo `deepseek/deepseek-v4.1-flash`: 3 parejas control/aviso, **6 llamadas**.
 Pareja 1: primera respuesta. Pareja 2: continuación con Continuar.
 Pareja 3: continuación con Cancelar. Orden A/B, B/A, A/B.
-GPT Luna queda bloqueado en el script; sus otras 6 llamadas requieren autorización
-posterior. El límite global del piloto sigue siendo **USD 0.05**, no por modelo.
+GPT Luna quedó bloqueado en el ejecutor original. El primer piloto usó un límite
+global de **USD 0.05**, no por modelo; la ampliación aprobada figura al final.
 No se sacarán conclusiones sobre p90 con esta muestra.
 
 ## Resultado del proveedor: 3 parejas, 6 llamadas
@@ -61,11 +61,12 @@ significancia, equivalencia ni estabilidad de latencia. El primer texto quedó
 entre 2.990 y 5.413 s en estas fixtures; no valida la experiencia de 12–30 s
 en sesiones reales. La salida de primera/aviso alcanzó max_tokens=500, y este
 archivo no permite determinar si la respuesta fue semánticamente completa.
-No se evaluó GPT Luna ni otros modelos, cargas, sesiones históricas o un flujo
+En estos seis resultados no se evaluó GPT Luna ni otros modelos, cargas, sesiones históricas o un flujo
 visual completo. El piloto envía cuerpos sintéticos capturados del agente;
 no ejecuta herramientas ni generaciones de activos. Por ello, la caché observada
 complementa los tests del prefijo, pero no demuestra por sí sola igualdad de
-prefijos ni comportamiento completo de la app. No se aprobó ni ejecutó otra tanda.
+prefijos ni comportamiento completo de la app. Al leer estos resultados todavía
+no se había aprobado ni ejecutado otra tanda.
 
 Evidencia diferenciada: [script revisado](../scripts/price-pilot.mjs),
 [captura offline en sandbox](../tests/price-pilot-capture.test.ts),
@@ -130,7 +131,8 @@ estimación más alta. Ante error, conserva la reserva y se detiene.
 Una cerradura exclusiva impide ejecutar dos procesos a la vez; se conserva al
 terminar o interrumpir. Los IDs ya intentados no se reenvían.
 No hay reintentos, fallback, ejecución de herramientas, cotizaciones ni descargas.
-El presupuesto es compartido: no se reinicia para una futura etapa de GPT Luna.
+El presupuesto es compartido: la ampliación cuenta lo consumido aquí y requiere
+un ejecutor y un manifiesto aprobados aparte.
 
 El margen de caracteres es una estimación, no una garantía de factura del proveedor.
 Si el coste informado rebasa la reserva, el script se detiene inmediatamente y no
@@ -170,15 +172,16 @@ Simula 60 s con Date.now, comprueba 3 llamadas, el aviso una sola vez, pares de
 herramientas completos y prefijo serializado idéntico en las continuaciones.
 
 **Piloto finalizado: seis llamadas de DeepSeek, USD 0.0040175744 informados.
-Sin autorización para llamadas adicionales.**
+Las llamadas de la ampliación aprobada aún no se han ejecutado.**
 
-## Ampliación solicitada: cuatro modelos, pendiente de decisiones
+## Ampliación aprobada: cuatro modelos, tope global USD 1.00
 
 Consulta pública del catálogo el 2026-10-05, sin clave ni generación.
-Propuesta: las mismas tres parejas por modelo (24 llamadas adicionales),
+El usuario aprobó USD 1.00 el 2026-10-05. Preparación: tres parejas por modelo (24 llamadas adicionales),
 max_tokens=500 y reasoning_effort=medium solicitado en ambos brazos. No se ha
-modificado el ejecutor, su lista permitida, el límite USD 0.05 o el bloqueo del
-piloto anterior. No se han enviado peticiones a estos modelos.
+alterado el bloqueo del piloto anterior. El ejecutor original mantiene su límite
+de USD 0.05; el nuevo ejecutor aplica USD 1.00 global incluyendo DeepSeek.
+No se han enviado peticiones a estos modelos desde esta revisión.
 
 | Modelo / ID exacto | Esfuerzos anunciados | Suscripción según catálogo | Entrada / salida USD por millón | Reserva por tokens, 6 llamadas USD |
 | --- | --- | --- | ---: | ---: |
@@ -200,21 +203,65 @@ cargo de tokens, una contingencia conservadora añade 6 × 0.055 = USD 0.330000.
 Techo calculado con esa contingencia: **USD 0.741669 adicionales**, o
 **USD 0.745689** contando USD 0.004020 del ledger ya consumido. Sigue siendo
 un presupuesto con la aproximación de caracteres, no un límite contractual de
-factura. No se ha autorizado aumentar el tope USD 0.05. Una sola llamada de
-Grok ya reserva más de ese tope con estas fixtures; no cabe en la ejecución actual.
+factura. Una sola llamada de Grok ya reserva más de USD 0.05 con estas fixtures;
+por ello la ampliación usa el tope global USD 1.00 expresamente aprobado.
 
 MiMo y GLM no anuncian medium nativo. La [documentación de reasoning](https://docs.nano-gpt.com/api-reference/miscellaneous/extended-thinking)
 acepta ese valor en la API, pero indica que algunas rutas adaptan niveles al más
 cercano soportado. Enviar medium no demuestra medium efectivo en ambos modelos;
-no se les sustituirá esfuerzo o variante sin resolver esta decisión.
+Se envía exactamente medium a los cuatro y se registra por separado el nivel
+solicitado y el efectivo desconocido; no se les sustituye esfuerzo o variante.
 Los tokens de reasoning se facturan como salida y un límite de 500 puede agotar
 el presupuesto de salida antes del texto final. Una ampliación debe registrar
 finish_reason y reasoning_tokens si se informan, sin guardar contenido, para
 separar ausencia de texto o truncamiento de una respuesta terminada.
 
-La alternativa que cabe en USD 0.05 es Luna + GLM: USD 0.043028 adicionales,
-USD 0.047048 contando el ledger anterior, manteniendo n=3 por modelo; GLM
-seguiría teniendo medium solicitado con nivel efectivo no garantizado. Esta
-selección también requiere aprobación explícita y revisión del script modificado.
 No se convierte la comparación entre modelos en una prueba de causalidad: niveles
 adaptados, rutas, caché caliente/fría y longitudes de salida siguen siendo límites.
+
+### Ejecutor, revisión y salida
+
+[price-pilot-expansion.mjs](../scripts/price-pilot-expansion.mjs) deriva las 24
+peticiones de las fixtures existentes; cambia únicamente el modelo y fija medium.
+Intercala modelos por caso y usa orden control/aviso, aviso/control, control/aviso.
+No dispara herramientas ni llamadas previas para calentar caché; el orden se guarda.
+Solo lee `.sandbox/pilot/requests.json` y el ledger completado de DeepSeek.
+Valida el hash y la suma del ledger anterior; ese coste se incorpora una vez al
+ledger de la ampliación. Ni los archivos ni el bloqueo de DeepSeek se modifican.
+
+El modo por defecto calcula y escribe `.sandbox/pilot/expansion/estimate.json`,
+sin red y sin leer claves. La modalidad --execute lee únicamente NANOGPT_API_KEY,
+aborta si falta y exige PRICE_PILOT_APPROVAL igual al hash del manifiesto exacto
+(peticiones, modelos, precios, configuración y ledger previo). Solo usa el
+POST fijo de NanoGPT con redirecciones rechazadas, sin reintentos ni fallback.
+No imprime ni persiste claves, encabezados, texto o errores del proveedor.
+
+Antes de cada POST comprueba el saldo global de USD 1.00, reserva el máximo de
+esa llamada (incluida la contingencia Grok) y escribe ledger y resultados.
+Coste informado sustituye la reserva; si falta, permanece el máximo. Si supera
+la reserva o el dólar, se detienen los envíos restantes; el código no puede
+deshacer un cargo externo ya ocurrido. Una cerradura exclusiva persistente
+impide procesos simultáneos o repetir/reanudar la tanda, incluso después de error.
+
+Resultados: `.sandbox/pilot/expansion/results.json`, con costes previo, adicional
+y global, modelo/caso/brazo, tiempos de primer texto y total, tokens entrada/salida,
+cachedTokens, reasoningTokens, finishReason, esfuerzo solicitado y efectivo
+desconocido. Los campos ausentes se marcan desconocidos. finishReason=length
+permite identificar un límite alcanzado; si solo hay reasoning, primer texto es
+desconocido. Una respuesta HTTP terminada no demuestra una respuesta semánticamente
+completa. Los JSON de estimación y resultados no incluyen claves ni conversaciones.
+
+Código común: [price-pilot.mjs](../scripts/price-pilot.mjs) para credencial, POST,
+streaming y reservas; el límite por defecto del piloto original no aumenta.
+[Tests de la ampliación](../tests/price-pilot-expansion.test.ts): 24 envíos simulados
+con medium, historial idéntico a las fixtures, contabilidad compartida, clave/destino,
+reservas antes del POST, sobrepresupuesto, costes ausentes, rechazo de medium,
+truncamiento/solo reasoning, y ausencia de reintentos o persistencia de contenido.
+
+Comando para la terminal del usuario, después de revisar el script, con la clave
+ya exportada localmente (no se solicita en el chat):
+
+```bash
+cd '/home/samuel/Documentos/Projects/My New App/ogs-price-auth'
+PRICE_PILOT_APPROVAL=b56778a7a270a96fe152513aab49c701279691d71083d71afbdf37971a1a10f1 node scripts/price-pilot-expansion.mjs --execute
+```
