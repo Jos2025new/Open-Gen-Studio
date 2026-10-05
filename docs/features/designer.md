@@ -6,6 +6,8 @@
 | La exportación SVG mantiene orden, opacidad y mezcla, omite capas ocultas y conserva texto editable escapado. | [src/engine/design/export.ts](../../src/engine/design/export.ts) | [tests/design-export.test.ts](../../tests/design-export.test.ts) |
 | Save to gallery pide confirmación mediante un Popover de la app con Cancel y Save. | [src/components/designer/DesignerWorkspace.tsx](../../src/components/designer/DesignerWorkspace.tsx) | sin test |
 
+| Al ampliar el lienzo, las capas pintadas amplían el buffer y su base sin perder trazos; reducir conserva píxeles fuera de página y undo/redo restaura los buffers. | [paintBounds.ts](../../src/engine/design/paintBounds.ts), [canvasSize.ts](../../src/engine/design/canvasSize.ts) | [paint-resize.test.ts](../../tests/paint-resize.test.ts) |
+
 ## Monkey test manual
 Arranca `npm run dev:sandbox` y ejecuta `npm run stress`; termina deteniendo el sandbox ([test](../../tests-e2e/designer-monkey.spec.ts)).
 Usa `SEED=101 STEPS=300 npm run stress` para repetir acciones y coordenadas; el valor por defecto es 300 ([test](../../tests-e2e/designer-monkey.spec.ts)).

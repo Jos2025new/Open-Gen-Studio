@@ -12,7 +12,7 @@
 - [agente](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
-- [designer](features/designer.md).
+- [designer: capas, resize con pintura y verificación](features/designer.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
 - [proveedores](features/proveedores.md).

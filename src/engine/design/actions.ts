@@ -13,6 +13,7 @@ import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
+import { rebasePaintPixels } from './paintBounds';
 
 const get = useStore.getState;
 
@@ -181,19 +182,9 @@ export function addTextLayer(sessionId: string, docId: string, text: string, pos
 export function rebasePaintLayer(sessionId: string, docId: string, layerId: string): void {
   const doc = getDoc(sessionId, docId);
   const l = doc?.layers.find((x) => x.id === layerId);
-  const buf = l?.type === 'raster' && !l.sourceAssetId ? getBuffer(l.id) : undefined;
-  if (!doc || !l || l.type !== 'raster' || !buf || l.paintBaseId) return;
-  // Already 1:1, whole-pixel and covering the page (the brush reaches all of it): nothing to bake.
-  if (Number.isInteger(l.x) && Number.isInteger(l.y) && l.x <= 0 && l.y <= 0 && l.x + l.width >= doc.width && l.y + l.height >= doc.height && l.width === buf.width && l.height === buf.height && l.pxWidth === buf.width && l.pxHeight === buf.height) return;
-  // Bake at 1:1 over the page *and* whatever lies off it: moving or scaling past the edge never crops the pixels.
-  const x0 = Math.floor(Math.min(0, l.x)), y0 = Math.floor(Math.min(0, l.y));
-  const w = Math.ceil(Math.max(doc.width, l.x + l.width)) - x0, h = Math.ceil(Math.max(doc.height, l.y + l.height)) - y0;
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  c.getContext('2d')!.drawImage(buf, l.x - x0, l.y - y0, l.width, l.height);
-  setBuffer(l.id, c);
-  mutateDoc(sessionId, docId, (d) => ({ ...d, layers: d.layers.map((x) => (x.id === l.id ? { ...l, x: x0, y: y0, width: w, height: h, pxWidth: w, pxHeight: h } : x)) }), { record: false });
+  if (!doc || !l || l.type !== 'raster' || l.sourceAssetId) return;
+  const next = rebasePaintPixels(l, doc);
+  if (next) mutateDoc(sessionId, docId, (d) => ({ ...d, layers: d.layers.map((x) => x.id === l.id ? next : x) }), { record: false });
 }
 
 export function addVectorLayer(sessionId: string, docId: string, shapes: ShapeSpec[], name = 'Shapes'): string | null {
