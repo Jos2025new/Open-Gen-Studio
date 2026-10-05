@@ -7,7 +7,8 @@ export function pixelCanvas(width: number, height: number) {
   const put = (x: number, y: number, alpha: number) => {
     if (x < 0 || y < 0 || x >= width || y >= height) return;
     const i = y * width + x, a = alpha * ctx.globalAlpha, old = pixels[i];
-    pixels[i] = ctx.globalCompositeOperation === 'destination-out' ? old * (1 - a)
+    pixels[i] = ctx.globalCompositeOperation === 'destination-over' ? old + a * (1 - old)
+      : ctx.globalCompositeOperation === 'destination-out' ? old * (1 - a)
       : ctx.globalCompositeOperation === 'destination-in' ? old * a : a + old * (1 - a);
   };
   const mapped = (x: number, y: number) => [x * matrix[0] + matrix[4], y * matrix[3] + matrix[5]];

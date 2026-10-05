@@ -69,3 +69,38 @@ describe('painted layer canvas resize', () => {
     expect(pageAlpha(next, 8, 8)).toBe(255);
   });
 });
+
+import { solidPageFills, uniformOpaqueColor } from '../src/engine/design/solidPageFill';
+describe('full-page solid fill stays visible after resizing', () => {
+  it.each(ANCHORS)('extends the solid background with %s and restores the old buffer with undo', anchor => {
+    const sid = useStore.getState().activeSessionId;
+    const fill = newRasterLayer('Fill', { x: 0, y: 0, width: 12, height: 12 }, { width: 12, height: 12 });
+    const pixels = pixelCanvas(12, 12); pixels.getContext().fillRect(0, 0, 12, 12);
+    setBuffer(fill.id, pixels as unknown as HTMLCanvasElement);
+    const doc = { ...createDoc('white page', 12, 12), layers: [fill], activeLayerId: fill.id };
+    addDoc(sid, doc);
+    resizeCanvas(sid, doc.id, 24, 24, anchor);
+    const grown = layerAt(sid, doc.id);
+    expect(pageAlpha(grown, 1, 1)).toBe(255);
+    expect(pageAlpha(grown, 22, 22)).toBe(255);
+    undoDoc(sid, doc.id);
+    expect(getBuffer(fill.id)).toBe(pixels);
+    redoDoc(sid, doc.id);
+    expect(pageAlpha(layerAt(sid, doc.id), 22, 22)).toBe(255);
+  });
+  it('recognizes only uniform opaque pixels, including white, and rejects holes and differing colors', () => {
+    expect(uniformOpaqueColor(new Uint8ClampedArray([255,255,255,255,255,255,255,255]))).toBe('#ffffff');
+    expect(uniformOpaqueColor(new Uint8ClampedArray([20,40,60,255,20,40,60,255]))).toBe('#14283c');
+    expect(uniformOpaqueColor(new Uint8ClampedArray([255,255,255,255,255,255,255,0]))).toBeNull();
+    expect(uniformOpaqueColor(new Uint8ClampedArray([255,255,255,255,0,0,0,255]))).toBeNull();
+  });
+});
+
+ it('uses full-fill provenance only at the matching pixel revision', () => {
+  const layer = { ...newRasterLayer('Fill', { x: 0, y: 0, width: 12, height: 12 }, { width: 12, height: 12 }), pageFill: { color: '#ffffff', rev: 0 } };
+  const pixels = pixelCanvas(12, 12);
+  setBuffer(layer.id, pixels as unknown as HTMLCanvasElement);
+  const doc = { ...createDoc('fill', 12, 12), layers: [layer] };
+  expect(solidPageFills(doc).get(layer.id)).toBe('#ffffff');
+  expect(solidPageFills({ ...doc, layers: [{ ...layer, rev: 1 }] }).size).toBe(0);
+ });

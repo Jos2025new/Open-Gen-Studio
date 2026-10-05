@@ -820,6 +820,8 @@ export interface RasterStroke {
 
 export interface RasterLayer extends LayerBase {
   type: 'raster';
+  /** A full-page bucket fill, valid only until its pixels are edited. */
+  pageFill?: { color: string; rev: number };
   paintBaseId?: string;
   paintStrokes?: RasterStroke[];
   x: number;

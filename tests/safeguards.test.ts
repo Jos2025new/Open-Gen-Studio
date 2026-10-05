@@ -37,6 +37,17 @@ it('copies data and refuses a sandbox linked to real data', async () => {
   await expect(prepareSandbox(root, '.sandbox/data')).rejects.toThrow('Unsafe sandbox');
   expect(readFileSync(join(root, 'data/state.json'), 'utf8')).toBe('{"original":true}');
 });
+it('starts an isolated sandbox without source data, retaining existing sandbox files', async () => {
+  const root = fixture();
+  rmSync(join(root, 'data'), { recursive: true });
+  const destination = await prepareSandbox(root, '.sandbox/data');
+  writeFileSync(join(destination, 'state.json'), '{"sandbox":true}');
+  expect(await prepareSandbox(root, '.sandbox/data')).toBe(destination);
+  expect(readFileSync(join(destination, 'state.json'), 'utf8')).toBe('{"sandbox":true}');
+  rmSync(join(root, '.sandbox'), { recursive: true });
+  symlinkSync(join(root, 'docs'), join(root, '.sandbox'));
+  await expect(prepareSandbox(root, '.sandbox/data')).rejects.toThrow('Unsafe sandbox');
+});
 it('fails on nested docs keys without printing their values', async () => {
   const root = fixture();
   mkdirSync(join(root, 'docs/nested'));

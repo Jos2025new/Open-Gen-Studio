@@ -49,6 +49,7 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
     ctx.globalCompositeOperation = 'source-over';
   }
   const layer = { ...newRasterLayer('Fill', { x: 0, y: 0, width: doc.width, height: doc.height }, { width: w, height: h }), opacity };
+  if (!sel && region.every(value => value === 1) && smooth === 0) Object.assign(layer, { pageFill: { color, rev: layer.rev } });
   record(doc);
   setBuffer(layer.id, canvas);
   setDoc(sessionId, doc.id, (d) => insertLayer(d, layer, 'top'));

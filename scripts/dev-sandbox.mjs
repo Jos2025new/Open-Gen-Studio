@@ -24,6 +24,11 @@ export async function prepareSandbox(root, dataDir) {
   await mkdir(destination, { recursive: true, mode: 0o700 });
   if (await realpath(destination) !== resolve(canonicalRoot, '.sandbox/data')) throw new Error('Sandbox escaped project');
   const source = resolve(root, 'data');
+  const sourceInfo = await lstat(source).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+  });
+  // A worktree may have only sandbox data; never fall back to another checkout.
+  if (!sourceInfo) return destination;
   await cp(source, destination, {
     recursive: true,
     filter: async (from, to) => {
