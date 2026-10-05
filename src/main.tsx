@@ -10,6 +10,8 @@ import './styles/composer.css';
 import './styles/chat.css';
 import './styles/node.css';
 import './styles/designer.css';
+import './styles/prompt-box.css';
+import './styles/designer-connected.css';
 import { App } from './App';
 
 createRoot(document.getElementById('root')!).render(

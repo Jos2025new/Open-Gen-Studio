@@ -61,9 +61,11 @@ export function ChatWorkspace() {
         </div>
       ) : (
         <div className="chat-empty">
+          <header className="chat-welcome">
           <div className="hero-mark" aria-hidden />
           <h1>What are we making?</h1>
           <p className="faint">Images, video, node flows and layered designs — the agent plans it and asks before spending.</p>
+          </header>
           <div className="suggestions">
             {SUGGESTIONS.map((s) => (
               <button

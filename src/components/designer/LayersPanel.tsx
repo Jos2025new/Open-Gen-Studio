@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Ellipsis, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -14,7 +14,7 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
-import { EditModeToggle } from './ToolSettings';
+import { EditModeToggle, InlineColor } from './ToolSettings';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 
@@ -76,10 +76,11 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const layer = activeLayer(doc);
   const pop = usePopover();
   const addPop = usePopover();
+  const morePop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
-  const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'layers');
+  const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
@@ -123,36 +124,21 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }}
       onDoubleClick={() => setWidth(260)} />
     <div className="panel-tabs" role="tablist" aria-label="Layers panel">
-      {/* Inkscape-style docked tabs: the open one shows its icon and name, the others only their icon. */}
       {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, layer ? `Properties — ${layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}` : 'Properties']] as const).map(([id, Icon, label]) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
-          <Icon size={14} />{tab === id && <span>{label}</span>}
+          <Icon size={14} /><span className="sr-only">{label}</span>
         </button>
       ))}
       <span className="panel-tabs-gap" />
       {tab === 'layers' ? <div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div> : <IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} />}
     </div>
-    <div className="layers-body">
-    {tab === 'layers' && <section className="panel-section panel-tab-body">
-    <div className="layer-add">
-      {/* One "+" for a new layer (its kind in the menu); the order and folder tools sit beside it. */}
-      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" className="layer-new-btn" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
-      <Popover open={addPop.open} anchor={addPop.ref} onClose={addPop.close} placement="bottom-start" width={180} label="New layer">
-        <div className="menu" role="menu">
-          <MenuItem icon={Image} label="Raster" detail="Pixels: paint, images" onClick={() => { addEmptyLayer(sessionId, doc.id, 'raster'); addPop.close(); }} />
-          <MenuItem icon={Shapes} label="Vector" detail="Shapes and lineart" onClick={() => { addEmptyLayer(sessionId, doc.id, 'vector'); addPop.close(); }} />
-          <MenuItem icon={Type} label="Text" onClick={() => { addEmptyLayer(sessionId, doc.id, 'text'); addPop.close(); }} />
+    {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
+        <div className="prop-row">
+          <Field label="Opacity"><div className="opacity-field"><Range min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
+          <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
-      </Popover>
-      <span className="layer-actions-gap" />
-      {layer && <>
-        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
-          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
-          : <IconButton icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'} size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
-        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, 1))} />
-        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => (layer.locked ? lockedNote(layer.name) : moveLayer(sessionId, doc.id, layer.id, -1))} />
-      </>}
-    </div>
+    </fieldset>}
+    <section className="layer-shelf">
     <div className="layer-list">
       {[...doc.layers].reverse().map((l, d, shown) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes;
         // A folder's header sits above its topmost layer; a collapsed folder hides its layers' rows.
@@ -173,37 +159,54 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
         }}
         onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
-        <button className="layer-select" aria-pressed={layer?.id === l.id} onClick={(e) => {
+        <button className="layer-select" aria-label={`Select ${l.name}`} aria-pressed={layer?.id === l.id} onClick={(e) => {
           if (drag?.active) return;
           // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
           if (e.shiftKey && !(e.ctrlKey || e.metaKey)) { pickLayerRange(doc.id, doc.activeLayerId, l.id, doc.layers.map((x) => x.id)); pop.close(); return; }
           pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
         }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
           <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /></span>
-          <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />
+          {layer?.id !== l.id && <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />}
         </button>
+        {layer?.id === l.id && <input key={l.id + l.name} className="layer-name-inline" aria-label="Name" defaultValue={l.name} disabled={l.locked} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== l.name && !l.locked) patchLayer(sessionId, doc.id, l.id, { name: e.target.value.trim() }); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = l.name; e.currentTarget.blur(); } e.stopPropagation(); }} />}
         <span className="layer-kind" data-tip={`${l.type} layer`} aria-label={`${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
       </div></Fragment>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
-    {layer && <div className="layer-actions">
+    <div className="layer-actions">
+      <IconButton ref={addPop.ref} icon={Plus} label="New layer" size="sm" className="layer-new-btn" aria-haspopup="menu" aria-expanded={addPop.open} onClick={addPop.toggle} />
+      <Popover open={addPop.open} anchor={addPop.ref} onClose={addPop.close} placement="bottom-start" width={180} label="New layer">
+        <div className="menu" role="menu">
+          <MenuItem icon={Image} label="Raster" detail="Pixels: paint, images" onClick={() => { addEmptyLayer(sessionId, doc.id, 'raster'); addPop.close(); }} />
+          <MenuItem icon={Shapes} label="Vector" detail="Shapes and lineart" onClick={() => { addEmptyLayer(sessionId, doc.id, 'vector'); addPop.close(); }} />
+          <MenuItem icon={Type} label="Text" onClick={() => { addEmptyLayer(sessionId, doc.id, 'text'); addPop.close(); }} />
+        </div>
+      </Popover>
+      {layer && <>
+        <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} aria-label="Operations" data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}><span className="layer-ops-label">Operations</span></Button>}
         <span className="layer-actions-gap" />
-        <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
+        <IconButton ref={morePop.ref} icon={Ellipsis} label="More layer actions" size="sm" aria-haspopup="dialog" aria-expanded={morePop.open} onClick={morePop.toggle} />
+        <Popover open={morePop.open} anchor={morePop.ref} onClose={morePop.close} width={260} label="More layer actions"><div className="menu">
+      {layer && <>
+        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
+          ? <MenuItem icon={FolderOutput} label="Ungroup this folder"  onClick={() => { ungroup(sessionId, doc.id, layer.groupId!); morePop.close(); }} />
+          : <MenuItem icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'}  disabled={picked.length < 2} onClick={() => { groupLayers(sessionId, doc.id, picked); morePop.close(); }} />}
+        <MenuItem icon={ArrowUp} label="Move layer up"  disabled={index === doc.layers.length - 1} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, 1); morePop.close(); }} />
+        <MenuItem icon={ArrowDown} label="Move layer down"  disabled={index === 0} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, -1); morePop.close(); }} />
+      </>}
+        </div></Popover>
         <IconButton icon={Trash} label={picked.length > 1 ? `Delete ${picked.length} layers` : 'Delete layer'} size="sm" tone="danger" disabled={picked.every((id) => doc.layers.find((l) => l.id === id)?.locked)} onClick={() => deleteLayers(sessionId, doc.id, picked)} />
-      </div>}
-    </section>}
+      </>}
+    </div>
+    </section>
+    <div className="layers-body">
     {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
     {layer && <>
       {tab === 'props' && <section className="panel-section panel-tab-body">
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
-        <Field label="Name"><input key={layer.id + layer.name} defaultValue={layer.name} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== layer.name) patch({ name: e.target.value.trim() }); }} /></Field>
-        <div className="prop-row">
-          <Field label="Opacity"><div className="opacity-field"><Range min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
-          <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
-        </div>
         <div className="field edit-mode-field"><span className="field-label">Edit tool acts on</span><EditModeToggle /></div>
         <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
@@ -211,7 +214,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
           <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
           <Field label="Font"><select value={layer.fontFamily} onChange={(e) => patch({ fontFamily: e.target.value })}>{FONT_NAMES.map((f) => <option key={f}>{f}</option>)}</select></Field>
           <div className="property-grid"><Field label="Size"><input type="number" min={4} max={1000} value={layer.fontSize} onChange={(e) => patch({ fontSize: Math.min(1000, Math.max(4, +e.target.value)) })} /></Field><Field label="Weight"><select value={layer.fontWeight} onChange={(e) => patch({ fontWeight: +e.target.value })}>{[300, 400, 500, 600, 700, 800, 900].map((w) => <option key={w}>{w}</option>)}</select></Field></div>
-          <Field label="Text color"><input type="color" value={layer.color} onChange={(e) => patch({ color: e.target.value })} /></Field>
+          <Field label="Text color"><InlineColor label="Text color" value={layer.color} onChange={(color) => patch({ color })} /></Field>
           <Field label="Alignment"><select value={layer.align} onChange={(e) => patch({ align: e.target.value as 'left' | 'center' | 'right' })}>{['left', 'center', 'right'].map((a) => <option key={a}>{a}</option>)}</select></Field>
         </>}
         {layer.type === 'vector' && layer.strokes?.length ? (() => {

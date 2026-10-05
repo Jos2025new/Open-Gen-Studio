@@ -1,4 +1,4 @@
-import { Brush, Pipette, SquareDashed, Blend, Ruler, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
 import { Fragment, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
@@ -27,26 +27,23 @@ const GROUPS: Array<{ id: string; icon: LucideIcon; label: string; after: Design
   ] },
 ];
 
-function ToolGroup({ group, tool }: { group: (typeof GROUPS)[number]; tool: DesignTool }) {
+function ToolGroup({ group, tool, onPick }: { group: (typeof GROUPS)[number]; tool: DesignTool; onPick?: (button: HTMLButtonElement) => void }) {
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>
     <IconButton ref={pop.ref} icon={group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={pop.toggle} />
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={190} label={group.label}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} label={group.label}>
       <div className="menu" role="menu">
-        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} onClick={() => { setUi({ tool: t.id }); pop.close(); }} />)}
+        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} onClick={() => { setUi({ tool: t.id }); pop.close(); if (pop.ref.current) onPick?.(pop.ref.current); }} />)}
       </div>
     </Popover>
   </>;
 }
 
-export function ToolRail({ doc, children }: { doc: DesignDoc; children?: ReactNode }) {
+export function ToolRail({ doc, children, onPick }: { doc: DesignDoc; children?: ReactNode; onPick?: (button: HTMLButtonElement) => void }) {
   const tool = useStore((s) => s.ui.tool);
-  const rulers = useStore((s) => s.ui.rulers ?? false);
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
-    {TOOLS.map((t) => { const reason = toolBlockReason(t.id, activeLayer(doc)); return <Fragment key={t.id}><IconButton icon={t.icon} label={t.label} active={tool === t.id} aria-pressed={tool === t.id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: t.id })} />{GROUPS.filter((g) => g.after === t.id).map((g) => <ToolGroup key={g.id} group={g} tool={tool} />)}</Fragment>; })}
-    <div className="side-sep" />
-    <IconButton icon={Ruler} label={`${rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={rulers} aria-pressed={rulers} onClick={() => setUi({ rulers: !rulers })} />
     {children}
+    {[[0, 3], [3, 6], [6, TOOLS.length]].map(([start, end]) => <div className="tool-family" key={start}>{TOOLS.slice(start, end).map((t) => { const reason = toolBlockReason(t.id, activeLayer(doc)); return <Fragment key={t.id}><IconButton icon={t.icon} label={t.label} active={tool === t.id} aria-pressed={tool === t.id} disabled={!!reason} data-tip={reason ?? (t.id === 'text' ? 'Text (T) · settings for new text' : t.label)} onClick={(e) => { setUi({ tool: t.id }); onPick?.(e.currentTarget); }} />{GROUPS.filter((g) => g.after === t.id).map((g) => <ToolGroup key={g.id} group={g} tool={tool} onPick={onPick} />)}</Fragment>; })}</div>)}
   </div>;
 }

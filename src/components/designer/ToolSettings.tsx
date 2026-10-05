@@ -17,6 +17,7 @@ import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 import { clearSelected, fillSelection, getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
+import { ColorPlane } from './ColorPlane';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -58,11 +59,12 @@ export function InlineColor({ label, value, onChange }: { label: string; value: 
       onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
   );
   return <>
-    <button type="button" ref={pop.ref} className="opt opt-color" data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
-      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />
+    <button type="button" ref={pop.ref} className="opt opt-color" aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
+      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />{label === 'Text color' && <span className="opt-value">{value.toUpperCase()}</span>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={232} label={label}>
       <div className="swatch-panel">
+        <ColorPlane value={value} onChange={pick} />
         <div className="swatch-row">
           <input type="color" value={value} aria-label={label} onChange={(e) => pick(e.target.value)} />
           <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} />
