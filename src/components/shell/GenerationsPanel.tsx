@@ -33,7 +33,7 @@ const STATUSES: Array<{ id: Status; label: string }> = [
 const CANVAS = { chat: 'Chat', node: 'Nodes', designer: 'Designer' } as const;
 const KIND_ICON = { image: ImageIcon, video: Film, audio: Music, model3d: Box, text: FileText } as const;
 const statusOf = (g: Generation): Status => (g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : 'running');
-const STATUS_LABEL: Record<Generation['status'], string> = { done: 'Done', running: 'Generating', queued: 'Queued', error: 'Failed', canceled: 'Canceled' };
+const STATUS_LABEL: Record<Generation['status'], string> = { done: 'Done', running: 'Generating', queued: 'Queued', error: 'Failed', canceled: 'Canceled', review: 'Needs review' };
 
 /**
  * Every generation as a record: what it was, where and when, what it cost. Filters stay in sight (scope, type,

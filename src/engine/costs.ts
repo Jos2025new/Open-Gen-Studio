@@ -28,10 +28,10 @@ function megapixels(settings: GenSettings): number {
   return (long * short) / 1_000_000;
 }
 
-export function estimateMedia(ref: string, kind: MediaKind, settings: GenSettings, withImage: boolean): Estimate {
+export function estimateMedia(ref: string, kind: MediaKind, settings: GenSettings, withImage: boolean, memoryOnly = false): Estimate {
   if (ref.startsWith('local::')) return FREE;
   // Atlas prices the exact request (C3); until its quote arrives, the catalog estimate below shows.
-  const quoted = knownAtlasQuote(ref, settings);
+  const quoted = knownAtlasQuote(ref, settings, !memoryOnly);
   if (quoted != null) return { usd: quoted, approximate: false, exact: true, note: 'Exact price from Atlas for this request' };
   const price = priceOf(ref);
   if (!price) return UNKNOWN;

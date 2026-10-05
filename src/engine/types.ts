@@ -289,7 +289,7 @@ export type OpId =
   | 'join_clips';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
-export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled';
+export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
 
 export interface RemoteJob {
   provider: RemoteProviderId;
@@ -515,7 +515,7 @@ export interface Plan {
   adjustments: string[];
 }
 
-export type StepState = 'pending' | 'running' | 'done' | 'error' | 'skipped';
+export type StepState = 'pending' | 'running' | 'done' | 'error' | 'skipped' | 'review';
 
 // ---------------------------------------------------------------------------
 // Feed (conversation canvas)
@@ -610,6 +610,7 @@ export interface StepAuthorization {
     audio?: boolean;
     advanced: Record<string, AdvancedValue>;
     shotDurations?: number[];
+    operationFactor?: number;
   };
   estimate: Estimate;
 }
@@ -626,11 +627,12 @@ export interface PlanFeedItem extends FeedBase {
   type: 'plan';
   plan: Plan;
   style: AgentStyle;
-  status: 'awaiting' | 'running' | 'done' | 'partial' | 'error' | 'canceled';
+  status: 'awaiting' | 'running' | 'done' | 'partial' | 'error' | 'canceled' | 'review';
   stepStates: Record<string, StepState>;
   stepGenerations: Record<string, string>;
   stepAuthorizations?: Record<string, StepAuthorization>;
   stepCostReviews?: Record<string, StepCostReview>;
+  stepVariantNotes?: Record<string, string>;
   estimate: Estimate;
   error?: string;
   /** This plan replaced the pending one after the user asked for a change. */

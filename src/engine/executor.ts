@@ -2,14 +2,14 @@ import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
 import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
-import { createGeneration, opSpec, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
+import { createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
-import { OPS } from './ops';
+import { OPS, opCount } from './ops';
 import { parseRef, stepDeps, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
 import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
-import { costAuthorization } from './priceAuthorization';
+import { costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -35,6 +35,8 @@ export interface ExecContext {
   prior?: Map<string, StepOutput>;
   /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
   blocked?: Map<string, string>;
+  waiting?: Set<string>;
+  reuseGenerations?: Record<string, string>;
   onState: (stepId: string, state: StepState, info?: { generationId?: string; error?: string }) => void;
 }
 
@@ -42,6 +44,7 @@ export interface ExecResult {
   outputs: Map<string, StepOutput>;
   failed: Array<{ stepId: string; error: string }>;
   skipped: string[];
+  waiting: string[];
 }
 
 export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Record<string, Estimate>; authorizations: Record<string, StepAuthorization> } {
@@ -79,7 +82,16 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
       }
     } else perStep[s.id] = { usd: 0, approximate: false };
     if ('modelRef' in s) authorizations[s.id] = costAuthorization(s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
-    else if (s.kind === 'op') authorizations[s.id] = costAuthorization(opRef ?? '', opSettings, perStep[s.id]);
+    else if (s.kind === 'op') {
+      const engine = OPS[s.op].engine;
+      const source = parseRef(s.input);
+      if (!['local', 'transcribe', 'voice'].includes(engine) && opRef) {
+        const choice = opModelFor(engine);
+        const spec = opSpecForModel({ sessionId: '', origin: 'agent', op: s.op, params: s.params, sourceAssetId: source?.type === 'asset' ? source.id : '' }, opRef, choice.ref === opRef && choice.viaEdit, get().catalog.schemas[opRef]);
+        opSettings = spec.settings;
+      } else opSettings = { count: opCount(OPS[s.op], s.params), advanced: {} };
+      authorizations[s.id] = costAuthorization(opRef ?? '', opSettings, perStep[s.id], s.op === 'upscale' ? Number(s.params.factor) || 2 : undefined);
+    } else authorizations[s.id] = costAuthorization(`local::${s.kind}`, { count: 1, advanced: {} }, perStep[s.id]);
   }
   return { total: sumEstimates(Object.values(perStep)), perStep, authorizations };
 }
@@ -91,6 +103,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const outputs = new Map<string, StepOutput>();
   const failed: ExecResult['failed'] = [];
   const skipped: string[] = [];
+  const waiting: string[] = [];
   const state = new Map<string, StepState>(order.map((id) => [id, 'pending']));
   const limit = Math.max(1, ctx.concurrency ?? 2);
 
@@ -155,6 +168,11 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const withLocal = <T extends object>(inputs: T) => ({ ...inputs, ...(local.length ? { subjects: [...local] } : {}), ...(ctx.nodeLibrary ? { nodeLibrary: ctx.nodeLibrary } : {}) });
 
   const runStep = async (s: PlanStep): Promise<StepOutput> => {
+    const reuse = ctx.reuseGenerations?.[s.id];
+    if (reuse) {
+      const out = stepOutputs(reuse, await runGeneration(reuse));
+      return { ...out, text: get().generations[reuse]?.text };
+    }
     const nodeSubjects: Subject[] = [];
     for (const subject of s.nodeSubjects ?? []) {
       const asset = await resolveAsset(subject.from);
@@ -277,6 +295,10 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     failed.push({ stepId: id, error });
   }
 
+  for (const id of ctx.waiting ?? []) {
+    if (state.has(id)) { state.set(id, 'review'); waiting.push(id); }
+  }
+
   await new Promise<void>((resolve) => {
     let active = 0;
     const pump = () => {
@@ -307,6 +329,12 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
             ctx.onState(id, 'done');
           })
           .catch((err: unknown) => {
+            if (err instanceof PriceReviewRequired) {
+              state.set(id, 'review');
+              waiting.push(id);
+              ctx.onState(id, 'review');
+              return;
+            }
             state.set(id, 'error');
             const message = isAbort(err) ? 'Canceled' : (err as Error).message;
             failed.push({ stepId: id, error: message });
@@ -323,7 +351,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     pump();
   });
 
-  return { outputs, failed, skipped };
+  for (const [id, st] of state) if (st === 'pending') { waiting.push(id); ctx.onState(id, 'pending'); }
+  return { outputs, failed, skipped, waiting };
 }
 
 /** Save a plan subject in the library, unless one with that name exists (it is reused, as the plan card said). */

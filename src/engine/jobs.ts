@@ -1,3 +1,4 @@
+import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
@@ -52,7 +53,7 @@ export function modelName(ref: string): string {
   return get().catalog.models[ref]?.name ?? get().catalog.transcribers?.[ref]?.name ?? parseModelRef(ref)?.id ?? ref;
 }
 
-export function estimateSpec(spec: GenerationSpec): Estimate {
+export function estimateSpec(spec: GenerationSpec, memoryOnly = false): Estimate {
   if (spec.op) {
     const src = get().assets[spec.op.sourceAssetId];
     return estimateOp(spec.op.id, spec.op.params, src, spec.settings, spec.modelRef);
@@ -60,10 +61,22 @@ export function estimateSpec(spec: GenerationSpec): Estimate {
   if (spec.kind === 'text') {
     // Text from a model (MiniMax Lyrics) is priced like its media kind; other text results are not predictable.
     const m = get().catalog.models[spec.modelRef];
-    return m?.textOutput ? estimateMedia(spec.modelRef, m.kind, spec.settings, false) : { usd: null, approximate: true };
+    return m?.textOutput ? estimateMedia(spec.modelRef, m.kind, spec.settings, false, memoryOnly) : { usd: null, approximate: true };
   }
   const withImage = Boolean(spec.inputs?.refs.length || spec.inputs?.firstFrame);
-  return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage);
+  return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage, memoryOnly);
+}
+
+function requestEstimate(spec: GenerationSpec): Estimate {
+  if (spec.op) {
+    const engine = OPS[spec.op.id].engine;
+    const source = get().assets[spec.op.sourceAssetId];
+    if (engine === 'transcribe') return estimateTranscribe(get().catalog.transcribers?.[spec.modelRef]?.usdPerMinute, source?.duration);
+    if (engine === 'video_upscale' || engine === 'video_edit' || engine === 'video_extend') {
+      return estimateOp(spec.op.id, spec.op.params, source, { ...spec.settings, duration: videoOpSeconds(engine, spec.settings, source?.duration) }, spec.modelRef);
+    }
+  }
+  return estimateSpec(spec, true);
 }
 
 export function createGeneration(spec: GenerationSpec): Generation {
@@ -285,10 +298,14 @@ function oneAtATime<T>(key: string, send: () => Promise<T>): Promise<T> {
   return mine;
 }
 
+export function generationInFlight(id: string): boolean { return running.has(id); }
+
 /** Execute a queued generation. Resolves with the created asset ids. */
 export function runGeneration(id: string): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
+  const generation = get().generations[id];
+  if (generation?.status === 'review') return Promise.reject(new PriceReviewRequired('Necesita revisión'));
   const p = attempt(id).finally(() => {
     running.delete(id);
     controllers.delete(id);
@@ -331,6 +348,9 @@ async function execute(id: string): Promise<string[]> {
       const assetIds = await runLocalOp(g, signal);
       finish(id, assetIds, 0);
       return assetIds;
+    }
+    if (g.planId && ((g.op && ['transcribe', 'voice'].includes(OPS[g.op.id].engine)) || (g.kind === 'text' && g.modelRef === RECRAFT_STYLE_REF))) {
+      checkStepAuthorization(g, costAuthorization(g.modelRef, g.settings, requestEstimate(g)));
     }
     if (g.op && OPS[g.op.id].engine === 'transcribe') {
       await runTranscribe(g, signal);
@@ -534,6 +554,9 @@ async function execute(id: string): Promise<string[]> {
     const variants = g.variants?.length ? g.variants : undefined;
     const total = variants ? variants.length : Math.max(1, g.settings.count);
     const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
+    const approvalSettings = { ...genSettings, count: total };
+    const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
+    if (proposed) checkStepAuthorization(g, proposed);
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];
@@ -547,7 +570,9 @@ async function execute(id: string): Promise<string[]> {
       const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
       // Atlas reports no cost: its exact quote for this request (same body, no media) is the real charge (C3).
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
-      const send = () => ADAPTERS[model.provider].generate({
+      const send = () => {
+        if (proposed) checkStepAuthorization(g, proposed);
+        return ADAPTERS[model.provider].generate({
         kind,
         model,
         schema,
@@ -584,6 +609,7 @@ async function execute(id: string): Promise<string[]> {
           patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });
         },
       });
+      };
       const serial = seriesKey(model);
       const once = () => (serial ? oneAtATime(serial, send) : send());
       // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts the very same one
@@ -623,6 +649,7 @@ async function execute(id: string): Promise<string[]> {
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered));
     return assetIds;
   } catch (err) {
+    if (err instanceof PriceReviewRequired) throw err;
     const cur = get().generations[id];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
@@ -987,8 +1014,6 @@ export function videoOpSeconds(engine: VideoOpEngine, settings: GenSettings, cli
 
 export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const def = OPS[input.op];
-  const source: { width: number; height: number } | undefined = get().assets[input.sourceAssetId] ?? input.sourceDims;
-  const prompt = def.instruction ? def.instruction(input.params) : def.label;
   const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   if (input.op === 'join_clips') {
@@ -1018,14 +1043,25 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
   if (def.engine === 'video_upscale' && (!schema || schema.source === 'derived')) throw new Error('The video upscaler parameter schema is unavailable. Choose another model or reload its provider.');
+  return opSpecForModel(input, choice.ref, choice.viaEdit, schema);
+}
+
+/** Build the same operation parameters using an already chosen model and in-memory schema. No selection or I/O. */
+export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: boolean, schema: ModelSchema | undefined): GenerationSpec {
+  const def = OPS[input.op];
+  const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
+  const prompt = def.instruction ? def.instruction(input.params) : def.label;
+  const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
+  const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
+  const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {
     const settings = videoOpSettings(def.engine, schema, input.params);
     // No "auto" option: keep the source's shape with the nearest ratio, or the model picks its own (16:9) and reframes.
     const aspectOpts = paramByRole(schema, 'aspect')?.options;
     if (settings.aspect == null && aspectOpts?.length && source?.width && source.height) settings.aspect = matchInputOption(aspectOpts) ?? nearestAspect(aspectOpts, source.width / source.height, undefined) ?? undefined;
-    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: choice.ref, settings, op };
+    const spec: GenerationSpec = { ...base, kind: 'video', prompt: def.engine === 'video_upscale' ? '' : prompt, modelRef: modelRef, settings, op };
     const clip = get().assets[input.sourceAssetId];
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, choice.ref) };
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, { ...settings, duration: videoOpSeconds(def.engine, settings, clip?.duration) }, modelRef) };
   }
   if (def.engine === 'video') {
     const video = input.nodeChoice?.settings ?? get().composer.video.settings;
@@ -1045,11 +1081,11 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
       const auto = opts.find(isAutoOption);
       settings.aspect = matchInputOption(opts) ?? nearestAspect(opts, source.width / source.height, settings.aspect) ?? (auto != null ? String(auto) : settings.aspect);
     }
-    const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: choice.ref, settings, op };
-    return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, choice.ref) };
+    const spec: GenerationSpec = { ...base, kind: 'video', prompt, modelRef: modelRef, settings, op };
+    return { ...spec, estimate: estimateOp(input.op, input.params, source, settings, modelRef) };
   }
   const count = opCount(def, input.params);
-  const dedicated = !choice.viaEdit && (def.engine === 'upscale' || def.engine === 'remove_bg');
+  const dedicated = !viaEdit && (def.engine === 'upscale' || def.engine === 'remove_bg');
   const { settings } = coerceSettings(schema, 'image', { count, advanced: {} });
   const aspectParam = paramByRole(schema, 'aspect');
   if (aspectParam?.options?.length) {
@@ -1064,7 +1100,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   }
   if (input.op === 'upscale') {
     const res = paramByRole(schema, 'resolution');
-    if (res?.options?.length && choice.viaEdit) settings.resolution = String(res.options[res.options.length - 1]);
+    if (res?.options?.length && viaEdit) settings.resolution = String(res.options[res.options.length - 1]);
     const factorParam = schema?.params.find((p) => p.role === 'other' && /upscale_factor|^scale$|factor/i.test(p.key));
     if (factorParam) {
       const f = Number(input.params.factor) || 2;
@@ -1081,8 +1117,8 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
       if (pick.toUpperCase() !== '2K') sheetNote = `sheet at ${pick}: the model has no 2K`;
     }
   }
-  const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: choice.ref, settings, op };
-  const estimate = estimateOp(input.op, input.params, source, settings, choice.ref);
+  const spec: GenerationSpec = { ...base, kind: 'image', prompt: dedicated ? '' : prompt, modelRef: modelRef, settings, op };
+  const estimate = estimateOp(input.op, input.params, source, settings, modelRef);
   return { ...spec, estimate: sheetNote ? { ...estimate, note: [estimate.note, sheetNote].filter(Boolean).join('; ') } : estimate };
 }
 

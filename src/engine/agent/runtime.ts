@@ -955,7 +955,7 @@ async function runPlanItem(
   }
 
   const failed = result.failed.length;
-  const status: PlanFeedItem['status'] = failed === 0 && !result.skipped.length ? 'done' : result.outputs.size ? 'partial' : 'error';
+  const status: PlanFeedItem['status'] = result.waiting.length ? 'review' : failed === 0 && !result.skipped.length ? 'done' : result.outputs.size ? 'partial' : 'error';
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
   const summary = plan.steps
     .map((st) => {
@@ -984,7 +984,7 @@ async function runPlanItem(
   patchAgent(sessionId, (a) => ({ notes: [...a.notes, `Plan "${plan.title}" (${plan.workspace} canvas) ${status}: ${summary}`].slice(-6) }));
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
-  else toast(`${plan.title} failed`, 'error');
+  else if (status !== 'review') toast(`${plan.title} failed`, 'error');
   await wrapUpPlan(sessionId, itemId, plan.title, status, summary);
 }
 

@@ -353,7 +353,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
   if (preview.errors.length) { toast(preview.errors[0], 'error'); return null; }
   const problem = budgetProblem(preview.estimate);
   if (problem) { toast(problem, 'error'); return null; }
-  if (!preview.count) return { outputs: new Map(), failed: [], skipped: [] };
+  if (!preview.count) return { outputs: new Map(), failed: [], skipped: [], waiting: [] };
   const release = lockNodes(sessionId, preview.runIds, preview.inputIds);
   // The run works on the graph as it was when it started: edits made meanwhile apply to the next run.
   const startGraph = get().sessions[sessionId].graph;

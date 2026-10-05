@@ -70,7 +70,7 @@ export function fetchAtlasQuote(body: Record<string, unknown>, timeoutMs = 6000)
  * (the estimate shows meanwhile and is replaced when the quote arrives). Undefined for other providers, for a
  * model whose schema has not loaded, or while no quote is known.
  */
-export function knownAtlasQuote(ref: string, settings: GenSettings): number | undefined {
+export function knownAtlasQuote(ref: string, settings: GenSettings, requestMissing = true): number | undefined {
   const parsed = parseModelRef(ref);
   if (parsed?.provider !== 'atlas') return undefined;
   const schema = get().catalog.schemas[ref];
@@ -84,7 +84,7 @@ export function knownAtlasQuote(ref: string, settings: GenSettings): number | un
   for (const n of [...new Set(sizes)]) {
     const body = atlasQuoteBody(parsed.id, schema, settings, n);
     const q = get().quotes[keyOf(body)];
-    if (q === undefined && !inflight.has(keyOf(body))) queueMicrotask(() => void fetchAtlasQuote(body));
+    if (requestMissing && q === undefined && !inflight.has(keyOf(body))) queueMicrotask(() => void fetchAtlasQuote(body));
     if (q == null) return undefined;
     sum += q * sizes.filter((x) => x === n).length;
   }
