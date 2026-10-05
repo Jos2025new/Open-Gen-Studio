@@ -237,3 +237,48 @@ Sandbox: peticiones sintéticas capturadas por el test existente, sin sesión re
 ni prueba visual nueva. Proveedor: ejecución realizada por el usuario, examinada
 a través de las métricas locales. Codex no lanzó llamadas nuevas. No se verificaron
 factura, esfuerzo efectivo, p90 ni causalidad de los tiempos; no se fusionó la rama.
+
+
+## Medición cerrada: razonamiento, variación y caché
+
+No se harán más llamadas al proveedor para esta medición. Los tiempos incluyen
+el razonamiento antes del primer texto y la variación del servicio. Estos datos
+no permiten afirmar que la latencia siga proporcionalmente el número de tokens:
+GLM tuvo 15.69/15.69 s en la primera pareja con 243/352 tokens de razonamiento,
+y la continuación de 44.94 s tuvo solo 135 tokens (el control: 8.90 s y 39).
+Grok pasó de 15.06 s y 1116 tokens a 7.08 s y 459 en la primera pareja, pero también
+cambió la caché. La cantidad de razonamiento es un factor compatible con algunos
+resultados; no explica por sí sola el caso de GLM ni demuestra la causa del retraso.
+La variación del proveedor/ruta/caché sigue siendo una explicación posible,
+sin separar experimentalmente esos factores. Se conserva el límite de n=3.
+
+El aviso conserva el prefijo y permite reutilizar la caché: en la pareja Cancelar
+de Grok, cachedTokens=18560 tanto en control como con aviso; en la primera de
+Luna, 13449 en ambos. Luna Cancelar con aviso informó 15702 y GLM primera con
+aviso 14976. Son aciertos observados, no una garantía para todas las llamadas;
+los ceros y el calentamiento desigual siguen documentados arriba. El test del
+prefijo acredita que el aviso no reescribe el historial anterior.
+
+## Hallazgo de código: MiMo puede recibir un esfuerzo rechazado
+
+Lectura estática, sin corregir ni hacer peticiones nuevas. El selector
+[SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) ofrece None, Low,
+Medium y High para NanoGPT sin restringirlos por modelo. El catálogo de
+[llm.ts](../src/engine/providers/llm.ts) guarda reasoning como capacidad booleana,
+pero no una lista de esfuerzos admitidos. [runtime.ts](../src/engine/agent/runtime.ts)
+pasa settings.agent.effort a chat. reasoningBody recibe el proveedor, no el
+modelo, y copia ese valor a reasoning_effort. Por tanto, con MiMo V2.6 Flash
+seleccionado y Medium, la app puede enviar el valor rechazado en el piloto:
+HTTP 400 / unsupported_reasoning_effort. La configuración inicial también usa Medium.
+
+El adaptador de la app tiene un comportamiento distinto del piloto: ante HTTP 400
+con campos de razonamiento, analiza el mensaje; si contiene reason, effort o think,
+repite una vez sin esos campos. No usa error.code para decidir ese fallback.
+[agent-thinking.test.ts](../tests/agent-thinking.test.ts) cubre este segundo envío
+con un mensaje simulado, no con el error real de MiMo. El diagnóstico seguro del
+piloto no conserva el mensaje, así que no confirma si ese fallback habría actuado
+con la respuesta real. Puede haber un primer envío rechazado y una llamada extra;
+si el mensaje no coincide, la app propaga el error. No se modificó este código.
+
+La [prueba manual sin gasto](price-review-sandbox.md) permite pulsar Continuar y
+Cancelar con un paso sintético y comprobar el contexto mediante respuestas simuladas.
