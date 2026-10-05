@@ -16,6 +16,7 @@
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
 - [proveedores](features/proveedores.md).
+- [precio autorizado: decisiones, avisos y coste informado](features/precio-autorizado.md).
 
 ## Decisiones
 
