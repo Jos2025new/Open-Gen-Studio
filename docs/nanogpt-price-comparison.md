@@ -291,3 +291,36 @@ ya exportada localmente (no se solicita en el chat):
 cd '/home/samuel/Documentos/Projects/My New App/ogs-price-auth'
 PRICE_PILOT_APPROVAL=f15725ccff3cb65339dd1fd8907affbe29c82d3edb7d2e1d5d07f94c6cb9591d node scripts/price-pilot-expansion.mjs --execute
 ```
+
+### Intento detenido en el primer calentamiento
+
+El usuario intentó ejecutar el manifiesto anterior. Lectura local el 2026-10-05:
+`.sandbox/pilot/expansion/results.json` tiene status=stopped, un único intento
+`xiaomi/mimo-v2.6-flash/warmup`, status=uncertain, y **0 llamadas medidas**.
+No se informó HTTP, tokens, finishReason ni coste del proveedor. Se conserva
+la reserva de USD 0.004844; con DeepSeek, el total contabilizado es USD 0.008864.
+Es contabilidad conservadora de un intento incierto, no un cobro confirmado.
+El resto de las 27 peticiones no figura como intentado.
+
+La versión ejecutada descartaba el error completo, incluido el código HTTP;
+por ello no se puede reconstruir si falló por HTTP, red, timeout o streaming.
+No hay evidencia para atribuirlo a medium ni para afirmar que el proveedor no
+recibió o cobró la petición. No se reenvió el intento, no se borró la cerradura
+y no se modificó el ledger o los resultados para fingir que no ocurrió.
+El comando anterior queda bloqueado por esa cerradura; no sirve para reanudar.
+
+Corrección del diagnóstico, sin otra llamada: el código común conserva solamente
+failureKind (categorías fijas) y httpStatus (número o desconocido), tanto en el
+registro del intento como en el mensaje seguro de salida. Distingue http_error,
+transport_error, timeout, missing_stream, invalid_stream, provider_error,
+stream_error y local_error. No copia cuerpos de error, mensajes, causas, stacks,
+encabezados ni valores arbitrarios del proveedor; no registra claves o contenido.
+Los campos nuevos solo existen para futuros fallos, no recuperan este fallo pasado.
+El control de presupuesto, hashes de peticiones, ausencia de reintentos y bloqueos
+persistentes siguen vigentes.
+
+Los [tests de regresión](../tests/price-pilot-expansion.test.ts) reprodujeron con
+fetch simulado la pérdida del diagnóstico y comprueban HTTP 400, transporte,
+timeout, JSON inválido y error SSE, además del filtrado de strings sensibles.
+Esta corrección está probada localmente; la causa del fallo real permanece sin
+verificar. No se ha aprobado ni preparado una repetición del intento incierto.
