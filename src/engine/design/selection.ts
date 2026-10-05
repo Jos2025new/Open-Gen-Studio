@@ -1,3 +1,4 @@
+import type { DesignDoc, Layer } from '../types';
 import { create } from 'zustand';
 
 /*
@@ -28,4 +29,10 @@ export function pickLayerRange(docId: string, anchorId: string | null, id: strin
   const next = a < 0 || b < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1);
   useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: next } }));
   return next;
+}
+
+/** Other movable layers picked alongside this one. */
+export function otherPickedLayers(doc: DesignDoc, id: string): Layer[] {
+  const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map(l => l.id));
+  return picked.includes(id) ? doc.layers.filter(l => l.id !== id && picked.includes(l.id) && !l.locked && l.visible) : [];
 }

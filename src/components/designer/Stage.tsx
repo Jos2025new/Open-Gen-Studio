@@ -8,7 +8,7 @@ import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel, toLayerSpace } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
-import { layerSelection, pickLayer, useLayerSelection } from '../../engine/design/selection';
+import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke, paintLive, type LiveStroke } from '../../engine/design/raster';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
@@ -24,6 +24,7 @@ import { applyGradient, paintGradient, type GradientSpec } from '../../engine/de
 import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
+import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
 import { uid } from '../../lib/id';
 
 interface View {
@@ -33,6 +34,7 @@ interface View {
 }
 
 type Drag =
+  | { kind: 'pixelMove'; move: PixelMove }
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string }
   | { kind: 'xform'; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
@@ -188,10 +190,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
-  // Layers picked with Ctrl/Shift (panel) or Ctrl (canvas): their boxes show and they move together.
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-  const pickedOthers = (d0: DesignDoc, id: string) => layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).includes(id) ? layerSelection(d0.id, d0.activeLayerId, d0.layers.map((l) => l.id)).filter((x) => x !== id).map((x) => d0.layers.find((l) => l.id === x)).filter((l): l is Layer => Boolean(l && !l.locked && l.visible)) : [];
+
   // Snap guides while moving (screen overlay only).
   const [guideLines, setGuideLines] = useState<{ x?: number; y?: number }>({});
   const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
@@ -676,7 +677,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
 
     if (tool === 'move') {
-      // Transform handles on the selection box come first.
+      const move = startPixelMove(sessionId, current, p, 3 / view.zoom);
+      if (move) { if (move !== true) drag.current = { kind: 'pixelMove', move }; return; }
       const tol = (HANDLE + 4) / view.zoom;
       const hHit = [...handles].reverse().find((h) => Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol);
       if (hHit && tBox && pivotAt) {
@@ -744,7 +746,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           if (!had) pickLayer(doc.id, hit.id, true, ids);
           setActiveLayer(sessionId, doc.id, hit.id);
           record(current);
-          drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: pickedOthers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
+          drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
           return;
         }
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
@@ -759,7 +761,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           if (!whole.locked) {
             record(current);
             // One of several picked layers: they all move together (as in Inkscape).
-            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, others: pickedOthers(current, whole.id), again };
+            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, others: otherPickedLayers(current, whole.id), again };
           }
         }
         return;
@@ -777,7 +779,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           setActiveLayer(sessionId, doc.id, hit.id);
           if (!hit.locked) {
             record(current);
-            drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: pickedOthers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
+            drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
           }
         }
         return;
@@ -799,7 +801,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
             record(current);
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: pickedOthers(current, act.id), again: true };
+            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: true };
             return;
           }
         }
@@ -811,7 +813,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       setActiveLayer(sessionId, doc.id, hit?.id ?? null);
       if (hit && !hit.locked) {
         record(current);
-        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: pickedOthers(current, hit.id) };
+        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id) };
       }
       return;
     }
@@ -994,7 +996,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (over !== guideHover) setGuideHover(over);
     }
     if (!d) return;
-    if (d.kind === 'pan') {
+    if (d.kind === 'pixelMove') { d.move.update(p);
+    } else if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
     } else if (d.kind === 'xform' && d.op === 'pivot') {
       setPivot({ x: p.x, y: p.y });
@@ -1132,6 +1135,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     const d = drag.current;
     drag.current = null;
     if (!d) return;
+    if (d.kind === 'pixelMove') { if (e) d.move.update(toDoc(e.clientX, e.clientY)); return; }
     // A guide lands where the pointer is released (a quick drag may send no move in between).
     if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
     showGuides({});
