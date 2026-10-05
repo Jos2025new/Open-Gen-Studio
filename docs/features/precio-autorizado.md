@@ -40,3 +40,9 @@ Los avisos esperan la siguiente llamada existente cuando el agente está ocupado
 offline o no corresponde el resumen final. No despiertan al LLM ni reejecutan pasos.
 La conciliación tras recarga no envía generaciones nuevas. Las pruebas simulan
 proveedores y persistencia; no prueban facturación, interfaz visual ni rendimiento real.
+
+El [piloto NanoGPT de tres parejas DeepSeek](../nanogpt-price-comparison.md)
+aporta evidencia separada del proveedor: USD 0.0040175744 informados, 44–51 tokens
+extra por aviso y caché utilizada en las tres peticiones con aviso. No se observó
+un retraso consistente del primer texto; el tiempo total fue mayor en las tres
+parejas, con salidas más largas. n=3 no permite generalizar latencia, p90 o caché.
