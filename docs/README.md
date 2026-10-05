@@ -45,6 +45,8 @@
 - [016-2026-09-W40](history/016-2026-09-W40.md) — 1339 bytes.
 - [017-2026-10-W40](history/017-2026-10-W40.md) — 7357 bytes.
 
+- [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
+
 ## Verificación
 
 - [Línea base del agente: script, resultados y límites](agent-baseline.md).

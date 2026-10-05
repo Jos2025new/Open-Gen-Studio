@@ -5,16 +5,14 @@
 | El raster guarda los últimos píxeles tras 700 ms; los fallos quedan pendientes y borrar espera la escritura. | [src/engine/design/raster.ts](../../src/engine/design/raster.ts) | [tests/raster-persist.test.ts](../../tests/raster-persist.test.ts) |
 | La exportación SVG mantiene orden, opacidad y mezcla, omite capas ocultas y conserva texto editable escapado. | [src/engine/design/export.ts](../../src/engine/design/export.ts) | [tests/design-export.test.ts](../../tests/design-export.test.ts) |
 | Save to gallery pide confirmación mediante un Popover de la app con Cancel y Save. | [src/components/designer/DesignerWorkspace.tsx](../../src/components/designer/DesignerWorkspace.tsx) | sin test |
-
 | Los rellenos sólidos de página completa también crecen al ampliar el lienzo; los trazos negros permanecen visibles en la zona nueva. La identificación de nuevos rellenos conserva color y revisión de píxeles. | [solidPageFill.ts](../../src/engine/design/solidPageFill.ts), [fill.ts](../../src/engine/design/fill.ts) | [paint-resize.test.ts](../../tests/paint-resize.test.ts) |
 | Al ampliar el lienzo, las capas pintadas amplían el buffer y su base sin perder trazos; reducir conserva píxeles fuera de página y undo/redo restaura los buffers. | [paintBounds.ts](../../src/engine/design/paintBounds.ts), [canvasSize.ts](../../src/engine/design/canvasSize.ts) | [paint-resize.test.ts](../../tests/paint-resize.test.ts) |
-
 | Las máscaras de regiones vectoriales se guardan como buffers, entran en undo/redo y acompañan la traslación/transformación de la capa; SVG conserva formas y máscaras alfa. | [vectorMask.ts](../../src/engine/design/vectorMask.ts), [raster.ts](../../src/engine/design/raster.ts), [export.ts](../../src/engine/design/export.ts) | [pixel-move.test.ts](../../tests/pixel-move.test.ts), [design-export.test.ts](../../tests/design-export.test.ts) |
 | Mover dentro de una selección raster o vectorial extrae la región a una capa encima y mueve solo esa capa, con alfa parcial y un único undo. En Lineart/formas conserva los vectores mediante máscaras alfa; Edit muestra «Move selection · drag inside». Las capas bloqueadas rechazan la extracción; Ctrl+J sigue copiando. | [pixelMove.ts](../../src/engine/design/pixelMove.ts), [vectorSelection.ts](../../src/engine/design/vectorSelection.ts), [Stage.tsx](../../src/components/designer/Stage.tsx) | [pixel-move.test.ts](../../tests/pixel-move.test.ts) |
-
 | El círculo raster conserva la última posición de pantalla y recalcula coordenadas al desplazar o hacer zoom; no añade un bucle de frames. | [viewCoordinates.ts](../../src/engine/design/viewCoordinates.ts), [Stage.tsx](../../src/components/designer/Stage.tsx) | [view-coordinates.test.ts](../../tests/view-coordinates.test.ts) |
-
 | Un único círculo indica el tamaño raster y lineart a escala del zoom y el radio actual de edición o Alt-deformación. No cambia qué trazo se deforma; la influencia sigue medida a lo largo del trazo. | [cursorPreview.ts](../../src/engine/design/cursorPreview.ts), [BrushCursor.tsx](../../src/components/designer/BrushCursor.tsx) | [cursor-preview.test.ts](../../tests/cursor-preview.test.ts) |
+
+Registro de esta sesión: [implementación, revisión vectorial, procedimiento, tiempos y límites](../history/018-2026-10-W40.md).
 
 ## Monkey test manual
 Arranca `npm run dev:sandbox` y ejecuta `npm run stress`; termina deteniendo el sandbox ([test](../../tests-e2e/designer-monkey.spec.ts)).
