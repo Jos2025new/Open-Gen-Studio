@@ -10,7 +10,7 @@ function Thumbnail({ doc }: { doc: DesignDoc }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const version = useSyncExternalStore(subscribeRaster, rasterVersion);
   useEffect(() => {
-    void ensureBuffers(doc.layers.filter((l) => l.type === 'raster'));
+    void ensureBuffers(doc.layers);
   }, [doc.layers]);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');

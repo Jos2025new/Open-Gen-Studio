@@ -29,7 +29,7 @@ function LayerThumb({ doc, layer }: { doc: DesignDoc; layer: Layer }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const version = useSyncExternalStore(subscribeRaster, rasterVersion);
   useEffect(() => {
-    if (layer.type === 'raster') void ensureBuffers([layer]);
+    void ensureBuffers([layer]);
   }, [layer]);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');

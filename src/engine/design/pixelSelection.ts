@@ -1,3 +1,4 @@
+import { splitVectorSelection } from './vectorSelection';
 import { useSyncExternalStore } from 'react';
 import type { DesignDoc, RasterLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
@@ -253,11 +254,18 @@ function addPixelLayer(sessionId: string, doc: DesignDoc, name: string, canvas: 
   setDoc(sessionId, doc.id, (d) => insertLayer(d, layer, 'above'));
 }
 
-/** Copy the selected pixels of the active raster layer to a new layer above it (Ctrl+J). */
+/** Copy the selected region above the active layer (Ctrl+J); vectors retain their geometry. */
 export function selectionToLayer(sessionId: string, doc: DesignDoc): string | null {
   const sel = getSelection(doc.id);
   if (!sel) return 'Nothing is selected.';
   const l = activeLayer(doc);
+  if (l?.type === 'vector') {
+    const split = splitVectorSelection(doc, l, false);
+    if (!split) return 'Layer pixels are still loading. Try again in a moment.';
+    record(doc);
+    setDoc(sessionId, doc.id, d => insertLayer(d, split.lifted, 'above'));
+    return null;
+  }
   if (!l || l.type !== 'raster') return 'Select a raster layer.';
   if (!getBuffer(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
   addPixelLayer(sessionId, doc, `${l.name} · selection`, selectedPixels(doc, l, sel));

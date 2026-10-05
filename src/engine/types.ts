@@ -880,6 +880,8 @@ export interface Stroke extends StrokeStyle {
 
 export interface VectorLayer extends LayerBase {
   type: 'vector';
+  /** Alpha coverage for a lifted region; vector geometry stays editable. */
+  pixelMask?: RasterLayer;
   shapes: VectorShape[];
   /** Editable pressure strokes (Lineart tool), drawn above the shapes. */
   strokes?: Stroke[];

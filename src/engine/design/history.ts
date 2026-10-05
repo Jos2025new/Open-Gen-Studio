@@ -41,7 +41,7 @@ function restorePicks(docId: string, snap: Snapshot): void {
 }
 
 function capture(doc: DesignDoc): Snapshot {
-  const rasterIds = rasterBufferIds(doc.layers.filter((l) => l.type === 'raster'));
+  const rasterIds = rasterBufferIds(doc.layers);
   return { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
 }
 

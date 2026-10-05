@@ -49,7 +49,7 @@ export function addDoc(sessionId: string, doc: DesignDoc): void {
 export function selectDoc(sessionId: string, docId: string): void {
   patchSession(sessionId, (s) => ({ ...s, activeDocId: docId }));
   const doc = getDoc(sessionId, docId);
-  if (doc) void ensureBuffers(doc.layers.filter((l) => l.type === 'raster') as Extract<Layer, { type: 'raster' }>[]);
+  if (doc) void ensureBuffers(doc.layers);
 }
 
 export function newBlankDoc(sessionId: string, preset: { label: string; width: number; height: number }): DesignDoc {
@@ -73,7 +73,7 @@ export function renameDoc(sessionId: string, docId: string, name: string): void 
 export function deleteDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
-  void deleteBuffers(rasterBufferIds(doc.layers.filter((l) => l.type === 'raster')));
+  void deleteBuffers(rasterBufferIds(doc.layers));
   dropHistory(docId);
   patchSession(sessionId, (s) => {
     const docs = s.docs.filter((d) => d.id !== docId);
@@ -269,6 +269,7 @@ export function duplicateLayer(sessionId: string, docId: string, layerId: string
   if (!doc || !l) return;
   const copy = D.cloneLayer(l);
   if (l.type === 'raster') copyBuffer(l.id, copy.id);
+  if (l.type === 'vector' && l.pixelMask && copy.type === 'vector' && copy.pixelMask) copyBuffer(l.pixelMask.id, copy.pixelMask.id);
   mutateDoc(sessionId, docId, (d) => ({ ...D.insertLayer({ ...d, activeLayerId: layerId }, copy, 'above') }));
 }
 
@@ -367,7 +368,7 @@ export async function placeAboveLayer(sessionId: string, docId: string, layerId:
 export async function exportDocFile(sessionId: string, docId: string, format: ExportFormat = 'png'): Promise<void> {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
-  await ensureBuffers(doc.layers.filter((l) => l.type === 'raster') as Extract<Layer, { type: 'raster' }>[]);
+  await ensureBuffers(doc.layers);
   const base = doc.name.replace(/[^\w-]+/g, '_') || 'design';
   if (format === 'png' || format === 'jpg') {
     downloadBlob(await exportDoc(doc, format === 'jpg' ? 'image/jpeg' : 'image/png'), `${base}.${format}`);
@@ -392,7 +393,7 @@ function svgDeps(): SvgDeps {
 export async function saveDocToGallery(sessionId: string, docId: string): Promise<Asset | null> {
   const doc = getDoc(sessionId, docId);
   if (!doc) return null;
-  await ensureBuffers(doc.layers.filter((l) => l.type === 'raster') as Extract<Layer, { type: 'raster' }>[]);
+  await ensureBuffers(doc.layers);
   const blob = await exportDoc(doc);
   const asset = await storeDesignAsset(sessionId, blob, doc.width, doc.height, 'design');
   toast('Design saved to the gallery', 'success');

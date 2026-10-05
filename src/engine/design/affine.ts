@@ -1,3 +1,4 @@
+import { allVectorObjects } from './vectorMask';
 import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { mapPathShape } from './path';
@@ -65,6 +66,7 @@ export function transformObjects(layer: Layer, ids: string[] | null, m: Mat): La
   if (layer.type === 'vector') {
     return {
       ...layer,
+      ...(layer.pixelMask && allVectorObjects(layer, ids) ? { pixelMask: { ...layer.pixelMask, transform: multiply(m, layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}),
       shapes: layer.shapes.map((s) => (on(s.id) ? transformShape(s, m) : s)),
       ...(layer.strokes ? { strokes: layer.strokes.map((s) => (on(s.id) ? transformStroke(s, m) : s)) } : {}),
     } as VectorLayer;

@@ -216,6 +216,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
 /** With another tool active, a pixel selection still shows in the bar (it still clips Delete, copy and the gradient). */
 export function SelectionChip({ docId }: { docId: string }) {
   useSelectionVersion();
+  useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
   const sel = getSelection(docId);
   if (!sel || tool === 'select') return null;
@@ -256,6 +257,7 @@ function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
 }
 
 export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
+  useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
   const lineart = useStore((s) => s.ui.lineart);
@@ -290,7 +292,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />

@@ -2,7 +2,7 @@ import { logged } from '../../lib/log';
 import { blobDb } from '../../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import { uid } from '../../lib/id';
-import type { RasterLayer, RasterStroke } from '../types';
+import type { Layer, RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
 
 /*
@@ -156,8 +156,13 @@ export function composeRaster(layer: RasterLayer, persist = true): boolean {
   return true;
 }
 
-export function rasterBufferIds(layers: RasterLayer[]): string[] {
-  return [...new Set(layers.flatMap((l) => l.paintBaseId ? [l.id, l.paintBaseId] : [l.id]))];
+function pixelLayers(layers: Layer[]): RasterLayer[] {
+  return layers.flatMap(l => l.type === 'raster' ? [l] : l.type === 'vector' && l.pixelMask ? [l.pixelMask] : []);
+}
+
+export function rasterBufferIds(layers: Layer[]): string[] {
+  const rasters = pixelLayers(layers);
+  return [...new Set(rasters.flatMap((l) => l.paintBaseId ? [l.id, l.paintBaseId] : [l.id]))];
 }
 
 /** Start an edit: clone the current buffer so earlier snapshots stay intact. */
@@ -250,7 +255,8 @@ if (typeof window !== 'undefined') {
 }
 
 /** Load buffers for layers that are not in memory yet (after reload). */
-export async function ensureBuffers(layers: RasterLayer[]): Promise<void> {
+export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
+  const layers = pixelLayers(allLayers);
   let changed = false;
   const baseIds = new Set(layers.map((l) => l.paintBaseId).filter(Boolean));
   await Promise.all(

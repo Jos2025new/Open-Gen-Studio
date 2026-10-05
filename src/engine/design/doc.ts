@@ -132,14 +132,14 @@ export function dropIndex(n: number, from: number, slot: number): number | null 
 
 export function cloneLayer(layer: Layer): Layer {
   const id = uid('lyr');
-  if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => ({ ...s, id: uid('stk') })) } : {}) };
+  if (layer.type === 'vector') return { ...layer, id, name: `${layer.name} copy`, ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, id: uid('mask') } } : {}), shapes: layer.shapes.map((s) => ({ ...s, id: uid('shp') })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => ({ ...s, id: uid('stk') })) } : {}) };
   return { ...layer, id, name: `${layer.name} copy` };
 }
 
 export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
   // A rotated image or text moves its transform, so it moves on the page however it is turned.
   if (layer.transform && layer.type !== 'vector') return { ...layer, transform: multiply(translation(dx, dy), layer.transform) };
-  if (layer.type === 'vector') return { ...layer, shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => translateStroke(s, dx, dy)) } : {}) };
+  if (layer.type === 'vector') return { ...layer, ...(layer.pixelMask ? { pixelMask: translateLayer(layer.pixelMask, dx, dy) as RasterLayer } : {}), shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => translateStroke(s, dx, dy)) } : {}) };
   return { ...layer, x: layer.x + dx, y: layer.y + dy };
 }
 
@@ -178,6 +178,7 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
     const k = Math.sqrt(Math.abs(sx * sy));
     return {
       ...layer,
+      ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(scaleAbout(sx, sy, ax, ay), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}),
       shapes: layer.shapes.map((s: VectorShape) => ({ ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, radius: s.radius * k })),
       ...(layer.strokes ? { strokes: layer.strokes.map((s) => scaleStroke(s, sx, sy, ax, ay)) } : {}),
     };

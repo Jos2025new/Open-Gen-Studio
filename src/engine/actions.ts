@@ -771,7 +771,7 @@ export function deleteSession(sessionId: string): void {
   const active = new Set(Object.values(st.generations).filter((g) => g.sessionId === sessionId && isRunning(g.id)).map((g) => g.id));
   const assetIds = Object.values(st.assets).filter((a) => a.sessionId === sessionId && !kept.has(a.id) && !(a.generationId && active.has(a.generationId))).map((a) => a.id);
   const genIds = Object.values(st.generations).filter((g) => g.sessionId === sessionId && !active.has(g.id)).map((g) => g.id);
-  const rasterIds = rasterBufferIds(s.docs.flatMap((d) => d.layers.filter((l) => l.type === 'raster')));
+  const rasterIds = rasterBufferIds(s.docs.flatMap((d) => d.layers));
   useStore.setState((cur) => {
     const sessions = { ...cur.sessions };
     delete sessions[sessionId];

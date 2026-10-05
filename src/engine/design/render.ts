@@ -1,3 +1,4 @@
+import { drawMaskedVector, maskContains, maskBounds } from './vectorMask';
 import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
@@ -113,7 +114,14 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
 }
 
 export function layerBox(l: Layer): Box | null {
-  const b = untransformedBox(l);
+  let b = untransformedBox(l);
+  if (b && l.type === 'vector' && l.pixelMask) {
+    const mb = maskBounds(l.pixelMask);
+    if (!mb) return null;
+    const x = Math.max(b.x, mb.x), y = Math.max(b.y, mb.y);
+    const w = Math.min(b.x + b.w, mb.x + mb.w) - x, h = Math.min(b.y + b.h, mb.y + mb.h) - y;
+    b = w > 0 && h > 0 ? { x, y, w, h } : null;
+  }
   // Images and text that were rotated or skewed: the box around where they show.
   return b && l.transform && l.type !== 'vector' ? mapBox(l.transform, b) : b;
 }
@@ -210,8 +218,8 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer): void {
       ctx.drawImage(buf, l.x, l.y, l.width, l.height);
     }
   } else if (l.type === 'vector') {
-    l.shapes.forEach((s) => drawShape(ctx, s));
-    l.strokes?.forEach((s) => drawStroke(ctx, s));
+    const paint = (c: CanvasRenderingContext2D) => { l.shapes.forEach(s => drawShape(c, s)); l.strokes?.forEach(s => drawStroke(c, s)); };
+    if (l.pixelMask) drawMaskedVector(ctx, l, paint); else paint(ctx);
   } else {
     drawText(ctx, l);
   }
@@ -266,6 +274,7 @@ export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null
     const b = layerBox(l);
     if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) continue;
     if (l.type === 'vector') {
+      if (!maskContains(l, x, y)) continue;
       // One of its own shapes or strokes, not the box around all of them.
       const inside = (bx: Box | null) => bx && x >= bx.x && x <= bx.x + bx.w && y >= bx.y && y <= bx.y + bx.h;
       if (l.shapes.some((sh) => inside(shapeBox(sh))) || (l.strokes ?? []).some((st) => inside(strokeBox(st)))) return l;

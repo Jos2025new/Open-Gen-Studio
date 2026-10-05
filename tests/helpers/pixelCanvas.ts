@@ -25,6 +25,10 @@ export function pixelCanvas(width: number, height: number) {
     save() { saved.push({ matrix: [...matrix], op: ctx.globalCompositeOperation, alpha: ctx.globalAlpha }); },
     restore() { const s = saved.pop()!; matrix = s.matrix; ctx.globalCompositeOperation = s.op; ctx.globalAlpha = s.alpha; },
     setTransform(...m: number[]) { matrix = m; },
+    transform(...m: number[]) {
+      const a = matrix;
+      matrix = [a[0]*m[0]+a[2]*m[1], a[1]*m[0]+a[3]*m[1], a[0]*m[2]+a[2]*m[3], a[1]*m[2]+a[3]*m[3], a[0]*m[4]+a[2]*m[5]+a[4], a[1]*m[4]+a[3]*m[5]+a[5]];
+    },
     drawImage(src: ReturnType<typeof pixelCanvas>, ...args: number[]) {
       const [sx, sy, sw, sh, dx, dy, dw, dh] = args.length === 8 ? args : [0, 0, src.width, src.height, args[0], args[1], args[2] ?? src.width, args[3] ?? src.height];
       const [x0, y0] = mapped(dx, dy), [x1, y1] = mapped(dx + dw, dy + dh);

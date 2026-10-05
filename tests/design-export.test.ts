@@ -83,3 +83,15 @@ describe('SVG export', () => {
     expect(xmlEscape(`'"`)).toBe('&apos;&quot;');
   });
 });
+
+it('exports vector coverage as an alpha mask while retaining editable SVG shapes', async () => {
+  const vector = doc.layers[1]; if (vector.type !== 'vector') throw new Error('fixture');
+  const mask = { ...base, type: 'raster' as const, id: 'coverage', name: 'coverage', x: 0, y: 0, width: 400, height: 300, pxWidth: 400, pxHeight: 300, rev: 0, transform: [1, 0, 0, 1, 20, 30] as [number, number, number, number, number, number] };
+  const svg = await docToSvg({ ...doc, layers: [{ ...vector, pixelMask: mask }] }, deps);
+  expect(svg).toContain('maskUnits="userSpaceOnUse"');
+  expect(svg).toContain('mask-type:alpha');
+  expect(svg).toContain('matrix(1 0 0 1 20 30)');
+  expect(svg).toContain('mask="url(#mask-v1)"');
+  expect(svg).toContain('<ellipse');
+  expect(svg).toContain('<line');
+});

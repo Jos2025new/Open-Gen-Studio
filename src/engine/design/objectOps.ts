@@ -1,7 +1,8 @@
+import { allVectorObjects, maskBounds, maskContains } from './vectorMask';
 import type { DesignDoc, Layer, RasterLayer, VectorLayer } from '../types';
 import { setDoc, toast, useStore } from '../../store/store';
 import { record } from './history';
-import { shapeBox } from './doc';
+import { shapeBox, translateLayer } from './doc';
 import { looksUnchanged, noChangeNote } from './symmetry';
 import { strokeBox, translateStroke } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
@@ -24,15 +25,25 @@ const union = (bs: Box[]): Box | null => {
 /** The objects of a layer that can be picked, with their boxes (page coordinates). */
 export function layerObjects(layer: Layer): Array<{ id: string; box: Box }> {
   if (layer.type === 'raster') return (layer.paintStrokes ?? []).filter((s) => !s.erase).map((s) => ({ id: s.id, box: rasterStrokeBox(layer, s) })).filter((o): o is { id: string; box: Box } => Boolean(o.box));
-  if (layer.type === 'vector') return [
+  if (layer.type === 'vector') {
+    const mask = layer.pixelMask ? maskBounds(layer.pixelMask) : null;
+    return [
     ...layer.shapes.map((s) => ({ id: s.id, box: shapeBox(s) as Box | null })),
     ...(layer.strokes ?? []).map((s) => ({ id: s.id, box: strokeBox(s) })),
-  ].filter((o): o is { id: string; box: Box } => Boolean(o.box));
+  ].map(o => {
+    if (!layer.pixelMask || !o.box) return o;
+    if (!mask) return { ...o, box: null };
+    const x = Math.max(o.box.x, mask.x), y = Math.max(o.box.y, mask.y);
+    const w = Math.min(o.box.x + o.box.w, mask.x + mask.w) - x, h = Math.min(o.box.y + o.box.h, mask.y + mask.h) - y;
+    return { ...o, box: w > 0 && h > 0 ? { x, y, w, h } : null };
+  }).filter((o): o is { id: string; box: Box } => Boolean(o.box));
+  }
   return [];
 }
 
 /** The topmost object of the layer under a point. */
 export function objectAt(layer: Layer, x: number, y: number): string | null {
+  if (layer.type === 'vector' && !maskContains(layer, x, y)) return null;
   const objs = layerObjects(layer);
   for (let i = objs.length - 1; i >= 0; i--) {
     const b = objs[i].box;
@@ -49,6 +60,7 @@ export function objectsBox(layer: Layer, ids: string[]): Box | null {
 export function translateObjects(layer: Layer, ids: string[], dx: number, dy: number): Layer {
   if (!dx && !dy) return layer;
   if (layer.type === 'raster') return ids.reduce((l, id) => moveRasterStroke(l, id, dx, dy), layer as RasterLayer);
+  if (layer.type === 'vector' && layer.pixelMask && allVectorObjects(layer, ids)) return translateLayer(layer, dx, dy);
   if (layer.type === 'vector') return {
     ...layer,
     shapes: layer.shapes.map((s) => (ids.includes(s.id) ? { ...s, x: s.x + dx, y: s.y + dy } : s)),
@@ -62,6 +74,7 @@ export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
   const box = objectsBox(layer, ids);
   if (!box) return layer;
   if (layer.type === 'vector') {
+    if (layer.pixelMask && allVectorObjects(layer, ids)) return turnVector(layer, turn);
     // The picked objects alone, as a layer: turned about their own joint center, then put back in place.
     const part: VectorLayer = { ...layer, shapes: layer.shapes.filter((s) => ids.includes(s.id)), strokes: (layer.strokes ?? []).filter((s) => ids.includes(s.id)) };
     const turned = turnVector(part, turn);

@@ -1,3 +1,4 @@
+import { multiply, rotateAbout } from './matrix';
 import { mapPathShape } from './path';
 import { looksUnchanged, noChangeNote } from './symmetry';
 import type { DesignDoc, Layer, VectorLayer, VectorShape } from '../types';
@@ -66,7 +67,7 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
     return { ...s, x: mx - s.h / 2, y: my - s.w / 2, w: s.h, h: s.w };
   });
   const strokes = layer.strokes?.map((st) => ({ ...st, points: st.points.map(([x, y, p]) => [...rot(x, y), p] as [number, number, number]) }));
-  return { ...layer, shapes, ...(strokes ? { strokes } : {}) };
+  return { ...layer, shapes, ...(strokes ? { strokes } : {}), ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(rotateAbout(cw ? Math.PI / 2 : -Math.PI / 2, cx, cy), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}) };
 }
 
 /** Raster: the pixels turned, the layer box turned about its center; painted strokes are merged into the image. */

@@ -77,6 +77,13 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
       // Pressure strokes become their filled outline: an editable path, not the original gesture.
       const strokes = await Promise.all((l.strokes ?? []).map((s) => strokeSvg(s)));
       inner = l.shapes.map(shapeSvg).join('') + strokes.join('');
+      if (l.pixelMask) {
+        const mask = l.pixelMask, href = await deps.rasterHref(mask);
+        if (!href) continue;
+        const id = `mask-${xmlEscape(l.id)}`;
+        const transform = mask.transform ? ` transform="matrix(${mask.transform.map(n).join(' ')})"` : '';
+        inner = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000" style="mask-type:alpha"><image x="${n(mask.x)}" y="${n(mask.y)}" width="${n(mask.width)}" height="${n(mask.height)}" preserveAspectRatio="none" href="${href}"${transform}/></mask></defs><g mask="url(#${id})">${inner}</g>`;
+      }
     } else {
       inner = textSvg(l, deps.layout(l), deps.ascent(l));
     }
