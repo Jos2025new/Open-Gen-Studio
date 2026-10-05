@@ -18,7 +18,8 @@ import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
-import { canRecheck, recheckGeneration, retryGeneration } from '../jobs';
+import { patchGeneration } from '../../store/store';
+import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
@@ -876,12 +877,25 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
  * Execute a plan card's steps and report back to the card and the agent. Resuming (Check status / Retry failed):
  * `resume.prior` holds the steps already done, `resume.blocked` the ones that failed again.
  */
-async function runPlanItem(
+const planRuns = new Map<string, Promise<void>>();
+
+type PlanResume = { prior: Map<string, StepOutput>; blocked: Map<string, string>; waiting?: Set<string>; reuseGenerations?: Record<string, string> };
+
+function runPlanItem(sessionId: string, itemId: string, chosen: PlanStep[], off: Set<string>, resume?: PlanResume): Promise<void> {
+  const key = `${sessionId}:${itemId}`;
+  const existing = planRuns.get(key);
+  if (existing) return existing;
+  const promise = executePlanItem(sessionId, itemId, chosen, off, resume).finally(() => { planRuns.delete(key); });
+  planRuns.set(key, promise);
+  return promise;
+}
+
+async function executePlanItem(
   sessionId: string,
   itemId: string,
   chosen: PlanStep[],
   off: Set<string>,
-  resume?: { prior: Map<string, StepOutput>; blocked: Map<string, string> },
+  resume?: PlanResume,
 ): Promise<void> {
   const item = session(sessionId).feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'plan') return;
@@ -904,7 +918,8 @@ async function runPlanItem(
   if (workspace === 'designer') docId = ensureDoc(sessionId, designerDims()).id;
 
   const result = await executeSteps(steps, {
-    ...(resume ? { prior: resume.prior, blocked: resume.blocked } : {}),
+    ...(resume ? { prior: resume.prior, blocked: resume.blocked, waiting: resume.waiting, reuseGenerations: resume.reuseGenerations } : {}),
+    canceled: new Set(item.canceledSteps ?? []),
     sessionId,
     planId: plan.id,
     workspace,
@@ -956,7 +971,7 @@ async function runPlanItem(
 
   const failed = result.failed.length;
   const status: PlanFeedItem['status'] = result.waiting.length ? 'review' : failed === 0 && !result.skipped.length ? 'done' : result.outputs.size ? 'partial' : 'error';
-  updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, { status, stepOutputs: Object.fromEntries(result.outputs), error: failed ? result.failed.map((f) => `${f.stepId}: ${f.error}`).join(' · ') : undefined });
   const summary = plan.steps
     .map((st) => {
       const key = workspace === 'node' ? nodeOf(st.id) : st.id;
@@ -964,6 +979,10 @@ async function runPlanItem(
       const fail = result.failed.find((f) => f.stepId === key);
       if (fail) return `${st.id} failed (${fail.error})`;
       if (off.has(st.id)) return `${st.id} not run (unchecked by the user)`;
+      if (result.waiting.includes(key)) {
+        const current = session(sessionId).feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.id === itemId);
+        return current?.stepCostReviews?.[st.id] ? `${st.id} needs cost review: ${current.stepCostReviews[st.id].message} Not sent.` : `${st.id} waiting for a reviewed step`;
+      }
       if (!out) return `${st.id} skipped`;
       // O3: what came back different from what was asked, for the closing message.
       const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
@@ -985,7 +1004,42 @@ async function runPlanItem(
   if (status === 'done') toast(`${plan.title} · done`, 'success');
   else if (status === 'partial') toast(`${plan.title} finished with ${failed} failed step${failed === 1 ? '' : 's'}`, 'error');
   else if (status !== 'review') toast(`${plan.title} failed`, 'error');
-  await wrapUpPlan(sessionId, itemId, plan.title, status, summary);
+  if (status !== 'review') await wrapUpPlan(sessionId, itemId, plan.title, status, summary);
+}
+
+/** Claim the waiting step synchronously; another click cannot authorize or send it again. */
+export async function resolveStepCostReview(sessionId: string, itemId: string, stepId: string, decision: 'continue' | 'cancel'): Promise<void> {
+  const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
+  const review = item?.stepCostReviews?.[stepId];
+  const generationId = item?.stepGenerations[stepId];
+  if (!item || !review || item.stepStates[stepId] !== 'review' || !generationId) return;
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
+    ...it,
+    stepStates: { ...it.stepStates, [stepId]: decision === 'continue' ? 'running' : 'skipped' },
+    stepAuthorizations: decision === 'continue' ? { ...it.stepAuthorizations, [stepId]: review.proposed } : it.stepAuthorizations,
+    canceledSteps: decision === 'cancel' ? [...(it.canceledSteps ?? []), stepId] : it.canceledSteps,
+  }));
+  patchGeneration(generationId, { status: decision === 'continue' ? 'queued' : 'canceled', statusText: undefined });
+  // Independent steps already in flight finish first; their results are then reused, including after reload.
+  await planRuns.get(`${sessionId}:${itemId}`);
+  const latest = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
+  if (!latest) return;
+  const { chosen, off } = approvedSteps(latest);
+  const prior = new Map(Object.entries(latest.stepOutputs ?? {}));
+  const blocked = new Map<string, string>();
+  const waiting = new Set<string>();
+  const reuseGenerations: Record<string, string> = {};
+  for (const st of chosen) {
+    const gid = latest.stepGenerations[st.id];
+    const gen = gid ? get().generations[gid] : undefined;
+    if (gen?.status === 'done') prior.set(st.id, { assetIds: gen.assetIds, text: gen.text });
+    else if (gen?.status === 'review') waiting.add(st.id);
+    else if (gen?.status === 'queued' || (gen?.status === 'running' && generationInFlight(gen.id))) reuseGenerations[st.id] = gen.id;
+    else if (gen?.status === 'running') blocked.set(st.id, 'Interrupted by reload; check the existing generation before retrying.');
+    else if (latest.stepStates[st.id] === 'error') blocked.set(st.id, gen?.error ?? 'Failed');
+  }
+  updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({ ...it, status: 'running', stepStates: { ...it.stepStates, ...Object.fromEntries([...blocked.keys()].map(id => [id, 'error' as StepState])) } }));
+  await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked, waiting, reuseGenerations });
 }
 
 /**
@@ -1071,6 +1125,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
   // The failed generations first, in their own cards: fetched again (check) or run again (retry).
   const blocked = new Map<string, string>();
   const recovered = new Set<string>();
+  const waiting = new Set<string>();
   await Promise.all(
     failedIds.map(async (id) => {
       const g = genOf(id);
@@ -1087,6 +1142,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
       await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
       const after = get().generations[g.id];
       if (after?.status === 'done') recovered.add(id);
+      else if (after?.status === 'review') waiting.add(id);
       else blocked.set(id, after?.error ?? 'Failed');
     }),
   );
@@ -1100,7 +1156,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
     ...it,
     stepStates: { ...it.stepStates, ...Object.fromEntries([...recovered].map((id) => [id, 'done' as StepState])), ...Object.fromEntries([...blocked.keys()].map((id) => [id, 'error' as StepState])) },
   }));
-  await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked });
+  await runPlanItem(sessionId, itemId, chosen, off, { prior, blocked, waiting });
   const done = session(sessionId).feed.find((f) => f.id === itemId);
   const status = done?.type === 'plan' ? done.status : 'error';
   return `${mode === 'check' ? 'Checked' : 'Retried'} "${item.plan.title}": ${status === 'done' ? 'all steps done' : status === 'partial' ? `finished with errors (${done?.type === 'plan' ? done.error : ''})` : `still failing (${done?.type === 'plan' ? done.error : ''})`}.`;
@@ -1774,11 +1830,12 @@ export function settleInterruptedPlans(): void {
       }
       const states: Record<string, StepState> = { ...item.stepStates };
       let pending = false;
+      const review = Object.values(states).includes('review');
       for (const st of item.plan.steps) {
         const gid = item.stepGenerations[st.id];
         const g = gid ? gens[gid] : undefined;
-        if (g) states[st.id] = g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
-        else if (states[st.id] !== 'done') states[st.id] = 'skipped';
+        if (g) states[st.id] = g.status === 'review' ? 'review' : g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : ((pending = true), 'running');
+        else if (!review && states[st.id] !== 'done') states[st.id] = 'skipped';
       }
       if (pending) continue;
       open.delete(key);
@@ -1786,8 +1843,8 @@ export function settleInterruptedPlans(): void {
       const all = item.plan.steps.length;
       updateFeedItem<PlanFeedItem>(sessionId, itemId, {
         stepStates: states,
-        status: done === all ? 'done' : done ? 'partial' : 'error',
-        error: done === all ? undefined : 'Interrupted by a page reload; some steps did not run.',
+        status: review ? 'review' : done === all ? 'done' : done ? 'partial' : 'error',
+        error: review || done === all ? undefined : 'Interrupted by a page reload; some steps did not run.',
       });
     }
     if (!open.size) unsubscribe();

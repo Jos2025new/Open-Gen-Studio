@@ -36,6 +36,7 @@ export interface ExecContext {
   /** Resuming a plan: steps that failed again and stay failed (their dependents are skipped). */
   blocked?: Map<string, string>;
   waiting?: Set<string>;
+  canceled?: Set<string>;
   reuseGenerations?: Record<string, string>;
   onState: (stepId: string, state: StepState, info?: { generationId?: string; error?: string }) => void;
 }
@@ -295,6 +296,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     failed.push({ stepId: id, error });
   }
 
+  for (const id of ctx.canceled ?? []) {
+    if (state.has(id)) { state.set(id, 'skipped'); skipped.push(id); }
+  }
   for (const id of ctx.waiting ?? []) {
     if (state.has(id)) { state.set(id, 'review'); waiting.push(id); }
   }

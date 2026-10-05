@@ -633,6 +633,8 @@ export interface PlanFeedItem extends FeedBase {
   stepAuthorizations?: Record<string, StepAuthorization>;
   stepCostReviews?: Record<string, StepCostReview>;
   stepVariantNotes?: Record<string, string>;
+  stepOutputs?: Record<string, { assetIds: string[]; text?: string; layerId?: string | null }>;
+  canceledSteps?: string[];
   estimate: Estimate;
   error?: string;
   /** This plan replaced the pending one after the user asked for a change. */

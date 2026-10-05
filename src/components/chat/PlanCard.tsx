@@ -1,7 +1,7 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
 import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette, Pencil } from 'lucide-react';
-import { approvePlan, cancelPlan, sendAgentMessage } from '../../engine/agent/runtime';
+import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
@@ -71,6 +71,7 @@ function stepScript(s: PlanStep): string {
 function StateIcon({ state }: { state: StepState }) {
   if (state === 'running') return <LoaderCircle size={13} className="spin accent" />;
   if (state === 'done') return <Check size={13} className="ok" />;
+  if (state === 'review') return <CircleAlert size={13} className="accent" />;
   if (state === 'error') return <CircleAlert size={13} className="danger" />;
   if (state === 'skipped') return <Minus size={13} className="faint" />;
   return <span className="state-dot" />;
@@ -183,6 +184,14 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               ) : null}
               <StateIcon state={state} />
               {script && shown ? <p className="step-script">{script}</p> : null}
+              {state === 'review' && item.stepCostReviews?.[s.id] ? (
+                <div className="step-script">
+                  <p>{item.stepCostReviews[s.id].message}</p>
+                  <Button size="sm" variant="primary" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'continue'); }}>Continuar</Button>
+                  <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
+                </div>
+              ) : null}
+              {item.stepVariantNotes?.[s.id] ? <p className="step-script faint">{item.stepVariantNotes[s.id]}</p> : null}
               {s.kind === 'image' && s.variations?.length ? <Variations title={s.title} variations={s.variations} editable={awaiting} /> : null}
             </li>
           );
@@ -244,7 +253,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         ) : (
           <>
             <span className={`plan-final st-${item.status} num`}>
-              {item.status === 'done' ? 'Done' : item.status === 'partial' ? 'Finished with errors' : item.status === 'canceled' ? 'Canceled' : 'Failed'}
+              {item.status === 'review' ? 'Necesita revisión' : item.status === 'done' ? 'Done' : item.status === 'partial' ? 'Finished with errors' : item.status === 'canceled' ? 'Canceled' : 'Failed'}
             </span>
             {plan.workspace !== workspace && (item.status === 'done' || item.status === 'partial') && plan.workspace !== 'chat' ? (
               <Button variant="ghost" size="sm" onClick={() => setUi({ workspace: plan.workspace })}>
