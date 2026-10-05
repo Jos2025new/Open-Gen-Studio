@@ -323,4 +323,6 @@ Los [tests de regresión](../tests/price-pilot-expansion.test.ts) reprodujeron c
 fetch simulado la pérdida del diagnóstico y comprueban HTTP 400, transporte,
 timeout, JSON inválido y error SSE, además del filtrado de strings sensibles.
 Esta corrección está probada localmente; la causa del fallo real permanece sin
-verificar. No se ha aprobado ni preparado una repetición del intento incierto.
+verificar. En esa revisión no se había preparado otra ejecución. La posterior
+[expansion-2](nanogpt-price-expansion-2.md), solicitada por el usuario, arrastra
+todo el coste contabilizado y conserva intactos los registros y locks anteriores.
