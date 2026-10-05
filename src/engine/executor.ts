@@ -8,7 +8,8 @@ import { OPS } from './ops';
 import { parseRef, stepDeps, topoOrder } from './plan';
 import { sumEstimates } from './pricing';
 import { uid } from '../lib/id';
-import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Subject, Workspace } from './types';
+import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
+import { costAuthorization } from './priceAuthorization';
 import { useStore } from '../store/store';
 
 const get = useStore.getState;
@@ -43,10 +44,13 @@ export interface ExecResult {
   skipped: string[];
 }
 
-export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Record<string, Estimate> } {
+export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Record<string, Estimate>; authorizations: Record<string, StepAuthorization> } {
   const perStep: Record<string, Estimate> = {};
+  const authorizations: Record<string, StepAuthorization> = {};
   const videoSettings = get().composer.video.settings;
   for (const s of steps) {
+    let opRef: string | undefined;
+    let opSettings = videoSettings;
     if (s.kind === 'image') perStep[s.id] = estimateMedia(s.modelRef, 'image', s.settings, s.refs.length > 0);
     else if (s.kind === 'model3d') perStep[s.id] = estimateMedia(s.modelRef, 'model3d', s.settings, s.refs.length > 0);
     else if (s.kind === 'video') perStep[s.id] = estimateMedia(s.modelRef, 'video', s.settings, Boolean(s.firstFrame));
@@ -61,6 +65,8 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
         const settings = videoOpSettings(engine, get().catalog.schemas[ref], s.params);
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
         const clip = src?.duration ?? (upstream?.kind === 'video' ? upstream.settings.duration : undefined);
+        opRef = ref;
+        opSettings = { ...settings, duration: videoOpSeconds(engine, settings, clip) };
         const est = estimateOp(s.op, s.params, src, { ...settings, duration: videoOpSeconds(engine, settings, clip) }, ref);
         perStep[s.id] = upstream && engine !== 'video_extend' ? { ...est, approximate: true } : est;
       } else {
@@ -68,11 +74,14 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
         const upstream = p?.type === 'step' ? steps.find((x) => x.id === p.id) : undefined;
         const kind = engine === 'edit' ? 'image' : 'video';
         const ref = opFollowsSource(engine) ? (typeof s.params._modelRef === 'string' ? s.params._modelRef : src ? opModelForAsset(engine, src.id).ref : (upstream && 'modelRef' in upstream ? opModelFromRef(upstream.modelRef, kind) : null) ?? opModelFor(engine).ref) : undefined;
+        opRef = ref ?? opModelFor(engine).ref;
         perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings, ref);
       }
     } else perStep[s.id] = { usd: 0, approximate: false };
+    if ('modelRef' in s) authorizations[s.id] = costAuthorization(s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
+    else if (s.kind === 'op') authorizations[s.id] = costAuthorization(opRef ?? '', opSettings, perStep[s.id]);
   }
-  return { total: sumEstimates(Object.values(perStep)), perStep };
+  return { total: sumEstimates(Object.values(perStep)), perStep, authorizations };
 }
 
 /** Run a DAG of steps with bounded concurrency. Failed steps skip their dependents. */

@@ -600,6 +600,26 @@ export interface EditLogEntry {
   removed: number;
 }
 
+export interface StepAuthorization {
+  modelRef: string;
+  parameters: {
+    count: number;
+    aspect?: string;
+    resolution?: string;
+    duration?: number;
+    audio?: boolean;
+    advanced: Record<string, AdvancedValue>;
+    shotDurations?: number[];
+  };
+  estimate: Estimate;
+}
+
+export interface StepCostReview {
+  approved: StepAuthorization;
+  proposed: StepAuthorization;
+  message: string;
+}
+
 export interface PlanFeedItem extends FeedBase {
   /** Approval of existing node IDs; never materialized again. */
   nodeRun?: { targets: string[]; force: boolean; signature: string };
@@ -609,6 +629,8 @@ export interface PlanFeedItem extends FeedBase {
   status: 'awaiting' | 'running' | 'done' | 'partial' | 'error' | 'canceled';
   stepStates: Record<string, StepState>;
   stepGenerations: Record<string, string>;
+  stepAuthorizations?: Record<string, StepAuthorization>;
+  stepCostReviews?: Record<string, StepCostReview>;
   estimate: Estimate;
   error?: string;
   /** This plan replaced the pending one after the user asked for a change. */

@@ -789,14 +789,14 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const chosen = pruned.steps;
   if (!chosen.length) return;
   // Re-estimate: models or prices may have loaded since the plan was shown.
-  const { total } = estimateSteps(chosen);
+  const { total, authorizations } = estimateSteps(chosen);
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approval_attempted', reason: 'approval requested; budget check pending', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: item.status, stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd } });
   // Over an active limit, the card asks first ("Continue anyway"); approving without that stops here.
   if (overLimit(total)) {
     toast(overLimitText(total), 'error');
     return;
   }
-  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'approval accepted for current plan estimate; no maximum or final-request authorization is stored', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
+  recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'price-approval-execution', event: 'plan.approved', reason: 'per-step authorization accepted for current plan estimate', sessionId, planId: plan.id, approvalId: item.id, before: { status: item.status, skipped: [...off] }, after: { status: 'running', stepIds: chosen.map((step) => step.id) }, prices: { storedEstimateUsd: item.estimate.usd, liveEstimateUsd: total.usd, acceptedEstimateUsd: total.usd } });
   const pending = s.agent.pending;
   if (pending?.feedItemId === itemId) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
@@ -808,6 +808,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     ...it,
     status: 'running',
     estimate: total,
+    stepAuthorizations: authorizations,
     stepStates: { ...it.stepStates, ...Object.fromEntries([...off].map((sid) => [sid, 'skipped' as StepState])) },
   }));
 
