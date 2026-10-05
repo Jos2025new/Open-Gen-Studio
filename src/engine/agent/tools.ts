@@ -232,7 +232,7 @@ export const TOOLS: ToolSpec[] = [
             type: 'array',
             maxItems: 6,
             description:
-              'Characters, objects, products or style references to keep identical across steps. Each is saved to the library: from an existing image (asset:<id>, e.g. the attached character) when the plan runs, or from an image step (its reference sheet) when it ends. Later steps mention it as @Name in their prompt; the app sends its image as a reference with the right syntax and runs those steps after it.',
+              'Named image references across steps. For temporary use of an existing image, use refs in each consuming step instead. from asset:<id> saves to the library when the approved plan runs: use only when the user explicitly asked to save or accepted an offer to save. from an image step is used by this plan only, never saved automatically. Steps mention @Name; the app sends its image in the model syntax and waits for its source step. Reuse existing library names without redefining them.',
             items: {
               type: 'object',
               properties: {

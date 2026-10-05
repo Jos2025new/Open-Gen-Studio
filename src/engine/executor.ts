@@ -268,8 +268,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     }
   };
 
-  // The user's own images are saved to the library before anything runs. A subject made by a step (a reference
-  // sheet) is only a candidate: it serves this plan's @Name and reaches the library when the user saves it.
+  // Asset subjects save/reuse library entries. Step subjects serve this plan without saving to the library.
   for (const subj of ctx.subjects ?? []) {
     const p = parseRef(subj.from);
     if (p?.type === 'asset') saveSubjectOnce(subj, p.id);
@@ -289,6 +288,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     if (!state.has(id)) continue;
     state.set(id, 'done');
     outputs.set(id, out);
+    saveSubjectsOf(id, out);
   }
   for (const [id, error] of ctx.blocked ?? []) {
     if (!state.has(id)) continue;

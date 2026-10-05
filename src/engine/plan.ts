@@ -158,7 +158,7 @@ export interface PlanContext {
   userText?: () => string;
   /** Images attached to the current request: the start frame a model needs when the plan forgot it. */
   requestImages?: () => string[];
-  /** Names of the session's subjects: a plan subject with one of these names reuses it. */
+  /** Library names used to validate mentions and explain name collisions. */
   subjectNames?: () => string[];
   /** Settings the user confirmed (phase 2): model, resolution, duration and aspect for every step of that kind. */
   confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
@@ -944,8 +944,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
 }
 
 /**
- * Plan subjects (F3): each names an image the plan saves as a session subject. Steps that mention @Name wait for
- * the step that makes it (`after`), so the subject exists before their prompt is sent. An existing name is reused.
+ * Asset subjects save or reuse library entries; step subjects are temporary overrides. Mentions add `after`
+ * dependencies so the source image exists before the dependent prompt is sent.
  */
 function planSubjects(
   raw: RawPlan['subjects'],
@@ -976,7 +976,11 @@ function planSubjects(
       errors.push(`${where}: "from" must be an image; "${r.from}" is ${k}.`);
       continue;
     }
-    if (existing.some((n) => n.toLowerCase() === name.toLowerCase())) adjustments.push(`@${name} already exists in this session: reused`);
+    if (existing.some((n) => n.toLowerCase() === name.toLowerCase())) {
+      adjustments.push(parseRef(r.from)?.type === 'step'
+        ? `@${name} uses the temporary image from ${r.from}; the existing library item is unchanged`
+        : `@${name} already exists in this session: reused`);
+    }
     out.push({ name, from: r.from.trim(), ...(r.kind ? { kind: r.kind } : {}), ...(r.description?.trim() ? { description: r.description.trim() } : {}) });
   }
   for (const subj of out) {
@@ -1002,7 +1006,7 @@ function unknownMentions(steps: PlanStep[], known: string[], errors: string[]): 
     for (const m of st.prompt.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)) {
       const n = m[1];
       if (REF_SYNTAX.test(n) || names.has(n.toLowerCase())) continue;
-      errors.push(`step ${st.id}: @${n} is not in the library; add it to "subjects" (from an attached image or a reference step) or describe it without @.`);
+      errors.push(`step ${st.id}: @${n} is not in the library; for temporary use of an existing image, carry it in refs and cite its role with the model reference syntax, or describe without @ if no reference is needed. A subject from an image step is temporary; use subjects from asset:<id> only when the user explicitly asked to save or accepted an offer to save.`);
     }
   }
 }

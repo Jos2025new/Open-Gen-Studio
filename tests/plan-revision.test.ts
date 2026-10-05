@@ -8,20 +8,20 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { approvePlan, sendAgentMessage } from '../src/engine/agent/runtime';
+import { approvePlan, cancelPlan, sendAgentMessage } from '../src/engine/agent/runtime';
 import { toggleStep } from '../src/engine/plan';
 import { updateFeedItem } from '../src/store/store';
 import type { PlanStep } from '../src/engine/types';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem } from '../src/engine/types';
 
-type Reply = { plan?: { title: string; revision?: boolean; texts: string[] }; text?: string };
+type Reply = { plan?: { title: string; revision?: boolean; texts: string[]; subjects?: Array<{ name: string; from: string }> }; text?: string };
 
 const sse = (r: Reply) => {
   const chunks: unknown[] = [];
   if (r.text) chunks.push({ choices: [{ delta: { content: r.text } }] });
   if (r.plan) {
-    const args = JSON.stringify({ title: r.plan.title, revision: r.plan.revision, steps: r.plan.texts.map((t, i) => ({ id: `s${i + 1}`, kind: 'text', text: t })) });
+    const args = JSON.stringify({ title: r.plan.title, revision: r.plan.revision, subjects: r.plan.subjects, steps: r.plan.texts.map((t, i) => ({ id: `s${i + 1}`, kind: 'text', text: t })) });
     chunks.push({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: 'propose_plan', arguments: args } }] }, finish_reason: 'tool_calls' }] });
   }
   const body = chunks.map((c) => `data: ${JSON.stringify(c)}\n\n`).join('') + 'data: [DONE]\n\n';
@@ -117,5 +117,32 @@ describe('choosing which steps run', () => {
     // The plan call plus the text-only wrap-up after it ran (S4), which reports the unchecked steps.
     expect(chatCalls).toBe(2);
     expect(history.some((m) => m.role === 'user' && typeof m.content === 'string' && /^\[app\] Plan "Three" finished \(done\).*s2 not run \(unchecked/.test(m.content))).toBe(true);
+  });
+});
+
+describe('H11 consent across approval and revision', () => {
+  const setup = () => useStore.setState((st) => ({ library: [], assets: { ...st.assets, consent_ref: { id: 'consent_ref', kind: 'image', mime: 'image/png', width: 64, height: 64, sessionId: st.activeSessionId, origin: 'upload', stored: true, favorite: false, createdAt: 1 } } }));
+  it('canceling a proposed save leaves the library unchanged', async () => {
+    setup();
+    replies = [{ plan: { title: 'Save', texts: ['note'], subjects: [{ name: 'Kai', from: 'asset:consent_ref' }] } }];
+    await sendAgentMessage('Save this image as Kai');
+    expect(plans()[0].plan.subjects).toEqual([{ name: 'Kai', from: 'asset:consent_ref' }]);
+    expect(useStore.getState().library).toEqual([]);
+    cancelPlan(useStore.getState().activeSessionId, plans()[0].id);
+    expect(plans()[0].status).toBe('canceled');
+    expect(useStore.getState().library).toEqual([]);
+  });
+  it('revision preserves the requested save, which occurs only on approval', async () => {
+    setup();
+    const subjects = [{ name: 'Kai', from: 'asset:consent_ref' }];
+    replies = [{ plan: { title: 'Save', texts: ['note'], subjects } }];
+    await sendAgentMessage('Save this image as Kai');
+    replies = [{ plan: { title: 'Save', revision: true, texts: ['changed note'], subjects } }];
+    await sendAgentMessage('change the note');
+    expect(plans()).toHaveLength(1);
+    expect(plans()[0].plan.subjects).toEqual(subjects);
+    expect(useStore.getState().library).toEqual([]);
+    await approvePlan(useStore.getState().activeSessionId, plans()[0].id);
+    expect(useStore.getState().library).toMatchObject([{ name: 'Kai', frontalAssetId: 'consent_ref' }]);
   });
 });

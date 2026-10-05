@@ -24,6 +24,7 @@
 - [0002 — No usar confirm() nativo](decisions/0002-confirmaciones-de-la-app.md).
 - [0003 — Probar la app solo en el sandbox](decisions/0003-pruebas-en-sandbox.md).
 - [0004 — Aprobar un coste máximo antes de usar proveedores de pago](decisions/0004-coste-maximo.md).
+- [0005 — Contrato operativo del agente: P0 + P1a aprobados; resto propuesto](decisions/0005-contrato-operativo-agente.md).
 
 ## Historial
 
@@ -48,6 +49,11 @@
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 
 ## Verificación
+
+- [P0 + P1a: biblioteca, consentimiento, pruebas y límites](agent-library-consent.md).
+
+- [Contrato operativo del agente: evidencia H01–H13, inferencias y límites](agent-contract-evidence.md).
+- [Contrato operativo: recorridos, UX, riesgos y validación a largo plazo](agent-contract-validation.md).
 
 - [Línea base del agente: script, resultados y límites](agent-baseline.md).
 - [Comparación NanoGPT: resultados DeepSeek y ampliación aprobada hasta USD 1, coste, caché y límites](nanogpt-price-comparison.md).

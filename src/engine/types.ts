@@ -510,7 +510,7 @@ export interface Plan {
   summary: string;
   workspace: Workspace;
   steps: PlanStep[];
-  /** Characters or objects saved as session subjects, mentioned as @Name by later steps (F3). */
+  /** Named image references: asset sources save/reuse library entries; step sources stay temporary (F3). */
   subjects?: PlanSubject[];
   /** Style block appended to every image and video prompt (already in the prompts). */
   style?: string;

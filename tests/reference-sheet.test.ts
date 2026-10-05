@@ -89,3 +89,54 @@ describe('reference_sheet op', () => {
     expect(preferredResolution(['auto', 'standard'], '2K')).toBeUndefined();
   });
 });
+
+describe('H11 reference execution', () => {
+  const steps = (): PlanStep[] => [
+    { id: 'h1', kind: 'image', title: 'reference', prompt: 'the person in image 1', modelRef: 'local::sketch', settings: { count: 1, advanced: {} }, refs: ['asset:source'] },
+    { id: 'h2', kind: 'image', title: 'scene', prompt: '@Temp on a rooftop', modelRef: 'local::sketch', settings: { count: 1, advanced: {} }, refs: ['asset:source', 'h1'], after: ['h1'] },
+  ];
+  const reset = () => useStore.setState((st) => ({ library: [], generations: {}, assets: { ...st.assets, source: img('source'), img_h1: img('img_h1') } }));
+  const context = () => ({ sessionId: useStore.getState().activeSessionId, workspace: 'chat' as const, origin: 'agent' as const, onState: () => undefined });
+
+  it('reuses attached and upstream refs without saving either', async () => {
+    reset();
+    const temporary = steps();
+    if (temporary[1].kind === 'image') temporary[1].prompt = 'image 1 is the source and image 2 the previous result';
+    const result = await executeSteps(temporary, context());
+    expect(result.failed).toEqual([]);
+    const generations = Object.values(useStore.getState().generations);
+    expect(generations.find((g) => g.stepId === 'h1')!.inputs.refs).toEqual(['source']);
+    expect(generations.find((g) => g.stepId === 'h2')!.inputs.refs).toEqual(['source', 'img_h1']);
+    expect(useStore.getState().library).toEqual([]);
+  });
+
+  it('restores a temporary subject from completed outputs when resuming a dependent step', async () => {
+    reset();
+    const result = await executeSteps(steps(), { ...context(), subjects: [{ name: 'Temp', from: 'h1' }], prior: new Map([['h1', { assetIds: ['img_h1'] }]]) });
+    expect(result.failed).toEqual([]);
+    const generations = Object.values(useStore.getState().generations);
+    expect(generations.map((g) => g.stepId)).toEqual(['h2']);
+    expect(generations[0].inputs.subjects).toMatchObject([{ name: 'Temp', frontalAssetId: 'img_h1' }]);
+    expect(generations[0].inputs.refs).toEqual(['source', 'img_h1']);
+    expect(useStore.getState().library).toEqual([]);
+  });
+
+  it('explicit saving is idempotent and does not replace an existing library identity', async () => {
+    reset();
+    const existing = subjectFromAsset('source', 'Kai', 'character')!;
+    for (let i = 0; i < 2; i++) await executeSteps([{ id: 'note', kind: 'text', title: 'note', text: 'saved' }], { ...context(), subjects: [{ name: 'kai', from: 'asset:img_h1' }] });
+    expect(useStore.getState().library).toEqual([existing]);
+  });
+});
+
+it('a temporary alias with an existing library name carries its own image without overwriting the library', async () => {
+  useStore.setState((st) => ({ library: [], generations: {}, assets: { ...st.assets, original: img('original'), generated: img('generated') } }));
+  const existing = subjectFromAsset('original', 'Kai')!;
+  const steps: PlanStep[] = [
+    { id: 'reference', kind: 'image', title: 'reference', prompt: 'reference', modelRef: 'local::sketch', settings: { count: 1, advanced: {} }, refs: [] },
+    { id: 'scene', kind: 'image', title: 'scene', prompt: '@Kai in the scene', modelRef: 'local::sketch', settings: { count: 1, advanced: {} }, refs: [], after: ['reference'] },
+  ];
+  await executeSteps(steps, { sessionId: useStore.getState().activeSessionId, workspace: 'chat', origin: 'agent', subjects: [{ name: 'Kai', from: 'reference' }], prior: new Map([['reference', { assetIds: ['generated'] }]]), onState: () => undefined });
+  expect(Object.values(useStore.getState().generations)[0].inputs.subjects).toMatchObject([{ name: 'Kai', frontalAssetId: 'generated' }]);
+  expect(useStore.getState().library).toEqual([existing]);
+});

@@ -91,11 +91,13 @@ describe('text before a rejected plan', () => {
 });
 
 describe('attached images as references, no library saves unasked', () => {
-  it('the agent cites the attached image in refs and saves subjects only when the user decided', async () => {
+  it('the agent uses refs temporarily and saves asset subjects only when the user decided', async () => {
     const { SYSTEM_PROMPT } = await import('../src/engine/agent/context');
     const { workflowById } = await import('../src/engine/skills');
     expect(SYSTEM_PROMPT).toMatch(/Never save anything to the library on your own/);
-    expect(SYSTEM_PROMPT).toMatch(/only when the user asked to save it or said yes in the questions card/);
+    expect(SYSTEM_PROMPT).toContain('from asset:<id> saves to the library when the approved plan runs: use only when the user explicitly asked to save or accepted an offer to save');
+    expect(SYSTEM_PROMPT).toContain('from an image step is used by this plan only, never saved automatically');
+    expect(SYSTEM_PROMPT).toContain('For temporary use of an existing image, use refs');
     expect(SYSTEM_PROMPT).not.toMatch(/the character as a @Name subject/);
     expect(workflowById('story')!.continuity).toMatch(/goes in the refs of every clip/);
   });

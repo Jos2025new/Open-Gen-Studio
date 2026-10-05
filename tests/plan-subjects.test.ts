@@ -8,6 +8,8 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
+import { TOOLS } from '../src/engine/agent/tools';
+import { SYSTEM_PROMPT } from '../src/engine/agent/context';
 import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
 import { normalizePlan, stepDeps, toggleStep, type PlanContext } from '../src/engine/plan';
 import { executeSteps } from '../src/engine/executor';
@@ -52,12 +54,14 @@ describe('plan subjects (F3)', () => {
     expect(toggleStep(plan!.steps, [], 's1')).toEqual(['s1', 's2', 's3']);
   });
 
-  it('rejects a bad name or a non-image source, and reuses an existing subject', async () => {
+  it('rejects invalid subjects and explains a temporary alias that shadows a library name', async () => {
     const bad = await normalizePlan({ ...structuredClone(story), subjects: [{ name: 'La chica', from: 's1' }, { name: 'Clip', from: 's2' }] }, ctx(), 'p');
     expect(bad.errors.join(' ')).toMatch(/one word/);
     expect(bad.errors.join(' ')).toMatch(/must be an image; "s2" is video/);
     const reuse = await normalizePlan(structuredClone(story), ctx(['reto']), 'p');
-    expect(reuse.plan!.adjustments.join(' ')).toMatch(/@Reto already exists in this session: reused/);
+    expect(reuse.plan!.adjustments.join(' ')).toMatch(/@Reto uses the temporary image from s1; the existing library item is unchanged/);
+    const assetReuse = await normalizePlan({ ...structuredClone(story), subjects: [{ name: 'Reto', from: 'asset:char' }] }, ctx(['reto']), 'p');
+    expect(assetReuse.plan!.adjustments.join(' ')).toContain('@Reto already exists in this session: reused');
   });
 
   it('an attached image becomes the subject when the plan runs, before any step', async () => {
@@ -80,5 +84,25 @@ describe('plan subjects (F3)', () => {
     });
     expect(seen).toEqual(['t1:Reto']);
     expect(useStore.getState().library[0]).toMatchObject({ name: 'Reto', frontalAssetId: 'char' });
+  });
+});
+
+describe('H11 reference and persistence contract', () => {
+  it('repair offers refs for temporary use, and requires an explicit save request for asset subjects', async () => {
+    const result = await normalizePlan({ title: 'Temporary', steps: [{ id: 's1', kind: 'image', prompt: '@Ghost smiles', refs: ['asset:char'] }] }, ctx(), 'p');
+    const repair = result.errors.join(' ');
+    expect(repair).toContain('refs');
+    expect(repair).toContain('explicitly asked to save');
+    expect(repair).not.toContain('add it to "subjects" (from an attached image');
+  });
+
+  it('the tool and system distinguish asset persistence from a temporary step subject', () => {
+    const tool = TOOLS.find((x) => x.function.name === 'propose_plan')!;
+    const contract = JSON.stringify(tool.function.parameters);
+    expect(contract).not.toContain('Each is saved to the library');
+    expect(contract).toContain('explicitly asked to save');
+    expect(contract).toContain('this plan only');
+    expect(SYSTEM_PROMPT).toContain('For temporary use of an existing image, use refs');
+    expect(SYSTEM_PROMPT).not.toContain('use subjects only if they said yes or asked');
   });
 });
