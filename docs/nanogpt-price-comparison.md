@@ -1,96 +1,97 @@
-# Comparación NanoGPT — plan pendiente de aprobación
+# Piloto NanoGPT — pendiente de aprobación
 
-Fecha de preparación: 2026-10-04. **No ejecutado.** La única consulta remota fue
-un GET público del [catálogo NanoGPT](https://nano-gpt.com/api/v1/models?detailed=true),
-sin autenticación ni generación. La lectura del sandbox encontró agente offline y
-modelo vacío. Se proponen estos IDs concretos, sin alias ni sustituciones:
+Fecha: 2026-10-04. Sustituye el plan rechazado de 160 llamadas.
+No se ha enviado ninguna llamada de generación.
 
-| Modelo | ID | Entrada USD/M | Salida USD/M | Contexto máximo | Suscripción según catálogo |
-| --- | --- | ---: | ---: | ---: | --- |
-| DeepSeek V4.1 Flash | deepseek/deepseek-v4.1-flash | 0.13 | 0.52 | 1000000 | incluido |
-| GPT 6 Luna | openai/gpt-6-luna | 0.10 | 0.50 | 1050000 | no incluido |
+## Alcance
 
-La inclusión depende de la cuenta y las condiciones vigentes; no se presupone coste
-cero. El [soporte oficial](https://nano-gpt.com/support) describe caché implícita
-dependiente de ruta y modelo, y señala que tokens cacheados consumen cuota de entrada.
+Solo `deepseek/deepseek-v4.1-flash`: 3 parejas control/aviso, **6 llamadas**.
+Pareja 1: primera respuesta. Pareja 2: continuación con Continuar.
+Pareja 3: continuación con Cancelar. Orden A/B, B/A, A/B.
+GPT Luna queda bloqueado en el script; sus otras 6 llamadas requieren autorización
+posterior. El límite global del piloto sigue siendo **USD 0.05**, no por modelo.
+No se sacarán conclusiones sobre p90 con esta muestra.
 
-## Casos y orden
+## Captura y estimación sin gasto
 
-20 pares por modelo y tipo de sesión: **20 muestras por brazo/modelo/tipo**,
-80 peticiones por modelo, **160 llamadas en total**. Cada muestra mide una llamada
-streaming del agente, sin ejecución de herramientas ni generaciones multimedia.
-No es una medición de un plan multimedia completo.
+El [test de captura](../tests/price-pilot-capture.test.ts) ejecuta el runtime real
+con sesiones sintéticas en memoria, persistencia y fetch simulados. Conserva system,
+tools y contexto del agente. Para construir una continuación, la llamada anterior
+y el resultado local de read_guide se simulan; no hay warmup de pago.
+Los cuerpos se guardan solo en `.sandbox/pilot/requests.json`; no se extraen
+conversaciones ni credenciales del almacén real. No se modifica `.sandbox/data`.
+No es una muestra de conversación histórica: es una petición real construida por
+el cliente para estas fixtures reproducibles del sandbox.
 
-Se emplean cinco fixtures sintéticas propias, cuatro repeticiones cada una:
-Continuar con 0.20 → 1.20; Cancelar; terminado con proveedor 0.73; terminado con
-coste desconocido; fallido con coste desconocido. La pregunta común pide explicar
-la decisión, la autorización y el coste informado con una respuesta breve.
+Por instrucción del usuario, no se usa tokenizer. Se cuentan los caracteres Unicode
+del JSON compacto que se enviaría, con **max_tokens 500** en todos los brazos:
 
-- Sesión nueva: historial de inicio sintético; ninguna conversación del usuario.
-- Continuación: mismo historial sintético con una llamada y respuesta de herramienta
-  ya completas. El historial se construye localmente, sin llamada de calentamiento.
-- Control A: historial sin el aviso; B: mismo historial más el aviso fijo al final.
-  No se modifica el prefijo compartido. No se envía el texto de conversaciones reales.
-- Alternar A/B y B/A por pareja y modelo. Dos bloques de 10 pares por cada tipo,
-  con orden invertido en el segundo; conservar resultados separados por bloque.
-- Una petición por muestra, sin reintentos automáticos, fallback, cotizaciones,
-  llamadas auxiliares LLM ni warmup de pago. Si el modelo devuelve solo herramientas,
-  no se ejecutan: primer texto visible desconocido; no se elimina esa muestra.
+`tokensEntrada = ceil(caracteres(JSON.stringify(body)) / 3 × 1.50)`.
 
-Configuración idéntica entre brazos: endpoint habitual `/api/v1/chat/completions`,
-streaming, system y tools actuales, tool_choice auto, reasoning_effort low,
-showReasoning false y max_tokens 16000, igual al límite del cliente actual.
-No añadir temperature, cache_control, prompt_caching ni selección extra de ruta.
-Ejecutar únicamente en el sandbox del worktree, con cliente aislado y credencial
-autorizada para ese ensayo. No iniciar el script que copie data/ real.
+La salida futura no se puede observar sin llamar al modelo. Se reserva su límite
+completo de 500 tokens; no se presenta una respuesta simulada como salida real.
+El cliente de producción y el aviso de prisa no se modifican en esta preparación.
 
-## COSTE MÁXIMO: USD 22.21
+| Caso | Brazo | Caracteres | Tokens entrada estimados, con margen | Salida máxima | Máximo calculado USD |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Primera respuesta | control | 61200 | 30600 | 500 | 0.004238 |
+| Primera respuesta | aviso | 61375 | 30688 | 500 | 0.004250 |
+| Continuación / Continuar | control | 70841 | 35421 | 500 | 0.004865 |
+| Continuación / Continuar | aviso | 71016 | 35508 | 500 | 0.004877 |
+| Continuación / Cancelar | control | 70841 | 35421 | 500 | 0.004865 |
+| Continuación / Cancelar | aviso | 70994 | 35497 | 500 | 0.004875 |
+| Total | 6 llamadas | | 203135 | 3000 | **0.027970** |
 
-Es un límite deliberadamente conservador calculado con **todo el contexto máximo
-de cada modelo en cada llamada**, más 16000 tokens de salida, sin descuento por
-caché ni suscripción. No es una predicción del gasto habitual.
+Tarifas del catálogo público consultado en esta sesión: entrada 0.13 USD/M y salida
+0.52 USD/M, sin descuentos por caché o suscripción.
+Fuente: [catálogo NanoGPT](https://nano-gpt.com/api/v1/models?detailed=true).
+Cálculo por llamada: `(tokensEntrada × 0.13 + 500 × 0.52) / 1000000`,
+redondeado hacia arriba al microdólar. Es un máximo **presupuestado por el método
+aproximado solicitado**, no una medición de tokens facturados por NanoGPT.
 
-Para GPT Luna se usa 0.125 USD/M de entrada, el mayor precio entre entrada normal
-y escritura de caché publicado (0.000125 USD/1000); no se activa caché explícita.
+## Script y tope
 
-| Modelo | Máximo por petición | Peticiones | Máximo subtotal USD |
-| --- | ---: | ---: | ---: |
-| DeepSeek | (1000000 × 0.13 + 16000 × 0.52) / 1000000 = 0.13832 | 80 | 11.0656 |
-| GPT Luna | (1050000 × 0.125 + 16000 × 0.50) / 1000000 = 0.13925 | 80 | 11.1400 |
-| Total | | 160 | 22.2056, redondeado hacia arriba a **22.21** |
+[price-pilot.mjs](../scripts/price-pilot.mjs) se ejecuta por defecto en modo
+estimación, sin red: `node scripts/price-pilot.mjs`.
+La ejecución requiere autorización explícita para el hash del manifiesto y una
+credencial autorizada del sandbox; no se ha activado esa modalidad.
+El script solo permite DeepSeek, 6 peticiones y max_tokens 500.
 
-Antes del primer POST, volver a consultar el catálogo público y verificar IDs,
-tarifas, contexto, capacidad de herramientas y que el límite de salida cubre los
-tokens facturables, incluido razonamiento. Si cambian los límites o no se puede
-verificar ese contrato, detenerse antes de gastar y presentar otro máximo.
-No sustituir modelos ni cambiar configuración automáticamente.
-Reservar el máximo por petición **antes** del envío. Ante coste desconocido o timeout,
-mantener esa reserva, registrar identificador/estado si existe y no repetir el envío.
-No generar muestras adicionales para reemplazar fallos. No recargar saldo ni cambiar
-la configuración económica de la cuenta como parte de este ensayo.
+Antes de cada POST, reserva la estimación máxima de esa llamada en un ledger local
+persistido y rechaza el envío si supera el saldo restante de **USD 0.05**.
+Después sustituye esa reserva por el coste informado; si falta, conserva la
+estimación más alta. Ante error, conserva la reserva y se detiene.
+Una cerradura exclusiva impide ejecutar dos procesos a la vez; se conserva al
+terminar o interrumpir. Los IDs ya intentados no se reenvían.
+No hay reintentos, fallback, ejecución de herramientas, cotizaciones ni descargas.
+El presupuesto es compartido: no se reinicia para una futura etapa de GPT Luna.
 
-## Registro y aceptación
+El margen de caracteres es una estimación, no una garantía de factura del proveedor.
+Si el coste informado rebasa la reserva, el script se detiene inmediatamente y no
+hace más llamadas; no puede deshacer un cargo ya comunicado por un servicio externo.
+El límite local impide **autorizar** envíos por encima del presupuesto calculado.
+Una garantía bancaria de cargo requeriría además un límite del lado del proveedor.
 
-Guardar solo modelo/ID, tipo, brazo, bloque, orden, tiempos, llamadas, tokens,
-cachedTokens y coste informado. Nada de credenciales ni texto de respuesta en el
-informe. Medir primer fragmento de texto, primera salida texto/herramienta y fin del
-stream por separado; campos ausentes desconocidos. Registrar llamadas fallidas sin
-inventar uso ni coste. Emplear mediana, p90 nearest-rank y porcentaje >30 s con su n
-conocido/desconocido, por modelo, tipo, brazo y bloque.
+Por llamada se guarda: tiempo al primer texto (no razonamiento/herramienta), tiempo
+total, tokens de entrada/salida, cachedTokens o desconocido, coste informado o
+desconocido, y coste contabilizado. No se guardan textos de respuesta ni claves.
+No se concluye sobre p90, caché efectiva ni experiencia de producción con 3 pares.
+[Tests de presupuesto y streaming](../tests/price-pilot-budget.test.ts).
 
-Criterio propuesto para «no empeora consistentemente»: falla si ambos bloques del
-mismo modelo/tipo empeoran en mediana más de max(1 s, 10%) o en p90 más de max(3 s,
-10%) frente a su control. Un resultado contradictorio o insuficiente se declara
-inconcluso, sin gastar en otra ronda automáticamente. La primera respuesta visible
-debe conservar mediana y p90 ≤30 s; respuestas más rápidas que 12 s son aceptables.
-Informar aparte qué porcentaje queda entre 12 y 30 s y el primer texto visible.
-Con 20 muestras por brazo, p90 sigue siendo sensible a pocos casos lentos.
+## Aviso de prisa de 50 s: explicación, sin cambios nuevos
 
-Verificar además que B no aumenta llamadas, y que prefijos/cachedTokens se informan
-sin atribuir automáticamente un hit a la implementación. No proclamar aceptación
-de la experiencia de la app completa a partir de una sola llamada del modelo.
+Antes, pasado el umbral de 50 s, el cliente añadía HURRY_NOTE solo al cuerpo enviado;
+no lo persistía en el historial. En la siguiente continuación, la respuesta de la
+llamada previa entraba antes del aviso temporal y podía cambiar el prefijo.
 
-El [paso 1](agent-baseline.md) tiene 0 muestras: no permite afirmar hoy que se cumple
-12–30 s, que hay caché efectiva o que el cambio carece de regresión en NanoGPT.
-**Se requiere aprobación explícita de estos modelos, 160 llamadas y USD 22.21
-antes de enviar cualquier petición de generación.**
+Ahora, pasado el mismo umbral, se añade una vez al final del historial del turno.
+El texto expresa vigencia hasta la siguiente petición del usuario. El mensaje
+system, el umbral y las esperas permanecen como estaban. No se amplió este cambio.
+
+Cobertura: [price-agent-notes.test.ts](../tests/price-agent-notes.test.ts), caso
+`continuation preserves the complete prefix and call count (notice=true, hurry=true)`.
+Simula 60 s con Date.now, comprueba 3 llamadas, el aviso una sola vez, pares de
+herramientas completos y prefijo serializado idéntico en las continuaciones.
+
+**Esperando aprobación únicamente para las 6 llamadas de DeepSeek,
+USD 0.027970 calculados, con tope global de USD 0.05.**
