@@ -24,21 +24,26 @@ describe('expanded pilot with simulated providers; never uses a live credential'
   it('builds exactly three pairs for each requested model, preserving the captured history and configuration', () => {
     const { fixtures, previous } = setup();
     const { requests, report } = buildExpansion(fixtures, previous);
-    expect(requests).toHaveLength(24);
-    expect(new Set(requests.map((r) => r.id)).size).toBe(24);
+    expect(requests).toHaveLength(28);
+    expect(new Set(requests.map((r) => r.id)).size).toBe(28);
+    expect(requests.filter((r) => !r.measured)).toHaveLength(4);
     for (const model of MODELS) {
-      const samples = requests.filter((r) => r.body.model === model.id);
+      const samples = requests.filter((r) => r.body.model === model.id && r.measured);
       expect(samples.map((s) => s.arm)).toEqual(['control', 'notice', 'notice', 'control', 'control', 'notice']);
       for (const r of samples) {
         const source = fixtures.find((f) => r.id === `${model.id}/${f.id}`)!;
-        expect(r.body).toEqual({ ...source.body, model: model.id, reasoning_effort: 'medium' });
+        expect(r.body).toEqual({ ...source.body, model: model.id, reasoning_effort: 'medium', max_tokens: 2000 });
         expect(JSON.stringify(r.body.messages)).toBe(JSON.stringify(source.body.messages));
       }
+      const warmup = requests.find((r) => r.body.model === model.id && !r.measured)!;
+      expect(warmup.body).toEqual(samples[0].body);
+      expect(requests.indexOf(warmup) + 1).toBe(requests.indexOf(samples[0]));
     }
     expect(report.previousMicroUsd).toBe(4020);
     expect(report.rows.filter((r: any) => r.model === 'x-ai/grok-4.7').every((r: any) =>
       r.rejectionFeeMicroUsd === 55000 && r.maximumMicroUsd === r.tokenMicroUsd + 55000)).toBe(true);
-    expect(report.rows.filter((r: any) => !r.mediumAdvertised).map((r: any) => r.model)).toHaveLength(12);
+    expect(report.rows.filter((r: any) => !r.mediumAdvertised).map((r: any) => r.model)).toHaveLength(14);
+    expect(report).toMatchObject({ calls: 28, measuredCalls: 24, warmupCalls: 4, maxOutputTokens: 2000, grokContingencyIncluded: true });
     expect(report.globalMaximumUsd).toBeCloseTo(report.previousUsd + report.additionalMaximumUsd, 8);
   });
 
@@ -57,11 +62,26 @@ describe('expanded pilot with simulated providers; never uses a live credential'
 
   it('rejects an expansion over the approved global dollar before any network use', () => {
     const { fixtures } = setup();
-    fixtures.forEach((f) => { f.body.messages[0].content = 'a'.repeat(120000); });
+    fixtures[0].body.messages[0].content = 'a'.repeat(700000);
     const original = estimatePilot(fixtures);
     const previous = { approvalHash: original.approvalHash, chargedMicroUsd: 0, stopped: false,
       calls: ids.map((id) => ({ id, status: 'finished', chargedMicroUsd: 0 })) };
     expect(() => buildExpansion(fixtures, previous)).toThrow('exceeds approved global');
+  });
+
+  it('removes Grok contingency before dropping any warmup or measured pair if the full reservation exceeds a dollar', () => {
+    const { fixtures } = setup();
+    fixtures.forEach((f) => { f.body.messages[0].content = 'a'.repeat(120000); });
+    const original = estimatePilot(fixtures);
+    const previous = { approvalHash: original.approvalHash, chargedMicroUsd: 0, stopped: false,
+      calls: ids.map((id) => ({ id, status: 'finished', chargedMicroUsd: 0 })) };
+    const { report, requests } = buildExpansion(fixtures, previous);
+    expect(report.globalMaximumWithContingencyUsd).toBeGreaterThan(1);
+    expect(report.grokContingencyIncluded).toBe(false);
+    expect(report.globalMaximumUsd).toBeLessThanOrEqual(1);
+    expect(report.rows.every((r: any) => r.rejectionFeeMicroUsd === 0 && r.maximumMicroUsd === r.tokenMicroUsd)).toBe(true);
+    expect(requests.filter((r) => r.measured)).toHaveLength(24);
+    expect(requests.filter((r) => !r.measured)).toHaveLength(4);
   });
 
   it('retains the original five-cent default and blocks a next reservation beyond the expanded dollar', () => {
@@ -72,7 +92,7 @@ describe('expanded pilot with simulated providers; never uses a live credential'
     expect(() => reserveCall(ledger, { id: 'next', maximumMicroUsd: 1 }, 1000001)).toThrow('Invalid budget limit');
   });
 
-  it('sends 24 medium requests only to NanoGPT, saves reservations first, accounts prior cost and excludes secrets/content', async () => {
+  it('sends four unmeasured warmups and 24 medium samples, saving reservations and accounting all costs without secrets/content', async () => {
     const { fixtures, previous, ledger, env } = setup();
     const original = JSON.stringify(previous);
     const saved: string[] = [];
@@ -81,22 +101,24 @@ describe('expanded pilot with simulated providers; never uses a live credential'
       expect(url).toBe('https://nano-gpt.com/api/v1/chat/completions');
       expect(options).toMatchObject({ method: 'POST', redirect: 'error', credentials: 'omit' });
       expect(options?.headers).toEqual({ 'content-type': 'application/json', authorization: `Bearer ${env.NANOGPT_API_KEY}` });
-      expect(JSON.parse(String(options?.body))).toMatchObject({ reasoning_effort: 'medium', max_tokens: 500 });
+      expect(JSON.parse(String(options?.body))).toMatchObject({ reasoning_effort: 'medium', max_tokens: 2000 });
       expect(String(options?.body)).not.toContain(env.NANOGPT_API_KEY);
       expect(JSON.parse(saved.at(-1)!).calls.at(-1).status).toBe('reserved');
       sends++; return ok();
     }) as typeof fetch;
     await runExpansion(fixtures, previous, ledger, async (s) => { saved.push(JSON.stringify(s)); }, env, fakeFetch);
-    expect(sends).toBe(24);
-    expect(ledger.chargedMicroUsd).toBe(4020 + 24 * 10);
+    expect(sends).toBe(28);
+    expect(ledger.chargedMicroUsd).toBe(4020 + 28 * 10);
     expect(expansionResults(ledger)).toMatchObject({ status: 'finished', limitUsd: 1, previousAccountedUsd: 0.00402,
-      globalAccountedUsd: 0.00426, additionalAccountedUsd: 0.00024 });
+      globalAccountedUsd: 0.00430, additionalAccountedUsd: 0.00028, measuredCalls: 24, warmupCalls: 4 });
+    expect(ledger.calls.filter((c: any) => !c.measured).every((c: any) => c.firstTextMs === 'no medido' && c.totalMs === 'no medido')).toBe(true);
+    expect(ledger.calls.filter((c: any) => c.measured).every((c: any) => typeof c.firstTextMs === 'number')).toBe(true);
     expect(JSON.stringify(previous)).toBe(original);
     expect(saved.join('')).not.toMatch(/dummy-expansion-secret|private answer|private reasoning/);
     expect(ledger.calls.every((c: any) => c.requestedReasoningEffort === 'medium' && c.effectiveReasoningEffort === 'desconocido' &&
       c.reasoningTokens === 450 && c.finishReason === 'length' && c.cachedTokens === 10)).toBe(true);
     await expect(runExpansion(fixtures, previous, ledger, async () => undefined, env, fakeFetch)).rejects.toThrow('Already attempted');
-    expect(sends).toBe(24);
+    expect(sends).toBe(28);
   });
 
   it('aborts missing credentials or wrong approval before saving or sending', async () => {
@@ -114,7 +136,7 @@ describe('expanded pilot with simulated providers; never uses a live credential'
     const fetcher = (async () => new Response('data: {"choices":[{"delta":{"reasoning":"private"},"finish_reason":"length"}]}\n\ndata: [DONE]\n\n')) as typeof fetch;
     await runExpansion(fixtures, previous, ledger, async () => undefined, env, fetcher);
     expect(ledger.chargedMicroUsd).toBe(Math.round(report.globalMaximumUsd * 1e6));
-    expect(ledger.calls.every((c: any) => c.costSource === 'highest-estimate' && c.firstTextMs === 'desconocido' &&
+    expect(ledger.calls.every((c: any) => c.costSource === 'highest-estimate' && c.firstTextMs === (c.measured ? 'desconocido' : 'no medido') &&
       c.finishReason === 'length' && c.reportedUsd === 'desconocido')).toBe(true);
   });
 

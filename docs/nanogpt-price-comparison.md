@@ -177,42 +177,59 @@ Las llamadas de la ampliación aprobada aún no se han ejecutado.**
 ## Ampliación aprobada: cuatro modelos, tope global USD 1.00
 
 Consulta pública del catálogo el 2026-10-05, sin clave ni generación.
-El usuario aprobó USD 1.00 el 2026-10-05. Preparación: tres parejas por modelo (24 llamadas adicionales),
-max_tokens=500 y reasoning_effort=medium solicitado en ambos brazos. No se ha
+El usuario aprobó USD 1.00 el 2026-10-05. Preparación actualizada: tres parejas por
+modelo (24 llamadas medidas) más un calentamiento sin medir por modelo (4 llamadas).
+Las **28 llamadas** usan max_tokens=2000 y reasoning_effort=medium solicitado.
+El cambio de 500 a 2000 y los calentamientos sustituyen el manifiesto anterior.
+No se ha
 alterado el bloqueo del piloto anterior. El ejecutor original mantiene su límite
 de USD 0.05; el nuevo ejecutor aplica USD 1.00 global incluyendo DeepSeek.
 No se han enviado peticiones a estos modelos desde esta revisión.
 
-| Modelo / ID exacto | Esfuerzos anunciados | Suscripción según catálogo | Entrada / salida USD por millón | Reserva por tokens, 6 llamadas USD |
+| Modelo / ID exacto | Esfuerzos anunciados | Suscripción según catálogo | Entrada / salida USD por millón | Reserva por tokens, 6 medidas USD |
 | --- | --- | --- | ---: | ---: |
-| MiMo V2.6 Flash / xiaomi/mimo-v2.6-flash | none, high | Incluido | 0.14 / 0.28 | 0.029280 |
-| Grok 4.7 / x-ai/grok-4.7 | low, medium, high, xhigh | Fuera | 1.60 / 4.80 | 0.339361 |
-| GPT 6 Luna / openai/gpt-6-luna | none, low, medium, high, xhigh, max | Fuera | 0.10 / 0.50 | 0.021814 |
-| GLM 5.3 Flash / z-ai/glm-5.3-flash | low, high, max | Incluido | 0.10 / 0.30 | 0.021214 |
+| MiMo V2.6 Flash / xiaomi/mimo-v2.6-flash | none, high | Incluido | 0.14 / 0.28 | 0.031800 |
+| Grok 4.7 / x-ai/grok-4.7 | low, medium, high, xhigh | Fuera | 1.60 / 4.80 | 0.382565 |
+| GPT 6 Luna / openai/gpt-6-luna | none, low, medium, high, xhigh, max | Fuera | 0.10 / 0.50 | 0.026314 |
+| GLM 5.3 Flash / z-ai/glm-5.3-flash | low, high, max | Incluido | 0.10 / 0.30 | 0.023914 |
 
 Fuente: [catálogo NanoGPT](https://nano-gpt.com/api/v1/models?detailed=true).
 Se serializaron offline las seis fixtures existentes, sustituyendo únicamente
-model y reasoning_effort. Se aplicó ceil(caracteres Unicode / 3 × 1.50), sin
-tokenizer ni descuento de caché/suscripción. Entrada por petición: 30594–30686
+model, reasoning_effort y max_tokens, más una repetición del primer control para
+calentar cada modelo. Se aplicó ceil(caracteres Unicode / 3 × 1.50), sin
+tokenizer ni descuento de caché/suscripción. Entrada por petición: 30595–30687
 tokens estimados en primera respuesta y 35415–35507 en continuación; salida
-máxima reservada: 500. No son tokens medidos de estos cuatro proveedores.
+máxima reservada: 2000, también para el calentamiento. No son tokens medidos de
+estos cuatro proveedores.
 
-Las 24 llamadas reservan **USD 0.411669 por tokens**. El catálogo advierte de
+Las 28 llamadas reservan **USD 0.535709 por tokens**. El catálogo advierte de
 cargos de rechazo de Grok de hasta USD 0.055; para no asumir que sustituyen al
-cargo de tokens, una contingencia conservadora añade 6 × 0.055 = USD 0.330000.
-Techo calculado con esa contingencia: **USD 0.741669 adicionales**, o
-**USD 0.745689** contando USD 0.004020 del ledger ya consumido. Sigue siendo
+cargo de tokens, una contingencia conservadora añade 7 × 0.055 = USD 0.385000.
+Techo calculado con esa contingencia: **USD 0.920709 adicionales**, o
+**USD 0.924729** contando USD 0.004020 del ledger ya consumido. Sigue siendo
 un presupuesto con la aproximación de caracteres, no un límite contractual de
 factura. Una sola llamada de Grok ya reserva más de USD 0.05 con estas fixtures;
 por ello la ampliación usa el tope global USD 1.00 expresamente aprobado.
+
+| Modelo | 6 medidas, incluidas contingencias USD | Calentamiento, incluida contingencia USD | Total 7 llamadas USD |
+| --- | ---: | ---: | ---: |
+| MiMo V2.6 Flash | 0.031800 | 0.004844 | 0.036644 |
+| Grok 4.7 | 0.712565 | 0.113552 | 0.826117 |
+| GPT 6 Luna | 0.026314 | 0.004060 | 0.030374 |
+| GLM 5.3 Flash | 0.023914 | 0.003660 | 0.027574 |
+
+Si un manifiesto supera USD 1.00 con la contingencia, el cálculo elimina primero
+la contingencia de Grok, conservando las 24 medidas y los 4 calentamientos. Si aun
+así supera el dólar, aborta antes de enviar nada. En el manifiesto actual cabe
+la contingencia completa; no se ha eliminado. El hash incluye esta selección.
 
 MiMo y GLM no anuncian medium nativo. La [documentación de reasoning](https://docs.nano-gpt.com/api-reference/miscellaneous/extended-thinking)
 acepta ese valor en la API, pero indica que algunas rutas adaptan niveles al más
 cercano soportado. Enviar medium no demuestra medium efectivo en ambos modelos;
 Se envía exactamente medium a los cuatro y se registra por separado el nivel
 solicitado y el efectivo desconocido; no se les sustituye esfuerzo o variante.
-Los tokens de reasoning se facturan como salida y un límite de 500 puede agotar
-el presupuesto de salida antes del texto final. Una ampliación debe registrar
+Los tokens de reasoning se facturan como salida. El límite ahora es 2000 para
+dar más margen al texto final, aunque no garantiza que llegue. Se registran
 finish_reason y reasoning_tokens si se informan, sin guardar contenido, para
 separar ausencia de texto o truncamiento de una respuesta terminada.
 
@@ -221,10 +238,16 @@ adaptados, rutas, caché caliente/fría y longitudes de salida siguen siendo lí
 
 ### Ejecutor, revisión y salida
 
-[price-pilot-expansion.mjs](../scripts/price-pilot-expansion.mjs) deriva las 24
-peticiones de las fixtures existentes; cambia únicamente el modelo y fija medium.
+[price-pilot-expansion.mjs](../scripts/price-pilot-expansion.mjs) deriva las 28
+peticiones de las fixtures existentes; cambia el modelo, fija medium y max_tokens=2000.
 Intercala modelos por caso y usa orden control/aviso, aviso/control, control/aviso.
-No dispara herramientas ni llamadas previas para calentar caché; el orden se guarda.
+Antes de la primera pareja de cada modelo envía exactamente una petición de
+calentamiento idéntica a su primer control. Se marca measured=false y sus tiempos
+son «no medido»; coste, tokens y campos del proveedor sí se contabilizan. Solo las
+24 llamadas measured=true forman las muestras de latencia; el orden se guarda.
+No dispara herramientas ni reintentos de calentamiento. La preparación reduce
+el sesgo inicial de caché fría/caliente, pero no garantiza un hit: ruta, granularidad,
+vigencia o eviction dependen del proveedor. Los cachedTokens permiten comprobarlo.
 Solo lee `.sandbox/pilot/requests.json` y el ledger completado de DeepSeek.
 Valida el hash y la suma del ledger anterior; ese coste se incorpora una vez al
 ledger de la ampliación. Ni los archivos ni el bloqueo de DeepSeek se modifican.
@@ -246,22 +269,25 @@ impide procesos simultáneos o repetir/reanudar la tanda, incluso después de er
 Resultados: `.sandbox/pilot/expansion/results.json`, con costes previo, adicional
 y global, modelo/caso/brazo, tiempos de primer texto y total, tokens entrada/salida,
 cachedTokens, reasoningTokens, finishReason, esfuerzo solicitado y efectivo
-desconocido. Los campos ausentes se marcan desconocidos. finishReason=length
+desconocido, y measured para separar los 4 calentamientos de las 24 muestras.
+Los campos ausentes se marcan desconocidos. finishReason=length
 permite identificar un límite alcanzado; si solo hay reasoning, primer texto es
 desconocido. Una respuesta HTTP terminada no demuestra una respuesta semánticamente
 completa. Los JSON de estimación y resultados no incluyen claves ni conversaciones.
 
 Código común: [price-pilot.mjs](../scripts/price-pilot.mjs) para credencial, POST,
 streaming y reservas; el límite por defecto del piloto original no aumenta.
-[Tests de la ampliación](../tests/price-pilot-expansion.test.ts): 24 envíos simulados
+[Tests de la ampliación](../tests/price-pilot-expansion.test.ts): 28 envíos simulados
 con medium, historial idéntico a las fixtures, contabilidad compartida, clave/destino,
 reservas antes del POST, sobrepresupuesto, costes ausentes, rechazo de medium,
-truncamiento/solo reasoning, y ausencia de reintentos o persistencia de contenido.
+truncamiento/solo reasoning, ausencia de reintentos o persistencia de contenido,
+2000 tokens de salida, calentamiento idéntico e inmediatamente antes del primer
+control, exclusión de sus tiempos y retirada de contingencia antes que parejas.
 
 Comando para la terminal del usuario, después de revisar el script, con la clave
 ya exportada localmente (no se solicita en el chat):
 
 ```bash
 cd '/home/samuel/Documentos/Projects/My New App/ogs-price-auth'
-PRICE_PILOT_APPROVAL=b56778a7a270a96fe152513aab49c701279691d71083d71afbdf37971a1a10f1 node scripts/price-pilot-expansion.mjs --execute
+PRICE_PILOT_APPROVAL=f15725ccff3cb65339dd1fd8907affbe29c82d3edb7d2e1d5d07f94c6cb9591d node scripts/price-pilot-expansion.mjs --execute
 ```
