@@ -8,6 +8,7 @@ import { setSketch } from '../../engine/flow/actions';
 import { setUi, toast, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, Range } from '../ui/primitives';
+import { InlineColor } from '../designer/InlineControls';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import type { Estimate } from '../../engine/types';
 
@@ -243,7 +244,7 @@ export function SketchEditor() {
               <button key={c} type="button" className={`sketch-swatch ${brush.color === c && !erase ? 'is-active' : ''}`} style={{ background: c }} aria-label={`Color ${c}`} onClick={() => (setBrush({ color: c }), setErase(false))} />
             ))}
             <label className="sketch-swatch sketch-custom" data-tip="Custom color">
-              <input type="color" value={brush.color} onChange={(e) => (setBrush({ color: e.target.value }), setErase(false))} aria-label="Custom color" />
+              <InlineColor label="Custom color" value={brush.color} onChange={(color) => (setBrush({ color }), setErase(false))} />
             </label>
           </div>
         ) : null}

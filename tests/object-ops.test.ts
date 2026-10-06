@@ -48,9 +48,10 @@ describe('Edit in Objects mode: only the picked objects change', () => {
     const m = translateObjects(l, ['r1'], 10, 20) as VectorLayer;
     expect([m.shapes[0].x, m.shapes[0].y, m.shapes[1].x]).toEqual([10, 20, 500]);
   });
-  it('align: one object to the page; several to their joint box', () => {
+  it('align respects the chosen reference for one or several objects', () => {
     const l = { ...newVectorLayer('v'), shapes: [rect('r1', 0, 0), rect('r2', 500, 500)] } as VectorLayer;
-    expect(alignObjectDeltas(doc, l, ['r2'], 'right', 'selection').get('r2')).toEqual({ dx: 400, dy: 0 });
+    expect(alignObjectDeltas(doc, l, ['r2'], 'right', 'page').get('r2')).toEqual({ dx: 400, dy: 0 });
+    expect(alignObjectDeltas(doc, l, ['r2'], 'right', 'selection').size).toBe(0);
     const both = alignObjectDeltas(doc, l, ['r1', 'r2'], 'left', 'selection');
     expect(both.get('r2')).toEqual({ dx: -500, dy: 0 });
     expect(both.has('r1')).toBe(false);

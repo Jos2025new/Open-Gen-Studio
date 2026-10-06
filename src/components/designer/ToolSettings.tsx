@@ -5,7 +5,7 @@ import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type 
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
 import { SNAP_DEFAULT } from '../../engine/design/snap';
-import { MenuItem, Range, Segmented } from '../ui/primitives';
+import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
 import { setUi, useStore } from '../../store/store';
@@ -14,9 +14,9 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 import { clearSelected, fillSelection, getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
+import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -24,71 +24,6 @@ export function ContextField({ label, hint, children }: { label: ReactNode; hint
     <button type="button" ref={pop.ref} className="tool-setting" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>{label}<ChevronDown size={12} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={230} label={typeof label === 'string' ? label : 'Tool setting'}>
       <div className="tool-setting-content"><div className="field"><span className="field-label">{label}</span>{children}{hint && <span className="field-hint">{hint}</span>}</div></div>
-    </Popover>
-  </>;
-}
-
-/**
- * A number set right in the bar: short label, a small slider and the value (type it, or scroll the wheel over it).
- * No menu to open: what it is and what it holds stay in sight.
- */
-export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; onChange: (v: number) => void }) {
-  const shown = Math.round(value * scale * 100) / 100;
-  const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
-  return <label className="opt" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
-    <span className="opt-label">{label}</span>
-    <Range className="opt-range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
-    <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
-    {unit && <span className="opt-unit">{unit}</span>}
-  </label>;
-}
-
-/**
- * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
- * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
- */
-export function InlineColor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const pop = usePopover();
-  const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
-  const [hex, setHex] = useState(value);
-  const close = () => { rememberColor(value); pop.close(); };
-  const pick = (c: string) => { onChange(c); setHex(c); };
-  const chip = (c: string, saved: boolean) => (
-    <button key={`${saved}${c}`} type="button" className={`swatch${c === value.toLowerCase() ? ' is-on' : ''}`} style={{ background: c }} aria-label={c} data-tip={saved ? `${c} · right-click to remove` : c}
-      onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
-  );
-  return <>
-    <button type="button" ref={pop.ref} className="opt opt-color" data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
-      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />
-    </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={232} label={label}>
-      <div className="swatch-panel">
-        <div className="swatch-row">
-          <input type="color" value={value} aria-label={label} onChange={(e) => pick(e.target.value)} />
-          <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} />
-          <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
-        </div>
-        {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
-        <span className="field-label">Saved</span>
-        {sw.saved.length ? <div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div> : <span className="field-hint">Save colors here to reuse them in any design.</span>}
-      </div>
-    </Popover>
-  </>;
-}
-
-/** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */
-export function InlineSelect<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; onChange: (v: T) => void }) {
-  const pop = usePopover();
-  const items = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
-  const current = items.find((o) => o.value === value)?.label ?? String(value);
-  return <>
-    <button type="button" ref={pop.ref} className="opt opt-pick" aria-haspopup="listbox" aria-expanded={pop.open} onClick={pop.toggle}>
-      <span className="opt-label">{label}</span><span className="opt-value">{current}</span><ChevronDown size={12} />
-    </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={170} label={label}>
-      <div className="menu" role="listbox">
-        {items.map((o) => <MenuItem key={String(o.value)} label={o.label} active={o.value === value} onClick={() => { onChange(o.value); pop.close(); }} />)}
-      </div>
     </Popover>
   </>;
 }
@@ -130,7 +65,7 @@ export function EditModeToggle() {
   ]} /></span>;
 }
 
-function SnapControl() {
+export function SnapControl() {
   const pop = usePopover();
   const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
   const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });
@@ -152,10 +87,10 @@ function SnapControl() {
  * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
  * picked layer about its own center).
  */
-function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean }) {
   const align = usePopover();
   const turn = usePopover();
-  const [rel, setRel] = useState<RelativeTo>('selection');
+  const [rel, setRel] = useState<RelativeTo | null>(null);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -173,13 +108,14 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const emptyPick = !onObjects && !layers.length;
   const count = onObjects ? objIds.length : layers.length;
   const many = count > 1;
+  const relativeTo = rel ?? (many ? 'selection' : 'page');
   const one = layers[0];
   const locked = onObjects ? Boolean(objLayer?.locked) : layers.some((l) => l.locked);
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
   const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
   const why = !emptyPick ? undefined : mode === 'objects' ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
-  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, many ? rel : 'page') : alignLayers(sessionId, doc.id, ids, to, many ? rel : 'page'));
+  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo) : alignLayers(sessionId, doc.id, ids, to, relativeTo));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
@@ -187,22 +123,18 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
         <div className="menu-target">{target}</div>
-        {many ? (
-          <label className="menu-field"><span>Relative to</span><select value={rel} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
-        ) : <div className="menu-sep-label">To the page</div>}
         {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => doAlign(a.id)} />)}
-        {count >= 3 ? <>
-          <div className="menu-sep-label">Distribute</div>
-          <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" onClick={() => doDistribute('h')} />
-          <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" onClick={() => doDistribute('v')} />
-        </> : null}
+        <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" disabled={count < 3} onClick={() => doDistribute('h')} />
+        <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" disabled={count < 3} onClick={() => doDistribute('v')} />
         {!onObjects && !many && one?.type === 'raster' ? <>
           <div className="menu-sep-label">Size</div>
           <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
           <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
         </> : null}
+        <label className="menu-field align-reference"><span>Relative to</span><select aria-label="Relative to" value={relativeTo} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
       </div>
     </Popover>
+    {!alignOnly && <>
     <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
@@ -210,6 +142,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
         {TURN_ITEMS.map((t) => { const no = onObjects ? null : layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(no)} tip={no ?? undefined} onClick={() => doTurn(t.id)} />; })}
       </div>
     </Popover>
+    </>}
   </>;
 }
 
@@ -229,7 +162,7 @@ export function SelectionChip({ docId }: { docId: string }) {
 const WAND_DEFAULT = { threshold: 24, expand: 0, smooth: 0, mode: 'replace' as 'replace' | 'add' | 'subtract', sample: 'all' as 'layer' | 'all' };
 
 /** Pixel selection: its shape, and what to do with what is selected. */
-function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc: DesignDoc; compact?: boolean }) {
   useSelectionVersion();
   const shape = useStore((s) => s.ui.selectShape ?? 'rect');
   const wand = useStore((s) => s.ui.wand) ?? WAND_DEFAULT;
@@ -247,16 +180,18 @@ function SelectOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
       <span data-tip="New replaces the selection; Add and Subtract change it (Shift adds, Alt subtracts with any shape)"><InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /></span>
       <span data-tip="Active layer: only its own pixels and elements decide · All layers: the whole visible picture"><InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} /></span>
     </> : null}
+    {!compact && <>
     <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Ctrl+A">All</button>
     <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => clearSelected(sessionId, cur()))} data-tip="Delete · erases the selected pixels of the active raster layer">Delete</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => fillSelection(sessionId, cur(), brush.color, brush.opacity))} data-tip="Fills the selection with the brush color, on a new layer">Fill</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
+    </>}
   </div>;
 }
 
-export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
+export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean }) {
   useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -277,7 +212,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
     mutateDoc(sessionId, doc.id, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => l.id === target.id && l.type === 'vector' ? { ...l, strokes: l.strokes?.map((s) => s.id === selectedCurve.strokeId ? { ...s, ...patch } : s) } : l) }));
   };
   if (tool === 'hand') return null;
-  if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} />;
+  if (tool === 'select') return <SelectOps sessionId={sessionId} doc={doc} compact={compact} />;
   if (tool === 'eyedropper') return <div className="tool-settings" role="toolbar" aria-label="Eyedropper settings"><InlineColor label="Picked" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} /><span className="opt-hint">Click the page to pick its visible color</span></div>;
   if (tool === 'gradient') {
     const g = gradient ?? { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
@@ -287,12 +222,14 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
       <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
       <InlineSelect label="To" value={g.mode} options={[{ value: 'two' as const, label: 'Second color' }, { value: 'fade' as const, label: 'Transparent' }]} onChange={(v) => set({ mode: v })} />
       {g.mode === 'two' && <InlineColor label="Second" value={g.color2} onChange={(v) => set({ color2: v })} />}
+      {!compact && <>
       <button type="button" className="opt" onClick={() => setUi({ brush: { ...brush, color: g.color2 }, gradient: { ...g, color2: brush.color } })} data-tip="Swap the two colors">⇄</button>
       <label className="opt check-row"><input type="checkbox" checked={!!g.reverse} onChange={(e) => set({ reverse: e.target.checked })} />Reverse</label>
+      </>}
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
@@ -306,11 +243,13 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
           <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
           <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
           <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setUi({ brush: { ...brush, fillThreshold: v } })} />
+          {!compact && <>
           <InlineSlider label="Expand" unit="px" min={0} max={12} value={brush.fillExpand ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillExpand: v } })} />
           <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillSmooth: v } })} />
+          </>}
         </> : tool === 'lineart' ? <>
           <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
-          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
+          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
         </> : paint ? <>
           <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => setUi({ brush: { ...brush, size: v } })} />
           {tool !== 'eraser' && <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />}
@@ -318,8 +257,8 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
           <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => setUi({ brush: { ...brush, smoothing: v } })} />
           <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => setUi({ brush: { ...brush, stabilization: v } })} />
         </> : <>
-          {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <ContextField label={shape.fill === null ? "Fill · none" : "Fill"}><input type="color" value={shape.fill ?? '#d4f25a'} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.value } })} /><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></ContextField>}
-          <ContextField label={shape.stroke === null ? "Stroke · none" : "Stroke"}><input type="color" value={shape.stroke ?? '#ffffff'} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.value } })} /><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></ContextField>
+          {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
+          <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
           <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
           {tool === 'polygon' && <InlineSlider label="Sides" min={3} max={12} value={shape.sides ?? 5} onChange={(v) => setUi({ shape: { ...shape, sides: v } })} />}
           {tool === 'curve' && <span data-tip="How far the curve bows from the straight line; negative bows to the other side"><InlineSlider label="Bend" unit="%" min={-100} max={100} value={shape.bend ?? 30} onChange={(v) => setUi({ shape: { ...shape, bend: v } })} /></span>}

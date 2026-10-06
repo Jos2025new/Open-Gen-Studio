@@ -4,7 +4,7 @@ import { setComposer, useStore } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip, Segmented } from '../ui/primitives';
 
-function SkillsChip() {
+function SkillsChip({ onPicked }: { onPicked?: () => void }) {
   const skillId = useStore((s) => s.composer.skillId);
   const pop = usePopover();
   const skill = skillById(skillId);
@@ -24,6 +24,7 @@ function SkillsChip() {
               onClick={() => {
                 setComposer({ skillId: s.id === skillId ? null : s.id });
                 pop.close();
+                onPicked?.();
               }}
             >
               <span className="pick-text">
@@ -39,7 +40,7 @@ function SkillsChip() {
   );
 }
 
-function WorkflowsChip() {
+function WorkflowsChip({ onPicked }: { onPicked?: () => void }) {
   const workflowId = useStore((s) => s.composer.workflowId);
   const workspace = useStore((s) => s.ui.workspace);
   const pop = usePopover();
@@ -62,6 +63,7 @@ function WorkflowsChip() {
               onClick={() => {
                 setComposer({ workflowId: w.id === workflowId ? null : w.id });
                 pop.close();
+                onPicked?.();
               }}
             >
               <span className="pick-text">
@@ -91,6 +93,15 @@ function WorkflowsChip() {
   );
 }
 
+export function AgentOptions({ activeOnly = false, onPicked }: { activeOnly?: boolean; onPicked?: () => void }) {
+  const skillId = useStore((s) => s.composer.skillId);
+  const workflowId = useStore((s) => s.composer.workflowId);
+  return <>
+    {!activeOnly || skillById(skillId) ? <SkillsChip onPicked={onPicked} /> : null}
+    {!activeOnly || workflowById(workflowId) ? <WorkflowsChip onPicked={onPicked} /> : null}
+  </>;
+}
+
 export function AgentControls() {
   const style = useStore((s) => s.composer.agentStyle);
   const workflowId = useStore((s) => s.composer.workflowId);
@@ -107,8 +118,7 @@ export function AgentControls() {
           { value: 'guided', label: 'Guided', tip: 'The agent asks a few questions (max rounds in Settings), then shows the plan' },
         ]}
       />
-      <SkillsChip />
-      <WorkflowsChip />
+      <AgentOptions activeOnly />
       {wf && !wf.workspaces.includes(workspace) ? (
         <Chip icon={X} muted onClick={() => setComposer({ workflowId: null })} data-tip="This workflow does not apply here; it will be ignored">
           Not for {workspace}

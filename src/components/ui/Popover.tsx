@@ -2,13 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom';
 
 /*
- * Every information-dense surface opens as a popover anchored to the button that
- * opened it: just above it and extending to the right, left edges aligned
- * ("top-start"). Sidebar buttons use "right-end": to the right, bottom-aligned,
- * growing upward. When there is not enough room above, it flips below.
+ * Dropdowns align their right edge with the trigger's chevron and open below,
+ * flipping above when needed. Other panels retain their explicit placement.
  */
 
-export type Placement = 'top-start' | 'bottom-start' | 'right-start' | 'right-end';
+export type Placement = 'top-start' | 'bottom-start' | 'bottom-center' | 'right-start' | 'right-end';
 
 const GAP = 8;
 const MARGIN = 8;
@@ -54,10 +52,14 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.bottom = Math.max(MARGIN, vh - r.bottom);
       next.maxHeight = r.bottom - MARGIN;
     } else {
-      next.left = Math.max(MARGIN, Math.min(r.left, vw - w - MARGIN));
+      const left = placement === 'bottom-center' ? r.left + (r.width - w) / 2 : r.right - w;
+      next.left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
-      if (placement !== 'bottom-start' && (above >= Math.min(contentH, 240) || above >= below)) {
+      const openAbove = placement === 'bottom-start' || placement === 'bottom-center'
+        ? below < contentH && above > below
+        : above >= Math.min(contentH, 240) || above >= below;
+      if (openAbove) {
         next.bottom = vh - r.top + GAP;
         next.maxHeight = above;
       } else {

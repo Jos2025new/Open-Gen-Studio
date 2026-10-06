@@ -3,7 +3,7 @@ import { ChevronDown, MessageSquare } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { FeedList } from '../chat/FeedList';
 
-/** The session conversation in the Node and Designer workspaces: a foldable card on the right, clear of the canvas centre. */
+/** The session conversation in the Node and Designer workspaces: a foldable card on the left, clear of the canvas centre. */
 export function ThreadPeek({ workspace }: { workspace: string }) {
   const open = useStore((s) => s.ui.threadOpen);
   const sessionId = useStore((s) => s.activeSessionId);

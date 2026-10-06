@@ -20,13 +20,13 @@ import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
-import { ToolRail } from './ToolRail';
+import { ToolPalette } from './ToolPalette';
 import { DocumentPicker } from './DocumentPicker';
 import { uploadFiles } from '../../engine/actions';
 import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
 import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
-import { SelectionChip, ToolSettings } from './ToolSettings';
+import { SelectionChip } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 
@@ -52,6 +52,7 @@ export function DesignerWorkspace() {
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
   const [zoom, setZoom] = useState(1);
+  const [zoomDraft, setZoomDraft] = useState<string | null>(null);
   const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
   useEffect(() => { setSelectedCurve(null); }, [doc?.id, session.id]);
   const [busy, setBusy] = useState(false);
@@ -135,7 +136,7 @@ export function DesignerWorkspace() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover, .lightbox')) return;
+      if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover:not(.designer-context), .lightbox')) return;
       const layer = activeLayer(doc);
       const k = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;
@@ -203,7 +204,6 @@ export function DesignerWorkspace() {
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
-      {doc && <ToolSettings sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />}
       {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
         <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
@@ -231,14 +231,32 @@ export function DesignerWorkspace() {
       modes={[{ id: 'layers', label: 'As layers of one' }, { id: 'documents', label: 'Each as a design' }]}
       onImport={(ids, mode) => void chatToDesigner(session.id, { assetIds: ids, as: mode === 'documents' ? 'documents' : 'layers' })}
     />
-    {doc ? <><DocumentPicker sessionId={session.id} docs={session.docs} active={doc} /><ToolRail doc={doc}>
-        <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
-        <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
-        <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
-        <span className="zoom-value num">{Math.round(zoom * 100)}%</span>
-        <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
-        <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
-      </ToolRail><Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} /><LayersPanel sessionId={session.id} doc={doc} /></> :
+    {doc ? <>
+      <DocumentPicker sessionId={session.id} docs={session.docs} active={doc} />
+      <ToolPalette sessionId={session.id} doc={doc} selectedCurve={selectedCurve}
+        history={<>
+          <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
+          <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
+        </>}
+        view={<>
+          <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
+          <label className="zoom-value num">
+            <input aria-label="Zoom percent" inputMode="decimal" value={zoomDraft ?? Math.round(zoom * 100)} onFocus={() => setZoomDraft(String(Math.round(zoom * 100)))} onChange={(e) => setZoomDraft(e.target.value)} onBlur={(e) => {
+              const raw = e.target.value.trim().replace(',', '.');
+              const percent = Number(raw);
+              setZoomDraft(null);
+              if (raw && Number.isFinite(percent)) window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: Math.min(800, Math.max(5, percent)) / (zoom * 100) }));
+            }} onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') { e.currentTarget.value = String(Math.round(zoom * 100)); e.currentTarget.blur(); e.stopPropagation(); }
+            }} /><span>%</span>
+          </label>
+          <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
+          <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
+        </>} />
+      <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
+      <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
+    </> :
       <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div></div>}
   </div>;
 }

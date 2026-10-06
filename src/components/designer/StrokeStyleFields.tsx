@@ -1,37 +1,27 @@
-import type { ComponentType, ReactNode } from 'react';
 import type { StrokeStyle } from '../../engine/types';
 import { STAMPS } from '../../engine/design/brushTextures';
 import { randomSeed } from '../../lib/rng';
-import { Field, Range } from '../ui/primitives';
+import { Field } from '../ui/primitives';
+import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 
-/** Lineart stroke controls: the tool settings (new strokes) and a Lineart layer's properties (its strokes). */
-export function StrokeStyleFields({ value, onChange, fieldComponent: Control = Field }: { value: StrokeStyle; onChange: (patch: Partial<StrokeStyle>) => void; fieldComponent?: ComponentType<{ label: ReactNode; children: ReactNode }> }) {
-  const range = (key: 'thinning' | 'smoothing' | 'streamline', label: string, min = 0) => (
-    <Control label={`${label} · ${value[key].toFixed(2)}`}>
-      <Range min={min} max={1} step={0.01} value={value[key]} onChange={(e) => onChange({ [key]: +e.target.value })} />
-    </Control>
-  );
-  return <>
-    <Control label={`Size · ${Math.round(value.size)}px`}><Range min={1} max={120} value={value.size} onChange={(e) => onChange({ size: +e.target.value })} /></Control>
-    <Control label="Color"><input type="color" value={value.color} onChange={(e) => onChange({ color: e.target.value })} /></Control>
-    <Control label={`Opacity · ${Math.round(value.opacity * 100)}%`}><Range min={0.05} max={1} step={0.01} value={value.opacity} onChange={(e) => onChange({ opacity: +e.target.value })} /></Control>
+/** Shared controls; callers choose whether edits affect new strokes or selected strokes. */
+export function StrokeStyleFields({ value, onChange }: { value: StrokeStyle; onChange: (patch: Partial<StrokeStyle>) => void }) {
+  const range = (key: 'thinning' | 'smoothing' | 'streamline', label: string, min = 0) =>
+    <InlineSlider label={label} min={min} max={1} step={0.01} value={value[key]} onChange={(v) => onChange({ [key]: v })} />;
+  return <div className="stroke-controls">
+    <InlineSlider label="Size" unit="px" min={1} max={120} value={value.size} onChange={(size) => onChange({ size })} />
+    <InlineColor label="Color" showValue value={value.color} onChange={(color) => onChange({ color })} />
+    <InlineSlider label="Opacity" unit="%" scale={100} min={0.05} max={1} step={0.01} value={value.opacity} onChange={(opacity) => onChange({ opacity })} />
     {range('thinning', 'Pressure thinning', -1)}
     {range('smoothing', 'Smoothing')}
     {range('streamline', 'Streamline')}
-    <Control label="Texture">
-      <select value={value.texture?.stamp ?? ''} onChange={(e) => onChange({ texture: e.target.value ? { spacing: 0.15, jitter: 0.4, seed: randomSeed(), ...value.texture, stamp: e.target.value } : undefined })}>
-        <option value="">Solid ink</option>
-        {STAMPS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-      </select>
-    </Control>
+    <InlineSelect label="Texture" value={value.texture?.stamp ?? ''} options={[{ value: '', label: 'Solid ink' }, ...STAMPS.map((s) => ({ value: s.id, label: s.label }))]} onChange={(stamp) => onChange({ texture: stamp ? { spacing: 0.15, jitter: 0.4, seed: randomSeed(), ...value.texture, stamp } : undefined })} />
     {value.texture ? <>
-      <Control label={`Spacing · ${Math.round(value.texture.spacing * 100)}% of size`}><Range min={0.05} max={1} step={0.01} value={value.texture.spacing} onChange={(e) => onChange({ texture: { ...value.texture!, spacing: +e.target.value } })} /></Control>
-      <Control label={`Jitter · ${Math.round(value.texture.jitter * 100)}%`}><Range min={0} max={1} step={0.01} value={value.texture.jitter} onChange={(e) => onChange({ texture: { ...value.texture!, jitter: +e.target.value } })} /></Control>
-      <Control label="Seed (same seed, same grain)"><input type="number" min={0} value={value.texture.seed} onChange={(e) => onChange({ texture: { ...value.texture!, seed: Math.max(0, Math.floor(+e.target.value)) } })} /></Control>
+      <InlineSlider label="Spacing" unit="%" scale={100} min={0.05} max={1} step={0.01} value={value.texture.spacing} onChange={(spacing) => onChange({ texture: { ...value.texture!, spacing } })} />
+      <InlineSlider label="Jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={value.texture.jitter} onChange={(jitter) => onChange({ texture: { ...value.texture!, jitter } })} />
+      <Field label="Seed" hint="Same seed, same grain"><input type="number" min={0} value={value.texture.seed} onChange={(e) => onChange({ texture: { ...value.texture!, seed: Math.max(0, Math.floor(+e.target.value)) } })} /></Field>
     </> : null}
-    <div className={Control === Field ? "property-grid" : "tool-settings-group"}>
-      <Control label="Taper start"><input type="number" min={0} max={500} value={Math.round(value.taperStart)} onChange={(e) => onChange({ taperStart: Math.max(0, +e.target.value) })} /></Control>
-      <Control label="Taper end"><input type="number" min={0} max={500} value={Math.round(value.taperEnd)} onChange={(e) => onChange({ taperEnd: Math.max(0, +e.target.value) })} /></Control>
-    </div>
-  </>;
+    <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={value.taperStart} onChange={(taperStart) => onChange({ taperStart })} />
+    <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={value.taperEnd} onChange={(taperEnd) => onChange({ taperEnd })} />
+  </div>;
 }

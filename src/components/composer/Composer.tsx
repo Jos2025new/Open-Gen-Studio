@@ -1,7 +1,7 @@
 import { ComposerAlerts } from './ComposerAlerts';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowUp, CircleStop, Layers, Plus, Pencil, X, Zap } from 'lucide-react';
-import { setComposer, toast, useStore } from '../../store/store';
+import { ArrowUp, CircleStop, Layers, Pencil, X, Zap } from 'lucide-react';
+import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
 import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
 import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
@@ -12,44 +12,31 @@ import { beginJourney, recordJourneyEvent } from '../../lib/journeyTrace';
 import type { MediaKind } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Chip, costLabel, IconButton } from '../ui/primitives';
+import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { ModeMenu } from './ModeMenu';
 import { AgentControls } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
+import { ComposerOptions } from './ComposerOptions';
 
-/** The attachments as a stack of cards in the + slot; hovering opens them into a row with remove buttons and a big preview. */
-function AttachStack({ ids, label, disabled, onAdd }: { ids: string[]; label: string; disabled: boolean; onAdd: () => void }) {
-  if (!ids.length) return <IconButton icon={Plus} className="composer-add" label={label} size="md" disabled={disabled} onClick={onAdd} />;
+function AttachStrip({ ids }: { ids: string[] }) {
+  if (!ids.length) return null;
   const remove = (id: string) => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }));
   return (
-    <div className="attach-stack" tabIndex={0} aria-label={`${ids.length} attached`}>
-      <div className="attach-pile">
-        {ids.slice(0, 3).map((id, i) => (
-          <span key={id} className="attach-pile-card" style={{ '--i': i } as React.CSSProperties}>
-            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-          </span>
-        ))}
-        {ids.length > 1 ? <span className="attach-pile-count num">{ids.length}</span> : null}
-        <span className="attach-pile-add"><Plus size={14} /></span>
-      </div>
-      <div className="attach-row">
-        {ids.map((id) => (
-          <span key={id} className="attach-thumb">
-            <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
-            <span className="attach-preview"><AssetMedia assetId={id} hoverPlay={false} draggable={false} /></span>
+    <div className="composer-attachments" role="list" aria-label={`${ids.length} attached`}>
+        {ids.map((id, index) => (
+          <span key={id} className="attach-thumb" role="listitem">
+            <button type="button" className="attachment-preview-button" aria-label={`Preview attachment ${index + 1}`} onClick={() => setUi({ lightbox: { assetIds: ids, index } })}>
+              <AssetMedia assetId={id} hoverPlay={false} draggable={false} />
+            </button>
             <AttachTiming id={id} />
-            <button type="button" aria-label="Remove attachment" onClick={() => remove(id)}>
+            <button type="button" className="attachment-remove" aria-label="Remove attachment" onClick={() => remove(id)}>
               <X size={11} />
             </button>
           </span>
         ))}
-        <button type="button" className="attach-more" aria-label={label} data-tip={label} disabled={disabled} onClick={onAdd}>
-          <Plus size={16} />
-        </button>
-      </div>
     </div>
   );
 }
@@ -269,7 +256,26 @@ export function Composer() {
   const takesAudio = mode === 'agent' || Boolean(mediaSlots?.audio || mediaSlots?.refAudios || (mode === 'video' && mediaSlots?.mixedRefs));
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dockRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => {
+    const dock = dockRef.current;
+    const parent = dock?.parentElement;
+    if (!dock || !parent) return;
+    const zoomRail = parent.querySelector<HTMLElement>('.designer-view');
+    const measure = () => {
+      const rect = dock.getBoundingClientRect();
+      parent.style.setProperty('--composer-height', `${rect.height}px`);
+      if (zoomRail) parent.style.setProperty('--conversation-side-width', `${Math.max(0, rect.left - zoomRail.getBoundingClientRect().right - 32)}px`);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(dock);
+    observer.observe(parent);
+    if (zoomRail) observer.observe(zoomRail);
+    measure();
+    return () => { observer.disconnect(); parent.style.removeProperty('--composer-height'); parent.style.removeProperty('--conversation-side-width'); };
+  }, [workspace]);
 
   useEffect(() => {
     if (focusTick) taRef.current?.focus();
@@ -287,7 +293,7 @@ export function Composer() {
     const ta = taRef.current;
     if (!ta) return;
     ta.style.height = '0px';
-    ta.style.height = `${Math.min(ta.scrollHeight, 220)}px`;
+    ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
   }, [text, mode]);
 
   const liveAttachments = attachments.filter((id) => assets[id]);
@@ -384,7 +390,7 @@ export function Composer() {
   };
 
   return (
-    <div className={`composer-dock dock-${workspace}`}>
+    <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
       {workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
       <ComposerAlerts />
       <div
@@ -411,14 +417,8 @@ export function Composer() {
           }
         }}
       >
+        <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row">
-          {/* Attachments live where + is: a small stack that opens into a row on hover. */}
-          <AttachStack
-            ids={liveAttachments}
-            label={takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
-            disabled={!takesImages && !takesAudio && mode !== 'model3d'}
-            onAdd={() => fileRef.current?.click()}
-          />
           <textarea
             ref={taRef}
             className="composer-input"
@@ -443,6 +443,12 @@ export function Composer() {
           />
         </div>
         <div className="composer-bar">
+          <ComposerOptions
+            label={takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
+            disabled={!takesImages && !takesAudio && mode !== 'model3d'}
+            agent={mode === 'agent'}
+            onAdd={() => fileRef.current?.click()}
+          />
           {editing ? (
             <span className="editing-chip" data-tip={editingPrompt}>
               <Pencil size={12} />

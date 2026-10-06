@@ -1179,7 +1179,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       } else {
         const layer = newVectorLayer(`Lineart ${current.layers.length + 1}`);
         layer.strokes = [stroke];
-        setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
+        setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'top'));
       }
       return;
     }
@@ -1246,12 +1246,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const act = activeLayer(current);
       record(current);
       // Each shape gets its own layer; only an empty vector layer is filled in place.
-      if (act && act.type === 'vector' && !act.locked && !act.shapes.length) {
-        setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === act.id && l.type === 'vector' ? { ...l, shapes: [...l.shapes, shape] } : l)) }));
+      if (act && act.type === 'vector' && !act.locked && !act.shapes.length && !act.strokes?.length) {
+        setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: [...dd.layers.filter((l) => l.id !== act.id), { ...act, shapes: [shape] }] }));
       } else {
         const layer = newVectorLayer(`${SHAPE_NAMES[d.tool]} ${current.layers.length + 1}`);
         layer.shapes = [shape];
-        setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'above'));
+        setDoc(sessionId, doc.id, (dd) => insertLayer(dd, layer, 'top'));
       }
     }
   };
