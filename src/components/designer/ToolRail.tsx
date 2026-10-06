@@ -10,7 +10,7 @@ import { InlineColor, InlineSlider } from './InlineControls';
 import { EditOps, SnapControl } from './ToolSettings';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
-  { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move, double-click to edit' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
+  { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move and select objects' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
   { id: 'select', icon: SquareDashed, label: 'Select pixels (M) · rectangle, lasso or magic wand; Shift adds, Alt subtracts; Delete, Ctrl+C/X, Ctrl+J to a layer' },
   { id: 'eyedropper', icon: Pipette, label: 'Eyedropper (I) · picks the visible color; Alt-click does it with Brush or Fill' },
   { id: 'fill', icon: PaintBucket, label: 'Fill (G) · contiguous visible color, on a new layer' },
@@ -29,11 +29,11 @@ const GROUPS: Array<{ id: string; icon: LucideIcon; label: string; after: Design
   ] },
 ];
 
-function ToolGroup({ group, tool, doc, onPick }: { doc: DesignDoc; group: (typeof GROUPS)[number]; tool: DesignTool; onPick?: (button: HTMLButtonElement) => void }) {
+function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: (typeof GROUPS)[number]; tool: DesignTool }) {
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>
-    <IconButton ref={pop.ref} icon={current?.icon ?? group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={(e) => { if (e.detail < 2) pop.toggle(); }} onDoubleClick={(e) => { if (current) { pop.close(); onPick?.(e.currentTarget); } }} />
+    <IconButton ref={pop.ref} icon={current?.icon ?? group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={(e) => { if (e.detail < 2) pop.toggle(); }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} label={group.label}>
       <div className="menu" role="menu">
         {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label.split(' · ')[0]} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} disabled={!!toolBlockReason(t.id, activeLayer(doc))} tip={toolBlockReason(t.id, activeLayer(doc)) ?? t.label} onClick={() => { setUi({ tool: t.id }); pop.close(); }} />)}
@@ -42,28 +42,30 @@ function ToolGroup({ group, tool, doc, onPick }: { doc: DesignDoc; group: (typeo
   </>;
 }
 
-export function ToolRail({ sessionId, doc, onPick }: { sessionId: string; doc: DesignDoc; children?: ReactNode; onPick?: (button: HTMLButtonElement) => void }) {
+export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc; children?: ReactNode }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
   const shapeTool = ['rect', 'ellipse', 'polygon', 'line', 'curve', 'arrow'].includes(tool);
-  const color = tool === 'text' ? ui.text.color : tool === 'lineart' ? ui.lineart.color : shapeTool ? ui.shape.fill ?? ui.brush.color : ui.brush.color;
-  const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, fill: color } } : { brush: { ...ui.brush, color } });
+  const strokeTool = ['line', 'curve', 'arrow'].includes(tool);
+  const color = tool === 'text' ? ui.text.color : tool === 'lineart' ? ui.lineart.color : shapeTool ? (strokeTool ? ui.shape.stroke ?? '#ffffff' : ui.shape.fill ?? '#d4f25a') : ui.brush.color;
+  const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, [strokeTool ? 'stroke' : 'fill']: color } } : { brush: { ...ui.brush, color } });
   const influence = tool === 'move' || (tool === 'lineart' && ui.lineartMode === 'edit');
+  const showColor = !influence && !['hand', 'select', 'eyedropper', 'eraser'].includes(tool);
   const size = influence ? ui.lineartInfluence ?? 80 : tool === 'text' ? ui.text.fontSize : tool === 'lineart' ? ui.lineart.size : shapeTool ? ui.shape.strokeWidth : ui.brush.size;
   const setSize = (v: number) => setUi(influence ? { lineartInfluence: v } : tool === 'text' ? { text: { ...ui.text, fontSize: v } } : tool === 'lineart' ? { lineart: { ...ui.lineart, size: v } } : shapeTool ? { shape: { ...ui.shape, strokeWidth: v } } : { brush: { ...ui.brush, size: v } });
   const button = (id: DesignTool) => {
     const t = TOOLS.find((t) => t.id === id)!;
     const reason = toolBlockReason(id, activeLayer(doc));
-    return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: id })} onDoubleClick={(e) => onPick?.(e.currentTarget)} />;
+    return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: id })} />;
   };
   const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
   const paint = { id: 'paint', icon: Brush, label: 'Paint', after: 'hand' as DesignTool, tools: TOOLS.filter((t) => ['brush', 'eraser', 'select'].includes(t.id)) };
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
     <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
-    <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} onPick={onPick} /><ToolGroup doc={doc} group={paint} tool={tool} onPick={onPick} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
+    <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} /><ToolGroup doc={doc} group={paint} tool={tool} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
     <div className="tool-family palette-quick">
-      <InlineColor label="Active color" value={color} onChange={setColor} />{button('eyedropper')}
+      {showColor && <InlineColor label="Active color" value={color} onChange={setColor} />}{button('eyedropper')}
       {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
     </div>
 
