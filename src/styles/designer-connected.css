@@ -127,3 +127,7 @@
 .palette-snap .tool-setting > svg:first-child { width: var(--control-icon); height: var(--control-icon); }
 
 @media (max-width: 1400px) { .designer-view { bottom: calc(var(--composer-height, 104px) + 92px); } }
+
+.designer-view .zoom-value { width: var(--control-h); gap: 1px; }
+.designer-view .zoom-value input { width: 3.5ch; min-width: 0; padding: 3px 0 !important; border: 0 !important; background: transparent !important; font-size: 11px; text-align: center; }
+.designer-view .zoom-value span { font-size: 10px; color: var(--text-2); }

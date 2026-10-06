@@ -52,6 +52,7 @@ export function DesignerWorkspace() {
   const exportMenu = usePopover();
   const saveConfirm = usePopover();
   const [zoom, setZoom] = useState(1);
+  const [zoomDraft, setZoomDraft] = useState<string | null>(null);
   const [selectedCurve, setSelectedCurve] = useState<{ layerId: string; strokeId: string; handles: number[] } | null>(null);
   useEffect(() => { setSelectedCurve(null); }, [doc?.id, session.id]);
   const [busy, setBusy] = useState(false);
@@ -238,9 +239,19 @@ export function DesignerWorkspace() {
           <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
         </>}
         view={<>
-          <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
-          <span className="zoom-value num">{Math.round(zoom * 100)}%</span>
           <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
+          <label className="zoom-value num">
+            <input aria-label="Zoom percent" inputMode="decimal" value={zoomDraft ?? Math.round(zoom * 100)} onFocus={() => setZoomDraft(String(Math.round(zoom * 100)))} onChange={(e) => setZoomDraft(e.target.value)} onBlur={(e) => {
+              const raw = e.target.value.trim().replace(',', '.');
+              const percent = Number(raw);
+              setZoomDraft(null);
+              if (raw && Number.isFinite(percent)) window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: Math.min(800, Math.max(5, percent)) / (zoom * 100) }));
+            }} onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+              if (e.key === 'Escape') { e.currentTarget.value = String(Math.round(zoom * 100)); e.currentTarget.blur(); e.stopPropagation(); }
+            }} /><span>%</span>
+          </label>
+          <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
           <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
         </>} />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
