@@ -25,7 +25,7 @@ function SummaryRow({ id, name, state, onClick }: { id: PickerId; name: string; 
   return (
     <button type="button" className="agent-model-row" onClick={onClick}>
       <span className="agent-model-role">{label[id]}</span>
-      <span className="agent-model-name">{name}</span>
+      <span className="agent-model-name" title={name}>{name}</span>
       <span className={`agent-model-state is-${state}`}>{state === 'manual' ? 'set' : state === 'default' ? 'default' : 'auto'}</span>
       <ChevronRight size={13} />
     </button>
@@ -154,7 +154,7 @@ export function AgentModelControls() {
         {manualCount ? `Models · ${manualCount}` : 'Models'}
         {pop.open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </Chip>
-      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={520} label="Agent models" className="agent-model-pop">
+      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={picker ? 520 : 400} label="Agent models" className="agent-model-pop">
         {picker ? (
           <>
             <button type="button" className="agent-model-back" onClick={() => setPicker(null)}><ArrowLeft size={14} /> Models</button>
@@ -165,14 +165,13 @@ export function AgentModelControls() {
           </>
         ) : (
           <>
-            <PopoverHeader title="Models" sub="Choose a model per category, or leave it on Auto. Input variants are resolved automatically." />
+            <PopoverHeader title="Models" sub="Input variants resolve automatically." />
             <div className="agent-model-summary">
               {rows.map((r) => <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} />)}
             </div>
-            <div className="agent-model-foot">
-              <span />
-              {manualCount ? <button type="button" className="link-btn" onClick={resetAll}><RotateCcw size={12} /> Reset all to Auto</button> : null}
-            </div>
+            {manualCount > 0 && <div className="agent-model-foot">
+              <button type="button" className="link-btn" onClick={resetAll}><RotateCcw size={12} /> Reset all to Auto</button>
+            </div>}
           </>
         )}
       </Popover>
