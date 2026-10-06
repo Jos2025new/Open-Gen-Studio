@@ -156,3 +156,5 @@
 .sidebar-tool-settings .tool-settings .edit-mode { flex-basis: 100%; justify-content: space-between; }
 .sidebar-tool-settings .opt-hint { white-space: normal; }
 .layer-details > summary { padding: 12px 10px; cursor: pointer; font-size: 12px; color: var(--text-2); }
+
+.palette-quick .tool-settings { max-width: none; overflow: visible; flex-shrink: 0; }

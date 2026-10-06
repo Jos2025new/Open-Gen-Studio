@@ -7,7 +7,7 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { InlineColor, InlineSlider } from './InlineControls';
-import { EditOps, SnapControl } from './ToolSettings';
+import { EditOps, SnapControl, ToolSettings } from './ToolSettings';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move and select objects' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
@@ -50,6 +50,7 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
   const color = tool === 'text' ? ui.text.color : tool === 'lineart' ? ui.lineart.color : shapeTool ? (strokeTool ? ui.shape.stroke ?? '#ffffff' : ui.shape.fill ?? '#d4f25a') : ui.brush.color;
   const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, [strokeTool ? 'stroke' : 'fill']: color } } : { brush: { ...ui.brush, color } });
   const influence = tool === 'move' || (tool === 'lineart' && ui.lineartMode === 'edit');
+  const contextualSettings = ['select', 'fill', 'gradient'].includes(tool);
   const showColor = !influence && !['hand', 'select', 'eyedropper', 'eraser'].includes(tool);
   const size = influence ? ui.lineartInfluence ?? 80 : tool === 'text' ? ui.text.fontSize : tool === 'lineart' ? ui.lineart.size : shapeTool ? ui.shape.strokeWidth : ui.brush.size;
   const setSize = (v: number) => setUi(influence ? { lineartInfluence: v } : tool === 'text' ? { text: { ...ui.text, fontSize: v } } : tool === 'lineart' ? { lineart: { ...ui.lineart, size: v } } : shapeTool ? { shape: { ...ui.shape, strokeWidth: v } } : { brush: { ...ui.brush, size: v } });
@@ -65,8 +66,10 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
     <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} /><ToolGroup doc={doc} group={paint} tool={tool} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
     <div className="tool-family palette-quick">
+      {contextualSettings ? <>{button('eyedropper')}<ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact /></> : <>
       {showColor && <InlineColor label="Active color" value={color} onChange={setColor} />}{button('eyedropper')}
       {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
+      </>}
     </div>
 
   </div>;
