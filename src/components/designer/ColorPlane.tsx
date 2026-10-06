@@ -24,7 +24,7 @@ export function ColorPlane({ value, onChange }: { value: string; onChange: (colo
     onChange(hex(hue, s, v));
   };
   return <div className="color-plane-controls">
-    <div className="color-plane" role="button" tabIndex={0} aria-label={`Color saturation and brightness, ${Math.round(color.s * 100)} and ${Math.round(color.v * 100)} percent`} style={{ backgroundColor: `hsl(${hue} 100% 50%)` }}
+    <div className="color-plane" role="group" tabIndex={0} aria-roledescription="Two-axis color control" aria-label={`Color saturation and brightness, ${Math.round(color.s * 100)} and ${Math.round(color.v * 100)} percent. Use left and right arrows for saturation, up and down for brightness.`} style={{ backgroundColor: `hsl(${hue} 100% 50%)` }}
       onPointerDown={(e) => { if (e.button !== 0) return; e.currentTarget.focus(); e.currentTarget.setPointerCapture(e.pointerId); point(e); }}
       onPointerMove={(e) => { if (e.buttons & 1) point(e); }}
       onKeyDown={(e) => {
