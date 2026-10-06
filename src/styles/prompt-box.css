@@ -1,5 +1,5 @@
 .composer-dock { bottom: 24px; }
-.composer-dock:not(.dock-designer) { width: min(800px, calc(100% - 48px)); }
+.composer-dock { width: min(800px, calc(100% - 48px)); }
 .composer { padding: 18px; border-radius: 24px; }
 .composer-prompt-row { display: block; margin-bottom: 14px; }
 .composer-prompt-row .composer-input { font-size: 15px; line-height: 1.65; min-height: 72px; max-height: min(180px, 25dvh); padding: 4px 2px; overflow-y: auto; scrollbar-width: thin; }
@@ -51,7 +51,7 @@
   .ws-chat:has(.chat-empty) { gap: 18px; }
   .chat-welcome .hero-mark { margin-bottom: 12px; }
   .composer { padding: 16px; }
-  .composer-dock:not(.dock-designer), .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 32px)); }
+  .composer-dock, .chat-welcome, .chat-empty .suggestions { width: min(800px, calc(100% - 32px)); }
 }
 @media (max-width: 767px) {
   .composer { padding: 12px; border-radius: 20px; }
@@ -65,7 +65,7 @@
 }
 @media (max-width: 600px) {
   .composer-dock { bottom: 10px; }
-  .composer-dock:not(.dock-designer) { width: calc(100% - 20px); }
+  .composer-dock { width: calc(100% - 20px); }
   .composer-prompt-row .composer-input { max-height: min(130px, 25dvh); }
   .chat-empty .suggestions { display: none; }
   .chat-welcome .hero-mark { display: none; }
