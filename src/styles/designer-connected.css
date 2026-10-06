@@ -20,7 +20,7 @@
 .settings-text .tool-settings > :nth-child(2), .settings-text .tool-settings > :nth-child(6) { grid-column: span 4; }
 .settings-text .tool-settings > :nth-child(4) { grid-column: span 2; }
 .settings-text .tool-settings > :nth-child(7) { grid-column: span 5; }
-.dock-designer { left: calc((100% - var(--layers-w,260px)) / 2); width: min(800px, calc(100% - var(--layers-w,260px) - 32px)); }
+.dock-designer { left: calc((100% - var(--layers-w,0px)) / 2); width: min(800px, calc(100% - var(--layers-w,0px) - 32px)); }
 .layers-panel .panel-tab { width: 36px; height: 32px; flex: 0 0 36px; justify-content: center; padding: 0; border-radius: var(--radius-s); }
 .layer-appearance { border: 0; margin: 0; padding: 10px 8px; min-width: 0; }
 .layer-appearance .prop-row { grid-template-columns: minmax(100px,1fr) minmax(0,1fr); gap: 8px; align-items: center; }

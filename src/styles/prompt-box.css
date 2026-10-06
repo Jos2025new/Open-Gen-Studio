@@ -1,4 +1,5 @@
-.composer-dock:not(.dock-designer) { width: min(800px, calc(100% - 48px)); bottom: 24px; }
+.composer-dock { bottom: 24px; }
+.composer-dock:not(.dock-designer) { width: min(800px, calc(100% - 48px)); }
 .composer { padding: 18px; border-radius: 24px; }
 .composer-prompt-row { display: block; margin-bottom: 14px; }
 .composer-prompt-row .composer-input { font-size: 15px; line-height: 1.65; min-height: 72px; max-height: min(180px, 25dvh); padding: 4px 2px; overflow-y: auto; scrollbar-width: thin; }
@@ -63,7 +64,8 @@
   .chat-welcome h1 { font-size: 26px; }
 }
 @media (max-width: 600px) {
-  .composer-dock:not(.dock-designer) { width: calc(100% - 20px); bottom: 10px; }
+  .composer-dock { bottom: 10px; }
+  .composer-dock:not(.dock-designer) { width: calc(100% - 20px); }
   .composer-prompt-row .composer-input { max-height: min(130px, 25dvh); }
   .chat-empty .suggestions { display: none; }
   .chat-welcome .hero-mark { display: none; }
