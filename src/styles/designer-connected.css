@@ -1,6 +1,8 @@
-.designer .document-picker { z-index: 9; }
+.designer .document-picker { z-index: 9; top: 12px; }
+.designer .document-picker-toggle { height: 46px; border-color: var(--border-strong); border-radius: 12px; background: var(--surface-2); box-shadow: var(--shadow-card); }
+.designer .document-picker-toggle svg { width: 18px; height: 18px; }
 .designer-palette { position: absolute; z-index: 8; top: 62px; left: calc((100% - var(--layers-w,260px)) / 2); transform: translateX(-50%); max-width: calc(100% - var(--layers-w,260px) - 24px); }
-.designer-palette .tool-rail { width: max-content; max-width: 100%; display: flex; flex-direction: row; align-items: center; padding: 6px; gap: 3px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-card); overflow-x: auto; overflow-y: hidden; }
+.designer-palette .tool-rail { width: max-content; max-width: 100%; display: flex; flex-direction: row; align-items: center; padding: 6px; gap: 3px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: var(--shadow-card); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .designer-palette .icon-btn { position: relative; }
 .designer-palette .icon-btn, .designer-view .icon-btn { width: 32px; height: 32px; border-radius: var(--radius-s); flex-shrink: 0; }
 .designer-palette .icon-btn svg, .designer-view .icon-btn svg { width: 18px; height: 18px; }
@@ -57,9 +59,18 @@
 @media (max-width: 767px) {
   .designer .document-picker { top: 8px; left: 8px; width: 190px; max-width: calc(100% - 184px); }
   .designer .document-picker-toggle { width: 100%; }
-  .designer-palette { top: 54px; left: 50%; max-width: calc(100% - 16px); }
+  .designer-palette { top: 62px; left: 50%; max-width: calc(100% - 16px); }
   .designer-view { right: 8px; top: 8px; }
   .designer-palette .icon-btn { width: 32px; height: 32px; }
   .layers-panel { max-height: none; }
   .settings-text .tool-settings > :nth-child(n) { grid-column: span 6; }
+}
+
+@media (min-width: 1400px) {
+  .designer-palette { top: 12px; }
+}
+
+@media (max-width: 480px) {
+  .designer .document-picker { top: 62px; max-width: calc(100% - 16px); }
+  .designer-palette { top: 116px; }
 }
