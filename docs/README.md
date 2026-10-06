@@ -24,7 +24,7 @@
 - [0002 — No usar confirm() nativo](decisions/0002-confirmaciones-de-la-app.md).
 - [0003 — Probar la app solo en el sandbox](decisions/0003-pruebas-en-sandbox.md).
 - [0004 — Aprobar un coste máximo antes de usar proveedores de pago](decisions/0004-coste-maximo.md).
-- [0005 — Contrato operativo del agente: P0 + P1a aprobados; resto propuesto](decisions/0005-contrato-operativo-agente.md).
+- [0005 — Contrato operativo del agente: implementación transversal y límites](decisions/0005-contrato-operativo-agente.md).
 
 ## Historial
 
@@ -49,6 +49,8 @@
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 
 ## Verificación
+
+- [Contrato del operador: recorrido corregido, sesiones existentes y límites](agent-operator-contract.md).
 
 - [P0 + P1a: biblioteca, consentimiento, pruebas y límites](agent-library-consent.md).
 

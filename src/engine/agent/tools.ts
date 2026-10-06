@@ -1,3 +1,4 @@
+import { SETTINGS_POLICY } from '../procedure';
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
@@ -151,7 +152,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'confirm_settings',
       description:
-        'Phase 2, before writing any prompt: show the user one settings card for the plan you will propose NOW — only the kinds of steps it has (a sheet or product image stage → image only; the clips stage → video; a key frame + clip plan → both, images first). For each kind the app shows the recommended model with a few others, and its resolution, duration (video) and aspect, preselected. The user confirms or changes them; you get back the confirmed values and each model\'s prompting guide, then write the plan for exactly that. Also for a single image (the user picks how many). Not for operations on an existing result, not on the node canvas. Settings hold for this request and its plan revisions; each new request calls it again.',
+        SETTINGS_POLICY + ' Show one card for the image/video kinds in this plan, with the recommended model and its supported values. After confirmation use those values and the returned guide. Images count is per step: distinct requested outputs need distinct steps, not candidates of one prompt.',
       parameters: {
         type: 'object',
         properties: {
@@ -169,7 +170,7 @@ export const TOOLS: ToolSpec[] = [
           count: { type: 'integer', description: 'Video: how many clips the plan makes. Images: how many to generate per image step, 1–4 (your recommendation, e.g. 3 candidates for a sheet; the user can change it on the card).' },
           duration: { type: 'number', description: 'Video: seconds per clip you recommend.' },
           aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
-          model: { type: 'string', description: 'Only a model the user named, or an image model of the short list for this task. Leave out otherwise.' },
+          model: { type: 'string', description: 'The model named/selected by the user; omit to use the app recommendation. Recommend another listed model only for a required capability or requested comparison.' },
               },
               required: ['kind'],
             },
@@ -257,7 +258,7 @@ export const TOOLS: ToolSpec[] = [
                 prompt: { type: 'string', description: 'image/video: full generation prompt (English works best). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
                 prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
                 lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
-                model: { type: 'string', description: 'Model ref "provider::id" or a family name ("Wan 3", "Seedance 2.5"), only when the user names a model. Omit it otherwise.' },
+                model: { type: 'string', description: 'Confirmed or user-named/selected model ref "provider::id" or compatible family; also supported for edit/animate ops. Omit to use the app default/source precedence, not necessarily the composer model.' },
                 purpose: { type: 'string', enum: ['draft', 'normal', 'long'], description: 'video without "model": draft (test, cheapest), normal (default), long (over 15 s, up to 30 s). The app picks the cheapest fitting model.' },
                 aspect: { type: 'string', description: 'e.g. "16:9", "9:16", "1:1", "4:5".' },
                 resolution: { type: 'string', description: 'A value from the model options (e.g. "2K", "1080p").' },

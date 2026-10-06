@@ -1,8 +1,8 @@
 Product photography — full guide (commercial, e-commerce and brand imagery; the product is always the hero)
 
 1. Product sheet first (one identity)
-- Before writing any prompt, look at the product photo(s) and write one short product sheet: object type, shape and proportions, materials and finish (matte, gloss, brushed metal, frosted glass), exact colors (hex when clear), label layout, logo position, the legible text on the pack.
-- Repeat that sheet word for word in every step prompt. Never restyle, recolor or redesign the product unless asked.
+- When no reference image exists, establish one fixed product description: object type, shape and proportions, materials and finish (matte, gloss, brushed metal, frosted glass), exact colors (hex when clear), label layout, logo position, the legible text on the pack.
+- With a reference image, cite its product role instead of redescribing identity. Repeat the fixed description only in text-only prompts. Never restyle, recolor or redesign the product unless asked.
 - Pass the product photo as a reference in every step (refs: the asset id); later steps also reference the approved hero shot.
 - Pack text: quote it literally in quotes and only when legible in the photo; never invent claims, logos or labels.
 

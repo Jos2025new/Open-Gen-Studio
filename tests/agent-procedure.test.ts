@@ -26,7 +26,7 @@ describe('one procedure instead of per-case rules', () => {
   it('tells the agent the app\'s order and checks up front, so plans pass the first time', () => {
     const head = SYSTEM_PROMPT.slice(0, 9000);
     expect(head).toContain('How the app works');
-    expect(head).toContain('ask_questions (only missing user data, once) → confirm_settings (always, before any prompt) → propose_plan');
+    expect(head).toContain('ask_questions (only missing user data) → confirm_settings (only when the settings policy below requires it) → propose_plan');
     expect(head).toContain('candidates end the plan');
   });
   it('staged-piece rules live once, in skill:staged, not in the prompt', () => {

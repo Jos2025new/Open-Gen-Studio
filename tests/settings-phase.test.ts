@@ -153,6 +153,14 @@ describe('a video plan before the settings are confirmed', () => {
     expect(tool).toMatch(/call confirm_settings first \(kind "video"\)/);
   });
 
+  it('a revision cannot introduce unconfirmed video settings', async () => {
+    first = { name: 'propose_plan', args: { revision: true, title: 'Revision', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };
+    await sendAgentMessage('Change the plan to a video');
+    const feed = useStore.getState().sessions[useStore.getState().activeSessionId].feed;
+    expect(feed.some(f => f.type === 'plan')).toBe(false);
+    expect(sent[1].messages.filter(m => m.role === 'tool').map(m => String(m.content)).join(' ')).toContain('call confirm_settings first');
+  });
+
   it('typing while the settings card is open does not confirm it (16:04: a question confirmed Nano Banana)', async () => {
     first = { name: 'confirm_settings', args: { parts: [{ kind: 'image', model: LOCAL_IMAGE_REF }] } };
     await sendAgentMessage('Haz un gato');

@@ -14,7 +14,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { trimReferenceResults } from '../src/engine/agent/attachments';
+import { TRIM_MIN_CHARS, trimReferenceResults } from '../src/engine/agent/attachments';
 import { repairHistory, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { LlmMessage } from '../src/engine/types';
@@ -97,7 +97,7 @@ describe('the history of a new request (T6)', () => {
 
   it('a new request trims what came before and leaves what this request reads alone', async () => {
     const sid = useStore.getState().activeSessionId;
-    // A finished turn that read the guides it needs: their real text is what crosses the size to be worth trimming.
+    // A finished turn that read the guides it needs: a controlled expansion below crosses the compaction threshold.
     const replies = [
       () => sse(['workflow:ugc', 'workflow:product-pack', 'skill:social', 'skill:staged', 'workflow:story'].map((id) => tool('read_guide', { id }))),
       () => sse([text('Vamos con la UGC.')]),
@@ -114,6 +114,8 @@ describe('the history of a new request (T6)', () => {
     await sendAgentMessage('quiero un UGC para vender la corneta');
     const afterFirst = useStore.getState().sessions[sid].agent.history;
     expect(afterFirst.filter((m) => m.role === 'tool')).toHaveLength(5);
+    // The revised guides are shorter; explicitly cross the compaction threshold to test recovery, not their size.
+    useStore.setState(st => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], agent: { ...st.sessions[sid].agent, history: st.sessions[sid].agent.history.map((m, i) => i === st.sessions[sid].agent.history.findIndex(x => x.role === 'tool') ? { ...m, content: String(m.content) + ' '.repeat(TRIM_MIN_CHARS) } : m) } } } }));
 
     await sendAgentMessage('ahora en un sofá');
     const history = useStore.getState().sessions[sid].agent.history;

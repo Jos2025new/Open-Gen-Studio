@@ -13,7 +13,7 @@ export const SKILLS: Skill[] = [
     id: 'product',
     name: 'Product photography',
     description: 'Commercial product shots: studio light, clean sets, hero angles.',
-    guidance: 'Write prompts like a commercial product photographer: one product sheet repeated in every prompt, the product photo as a reference in every step, light with direction and color temperature, lens and aperture per shot, a grounded contact shadow, negative space where copy goes. Load skill:product for the full guide before writing prompts.',
+    guidance: 'Write prompts like a commercial product photographer: the product photo as the identity reference in every step (a fixed product description only when there is no image), light with direction and color temperature, lens and aperture per shot, a grounded contact shadow, negative space where copy goes. Load skill:product for the full guide before writing prompts.',
     guide: productGuide,
     promptHint: 'commercial product photography, studio lighting, crisp detail, clean background',
   },
@@ -21,7 +21,7 @@ export const SKILLS: Skill[] = [
     id: 'character',
     name: 'Character consistency',
     description: 'Keep the same character across images and shots.',
-    guidance: 'Establish the character once (a clear front view) and pass that output as a reference to every later image step. Repeat identity anchors (face, hair, outfit, palette) in each prompt.',
+    guidance: 'Use the provided character image as the identity source in every consuming step. If no image exists, establish one source first and repeat the fixed identity description only in text-only prompts. View changes preserve the source pose and outfit unless requested otherwise.',
     promptHint: 'consistent character, same face and outfit',
   },
   {

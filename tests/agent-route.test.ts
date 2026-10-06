@@ -23,7 +23,7 @@ describe('medium quality by default (R1)', () => {
 
 describe('default route and prompting rules in the system prompt (R1, R2)', () => {
   it('states the default route, the purpose tables and the prompting rules', () => {
-    for (const s of ['Default route', 'set purpose on each video step', 'cheapest model that fits', 'GPT Image 2', 'Nano Banana Pro', 'Recraft', 'Ideogram', 'never from how many references', 'do not describe the image again', 'Never paraphrase a reference']) {
+    for (const s of ['Default route', 'set purpose on each video step', 'cheapest model that fits', 'keep the user selection', 'use the image default supplied by the app', 'never from how many references', 'do not describe the image again', 'Never paraphrase a reference']) {
       expect(SYSTEM_PROMPT).toContain(s);
     }
     expect(SYSTEM_PROMPT).not.toMatch(/Usually 40-120 words\. Write prompts/);
@@ -131,15 +131,15 @@ describe('subject mentions in each model syntax (R10)', () => {
 });
 
 describe('skills and workflows index, guides and total length (R4)', () => {
-  it('indexes every workflow and skill once; read_guide returns the full text with needs, continuity and skill', async () => {
+  it('indexes every workflow and skill once; read_guide returns the full text with brief fields, continuity and skill', async () => {
     const { SKILLS, WORKFLOWS, guideIndex, readGuide } = await import('../src/engine/skills');
     const index = guideIndex();
     for (const w of WORKFLOWS) expect(index.split(`workflow:${w.id} —`).length).toBe(2);
     for (const k of SKILLS) expect(index.split(`skill:${k.id} —`).length).toBe(2);
     expect(SYSTEM_PROMPT).toContain(index);
     const sheet = readGuide('workflow:character-sheet')!;
-    expect(sheet).toMatch(/needs .*the character/);
-    expect(sheet).toMatch(/continuity: Every view derives from the front view/);
+    expect(sheet).toMatch(/brief fields .*the character/);
+    expect(sheet).toMatch(/continuity: Every requested independent view derives from the original provided image/);
     expect(sheet).toMatch(/skill Character consistency:/);
     expect(readGuide('skill:product')).toMatch(/^Product photography:/);
     expect(readGuide('workflow:nope')).toBeUndefined();

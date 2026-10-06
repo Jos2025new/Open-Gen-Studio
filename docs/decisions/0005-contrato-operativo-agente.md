@@ -4,7 +4,7 @@
 
 Propuesto
 
-Samuel aprobó únicamente P0 + P1a el 2026-10-05: referencias temporales sin guardado; guardar requiere petición explícita o aceptación de una oferta de guardado. El resto permanece Propuesto. La implementación y sus límites se registran en [P0 + P1a: evidencia de la corrección](../agent-library-consent.md). Este ADR no autoriza P1b, P2, P3, migraciones ni llamadas de pago.
+Samuel aprobó únicamente P0 + P1a el 2026-10-05: referencias temporales sin guardado; guardar requiere petición explícita o aceptación de una oferta de guardado. El resto permanece Propuesto. La implementación y sus límites se registran en [P0 + P1a: evidencia de la corrección](../agent-library-consent.md). La restricción original se amplió el 2026-10-06 con «Resuelve eso. YA» y «Continua»: se implementó el recorrido transversal de ajustes, capacidades, guías y aprobación, documentado en [corrección del operador](../agent-operator-contract.md). Las comparaciones pagadas, migraciones y el resto no ejecutado de la propuesta permanecen pendientes.
 
 ## Fecha
 
@@ -138,6 +138,11 @@ Beneficio esperado, aún no medido: menor necesidad de deducir procedimiento y e
 
 No se incluyen reparación de Designer, controles de zoom, modo desarrollador, modelos nuevos, precios nuevos, migración de biblioteca, cambios de proveedor ni reescritura de UI. La revisión identifica áreas candidatas, no garantiza coherencia de toda la app. Si se descubre otro conflicto, se ubica en el responsable existente y se verifica su ámbito; no se añade automáticamente una nueva regla global.
 
-### 13. Estado de esta entrega
+### 13. Estado de la entrega documental original
 
 Hecho: lectura y auditoría descritas; 23 tests existentes pasaron en la auditoría; documento propuesto, evidencia, complemento de recorridos/UX/validación e índice. La ampliación verifica fragmentos del historial y PlanCard/CSS; no demuestra todavía una mejora visual. No hecho: cambios de app, nuevos tests de coherencia/procedimiento, suite completa de esta propuesta, sandbox visual, llamadas reales, comparación de latencia ni aceptación de políticas. La documentación nueva se valida con check-docs y safeguards y se deja sin commit para revisión. El resumen de entrega informa el resultado efectivo de esos controles; no se promete anticipadamente que pasen.
+
+
+### 14. Implementación posterior, 2026-10-06
+
+La corrección posterior une el contexto efectivo y sus consumidores: política compartida de ajustes, motor de OPS visible, resolución existente explicada, adaptación de salidas, instrucciones históricas actualizadas y modelo/formato visibles antes de aprobar. No se acepta como garantía de latencia ni comprensión del LLM. [Registro actual](../agent-operator-contract.md) distingue código, regresiones y sandbox local de la comparación real pendiente; el apartado anterior conserva el estado histórico original.

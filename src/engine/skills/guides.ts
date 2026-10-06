@@ -1,6 +1,7 @@
+import { WORKFLOW_CONTRACT } from '../procedure';
 import { APP_GUIDES } from './app';
 import { MODEL_GUIDES, modelGuide } from '../guides';
-import type { Workspace } from '../types';
+import type { Workspace, LlmMessage } from '../types';
 import stagedGuide from '../guides/staged.md?raw';
 import { SKILLS, skillById } from './catalog';
 import { WORKFLOWS, workflowById, describeWorkflow } from './workflows';
@@ -60,5 +61,49 @@ export function readGuide(id: string): string | undefined {
   if (variant && !v) return undefined;
   const chosen: Workflow = v ? { ...w, name: `${w.name} · ${v.name}`, description: v.description, steps: v.steps ?? w.steps, variants: undefined } : w;
   const skill = skillById(w.skill);
-  return `workflow (follow this structure, adapt prompts to the request):\n${describeWorkflow(chosen)}${skill ? `\nskill ${skill.name}: ${skill.guidance}` : ''}`;
+  return `workflow (${WORKFLOW_CONTRACT}):\n${describeWorkflow(chosen)}${skill ? `\nskill ${skill.name}: ${skill.guidance}` : ''}`;
+}
+
+
+/** Replace outdated instruction payloads in a live conversation; keep calls, user messages and result IDs. */
+export function refreshLoadedGuides(history: LlmMessage[]): LlmMessage[] {
+  const calls = new Map<string, string>();
+  for (const message of history) for (const call of message.tool_calls ?? []) {
+    if (call.function.name !== 'read_guide') continue;
+    try {
+      const id = JSON.parse(call.function.arguments ?? '{}').id;
+      if (typeof id === 'string' && /^(workflow|skill):/.test(id)) calls.set(call.id, id);
+    } catch { /* Malformed arguments remain available to the existing repair mechanism. */ }
+  }
+  const currentById = new Map([...new Set(calls.values())].map(id => [id, readGuide(id)]));
+  return history.map(original => {
+    const message = original.role === 'user' ? { ...original, content: typeof original.content === 'string'
+      ? historicalContext(original.content) : Array.isArray(original.content)
+        ? original.content.map(part => part.type === 'text' ? { ...part, text: historicalContext(part.text) } : part) : original.content } : original;
+    if (message.role !== 'tool' || !message.tool_call_id || typeof message.content !== 'string') return message;
+    const id = calls.get(message.tool_call_id);
+    const current = id ? currentById.get(id) : undefined;
+    if (!current) return message;
+    // Short errors/compaction markers are not successful guide payloads and must retain their meaning.
+    const successful = id!.startsWith('workflow:') ? message.content.startsWith('workflow (')
+      : id === 'skill:staged' ? message.content.startsWith('# Staged pieces')
+        : message.content.startsWith(`${skillById(id!.slice(6))?.name}:`);
+    if (!successful) return message;
+    const shared = id!.startsWith('workflow:') && message.content.includes('# Staged pieces') ? `\n\n---\n${STAGED_GUIDE}` : '';
+    if (message.content.includes(current) && (!shared || message.content.includes(STAGED_GUIDE))) return message;
+    return { ...message, content: current + shared };
+  });
+}
+
+/** Historical app snapshots retain selections and references; current guides supply procedure. */
+function historicalContext(text: string): string {
+  const start = text.lastIndexOf('\n\n<app_context>');
+  if (start < 0 || !text.endsWith('</app_context>')) return text;
+  return text.slice(0, start) + text.slice(start).replace(/<app_context>([\s\S]*?)<\/app_context>$/, (_, context: string) => {
+    const state = context
+      .replace(/^skill: ([^\n]+?) — [^\n]*$/gm, 'skill previously selected: $1')
+      .replace(/^workflow \([^\n]*\):\n([^\n:]+):[^\n]*(?:\n  [^\n]*)*/gm, 'workflow previously selected: $1')
+      .replace(/\n\n---\n# Staged pieces[\s\S]*$/, '');
+    return `<app_context>${state}</app_context>`;
+  });
 }

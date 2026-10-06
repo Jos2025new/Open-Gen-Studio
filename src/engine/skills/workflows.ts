@@ -31,7 +31,7 @@ export const WORKFLOWS: Workflow[] = [
       'a second refining pass (label, edges, reflections; costs one edit per image)? "No" (recommended) or "Yes"',
     ],
     continuity:
-      'One product identity: write the product sheet once and repeat it in every prompt; pass the product photo as a reference in every step and the hero (s1) in later ones. Never change the product between shots. Video and second pass only when the user said yes: an animate step from the approved hero, an edit step per chosen image.',
+      'One product identity: the provided photo is the visual source in every consuming step; repeat the fixed product description only in text-only prompts without that image. Use the hero (s1) as an additional reference only when the requested look needs it. Never change the product between shots. Video and second pass only when the user said yes: an animate step from the approved hero, an edit step per chosen image.',
     variants: [
       { id: 'packshot', name: 'Packshot', description: 'Catalog: neutral or white background, three clean angles.', steps: [
         { id: 's1', kind: 'image', title: 'Front', prompt: '{prompt}, packshot on seamless white, soft studio light', aspect: '1:1' },
@@ -84,11 +84,11 @@ export const WORKFLOWS: Workflow[] = [
   {
     id: 'character-sheet',
     name: 'Character sheet',
-    description: 'One character from four angles.',
+    description: 'Character views: independent views or a composite sheet, according to the requested deliverable.',
     workspaces: ['chat', 'node'],
     skill: 'character',
     needs: ['the character (image or description)'],
-    continuity: 'Every view derives from the front view; one identity throughout.',
+    continuity: 'Every requested independent view derives from the original provided image, or from one established source when no image exists. A composite sheet uses reference_sheet; separate views use angle or image steps with the same source and explicit user model. The front view below is only a default preparation example for a missing source, not an extra requested output.',
     steps: [
       { id: 's1', kind: 'image', title: 'Front view', prompt: '{prompt}, full body, front view, neutral background', aspect: '3:4' },
       { id: 's2', kind: 'op', title: '3/4 view', op: 'angle', input: 's1', params: { angle: 'three-quarter-left' } },
@@ -137,14 +137,14 @@ export const WORKFLOWS: Workflow[] = [
     needs: [
       'the product (photo, or a description)',
       'the creator: an attached photo (used as is), or which kind from the user\'s words (influencer → lifestyle, tech, beauty, gaming streamer, cooking, fitness…; age range including 18–24 when they say young or streamer)',
-      'how to start, as one question: "creator sheet → 5 s test → full video" (recommended for an invented creator), "creator sheet → full video", "all at once"; plus the optional extra "a product sheet from my photo too"',
+      'available identity sources; ask only missing user data, and offer an optional test stage only for a concrete scope/cost reason',
       'language of the spoken lines',
       'total duration (one clip with timed shots when it fits the model)',
       'claims to use: only benefits the user states or the product shows (none → neutral)',
     ],
     fixed: { aspect: '9:16' },
     continuity:
-      'Pre-production first, like a real shoot. The creator: the user\'s photo as is, or — when invented — a creator sheet made from text only (one text-to-image step, no refs: never the product photo; 2×2: front, three-quarter, profile and a face close-up, plain neutral background, same outfit; count 3 candidates so the user picks the look), never a creator already holding the product. The product: the user\'s photo as is, or — when invented — a product image made from text only (the product alone on a plain neutral background, the look the user described; in plan 1 with the creator sheet). Then the video: the creator sheet (or photo) and the product photo or image together in the refs of every clip (reference-to-video keeps both identities), cited with the model\'s reference syntax and their roles; never describe them again. Script before prompts: hook in the first 1–2 s → product in use or its benefit → call to action, as timed beats with the creator\'s spoken lines in quotes in the chosen language, short; audio on. Staged: plan 1 is the creator sheet and, for an invented product, its product image (a product sheet from the user\'s photo only if asked); with a test, plan 2 is a 5 s draft of the hook with the same refs and plan 3 the full video; each plan after the user sees the previous one. Save to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans.',
+      'Pre-production first, like a real shoot. The creator: the user\'s photo as is, or — when invented — a creator sheet made from text only (one text-to-image step, no refs: never the product photo; 2×2: front, three-quarter, profile and a face close-up, plain neutral background, same outfit; one source; candidates only when requested), never a creator already holding the product. The product: the user\'s photo as is, or — when invented — a product image made from text only (the product alone on a plain neutral background, the look the user described; in plan 1 with the creator sheet). Then the video: the creator sheet (or photo) and the product photo or image together in the refs of every clip (reference-to-video keeps both identities), cited with the model\'s reference syntax and their roles; never describe them again. Script before prompts: hook in the first 1–2 s → product in use or its benefit → call to action, as timed beats with the creator\'s spoken lines in quotes in the chosen language, short; audio on. Staged when an identity source is missing: plan 1 is the creator sheet and, for an invented product, its product image (a product sheet from the user\'s photo only if asked); with a test, plan 2 is a 5 s draft of the hook with the same refs and plan 3 the full video; each plan after the user sees the previous one. Save to the library only if the user asks or says yes in the questions card. Claims only from the brief. One variant per piece: two formats are two plans.',
     variants: [
       { id: 'review', name: 'Review', description: 'Creator talks to camera holding the product: hook, two benefits, verdict.' },
       { id: 'unboxing', name: 'Unboxing', description: 'Hands open the package, reveal and first reaction.' },
@@ -189,7 +189,7 @@ export const WORKFLOWS: Workflow[] = [
       'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (recommended when the character is invented or the image does not show it well; a cheap first plan, the user sees it, then the clips with the sheet in their refs)',
     ],
     continuity:
-      'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; a clip with no image of her repeats the same 3–6 literal traits (skill:cinematic). Save her to the library only if the user asks or says yes in the questions card. One clip or several is asked in the brief card (see needs). One clip: the whole story with timed shots (hook → conflict → payoff as "0–5s / 5–10s / …" with shot size and camera each), no join. Several clips: each clip is one closed beat with a start and an end, written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
+      'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; a clip with no image of her repeats the same 3–6 literal traits (skill:cinematic). Save her to the library only if the user asks or says yes in the questions card. One clip or several is asked in the brief card (see needs). One clip: the whole story with timed shots (hook → conflict → payoff as "0–5s / 5–10s / …" with shot size and camera each), no join. Several clips: each clip is one closed beat with a start and an end, written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All requested clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
     steps: [
       { id: 's1', kind: 'video', title: 'Clip 1 · hook', prompt: '{prompt}' },
       { id: 's2', kind: 'video', title: 'Clip 2 · conflict', prompt: '{prompt}' },
@@ -353,8 +353,8 @@ export function describeWorkflow(w: Workflow): string {
   const extra = [
     // One cast rule for every workflow, so none can assume the user brought every image (UGC once assumed a product photo).
     `cast (every workflow): each person, character, product or place this flow shows has one visual source — the user's image as is, a library @Name, or, when the user wants it invented, its own reference image made from text in the first plan (a sheet, the product alone on a plain background, a key view); later steps carry it in refs. Wherever this workflow says "photo" or "attached image", read "or its invented reference image". Never invent it inside a later prompt.`,
-    w.fixed ? `fixed (do not ask): ${Object.entries(w.fixed).map(([k, v]) => `${k} ${v}`).join(', ')}` : '',
-    w.needs?.length ? `needs (ask the missing ones in the one questions card): ${w.needs.join('; ')}` : '',
+    w.fixed ? `template defaults (unless the user specified otherwise): ${Object.entries(w.fixed).map(([k, v]) => `${k} ${v}`).join(', ')}` : '',
+    w.needs?.length ? `brief fields (reuse supplied values; ask only missing user data in Auto; creative choices optional in Guided): ${w.needs.join('; ')}` : '',
     w.continuity ? `continuity: ${w.continuity}` : '',
     w.variants?.length ? `variants: ${w.variants.map((v) => `${v.id} (${v.description})`).join('; ')}` : '',
     w.skills?.length ? `skills (read_guide each before writing its steps): ${w.skills.map((k) => `skill:${k.id} for ${k.for}`).join('; ')}` : '',

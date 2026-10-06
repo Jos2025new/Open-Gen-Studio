@@ -8,7 +8,7 @@ import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
 import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
-import type { PlanFeedItem, PlanStep, StepState } from '../../engine/types';
+import type { PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -40,7 +40,7 @@ const aboutUserModel = (a: string) => /\byour [\w-]+ model\b/.test(a);
 /** `ref` names an input in words for the card: a step by its title, an asset as "your image" or "the earlier clip". */
 type RefName = (ref: string) => string;
 
-function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: RefName): string {
+function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: RefName, authorization?: StepAuthorization): string {
   switch (s.kind) {
     case 'image':
       return [modelName(s.modelRef), s.settings.aspect ? aspectLabel(s.settings.aspect) : '', s.settings.count > 1 ? `×${s.settings.count}` : '', s.refs.length ? `${s.refs.length} ref` : ''].filter(Boolean).join(' · ');
@@ -51,7 +51,13 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: Re
     case 'audio':
       return [modelName(s.modelRef), s.lyricsFrom ? `lyrics from ${refName(s.lyricsFrom)}` : s.settings.extras?.lyrics ? 'with lyrics' : s.settings.advanced.is_instrumental ? 'instrumental' : ''].filter(Boolean).join(' · ');
     case 'op':
-      return `${OPS[s.op].label} of ${refName(s.input)}`;
+      return [
+        `${OPS[s.op].label} of ${refName(s.input)}`,
+        OPS[s.op].engine === 'local' ? 'Local operation' : authorization?.modelRef ? modelName(authorization.modelRef) : 'Model pending',
+        authorization?.parameters.aspect ? aspectLabel(authorization.parameters.aspect) : '',
+        authorization?.parameters.resolution ?? '',
+        OPS[s.op].engine !== 'local' && !s.input.startsWith('asset:') ? 'Provisional until source exists' : '',
+      ].filter(Boolean).join(' · ');
     case 'text':
       return s.text.length > 60 ? `${s.text.slice(0, 59)}…` : s.text;
     case 'layer':
@@ -153,6 +159,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           const gen = genId ? generations[genId] : undefined;
           const state = item.stepStates[s.id] ?? 'pending';
           const script = stepScript(s);
+          const detail = stepDetail(s, name, refName, live?.authorizations[s.id] ?? item.stepAuthorizations?.[s.id]);
           const shown = open.has(s.id);
           return (
             <li key={s.id} className={`plan-step st-${state}${awaiting && off.has(s.id) ? ' is-off' : ''}`}>
@@ -166,12 +173,12 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <span className="step-title">
                     {shown ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {s.title}
                   </span>
-                  <span className="step-detail faint">{stepDetail(s, name, refName)}</span>
+                  <span className="step-detail faint">{detail}</span>
                 </button>
               ) : (
                 <span className="step-text">
                   <span className="step-title">{s.title}</span>
-                  <span className="step-detail faint">{stepDetail(s, name, refName)}</span>
+                  <span className="step-detail faint">{detail}</span>
                 </span>
               )}
               {awaiting && (s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d') ? <SuggestChange label={`"${s.title}"`} /> : null}
@@ -217,7 +224,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
       {plan.adjustments.length ? (
         <div className="plan-note faint">
           <button type="button" className="plan-adj-toggle" onClick={() => setShowAdj((v) => !v)} aria-expanded={showAdj}>
-            {showAdj ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {plan.adjustments.length} adjustment{plan.adjustments.length === 1 ? '' : 's'} to the models
+            {showAdj ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {plan.adjustments.length} adjustment{plan.adjustments.length === 1 ? '' : 's'} to the plan
           </button>
           {showAdj ? <ul className="plan-adj">{plan.adjustments.map((a, i) => <li key={i}>{a}</li>)}</ul> : null}
         </div>

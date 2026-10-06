@@ -1,3 +1,4 @@
+import { missingSettingsKind } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
@@ -23,7 +24,7 @@ import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } fr
 import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
-import { activeSkill, workflowById } from '../skills';
+import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary } from '../catalog';
 import type {
@@ -291,7 +292,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // A new request: images of earlier requests become a note instead of being sent again, and so do the results of
   // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
   // history grow without bound (T6).
-  patchAgent(sessionId, (a) => ({ history: trimReferenceResults(stripImages(a.history)) }));
+  patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
@@ -1715,10 +1716,10 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             planFailures++;
             continue;
           }
-          // Phase 2 first: prompts for video, or for 2+ images, are written only after the user confirms the settings.
-          if (workspace !== 'node' && !v.data.revision) {
+          // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
+          if (workspace !== 'node') {
             const kinds = v.data.steps.map((st) => st.kind);
-            const need = kinds.includes('video') && !session(sessionId).agent.settings?.video ? 'video' : kinds.includes('image') && !session(sessionId).agent.settings?.image ? 'image' : null;
+            const need = missingSettingsKind(workspace, kinds, session(sessionId).agent.settings);
             if (need) {
               recordMetric(sessionId, { type: 'rejected' });
               respond(`Not shown: call confirm_settings first (kind "${need}") so the user confirms the model, resolution${need === 'video' ? ', duration' : ', how many images'} and aspect; then write the prompts for the confirmed model and call propose_plan.`);

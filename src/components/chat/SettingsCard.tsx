@@ -13,8 +13,8 @@ import { EditAnswerButton } from './EditAnswerButton';
 
 /**
  * Phase 2: the model and its main values, preselected by the app, confirmed before the agent writes any prompt.
- * Only the kinds of the plan that comes now, images first. Every change is kept on the card (a typed message
- * confirms what it shows) and reported to the agent.
+ * Only the kinds of the plan that comes now, images first. Every change is kept on the card (the explicit confirmation button
+ * accepts what it shows) and reported to the agent.
  */
 export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sessionId: string }) {
   const models = useStore((s) => s.catalog.models);
@@ -124,8 +124,8 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
 
       {item.kind === 'image' ? (
         <div className="q-block">
-          <div className="q-question">Images to generate{item.count > 1 ? ' per step' : ''}</div>
-          <StepSlider values={IMAGE_COUNTS} value={choice.count ?? 1} label="Images to generate" onChange={(n) => update({ ...choice, count: n })} />
+          <div className="q-question">Images per step</div>
+          <StepSlider values={IMAGE_COUNTS} value={choice.count ?? 1} label="Images per step" onChange={(n) => update({ ...choice, count: n })} />
         </div>
       ) : null}
 
