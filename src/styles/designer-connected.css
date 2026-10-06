@@ -113,3 +113,11 @@
 .designer-context .tool-settings > .stroke-controls { flex-basis: 100%; }
 .designer-context .tool-setting { padding: 7px 10px; }
 .stroke-controls > .opt-pick { grid-column: 1 / -1; height: 38px; }
+.palette-quick .opt { height: var(--control-h); padding: 0 6px; border: 0; background: transparent; }
+.palette-quick .opt-color { width: var(--control-h); padding: 0; justify-content: center; }
+.palette-quick .opt-color .opt-label { display: none; }
+.palette-quick .opt-swatch { width: 20px; height: 20px; }
+.palette-quick .opt-slider { display: inline-flex; gap: 5px; }
+.palette-quick .opt-range { width: 52px; }
+.palette-quick .opt-label { font-size: 10px; }
+.view-history { display: flex; gap: 3px; border-left: 1px solid var(--border-strong); padding-left: 6px; margin-left: 3px; }

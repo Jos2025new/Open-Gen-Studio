@@ -41,7 +41,6 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
     const vh = window.innerHeight;
     const w = Math.min(width, vw - MARGIN * 2);
     const contentH = el.scrollHeight;
-    const dropdown = Boolean(a.querySelector('.lucide-chevron-down, .lucide-chevron-up'));
     const next: CSSProperties = { width: w, visibility: 'visible' };
     if (placement === 'right-start') {
       // Beside the anchor, aligned to its top (a rail's flyout).
@@ -53,13 +52,13 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.bottom = Math.max(MARGIN, vh - r.bottom);
       next.maxHeight = r.bottom - MARGIN;
     } else {
-      const left = dropdown ? r.right - w : placement === 'bottom-center' ? r.left + (r.width - w) / 2 : r.left;
+      const left = placement === 'bottom-center' ? r.left + (r.width - w) / 2 : r.right - w;
       next.left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
-      const openAbove = dropdown
+      const openAbove = placement === 'bottom-start' || placement === 'bottom-center'
         ? below < contentH && above > below
-        : placement !== 'bottom-start' && placement !== 'bottom-center' && (above >= Math.min(contentH, 240) || above >= below);
+        : above >= Math.min(contentH, 240) || above >= below;
       if (openAbove) {
         next.bottom = vh - r.top + GAP;
         next.maxHeight = above;

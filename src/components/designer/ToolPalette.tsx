@@ -21,10 +21,11 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
   };
   return <>
     <div className="designer-palette">
-      <ToolRail doc={settings.doc} onPick={pick}><div className="palette-history">{history}</div></ToolRail>
+      <ToolRail doc={settings.doc} onPick={pick} />
     </div>
     <div className="designer-view" role="toolbar" aria-label="Canvas view">
       <IconButton icon={Ruler} label={`${rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={rulers} aria-pressed={rulers} size="sm" onClick={() => setUi({ rulers: !rulers })} />
+      <div className="view-history">{history}</div>
       {view}
     </div>
     <Popover key={tool} open={pop.open && tool !== 'hand'} anchor={pop.ref} onClose={pop.close} placement="bottom-center" width={tool === 'eyedropper' ? 360 : ['text', 'select', 'move'].includes(tool) ? 560 : 440} label={tool === 'text' ? 'New text settings' : `${tool} tool settings`} className={`designer-context settings-${tool}`}>
