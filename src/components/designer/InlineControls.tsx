@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { useStore } from '../../store/store';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
+import { colorHsl } from '../../lib/color';
 import { ColorPlane } from './ColorPlane';
 import { ColorChannels } from './ColorChannels';
 
@@ -11,13 +12,13 @@ import { ColorChannels } from './ColorChannels';
  * A number set right in the bar: short label, a small slider and the value (type it, or scroll the wheel over it).
  * No menu to open: what it is and what it holds stay in sight.
  */
-export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; onChange: (v: number) => void }) {
+export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, allowManualOverflow = false, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; allowManualOverflow?: boolean; onChange: (v: number) => void }) {
   const shown = Math.round(value * scale * 100) / 100;
   const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
   return <label className="opt opt-slider" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
     <span className="opt-label">{label}</span>
     <Range className="opt-range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
-    <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
+    <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={allowManualOverflow ? undefined : max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => { const v = +e.target.value / scale; if (Number.isFinite(v)) allowManualOverflow ? onChange(Math.max(min, v)) : set(v); }} />
     {unit && <span className="opt-unit">{unit}</span>}
   </label>;
 }
@@ -30,6 +31,8 @@ export function InlineColor({ label, value, onChange, showValue = false, childre
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
   const [hex, setHex] = useState(value);
+  const [hue, setHue] = useState(() => colorHsl(value)[0]);
+  useEffect(() => { const [h, s] = colorHsl(value); if (s > 0) setHue(h); }, [value]);
   const close = () => { rememberColor(value); pop.close(); };
   const pick = (c: string) => { onChange(c); setHex(c); };
   const chip = (c: string, saved: boolean) => (
@@ -42,8 +45,8 @@ export function InlineColor({ label, value, onChange, showValue = false, childre
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
       <div className="swatch-panel">
-        <ColorPlane value={value} onChange={pick} />
-        <ColorChannels value={value} onChange={pick} />
+        <ColorPlane value={value} hue={hue} onChange={pick} />
+        <ColorChannels value={value} hue={hue} onHueChange={setHue} onChange={pick} />
         {children}
         <div className="swatch-row">
           <span className="picker-preview" style={{ background: value }} aria-hidden="true" />

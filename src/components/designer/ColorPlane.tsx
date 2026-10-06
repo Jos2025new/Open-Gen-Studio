@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent } from 'react';
+import { type PointerEvent } from 'react';
 
 function hsv(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
@@ -13,10 +13,8 @@ function hex(h: number, s: number, v: number) {
   return '#' + rgb.map((n) => Math.round((n + m) * 255).toString(16).padStart(2, '0')).join('');
 }
 
-export function ColorPlane({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+export function ColorPlane({ value, hue, onChange }: { value: string; hue: number; onChange: (color: string) => void }) {
   const color = hsv(value);
-  const [hue, setHue] = useState(color.h);
-  useEffect(() => { const next = hsv(value); if (next.s > 0) setHue(next.h); }, [value]);
   const point = (e: PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const s = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));

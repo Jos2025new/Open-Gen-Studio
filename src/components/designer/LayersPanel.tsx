@@ -82,6 +82,11 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
   const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
+  const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const previousTool = useRef(tool);
+  useEffect(() => {
+    if (previousTool.current !== tool) { setTab('props'); setCollapsed(false); previousTool.current = tool; }
+  }, [tool, setTab, setCollapsed]);
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);
@@ -127,7 +132,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     <div className="panel-tabs" role="tablist" aria-label="Layers panel">
       {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, 'Tool settings and layer properties']] as const).map(([id, Icon, label]) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
-          <Icon size={14} /><span className="sr-only">{label}</span>
+          <Icon size={14} /><span>{id === 'layers' ? 'Layers' : 'Tool settings'}</span>
         </button>
       ))}
       <span className="panel-tabs-gap" />
@@ -204,7 +209,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     </section>}
     {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
     {layer && <>
-      {tab === 'props' && <details key={tool} className="layer-details" open={tool === 'move'}>
+      {tab === 'props' && <details className="layer-details" open={propertiesOpen} onToggle={(e) => setPropertiesOpen(e.currentTarget.open)}>
       <summary>Layer properties</summary>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />

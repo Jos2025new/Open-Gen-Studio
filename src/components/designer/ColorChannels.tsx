@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Segmented } from '../ui/primitives';
 import { colorRgb, colorHsl, rgbHex, hslHex } from '../../lib/color';
 
-export function ColorChannels({ value, onChange }: { value: string; onChange: (color: string) => void }) {
+export function ColorChannels({ value, hue, onHueChange, onChange }: { value: string; hue: number; onHueChange: (hue: number) => void; onChange: (color: string) => void }) {
   const [mode, setMode] = useState<'hsl' | 'rgb'>('hsl');
   const rgb = colorRgb(value), hsl = colorHsl(value);
-  const [hue, setHue] = useState(hsl[0]);
-  useEffect(() => { if (hsl[1] > 0) setHue(hsl[0]); }, [value]);
   const color = (s: number, l: number) => `hsl(${hue} ${s}% ${l}%)`;
   const channels = mode === 'hsl' ? [
     { label: 'Hue', short: 'H', value: hue, max: 359, gradient: 'linear-gradient(to right,red,#ff0,#0f0,#0ff,#00f,#f0f,red)' },
@@ -22,7 +20,7 @@ export function ColorChannels({ value, onChange }: { value: string; onChange: (c
       <span>{c.short}</span><input className="color-track" type="range" min={0} max={c.max} step={1} value={Math.round(c.value)} aria-label={c.label} style={{ background: c.gradient }} onChange={(e) => {
         const next = Number(e.target.value);
         if (mode === 'rgb') { const result = [...rgb]; result[i] = next; onChange(rgbHex(result)); }
-        else { const result = [hue, hsl[1], hsl[2]]; result[i] = next; if (i === 0) setHue(next); onChange(hslHex(result)); }
+        else { const result = [hue, hsl[1], hsl[2]]; result[i] = next; if (i === 0) onHueChange(next); onChange(hslHex(result)); }
       }} />
     </label>)}
   </div>;

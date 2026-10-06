@@ -21,7 +21,7 @@ export function StrokeStyleFields({ value, onChange }: { value: StrokeStyle; onC
       <InlineSlider label="Jitter" unit="%" scale={100} min={0} max={1} step={0.01} value={value.texture.jitter} onChange={(jitter) => onChange({ texture: { ...value.texture!, jitter } })} />
       <Field label="Seed" hint="Same seed, same grain"><input type="number" min={0} value={value.texture.seed} onChange={(e) => onChange({ texture: { ...value.texture!, seed: Math.max(0, Math.floor(+e.target.value)) } })} /></Field>
     </> : null}
-    <InlineSlider label="Taper start" unit="px" min={0} max={500} value={value.taperStart} onChange={(taperStart) => onChange({ taperStart })} />
-    <InlineSlider label="Taper end" unit="px" min={0} max={500} value={value.taperEnd} onChange={(taperEnd) => onChange({ taperEnd })} />
+    <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={value.taperStart} onChange={(taperStart) => onChange({ taperStart })} />
+    <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={value.taperEnd} onChange={(taperEnd) => onChange({ taperEnd })} />
   </div>;
 }

@@ -1,5 +1,5 @@
-import { Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { ChevronLeft, ChevronRight, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -42,6 +42,32 @@ function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: (typeof GROUPS
   </>;
 }
 
+function ContextControls({ tool, children }: { tool: DesignTool; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ overflow: false, left: false, right: false });
+  const measure = () => {
+    const el = ref.current;
+    if (!el) return;
+    const next = { overflow: el.scrollWidth > el.clientWidth + 1, left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 };
+    setEdges((old) => old.overflow === next.overflow && old.left === next.left && old.right === next.right ? old : next);
+  };
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.scrollLeft = 0;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    measure();
+    return () => observer.disconnect();
+  }, [tool]);
+  return <div className="tool-family palette-quick">
+    {edges.overflow && <button type="button" className="context-scroll" aria-label="Scroll tool settings left" data-tip="Previous tool settings" disabled={!edges.left} onClick={() => ref.current?.scrollBy({ left: -180, behavior: 'smooth' })}><ChevronLeft size={12} /></button>}
+    <div ref={ref} className="palette-quick-scroll" onScroll={measure}><div className="palette-quick-content">{children}</div></div>
+    {edges.overflow && <button type="button" className="context-scroll" aria-label="Scroll tool settings right" data-tip="More tool settings" disabled={!edges.right} onClick={() => ref.current?.scrollBy({ left: 180, behavior: 'smooth' })}><ChevronRight size={12} /></button>}
+  </div>;
+}
+
 export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc; children?: ReactNode }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
@@ -65,12 +91,12 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
     <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
     <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} /><ToolGroup doc={doc} group={paint} tool={tool} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
-    <div className="tool-family palette-quick">
+    <ContextControls tool={tool}>
       {contextualSettings ? <>{button('eyedropper')}<ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact /></> : <>
       {showColor && <InlineColor label="Active color" value={color} onChange={setColor} />}{button('eyedropper')}
       {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
       </>}
-    </div>
+    </ContextControls>
 
   </div>;
 }
