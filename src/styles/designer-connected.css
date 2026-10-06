@@ -77,3 +77,38 @@
 
 .designer-context .tool-setting { min-height: var(--control-h); background: var(--surface); border-color: transparent; }
 .designer-context .tool-setting:hover, .designer-context .tool-setting[aria-expanded="true"] { background: var(--surface-3); }
+
+/* The same parameter layout is used in tool popovers and layer properties. */
+.stroke-controls, .designer-context .tool-settings {
+  gap: 8px;
+}
+.stroke-controls {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); width: 100%;
+}
+.designer-context .opt-slider, .stroke-controls .opt-slider {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center;
+  height: auto; min-height: 56px; padding: 8px 10px; gap: 6px;
+  background: var(--surface); border: 1px solid transparent; border-radius: var(--radius);
+}
+.opt-slider .opt-label { grid-column: 1; grid-row: 1; }
+.opt-slider .opt-num { grid-column: 2; grid-row: 1; text-align: right; font-variant-numeric: tabular-nums; }
+.opt-slider .opt-unit { grid-column: 3; grid-row: 1; margin-left: -3px; }
+.designer-context .opt-slider .opt-range, .stroke-controls .opt-slider .opt-range {
+  grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; min-width: 0; margin: 0;
+}
+.stroke-controls .opt-color, .stroke-controls .opt-pick {
+  min-width: 0; height: 56px; padding: 8px 10px; background: var(--surface); border-color: transparent;
+  border-radius: var(--radius); flex-wrap: wrap; gap: 6px;
+}
+.stroke-controls .opt-color .opt-value { margin-left: auto; font-variant-numeric: tabular-nums; }
+.stroke-controls .opt-pick .opt-value { flex: 1; text-align: right; max-width: none; }
+.stroke-controls .opt-pick svg { margin-left: 0; }
+.stroke-controls .field { min-width: 0; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); }
+.layer-properties .stroke-controls .opt { background: var(--surface-2); }
+.designer-context .tool-settings > .opt-slider { flex: 1 1 170px; }
+.designer-context .tool-settings > .opt-pick, .designer-context .tool-settings > .opt-color {
+  flex: 1 1 130px; height: 38px; justify-content: space-between; padding: 0 10px;
+}
+.designer-context .tool-settings > .stroke-controls { flex-basis: 100%; }
+.designer-context .tool-setting { padding: 7px 10px; }
+.stroke-controls > .opt-pick { grid-column: 1 / -1; height: 38px; }

@@ -5,7 +5,7 @@ import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type 
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
 import { SNAP_DEFAULT } from '../../engine/design/snap';
-import { MenuItem, Range, Segmented } from '../ui/primitives';
+import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
 import { setUi, useStore } from '../../store/store';
@@ -14,10 +14,9 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
 import { clearSelected, fillSelection, getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
-import { ColorPlane } from './ColorPlane';
+import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -25,72 +24,6 @@ export function ContextField({ label, hint, children }: { label: ReactNode; hint
     <button type="button" ref={pop.ref} className="tool-setting" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>{label}<ChevronDown size={12} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={230} label={typeof label === 'string' ? label : 'Tool setting'}>
       <div className="tool-setting-content"><div className="field"><span className="field-label">{label}</span>{children}{hint && <span className="field-hint">{hint}</span>}</div></div>
-    </Popover>
-  </>;
-}
-
-/**
- * A number set right in the bar: short label, a small slider and the value (type it, or scroll the wheel over it).
- * No menu to open: what it is and what it holds stay in sight.
- */
-export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; onChange: (v: number) => void }) {
-  const shown = Math.round(value * scale * 100) / 100;
-  const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
-  return <label className="opt" onWheel={(e) => { set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
-    <span className="opt-label">{label}</span>
-    <Range className="opt-range" min={min} max={max} step={step} value={value} aria-label={label} onChange={(e) => set(+e.target.value)} />
-    <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" min={min * scale} max={max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => set(+e.target.value / scale)} />
-    {unit && <span className="opt-unit">{unit}</span>}
-  </label>;
-}
-
-/**
- * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
- * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
- */
-export function InlineColor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  const pop = usePopover();
-  const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
-  const [hex, setHex] = useState(value);
-  const close = () => { rememberColor(value); pop.close(); };
-  const pick = (c: string) => { onChange(c); setHex(c); };
-  const chip = (c: string, saved: boolean) => (
-    <button key={`${saved}${c}`} type="button" className={`swatch${c === value.toLowerCase() ? ' is-on' : ''}`} style={{ background: c }} aria-label={c} data-tip={saved ? `${c} · right-click to remove` : c}
-      onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
-  );
-  return <>
-    <button type="button" ref={pop.ref} className="opt opt-color" aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
-      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />{label === 'Text color' && <span className="opt-value">{value.toUpperCase()}</span>}
-    </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={232} label={label}>
-      <div className="swatch-panel">
-        <ColorPlane value={value} onChange={pick} />
-        <div className="swatch-row">
-          <input type="color" value={value} aria-label={label} onChange={(e) => pick(e.target.value)} />
-          <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} />
-          <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
-        </div>
-        {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
-        <span className="field-label">Saved</span>
-        {sw.saved.length ? <div className="swatch-grid">{sw.saved.map((c) => chip(c, true))}</div> : <span className="field-hint">Save colors here to reuse them in any design.</span>}
-      </div>
-    </Popover>
-  </>;
-}
-
-/** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */
-export function InlineSelect<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; onChange: (v: T) => void }) {
-  const pop = usePopover();
-  const items = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
-  const current = items.find((o) => o.value === value)?.label ?? String(value);
-  return <>
-    <button type="button" ref={pop.ref} className="opt opt-pick" aria-haspopup="listbox" aria-expanded={pop.open} onClick={pop.toggle}>
-      <span className="opt-label">{label}</span><span className="opt-value">{current}</span><ChevronDown size={12} />
-    </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={170} label={label}>
-      <div className="menu" role="listbox">
-        {items.map((o) => <MenuItem key={String(o.value)} label={o.label} active={o.value === value} onClick={() => { onChange(o.value); pop.close(); }} />)}
-      </div>
     </Popover>
   </>;
 }
@@ -292,7 +225,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle /><SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
@@ -310,7 +243,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve }: { sessionId: str
           <InlineSlider label="Smooth" unit="px" min={0} max={4} step={0.5} value={brush.fillSmooth ?? 0} onChange={(v) => setUi({ brush: { ...brush, fillSmooth: v } })} />
         </> : tool === 'lineart' ? <>
           <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
-          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields fieldComponent={ContextField} value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields fieldComponent={ContextField} value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
+          {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
         </> : paint ? <>
           <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => setUi({ brush: { ...brush, size: v } })} />
           {tool !== 'eraser' && <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />}

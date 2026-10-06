@@ -14,7 +14,8 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
-import { EditModeToggle, InlineColor } from './ToolSettings';
+import { EditModeToggle } from './ToolSettings';
+import { InlineColor } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 

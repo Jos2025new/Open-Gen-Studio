@@ -8,7 +8,7 @@ textarea { resize: vertical; }
 svg { flex-shrink: 0; }
 .icon-btn, .btn, .chip { display: inline-flex; align-items: center; justify-content: center; gap: var(--control-gap); border-radius: var(--radius-s); flex-shrink: 0; }
 .icon-btn { width: var(--control-h); height: var(--control-h); color: var(--text-2); }
-.topbar-slot { flex-shrink: 0; }
+.topbar .topbar-slot { flex: 0 0 auto; }
 .icon-btn-sm { width: 27px; height: 27px; }
 .icon-btn-lg { width: 38px; height: 38px; }
 .icon-btn.is-active, .chip.is-active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); }
@@ -109,3 +109,16 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 /* Import from Chat / Nodes in the top bar: boxed like the secondary buttons beside it, so it reads as an action. */
 .import-chat-btn { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; }
 .import-chat-btn:hover { border-color: var(--accent-line); color: var(--accent); }
+
+/* A parameter reads as one control: quiet label, clear value, then its adjustment. */
+.field:has(> input[type=range]), .op-field:has(> input[type=range]) {
+  padding: 10px 12px; gap: 8px; background: var(--surface-2); border-radius: var(--radius);
+}
+.field > input[type=range], .op-field > input[type=range] { width: 100%; margin: 0; }
+.field > select, .op-field > select, .node-field > select {
+  min-height: var(--control-h); background-color: var(--surface-2); color: var(--text); border-color: var(--border);
+}
+.field:has(> select) > .field-label, .op-field:has(> select) > .field-label { padding-left: 2px; }
+.menu-item[aria-selected=true], .menu-item.is-active { box-shadow: inset 2px 0 var(--accent); }
+.opt-unit { font-size: 10px; opacity: .8; }
+.opt-pick .opt-value { font-weight: 550; }
