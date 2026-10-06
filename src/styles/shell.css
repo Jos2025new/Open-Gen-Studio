@@ -323,3 +323,6 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .topbar-slot > * { flex-shrink: 0; }
 .topbar-slot > .tool-settings { flex-shrink: 1; min-width: 110px; overflow-x: auto; }
 .topbar-right > :not(.topbar-slot) { flex-shrink: 0; }
+
+.ml-foot-icon.session-new { color: var(--accent); background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.ml-foot-icon.session-new:hover { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }

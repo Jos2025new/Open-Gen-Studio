@@ -149,7 +149,7 @@ function SessionSwitcher({ activeId, title, onRename }: { activeId: string; titl
           <button type="button" className="ml-foot-main" onClick={() => go(() => setUi({ panel: 'sessions' }))}>
             All sessions ({Object.keys(sessions).length})
           </button>
-          <button type="button" className="ml-foot-icon" aria-label="New session" data-tip="New session" onClick={() => go(() => newSession())}>
+          <button type="button" className="ml-foot-icon session-new" aria-label="New session" data-tip="New session" onClick={() => go(() => newSession())}>
             <Plus size={14} />
           </button>
         </div>
