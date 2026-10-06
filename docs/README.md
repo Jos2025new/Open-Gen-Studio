@@ -50,6 +50,8 @@
 
 ## Verificación
 
+- [Error de referencia 3D: adjunto, captura vigente y límites](agent-3d-view-reference.md).
+
 - [Contrato del operador: recorrido corregido, sesiones existentes y límites](agent-operator-contract.md).
 
 - [P0 + P1a: biblioteca, consentimiento, pruebas y límites](agent-library-consent.md).

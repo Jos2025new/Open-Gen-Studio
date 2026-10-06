@@ -32,11 +32,20 @@ describe('find_assets', () => {
 
   it('says what each thing is: a view image is the viewer\'s, a 3D model names its view image', () => {
     expect(describeAsset(assets.v1, assets, generations)).toMatch(/view image of 3D model asset:glb, rendered by the app's 3D viewer \(not by the 3D model provider\)/);
-    expect(describeAsset(assets.glb, assets, generations)).toMatch(/3D model \.glb .*TRELLIS\.2 · "the heroine as a 3D model" · .*inputs asset:img · its view image: asset:v1/);
+    expect(describeAsset(assets.glb, assets, generations)).toMatch(/3D model \.glb .*TRELLIS\.2 · "the heroine as a 3D model" · .*inputs asset:img · current view image: asset:v1/);
     expect(describeAsset(assets.img2, assets, generations)).toMatch(/Nano Banana #2 of 2 .*aspect 3:2, count 2 · plan step s1/);
   });
 
   it('view shows images as they are and a 3D model by its view image', () => {
-    expect(viewTargets([assets.glb, assets.img])).toEqual([{ show: 'v1', note: '3D model asset:glb, shown by its view image asset:v1' }, { show: 'img', note: 'asset:img' }]);
+    expect(viewTargets([assets.glb, assets.img], assets)).toEqual([{ show: 'v1', note: '3D model asset:glb, shown by its current view image asset:v1' }, { show: 'img', note: 'asset:img' }]);
   });
+});
+
+it('view targets validate the 3D relation and retain an explicitly selected saved image', () => {
+  const foreign = asset('foreignView', { sessionId: 's2' });
+  const broken = asset('broken', { kind: 'model3d', viewImageId: foreign.id });
+  const saved = asset('saved', { origin: 'view3d' });
+  const targets = viewTargets([broken, saved], { ...assets, broken, foreignView: foreign, saved });
+  expect(targets[0].show).toBeUndefined();
+  expect(targets[1].show).toBe('saved');
 });

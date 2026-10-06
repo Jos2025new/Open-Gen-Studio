@@ -1,3 +1,4 @@
+import { currentViewImage, viewReferenceLabel } from './assetSearch';
 import { getAssetBlob } from '../../lib/idb';
 import { blobToDataUrl, canvasToBlob, createCanvas, ctx2d, fetchBlob, blobToCanvas, videoFrameSheet } from '../../lib/media';
 import type { Asset, LlmContentPart, LlmMessage } from '../types';
@@ -52,7 +53,7 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
     try {
       if (a.kind === 'model3d') {
         // Its view image: rendered when the user moves the model in the viewer (or on first show).
-        const view = a.viewImageId;
+        const view = currentViewImage(a, assets)?.id;
         if (view && deps.dataUrl) url = await deps.dataUrl(view);
         else if (view) { const blob = await assetBlob(view); if (blob) url = await reducedDataUrl(blob); }
         if (!url && a.thumbnailUrl?.startsWith('data:')) url = a.thumbnailUrl;
@@ -73,7 +74,7 @@ export async function attachmentParts(ids: string[], deps: { dataUrl?: (id: stri
       url = null;
     }
     const label = a.kind === 'model3d'
-      ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (3D model, shown by its current view image${a.viewImageId ? ` asset:${a.viewImageId}` : ''}: the angle the user left it at in the viewer)`
+      ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (3D model, ${viewReferenceLabel(a, assets)}; shown by the viewer capture, not the GLB file)`
       : `asset:${id} name=${JSON.stringify(assetContextName(a))} (${a.kind === 'video' ? `video ${a.width}×${a.height}${a.duration ? ` ${a.duration.toFixed(1)}s` : ''}, 4 frames shown on one 2×2 sheet: start, ⅓, ⅔, end` : `image ${a.width}×${a.height}`})`;
     parts.push({ type: 'text', text: url ? `${label}:` : `${label}: could not be shown.` });
     if (url) parts.push({ type: 'image_url', image_url: { url } });

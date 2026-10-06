@@ -18,6 +18,7 @@ import { nodeOutputAsset } from '../flow/graph';
 import { graphIndex } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
 import { assetContextName } from './attachments';
+import { viewReferenceLabel } from './assetSearch';
 
 const get = useStore.getState;
 
@@ -281,7 +282,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
       `attached by the user in selection order: ${opts.attachments
         .map((id) => {
           const a = st.assets[id];
-          return a ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (${assetShape(a)})` : '';
+          const view = a ? viewReferenceLabel(a, st.assets) : '';
+          return a ? `asset:${id} name=${JSON.stringify(assetContextName(a))} (${assetShape(a)})${view ? ` — ${view}` : ''}` : '';
         })
         .filter(Boolean)
         .join(', ')}`,
@@ -302,8 +304,9 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
       `recent assets on the ${opts.workspace} canvas (newest first; other canvases are not listed):\n${recent
         .map((a) => {
           const g = a.generationId ? st.generations[a.generationId] : undefined;
-          const what = g ? (g.op ? OPS[g.op.id].label : truncate(g.prompt, 70)) : a.origin === 'view3d' ? "view image of a 3D model, rendered by the app's viewer" : a.origin;
-          return `  asset:${a.id} — ${assetShape(a)} — ${what}`;
+          const what = g ? (g.op ? OPS[g.op.id].label : truncate(g.prompt, 70)) : a.origin;
+          const view = viewReferenceLabel(a, st.assets);
+          return `  asset:${a.id} — ${assetShape(a)} — ${what}${view ? ` — ${view}` : ''}`;
         })
         .join('\n')}`,
     );

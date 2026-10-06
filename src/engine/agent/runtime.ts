@@ -335,7 +335,7 @@ function pickedWorkflowGuides(sessionId: string): string {
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
 async function visibleAttachments(sessionId: string, workspace: Workspace, attachments: string[]) {
-  if (!attachments.some((id) => ['image', 'video'].includes(get().assets[id]?.kind ?? ''))) return [];
+  if (!attachments.some((id) => ['image', 'video', 'model3d'].includes(get().assets[id]?.kind ?? ''))) return [];
   if (!agentSeesImages()) {
     notice(sessionId, workspace, 'The selected agent model cannot see images: it only gets their size and type. Pick a model with vision in Settings.', 'info');
     return [];
@@ -1608,7 +1608,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             else if (!agentSeesImages()) respond(`${found.text}\n\nNone sent: the agent model the user picked (${get().settings.agent.model}) cannot see images, on any canvas. Tell the user exactly that, and that a model with vision (chosen in Settings → Agent) can look; never describe the results.`);
             else {
               const parts: LlmContentPart[] = [];
-              for (const t of viewTargets(found.rows)) {
+              for (const t of viewTargets(found.rows, get().assets)) {
                 if (!t.show) parts.push({ type: 'text', text: `${t.note}.` });
                 else {
                   if (t.note !== `asset:${t.show}`) parts.push({ type: 'text', text: `${t.note}:` });

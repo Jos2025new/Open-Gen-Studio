@@ -56,7 +56,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'find_assets',
       description:
-        'This session\'s results and uploads (never other sessions), newest first: id, type and file extension, date, model, prompt or operation, settings, inputs. Filter by kind, origin, canvas, date (since: "24h", "7d", "today" or a date) and words (prompt, model, operation, extension like "png" or "glb", id). view: true also sends the first matches (up to 4) as images in the next message — the only way to see a result you were not shown. A 3D model is shown by its view image.',
+        'This session\'s results and uploads (never other sessions), newest first: id, type and file extension, date, model, prompt or operation, settings, inputs. Filter by kind, origin, canvas, date (since: "24h", "7d", "today" or a date) and words (prompt, model, operation, extension like "png" or "glb", id). view: true also sends the first matches (up to 4) as images in the next message — the only way to see a result you were not shown. A 3D model is shown by its current saved view image; previous captures remain separate image assets.',
       parameters: {
         type: 'object',
         properties: {
