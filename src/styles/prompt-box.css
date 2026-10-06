@@ -6,9 +6,9 @@
 .composer-bar { gap: 10px; min-height: 36px; flex-wrap: wrap; }
 .composer-controls { flex: 1 1 200px; flex-wrap: wrap; overflow: visible; max-height: none; }
 .composer-bar .mode-btn { height: 34px; border: 0; border-radius: var(--radius); background: var(--surface-3); padding: 0 11px; flex-shrink: 0; }
-.composer-bar .segmented { border: 0; border-radius: var(--radius); padding: 3px; background: transparent; }
+.composer-bar .segmented { border: 0; border-radius: var(--radius); padding: 3px; background: var(--surface); }
 .composer-bar .segmented button { height: 28px; border-radius: var(--radius-s); padding: 0 10px; }
-.composer-bar .segmented .is-active { background: var(--surface-3); box-shadow: none; }
+.composer-bar .segmented .is-active { background: var(--surface-3); }
 .composer-end { gap: 12px; max-width: 100%; flex-wrap: wrap; }
 .composer-end .models-chip { height: 34px; background: transparent; border: 0; padding: 0 6px; }
 .composer-bar .send-btn.is-agent, .composer-bar .send-btn.is-stop { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
