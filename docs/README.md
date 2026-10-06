@@ -12,7 +12,7 @@
 - [agente](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
-- [designer: resize con pintura y relleno de página, selección raster/vectorial y cursores raster/vector/influencia](features/designer.md).
+- [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
 - [proveedores](features/proveedores.md).

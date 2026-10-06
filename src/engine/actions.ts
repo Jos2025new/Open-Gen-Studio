@@ -662,7 +662,10 @@ export async function attachFiles(files: File[]): Promise<void> {
   const models = ids.filter((id) => get().assets[id]?.kind === 'model3d');
   if (models.length) toast(`${models.length} 3D model${models.length > 1 ? 's' : ''} added to the gallery.`, 'info');
   const inputs = ids.filter((id) => !models.includes(id));
-  if (inputs.length) setComposer((c) => ({ attachments: [...c.attachments, ...inputs] }));
+  if (inputs.length) {
+    setComposer((c) => ({ attachments: [...c.attachments, ...inputs] }));
+    if (get().ui.workspace === 'designer') setUi({ designerDock: 'prompt' });
+  }
 }
 
 // ---------------------------------------------------------------------------

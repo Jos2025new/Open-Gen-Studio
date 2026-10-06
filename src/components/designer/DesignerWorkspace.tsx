@@ -23,6 +23,7 @@ import { Stage } from './Stage';
 import { ToolPalette } from './ToolPalette';
 import { DocumentPicker } from './DocumentPicker';
 import { uploadFiles } from '../../engine/actions';
+import { placeImportedImages } from '../../engine/design/importImages';
 import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
 import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
@@ -202,7 +203,7 @@ export function DesignerWorkspace() {
   const importFiles = async (files: File[]) => {
     if (!doc) return;
     const ids = await uploadFiles(files.filter((f) => f.type.startsWith('image/')));
-    for (const id of ids) await placeAsset(session.id, doc.id, id, doc.layers.length ? 'new' : 'base');
+    await placeImportedImages(session.id, doc.id, ids);
   };
   useEffect(() => {
     const open = () => importRef.current?.click();

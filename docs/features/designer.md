@@ -14,6 +14,12 @@
 
 Registro de esta sesión: [implementación, revisión vectorial, procedimiento, tiempos y límites](../history/018-2026-10-W40.md).
 
+## Importación y referencias en el dock
+
+- Importar varias imágenes conserva cada una en una capa: solo la primera usa la base si el documento está vacío. La decisión consulta el documento actualizado después de cada colocación; una colocación fallida no consume la base ([código](../../src/engine/design/importImages.ts), [tests](../../tests/import-images.test.ts)).
+- Adjuntar archivos aceptados al compositor desde Designer muestra el prompt y sus referencias. Cancelar o rechazar todos los archivos conserva las herramientas; adjuntar en Chat no cambia la preferencia del dock ([código](../../src/engine/actions.ts), [tests](../../tests/attach-files-dock.test.ts)).
+- Validación automatizada con almacenamiento simulado; aspecto visual en sandbox pendiente de verificar para estas correcciones.
+
 ## Monkey test manual
 Arranca `npm run dev:sandbox` y ejecuta `npm run stress`; termina deteniendo el sandbox ([test](../../tests-e2e/designer-monkey.spec.ts)).
 Usa `SEED=101 STEPS=300 npm run stress` para repetir acciones y coordenadas; el valor por defecto es 300 ([test](../../tests-e2e/designer-monkey.spec.ts)).
