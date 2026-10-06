@@ -31,10 +31,10 @@ function ToolGroup({ group, tool, onPick }: { group: (typeof GROUPS)[number]; to
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>
-    <IconButton ref={pop.ref} icon={group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={pop.toggle} />
+    <IconButton ref={pop.ref} icon={group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={(e) => { if (e.detail < 2) pop.toggle(); }} onDoubleClick={(e) => { if (current) { pop.close(); onPick?.(e.currentTarget); } }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} label={group.label}>
       <div className="menu" role="menu">
-        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} onClick={() => { setUi({ tool: t.id }); pop.close(); if (pop.ref.current) onPick?.(pop.ref.current); }} />)}
+        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} onClick={() => { setUi({ tool: t.id }); pop.close(); }} />)}
       </div>
     </Popover>
   </>;
@@ -44,6 +44,6 @@ export function ToolRail({ doc, children, onPick }: { doc: DesignDoc; children?:
   const tool = useStore((s) => s.ui.tool);
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
     {children}
-    {[[0, 3], [3, 6], [6, TOOLS.length]].map(([start, end]) => <div className="tool-family" key={start}>{TOOLS.slice(start, end).map((t) => { const reason = toolBlockReason(t.id, activeLayer(doc)); return <Fragment key={t.id}><IconButton icon={t.icon} label={t.label} active={tool === t.id} aria-pressed={tool === t.id} disabled={!!reason} data-tip={reason ?? (t.id === 'text' ? 'Text (T) · settings for new text' : t.label)} onClick={(e) => { setUi({ tool: t.id }); onPick?.(e.currentTarget); }} />{GROUPS.filter((g) => g.after === t.id).map((g) => <ToolGroup key={g.id} group={g} tool={tool} onPick={onPick} />)}</Fragment>; })}</div>)}
+    {[[0, 3], [3, 6], [6, TOOLS.length]].map(([start, end]) => <div className="tool-family" key={start}>{TOOLS.slice(start, end).map((t) => { const reason = toolBlockReason(t.id, activeLayer(doc)); return <Fragment key={t.id}><IconButton icon={t.icon} label={t.label} active={tool === t.id} aria-pressed={tool === t.id} disabled={!!reason} data-tip={reason ?? (t.id === 'text' ? 'Text (T) · settings for new text' : t.label)} onClick={() => setUi({ tool: t.id })} onDoubleClick={(e) => onPick?.(e.currentTarget)} />{GROUPS.filter((g) => g.after === t.id).map((g) => <ToolGroup key={g.id} group={g} tool={tool} onPick={onPick} />)}</Fragment>; })}</div>)}
   </div>;
 }
