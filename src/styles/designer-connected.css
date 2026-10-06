@@ -146,3 +146,13 @@
 .color-channel input.color-track::-webkit-slider-thumb { width: 12px; height: 18px; border: 2px solid white; border-radius: 5px; background: transparent; box-shadow: 0 0 0 1px #0008; }
 .color-channel input.color-track::-moz-range-thumb { width: 8px; height: 14px; border: 2px solid white; border-radius: 5px; background: transparent; box-shadow: 0 0 0 1px #0008; }
 .picker-preview { flex: 0 0 26px; height: 26px; border: 1px solid var(--border-strong); border-radius: 5px; }
+
+.sidebar-tool-settings { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+.sidebar-tool-settings .tool-settings { display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; max-width: none; overflow: visible; gap: 8px; }
+.sidebar-tool-settings .tool-settings > .opt-slider { flex: 1 1 140px; display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; height: auto; min-height: 56px; padding: 8px 10px; gap: 6px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
+.sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 38px; padding: 0 10px; background: var(--surface-2); border: 0; border-radius: var(--radius-s); }
+.sidebar-tool-settings .tool-settings > .stroke-controls { flex-basis: 100%; }
+.sidebar-tool-settings .opt-slider .opt-range { grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; min-width: 0; margin: 0; }
+.sidebar-tool-settings .tool-settings .edit-mode { flex-basis: 100%; justify-content: space-between; }
+.sidebar-tool-settings .opt-hint { white-space: normal; }
+.layer-details > summary { padding: 12px 10px; cursor: pointer; font-size: 12px; color: var(--text-2); }

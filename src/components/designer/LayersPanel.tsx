@@ -14,7 +14,7 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
-import { EditModeToggle } from './ToolSettings';
+import { ToolSettings } from './ToolSettings';
 import { InlineColor } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
@@ -73,9 +73,9 @@ function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc:
   </div>;
 }
 
-export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const layer = activeLayer(doc);
-  const editing = useStore((s) => s.ui.tool === 'move');
+  const tool = useStore((s) => s.ui.tool);
   const pop = usePopover();
   const addPop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
@@ -125,7 +125,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }}
       onDoubleClick={() => setWidth(260)} />
     <div className="panel-tabs" role="tablist" aria-label="Layers panel">
-      {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, layer ? `Properties — ${layer.type === 'raster' ? 'Raster' : layer.type === 'text' ? 'Text' : 'Vector'}` : 'Properties']] as const).map(([id, Icon, label]) => (
+      {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, 'Tool settings and layer properties']] as const).map(([id, Icon, label]) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
           <Icon size={14} /><span className="sr-only">{label}</span>
         </button>
@@ -199,11 +199,14 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     </div>
     </section>
     <div className="layers-body">
+    {tab === 'props' && <section className={`sidebar-tool-settings settings-${tool}`} aria-label="Active tool settings">
+      {tool === 'hand' ? <p className="field-hint">Pan has no additional settings.</p> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} />}
+    </section>}
     {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}
     {layer && <>
-      {tab === 'props' && <section className="panel-section panel-tab-body">
+      {tab === 'props' && <details key={tool} className="layer-details" open={tool === 'move'}>
+      <summary>Layer properties</summary>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
-        {editing && <div className="field edit-mode-field"><span className="field-label">Edit tool acts on</span><EditModeToggle /></div>}
         <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
         {layer.type === 'text' && <>
@@ -227,7 +230,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
         })() : null}
         {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill } : x) })} /></Field><Field label="Stroke"><InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
       </fieldset>
-      </section>}
+      </details>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>
         {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image').map((o) => <MenuItem key={o.id} label={o.label} detail={o.description} onClick={() => setOp(o.id)} />)}
       </Popover>
