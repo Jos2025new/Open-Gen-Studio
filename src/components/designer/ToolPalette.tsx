@@ -27,7 +27,7 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
       <IconButton icon={Ruler} label={`${rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={rulers} aria-pressed={rulers} size="sm" onClick={() => setUi({ rulers: !rulers })} />
       {view}
     </div>
-    <Popover key={tool} open={pop.open && tool !== 'hand'} anchor={pop.ref} onClose={pop.close} placement="bottom-center" width={560} label={tool === 'text' ? 'New text settings' : `${tool} tool settings`} className={`designer-context settings-${tool}`}>
+    <Popover key={tool} open={pop.open && tool !== 'hand'} anchor={pop.ref} onClose={pop.close} placement="bottom-center" width={tool === 'eyedropper' ? 360 : ['text', 'select', 'move'].includes(tool) ? 560 : 440} label={tool === 'text' ? 'New text settings' : `${tool} tool settings`} className={`designer-context settings-${tool}`}>
       <ToolSettings {...settings} />
     </Popover>
   </>;

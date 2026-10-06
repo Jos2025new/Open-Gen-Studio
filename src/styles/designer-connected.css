@@ -10,9 +10,9 @@
 .palette-history { display: flex; order: -1; gap: 2px; padding-right: 7px; margin-right: 4px; border-right: 1px solid var(--border-strong); }
 .designer-view { position: absolute; top: 12px; right: calc(var(--layers-w,260px) + 14px); z-index: 8; display: flex; align-items: center; gap: 3px; padding: 5px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); }
 .designer-view .zoom-value { font-size: 11px; }
-.designer-context { padding: 12px; border-radius: 12px; }
-.designer-context .tool-settings { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; overflow: visible; }
-.designer-context .opt { min-width: 0; height: 34px; padding: 0 7px; background: var(--surface); border-color: transparent; border-radius: var(--radius-s); }
+.designer-context { padding: 8px; border-radius: 12px; }
+.designer-context .tool-settings { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; overflow: visible; }
+.designer-context .opt { min-width: 0; height: 32px; padding: 0 7px; background: var(--surface); border-color: transparent; border-radius: var(--radius-s); }
 .designer-context .opt-range { flex: 1; min-width: 24px; max-width: 68px; }
 .designer-context .opt-pick svg { margin-left: auto; }
 .designer-context.settings-text .tool-settings { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); }
