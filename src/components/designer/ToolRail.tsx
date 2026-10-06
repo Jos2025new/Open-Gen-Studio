@@ -1,5 +1,5 @@
 import { Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
-import { useLayoutEffect, useRef, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -43,15 +43,6 @@ function ToolGroup({ group, tool, doc, onPick }: { doc: DesignDoc; group: (typeo
 }
 
 export function ToolRail({ doc, onPick }: { doc: DesignDoc; children?: ReactNode; onPick?: (button: HTMLButtonElement) => void }) {
-  const fixedTools = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const fixed = fixedTools.current!;
-    const measure = () => fixed.closest<HTMLElement>('.designer-palette')?.style.setProperty('--tools-fixed-w', `${fixed.getBoundingClientRect().width + 14}px`);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(fixed);
-    return () => observer.disconnect();
-  }, []);
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
   const shapeTool = ['rect', 'ellipse', 'polygon', 'line', 'curve', 'arrow'].includes(tool);
@@ -68,7 +59,7 @@ export function ToolRail({ doc, onPick }: { doc: DesignDoc; children?: ReactNode
   const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
   const paint = { id: 'paint', icon: Brush, label: 'Paint', after: 'hand' as DesignTool, tools: TOOLS.filter((t) => ['brush', 'eraser', 'select'].includes(t.id)) };
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
-    <div className="palette-fixed" ref={fixedTools}><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
+    <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
     <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} onPick={onPick} /><ToolGroup doc={doc} group={paint} tool={tool} onPick={onPick} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
     <div className="tool-family palette-quick">
