@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Ellipsis, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -8,7 +8,7 @@ import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
-import { Button, Field, IconButton, MenuItem, Range } from '../ui/primitives';
+import { Field, IconButton, MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
@@ -77,7 +77,6 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
   const layer = activeLayer(doc);
   const pop = usePopover();
   const addPop = usePopover();
-  const morePop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
@@ -187,18 +186,13 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
       </Popover>
       {layer && <>
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
-        {layer.type === 'raster' && <Button ref={pop.ref} size="sm" variant="ghost" icon={Sparkles} className="layer-ops-btn" disabled={layer.locked} aria-label="Operations" data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }}><span className="layer-ops-label">Operations</span></Button>}
+        {layer.type === 'raster' && <IconButton ref={pop.ref} size="sm" icon={Sparkles} label="Operations" className="layer-ops-btn" disabled={layer.locked} data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }} />}
         <span className="layer-actions-gap" />
-        <IconButton ref={morePop.ref} icon={Ellipsis} label="More layer actions" size="sm" aria-haspopup="dialog" aria-expanded={morePop.open} onClick={morePop.toggle} />
-        <Popover open={morePop.open} anchor={morePop.ref} onClose={morePop.close} width={260} label="More layer actions"><div className="menu">
-      {layer && <>
         {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
-          ? <MenuItem icon={FolderOutput} label="Ungroup this folder"  onClick={() => { ungroup(sessionId, doc.id, layer.groupId!); morePop.close(); }} />
-          : <MenuItem icon={FolderInput} label={picked.length > 1 ? `Group ${picked.length} layers (Ctrl+G)` : 'Group layers · Ctrl or Shift-click two or more layers first'}  disabled={picked.length < 2} onClick={() => { groupLayers(sessionId, doc.id, picked); morePop.close(); }} />}
-        <MenuItem icon={ArrowUp} label="Move layer up"  disabled={index === doc.layers.length - 1} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, 1); morePop.close(); }} />
-        <MenuItem icon={ArrowDown} label="Move layer down"  disabled={index === 0} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, -1); morePop.close(); }} />
-      </>}
-        </div></Popover>
+          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
+          : <IconButton icon={FolderInput} label="Group layers (Ctrl+G)" size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
+        <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, 1); }} />
+        <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, -1); }} />
         <IconButton icon={Trash} label={picked.length > 1 ? `Delete ${picked.length} layers` : 'Delete layer'} size="sm" tone="danger" disabled={picked.every((id) => doc.layers.find((l) => l.id === id)?.locked)} onClick={() => deleteLayers(sessionId, doc.id, picked)} />
       </>}
     </div>
@@ -230,7 +224,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
             <StrokeStyleFields value={targets[targets.length - 1]} onChange={(p) => patch({ strokes: layer.strokes!.map((st) => (ids.has(st.id) ? { ...st, ...p } : st)) })} />
           </>;
         })() : null}
-        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><input type="color" value={s.fill ?? '#d4f25a'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill: e.target.value } : x) })} /></Field><Field label="Stroke"><input type="color" value={s.stroke ?? '#ffffff'} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke: e.target.value } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
+        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill } : x) })} /></Field><Field label="Stroke"><InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
       </fieldset>
       </section>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>

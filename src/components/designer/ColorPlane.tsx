@@ -37,6 +37,6 @@ export function ColorPlane({ value, onChange }: { value: string; onChange: (colo
       }}>
       <span className="color-plane-point" style={{ left: `${color.s * 100}%`, top: `${(1 - color.v) * 100}%` }} />
     </div>
-    <input className="color-hue" type="range" min={0} max={359} step={1} aria-label="Hue" value={Math.min(359, Math.round(hue))} onChange={(e) => { const next = Number(e.target.value); setHue(next); onChange(hex(next, color.s, color.v)); }} />
+
   </div>;
 }
