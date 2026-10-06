@@ -1,19 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { FolderOpen, Wallet, MessageSquare, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, PenTool, Plus, Workflow } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { FolderOpen, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
 import type { Workspace } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
-import { MenuItem } from '../ui/primitives';
+import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
 import { Popover, usePopover } from '../ui/Popover';
-
-const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon; hint: string }> = [
-  { id: 'chat', label: 'Chat', icon: MessageSquare, hint: 'Conversation, questions and results' },
-  { id: 'node', label: 'Node', icon: Workflow, hint: 'Connected flows of cards' },
-  { id: 'designer', label: 'Designer', icon: PenTool, hint: 'Layers: raster, vector and text' },
-];
 
 /**
  * Library: a drawer (a rounded box, the line of its top, a handle below it), drawn here: lucide's archive box has a
@@ -59,7 +52,7 @@ function HomeMenu({ workspace }: { workspace: Workspace }) {
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={240} label="Canvases">
       <div className="menu" role="menu" onPointerEnter={keep} onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}>
-        {WORKSPACES.map((w) => <MenuItem key={w.id} icon={w.icon} label={w.label} detail={w.hint} active={w.id === workspace} onClick={() => { setUi({ workspace: w.id }); pop.close(); }} />)}
+        <WorkspaceMenuItems workspace={workspace} onClose={pop.close} />
       </div>
     </Popover>
   </>;

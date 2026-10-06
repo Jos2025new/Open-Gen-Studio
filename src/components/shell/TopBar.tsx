@@ -10,6 +10,7 @@ import { GenerationsPanel } from './GenerationsPanel';
 import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { IconButton } from '../ui/primitives';
+import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
@@ -24,8 +25,6 @@ export function TopbarActions({ children }: { children: ReactNode }) {
   return target ? createPortal(children, target) : null;
 }
 
-const WS_LABEL = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
-
 export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => void }) {
   const sessionId = useStore((s) => s.activeSessionId);
   const title = useStore((s) => s.sessions[s.activeSessionId]?.title ?? '');
@@ -36,6 +35,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const keys = useStore((s) => s.settings.keys);
   const settingsOpen = useStore((s) => s.ui.settingsOpen);
   const settingsRef = useRef<HTMLButtonElement>(null);
+  const workspacePop = usePopover();
   const connectedPop = usePopover();
   const generationsPop = usePopover();
   const connected = REMOTE_PROVIDERS.filter((p) => keys[p]?.trim());
@@ -56,7 +56,12 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   return (
     <header className="topbar">
       <div className="topbar-left">
-        <span className="ws-tag">{WS_LABEL[workspace]}</span>
+        <button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
+          {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
+        </button>
+        <Popover open={workspacePop.open} anchor={workspacePop.ref} onClose={workspacePop.close} placement="bottom-start" width={240} label="Canvases">
+          <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={workspacePop.close} /></div>
+        </Popover>
         <span className="topbar-sep">/</span>
         {editing ? (
           <input
