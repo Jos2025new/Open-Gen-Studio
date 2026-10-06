@@ -100,16 +100,18 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .attach-pile-count { position: absolute; left: -6px; top: -6px; z-index: 4; min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 10px; background: var(--accent); color: var(--accent-ink, #111); font-size: 11px; font-weight: 600; }
 
 /* Conversation card beside the composer (inside the dock), bottom-aligned with it; as wide as the space to the right allows. */
-.thread-peek { position: absolute; left: calc(100% + 12px); bottom: 0; z-index: 13; display: flex; flex-direction: column; width: max(260px, min(420px, calc((100vw - 56px - 100%) / 2 - 28px))); }
+.thread-peek { position: absolute; right: calc(100% + 12px); bottom: 0; z-index: 13; display: flex; flex-direction: column; width: max(260px, min(420px, calc((100vw - 56px - 100%) / 2 - 28px))); }
 .thread-designer { width: max(260px, min(420px, calc((100vw - 56px - var(--layers-w, 260px) - 100%) / 2 - 28px))); }
 .thread-peek.is-open { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: hidden; }
 .thread-peek.is-open .thread-toggle { width: 100%; margin: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--surface-2); padding: 9px 12px; }
 .thread-peek.is-open .thread-toggle svg:last-child { margin-left: auto; }
 .thread-peek .thread-body { max-height: min(560px, calc(100vh - 160px)); margin: 0; border: 0; border-radius: 0; box-shadow: none; }
-@media (max-width: 1100px) { .thread-peek { left: auto; right: 0; bottom: calc(100% + 8px); width: 100%; } .thread-peek .thread-body { max-height: calc(100vh - 300px); } }
-.thread-peek-folded { position: absolute; left: calc(100% + 12px); bottom: 0; }
-.thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; }
-@media (max-width: 1100px) { .thread-peek-folded { left: auto; right: 0; bottom: calc(100% + 8px); } }
+@media (max-width: 1400px) { .thread-peek { right: auto; left: 0; bottom: calc(100% + 8px); width: 100%; } .thread-peek .thread-body { max-height: calc(100vh - 300px); } }
+.thread-peek-folded { position: absolute; right: calc(100% + 12px); bottom: 0; }
+.thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; min-width: 190px; height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); padding: 0 12px; border-color: var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); }
+.thread-peek-folded .thread-toggle svg { width: var(--control-icon); height: var(--control-icon); }
+.thread-peek-folded .thread-toggle svg:last-child { margin-left: auto; }
+@media (max-width: 1400px) { .thread-peek-folded { right: auto; left: 0; bottom: calc(100% + 8px); } }
 
 /* Model lines: one row per model, its other routes folded under it. */
 .ml-line-head { display: flex; align-items: center; }
