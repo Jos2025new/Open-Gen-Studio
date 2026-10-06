@@ -161,6 +161,7 @@ export function ModelList({
   filter,
   autoOption,
   familyTree = false,
+  automaticVariants = false,
 }: {
   kind: MediaKind;
   value: string | null;
@@ -169,6 +170,8 @@ export function ModelList({
   autoOption?: string;
   /** Compact Agent picker: families are collapsible; variants stay as the existing rows. */
   familyTree?: boolean;
+  /** Select model lines; the runtime resolves their input variants. */
+  automaticVariants?: boolean;
 }) {
   const models = useStore((s) => s.catalog.models);
   const status = useStore((s) => s.catalog.status);
@@ -308,7 +311,7 @@ export function ModelList({
               const lineOpen = Boolean(needle) || openLines.includes(lineId) || rest.some((r) => r.members.some((x) => x.ref === value));
               const row = (g: VariantGroup, sub: boolean) => {
                 const { key, members, best: m } = g;
-                const selected = members.some((x) => x.ref === value);
+                const selected = members.some((x) => x.ref === value) || (automaticVariants && !sub && rest.some(g => g.members.some(x => x.ref === value)));
                 return (
                   <button key={key} type="button" className={`ml-row ${sub ? 'is-variant' : ''} ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
                     {sub ? <span className="ml-variant-dot" /> : <Monogram m={m} />}
@@ -335,7 +338,7 @@ export function ModelList({
                 <div key={lineId} className="ml-line">
                   <div className="ml-line-head">
                     {row(head, false)}
-                    {rest.length ? (
+                    {!automaticVariants && rest.length ? (
                       <button
                         type="button"
                         className={`ml-line-toggle ${lineOpen ? 'is-open' : ''}`}
@@ -348,7 +351,7 @@ export function ModelList({
                       </button>
                     ) : null}
                   </div>
-                  {lineOpen ? rest.map((g) => row(g, true)) : null}
+                  {!automaticVariants && lineOpen ? rest.map((g) => row(g, true)) : null}
                 </div>
               );
             }) : null}

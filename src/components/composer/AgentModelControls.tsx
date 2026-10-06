@@ -2,86 +2,24 @@ import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import { filterLlm, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  defaultModelFor,
-  modelSummary,
-  opModelFor,
-  pickImageEditModel,
-  fillVideoRoutes,
-  pickComposerModel,
-  preferredModel,
-  resetAgentModel,
-  resetComposerModel,
-} from '../../engine/catalog';
-import { routeHead, type RouteMode } from '../../engine/routing';
-import { variantRoute } from '../../engine/variants';
+import { useState } from 'react';
+import { modelSummary, pickComposerModel, preferredModel, resetAgentModel, resetComposerModel } from '../../engine/catalog';
 import type { ModelSummary } from '../../engine/types';
-import { setComposer, setSettings, toast, useStore } from '../../store/store';
+import { setComposer, setSettings, useStore } from '../../store/store';
 import { Chip } from '../ui/primitives';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { ModelList } from './ModelList';
 
-type PickerId = 'director' | 'image' | 'imageEdit' | 'videoText' | 'videoImage' | 'videoReference' | 'videoEdit' | 'audio';
-
-const label: Record<PickerId, string> = {
-  director: 'Director',
-  image: 'Image',
-  imageEdit: 'Image edit',
-  videoText: 'Text → video',
-  videoImage: 'Image → video',
-  videoReference: 'Reference → video',
-  videoEdit: 'Video edit',
-  audio: 'Audio',
-};
-
-const modeOf: Partial<Record<PickerId, RouteMode>> = {
-  videoText: 'text',
-  videoImage: 'image',
-  videoReference: 'reference',
-};
+type PickerId = 'director' | 'image' | 'video' | 'audio' | 'model3d';
+const label: Record<PickerId, string> = { director: 'Director', image: 'Image', video: 'Video', audio: 'Music', model3d: '3D' };
+const mediaKinds = ['image', 'video', 'audio', 'model3d'] as const;
 
 function modelName(ref: string | null | undefined): string {
   if (!ref) return 'No connected model';
   return modelSummary(ref)?.name ?? ref.split('::')[1] ?? ref;
 }
 
-/** Why a route row lists fewer models than the others. */
-function routeHint(picker: PickerId): string {
-  const mode = modeOf[picker];
-  return mode ? ` Only models that do ${mode}-to-video are listed${mode === 'reference' ? ' (several reference images)' : ''}.` : '';
-}
-
-function setRouteModel(mode: RouteMode, ref: string | null): void {
-  setComposer((c) => {
-    const videoRoutes = { ...(c.videoRoutes ?? {}) };
-    if (ref) videoRoutes[mode] = ref;
-    else delete videoRoutes[mode];
-    return { videoRoutes: Object.keys(videoRoutes).length ? videoRoutes : undefined };
-  });
-}
-
-function routeDefault(mode: RouteMode): string {
-  const st = useStore.getState();
-  if (st.composer.userPicked?.video) return defaultModelFor('video', mode !== 'text');
-  const head = routeHead('normal', (ref) => Boolean(st.catalog.models[ref]));
-  return head?.refs[mode] ?? defaultModelFor('video', mode !== 'text');
-}
-
-const plainImage = (m: ModelSummary) =>
-  m.acceptsText && !m.tags.length && !/(?:\/|\b)(?:edit|inpaint|image-to-image|remove-background|upscal)/i.test(m.id);
-const imageEdit = (m: ModelSummary) => m.acceptsImage && !m.tags.length;
-const textVideo = (m: ModelSummary) => m.acceptsText && !m.needsVideo && !/(?:image|reference)-to-video/i.test(m.id);
-const imageVideo = (m: ModelSummary) => m.acceptsImage && !m.needsVideo && !/reference-to-video/i.test(m.id);
-// Reference-to-video: a reference variant, or a model whose schema takes two or more reference images.
-const referenceVideo = (m: ModelSummary) => {
-  if (!m.acceptsImage || m.needsVideo) return false;
-  if (variantRoute(m) === 'reference') return true;
-  const slots = useStore.getState().catalog.schemas[m.ref]?.slots;
-  return Boolean(slots?.mixedRefs || (slots?.images?.max ?? 0) >= 2);
-};
-const ROUTE_FILTER = { text: textVideo, image: imageVideo, reference: referenceVideo } as const;
-const editVideo = (m: ModelSummary) => Boolean(m.acceptsVideo);
+const mediaModel = (m: ModelSummary) => !m.tags.length;
 
 function SummaryRow({ id, name, state, onClick }: { id: PickerId; name: string; state: 'auto' | 'manual' | 'default'; onClick: () => void }) {
   return (
@@ -170,79 +108,44 @@ export function AgentModelControls() {
   const composer = useStore((s) => s.composer);
   const agent = useStore((s) => s.settings.agent);
   const ops = useStore((s) => s.settings.ops);
-  const models = useStore((s) => s.catalog.models);
+  useStore((s) => s.catalog.models);
 
-  const routeManual = composer.videoRoutes ?? {};
-  // A route model saved before this check that cannot do its route goes back to Auto.
-  useEffect(() => {
-    for (const mode of Object.keys(routeManual) as RouteMode[]) {
-      const m = routeManual[mode] ? models[routeManual[mode]!] : undefined;
-      if (m && !ROUTE_FILTER[mode](m)) {
-        setRouteModel(mode, null);
-        toast(`${m.name} does not do ${mode}-to-video, so that row is back to Auto.`, 'error');
-      }
-    }
-  }, [routeManual, models]);
-  const manualCount =
-    Number(Boolean(agent.modelPinned)) +
-    Number(Boolean(composer.userPicked?.image)) +
-    Number(Boolean(composer.userPicked?.audio)) +
-    Number(Boolean(composer.userPicked?.video)) +
-    Number(Boolean(ops.edit)) +
-    Object.keys(routeManual).length +
-    Number(Boolean(ops.videoEdit));
-
-  const rows = useMemo(() => {
-    const globalVideo = Boolean(composer.userPicked?.video);
-    return [
-      { id: 'director' as const, name: agent.provider === 'offline' ? 'Local planner' : agent.model || 'No model resolved', state: agent.modelPinned ? 'manual' as const : 'auto' as const },
-      { id: 'image' as const, name: modelName(composer.image.modelRef), state: composer.userPicked?.image ? 'manual' as const : 'auto' as const },
-      { id: 'imageEdit' as const, name: modelName(ops.edit || opModelFor('edit').ref), state: ops.edit ? 'manual' as const : 'auto' as const },
-      ...(['videoText', 'videoImage', 'videoReference'] as const).map((id) => {
-        const mode = modeOf[id]!;
-        return { id, name: modelName(routeManual[mode] ?? routeDefault(mode)), state: routeManual[mode] ? 'manual' as const : globalVideo ? 'default' as const : 'auto' as const };
-      }),
-      { id: 'videoEdit' as const, name: modelName(ops.videoEdit || opModelFor('video_edit').ref), state: ops.videoEdit ? 'manual' as const : 'auto' as const },
-      { id: 'audio' as const, name: modelName(composer.audio.modelRef), state: composer.userPicked?.audio ? 'manual' as const : 'auto' as const },
-    ];
-  }, [agent.model, agent.modelPinned, agent.provider, composer.audio.modelRef, composer.image.modelRef, composer.userPicked, models, ops.edit, ops.videoEdit, routeManual]);
-
+  // Saved route overrides remain visible as a category choice until the user replaces or releases it.
+  const manual = {
+    image: Boolean(composer.userPicked?.image || ops.edit),
+    video: Boolean(composer.userPicked?.video || Object.keys(composer.videoRoutes ?? {}).length || ops.videoEdit),
+    audio: Boolean(composer.userPicked?.audio),
+    model3d: Boolean(composer.userPicked?.model3d),
+  };
+  const manualCount = Number(Boolean(agent.modelPinned)) + mediaKinds.filter(kind => manual[kind]).length;
+  const rows = [
+    { id: 'director' as const, name: agent.provider === 'offline' ? 'Local planner' : agent.model || 'No model resolved', state: agent.modelPinned ? 'manual' as const : 'auto' as const },
+    ...mediaKinds.map(kind => ({ id: kind, name: modelName(composer[kind].modelRef), state: manual[kind] ? 'manual' as const : 'auto' as const })),
+  ];
   const close = () => { setPicker(null); pop.close(); };
-  const choose = (ref: string | null) => {
-    if (!picker) return;
-    if (picker === 'image' || picker === 'audio') {
-      if (ref) void pickComposerModel(picker, ref);
-      else void resetComposerModel(picker);
-    } else if (picker === 'imageEdit') pickImageEditModel(ref);
-    else if (picker === 'videoEdit') setSettings((s) => ({ ops: { ...s.ops, videoEdit: ref } }));
-    else {
-      const mode = modeOf[picker];
-      // Picking one route fills the others with the same model's routes, when they exist.
-      if (mode && ref) fillVideoRoutes(ref);
-      if (mode) setRouteModel(mode, ref);
+  const releaseOverrides = (kind: typeof mediaKinds[number]) => {
+    if (kind === 'image') setSettings(s => ({ ops: { ...s.ops, edit: null } }));
+    if (kind === 'video') {
+      setComposer({ videoRoutes: undefined });
+      setSettings(s => ({ ops: { ...s.ops, videoEdit: null } }));
     }
+  };
+  const choose = (ref: string | null) => {
+    if (!picker || picker === 'director') return;
+    releaseOverrides(picker);
+    if (ref) void pickComposerModel(picker, ref);
+    else void resetComposerModel(picker);
     setPicker(null);
   };
-
-  const pickerConfig = picker === 'image'
-    ? { kind: 'image' as const, value: composer.userPicked?.image ? composer.image.modelRef : null, filter: plainImage, auto: `Connected default (${modelName(preferredModel('image'))})` }
-    : picker === 'audio'
-      ? { kind: 'audio' as const, value: composer.userPicked?.audio ? composer.audio.modelRef : null, filter: undefined, auto: `Connected default (${modelName(preferredModel('audio'))})` }
-    : picker === 'imageEdit'
-      ? { kind: 'image' as const, value: ops.edit, filter: imageEdit, auto: `Best connected edit model (${modelName(opModelFor('edit').ref)})` }
-      : picker === 'videoEdit'
-        ? { kind: 'video' as const, value: ops.videoEdit, filter: editVideo, auto: `Best connected video edit model (${modelName(opModelFor('video_edit').ref)})` }
-        : picker && modeOf[picker]
-          ? { kind: 'video' as const, value: routeManual[modeOf[picker]!], filter: ROUTE_FILTER[modeOf[picker]!], auto: `Agent routing for ${modeOf[picker]} input (${modelName(routeDefault(modeOf[picker]!))})` }
-          : null;
-
+  const pickerConfig = picker && picker !== 'director'
+    ? { kind: picker, value: composer.userPicked?.[picker] ? composer[picker].modelRef : null, auto: `Connected default (${modelName(preferredModel(picker))})` }
+    : null;
   const resetAll = () => {
-    setComposer({ videoRoutes: undefined });
-    setSettings((s) => ({ ops: { ...s.ops, edit: null, videoEdit: null } }));
     void resetAgentModel();
-    if (composer.userPicked?.image) void resetComposerModel('image');
-    if (composer.userPicked?.audio) void resetComposerModel('audio');
-    if (composer.userPicked?.video) void resetComposerModel('video');
+    for (const kind of mediaKinds) {
+      releaseOverrides(kind);
+      if (manual[kind]) void resetComposerModel(kind);
+    }
   };
 
   return (
@@ -255,19 +158,19 @@ export function AgentModelControls() {
         {picker ? (
           <>
             <button type="button" className="agent-model-back" onClick={() => setPicker(null)}><ArrowLeft size={14} /> Models</button>
-            <PopoverHeader title={label[picker]} sub={`Auto keeps the established routing.${modeOf[picker] ? ' A video model also fills the other video rows with its own variants, when it has them.' : ' A choice affects only this row.'}${routeHint(picker)}`} />
+            <PopoverHeader title={label[picker]} sub={picker === 'director' ? 'Choose the planner or leave it on Auto.' : 'Choose a model. Its compatible input variant is resolved automatically; Auto uses the connected default.'} />
             {picker === 'director' ? <DirectorList done={() => setPicker(null)} /> : pickerConfig ? (
-              <ModelList kind={pickerConfig.kind} value={pickerConfig.value ?? null} filter={pickerConfig.filter} autoOption={pickerConfig.auto} familyTree onSelect={choose} />
+              <ModelList kind={pickerConfig.kind} value={pickerConfig.value ?? null} filter={pickerConfig.kind === 'image' ? mediaModel : undefined} autoOption={pickerConfig.auto} familyTree automaticVariants onSelect={choose} />
             ) : null}
           </>
         ) : (
           <>
-            <PopoverHeader title="Models" sub="The agent chooses in Auto. Fix only the routes you want to control." />
+            <PopoverHeader title="Models" sub="Choose a model per category, or leave it on Auto. Input variants are resolved automatically." />
             <div className="agent-model-summary">
               {rows.map((r) => <SummaryRow key={r.id} {...r} onClick={() => setPicker(r.id)} />)}
             </div>
             <div className="agent-model-foot">
-              {composer.userPicked?.video ? <button type="button" className="link-btn" onClick={() => void resetComposerModel('video')}>Release global video default</button> : <span />}
+              <span />
               {manualCount ? <button type="button" className="link-btn" onClick={resetAll}><RotateCcw size={12} /> Reset all to Auto</button> : null}
             </div>
           </>
