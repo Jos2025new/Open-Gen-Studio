@@ -87,7 +87,7 @@ export function SnapControl() {
  * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
  * picked layer about its own center).
  */
-function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
+export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean }) {
   const align = usePopover();
   const turn = usePopover();
   const [rel, setRel] = useState<RelativeTo>('selection');
@@ -138,6 +138,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
         </> : null}
       </div>
     </Popover>
+    {!alignOnly && <>
     <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
       <div className="menu">
@@ -145,6 +146,7 @@ function EditOps({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
         {TURN_ITEMS.map((t) => { const no = onObjects ? null : layers.map((l) => turnProblem(l, t.id)).find(Boolean); return <MenuItem key={t.id} icon={t.icon} label={t.label} disabled={Boolean(no)} tip={no ?? undefined} onClick={() => doTurn(t.id)} />; })}
       </div>
     </Popover>
+    </>}
   </>;
 }
 

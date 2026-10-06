@@ -18,7 +18,7 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
   };
   return <>
     <div className="designer-palette">
-      <ToolRail doc={settings.doc} onPick={pick} />
+      <ToolRail sessionId={settings.sessionId} doc={settings.doc} onPick={pick} />
     </div>
     <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation="vertical">
       <div className="view-history">{history}</div>

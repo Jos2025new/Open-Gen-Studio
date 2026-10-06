@@ -7,7 +7,7 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { InlineColor, InlineSlider } from './InlineControls';
-import { SnapControl } from './ToolSettings';
+import { EditOps, SnapControl } from './ToolSettings';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move, double-click to edit' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
@@ -42,7 +42,7 @@ function ToolGroup({ group, tool, doc, onPick }: { doc: DesignDoc; group: (typeo
   </>;
 }
 
-export function ToolRail({ doc, onPick }: { doc: DesignDoc; children?: ReactNode; onPick?: (button: HTMLButtonElement) => void }) {
+export function ToolRail({ sessionId, doc, onPick }: { sessionId: string; doc: DesignDoc; children?: ReactNode; onPick?: (button: HTMLButtonElement) => void }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
   const shapeTool = ['rect', 'ellipse', 'polygon', 'line', 'curve', 'arrow'].includes(tool);
@@ -59,7 +59,7 @@ export function ToolRail({ doc, onPick }: { doc: DesignDoc; children?: ReactNode
   const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
   const paint = { id: 'paint', icon: Brush, label: 'Paint', after: 'hand' as DesignTool, tools: TOOLS.filter((t) => ['brush', 'eraser', 'select'].includes(t.id)) };
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
-    <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
+    <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
     <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} onPick={onPick} /><ToolGroup doc={doc} group={paint} tool={tool} onPick={onPick} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
     <div className="tool-family palette-quick">
