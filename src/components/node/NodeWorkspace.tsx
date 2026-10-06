@@ -321,6 +321,12 @@ function Canvas() {
   }, [sessionId, rf]);
 
   useEffect(() => {
+    const open = () => fileInput.current?.click();
+    window.addEventListener('ogs:upload', open);
+    return () => window.removeEventListener('ogs:upload', open);
+  }, []);
+
+  useEffect(() => {
     const paste = (e: ClipboardEvent) => {
       if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));

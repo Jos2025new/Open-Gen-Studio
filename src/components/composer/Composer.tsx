@@ -14,7 +14,6 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { ModeMenu } from './ModeMenu';
 import { AgentControls } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
@@ -458,7 +457,6 @@ export function Composer() {
               </button>
             </span>
           ) : null}
-          <ModeMenu />
           <div className="composer-controls">
             {mode === 'agent' ? <AgentControls /> : <MediaControls kind={mode} />}
             {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}

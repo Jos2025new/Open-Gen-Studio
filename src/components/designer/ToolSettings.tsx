@@ -87,7 +87,7 @@ export function SnapControl() {
  * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
  * picked layer about its own center).
  */
-export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean }) {
+export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean; turnOnly?: boolean }) {
   const align = usePopover();
   const turn = usePopover();
   const [rel, setRel] = useState<RelativeTo | null>(null);
@@ -119,6 +119,7 @@ export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: stri
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
+    {!turnOnly && <>
     <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Align'} aria-label="Align"><AlignCenterVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
@@ -134,6 +135,7 @@ export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: stri
         <label className="menu-field align-reference"><span>Relative to</span><select aria-label="Relative to" value={relativeTo} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
       </div>
     </Popover>
+    </>}
     {!alignOnly && <>
     <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">

@@ -186,3 +186,5 @@
 }
 
 .designer .stage-hint { top: var(--stage-hint-top, 66px); }
+
+.topbar-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; flex-shrink: 0; }

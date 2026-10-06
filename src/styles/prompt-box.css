@@ -72,3 +72,7 @@
   .chat-welcome .hero-mark { display: none; }
   .chat-welcome { width: calc(100% - 28px); }
 }
+
+.composer-options-group { padding: 6px 12px 2px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.composer-options-file .menu-right { margin-left: auto; }
+.composer-options-file.is-active { background: var(--accent-soft); color: var(--accent); }

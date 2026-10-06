@@ -77,7 +77,6 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
   const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, [strokeTool ? 'stroke' : 'fill']: color } } : { brush: { ...ui.brush, color } });
   const influence = tool === 'move' || (tool === 'lineart' && ui.lineartMode === 'edit');
   const contextualSettings = ['select', 'fill', 'gradient'].includes(tool);
-  const showColor = !influence && !['hand', 'select', 'eyedropper', 'eraser'].includes(tool);
   const size = influence ? ui.lineartInfluence ?? 80 : tool === 'text' ? ui.text.fontSize : tool === 'lineart' ? ui.lineart.size : shapeTool ? ui.shape.strokeWidth : ui.brush.size;
   const setSize = (v: number) => setUi(influence ? { lineartInfluence: v } : tool === 'text' ? { text: { ...ui.text, fontSize: v } } : tool === 'lineart' ? { lineart: { ...ui.lineart, size: v } } : shapeTool ? { shape: { ...ui.shape, strokeWidth: v } } : { brush: { ...ui.brush, size: v } });
   const button = (id: DesignTool) => {
@@ -86,14 +85,13 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
     return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: id })} />;
   };
   const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
-  const paint = { id: 'paint', icon: Brush, label: 'Paint', after: 'hand' as DesignTool, tools: TOOLS.filter((t) => ['brush', 'eraser', 'select'].includes(t.id)) };
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
     <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
-    <div className="tool-family"><ToolGroup doc={doc} group={shapes} tool={tool} /><ToolGroup doc={doc} group={paint} tool={tool} />{button('lineart')}{button('text')}{button('fill')}{button('gradient')}</div>
+    <div className="tool-family"><InlineColor label="Active color" value={color} onChange={setColor} />{button('brush')}{button('eraser')}<ToolGroup doc={doc} group={shapes} tool={tool} />{button('lineart')}{button('select')}{button('text')}{button('fill')}{button('gradient')}</div>
     </div>
     <ContextControls tool={tool}>
       {contextualSettings ? <>{button('eyedropper')}<ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact /></> : <>
-      {showColor && <InlineColor label="Active color" value={color} onChange={setColor} />}{button('eyedropper')}
+      {button('eyedropper')}
       {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
       </>}
     </ContextControls>

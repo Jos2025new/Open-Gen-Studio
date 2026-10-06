@@ -1,10 +1,15 @@
 import { useEffect } from 'react';
-import { Paperclip, Plus } from 'lucide-react';
+import { Bot, Check, Paperclip, PencilRuler, Plus } from 'lucide-react';
 import { AgentOptions } from './AgentControls';
+import { MODES } from './ModeMenu';
 import { Popover, usePopover } from '../ui/Popover';
+import { setComposer, setUi, useStore } from '../../store/store';
 
+/** The "+" menu: Upload (to the prompt, or to the canvas of the open workspace), Agent, Create (a media kind) and Design. */
 export function ComposerOptions({ label, disabled, agent, onAdd }: { label: string; disabled: boolean; agent: boolean; onAdd: () => void }) {
   const pop = usePopover();
+  const mode = useStore((s) => s.composer.mode);
+  const workspace = useStore((s) => s.ui.workspace);
   useEffect(() => {
     if (!pop.open) return;
     const frame = requestAnimationFrame(() => {
@@ -12,13 +17,33 @@ export function ComposerOptions({ label, disabled, agent, onAdd }: { label: stri
     });
     return () => cancelAnimationFrame(frame);
   }, [pop.open]);
+  const pick = (fn: () => void) => () => { pop.close(); fn(); };
+  const canvasName = workspace === 'designer' ? 'the design' : workspace === 'node' ? 'the node canvas' : '';
   return <>
-    <button ref={pop.ref} type="button" className={`composer-options-trigger ${pop.open ? 'is-open' : ''}`} aria-label="Add files or agent options" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>
+    <button ref={pop.ref} type="button" className={`composer-options-trigger ${pop.open ? 'is-open' : ''}`} aria-label="Add files, switch mode or open Design" aria-haspopup="dialog" aria-expanded={pop.open} onClick={pop.toggle}>
       <Plus size={19} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={260} label="Files and agent options" className="composer-options">
-      <button type="button" className="composer-options-file" disabled={disabled} onClick={() => { pop.close(); onAdd(); }}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={270} label="Add and mode" className="composer-options">
+      <button type="button" className="composer-options-file" disabled={disabled} onClick={pick(onAdd)}>
         <Paperclip size={17} /><span>{label}</span>
+      </button>
+      {canvasName ? <button type="button" className="composer-options-file" onClick={pick(() => window.dispatchEvent(new Event('ogs:upload')))}>
+        <Plus size={17} /><span>Upload image to {canvasName}</span>
+      </button> : null}
+      <div className="composer-options-separator" />
+      <button type="button" className={`composer-options-file ${mode === 'agent' ? 'is-active' : ''}`} onClick={pick(() => setComposer({ mode: 'agent' }))}>
+        <Bot size={17} /><span>Agent</span>{mode === 'agent' ? <Check size={14} className="menu-right" /> : null}
+      </button>
+      <div className="composer-options-group">Create</div>
+      {MODES.filter((m) => m.id !== 'agent').map((m) => {
+        const off = workspace === 'designer' && (m.id === 'video' || m.id === 'audio' || m.id === 'model3d');
+        return <button key={m.id} type="button" className={`composer-options-file ${m.id === mode ? 'is-active' : ''}`} disabled={off} data-tip={off ? 'Designer layers hold images, text and shapes' : m.desc} onClick={pick(() => setComposer({ mode: m.id }))}>
+          <m.icon size={17} /><span>{m.label}</span>{m.id === mode ? <Check size={14} className="menu-right" /> : null}
+        </button>;
+      })}
+      <div className="composer-options-separator" />
+      <button type="button" className={`composer-options-file ${workspace === 'designer' ? 'is-active' : ''}`} onClick={pick(() => setUi({ workspace: 'designer' }))}>
+        <PencilRuler size={17} /><span>Design</span>{workspace === 'designer' ? <Check size={14} className="menu-right" /> : null}
       </button>
       {agent ? <><div className="composer-options-separator" /><AgentOptions onPicked={pop.close} /></> : null}
     </Popover>

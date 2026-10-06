@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef, type ComponentProps, type ReactNode } from 're
 import { ToolRail } from './ToolRail';
 import { ToolSettings } from './ToolSettings';
 
-export function ToolPalette({ history, view, ...settings }: ComponentProps<typeof ToolSettings> & { history: ReactNode; view: ReactNode }) {
+export function ToolPalette({ history, view, ...settings }: ComponentProps<typeof ToolSettings> & { history?: ReactNode; view: ReactNode }) {
   const palette = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = palette.current;
@@ -22,7 +22,7 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
       <ToolRail sessionId={settings.sessionId} doc={settings.doc} />
     </div>
     <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation="vertical">
-      <div className="view-history">{history}</div>
+      {history ? <div className="view-history">{history}</div> : null}
       {view}
     </div>
 

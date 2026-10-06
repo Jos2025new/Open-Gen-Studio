@@ -83,6 +83,13 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
   const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
   const [propertiesOpen, setPropertiesOpen] = useState(true);
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+  useEffect(() => {
+    const toggle = () => setCollapsed(!collapsedRef.current);
+    window.addEventListener('ogs:layers-toggle', toggle);
+    return () => window.removeEventListener('ogs:layers-toggle', toggle);
+  }, [setCollapsed]);
   const previousTool = useRef(tool);
   useEffect(() => {
     if (previousTool.current !== tool) { setTab('props'); setCollapsed(false); previousTool.current = tool; }

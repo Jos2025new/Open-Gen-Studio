@@ -1,7 +1,7 @@
 import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
 import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { CanvasSize } from './CanvasSize';
@@ -9,7 +9,7 @@ import { AspectGlyph } from '../composer/MediaControls';
 import { groupLayers } from '../../engine/design/groups';
 import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
-import { ArrowUpFromLine, Images, Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { deleteLayers, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
@@ -26,7 +26,7 @@ import { uploadFiles } from '../../engine/actions';
 import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
 import { cloneCanvas, getBuffer } from '../../engine/design/raster';
 import { canvasToBlob } from '../../lib/media';
-import { SelectionChip } from './ToolSettings';
+import { EditOps, SelectionChip } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
 import { DESIGN_TOOL_KEYS } from '../../engine/shortcuts';
 
@@ -198,12 +198,35 @@ export function DesignerWorkspace() {
     finally { setBusy(false); }
   };
 
+  const importRef = useRef<HTMLInputElement>(null);
+  const importFiles = async (files: File[]) => {
+    if (!doc) return;
+    const ids = await uploadFiles(files.filter((f) => f.type.startsWith('image/')));
+    for (const id of ids) await placeAsset(session.id, doc.id, id, doc.layers.length ? 'new' : 'base');
+  };
+  useEffect(() => {
+    const open = () => importRef.current?.click();
+    window.addEventListener('ogs:upload', open);
+    return () => window.removeEventListener('ogs:upload', open);
+  }, []);
+
   return <div className="designer">
+    <input ref={importRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
     <TopbarActions>
       <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
         {DOC_PRESETS.map((p) => <MenuItem key={p.id} label={<span className="preset-menu-label"><span className="preset-menu-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={16} /></span>{p.label}</span>} detail={`${p.width} × ${p.height}`} onClick={() => { newBlankDoc(session.id, p); presets.close(); }} />)}
       </Popover>
+      {doc && <>
+        <span className="topbar-sep" aria-hidden />
+        <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
+        <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
+        <span className="topbar-sep" aria-hidden />
+        <IconButton icon={ImagePlus} label="Import image" size="sm" onClick={() => importRef.current?.click()} />
+        <EditOps sessionId={session.id} doc={doc} turnOnly />
+        <IconButton icon={PanelRight} label="Show or hide right panel" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
+        <span className="topbar-sep" aria-hidden />
+      </>}
       {doc && <SelectionChip docId={doc.id} />}
       {doc && <>
         <CanvasSize key={doc.id} sessionId={session.id} doc={doc} />
@@ -234,10 +257,7 @@ export function DesignerWorkspace() {
     {doc ? <>
       <DocumentPicker sessionId={session.id} docs={session.docs} active={doc} />
       <ToolPalette sessionId={session.id} doc={doc} selectedCurve={selectedCurve}
-        history={<>
-          <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
-          <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
-        </>}
+        history={null}
         view={<>
           <IconButton icon={Plus} label="Zoom in" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 1.25 }))} />
           <label className="zoom-value num">
