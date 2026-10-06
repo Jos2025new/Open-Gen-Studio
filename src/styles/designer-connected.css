@@ -184,3 +184,5 @@
   .designer-palette .palette-fixed .tool-family { max-width: 100%; flex-wrap: wrap; }
   .designer-palette .palette-quick { max-width: 100%; border-left: 0; margin-left: 0; padding-left: 0; }
 }
+
+.designer .stage-hint { top: var(--stage-hint-top, 66px); }
