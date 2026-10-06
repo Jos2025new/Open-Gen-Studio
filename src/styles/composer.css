@@ -44,7 +44,10 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .agent-model-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto 14px; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 6px 8px; border-radius: 8px; text-align: left; }
 .agent-model-row:hover { background: var(--surface-2); }
 .agent-model-role { color: var(--text-2); font-size: 11px; }
-.agent-model-name { overflow: hidden; color: var(--text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.agent-model-name { display: flex; align-items: center; gap: 6px; overflow: hidden; color: var(--text); font-size: 12px; white-space: nowrap; }
+.agent-model-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.model-brand-small { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 16px; font-size: 11px; }
+.model-brand-small img { width: 16px; height: 16px; object-fit: contain; }
 .agent-model-state { min-width: 42px; font-size: 10px; text-align: right; }
 .agent-model-state.is-auto { color: var(--ok); }
 .agent-model-state.is-manual { color: var(--accent); }

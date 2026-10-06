@@ -2,6 +2,8 @@ Brand icons in this folder come from LobeHub Icons (@lobehub/icons-static-svg,
 https://github.com/lobehub/lobe-icons), copied unchanged except that monochrome
 icons are filled with #ECECEF instead of currentColor.
 
+zai.svg was added from @lobehub/icons-static-svg 1.95.1 under the same license.
+
 MIT License
 
 Copyright (c) 2023 LobeHub

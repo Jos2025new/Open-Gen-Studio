@@ -1,3 +1,4 @@
+import { ModelBrandIcon } from '../ui/ModelBrandIcon';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import { filterLlm, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
@@ -21,11 +22,11 @@ function modelName(ref: string | null | undefined): string {
 
 const mediaModel = (m: ModelSummary) => !m.tags.length;
 
-function SummaryRow({ id, name, state, onClick }: { id: PickerId; name: string; state: 'auto' | 'manual' | 'default'; onClick: () => void }) {
+function SummaryRow({ id, name, modelId, state, onClick }: { id: PickerId; name: string; modelId: string; state: 'auto' | 'manual' | 'default'; onClick: () => void }) {
   return (
     <button type="button" className="agent-model-row" onClick={onClick}>
       <span className="agent-model-role">{label[id]}</span>
-      <span className="agent-model-name" title={name}>{name}</span>
+      <span className="agent-model-name" title={name}><ModelBrandIcon id={modelId} name={name} local={modelId.startsWith('local::') || name === 'Local planner'} className="model-brand-small" /><span className="agent-model-label">{name}</span></span>
       <span className={`agent-model-state is-${state}`}>{state === 'manual' ? 'set' : state === 'default' ? 'default' : 'auto'}</span>
       <ChevronRight size={13} />
     </button>
@@ -119,8 +120,8 @@ export function AgentModelControls() {
   };
   const manualCount = Number(Boolean(agent.modelPinned)) + mediaKinds.filter(kind => manual[kind]).length;
   const rows = [
-    { id: 'director' as const, name: agent.provider === 'offline' ? 'Local planner' : agent.model || 'No model resolved', state: agent.modelPinned ? 'manual' as const : 'auto' as const },
-    ...mediaKinds.map(kind => ({ id: kind, name: modelName(composer[kind].modelRef), state: manual[kind] ? 'manual' as const : 'auto' as const })),
+    { id: 'director' as const, modelId: agent.model, name: agent.provider === 'offline' ? 'Local planner' : agent.model || 'No model resolved', state: agent.modelPinned ? 'manual' as const : 'auto' as const },
+    ...mediaKinds.map(kind => ({ id: kind, modelId: composer[kind].modelRef, name: modelName(composer[kind].modelRef), state: manual[kind] ? 'manual' as const : 'auto' as const })),
   ];
   const close = () => { setPicker(null); pop.close(); };
   const releaseOverrides = (kind: typeof mediaKinds[number]) => {

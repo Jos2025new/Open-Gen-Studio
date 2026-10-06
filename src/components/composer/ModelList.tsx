@@ -8,6 +8,7 @@ import { formatUsd } from '../../lib/format';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { MenuItem, Spinner } from '../ui/primitives';
+import { ModelBrandIcon, vendorOf } from '../ui/ModelBrandIcon';
 import { Popover, usePopover } from '../ui/Popover';
 import { usePref } from '../ui/hooks';
 
@@ -31,39 +32,6 @@ function badges(m: ModelSummary): string[] {
   else if (m.kind === 'video' && m.acceptsImage) out.push(m.acceptsText ? 'I2V' : 'I2V only');
   if (m.textOutput) out.push('Text out');
   return out;
-}
-
-// Who makes a model, read from its id or name: the maker's logo (LobeHub icons, MIT; see NOTICE), else a monogram.
-const logos = import.meta.glob('../../assets/brands/*.svg', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-const logo = (name: string) => logos[`../../assets/brands/${name}.svg`];
-const VENDORS: Array<[RegExp, string, string]> = [
-  [/gpt|openai|dall-?e|sora|whisper/, 'openai', 'OpenAI'],
-  [/nano-?banana|gemini/, 'gemini-color', 'Google Gemini'],
-  [/imagen|veo|google/, 'google-color', 'Google'],
-  [/seedream|seedance|seed3d|seedvr|bytedance|omnihuman|dreamina/, 'bytedance-color', 'ByteDance'],
-  [/flux|black-?forest|bfl/, 'bfl', 'Black Forest Labs'],
-  [/recraft/, 'recraft', 'Recraft'],
-  [/ideogram/, 'ideogram', 'Ideogram'],
-  [/kling/, 'kling-color', 'Kling'],
-  [/qwen/, 'qwen-color', 'Qwen'],
-  [/\bwan\b|wan-?\d|wan2|alibaba|z-?image|tongyi/, 'alibaba-color', 'Alibaba'],
-  [/hailuo/, 'hailuo-color', 'Hailuo'],
-  [/minimax/, 'minimax-color', 'MiniMax'],
-  [/grok|xai/, 'xai', 'xAI'],
-  [/hunyuan|tencent/, 'hunyuan-color', 'Hunyuan'],
-  [/runway|gen-?4/, 'runway', 'Runway'],
-  [/luma|ray-?2|photon/, 'luma-color', 'Luma'],
-  [/pixverse/, 'pixverse-color', 'PixVerse'],
-  [/meshy/, 'meshy-color', 'Meshy'],
-  [/tripo/, 'tripo-color', 'Tripo'],
-  [/elevenlabs/, 'elevenlabs', 'ElevenLabs'],
-  [/stable-?diffusion|stability|sdxl|sd3/, 'stability-color', 'Stability AI'],
-  [/vidu/, 'vidu-color', 'Vidu'],
-];
-
-function vendorOf(m: ModelSummary) {
-  const text = `${m.id} ${m.name}`.toLowerCase();
-  return VENDORS.find(([re]) => re.test(text));
 }
 
 // Recommended image models (user, 2026-09-27): these families, in this order; tools last. The rest is under "Browse all".
@@ -92,23 +60,6 @@ function where(members: ModelSummary[]): string {
   for (const x of members) if (!seen.has(x.provider)) seen.set(x.provider, x);
   if (seen.size < 2) return PROVIDER_LABELS[members[0].provider];
   return [...seen.values()].map((x) => `${PROVIDER_LABELS[x.provider]}${x.price?.skus[0] ? ` ${formatUsd(x.price.skus[0].usd)}` : ''}`).join(' · ');
-}
-
-function Monogram({ m }: { m: ModelSummary }) {
-  const hit = vendorOf(m);
-  const src = hit ? logo(hit[1]) : undefined;
-  if (src) {
-    return (
-      <span className="ml-mono" title={hit![2]}>
-        <img src={src} alt="" draggable={false} />
-      </span>
-    );
-  }
-  return (
-    <span className="ml-mono" aria-hidden>
-      {m.provider === 'local' ? '⌂' : m.name.trim().charAt(0).toUpperCase()}
-    </span>
-  );
 }
 
 /** One quiet line under the name: the provider's short description, else what goes in and out. */
@@ -314,7 +265,7 @@ export function ModelList({
                 const selected = members.some((x) => x.ref === value) || (automaticVariants && !sub && rest.some(g => g.members.some(x => x.ref === value)));
                 return (
                   <button key={key} type="button" className={`ml-row ${sub ? 'is-variant' : ''} ${selected ? 'is-selected' : ''}`} onClick={() => onSelect(m.ref)} title={m.description}>
-                    {sub ? <span className="ml-variant-dot" /> : <Monogram m={m} />}
+                    {sub ? <span className="ml-variant-dot" /> : <ModelBrandIcon id={m.id} name={m.name} local={m.provider === 'local'} />}
                     <span className="ml-main">
                       <span className="ml-name">{sub ? variantLabel(head.best, m) : m.name}</span>
                       <span className="ml-sub">
