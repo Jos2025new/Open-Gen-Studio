@@ -96,13 +96,13 @@ export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
   return layer;
 }
 
-/** How far each picked object moves to line up (one object: with the page; several: with `rel`). */
+/** How far each picked object moves to line up with the chosen reference. */
 export function alignObjectDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layer: Layer, ids: string[], to: AlignTo, rel: RelativeTo): Map<string, { dx: number; dy: number }> {
   const objs = layerObjects(layer).filter((o) => ids.includes(o.id));
   const out = new Map<string, { dx: number; dy: number }>();
   if (!objs.length) return out;
   const boxes = objs.map((o) => o.box);
-  const ref: Box | null = objs.length === 1 || rel === 'page' ? { x: 0, y: 0, w: doc.width, h: doc.height }
+  const ref: Box | null = rel === 'page' ? { x: 0, y: 0, w: doc.width, h: doc.height }
     : rel === 'first' ? boxes[0] : rel === 'last' ? boxes[boxes.length - 1]
       : rel === 'biggest' || rel === 'smallest' ? [...boxes].sort((a, b) => (rel === 'biggest' ? b.w * b.h - a.w * a.h : a.w * a.h - b.w * b.h))[0]
         : union(boxes);

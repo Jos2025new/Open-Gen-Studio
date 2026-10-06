@@ -137,3 +137,6 @@
 
 @media (max-width: 1100px) { .designer-palette { --palette-left: max(16px, calc(50% - 400px)); } }
 @media (max-width: 600px) { .designer-palette { --palette-left: 10px; } }
+
+.align-reference { border-bottom: 0; border-top: 1px solid var(--border); margin: 6px 0 0; padding-top: 8px; }
+.align-reference select { background: var(--surface-3); border-color: var(--border-strong); border-radius: var(--radius-s); color: var(--text); }

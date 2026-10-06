@@ -213,7 +213,7 @@ const pick = (sessionId: string, docId: string, ids: string[]) => {
 /** Align several layers (or one) to the page, the selection, the first or last picked, or the biggest or smallest. */
 export function alignLayers(sessionId: string, docId: string, ids: string[], to: AlignTo, rel: RelativeTo): void {
   const { doc, layers } = pick(sessionId, docId, ids);
-  if (doc && layers.length) moveLayers(sessionId, docId, alignDeltas(doc, layers, to, layers.length === 1 ? 'page' : rel));
+  if (doc && layers.length) moveLayers(sessionId, docId, alignDeltas(doc, layers, to, rel));
 }
 
 export function distributeLayers(sessionId: string, docId: string, ids: string[], axis: 'h' | 'v'): void {

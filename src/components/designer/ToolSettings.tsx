@@ -90,7 +90,7 @@ export function SnapControl() {
 export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean }) {
   const align = usePopover();
   const turn = usePopover();
-  const [rel, setRel] = useState<RelativeTo>('selection');
+  const [rel, setRel] = useState<RelativeTo | null>(null);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -108,13 +108,14 @@ export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: stri
   const emptyPick = !onObjects && !layers.length;
   const count = onObjects ? objIds.length : layers.length;
   const many = count > 1;
+  const relativeTo = rel ?? (many ? 'selection' : 'page');
   const one = layers[0];
   const locked = onObjects ? Boolean(objLayer?.locked) : layers.some((l) => l.locked);
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
   const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
   const why = !emptyPick ? undefined : mode === 'objects' ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
-  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, many ? rel : 'page') : alignLayers(sessionId, doc.id, ids, to, many ? rel : 'page'));
+  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo) : alignLayers(sessionId, doc.id, ids, to, relativeTo));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
@@ -122,20 +123,15 @@ export function EditOps({ sessionId, doc, alignOnly = false }: { sessionId: stri
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
         <div className="menu-target">{target}</div>
-        {many ? (
-          <label className="menu-field"><span>Relative to</span><select value={rel} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
-        ) : <div className="menu-sep-label">To the page</div>}
         {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => doAlign(a.id)} />)}
-        {count >= 3 ? <>
-          <div className="menu-sep-label">Distribute</div>
-          <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" onClick={() => doDistribute('h')} />
-          <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" onClick={() => doDistribute('v')} />
-        </> : null}
+        <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" disabled={count < 3} onClick={() => doDistribute('h')} />
+        <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" disabled={count < 3} onClick={() => doDistribute('v')} />
         {!onObjects && !many && one?.type === 'raster' ? <>
           <div className="menu-sep-label">Size</div>
           <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
           <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
         </> : null}
+        <label className="menu-field align-reference"><span>Relative to</span><select aria-label="Relative to" value={relativeTo} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
       </div>
     </Popover>
     {!alignOnly && <>
