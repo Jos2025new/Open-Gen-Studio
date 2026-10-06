@@ -19,6 +19,7 @@ import { AgentModelControls } from './AgentModelControls';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
+import { ToolRail } from '../designer/ToolRail';
 
 function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
@@ -277,7 +278,9 @@ export function Composer() {
   }, [workspace]);
 
   useEffect(() => {
-    if (focusTick) taRef.current?.focus();
+    if (!focusTick) return;
+    if (workspace === 'designer') setUi({ designerDock: 'prompt' });
+    requestAnimationFrame(() => taRef.current?.focus());
   }, [focusTick]);
 
   // Video cannot live on designer layers: switch the composer to image there.
@@ -388,6 +391,12 @@ export function Composer() {
     void attachFiles(list);
   };
 
+  const designDoc = useStore(() => activeDoc(sessionId));
+  const dockPref = useStore((s) => s.ui.designerDock) ?? 'tools';
+  const toolsDock = workspace === 'designer' && dockPref === 'tools';
+  const optionsLabel = takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files';
+  const optionsDisabled = !takesImages && !takesAudio && mode !== 'model3d';
+
   return (
     <div ref={dockRef} className={`composer-dock dock-${workspace}`}>
       {workspace !== 'chat' ? <ThreadPeek workspace={workspace} /> : null}
@@ -416,6 +425,21 @@ export function Composer() {
           }
         }}
       >
+        <input
+          ref={fileRef}
+          type="file"
+          accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
+          multiple={mode !== 'video' || videoRefs.multiple}
+          hidden
+          onChange={(e) => {
+            onFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        {toolsDock && designDoc ? <div className="composer-bar composer-tools-bar">
+          <ComposerOptions label={optionsLabel} disabled={optionsDisabled} agent={false} onAdd={() => fileRef.current?.click()} />
+          <div className="designer-palette is-docked"><ToolRail sessionId={sessionId} doc={designDoc} /></div>
+        </div> : <>
         <AttachStrip ids={liveAttachments} />
         <div className="composer-prompt-row">
           <textarea
@@ -443,8 +467,8 @@ export function Composer() {
         </div>
         <div className="composer-bar">
           <ComposerOptions
-            label={takesImages ? (mode === 'video' ? (videoRefs.multiple ? 'Attach references' : 'Start frame') : mode === 'model3d' ? 'Attach reference images' : 'Attach images') : takesAudio ? 'Attach audio' : 'This model takes no input files'}
-            disabled={!takesImages && !takesAudio && mode !== 'model3d'}
+            label={optionsLabel}
+            disabled={optionsDisabled}
             agent={mode === 'agent'}
             onAdd={() => fileRef.current?.click()}
           />
@@ -463,17 +487,6 @@ export function Composer() {
           </div>
           <div className="composer-end">
             {mode === 'agent' ? <AgentModelControls /> : null}
-            <input
-              ref={fileRef}
-              type="file"
-              accept={['image/png,image/jpeg,image/webp', mode === 'agent' || videoRefs.videos ? 'video/mp4,video/webm' : '', takesAudio ? 'audio/*' : '', mode === 'model3d' ? '.glb,model/gltf-binary' : ''].filter(Boolean).join(',')}
-              multiple={mode !== 'video' || videoRefs.multiple}
-              hidden
-              onChange={(e) => {
-                onFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
             {mode === 'agent' ? (
               busy ? (
                 <button type="button" className="send-btn is-stop" onClick={() => stopAgent()} aria-label="Stop" data-tip="Stop the agent">
@@ -489,6 +502,7 @@ export function Composer() {
             )}
           </div>
         </div>
+        </>}
       </div>
     </div>
   );

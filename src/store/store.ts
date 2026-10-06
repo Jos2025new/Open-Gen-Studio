@@ -119,6 +119,8 @@ export interface UiState {
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   /** Designer rulers (and the guides dragged from them) shown. */
   rulers?: boolean;
+  /** Designer bottom bar: the toolbox (default) or the prompt box. */
+  designerDock?: 'tools' | 'prompt';
   /** Gradient tool (the main color is the brush color). */
   gradient?: { shape: 'linear' | 'radial'; mode: 'two' | 'fade'; color2: string; reverse?: boolean; opacity: number };
   /** Style of new Lineart strokes (editable afterwards per layer). */

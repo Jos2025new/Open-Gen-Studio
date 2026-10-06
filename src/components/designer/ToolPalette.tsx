@@ -1,9 +1,11 @@
 import { useLayoutEffect, useRef, type ComponentProps, type ReactNode } from 'react';
 import { ToolRail } from './ToolRail';
 import { ToolSettings } from './ToolSettings';
+import { useStore } from '../../store/store';
 
 export function ToolPalette({ history, view, ...settings }: ComponentProps<typeof ToolSettings> & { history?: ReactNode; view: ReactNode }) {
   const palette = useRef<HTMLDivElement>(null);
+  const docked = (useStore((s) => s.ui.designerDock) ?? 'tools') === 'tools';
   useLayoutEffect(() => {
     const el = palette.current;
     const designer = el?.closest<HTMLElement>('.designer');
@@ -16,11 +18,11 @@ export function ToolPalette({ history, view, ...settings }: ComponentProps<typeo
     window.addEventListener('resize', placeHint);
     placeHint();
     return () => { observer.disconnect(); window.removeEventListener('resize', placeHint); designer.style.removeProperty('--stage-hint-top'); };
-  }, [settings.doc.id]);
+  }, [settings.doc.id, docked]);
   return <>
-    <div ref={palette} className="designer-palette">
+    {docked ? null : <div ref={palette} className="designer-palette">
       <ToolRail sessionId={settings.sessionId} doc={settings.doc} />
-    </div>
+    </div>}
     <div className="designer-view" role="toolbar" aria-label="Canvas view" aria-orientation="vertical">
       {history ? <div className="view-history">{history}</div> : null}
       {view}
