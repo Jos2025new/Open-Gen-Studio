@@ -263,11 +263,18 @@ export function Composer() {
     const dock = dockRef.current;
     const parent = dock?.parentElement;
     if (!dock || !parent) return;
-    const measure = () => parent.style.setProperty('--composer-height', `${dock.getBoundingClientRect().height}px`);
+    const zoomRail = parent.querySelector<HTMLElement>('.designer-view');
+    const measure = () => {
+      const rect = dock.getBoundingClientRect();
+      parent.style.setProperty('--composer-height', `${rect.height}px`);
+      if (zoomRail) parent.style.setProperty('--conversation-side-width', `${Math.max(0, rect.left - zoomRail.getBoundingClientRect().right - 32)}px`);
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(dock);
+    observer.observe(parent);
+    if (zoomRail) observer.observe(zoomRail);
     measure();
-    return () => { observer.disconnect(); parent.style.removeProperty('--composer-height'); };
+    return () => { observer.disconnect(); parent.style.removeProperty('--composer-height'); parent.style.removeProperty('--conversation-side-width'); };
   }, [workspace]);
 
   useEffect(() => {

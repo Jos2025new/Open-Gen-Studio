@@ -101,7 +101,7 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 
 /* Conversation card beside the composer (inside the dock), bottom-aligned with it; as wide as the space to the right allows. */
 .thread-peek { position: absolute; right: calc(100% + 12px); bottom: 0; z-index: 13; display: flex; flex-direction: column; width: max(260px, min(420px, calc((100vw - 56px - 100%) / 2 - 28px))); }
-.thread-designer { width: max(260px, min(420px, calc((100vw - 56px - var(--layers-w, 260px) - 100%) / 2 - 28px))); }
+.thread-designer { width: var(--conversation-side-width, 260px); }
 .thread-peek.is-open { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: hidden; }
 .thread-peek.is-open .thread-toggle { width: 100%; margin: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--surface-2); padding: 9px 12px; }
 .thread-peek.is-open .thread-toggle svg:last-child { margin-left: auto; }
