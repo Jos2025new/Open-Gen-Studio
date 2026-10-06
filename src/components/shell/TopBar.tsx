@@ -125,7 +125,7 @@ function SessionSwitcher({ activeId, title, onRename }: { activeId: string; titl
   };
   return (
     <>
-      <button type="button" ref={pop.ref} className={`title-btn ${pop.open ? 'is-open' : ''}`} onClick={(e) => { if (e.detail < 2) pop.toggle(); }} onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); pop.close(); onRename(); } }} aria-label="Switch session" aria-haspopup="dialog" aria-expanded={pop.open} data-tip="Switch session · double-click name to rename">
+      <button type="button" ref={pop.ref} className={`title-btn session-title-btn ${pop.open ? 'is-open' : ''}`} onClick={(e) => { if (e.detail < 2) pop.toggle(); }} onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); pop.close(); onRename(); } }} aria-label="Switch session" aria-haspopup="dialog" aria-expanded={pop.open} data-tip="Switch session · double-click name to rename">
         <span className="truncate" onDoubleClick={() => { pop.close(); onRename(); }}>{title}</span>
         <ChevronDown size={14} />
       </button>

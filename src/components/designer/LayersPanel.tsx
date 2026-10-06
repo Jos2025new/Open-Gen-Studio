@@ -12,7 +12,7 @@ import { Field, IconButton, MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
-import { toast } from '../../store/store';
+import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { EditModeToggle } from './ToolSettings';
 import { InlineColor } from './InlineControls';
@@ -75,6 +75,7 @@ function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc:
 
 export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const layer = activeLayer(doc);
+  const editing = useStore((s) => s.ui.tool === 'move');
   const pop = usePopover();
   const addPop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
@@ -202,7 +203,7 @@ export function LayersPanel({ sessionId, doc }: { sessionId: string; doc: Design
     {layer && <>
       {tab === 'props' && <section className="panel-section panel-tab-body">
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
-        <div className="field edit-mode-field"><span className="field-label">Edit tool acts on</span><EditModeToggle /></div>
+        {editing && <div className="field edit-mode-field"><span className="field-label">Edit tool acts on</span><EditModeToggle /></div>}
         <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
         {layer.type === 'text' && <>
