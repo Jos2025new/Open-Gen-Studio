@@ -121,3 +121,7 @@
 .palette-quick .opt-range { width: 52px; }
 .palette-quick .opt-label { font-size: 10px; }
 .view-history { display: flex; gap: 3px; border-left: 1px solid var(--border-strong); padding-left: 6px; margin-left: 3px; }
+
+.palette-snap { display: flex; align-items: center; }
+.palette-snap .tool-setting { height: var(--control-h); padding: 0 6px; border: 0; }
+.palette-snap .tool-setting > svg:first-child { width: var(--control-icon); height: var(--control-icon); }

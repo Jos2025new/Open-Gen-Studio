@@ -65,7 +65,7 @@ export function EditModeToggle() {
   ]} /></span>;
 }
 
-function SnapControl() {
+export function SnapControl() {
   const pop = usePopover();
   const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
   const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });

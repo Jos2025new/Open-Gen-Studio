@@ -7,6 +7,7 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { InlineColor, InlineSlider } from './InlineControls';
+import { SnapControl } from './ToolSettings';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move, double-click to edit' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
@@ -58,7 +59,7 @@ export function ToolRail({ doc, onPick }: { doc: DesignDoc; children?: ReactNode
   const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
   const paint = { id: 'paint', icon: Brush, label: 'Paint', after: 'hand' as DesignTool, tools: TOOLS.filter((t) => ['brush', 'eraser', 'select'].includes(t.id)) };
   return <div className="tool-rail" role="toolbar" aria-label="Design tools">
-    <div className="tool-family">{button('move')}{button('hand')}</div>
+    <div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span></div>
     <div className="tool-family palette-quick">
       <InlineColor label="Active color" value={color} onChange={setColor} />{button('eyedropper')}
       {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
