@@ -63,7 +63,7 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
   };
   return (
     <div className="msg msg-user">
-      <div className="bubble">
+      <div className={`bubble ${item.text.includes('\n') ? 'is-multiline' : ''}`}>
         {item.attachments.length ? (
           <div className="bubble-attachments">
             {item.attachments.map((id) => (
