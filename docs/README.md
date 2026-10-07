@@ -9,7 +9,7 @@
 
 ## Features
 
-- [agente](features/agente.md).
+- [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
@@ -67,3 +67,5 @@
 - [NanoGPT expansion-2: resultados por llamada, diagnóstico, coste, caché y límites](nanogpt-price-expansion-2.md).
 
 `node scripts/check-docs.mjs` comprueba tamaños, índice, ADRs, enlaces de las fichas y posibles secretos. `npm test` ejecuta primero las salvaguardas y esta comprobación. La lectura de data/ real no forma parte de estos controles.
+
+- [Corrección: variantes compatibles tras confirmar ajustes](confirmed-input-variants.md).

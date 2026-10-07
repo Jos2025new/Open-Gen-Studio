@@ -1,4 +1,4 @@
-import { lineKey } from './variants';
+import { lineKey, type VariantRoute } from './variants';
 import { continuityErrors } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
@@ -155,6 +155,8 @@ export interface PlanContext {
   routeModel?: (mode: RouteMode) => string | undefined;
   /** Closest supported ref for a wrong model id ("did you mean"); no LLM call. */
   suggestModel?: (ref: string, kind: MediaKind, needsImage: boolean) => string | undefined;
+  /** Exact input route within the confirmed model line and provider; no fuzzy name search. */
+  variantModel?: (ref: string, route: VariantRoute) => string | undefined;
   /** True when the user picked this kind's model by hand but it has no variant for these inputs and a stand-in is used. */
   defaultIsFallback?: (kind: MediaKind, needsImage: boolean) => boolean;
   /** What the user wrote (messages, answers): a model the plan names wins over the composer's pick only if it is named here. */
@@ -544,7 +546,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const stepNeedsImage = refs.length > 0 || Boolean(s.first_frame);
           const wrote = s.model?.trim();
           // The same model line in the variant these inputs need (the card was made for other inputs).
-          s.model = stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
+          const route = kind === 'image' ? (stepNeedsImage ? 'edit' : 'text') : routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
+          s.model = ctx.variantModel
+            ? ctx.variantModel(conf.modelRef, route) ?? conf.modelRef
+            : stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
           // A family name (e.g. Nano Banana 2) is the same choice written loosely: not worth a note.
           // Noted only when the plan named another model line: the confirmed model's own variant (edit, image-to-video) is the same choice.
           const wroteModel = wrote?.includes('::') ? (await ctx.getModel(wrote))?.model : undefined;

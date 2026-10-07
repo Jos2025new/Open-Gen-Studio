@@ -27,7 +27,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes } from '../catalog';
 import type {
   LlmContentPart,
   ActivityEntry,
@@ -174,6 +174,10 @@ function planContext(sessionId: string, workspace: Workspace) {
   return {
     workspace,
     getModel: resolveModel,
+    variantModel: (ref: string, route: import('../variants').VariantRoute) => {
+      const routes = lineRoutes(ref);
+      return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
+    },
     defaultModel: (kind: MediaKind, needsImage: boolean) => defaultModelFor(kind, needsImage),
     defaultIsFallback: (kind: MediaKind, needsImage: boolean) => defaultModelChoice(kind, needsImage).source === 'fallback',
     defaultSettings: (kind: MediaKind) => get().composer[kind].settings,
