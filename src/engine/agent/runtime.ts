@@ -1,4 +1,4 @@
-import { missingSettingsKind } from '../procedure';
+import { missingSettingsKind, planRequiresSettings } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
@@ -1159,8 +1159,22 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         return;
       }
       // A step that fails again rejects here; its card already shows the error, the plan must still settle.
+      const oldId = g.id;
       await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
-      const after = get().generations[g.id];
+      // retryGeneration may have created a new generation (same operation, new attempt).
+      // Find the latest attempt for this operation to check its status.
+      const opId = g.operationId ?? g.id;
+      const latestAttempt = Object.values(get().generations)
+        .filter(x => (x.operationId ?? x.id) === opId)
+        .sort((a, b) => b.createdAt - a.createdAt)[0];
+      const after = latestAttempt ?? get().generations[g.id];
+      // Update the plan's step → generation mapping if a new attempt was created.
+      if (after && after.id !== oldId) {
+        updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
+          ...it,
+          stepGenerations: { ...it.stepGenerations, [id]: after.id },
+        }));
+      }
       if (after?.status === 'done') recovered.add(id);
       else if (after?.status === 'review') waiting.add(id);
       else blocked.set(id, after?.error ?? 'Failed');
@@ -1733,12 +1747,14 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             continue;
           }
           // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
+          // The gate uses planRequiresSettings: a kind that was never confirmed still blocks;
+          // reuse of an existing confirmed kind is allowed automatically (Phase 1 of the General Model).
           if (workspace !== 'node') {
             const kinds = v.data.steps.map((st) => st.kind);
-            const need = missingSettingsKind(workspace, kinds, session(sessionId).agent.settings);
-            if (need) {
+            const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);
+            if (gate) {
               recordMetric(sessionId, { type: 'rejected' });
-              respond(`Not shown: call confirm_settings first (kind "${need}") so the user confirms the model, resolution${need === 'video' ? ', duration' : ', how many images'} and aspect; then write the prompts for the confirmed model and call propose_plan.`);
+              respond(gate);
               continue;
             }
           }

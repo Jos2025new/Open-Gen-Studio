@@ -341,6 +341,8 @@ export interface Generation {
   /** Only cost reported in the provider result; never a quote or catalog estimate. */
   providerReportedUsd?: number;
   parentId?: string;
+  /** Links attempts of the same operation: regenerate/retry share this id.  Phase 2 of the General Model. */
+  operationId?: string;
   planId?: string;
   stepId?: string;
   remoteJob?: RemoteJob;

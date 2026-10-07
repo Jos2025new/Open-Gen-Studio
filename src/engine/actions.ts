@@ -416,6 +416,8 @@ function specFrom(g: Generation): GenerationSpec {
     op: g.op,
     origin: g.origin,
     parentId: g.id,
+    // Preserve operation id: regenerate is another attempt of the same operation.
+    operationId: g.operationId ?? g.id,
     planId: g.planId,
     stepId: g.stepId,
   };

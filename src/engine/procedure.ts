@@ -9,6 +9,89 @@ export function missingSettingsKind(workspace: Workspace, kinds: string[], setti
   return kinds.includes('video') && !settings?.video ? 'video' : kinds.includes('image') && !settings?.image ? 'image' : null;
 }
 
+/**
+ * Automation policy: decide whether a plan needs the settings card, can reuse
+ * existing settings silently, or should expose the decision.
+ *
+ * Impact, detectability and reversibility govern the decision — not just
+ * confidence.  §11 of the General Generative Project Model.
+ */
+export type ConfirmationAction = 'automate' | 'expose' | 'ask';
+
+export interface ConfirmationInput {
+  workspace: Workspace;
+  /** The media kinds the plan includes (e.g. ['image'] or ['image','video']). */
+  kinds: MediaKind[];
+  /** Confirmed settings already on the session. */
+  settings: Partial<Record<MediaKind, SettingsChoice>> | undefined;
+  /** True when the user named or explicitly picked a model for this request. */
+  userChoseModel: boolean;
+  /** Estimated cost in USD for the plan (null = unknown). */
+  estimatedCost: number | null;
+  /** The plan has multiple candidate counts (count > 1 per step). */
+  hasMultipleCandidates: boolean;
+}
+
+/**
+ * Replaces the blanket "always ask" gate with a risk-based decision.
+ *
+ * - **automate**: reuse existing confirmed settings without asking
+ *   (low cost, single result, reversible, model already set).
+ * - **expose**: show the card pre-filled but don't block the plan —
+ *   the user can change it if they want.
+ * - **ask**: block the plan until the user confirms
+ *   (new kind, high cost, unknown cost, user chose model, or multiple candidates).
+ */
+export function needsConfirmation(input: ConfirmationInput): ConfirmationAction {
+  const { workspace, kinds, settings, userChoseModel, estimatedCost, hasMultipleCandidates } = input;
+  if (workspace === 'node') return 'automate'; // Nodes own their settings per-node.
+
+  for (const kind of kinds) {
+    // A kind that was never confirmed must ask.
+    if (!settings?.[kind]) return 'ask';
+  }
+
+  // Video always asks: high cost, long wait, hard to reverse.
+  if (kinds.includes('video')) return 'ask';
+
+  // High or unknown cost asks.
+  if (estimatedCost === null || estimatedCost > 0.5) return 'ask';
+
+  // Multiple candidates ask: user should choose count / model.
+  if (hasMultipleCandidates) return 'ask';
+
+  // User named a model: expose so they see the card but don't block.
+  if (userChoseModel) return 'expose';
+
+  // Low-cost, single result, no user model override: safe to reuse.
+  return 'automate';
+}
+
+/**
+ * Human-readable policy for agent-facing text.
+ * Describes when the app decides on its own vs. when it asks.
+ */
+export const AUTOMATION_POLICY =
+  'The app decides automatically when: the request is a low-cost single image, ' +
+  'settings are already confirmed for this session, and the user did not name a model. ' +
+  'It shows a pre-filled settings card (without blocking) when the user named a model. ' +
+  'It asks and blocks when: cost is high or unknown, video is involved, ' +
+  'multiple candidates are requested, or a kind has never been confirmed in this session.';
+
+/**
+ * Convenience: the gate that runtime uses to decide whether propose_plan is allowed
+ * without a preceding confirm_settings call.
+ *
+ * Returns null (allowed) or a message explaining what the agent must do.
+ */
+export function planRequiresSettings(workspace: Workspace, kinds: string[], settings: Partial<Record<MediaKind, SettingsChoice>> | undefined): string | null {
+  // Keep using the existing function for the strict check:
+  // a kind that was never confirmed still blocks.
+  const missing = missingSettingsKind(workspace, kinds, settings);
+  if (!missing) return null;
+  return `Not shown: call confirm_settings first (kind "${missing}") so the user confirms the model, resolution${missing === 'video' ? ', duration' : ', how many images'} and aspect; then write the prompts for the confirmed model and call propose_plan.`;
+}
+
 /** Derived from the execution registry, not a second list of operation capabilities. */
 export const OP_LINES = AGENT_OP_IDS.map(id => {
   const op = OPS[id];

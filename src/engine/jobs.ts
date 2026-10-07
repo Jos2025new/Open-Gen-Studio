@@ -41,6 +41,8 @@ export interface GenerationSpec {
   op?: Generation['op'];
   origin: GenerationOrigin;
   parentId?: string;
+  /** When present, links this attempt to its parent operation (regenerate/retry share the same operationId). */
+  operationId?: string;
   planId?: string;
   stepId?: string;
   estimate?: Estimate;
@@ -97,6 +99,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
     assetIds: [],
     estimate: spec.estimate ?? estimateSpec(spec),
     parentId: spec.parentId,
+    operationId: spec.operationId,
     planId: spec.planId,
     stepId: spec.stepId,
     ...(spec.variants?.length ? { variants: spec.variants } : {}),
@@ -830,13 +833,32 @@ export async function resumeInterrupted(): Promise<void> {
 }
 
 /**
- * Run a failed or canceled generation again, in its own card (same request, same seed). A job that was submitted
- * may still finish at the provider: Check status is the way to fetch it; Retry submits again (and is charged again).
+ * Run a failed or canceled generation again as a new attempt linked to the same operation.
+ * The original record stays intact (failed/canceled); the new attempt gets its own id.
+ * A job that was submitted may still finish at the provider: Check status is the way to fetch it;
+ * Retry submits again (and is charged again).
  */
 export function retryGeneration(id: string): Promise<string[]> {
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
-  return runGeneration(id);
+  // Create a new Generation as another attempt of the same operation.
+  const newG = createGeneration({
+    sessionId: g.sessionId,
+    kind: g.kind,
+    prompt: g.prompt,
+    modelRef: g.modelRef,
+    settings: { ...g.settings, seed: g.settings.seed },
+    inputs: g.inputs,
+    op: g.op,
+    origin: g.origin,
+    parentId: g.id,
+    operationId: g.operationId ?? g.id,
+    planId: g.planId,
+    stepId: g.stepId,
+    estimate: g.estimate,
+    variants: g.variants,
+  });
+  return runGeneration(newG.id);
 }
 
 /**
