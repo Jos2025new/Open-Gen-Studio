@@ -504,6 +504,12 @@ export interface PlanSubject {
   description?: string;
 }
 
+export interface PlanContinuity {
+  source: StepRef;
+  preserve: string;
+  steps: string[];
+}
+
 export interface Plan {
   id: string;
   title: string;
@@ -512,6 +518,8 @@ export interface Plan {
   steps: PlanStep[];
   /** Named image references: asset sources save/reuse library entries; step sources stay temporary (F3). */
   subjects?: PlanSubject[];
+  /** Declared preservation relationships; no implicit saving or extra execution. */
+  continuity?: PlanContinuity[];
   /** Style block appended to every image and video prompt (already in the prompts). */
   style?: string;
   adjustments: string[];

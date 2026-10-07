@@ -1,3 +1,4 @@
+import { CONTINUITY_POLICY } from '../procedure';
 import type { Workflow } from './types';
 
 export const WORKFLOWS: Workflow[] = [
@@ -186,15 +187,16 @@ export const WORKFLOWS: Workflow[] = [
       'sound: dialogue or voice-over, music and ambience, or silent (only for models with audio)',
       'format: the attached image\'s aspect (recommended) or another',
       'one clip with timed shots (recommended when the total fits the model: up to 30 s on Seedance 2.5 / Wan 3, 15 s on MiniMax H3) or several separate clips joined; both use the same fixed character sources in every clip',
-      'character references first? "No, use my image" (recommended when the image shows the character clearly) or "Yes, a character sheet first" (recommended when the character is invented or the image does not show it well; a cheap first plan, the user sees it, then the clips with the sheet in their refs)',
+      'reuse an existing character source, or establish it in an appropriate first requested scene; offer a separate reference sheet only for an explained need or when requested',
     ],
     continuity:
-      'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; a clip with no image of her repeats the same 3–6 literal traits (skill:cinematic). Save her to the library only if the user asks or says yes in the questions card. One clip or several is asked in the brief card (see needs). One clip: the whole story with timed shots (hook → conflict → payoff as "0–5s / 5–10s / …" with shot size and camera each), no join. Several clips: each clip is one closed beat with a start and an end, written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All requested clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
+      'One identity: the attached image (or the character-sheet image the user picked) goes in the refs of every clip, cited with the model\'s reference syntax and its role ("the girl in @Image1") — never describe her look again; text descriptions establish a source but do not preserve identity between independent outputs. If the model cannot accept the required source, explain that limitation before approval. Save her to the library only if the user asks or says yes in the questions card. One clip or several is asked in the brief card (see needs). One clip: the whole story with timed shots (hook → conflict → payoff as "0–5s / 5–10s / …" with shot size and camera each), no join. Several clips: each clip is one closed beat with a start and an end, written as action, camera and sound; the durations add up to the requested total (set total_duration). Neighboring clips change at least one of shot size, subject or angle. All requested clips go in one plan (the user unchecks what they do not want), followed by join_clips over them in order. If the story does not fit the length, say so with numbers and offer extending, focusing on one moment or compressing in the questions card.',
     steps: [
-      { id: 's1', kind: 'video', title: 'Clip 1 · hook', prompt: '{prompt}' },
-      { id: 's2', kind: 'video', title: 'Clip 2 · conflict', prompt: '{prompt}' },
-      { id: 's3', kind: 'video', title: 'Clip 3 · payoff', prompt: '{prompt}' },
-      { id: 's4', kind: 'op', title: 'Join clips', op: 'join_clips', input: 's1', more: ['s2', 's3'] },
+      { id: 's1', kind: 'image', title: 'First scene / identity source', prompt: '{prompt}' },
+      { id: 's2', kind: 'image', title: 'Next scene with the same identity', prompt: '{prompt}', refs: ['s1'] },
+      { id: 's3', kind: 'video', title: 'Clip 1', prompt: '{prompt}', firstFrame: 's1' },
+      { id: 's4', kind: 'video', title: 'Clip 2', prompt: '{prompt}', firstFrame: 's2' },
+      { id: 's5', kind: 'op', title: 'Join requested clips', op: 'join_clips', input: 's3', more: ['s4'] },
     ],
   },
   {
@@ -359,6 +361,6 @@ export function describeWorkflow(w: Workflow): string {
     w.variants?.length ? `variants: ${w.variants.map((v) => `${v.id} (${v.description})`).join('; ')}` : '',
     w.skills?.length ? `skills (read_guide each before writing its steps): ${w.skills.map((k) => `skill:${k.id} for ${k.for}`).join('; ')}` : '',
   ].filter(Boolean);
-  return [`${w.name}: ${w.description}`, ...lines, ...extra.map((e) => `  ${e}`)].join('\n');
+  return [`${w.name}: ${w.description}`, `preservation: ${CONTINUITY_POLICY}`, ...lines, ...extra.map((e) => `  ${e}`), 'Before propose_plan: check the declared preservation sources reach every consuming result; text repetition alone does not establish continuity.'].join('\n');
 }
 

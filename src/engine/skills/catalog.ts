@@ -21,7 +21,7 @@ export const SKILLS: Skill[] = [
     id: 'character',
     name: 'Character consistency',
     description: 'Keep the same character across images and shots.',
-    guidance: 'Use the provided character image as the identity source in every consuming step. If no image exists, establish one source first and repeat the fixed identity description only in text-only prompts. View changes preserve the source pose and outfit unless requested otherwise.',
+    guidance: 'Use the provided character image as the identity source in every consuming step. If no image exists, establish one source first and use text to establish that source, not as a substitute for passing it to related outputs. View changes preserve the source pose and outfit unless requested otherwise.',
     promptHint: 'consistent character, same face and outfit',
   },
   {

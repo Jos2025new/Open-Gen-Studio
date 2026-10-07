@@ -14,8 +14,6 @@ Directing clips — camera, emotion and identity (load before writing video prom
 - One emotional beat per clip, with a trigger and a reaction ("the phone buzzes → she freezes → a slow smile").
 - Pace matches the feeling: held shots and slow moves for weight; short beats and quick moves for energy.
 
-3. Identity without an image
-- The model only sees a subject (@Name) when its image goes with the clip: the clip's first_frame, its refs, or a model that takes reference images (the app then sends the subject's image). On a text-only clip the app sends just the name (plus the subject's saved description, if any): the look is lost.
-- For those clips, write 3–6 literal, visible traits of the subject in every clip, the same words each time: age range, hair (color, length, style), skin tone, build, the key garment with its color, one distinctive mark or accessory. "Reto, a woman in her 30s with a short black bob, olive skin, slim, a mustard raincoat and round glasses."
-- Never vary the trait wording between clips, never add new traits later, never describe what the image already shows when the image does go with the clip.
-- Better than words: start the clip from an approved still of the subject (first_frame) or keep the subject in refs.
+3. Identity and other preserved properties
+- Follow the shared preservation contract: related outputs reuse their relevant sources. A supplied image or an appropriate first requested result can supply identity; subsequent scene images carry it before they become clip start frames.
+- Repeating visible traits is useful to establish a new source from text, but is not an equivalent way to preserve identity across outputs. If a route cannot take the source, explain the limit before approval; do not silently substitute text or force another generation.

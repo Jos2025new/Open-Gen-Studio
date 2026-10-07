@@ -18,6 +18,7 @@ import { pushAlert } from '../alerts';
 import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
+import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
@@ -915,6 +916,17 @@ async function executePlanItem(
   let docId: string | undefined;
   if (workspace === 'designer') docId = ensureDoc(sessionId, designerDims()).id;
 
+  if (plan.continuity?.length) {
+    const ids = new Set(steps.map(s => s.id));
+    const mapSource = (ref: string) => workspace === 'node' && parseRef(ref)?.type === 'step' ? nodeOf(ref) : ref;
+    const groups = plan.continuity.map(g => ({ ...g, source: mapSource(g.source), steps: g.steps.map(id => workspace === 'node' ? nodeOf(id) : id).filter(id => ids.has(id)) }));
+    const subjects = plan.subjects?.map(s => ({ ...s, from: mapSource(s.from) }));
+    const errors = continuityErrors(groups, steps, subjects);
+    if (errors.length) {
+      updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: errors.join(' ') });
+      return;
+    }
+  }
   const result = await executeSteps(steps, {
     ...(resume ? { prior: resume.prior, blocked: resume.blocked, waiting: resume.waiting, reuseGenerations: resume.reuseGenerations } : {}),
     canceled: new Set(item.canceledSteps ?? []),

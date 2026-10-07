@@ -2,7 +2,7 @@ Product photography — full guide (commercial, e-commerce and brand imagery; th
 
 1. Product sheet first (one identity)
 - When no reference image exists, establish one fixed product description: object type, shape and proportions, materials and finish (matte, gloss, brushed metal, frosted glass), exact colors (hex when clear), label layout, logo position, the legible text on the pack.
-- With a reference image, cite its product role instead of redescribing identity. Repeat the fixed description only in text-only prompts. Never restyle, recolor or redesign the product unless asked.
+- With a reference image, cite its product role instead of redescribing identity. A fixed description may establish a new source from text; it is not an equivalent substitute for passing the source across related outputs. Declare preservation under the common continuity contract. Never restyle, recolor or redesign the product unless asked.
 - Pass the product photo as a reference in every step (refs: the asset id); later steps also reference the approved hero shot.
 - Pack text: quote it literally in quotes and only when legible in the photo; never invent claims, logos or labels.
 

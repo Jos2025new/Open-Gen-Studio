@@ -50,6 +50,8 @@
 
 ## Verificación
 
+- [Conservación transversal: propuesta ejecutada, contrato, pruebas y medición pendiente](continuity-contract.md).
+
 - [Error de referencia 3D: adjunto, captura vigente y límites](agent-3d-view-reference.md).
 
 - [Contrato del operador: recorrido corregido, sesiones existentes y límites](agent-operator-contract.md).

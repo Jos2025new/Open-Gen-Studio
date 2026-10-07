@@ -1,4 +1,5 @@
 import { lineKey } from './variants';
+import { continuityErrors } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
@@ -21,6 +22,7 @@ import type {
   Plan,
   PlanStep,
   PlanSubject,
+  PlanContinuity,
   ShapeSpec,
   StrokeSpec,
   StepRef,
@@ -77,6 +79,7 @@ export interface RawStep {
 }
 
 export interface RawPlan {
+  continuity?: PlanContinuity[];
   title?: string;
   summary?: string;
   /** Seconds the video steps add up to; split over the video steps without their own duration. */
@@ -902,6 +905,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
 
   if (ctx.workspace === 'node' && steps.some((s) => s.kind === 'layer')) errors.push('Layer steps are not valid in the Node workspace.');
   const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, ctx.subjectNames?.() ?? []);
+  const continuity = raw.continuity ?? [];
+  for (const group of continuity) {
+    if (!group.source?.trim() || !group.preserve?.trim() || !Array.isArray(group.steps) || !group.steps.length) errors.push('continuity: source, preserve and consuming steps are required.');
+    else refKind(group.source, 'continuity source');
+  }
+  if (continuity.length && !errors.length) errors.push(...continuityErrors(continuity, steps, subjects));
   unknownMentions(steps, [...(ctx.subjectNames?.() ?? []), ...subjects.map((x) => x.name)], errors);
   const style = raw.style?.trim();
   if (style) {
@@ -936,6 +945,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       workspace: ctx.workspace,
       steps,
       ...(subjects.length ? { subjects } : {}),
+      ...(continuity.length ? { continuity } : {}),
       ...(style ? { style } : {}),
       adjustments,
     },

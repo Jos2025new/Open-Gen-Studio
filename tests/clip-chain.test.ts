@@ -78,7 +78,7 @@ describe('identity without an image (O5)', () => {
   it('the directing guide and the 9:16 safe zones load on demand', async () => {
     const { readGuide, workflowById } = await import('../src/engine/skills');
     expect(readGuide('skill:cinematic')).toMatch(/Dolly in \/ out[\s\S]*Zoom in \/ out/);
-    expect(readGuide('skill:cinematic')).toMatch(/3–6 literal, visible traits/);
+    expect(readGuide('skill:cinematic')).toContain('not an equivalent way to preserve identity across outputs');
     expect(readGuide('skill:social')).toMatch(/bottom ~320 px/);
     expect(workflowById('story')?.skills?.map((x) => x.id)).toContain('cinematic');
   });

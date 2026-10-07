@@ -150,6 +150,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           </div>
           <h4 className="plan-title">{plan.title}</h4>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
+          {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
         <CostTag estimate={total} />
       </header>
