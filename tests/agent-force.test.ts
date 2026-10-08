@@ -115,9 +115,9 @@ describe('what the agent reads', () => {
 });
 
 /** A request end to end; returns each model call's tool_choice and messages. */
-async function request(text: string, attachments: string[]) {
+async function request(text: string, attachments: string[], proposed?: unknown[]) {
   const calls: Array<{ toolChoice: unknown; messages: string }> = [];
-  const plans = [{ title: 'Fondo', steps: [{ id: 's1', kind: 'op', op: 'remove_bg', input: 'asset:img1' }] }];
+  const plans = proposed ?? [{ title: 'Fondo', steps: [{ id: 's1', kind: 'op', op: 'remove_bg', input: 'asset:img1' }] }];
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
@@ -169,6 +169,20 @@ describe('the local planner uses the same gate', () => {
     };
     expect(opOf('cambia la luz a atardecer')).toMatchObject({ kind: 'op', op: 'relight' });
     expect(opOf('una chica en un café con luz suave')?.op).toBeUndefined();
+  });
+});
+
+describe('your flow: keyword → tool call; Auto and Guided confirm the image model first, Direct inherits the composer', () => {
+  it('Auto without confirmed image settings: the route says confirm_settings first, and a plan with the operation waits for it', async () => {
+    withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
+    const calls = await request('dame una vista lateral de esta imagen', ['img1'], [{ title: 'Ángulo', steps: [{ id: 's1', kind: 'op', op: 'angle', input: 'asset:img1' }] }]);
+    expect(calls[0].messages).toContain('confirm_settings first (kind image');
+    expect(calls.map((c) => c.messages).join(' ')).toContain('call confirm_settings first');
+  });
+  it('remove_bg has no model to choose: no card first', () => {
+    withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
+    const g = gateOps('quita el fondo', inputs(['img1']), false);
+    expect(steerNote(g, false)).not.toContain('confirm_settings');
   });
 });
 

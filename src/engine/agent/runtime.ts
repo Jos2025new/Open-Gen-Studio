@@ -77,6 +77,7 @@ import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
+import { OPS } from '../ops';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -214,6 +215,7 @@ function planContext(sessionId: string, workspace: Workspace) {
     direct: () => get().composer.agentStyle === 'direct',
     canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
+    opModel: () => (workspace === 'node' ? undefined : get().composer.agentStyle === 'direct' ? get().composer.image.modelRef : session(sessionId).agent.settings?.image?.modelRef),
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
     // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
@@ -327,7 +329,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
-  const forced = workspace === 'node' ? '' : steerNote(requestGate(sessionId));
+  const gate = workspace === 'node' ? [] : requestGate(sessionId);
+  // Auto and Guided confirm the image model of an image-model operation first (Auto once per session; Guided each request).
+  const confirmFirst = get().composer.agentStyle !== 'direct' && !session(sessionId).agent.settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
+  const forced = steerNote(gate, confirmFirst);
   // The route goes first: an instruction buried after the context was followed after the prompt's own steps.
   pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
@@ -1762,7 +1767,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             continue;
           }
           if (workspace !== 'node' && get().composer.agentStyle !== 'direct') {
-            const kinds = v.data.steps.map((st) => st.kind);
+            // An operation that runs on an image model needs the image kind confirmed, as an image step does.
+            const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
             const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);
             if (gate) {
               recordMetric(sessionId, { type: 'rejected' });

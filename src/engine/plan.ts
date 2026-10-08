@@ -179,6 +179,8 @@ export interface PlanContext {
   /** A question round is left in this request, and whether the user already answered one (fit.ts asks once). */
   canAsk?: () => boolean;
   answered?: () => boolean;
+  /** The image model an image-model operation runs on: the confirmed one (Auto, Guided) or the composer's (Direct). */
+  opModel?: () => string | undefined;
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -849,6 +851,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else if (got.model.kind !== kind || !got.model.acceptsImage || got.model.needsVideo) errors.push(`${where}: model "${ref}" does not take an input image for "${opId}". Fix: use its edit variant (find_models) or leave "model" out.${didYouMean(ctx, s.model, kind, true)}`);
           else params._modelRef = ref!;
         }
+        // Otherwise the confirmed (or, in Direct, the composer's) image model runs it, in its edit variant (ADR 0009).
+        const opModel = def.engine === 'edit' && !params._modelRef ? ctx.opModel?.() : undefined;
+        if (opModel) params._modelRef = ctx.variantModel?.(opModel, 'edit') ?? opModel;
         let more: string[] | undefined;
         if (def.multiInput) {
           more = (Array.isArray(s.more) ? s.more : []).map((r) => String(r).trim()).filter(Boolean);

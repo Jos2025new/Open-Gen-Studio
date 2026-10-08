@@ -213,3 +213,14 @@ describe('a contact sheet cut by grid_split takes its own grid', () => {
   });
 });
 
+describe('an image-model operation runs on the confirmed (or composer) image model, in its edit variant', () => {
+  it('angle takes the edit variant of the model the card confirmed; remove_bg takes none', async () => {
+    const ctx = { ...ctxWith('una vista lateral'), opModel: () => 'atlas::m/text-to-image', variantModel: (ref: string) => ref.replace('text-to-image', 'edit') } as PlanContext;
+    const raw = { title: 'Ops', steps: [{ id: 's1', kind: 'op', op: 'angle', input: 'asset:img1' }, { id: 's2', kind: 'op', op: 'remove_bg', input: 'asset:img1' }] } as unknown as Parameters<typeof normalizePlan>[0];
+    const { plan, errors } = await normalizePlan(raw, ctx, 'pln_test');
+    expect(errors).toEqual([]);
+    expect((plan!.steps[0] as { params: Record<string, string> }).params._modelRef).toBe('atlas::m/edit');
+    expect((plan!.steps[1] as { params: Record<string, string> }).params._modelRef).toBeUndefined();
+  });
+});
+
