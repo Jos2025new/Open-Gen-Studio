@@ -23,6 +23,7 @@
 - [0002 — No usar confirm() nativo](decisions/0002-confirmaciones-de-la-app.md).
 - [0003 — Probar la app solo en el sandbox](decisions/0003-pruebas-en-sandbox.md).
 - [0004 — Aprobar un coste máximo antes de usar proveedores de pago](decisions/0004-coste-maximo.md).
+- [0005 — Controles coherentes y Properties en el Designer](decisions/0005-controles-coherentes-designer.md).
 
 ## Historial
 
@@ -43,6 +44,10 @@
 - [015-2026-09-W39](history/015-2026-09-W39.md) — 8682 bytes.
 - [016-2026-09-W40](history/016-2026-09-W40.md) — 1339 bytes.
 - [017-2026-10-W40](history/017-2026-10-W40.md) — 7357 bytes.
+
+## Planes activos
+
+- [Controles coherentes y Properties en el Designer](../PLAN_INTERFAZ_UNIFICADA.md): fases V1-V4, regla de alcance, delimitadores, riesgos y trazabilidad. Version 2, sin codigo; la decision 0005 lo resume.
 
 ## Verificación
 
