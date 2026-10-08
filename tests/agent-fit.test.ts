@@ -120,3 +120,18 @@ describe('reference sheet and contact sheet take their count', () => {
     expect(value(fitContactAngles('nueve ángulos'), 'angles')).toBe('9');
   });
 });
+
+describe('no false refusals: a character or an object named with a place is still the sheet subject', () => {
+  it('a person, a character or an object wins over a place in the same request', () => {
+    for (const text of ['Hazme una hoja de personaje de la chica que está en la playa', 'Hoja de referencia de mi personaje, el chef de la cocina', 'Hoja de referencia de la casa de mi personaje'])
+      expect(fitOp('reference_sheet', text)).toMatchObject({ ok: true, params: { subject: 'character' } });
+    expect(fitOp('reference_sheet', 'hoja de referencia del bolso sobre la mesa de la oficina')).toMatchObject({ ok: true, params: { subject: 'object' } });
+  });
+
+  it('"separadas" about poses is a sheet; separate images or views are one image per view', () => {
+    expect(fitOp('reference_sheet', 'Hoja de referencia de mi personaje con poses separadas')).toMatchObject({ ok: true });
+    for (const text of ['tres vistas separadas de mi personaje', 'las vistas en imágenes separadas', 'cada vista en una imagen'])
+      expect(fitOp('reference_sheet', text)).toMatchObject({ ok: false, reason: expect.stringContaining('one image per view') });
+  });
+});
+

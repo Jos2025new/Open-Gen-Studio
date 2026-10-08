@@ -44,8 +44,11 @@ const INSTAGRAM_DEFAULT = '9:16';
 
 const CHANGE_WORDS = /\b(otro|otra|otros|distinto|distinta|diferente|nuevo|nueva|different|another|other|new)\b/;
 
-/** "Tres vistas, una imagen por vista": one image per view takes angle steps; a reference sheet is one image. */
-const PER_VIEW = /\b(por vista|per view|one image per view|independientes|separadas|separate views|cada vista)\b/;
+/**
+ * "Tres vistas, una imagen por vista": one image per view takes angle steps; a reference sheet is one image. It has to
+ * say so about images or views: "separadas" alone ("poses separadas") describes the sheet, not one image per view.
+ */
+const PER_VIEW = /\b(por vista|per view|one image per view|(imagenes|fotos|vistas) (separadas|independientes|por separado)|separate (images|views)|cada vista (en|como) (una )?(imagen|foto))\b/;
 /** A sheet is named: "hoja", "sheet", "turnaround", "referencias de personaje". */
 const SHEET_CUE = /\b(hoja|sheet|turnaround|referencias? de (personaje|personajes|persona|objeto|producto))\b/;
 /** The request counts views: "tres vistas", "two views". */
@@ -147,14 +150,15 @@ const PERSON = /\b(personaj\w*|persona\w*|character|people|person|mujer\w*|hombr
 const OBJECT = /\b(producto\w*|objeto\w*|product|object|bolso\w*|botella\w*|zapato\w*|reloj\w*|mochila\w*|taza\w*|silla\w*|mueble\w*)\b/;
 
 /**
- * The subject of a reference sheet: a character, a person or an object. A place is refused. A request that names none of
- * the three keeps the operation's default (a character): the source image usually settles it.
+ * The subject of a reference sheet: a character, a person or an object. A place is refused only when the request names
+ * a place and no character, person or object: "la chica que está en la playa" or "la casa de mi personaje" are about the
+ * character. A request that names none keeps the operation's default (a character): the source image usually settles it.
  */
 export function fitSubject(text: string): FitResult {
   const s = normalizeRequest(text);
-  if (PLACE.test(s)) return { ok: false, reason: 'a place is not a reference sheet subject (only characters, people or objects)' };
   if (PERSON.test(s)) return { ok: true, params: { subject: 'character' } };
   if (OBJECT.test(s)) return { ok: true, params: { subject: 'object' } };
+  if (PLACE.test(s)) return { ok: false, reason: 'a place is not a reference sheet subject (only characters, people or objects)' };
   return { ok: true, params: {} };
 }
 
