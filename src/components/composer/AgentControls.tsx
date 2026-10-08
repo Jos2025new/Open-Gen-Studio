@@ -1,8 +1,16 @@
 import { Check, GitBranch, Sparkles, X } from 'lucide-react';
 import { SKILLS, WORKFLOWS, skillById, workflowById } from '../../engine/skills';
+import type { AgentStyle } from '../../engine/types';
 import { setComposer, useStore } from '../../store/store';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Chip, Segmented } from '../ui/primitives';
+import { Chip } from '../ui/primitives';
+
+/** Agent modes: one dropdown, Auto by default. The tips say what each mode decides for the user. */
+export const AGENT_MODES: Array<{ value: AgentStyle; label: string; tip: string }> = [
+  { value: 'auto', label: 'Auto', tip: 'The agent decides; it asks one card only when something that changes the result is missing, and stops to confirm the cost' },
+  { value: 'guided', label: 'Guided', tip: 'The agent asks a few questions (max rounds in Settings), then shows the plan' },
+  { value: 'direct', label: 'Direct', tip: 'No questions and no settings card: the agent uses the models chosen in the composer; you approve the plan and its cost' },
+];
 
 function SkillsChip({ onPicked }: { onPicked?: () => void }) {
   const skillId = useStore((s) => s.composer.skillId);
@@ -109,15 +117,17 @@ export function AgentControls() {
   const wf = workflowById(workflowId);
   return (
     <>
-      <Segmented
+      <select
+        className="ml-filter agent-mode"
+        aria-label="Agent mode"
         value={style}
-        size="sm"
-        onChange={(v) => setComposer({ agentStyle: v })}
-        options={[
-          { value: 'auto', label: 'Auto', tip: 'The agent decides; it asks one card only when something that changes the result is missing, and stops to confirm the cost' },
-          { value: 'guided', label: 'Guided', tip: 'The agent asks a few questions (max rounds in Settings), then shows the plan' },
-        ]}
-      />
+        title={AGENT_MODES.find((m) => m.value === style)?.tip}
+        onChange={(e) => setComposer({ agentStyle: e.target.value as AgentStyle })}
+      >
+        {AGENT_MODES.map((m) => (
+          <option key={m.value} value={m.value} title={m.tip}>{m.label}</option>
+        ))}
+      </select>
       <AgentOptions activeOnly />
       {wf && !wf.workspaces.includes(workspace) ? (
         <Chip icon={X} muted onClick={() => setComposer({ workflowId: null })} data-tip="This workflow does not apply here; it will be ignored">

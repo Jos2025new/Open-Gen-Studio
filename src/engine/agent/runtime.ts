@@ -1,4 +1,4 @@
-import { costAskMessage, needsConfirmation, planRequiresSettings } from '../procedure';
+import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
@@ -29,6 +29,7 @@ import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
 import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes } from '../catalog';
 import type {
+  AgentStyle,
   LlmContentPart,
   ActivityEntry,
   ActivityFeedItem,
@@ -533,7 +534,7 @@ function showQuestions(sessionId: string, workspace: Workspace, intro: string | 
     intro,
     questions,
     round,
-    maxRounds: get().composer.agentStyle === 'auto' ? 1 : get().settings.guidedRounds,
+    maxRounds: roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     status: 'pending',
     ...(toolCallId ? { toolCallId } : {}),
   };
@@ -567,7 +568,8 @@ async function presentPlan(
   // Automation policy (§11) on the normalized plan: cost and candidates are known only here.
   // Nothing is stored or shown before this check: a plan that needs the settings card is not presented.
   const settingKinds = plan.steps.map((st) => st.kind).filter((k): k is 'image' | 'video' => k === 'image' || k === 'video');
-  if (workspace !== 'node' && settingKinds.length) {
+  // Direct mode decides nothing before the plan card: the models come from the composer and the card approves the cost.
+  if (workspace !== 'node' && settingKinds.length && get().composer.agentStyle !== 'direct') {
     const action = needsConfirmation({
       workspace,
       kinds: settingKinds,
@@ -1314,6 +1316,12 @@ export function askForPlan(sessionId: string, noticeId: string): void {
 }
 
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
+/** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
+const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
+function toolsFor(style: AgentStyle) {
+  return style === 'direct' ? TOOLS.filter((t) => !DIRECT_HIDDEN_TOOLS.has(t.function.name)) : TOOLS;
+}
+
 const SILENCE_MS = 60_000;
 const TURN_CAP_MS = 5 * 60_000;
 const AGENT_SYSTEM = `${MUST}\n\n${CAPABILITIES}\n\n${SYSTEM_PROMPT}\n\n${MUST}`;
@@ -1380,7 +1388,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           model: engine.model,
           system: AGENT_SYSTEM,
           messages: repairHistory(session(sessionId).agent.history),
-          tools: TOOLS,
+          tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
           onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
@@ -1545,7 +1553,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           const style = get().composer.agentStyle;
           const s = session(sessionId);
           // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
-          if (s.agent.questionRound >= (style === 'auto' ? 1 : get().settings.guidedRounds)) {
+          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
@@ -1756,7 +1764,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
           // Before normalization: a kind never confirmed in this session still blocks.
           // After normalization (presentPlan): the cost-based automation policy (needsConfirmation).
-          if (workspace !== 'node') {
+          if (workspace !== 'node' && get().composer.agentStyle !== 'direct') {
             const kinds = v.data.steps.map((st) => st.kind);
             const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);
             if (gate) {

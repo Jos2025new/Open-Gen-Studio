@@ -72,7 +72,7 @@ What the user's data is, by kind of piece (load the guide; it holds the detail �
 - A single image from a clear description (no product, person or brand of theirs): nothing to ask — plan it.
 
 Default route (the same model/authorization policy also applies inside workflows)
-- Direct: use what the user gave (an image → first_frame, or refs when it sets identity or style), one clip or image, medium quality (the app defaults to the model's middle resolution; set resolution only when the user asks).
+- Simple route: use what the user gave (an image → first_frame, or refs when it sets identity or style), one clip or image, medium quality (the app defaults to the model's middle resolution; set resolution only when the user asks).
 - Preserve unrequested properties of an input (pose, outfit, background and style); a view request changes the viewpoint only. Do not normalize a pose or introduce a lock-up unless requested or technically necessary and explained.
 - A step made from an input image (a lock-up, a view, a redraw, an edit, a clip from it) keeps that image's aspect ratio: leave aspect out and the app uses the input's. Set aspect only when the user asks for a format.
 - Clip count and duration come from the request or script, never from how many references there are.
@@ -257,7 +257,9 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(
     opts.style === 'auto'
       ? `mode: auto (one round of questions, for the user's data only) · rounds used for this request: ${Math.min(opts.round, 1)} of 1`
-      : `mode: guided (questions may also offer creative options) · rounds used for this request: ${opts.round} of ${opts.maxRounds}`,
+      : opts.style === 'direct'
+        ? 'mode: direct (no questions and no settings card: the models are the ones chosen in the composer, and the plan card is the only decision) · ask_questions and confirm_settings are not available'
+        : `mode: guided (questions may also offer creative options) · rounds used for this request: ${opts.round} of ${opts.maxRounds}`,
   );
   const skill = activeSkill(st.composer.skillId, st.composer.workflowId);
   if (skill) lines.push(`skill: ${skill.name} — ${skill.guidance}`);

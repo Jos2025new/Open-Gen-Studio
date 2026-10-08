@@ -4,7 +4,8 @@ import type { SentRequest } from '../lib/debug';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
-export type AgentStyle = 'auto' | 'guided';
+/** Agent mode: auto (one card when something that changes the result is missing), guided (question rounds), direct (no questions, no settings card). */
+export type AgentStyle = 'auto' | 'guided' | 'direct';
 /** Every generated media type is also a persistable asset type. */
 export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
 export type AssetKind = MediaKind;
