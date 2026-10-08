@@ -39,6 +39,7 @@ El usuario fijó también cómo se comporta cada modo. La revisión de `task/mod
    - **Auto:** el modelo pregunta solo lo esencial y una vez. Los ajustes confirmados se heredan en la sesión. La tarjeta aparece para lo que no se ha aprobado y, como protección contra sobrecargos (0004, 0006), cuando un plan que reutiliza ajustes tiene coste desconocido o superior a 0,50 USD.
    - **Direct:** sin tarjetas de pregunta ni de ajustes. Valores por defecto de la app y modelos del compositor; un modelo que nombra el usuario se usa.
 5. **Enmiendas.**
+   - **0007 (9):** una operación que usa un modelo de imagen (`angle`, `relight`, `reframe`, hojas, `variations`, `edit`) corre con el modelo de imagen confirmado en su variante de edición, no con el de su origen. En Auto exige la tarjeta de imagen una vez por sesión y en Guided en cada petición; en Direct usa el modelo del compositor. Las operaciones locales o dedicadas siguen sin tarjeta. La señal lo indica: «confirm_settings first, then propose_plan».
    - **0007 (1 y 9):** en Direct corre siempre el modelo del compositor, aunque antes se confirmara otro, y se envían las guías de los modelos que pueden correr.
    - **0007 (2):** una ambigüedad de intención se pregunta aunque el agente haya puesto un valor.
    - **0007 (4):** un lugar solo se rechaza como sujeto de hoja cuando no se nombra persona ni objeto.
