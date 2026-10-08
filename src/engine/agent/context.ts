@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import { AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, WORKFLOW_CONTRACT } from '../procedure';
+import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
@@ -110,7 +110,7 @@ Plan steps (propose_plan.steps is a DAG; ids s1, s2, … and l1, l2, … for lay
 - image: prompt, model?, aspect?, resolution?, count?, refs? (reference or source images).
 - video: prompt, model?, aspect?, duration?, resolution?, audio?, first_frame?, last_frame?, refs? (reference images/videos, or keyframe images in order), times? (keyframe seconds, parallel to refs).
 - model3d: prompt, model?, params?, refs? — a 3D model (GLB) from text or from an image of one object.
-- audio: prompt, model?, params?, lyrics_from? — music (an audio asset) or, with a lyrics model, song lyrics (text).
+- audio: prompt, model?, params?, lyrics_from? — ${AUDIO_STEP}
 - op: op, input, more?, model?, params? — operations on an existing image or video (join_clips: input = first clip, more = the rest in order):
 ${OP_LINES}
 ${OP_RESOLUTION}

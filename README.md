@@ -2,7 +2,7 @@
 
 **Un estudio creativo con IA que corre en tu ordenador.** Le dices lo que quieres, una foto de producto, la hoja de un personaje, un vídeo corto o un póster, y un agente lo convierte en un plan: qué se va a generar, con qué modelo y cuánto cuesta. Tú lo apruebas y la app lo ejecuta.
 
-Imagen, vídeo, música y 3D, con tus propias claves de **OpenRouter, fal.ai, NanoGPT y Atlas Cloud**. Sin claves también arranca: trae modelos de demostración para conocerla gratis.
+Imagen, vídeo, música, voz, efectos de sonido y 3D, con tus propias claves de **OpenRouter, fal.ai, NanoGPT y Atlas Cloud**. Sin claves también arranca: trae modelos de demostración para conocerla gratis.
 
 ---
 

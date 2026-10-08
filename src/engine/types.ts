@@ -121,13 +121,13 @@ export interface InputSlots {
 }
 
 export interface PriceSku {
-  unit: 'output' | 'second' | 'megapixel';
+  unit: 'output' | 'second' | 'megapixel' | 'kchar';
   usd: number;
   resolution?: string;
   audio?: boolean;
   mode?: 'text' | 'image';
   duration?: number;
-  /** Render quality the price applies to (NanoGPT FLUX 3: "full" or "draft"); unset = any. */
+  /** Render quality priced (NanoGPT FLUX 3: "full" | "draft"); unset = any. */
   quality?: string;
 }
 

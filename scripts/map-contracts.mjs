@@ -134,6 +134,17 @@ export default [
     tests: ['tests/agent-procedure.test.ts'],
   },
   {
+    id: 'audio-defaults',
+    what: 'Voz y efectos (2026-10-08): por defecto Gemini 3.8 Flash TTS para voz y ElevenLabs Sound Effects v2 para efectos, salvo que el usuario nombre o elija otro; el agente lo lee en el contrato del paso de audio.',
+    sides: [
+      ['src/engine/providers/nanogptAudio.ts', "export const SPEECH_MODELS = ['google/gemini-3.8-flash-tts'"],
+      ['src/engine/procedure.ts', 'export const AUDIO_STEP'],
+      ['src/engine/agent/context.ts', '${AUDIO_STEP}'],
+      ['docs/catalogo-voz-y-efectos.md', 'Gemini 3.8 Flash TTS'],
+    ],
+    tests: ['tests/nanogpt-speech.test.ts'],
+  },
+  {
     id: 'shortcuts',
     what: 'Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista.',
     sides: [

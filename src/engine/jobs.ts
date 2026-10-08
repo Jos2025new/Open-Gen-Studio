@@ -5,7 +5,7 @@ import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../l
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
 import { LOCAL_WRITE } from '../lib/disk';
 import { disk, diskAvailable } from '../lib/disk';
-import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
+import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, jpegThumbnail, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
@@ -67,7 +67,7 @@ export function estimateSpec(spec: GenerationSpec, memoryOnly = false): Estimate
     return m?.textOutput ? estimateMedia(spec.modelRef, m.kind, spec.settings, false, memoryOnly) : { usd: null, approximate: true };
   }
   const withImage = Boolean(spec.inputs?.refs.length || spec.inputs?.firstFrame);
-  return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage, memoryOnly);
+  return estimateMedia(spec.modelRef, spec.kind, spec.settings, withImage, memoryOnly, spec.prompt.length);
 }
 
 function requestEstimate(spec: GenerationSpec): Estimate {
@@ -204,17 +204,8 @@ export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Pr
   const models = files.filter((f) => !isImage(f) && !f.mime.startsWith('video/'));
   if (!models.length) throw new JobFailedError('The provider finished without a 3D file (only a preview image).');
   const thumb = files.find(isImage);
-  const thumbnailUrl = thumb?.blob ? await thumbnailDataUrl(thumb.blob).catch(() => undefined) : undefined;
+  const thumbnailUrl = thumb?.blob ? await jpegThumbnail(thumb.blob).catch(() => undefined) : undefined;
   return Promise.all(models.map((f) => storeOutput({ blob: f.blob, url: f.o.url, mime: f.mime }, g, 'model3d', { width: 0, height: 0 }, thumbnailUrl)));
-}
-
-/** A small JPEG kept in the asset itself: the provider's render link expires, and lists never load the mesh. */
-async function thumbnailDataUrl(blob: Blob): Promise<string> {
-  const src = await blobToCanvas(blob);
-  const scale = Math.min(1, 320 / Math.max(src.width, src.height));
-  const c = createCanvas(Math.max(1, Math.round(src.width * scale)), Math.max(1, Math.round(src.height * scale)));
-  ctx2d(c).drawImage(src, 0, 0, c.width, c.height);
-  return blobToDataUrl(await canvasToBlob(c, 'image/jpeg', 0.8));
 }
 
 function expectedDims(kind: MediaKind, s: GenSettings): MediaInfo {
@@ -603,7 +594,7 @@ async function execute(id: string): Promise<string[]> {
           requests += 1;
           // Trace only in tests and the sandbox: the real app builds nothing here, so a send can never fail on it.
           if (journeyActive()) try {
-          const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame));
+          const estimate = estimateMedia(g.modelRef, kind, { ...settings, count: n }, refs.length > 0 || Boolean(firstFrame), false, g.prompt.length);
           const approval = approvalEstimateForPlan(g.planId);
           recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'generation.request_prepared', reason: 'provider adapter exposed final request immediately before send', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, approvalId: approval.approvalId, after: { modelRef: g.modelRef, kind, inputRoles: { references: refs.length, referenceVideos: refVideos.length, firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), keyframes: keyframes?.length ?? 0 }, settings: { count: n, duration: settings.duration, resolution: settings.resolution, aspect: settings.aspect, quality: settings.advanced?.quality } }, prices: { acceptedEstimateUsd: approval.acceptedEstimateUsd ?? null, currentEstimateUsd: estimate.usd } }); } catch { /* diagnostics never block a send */ }
           patchGeneration(id, { sent: describeRequest({ ...info, attempt: requests, media: mediaInfo(refs[0] ?? firstFrame ?? video) }) });

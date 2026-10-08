@@ -11,6 +11,8 @@ export interface EstimateContext {
   megapixels?: number;
   /** The model's quality setting (FLUX 3 on NanoGPT: full | draft); a sku with a quality needs it, "full" when unset. */
   quality?: string;
+  /** Characters of text spoken (text-to-speech, priced per 1000 characters). */
+  chars?: number;
 }
 
 export const FREE: Estimate = { usd: 0, approximate: false };
@@ -68,6 +70,13 @@ export function estimate(rule: PriceRule | undefined, ctx: EstimateContext): Est
       if (known == null) approximate = true;
       if (ctx.duration != null && known == null) durationNote = `Automatic duration, priced at ${seconds}s${ctx.maxDuration != null ? ' (the longest)' : ''}`;
       usd = sku.usd * seconds * count;
+      break;
+    }
+    case 'kchar': {
+      // Text-to-speech bills the characters spoken; an unknown length is priced at 1000 and marked approximate.
+      if (ctx.chars == null) approximate = true;
+      // A paid line never rounds to free (that would skip the approval): at least 0.0001 USD.
+      usd = Math.max(sku.usd > 0 ? 0.0001 : 0, (sku.usd * (ctx.chars ?? 1000)) / 1000) * count;
       break;
     }
     case 'megapixel': {

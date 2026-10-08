@@ -58,7 +58,7 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
     if (s.kind === 'image') perStep[s.id] = estimateMedia(s.modelRef, 'image', s.settings, s.refs.length > 0);
     else if (s.kind === 'model3d') perStep[s.id] = estimateMedia(s.modelRef, 'model3d', s.settings, s.refs.length > 0);
     else if (s.kind === 'video') perStep[s.id] = estimateMedia(s.modelRef, 'video', s.settings, Boolean(s.firstFrame));
-    else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false);
+    else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false, false, s.prompt.length);
     else if (s.kind === 'op') {
       const p = parseRef(s.input);
       const src = p?.type === 'asset' ? get().assets[p.id] : undefined;

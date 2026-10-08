@@ -1,3 +1,4 @@
+import { DEFAULT_SFX_REF, DEFAULT_SPEECH_REF } from './providers/nanogptAudio';
 import { AGENT_OP_IDS, OPS } from './ops';
 import type { AgentStyle, MediaKind, SettingsChoice, Workspace } from './types';
 
@@ -100,6 +101,9 @@ export function planRequiresSettings(workspace: Workspace, kinds: string[], sett
 export function costAskMessage(kinds: string[], estimatedCost: number | null): string {
   return `Not shown: ${settingsAskReason(estimatedCost)}. Call confirm_settings so the user confirms the model, resolution and count for ${kinds.join(' and ')}; then call propose_plan again with the confirmed values.`;
 }
+
+/** What an audio step makes, and the default model of each kind of sound (speech and effects added 2026-10-08). */
+export const AUDIO_STEP = `music (an audio asset) or, with a lyrics model, song lyrics (text); speech: the prompt is exactly the words spoken, params.voice and, for Gemini or GPT-4o mini TTS, params.instructions (tone, pace); model: the composer's audio model if it is a speech model, else ${DEFAULT_SPEECH_REF} unless the user names one; sound effects: the prompt describes the sound, model ${DEFAULT_SFX_REF}.`;
 
 /** Derived from the execution registry, not a second list of operation capabilities. */
 export const OP_LINES = AGENT_OP_IDS.map(id => {

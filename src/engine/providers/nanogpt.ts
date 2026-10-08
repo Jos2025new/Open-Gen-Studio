@@ -1,11 +1,12 @@
 import { cacheDb } from '../../lib/idb';
 import { extractErrorMessage, JobFailedError, requestJson } from '../../lib/http';
-import { extensionForMime, fetchBlob } from '../../lib/media';
+import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
-import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob, TranscriberSummary } from '../types';
+import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
-import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext, TranscribeRequest } from './types';
+import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext } from './types';
 import { modelRef } from './types';
+import { generateSpeech, isSpeechModel, listTranscribers, nanoHeaders, pollTranscription, speechSchema, speechSummaries, transcribe } from './nanogptAudio';
 
 // api.nano-gpt.com serves an outdated catalog (no GPT-6, Opus 5.5, Seedream 5 Flash...); the root host is current.
 export const NANO_BASE = 'https://nano-gpt.com/api';
@@ -70,9 +71,6 @@ function upTo(d: NanoVideoParam | undefined, fallback: number): number {
 const imageRaw = new Map<string, NanoImageModel>();
 const videoRaw = new Map<string, NanoVideoModel>();
 
-function nanoHeaders(key: string): Record<string, string> {
-  return { Authorization: `Bearer ${key}`, 'x-api-key': key };
-}
 
 async function fetchImages(): Promise<NanoImageModel[]> {
   const cached = await cacheDb.get<NanoImageModel[]>('nano:v2:images', DAY / 2);
@@ -88,53 +86,6 @@ async function fetchVideos(): Promise<NanoVideoModel[]> {
   const res = await requestJson<{ data: NanoVideoModel[] }>(`${BASE}/v1/video-models?detailed=true`);
   await cacheDb.set('nano:v2:videos', res.data);
   return res.data;
-}
-
-interface NanoAudioModel {
-  id: string;
-  name?: string;
-  architecture?: { input_modalities?: string[] };
-  pricing?: { per_minute?: number };
-  capabilities?: { speech_to_text?: boolean; diarization?: boolean };
-  supported_parameters?: { max_request_body_mb?: number; supported_languages?: string[] };
-}
-
-async function fetchAudioModels(): Promise<NanoAudioModel[]> {
-  const cached = await cacheDb.get<NanoAudioModel[]>('nano:v1:audio', DAY / 2);
-  if (cached) return cached;
-  const res = await requestJson<{ data: NanoAudioModel[] }>(`${BASE}/v1/audio-models?detailed=true`);
-  await cacheDb.set('nano:v1:audio', res.data);
-  return res.data;
-}
-
-/** Files sent directly to /transcribe: the docs allow multipart uploads up to 3 MB. */
-const TRANSCRIBE_DIRECT_BYTES = 3 * 1024 * 1024;
-
-function pollTranscription(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
-  return pollJob(ctx, 'NanoGPT', 3000, async () => {
-    const res = await requestJson<Loose>(`${BASE}/transcribe/status`, {
-      method: 'POST',
-      headers: { ...JSON_HEADERS, ...nanoHeaders(ctx.apiKey) },
-      body: JSON.stringify({ runId: job.id, cost: num(job.meta.cost), paymentSource: job.meta.paymentSource || undefined, isApiRequest: true }),
-      signal: ctx.signal,
-      timeoutMs: POLL_TIMEOUT_MS,
-    });
-    const status = String(res.status ?? '').toLowerCase();
-    if (status === 'completed' || typeof res.transcription === 'string') {
-      return { outputs: [], text: transcriptionText(res), costUsd: num(res.cost) ?? num(job.meta.cost) };
-    }
-    if (status === 'failed' || status === 'error') throw new JobFailedError(extractErrorMessage(res, 'Transcription failed'));
-    return status === 'pending' ? 'Queued' : 'Transcribing';
-  });
-}
-
-/** The text of a finished transcription: `transcription`, else the diarized segments joined. */
-function transcriptionText(res: Loose): string {
-  if (typeof res.transcription === 'string') return res.transcription;
-  if (typeof res.text === 'string') return res.text;
-  const segments = (res.diarization as Loose | undefined)?.segments;
-  if (Array.isArray(segments)) return segments.map((s) => `${(s as Loose).speaker ? `${(s as Loose).speaker}: ` : ''}${(s as Loose).text ?? ''}`).join('\n');
-  return '';
 }
 
 function num(v: unknown): number | undefined {
@@ -392,8 +343,8 @@ export const nanogpt: ProviderAdapter = {
   label: 'NanoGPT',
 
   async listModels() {
-    const [images, videos, models3d] = await Promise.all([fetchImages(), fetchVideos(), fetch3dModels().catch(() => [] as Nano3dModel[])]);
-    const out: ModelSummary[] = [];
+    const [images, videos, models3d, speech] = await Promise.all([fetchImages(), fetchVideos(), fetch3dModels().catch(() => [] as Nano3dModel[]), speechSummaries()]);
+    const out: ModelSummary[] = [...speech];
     for (const m of models3d) {
       if (!NANO_3D_MODELS.has(m.id)) continue;
       model3dRaw.set(m.id, m);
@@ -451,6 +402,7 @@ export const nanogpt: ProviderAdapter = {
   },
 
   async loadSchema(model) {
+    if (model.kind === 'audio') return speechSchema(model);
     if (!(model.kind === 'image' ? imageRaw : model.kind === 'model3d' ? model3dRaw : videoRaw).has(model.id)) await nanogpt.listModels(undefined);
     if (model.kind === 'model3d') {
       const raw = model3dRaw.get(model.id);
@@ -468,6 +420,7 @@ export const nanogpt: ProviderAdapter = {
   },
 
   async generate(req: GenRequest): Promise<GenResult> {
+    if (req.kind === 'audio' && isSpeechModel(req.model.id)) return generateSpeech(req);
     const body: Record<string, unknown> = { model: req.model.id, ...wireParams(req.schema, req.settings, req.count) };
     if (req.prompt) body.prompt = req.prompt;
 
@@ -536,40 +489,9 @@ export const nanogpt: ProviderAdapter = {
     return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },
 
-  async listTranscribers() {
-    const models = await fetchAudioModels();
-    return models
-      .filter((m) => m.capabilities?.speech_to_text && !/voice-clone/i.test(m.id))
-      .map(
-        (m): TranscriberSummary => ({
-          ref: modelRef('nanogpt', m.id),
-          provider: 'nanogpt',
-          id: m.id,
-          name: m.name ?? m.id,
-          usdPerMinute: num(m.pricing?.per_minute),
-          maxDirectBytes: Math.min(TRANSCRIBE_DIRECT_BYTES, (num(m.supported_parameters?.max_request_body_mb) ?? 3) * 1024 * 1024),
-          video: Boolean(m.architecture?.input_modalities?.includes('video')),
-          diarization: Boolean(m.capabilities?.diarization),
-          languages: m.supported_parameters?.supported_languages,
-        }),
-      );
-  },
+  listTranscribers,
 
-  async transcribe(req: TranscribeRequest): Promise<GenResult> {
-    const form = new FormData();
-    form.append('audio', req.input.blob, `input.${extensionForMime(req.input.mime || req.input.blob.type)}`);
-    form.append('model', req.model.id);
-    form.append('language', req.language || 'auto');
-    req.onStatus('Transcribing');
-    const res = await requestJson<Loose>(`${BASE}/transcribe`, { method: 'POST', headers: nanoHeaders(req.apiKey), body: form, signal: req.signal });
-    if (typeof res.transcription === 'string') return { outputs: [], text: res.transcription, costUsd: num((res.metadata as Loose | undefined)?.cost) };
-    // Long files run as a job (HTTP 202): keep it so a reload or a failed check can resume.
-    const runId = String(res.runId ?? '');
-    if (!runId) throw new Error('NanoGPT returned no transcription');
-    const job: RemoteJob = { provider: 'nanogpt', id: runId, meta: { kind: 'transcribe', cost: String(res.cost ?? ''), paymentSource: String(res.paymentSource ?? '') } };
-    req.onRemoteJob(job);
-    return pollTranscription(job, { kind: 'text', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
-  },
+  transcribe,
 
   async balance(apiKey, signal) {
     const res = await requestJson<{ usd_balance?: string | number }>(`${BASE}/check-balance`, { method: 'POST', headers: nanoHeaders(apiKey), signal });

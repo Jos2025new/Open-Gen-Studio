@@ -12,8 +12,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
 - [ ] Fusionar `task/agent-forcing` en `task/modelo-general`. Avance directo, sin conflictos: ver [fusion-agent-forcing.md](fusion-agent-forcing.md). **2026-10-08**, decide el usuario.
 - [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
-- [ ] Texto a voz y efectos de sonido: **implementar** (usuario, **2026-10-08**). Falta que el usuario elija los modelos; datos y propuesta en el [catálogo de voz y efectos](catalogo-voz-y-efectos.md). Atlas no tiene efectos de sonido, así que irán por NanoGPT (ElevenLabs Sound Effects v2, salvo otra elección).
-- [ ] Prueba con gasto real de los modelos de voz y efectos. **2026-10-08**, la hará el usuario.
+- [ ] Prueba con gasto real de voz y efectos (NanoGPT): voz, instrucciones de tono y sonido. **2026-10-08**, la hará el usuario. **Sin verificar:** el formato real de la respuesta de cada modelo (audio directo o JSON con URL; se aceptan ambos) y si el efecto admite fijar la duración (hoy la elige el modelo).
 
 ## Por probar
 
@@ -42,6 +41,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Hecho
 
+- [x] Generar voz y efectos de sonido. **2026-10-08**, **test** ([nanogpt-speech](../tests/nanogpt-speech.test.ts), 10 casos, con proveedor simulado). Modelos elegidos por el usuario: GPT-4o mini TTS 2025-12-15, Gemini 3.8 Flash TTS (por defecto: entre los tres primeros de Artificial Analysis y 0,05 USD por 1000 caracteres), ElevenLabs v4 y v4 Turbo, MiniMax Speech 2.8 Turbo y HD; efectos con ElevenLabs Sound Effects v2. Ver [catálogo](catalogo-voz-y-efectos.md).
 - [x] Tests fiables con carga ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): reloj falso en lugar de esperas reales, esperas por condición y 20 s de margen global para trabajo de CPU. **2026-10-08**, **real**: 4 de 4 ejecuciones completas sin fallos con carga entre 25 y 39 (antes, hasta 8 fallos).
 - [x] Exportar los datos en un `.zip`. **2026-10-08**, **real**: ruta `/x/store/export` en un servidor Vite con datos de prueba. Devuelve 200 y un zip con `asset/` y `state.json`, con las claves vaciadas (0 apariciones). Sin test automático.
 - [x] Precio exacto de Atlas antes de generar (`src/engine/quotes.ts`). **2026-10-08**, **real**: `POST /api/v1/model/calculate` con Wan 3.0 a 720p devuelve 0,40 USD para 5 s y 0,80 USD para 10 s. **test**: [quotes.test.ts](../tests/quotes.test.ts). **usuario**: funciona.

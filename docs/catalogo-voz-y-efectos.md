@@ -48,9 +48,9 @@ Consulta en vivo del 2026-10-08, sin gasto, para elegir qué modelos implementar
 
 ## Selección
 
-Pendiente del usuario: ver [pendientes](pendientes.md).
+**Aprobada por el usuario el 2026-10-08 e implementada** (`src/engine/providers/nanogptAudio.ts`). Por defecto, salvo que el usuario nombre otro modelo o lo elija en el compositor: voz con **Gemini 3.8 Flash TTS**, que está entre los tres primeros del Speech Arena de Artificial Analysis (Gemini 3.1 Flash TTS, Elo 1204–1222) y cuesta 0,05 USD por 1000 caracteres; efectos con **ElevenLabs Sound Effects v2**. GPT-4o mini TTS es más barato, pero queda más abajo en las clasificaciones públicas.
 
-Propuesta del asistente:
+Propuesta, tal como se aprobó:
 - **Voz barata:** GPT-4o mini TTS 2025-12-15.
 - **Voz expresiva y diálogos:** Gemini 3.8 Flash TTS.
 - **Voz de calidad:** ElevenLabs v4, y v4 Turbo como versión más barata.

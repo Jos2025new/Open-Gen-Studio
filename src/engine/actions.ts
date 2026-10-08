@@ -2,8 +2,8 @@ import { assetsInUse } from './flow/locks';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
 import { uid } from '../lib/id';
-import { deleteAssetBlobs, getAssetBlob, loadAssetUrl, putAssetBlob } from '../lib/idb';
-import { downloadBlob, extensionForMime, fetchBlob, probeMedia } from '../lib/media';
+import { deleteAssetBlobs, loadAssetUrl, putAssetBlob } from '../lib/idb';
+import { probeMedia } from '../lib/media';
 import { isAbort } from '../lib/http';
 import { randomSeed } from '../lib/rng';
 import { ensureSchema, modelsOf, modelSummary, preferredModel, RECRAFT_STYLE_REF, pickComposerModel, selectComposerModel } from './catalog';
@@ -211,7 +211,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   const attachments = st.composer.attachments.filter((id) => st.assets[id]);
   const text = st.composer.text.trim();
   const imageAtt = attachments.filter((id) => st.assets[id]?.kind === 'image');
-  const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0);
+  const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0, false, text.length);
   if (kind === 'audio' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud in Settings to generate music.', estimate };
   if (kind === 'model3d' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud or NanoGPT in Settings to generate 3D models.', estimate };
   if (!schema) return { ok: false, reason: 'Loading model…', estimate };
@@ -427,7 +427,7 @@ export function regenerateEstimate(generationId: string): Estimate | null {
   const g = get().generations[generationId];
   if (!g) return null;
   if (g.op || g.kind === 'text') return g.estimate;
-  return estimateMedia(g.modelRef, g.kind, g.settings, Boolean(g.inputs.refs.length || g.inputs.firstFrame));
+  return estimateMedia(g.modelRef, g.kind, g.settings, Boolean(g.inputs.refs.length || g.inputs.firstFrame), false, g.prompt.length);
 }
 
 /** Run the same request again with a new seed. Call after the user confirmed the cost. */
@@ -574,18 +574,7 @@ export async function copyText(text: string): Promise<void> {
   }
 }
 
-export async function downloadAsset(assetId: string): Promise<void> {
-  const a = get().assets[assetId];
-  if (!a) return;
-  try {
-    let blob = await getAssetBlob(assetId);
-    if (!blob && a.remoteUrl) blob = await fetchBlob(a.remoteUrl);
-    if (!blob) throw new Error('File not available');
-    downloadBlob(blob, `${a.name || `ogs-${assetId.slice(-8)}`}.${extensionForMime(blob.type || a.mime)}`);
-  } catch (err) {
-    toast((err as Error).message, 'error');
-  }
-}
+export { downloadAsset } from './download';
 
 export function useAsReference(assetId: string): void {
   const st = get();

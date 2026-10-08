@@ -28,7 +28,8 @@ function megapixels(settings: GenSettings): number {
   return (long * short) / 1_000_000;
 }
 
-export function estimateMedia(ref: string, kind: MediaKind, settings: GenSettings, withImage: boolean, memoryOnly = false): Estimate {
+/** `chars`: the text a speech model speaks (its prompt), for models priced per character. */
+export function estimateMedia(ref: string, kind: MediaKind, settings: GenSettings, withImage: boolean, memoryOnly = false, chars?: number): Estimate {
   if (ref.startsWith('local::')) return FREE;
   // Atlas prices the exact request (C3); until its quote arrives, the catalog estimate below shows.
   const quoted = knownAtlasQuote(ref, settings, !memoryOnly);
@@ -53,6 +54,7 @@ export function estimateMedia(ref: string, kind: MediaKind, settings: GenSetting
     audio: settings.audio,
     mode: withImage ? 'image' : 'text',
     quality: typeof settings.advanced?.quality === 'string' ? settings.advanced.quality : undefined,
+    chars,
   });
 }
 

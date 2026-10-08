@@ -336,3 +336,12 @@ export function cleanFileName(typed: string): string {
     .replace(/[.\s]+$/, '')
     .slice(0, 120);
 }
+
+/** A small JPEG kept in the asset itself: the provider's render link expires, and lists never load the mesh. */
+export async function jpegThumbnail(blob: Blob): Promise<string> {
+  const src = await blobToCanvas(blob);
+  const scale = Math.min(1, 320 / Math.max(src.width, src.height));
+  const c = createCanvas(Math.max(1, Math.round(src.width * scale)), Math.max(1, Math.round(src.height * scale)));
+  ctx2d(c).drawImage(src, 0, 0, c.width, c.height);
+  return blobToDataUrl(await canvasToBlob(c, 'image/jpeg', 0.8));
+}

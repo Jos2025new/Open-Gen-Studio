@@ -26,6 +26,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **reference-sheet-subject** — Una hoja de referencia solo se rechaza si el lugar es su sujeto; la descripción de la operación dice lo mismo. | [fit.ts](../src/engine/agent/fit.ts), [ops.ts](../src/engine/ops.ts) | [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |
 | **keyword-route** — Las palabras clave señalan una operación y su encaje; la señal va antes del mensaje del usuario. | [triggers.ts](../src/engine/agent/triggers.ts), [force.ts](../src/engine/agent/force.ts), [fit.ts](../src/engine/agent/fit.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-force.test.ts](../tests/agent-force.test.ts), [agent-fit.test.ts](../tests/agent-fit.test.ts) |
 | **ops-in-prompt** — Las operaciones que conoce el agente salen del registro OPS, no de una segunda lista. | [ops.ts](../src/engine/ops.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts) | [agent-procedure.test.ts](../tests/agent-procedure.test.ts) |
+| **audio-defaults** — Voz y efectos (2026-10-08): por defecto Gemini 3.8 Flash TTS para voz y ElevenLabs Sound Effects v2 para efectos, salvo que el usuario nombre o elija otro; el agente lo lee en el contrato del paso de audio. | [nanogptAudio.ts](../src/engine/providers/nanogptAudio.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts), [catalogo-voz-y-efectos.md](../docs/catalogo-voz-y-efectos.md) | [nanogpt-speech.test.ts](../tests/nanogpt-speech.test.ts) |
 | **shortcuts** — Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista. | [shortcuts.ts](../src/engine/shortcuts.ts), [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [README.md](../README.md) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
 | **sandbox** — El sandbox usa .sandbox/data y el puerto 5183; las salvaguardas comprueban ese aislamiento. | [dev-sandbox.mjs](../scripts/dev-sandbox.mjs), [check-safeguards.mjs](../scripts/check-safeguards.mjs) | [safeguards.test.ts](../tests/safeguards.test.ts) |
 | **store-local-only** — El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba. | [local-store.js](../server/local-store.js), [seguridad.md](../docs/seguridad.md), [README.md](../README.md) | [store-server.test.ts](../tests/store-server.test.ts) |
@@ -37,10 +38,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 130 | 85 |
-| [store.ts](../src/store/store.ts) | 89 | 82 |
+| [types.ts](../src/engine/types.ts) | 131 | 86 |
+| [store.ts](../src/store/store.ts) | 90 | 83 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 41 | 0 |
-| [media.ts](../src/lib/media.ts) | 31 | 22 |
+| [media.ts](../src/lib/media.ts) | 33 | 22 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 30 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
@@ -49,11 +50,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/design/actions.ts) | 22 | 9 |
 | [doc.ts](../src/engine/design/doc.ts) | 22 | 15 |
 | [raster.ts](../src/engine/design/raster.ts) | 21 | 4 |
-| [types.ts](../src/engine/providers/types.ts) | 20 | 4 |
+| [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
 | [id.ts](../src/lib/id.ts) | 19 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
-| [idb.ts](../src/lib/idb.ts) | 15 | 97 |
-| [http.ts](../src/lib/http.ts) | 14 | 4 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 98 |
+| [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [render.ts](../src/engine/design/render.ts) | 13 | 2 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
 | [history.ts](../src/engine/design/history.ts) | 12 | 3 |
@@ -71,17 +72,17 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 10 | 0 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 27 | 108 |
-| `src/engine/agent` | 17 | 52 |
+| `src/engine` | 28 | 109 |
+| `src/engine/agent` | 17 | 53 |
 | `src/engine/design` | 38 | 30 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/providers` | 12 | 35 |
+| `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 15 | 103 |
-| `src/store` | 1 | 82 |
+| `src/lib` | 15 | 104 |
+| `src/store` | 1 | 83 |
 
-83 de 199 módulos no tienen ningún test que los importe directamente.
+84 de 201 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
