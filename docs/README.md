@@ -50,7 +50,7 @@
 - [017-2026-10-W40](history/017-2026-10-W40.md) — 7357 bytes.
 
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
-- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 11240 bytes.
+- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
 
 ## Trazabilidad
 
