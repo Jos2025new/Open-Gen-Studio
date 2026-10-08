@@ -18,6 +18,8 @@ export interface FitContext {
   sourceAspect?: string;
   /** Angle values already produced from this source. */
   usedAngles?: string[];
+  /** The grid of the source when a contact sheet made it ("3" for nine angles, "2x3" for six). */
+  sourceGrid?: string;
 }
 
 export type FitResult =
@@ -33,6 +35,7 @@ export const FIT_KEYS: Record<string, string[]> = {
   upscale: ['factor'],
   reference_sheet: ['subject', 'panels'],
   contact_sheet: ['angles'],
+  grid_split: ['grid'],
 };
 
 /** Camera angles, in the order a new one is picked when the request names none ("un ángulo diferente"). */
@@ -203,6 +206,8 @@ export function fitOp(op: string, text: string, ctx: FitContext = {}): FitResult
     case 'upscale': return fitUpscale(text, ctx.sourceLongEdge);
     case 'reference_sheet': return fitSheet(text);
     case 'contact_sheet': return fitContactAngles(text);
+    // A contact sheet's own grid: six angles are cut 2×3, nine 3×3 (the cut default).
+    case 'grid_split': return { ok: true, params: ctx.sourceGrid ? { grid: ctx.sourceGrid } : {} };
     default: return { ok: true, params: {} };
   }
 }

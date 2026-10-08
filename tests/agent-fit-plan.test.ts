@@ -202,3 +202,14 @@ describe('upscale says what it does', () => {
   });
 });
 
+describe('a contact sheet cut by grid_split takes its own grid', () => {
+  it('six angles are cut 2×3, nine 3×3', async () => {
+    for (const [angles, grid] of [['6', '2x3'], ['9', '3']]) {
+      const raw = { title: 'Hoja', steps: [{ id: 's1', kind: 'op', op: 'contact_sheet', input: 'asset:img1', params: { angles } }, { id: 's2', kind: 'op', op: 'grid_split', input: 's1' }] } as unknown as Parameters<typeof normalizePlan>[0];
+      const { plan, errors } = await normalizePlan(raw, ctxWith('hazme una hoja de contacto'), 'pln_test');
+      expect(errors).toEqual([]);
+      expect((plan!.steps[1] as { params: Record<string, string> }).params.grid).toBe(grid);
+    }
+  });
+});
+

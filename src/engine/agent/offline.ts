@@ -1,4 +1,6 @@
 import { detectLang, type Lang } from '../../lib/lang';
+import { OPS } from '../ops';
+import { gateOps } from './force';
 import type { RawPlan, RawStep } from '../plan';
 import type { Workflow } from '../skills';
 import type { AgentQuestion, AgentStyle, AssetKind, Workspace } from '../types';
@@ -148,21 +150,10 @@ function headlineFrom(request: string): string {
   return s ? s.toUpperCase() : 'NEW COLLECTION';
 }
 
-function opFromText(t: string): { op: string; params: Record<string, string> } | null {
-  if (has(t, /relight|reilumin|ilumina|iluminaci|lighting|luz/i)) {
-    const preset = has(t, /ne[oó]n/i) ? 'neon' : has(t, /estudio|studio/i) ? 'softbox' : has(t, /luna|moon/i) ? 'moonlight' : has(t, /vela|candle/i) ? 'candle' : 'golden-hour';
-    return { op: 'relight', params: { preset, direction: has(t, /derech|right/i) ? 'right' : 'left', intensity: 'medium' } };
-  }
-  if (has(t, /[aá]ngulo|angle|perspectiv|vista|view/i)) {
-    const angle = has(t, /perfil|profile/i) ? 'profile-right' : has(t, /arriba|top|cenital/i) ? 'top-down' : has(t, /espalda|behind|back/i) ? 'back' : has(t, /cerca|close/i) ? 'close-up' : 'three-quarter-left';
-    return { op: 'angle', params: { angle } };
-  }
-  if (has(t, /upscale|escala|resoluci[oó]n|4k|nitidez|sharpen/i)) return { op: 'upscale', params: { factor: has(t, /4x|4k|×4/i) ? '4' : '2' } };
-  if (has(t, /quita(r)? (el )?fondo|remove (the )?background|sin fondo|transparent|transparente|recorta/i)) return { op: 'remove_bg', params: {} };
-  if (has(t, /reencuadr|reframe|extiende|outpaint|ampl[ií]a/i)) return { op: 'reframe', params: { aspect: detectAspect(t) ?? '16:9' } };
-  if (has(t, /variaci|variation|variante|variant/i)) return { op: 'variations', params: { strength: 'medium', count: String(detectCount(t) ?? 2) } };
-  if (has(t, /anima|animate|video|vídeo|movimiento|motion/i)) return { op: 'animate', params: { motion: t } };
-  return null;
+/** The image operation the request fires on its attachment: the same keyword gate as the agent (force.ts), or none. */
+function opFromText(request: string, attachments: OfflineInput['attachments'], srcId: string): { op: string; params: Record<string, string> } | null {
+  const g = gateOps(request, attachments, true).find((x) => x.fired && x.input === `asset:${srcId}` && x.op !== 'edit' && OPS[x.op as keyof typeof OPS]?.input === 'image');
+  return g ? { op: g.op, params: g.params } : null;
 }
 
 export function offlinePlan(input: OfflineInput): OfflineAction {
@@ -214,7 +205,7 @@ export function offlinePlan(input: OfflineInput): OfflineAction {
           : { id: 's1', kind: 'op', title: lang === 'es' ? 'Continuación' : 'Continuation', op: 'continue', input: `asset:${src.id}`, params: { motion: request } },
       );
     } else {
-      const op = opFromText(low);
+      const op = opFromText(request, input.attachments, src.id);
       if (op) {
         steps.push({ id: 's1', kind: 'op', title: titleFor(op.op, lang), op: op.op, input: `asset:${src.id}`, params: op.op === 'animate' ? { motion: request } : op.params });
       } else {

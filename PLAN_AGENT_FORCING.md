@@ -56,8 +56,7 @@ Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en v
 ### F6. Disparo forzado: dirigir al agente hacia su tool call — tu petición
 
 - **Corrección.** La primera versión (`bc8c505`) era un suelo determinista con 5 disparadores que devolvía el plan. Me corregiste: forzar es dirigir al agente hacia una tool call, no enrutar, y `tool_choice` solo cuando aplican las palabras clave.
-- **Qué.** Los 19 disparadores (uno por operación) dirigen. El agente recibe dos líneas con la petición: qué operaciones se nombraron, con su frase, su propósito y la entrada adjunta. La primera llamada de esa petición lleva `tool_choice` con `propose_plan`; las demás van con `auto`. Si el proveedor rechaza el `tool_choice` con nombre, se repite con `auto`. No se rechaza ningún plan por no incluir la operación.
-- **Prueba.** Con palabras clave, la primera llamada lleva `tool_choice` con `propose_plan` y la nota; sin ellas, `auto` y sin nota. Un plan sin la operación se acepta. Un rechazo del proveedor se repite con `auto`.
+- **Qué (versión final).** Puerta por operación según tu mapa de parámetros: una operación dispara si está nombrada (puntuación con vetos), su entrada está adjunta y sus parámetros se leen del texto. Las disparadas dirigen la primera llamada a `propose_plan` (`tool_choice`), en orden n1, n2…; las nombradas sin disparar llegan con su motivo. El planificador local usa la misma puerta.
 
 ### F7. Validación y documentación
 

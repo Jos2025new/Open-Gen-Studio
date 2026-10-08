@@ -52,7 +52,7 @@
 
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 - [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
-- [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 6599 bytes.
+- [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 8045 bytes.
 
 ## Trazabilidad
 

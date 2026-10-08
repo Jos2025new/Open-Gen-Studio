@@ -828,6 +828,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           sourceLongEdge: srcAsset?.width && srcAsset?.height ? Math.max(srcAsset.width, srcAsset.height) : longEdgeOf(srcSettings?.resolution),
           sourceAspect: srcAsset?.width && srcAsset?.height ? aspectOfShape(srcAsset.width / srcAsset.height) : srcSettings?.aspect,
           usedAngles: src?.type === 'asset' && ctx.usedAngles ? ctx.usedAngles(src.id) : [],
+          sourceGrid: srcStep?.kind === 'op' && srcStep.op === 'contact_sheet' ? (String(srcStep.params.angles) === '6' ? '2x3' : '3') : undefined,
         }, fit);
         const params = fitted.params;
         errors.push(...fitted.errors);

@@ -76,7 +76,7 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
-import { STEER_TOOL, steerNote, steerOps } from './force';
+import { gateOps, STEER_TOOL, steerNote } from './force';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -95,10 +95,11 @@ function session(id: string): Session {
   return get().sessions[id];
 }
 
-/** The operations the current request's keywords name (agent/force.ts), with its attachments as inputs. */
-function requestSteer(sessionId: string) {
+/** The operations the current request names, fired or not by its attachments and parameters (agent/force.ts). */
+function requestGate(sessionId: string) {
   const draft = session(sessionId).agent.draft;
-  return steerOps(draft?.request ?? '', (draft?.attachments ?? []).map((id) => ({ id, kind: get().assets[id]?.kind })));
+  const inputs = (draft?.attachments ?? []).flatMap((id) => (get().assets[id] ? [get().assets[id]] : []));
+  return gateOps(draft?.request ?? '', inputs, get().composer.agentStyle === 'direct');
 }
 
 /** Sessions whose next model call must be propose_plan: the first call of a request whose keywords named an operation. */
@@ -326,9 +327,9 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
-  // Keywords that name operations direct the agent: a note with the request, and propose_plan as the first call (tool_choice).
-  const steer = workspace === 'node' ? [] : requestSteer(sessionId);
-  if (steer.length) steerNext.add(sessionId);
+  // The keyword gate (force.ts): fired operations direct the first call to propose_plan (tool_choice); all named ones are told.
+  const steer = workspace === 'node' ? [] : requestGate(sessionId);
+  if (steer.some((g) => g.fired)) steerNext.add(sessionId);
   const forced = steerNote(steer);
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}${forced}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);

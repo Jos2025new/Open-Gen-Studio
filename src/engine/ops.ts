@@ -208,7 +208,7 @@ export const OPS: Record<OpId, OpDef> = {
   reference_sheet: {
     id: 'reference_sheet',
     label: 'Reference sheet',
-    description: 'A reference sheet (turnaround, expressions or outfits) of a character, object or place, to keep it identical in later steps. A character turnaround has 3 or 4 views, set by panels.',
+    description: 'A reference sheet (turnaround, expressions or outfits) of a character, person or object, never a place, to keep it identical in later steps. A character turnaround has 3 or 4 views, set by panels.',
     input: 'image',
     output: 'image',
     engine: 'edit',

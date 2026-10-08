@@ -16,8 +16,13 @@ La revisión de `task/modelo-general` encontró además cinco fallos en lo aprob
 
 ## Decisión
 
-1. **Todos los disparadores dirigen.** Cuando las palabras clave de una petición nombran operaciones (cualquiera de las 19), el agente recibe con la petición dos líneas: qué operaciones se nombraron, en orden, con su frase, su propósito y la entrada adjunta que les corresponde si la hay; y que debe llamar a `propose_plan` con ellas como pasos.
-2. **`tool_choice` solo con palabras clave.** La primera llamada al modelo de esa petición lleva `tool_choice` con `propose_plan`. Las siguientes, y toda petición sin palabras clave, van con `auto`. Si el proveedor rechaza un `tool_choice` con nombre, se repite una vez con `auto` (la nota sigue nombrando la operación).
+1. **Puerta por operación, determinista.** Una operación (cualquiera de las 19) se dispara cuando se cumplen tres condiciones:
+   - **Está nombrada:** puntuación de palabras asociadas en español e inglés, donde una frase propia vale 1, cada palabra asociada 0,5 y un veto −1; dispara con 1 o más.
+   - **Su entrada está adjunta.**
+   - **Sus parámetros obligatorios se leen del texto:** el ángulo; el formato; el factor o los «K» según el tamaño de origen; el sujeto de la hoja; el preset de luz; el fotograma; la cuadrícula; dos clips para unir; una muestra de voz de 5 a 30 s.
+
+   `edit` es el comodín: solo dispara si ninguna operación específica cubre la misma imagen. Una ambigüedad se pregunta en Auto y se resuelve en Direct.
+2. **Forzar es dirigir.** Las operaciones disparadas llegan al agente en orden (n1, n2…) con sus parámetros, y su primera llamada lleva `tool_choice` con `propose_plan`. Las nombradas que no disparan llegan con su motivo y decide el agente: pregunta o niega la operación. Sin operaciones disparadas, `tool_choice` va en `auto`. Si el proveedor rechaza un `tool_choice` con nombre, se repite una vez con `auto`.
 3. **Sin puerta.** No se rechaza ningún plan por no incluir una operación nombrada. El agente escribe los pasos, los prompts y los parámetros, y el plan pasa por el mismo normalizador que cualquier otro.
 4. **Alcance.** Fuera del lienzo de nodos.
 5. **Enmiendas a 0007.**
@@ -37,5 +42,6 @@ La revisión de `task/modelo-general` encontró además cinco fallos en lo aprob
 ## Consecuencias
 
 - **Primera llamada sin alternativas.** Con palabras clave, la primera llamada no puede ser `read_guide` ni `ask_questions`. Si el plan necesita una pregunta o la tarjeta de ajustes, el normalizador lo dice y la siguiente llamada ya es libre.
-- **Falsos positivos.** Un disparador débil también dirige: «agrega» nombra `edit` y «cambia la iluminación» nombra `edit` y `relight`. El agente recibe la operación y sigue escribiendo el plan, pero puede seguir una indicación equivocada.
+- **Falsos positivos acotados.** Con la puerta, «iluminación» en una imagen nueva con referencia ya no dispara `relight` (veto), y «cambia la iluminación» sin un preset no fuerza. Queda el comodín `edit` sobre una imagen adjunta cuando ninguna operación específica encaja.
+- **El planificador local (sin clave) usa la misma puerta** para las operaciones de imagen.
 - **Soporte de proveedor sin verificar.** No se ha comprobado con proveedores reales que NanoGPT y OpenRouter acepten un `tool_choice` con nombre; el reintento con `auto` cubre el rechazo explícito.

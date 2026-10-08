@@ -41,6 +41,16 @@ const POSITIVES: Array<[string, string]> = [
   ['cambia la imagen en formato para instagram', 'reframe'],
   ['pásala a formato de historia de instagram', 'reframe'],
   ['make it 9:16 for tiktok', 'reframe'],
+  ['dame un ángulo de vista diferente', 'angle'],
+  ['give me a different angle', 'angle'],
+  ['show me this from another angle', 'angle'],
+  ['súbela a 4K', 'upscale'],
+  ['make it 4k', 'upscale'],
+  ['sube la resolución del video', 'video_upscale'],
+  ['join these clips', 'join_clips'],
+  ['junta estos videos', 'join_clips'],
+  ['cambia la luz a atardecer', 'relight'],
+  ['hazle una character sheet', 'reference_sheet'],
 ];
 
 // Each operation gets its own hard negatives: the word or a close one appears, nothing is requested.
@@ -76,6 +86,9 @@ const NEGATIVES: string[] = [
   // reframe: a post for Instagram is a new image, not a change of format
   'haz un post para instagram de mi cafetería',
   'genera una imagen 16:9 de un castillo',
+  // a new image that uses a photo as reference is not an edit or a relight of it
+  'Usa esta foto como referencia: una chica en un café con iluminación cálida',
+  'genera una imagen nueva de una chica con luz suave',
   // unrelated
   'una historia de un fotógrafo que viaja al sur',
 ];
