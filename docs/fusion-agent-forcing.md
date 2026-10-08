@@ -5,7 +5,7 @@ Fecha: 2026-10-08. Comparación hecha con git en ese momento. La fusión no se h
 ## Comparación
 
 - `task/modelo-general` (`ba46a7c`) está contenida entera en `task/agent-forcing`: le faltan 0 commits de ella. Ninguna otra rama local ni de GitHub (`main`, `better-worflows-xyz765`, `claude/stoic-*`, `origin/task/*`) tiene commits que falten en `task/agent-forcing`.
-- **No hay conflictos posibles.** La fusión es un avance directo (fast-forward) de 21 commits: 67 archivos, +2166 / −1519 líneas.
+- **No hay conflictos posibles.** La fusión es un avance directo (fast-forward) de 27 commits: 89 archivos, +2924 / −1660 líneas (recontado el 2026-10-08 tras el commit `a05e5af`).
 - Fusionar no revierte nada de `modelo-general`. Lo que esta rama cambió de decisiones anteriores está en la tabla «Enmiendas»; cada cambio fue pedido o aprobado por el usuario.
 
 ## Decisiones tomadas en esta rama
@@ -28,6 +28,10 @@ Cada decisión con su origen, su commit y lo que impide revertirla sin darse cue
 | Notas de trabajo y `.claude/` fuera del repositorio | Usuario | `5b2a722` | `.gitignore` |
 | Mapa del código obligatorio antes de cambiar código (AGENTS.md, regla 4) | Usuario | `440d3fe` | `npm test` ejecuta `scripts/map.mjs` |
 | `/x/store` solo responde al propio ordenador | Usuario, tras la revisión de Haiku | `97a1c21` | contrato `store-local-only`; [store-server.test.ts](../tests/store-server.test.ts) |
+| Las operaciones con modelo de imagen confirman su modelo: rige lo más nuevo | Usuario: «rige lo más nuevo» | `2dde4db` (documentación) | contrato `ops-confirm-model` |
+| Tests fiables con carga: reloj simulado, esperas por condición y 20 s de margen; cobertura por riesgo | Usuario: «escoge lo mejor y documenta por qué» ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)) | `a61d3a5` | los tests mismos; regla para tests nuevos en el ADR |
+| Voz y efectos con los modelos elegidos; por defecto Gemini 3.8 Flash TTS y ElevenLabs Sound Effects v2 | Usuario (selección y «más nada») | `a05e5af` | contrato `audio-defaults`; [nanogpt-speech.test.ts](../tests/nanogpt-speech.test.ts) |
+| Precio de voz por 1000 caracteres, nunca redondeado a gratis | Asistente: una línea gratis se saltaría la aprobación (ADR 0004) | `a05e5af` | test «a short paid line never rounds to free» |
 
 ## Enmiendas a decisiones anteriores
 
@@ -53,6 +57,6 @@ Cada decisión con su origen, su commit y lo que impide revertirla sin darse cue
 
 ## Antes de fusionar
 
-1. `npm test` en `task/agent-forcing` (2026-10-08: 967 aprobados, 5 omitidos).
-2. Prueba en el sandbox de lo que el usuario dijo que probaría: bucle de tarjetas, P2, P3 y P4.
+1. `npm test` en `task/agent-forcing` (2026-10-08, tras `a05e5af`: 977 aprobados, 5 omitidos).
+2. Prueba en el sandbox de lo que el usuario dijo que probaría: bucle de tarjetas, P2, P3 y P4, y la voz y los efectos con gasto real.
 3. **Notas locales:** la carpeta de la app real aún tiene versionados `PROGRESS.md`, `TRAZABILIDAD.md`, `PLAN_*` y los demás. Al fusionar, git los borrará de esa carpeta. La copia está en `../ogs-notas-locales/`; hay que restaurarla después.
