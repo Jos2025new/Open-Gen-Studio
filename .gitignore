@@ -21,3 +21,18 @@ e2e-runs/
 # Manual Playwright stress artifacts
 tests-e2e/failures/
 test-results/
+
+# Local working notes and tool settings: kept on the owner's machine, not in the repo
+/.claude/
+/API_DOC_REVIEW.md
+/HANDOFF.md
+/MISSION_AUDITOR.md
+/MODEL_VALIDATION.md
+/PARA_*.md
+/PARA_*.txt
+/PLAN_*.md
+/PRECIOS_VIDEO.md
+/PROGRESS.md
+/PROPUESTAS.md
+/REMEDIATION_PLAN*.md
+/TRAZABILIDAD.md

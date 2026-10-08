@@ -3,6 +3,7 @@
 ## Dónde mirar
 
 - [Reglas de trabajo](../AGENTS.md).
+- [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
 - Cada ficha de feature enlaza comportamiento, código y test; «sin test» marca falta de cobertura directa.
 - Los ADRs conservan contexto, decisión y consecuencias.
 - El historial conserva el texto original y su orden; los prefijos numéricos gobiernan la concatenación. Sus referencias históricas no prueban el estado actual.
@@ -53,11 +54,11 @@
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 - [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
 - [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 9214 bytes.
-- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 13937 bytes.
+- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 15817 bytes.
 
 ## Trazabilidad
 
-Tabla «Registro» de [`TRAZABILIDAD.md`](../TRAZABILIDAD.md), dividida por tamaño. Qué hace cada cambio, dónde está, qué lo verifica y qué queda sin verificar.
+Tabla «Registro» del antiguo `TRAZABILIDAD.md` (hoy una nota local, fuera del repositorio), dividida por tamaño. Qué hace cada cambio, dónde está, qué lo verifica y qué queda sin verificar.
 
 - [Registro 1: T1–T6, commits de proveedores y música (4c-2)](trazabilidad/registro-1.md).
 - [Registro 2: 3D, Designer, ruta del agente, gasto y C1–C4](trazabilidad/registro-2.md).

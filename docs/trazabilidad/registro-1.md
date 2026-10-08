@@ -1,6 +1,6 @@
 # Trazabilidad — registro 1: T1–T6, commits de proveedores y música (4c-2)
 
-Fragmento 1 de 2 de la tabla «Registro» de [`TRAZABILIDAD.md`](../../TRAZABILIDAD.md). Las filas se movieron sin cambios y en el mismo orden.
+Fragmento 1 de 2 de la tabla «Registro» del antiguo `TRAZABILIDAD.md` (hoy una nota local, fuera del repositorio). Las filas se movieron sin cambios y en el mismo orden.
 
 | Commit | Cambio | Archivos | Verificación automática | Verificación manual | Sin verificar / límites |
 | --- | --- | --- | --- | --- | --- |

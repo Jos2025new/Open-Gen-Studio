@@ -1,6 +1,6 @@
 # Trazabilidad — registro 2: 3D, Designer, ruta del agente, gasto y C1–C4
 
-Fragmento 2 de 2 de la tabla «Registro» de [`TRAZABILIDAD.md`](../../TRAZABILIDAD.md). Las filas se movieron sin cambios y en el mismo orden.
+Fragmento 2 de 2 de la tabla «Registro» del antiguo `TRAZABILIDAD.md` (hoy una nota local, fuera del repositorio). Las filas se movieron sin cambios y en el mismo orden.
 
 | Commit | Cambio | Archivos | Verificación automática | Verificación manual | Sin verificar / límites |
 | --- | --- | --- | --- | --- | --- |
