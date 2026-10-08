@@ -26,6 +26,7 @@
 - [0004 — Aprobar un coste máximo antes de usar proveedores de pago](decisions/0004-coste-maximo.md).
 - [0005 — Contrato operativo del agente: implementación transversal y límites](decisions/0005-contrato-operativo-agente.md).
 - [0006 — Modelo general generativo: automatización por coste e intentos enlazados](decisions/0006-modelo-general-generativo.md).
+- [0007 — Modos del agente y encaje de parámetros de las operaciones](decisions/0007-modos-y-encaje-del-agente.md).
 
 ## Historial
 
@@ -48,6 +49,7 @@
 - [017-2026-10-W40](history/017-2026-10-W40.md) — 7357 bytes.
 
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
+- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 8677 bytes.
 
 ## Verificación
 
