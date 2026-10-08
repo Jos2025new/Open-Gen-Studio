@@ -10,10 +10,10 @@ vi.mock('../../src/lib/idb', () => ({
 
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
-describe('journey module import isolation', () => {
+// Loads the whole app (React and every module): on a saturated machine this took over 20 s, so 60 s.
+describe('journey module import isolation', { timeout: 60_000 }, () => {
   it('isolates imports, deferred hydration writes and queued logs', async () => {
     const requests: string[] = [];
-    vi.useFakeTimers();
     vi.stubGlobal('fetch', async (input: string | URL) => {
       requests.push(String(input));
       throw new Error(`Blocked every network request during import: ${input}`);
@@ -27,6 +27,8 @@ describe('journey module import isolation', () => {
       import('../../src/lib/journeyTrace'), import('../../src/store/store'),
     ]);
     expect(requests).toEqual([]);
+    // The fake clock starts after the imports: frozen timers during a slow import (busy machine) hung the test.
+    vi.useFakeTimers();
     const { useStore } = await import('../../src/store/store');
     const { logEvent, logSettled } = await import('../../src/lib/log');
     // Exercise hydration/debounce rather than leaving the persistence timers frozen.

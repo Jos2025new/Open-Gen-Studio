@@ -33,6 +33,7 @@
 - [0007 — Modos del agente y encaje de parámetros de las operaciones](decisions/0007-modos-y-encaje-del-agente.md).
 - [0008 — Límite de 30 KB en el código: los archivos que ya lo superan no crecen](decisions/0008-limite-de-tamano-en-codigo.md).
 - [0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0007](decisions/0009-disparo-forzado.md).
+- [0010 — Estrategia de pruebas: tests fiables con carga y cobertura por riesgo](decisions/0010-estrategia-de-pruebas.md).
 
 ## Historial
 
@@ -57,7 +58,7 @@
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 - [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
 - [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 9214 bytes.
-- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 18091 bytes.
+- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 19508 bytes.
 
 ## Trazabilidad
 

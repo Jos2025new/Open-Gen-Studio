@@ -79,7 +79,8 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-describe('characterization of the current Composer React variant effect', () => {
+// Loads the whole app (React and every module): on a saturated machine this took over 20 s, so 60 s.
+describe('characterization of the current Composer React variant effect', { timeout: 60_000 }, () => {
   it('switches text-to-video to keyframes for two attached images and records start/end meaning', async () => {
     const { useStore, lastJourneyTrace } = await mountComposer();
     const st = useStore.getState();

@@ -38,6 +38,15 @@ async function tab() {
 const state = (at: number, what: string) => `{"savedAt":${at},"what":"${what}"}`;
 const onDisk = () => readFileSync(join(root, 'data', 'state.json'), 'utf8');
 const settle = () => new Promise((r) => setTimeout(r, 150));
+/** Waits for a save the test expects, however busy the machine is (a fixed pause raced the write: ENOENT under load). */
+async function until(done: () => boolean, ms = 15_000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!done()) {
+    if (Date.now() > end) throw new Error('the expected save did not arrive');
+    await new Promise((r) => setTimeout(r, 20));
+  }
+}
+const diskHas = (what: string) => () => { try { return onDisk().includes(what); } catch { return false; } };
 
 describe('two tabs saving the same state', () => {
   it('a tab that loaded before another one saved cannot overwrite the newer work', async () => {
@@ -47,15 +56,15 @@ describe('two tabs saving the same state', () => {
     await fresh.getState();
 
     fresh.setState(state(1000, 'test sessions'));
-    await settle();
+    await until(diskHas('test sessions'));
     fresh.setState(state(2000, 'more test sessions')); // its own later saves still go through
-    await settle();
+    await until(diskHas('more test sessions'));
     expect(onDisk()).toContain('more test sessions');
 
     let warned = 0;
     old.onStateConflict(() => warned++);
     old.setState(state(3000, 'stale copy')); // newer clock, older content: refused
-    await settle();
+    await until(() => old.isStale());
     expect(onDisk()).toContain('more test sessions');
     expect(old.isStale()).toBe(true);
     expect(warned).toBe(1);

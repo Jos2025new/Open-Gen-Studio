@@ -10,7 +10,7 @@ const events = vi.hoisted(() => [] as Array<{ model: string; at: string }>);
 const denials = vi.hoisted(() => new Map<string, number>());
 const denyNth = vi.hoisted(() => new Map<string, number>());
 const seen = vi.hoisted(() => new Map<string, number>());
-vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
+vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout: (...a: Parameters<typeof setTimeout>) => globalThis.setTimeout(...a), clearTimeout: (id: ReturnType<typeof setTimeout>) => globalThis.clearTimeout(id), addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
@@ -84,6 +84,14 @@ beforeEach(() => {
 });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+/** Runs a job on the fake clock: polls and retry waits pass in simulated time, never in real seconds. */
+async function onFakeClock<T>(run: Promise<T>): Promise<T> {
+  let settled = false;
+  void run.then(() => (settled = true), () => (settled = true));
+  while (!settled) await vi.advanceTimersByTimeAsync(1000);
+  return run;
+}
+
 describe('Atlas developer variants (T4)', () => {
   it('two requests to the same developer model never overlap; different models still run together', async () => {
     const a = gen(DEV);
@@ -99,18 +107,17 @@ describe('Atlas developer variants (T4)', () => {
   });
 
   it('"Upstream access denied" is tried once more on its own, and the card says so', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     denials.set(DEV, 1);
     const g = gen(DEV);
-    const run = runGeneration(g.id);
-    await run;
+    await onFakeClock(runGeneration(g.id));
     const done = useStore.getState().generations[g.id];
     expect(done.status).toBe('done');
     expect(done.assetIds).toHaveLength(1);
     expect(order().filter((e) => e === 'start:text-to-image-developer')).toHaveLength(2);
     // The card keeps what happened, after it is over.
     expect(done.notes?.join(' ')).toMatch(/access denied/i);
-  }, 20_000);
+  });
 
   it('denied on every try: three spaced retries (5 s, 20 s, 60 s), then the provider message stands', async () => {
     vi.useFakeTimers();
@@ -126,16 +133,15 @@ describe('Atlas developer variants (T4)', () => {
   });
 
   it('a batch where one request is refused: only that request is tried again; finished images are kept, not redone', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     const g = createGeneration({ sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: 'chica', modelRef: DEV, settings: { count: 3, advanced: {} }, inputs: { refs: [] }, origin: 'agent', variants: ['a', 'b', 'c'] });
     // The 2nd request is refused once (as in the real batch of 2026-10-03), the others go through.
     denyNth.set(DEV, 2);
-    const run = runGeneration(g.id);
-    await run;
+    await onFakeClock(runGeneration(g.id));
     const done = useStore.getState().generations[g.id];
     expect(done.status).toBe('done');
     expect(done.assetIds).toHaveLength(3);
     // 3 images, one retry: 4 requests in all; the first one was never sent twice.
     expect(order().filter((e) => e === 'start:text-to-image-developer')).toHaveLength(4);
-  }, 30_000);
+  });
 });

@@ -33,14 +33,15 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 ## Calidad del código
 
 - [ ] Partir los 13 archivos de más de 30 KB (`runtime.ts`, 115 KB). Afecta al desarrollo; no pueden crecer (ADR 0008). **2026-10-07**.
-- [ ] Cobertura: 129 de 199 módulos sin test que los importe directamente ([mapa](map.md)). Muchos son componentes de interfaz: un fallo visual o de interacción puede pasar `npm test`. **2026-10-08**.
-- [ ] Tests que fallan por tiempo de espera con la máquina cargada: hasta 8 con carga 34, ninguno sin carga. **2026-10-08**.
+- [ ] Cobertura por riesgo ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): pocas pruebas de recorrido completo en el sandbox, con el LLM y los proveedores simulados (petición → plan → aprobación → resultado; paso a Nodes y Designer). Hoy 129 de 199 módulos no tienen test directo. **2026-10-08**, decidido; sin implementar.
+
 - [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
 - [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**.
 - [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.
 
 ## Hecho
 
+- [x] Tests fiables con carga ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): reloj falso en lugar de esperas reales, esperas por condición y 20 s de margen global para trabajo de CPU. **2026-10-08**, **real**: 4 de 4 ejecuciones completas sin fallos con carga entre 25 y 39 (antes, hasta 8 fallos).
 - [x] Exportar los datos en un `.zip`. **2026-10-08**, **real**: ruta `/x/store/export` en un servidor Vite con datos de prueba. Devuelve 200 y un zip con `asset/` y `state.json`, con las claves vaciadas (0 apariciones). Sin test automático.
 - [x] Precio exacto de Atlas antes de generar (`src/engine/quotes.ts`). **2026-10-08**, **real**: `POST /api/v1/model/calculate` con Wan 3.0 a 720p devuelve 0,40 USD para 5 s y 0,80 USD para 10 s. **test**: [quotes.test.ts](../tests/quotes.test.ts). **usuario**: funciona.
 - [x] 3D y Designer (`PLAN_3D_DESIGNER.md`, P1–P9): cuatro modelos 3D, visor, exportación PDF/SVG, lineart editable y pinceles con textura. **2026-10-08**, **código** y **test** ([3d-contracts](../tests/3d-contracts.test.ts), [model3d](../tests/model3d.test.ts), [design-export](../tests/design-export.test.ts), [brush-control](../tests/brush-control.test.ts): 22 aprobados). **usuario**: el visor se probó y se amplió después.

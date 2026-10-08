@@ -68,6 +68,9 @@ export default defineConfig({
   server: { port: 5173, proxy, fs: { deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/data/**', '**/data.bak-*/**'] } },
   preview: { port: 4173, proxy },
   test: {
+    // 20 s, not the 5 s default: on a busy machine the first test of a file pays for loading its modules and went
+    // past 5 s (false failures). Tests that simulate time run on fake clocks, so this budget only covers real CPU work.
+    testTimeout: 20_000,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
   },
