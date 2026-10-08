@@ -143,6 +143,9 @@ describe('in a request, end to end (scenarios 1 to 3)', () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
     const calls = await request('Quítale el fondo a esta foto', ['img1']);
     expect(calls[0].messages).toContain('n1_remove-bg remove_bg on asset:img1');
+    // The route opens the request, before the user's words and the context, and rules out loading a guide first.
+    expect(calls[0].messages.indexOf('This request fires')).toBeLessThan(calls[0].messages.lastIndexOf('<user_message'));
+    expect(calls[0].messages).toContain('do not call read_guide for them');
     expect(calls.every((c) => c.toolChoice === 'auto')).toBe(true);
   });
   it('2: a specific request that does not fit the map (no input) follows the general workflow, no signal', async () => {

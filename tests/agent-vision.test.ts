@@ -61,7 +61,8 @@ describe('the agent sees the attached references', () => {
     expect(Array.isArray(msg.content)).toBe(true);
     const parts = msg.content as Array<{ type: string; text?: string; image_url?: { url: string } }>;
     expect(parts[0]).toMatchObject({ type: 'text' });
-    expect(parts[0].text).toMatch(/^<user_message canvas="chat">\nanimate this character\n<\/user_message>/);
+    // A request that fires an operation opens with its route (agent/force.ts), then the user's words.
+    expect(parts[0].text).toMatch(/^(This request fires[^]*?\n\n)?<user_message canvas="chat">\nanimate this character\n<\/user_message>/);
     expect(parts.some((p) => p.type === 'text' && /asset:img1 name=".*" \(image 2000×1000\)/.test(p.text!))).toBe(true);
     expect(parts.some((p) => p.type === 'image_url' && p.image_url!.url.startsWith('data:image/jpeg'))).toBe(true);
     expect(drawn).toContainEqual([768, 384]);

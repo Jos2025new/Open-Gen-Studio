@@ -42,9 +42,11 @@ describe('one procedure instead of per-case rules', () => {
 });
 
 describe('limits and mode lines the agent reads', () => {
-  it('the continuity preserve limit is stated where the agent reads it, and matches the schema', async () => {
-    const { TOOLS } = await import('../src/engine/agent/tools');
-    expect(JSON.stringify(TOOLS)).toContain('max 200 chars');
+  it('a continuity preserve text over 200 characters is trimmed by the app, not refused (no extra round)', async () => {
+    const { proposePlanSchema } = await import('../src/engine/agent/tools');
+    const parsed = proposePlanSchema.safeParse({ title: 't', steps: [{ id: 's1', kind: 'text', text: 'a' }], continuity: [{ source: 'asset:a', preserve: 'x'.repeat(260), steps: ['s1'] }] });
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.continuity![0].preserve.length).toBe(200);
   });
   it('the auto mode line says what to do, not which cards exist', async () => {
     const source = (await import('node:fs')).readFileSync('src/engine/agent/context.ts', 'utf8');

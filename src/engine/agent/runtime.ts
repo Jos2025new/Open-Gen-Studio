@@ -328,7 +328,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
   const forced = workspace === 'node' ? '' : steerNote(requestGate(sessionId));
-  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}${forced}\n</app_context>`, parts));
+  // The route goes first: an instruction buried after the context was followed after the prompt's own steps.
+  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
 

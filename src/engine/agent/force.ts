@@ -121,5 +121,5 @@ export function steerNote(gated: GatedOp[]): string {
   const fired = gated.filter((g) => g.fired);
   if (!fired.length) return '';
   const params = (p: Record<string, string>) => (Object.keys(p).length ? ` {${Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(', ')}}` : '');
-  return `\n\n---\nThis request fires, in order: ${fired.map((g) => `${g.seq} ${g.op} on ${g.input}${params(g.params)}${g.note ? ` (${g.note})` : ''}`).join('; ')}.\nYou MUST follow this route: propose_plan with these op steps in this order, writing only their prompts or instructions and any step the request adds.`;
+  return `This request fires, in order: ${fired.map((g) => `${g.seq} ${g.op} on ${g.input}${params(g.params)}${g.note ? ` (${g.note})` : ''}`).join('; ')}.\nYou MUST follow this route now: propose_plan with these op steps in this order, writing only their notes or instructions and any step the request adds. These operations need no workflow and no guide: do not call read_guide for them.\n\n`;
 }
