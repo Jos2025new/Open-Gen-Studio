@@ -135,3 +135,10 @@ describe('no false refusals: a character or an object named with a place is stil
   });
 });
 
+describe('the source size of a chained step comes from its resolution', () => {
+  it('reads 1k, 2K, 1080p and WxH', async () => {
+    const { longEdgeOf } = await import('../src/engine/agent/fit');
+    expect([longEdgeOf('1k'), longEdgeOf('2K'), longEdgeOf('1080p'), longEdgeOf('1024x1536'), longEdgeOf('auto')]).toEqual([1024, 2048, 1920, 1536, undefined]);
+  });
+});
+

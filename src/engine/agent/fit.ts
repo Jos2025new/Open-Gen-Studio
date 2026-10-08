@@ -1,4 +1,5 @@
-import { OPS } from '../ops';
+import { OPS, type OpField } from '../ops';
+import type { AdvancedValue } from '../types';
 import { normalizeRequest } from './triggers';
 
 /*
@@ -20,8 +21,10 @@ export interface FitContext {
 }
 
 export type FitResult =
-  | { ok: true; params: Record<string, string> }
-  | { ok: false; reason: string; ambiguous?: boolean; fallback?: Record<string, string> };
+  | { ok: true; params: Record<string, string>; note?: string }
+  // agentSettles: the ambiguity is missing data, not the user's intent (the source size of an upscale), so a valid
+  // value the agent gave settles it without a question.
+  | { ok: false; reason: string; ambiguous?: boolean; fallback?: Record<string, string>; agentSettles?: boolean };
 
 /** The parameters each operation's fit fills. A missing or invalid value for one of them is taken from the fit. */
 export const FIT_KEYS: Record<string, string[]> = {
@@ -129,12 +132,15 @@ export function fitUpscale(text: string, sourceLongEdge?: number): FitResult {
   const target = s.match(/\b(2|4|8)\s?k\b/);
   // Without a factor or a target size the request names no value: the operation keeps its own default.
   if (!target) return { ok: true, params: {} };
-  if (!sourceLongEdge) return { ok: false, ambiguous: true, reason: 'the source size is unknown, so the factor to reach the target cannot be computed', fallback: { factor: '2' } };
+  if (!sourceLongEdge) return { ok: false, ambiguous: true, agentSettles: true, reason: 'the source size is unknown, so the factor to reach the target cannot be computed', fallback: { factor: '2' } };
   const targetEdge = { '2': 2048, '4': 3840, '8': 7680 }[target[1]]!;
   const ratio = targetEdge / sourceLongEdge;
   if (ratio <= 1.25) return { ok: false, reason: 'the image is already at that size' };
   // Nearest of 2× and 4× on a log scale: the boundary between them is √8, about 2.83.
-  return { ok: true, params: { factor: ratio < Math.sqrt(8) ? '2' : '4' } };
+  const factor = ratio < Math.sqrt(8) ? 2 : 4;
+  // ×4 is the largest factor: a target beyond it is said, not silently missed (8K from 1024 px reaches 4096 px).
+  const short = sourceLongEdge * factor < targetEdge * 0.9;
+  return { ok: true, params: { factor: String(factor) }, ...(short ? { note: `×${factor} reaches ${sourceLongEdge * factor} px, short of ${target[1]}K (${targetEdge} px)` } : {}) };
 }
 
 /** Views of a character turnaround: 3 or 4. "Dos" is the nearest possible value, 3. Unnamed: no value (the default). */
@@ -200,3 +206,131 @@ export function fitOp(op: string, text: string, ctx: FitContext = {}): FitResult
     default: return { ok: true, params: {} };
   }
 }
+
+/** Long edge in pixels of a step's resolution setting ("1k", "2K", "1080p", "1024x1536"), when it names one. */
+export function longEdgeOf(resolution: unknown): number | undefined {
+  const r = String(resolution ?? '').toLowerCase().trim();
+  const size = r.match(/^(\d{3,5})\s*[x×*]\s*(\d{3,5})$/);
+  if (size) return Math.max(Number(size[1]), Number(size[2]));
+  const k = r.match(/^(\d(?:\.\d)?)\s*k$/);
+  if (k) return Math.round(Number(k[1]) * 1024);
+  const p = r.match(/^(\d{3,4})p$/);
+  return p ? Math.round((Number(p[1]) * 16) / 9) : undefined;
+}
+
+/** What the normalizer knows about the request while fitting a plan: the mode, and whether a question can be asked. */
+export interface FitState {
+  /** Direct: nothing is asked; an ambiguity takes the visible fallback. */
+  direct: boolean;
+  /** A question round is still available in this request (Auto and Guided). */
+  canAsk: boolean;
+  /** The user already answered questions in this request: an ambiguity is not asked again, the agent's reading stands. */
+  answered: boolean;
+  /** Angles given to angle steps of this plan, by input, so two steps on one image do not repeat an angle. */
+  angles: Map<string, string[]>;
+}
+
+export function fitState(direct: boolean, canAsk = true, answered = false): FitState {
+  return { direct, canAsk: !direct && canAsk, answered, angles: new Map() };
+}
+
+export interface RawOpStep { id: string; where: string; op: string; input?: string; params?: Record<string, unknown>; loose: Record<string, unknown> }
+
+/**
+ * The parameters of one op step. A valid value the agent gave is kept; a missing or invalid one is filled from the
+ * request and the source. An impossibility is refused in every mode. An ambiguity of the user's intent is asked in Auto
+ * and Guided even when the agent filled a value (it guessed for the user), once per request; when it cannot be asked
+ * (Direct, an answer already given, no round left) the agent's value or the fallback is used and shown on the plan.
+ */
+export function fitStepParams(step: RawOpStep, fields: OpField[], text: string, ctx: FitContext, state: FitState): { params: Record<string, AdvancedValue>; errors: string[]; adjustments: string[] } {
+  const params: Record<string, AdvancedValue> = {};
+  const errors: string[] = [];
+  const adjustments: string[] = [];
+  const planAngles = step.op === 'angle' ? state.angles.get(step.input ?? '') ?? [] : [];
+  const fitted = fitOp(step.op, text, { ...ctx, usedAngles: [...(ctx.usedAngles ?? []), ...planAngles] });
+  if (!fitted.ok && !fitted.ambiguous) errors.push(`${step.where}: op "${step.op}" does not fit this request: ${fitted.reason}.`);
+  const ambiguous = !fitted.ok && fitted.ambiguous;
+  const ask = ambiguous && state.canAsk && !state.answered;
+  const why = state.direct ? 'Direct does not ask' : state.answered ? 'read from your answers' : 'no question left in this request';
+  let asked = false;
+  for (const f of fields) {
+    // A field written on the step itself ("instruction": …) instead of in params counts as given.
+    const loose = step.loose[f.key];
+    const v = (step.params?.[f.key] ?? (typeof loose === 'string' || typeof loose === 'number' ? loose : undefined)) as AdvancedValue | undefined;
+    if (f.type !== 'choice') {
+      params[f.key] = typeof v === 'string' ? v : f.default;
+      continue;
+    }
+    const valid = f.options?.some((o) => o.value === String(v)) ? String(v) : undefined;
+    if (ambiguous && FIT_KEYS[step.op]?.includes(f.key) && !(fitted.agentSettles && valid !== undefined)) {
+      if (ask) {
+        if (!asked) errors.push(`${step.where}: op "${step.op}" needs ${f.key}: ${fitted.reason}. Ask the user, then propose again.`);
+        asked = true;
+        params[f.key] = valid ?? f.default;
+        continue;
+      }
+      const value = valid ?? fitted.fallback?.[f.key] ?? f.default;
+      params[f.key] = value;
+      adjustments.push(`${step.id}: ${f.key} "${value}" (${why}: ${fitted.reason})`);
+      continue;
+    }
+    if (valid !== undefined) {
+      params[f.key] = valid;
+      continue;
+    }
+    let fill = fitted.ok ? fitted.params[f.key] : undefined;
+    // Two angle steps on one image never get the same angle from the fill.
+    if (fill !== undefined && step.op === 'angle' && planAngles.includes(fill)) fill = ANGLE_ORDER.find((a) => !planAngles.includes(a) && !(ctx.usedAngles ?? []).includes(a)) ?? fill;
+    if (fill !== undefined) {
+      params[f.key] = fill;
+      adjustments.push(`${step.id}: ${f.key} "${fill}" from the request${v != null ? ` (was "${String(v)}")` : ''}`);
+      continue;
+    }
+    params[f.key] = f.default;
+    if (v != null) adjustments.push(`${step.id}: ${f.key} "${String(v)}" → ${f.default}`);
+  }
+  if (fitted.ok && fitted.note) adjustments.push(`${step.id}: ${fitted.note}`);
+  if (step.op === 'angle' && params.angle) state.angles.set(step.input ?? '', [...planAngles, String(params.angle)]);
+  return { params, errors, adjustments };
+}
+
+/** How many angle steps "múltiples ángulos" takes in Direct, which does not ask (ADR 0007). */
+export const DIRECT_ANGLES = 3;
+
+/**
+ * The fit across a plan's steps. "Múltiples ángulos" with one angle step: Auto and Guided ask how many; Direct makes
+ * the three steps itself, each with its own angle, instead of sending the plan back (an extra call the user never sees).
+ * "Tres vistas" made as angle steps with no sheet and no "por vista" named: Auto and Guided ask, as for a sheet.
+ */
+export function fitPlanSteps<T extends { id?: string; kind?: string; op?: string; params?: Record<string, unknown> }>(steps: T[], text: string, state: FitState): { steps: T[]; errors: string[]; adjustments: string[] } {
+  const errors: string[] = [];
+  const adjustments: string[] = [];
+  const angleSteps = steps.filter((x) => x.kind === 'op' && x.op === 'angle');
+  const canAsk = state.canAsk && !state.answered;
+  const s = normalizeRequest(text);
+  if (angleSteps.length === 1 && pluralAngles(text)) {
+    if (state.direct) {
+      const one = angleSteps[0];
+      const at = steps.indexOf(one);
+      const base = one.id && /^[A-Za-z][\w-]*$/.test(one.id) ? one.id : `s${at + 1}`;
+      const taken = new Set(steps.map((x) => x.id));
+      const copies: T[] = [];
+      for (let n = 2; copies.length < DIRECT_ANGLES - 1; n++) {
+        if (taken.has(`${base}_${n}`)) continue;
+        const rest = { ...(one.params ?? {}) };
+        delete rest.angle;
+        copies.push({ ...one, id: `${base}_${n}`, params: rest });
+      }
+      steps = [...steps.slice(0, at), { ...one, id: base }, ...copies, ...steps.slice(at + 1)];
+      adjustments.push(`${base}: ${DIRECT_ANGLES} angle steps, one per angle (Direct does not ask how many: "múltiples ángulos")`);
+    } else if (canAsk) {
+      errors.push('"Múltiples ángulos" needs a number: ask how many angles, then propose one angle step per angle.');
+    }
+  }
+  const sheet = steps.some((x) => x.kind === 'op' && x.op === 'reference_sheet');
+  if (!state.direct && canAsk && angleSteps.length && !sheet && VIEW_COUNT.test(s) && !SHEET_CUE.test(s) && !PER_VIEW.test(s)) {
+    errors.push('The request counts views but names no sheet: ask whether it is a reference sheet (one image) or one image per view, then propose again.');
+  }
+  return { steps, errors, adjustments };
+}
+

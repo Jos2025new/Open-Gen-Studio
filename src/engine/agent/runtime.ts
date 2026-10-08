@@ -203,6 +203,8 @@ function planContext(sessionId: string, workspace: Workspace) {
       .filter(Boolean),
     requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
     direct: () => get().composer.agentStyle === 'direct',
+    canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
+    answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
     // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),

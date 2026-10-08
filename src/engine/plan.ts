@@ -3,7 +3,7 @@ import { continuityErrors } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { FIT_KEYS, aspectOfShape, fitOp, pluralAngles } from './agent/fit';
+import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
@@ -176,6 +176,9 @@ export interface PlanContext {
   usedAngles?: (assetId: string) => string[];
   /** Direct mode: no questions, so an ambiguity takes the operation's visible default instead of asking. */
   direct?: () => boolean;
+  /** A question round is left in this request, and whether the user already answered one (fit.ts asks once). */
+  canAsk?: () => boolean;
+  answered?: () => boolean;
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -381,16 +384,14 @@ function cleanParams(p: Record<string, unknown> | undefined): Record<string, Adv
 export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: string): Promise<{ plan: Plan | null; errors: string[] }> {
   const errors: string[] = [];
   const adjustments: string[] = [];
-  const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
+  // The fit across steps (fit.ts): "múltiples ángulos" asked, or three angle steps in Direct; views as angles asked.
+  const fit = fitState(Boolean(ctx.direct?.()), ctx.canAsk?.() ?? true, ctx.answered?.() ?? false);
+  const planFit = fitPlanSteps(Array.isArray(raw.steps) ? raw.steps : [], ctx.requestText?.() ?? '', fit);
+  const rawSteps = planFit.steps;
+  errors.push(...planFit.errors);
+  adjustments.push(...planFit.adjustments);
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
-  // "Múltiples ángulos" is one angle step per angle: how many is asked in Auto and Guided, and Direct uses 3.
-  const angleSteps = rawSteps.filter((s) => s.kind === 'op' && s.op === 'angle').length;
-  if (angleSteps === 1 && pluralAngles(ctx.requestText?.() ?? '')) {
-    errors.push(ctx.direct?.()
-      ? 'Direct does not ask how many angles: "múltiples ángulos" takes 3 angle steps (the default), one per angle, each with its own angle.'
-      : '"Múltiples ángulos" needs a number: ask how many angles, then propose one angle step per angle.');
-  }
   // A total length is split evenly over the video steps that set none (each share then snaps to the model's lengths).
   const total = Number(raw.total_duration);
   const unset = rawSteps.filter((s) => s.kind === 'video' && s.duration == null);
@@ -817,52 +818,20 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const inputKind = k === 'raster' ? 'image' : k;
           if (inputKind !== def.input) errors.push(`${where}: op "${opId}" needs a${def.input === 'image' ? 'n image' : ' video'} input, "${s.input}" is ${inputKind}.${def.input === 'image' && inputKind === 'video' ? ` Fix: add a step { kind: "op", op: "extract_frame", input: "${s.input}", params: { which: "last" } } and use it as input.` : def.input === 'video' && inputKind === 'image' ? ' Fix: make a clip from it first (a video step with first_frame) and use that step as input.' : ''}`);
         }
-        const params: Record<string, AdvancedValue> = {};
-        // The request and the source image fill what the agent left out (fit.ts). A valid value the agent gave is kept;
-        // a value the request cannot give (a place as a reference sheet, an unclear Instagram format) is refused with its reason.
-        const sourceId = String(s.input ?? '').replace(/^asset:/, '');
-        const source = sourceId ? ctx.asset(sourceId) : undefined;
-        const fitted = fitOp(opId, ctx.requestText?.() ?? '', {
-          sourceLongEdge: source?.width && source?.height ? Math.max(source.width, source.height) : undefined,
-          sourceAspect: source?.width && source?.height ? aspectOfShape(source.width / source.height) : undefined,
-          usedAngles: sourceId && ctx.usedAngles ? ctx.usedAngles(sourceId) : [],
-        });
-        // An impossibility is refused in every mode; an ambiguity is asked about below, or decided in Direct.
-        if (!fitted.ok && !fitted.ambiguous) errors.push(`${where}: op "${opId}" does not fit this request: ${fitted.reason}.`);
-        let asked = false;
-        for (const f of def.fields) {
-          // A field written on the step itself ("instruction": …) instead of in params counts as given.
-          const loose = (s as unknown as Record<string, unknown>)[f.key];
-          const v = s.params?.[f.key] ?? (typeof loose === 'string' || typeof loose === 'number' ? (loose as AdvancedValue) : undefined);
-          if (f.type === 'choice') {
-            const ok = f.options?.some((o) => o.value === String(v));
-            if (ok) {
-              params[f.key] = String(v);
-              continue;
-            }
-            const fill = fitted.ok ? fitted.params[f.key] : undefined;
-            if (fill !== undefined) {
-              params[f.key] = fill;
-              adjustments.push(`${s.id}: ${f.key} "${fill}" from the request${v != null ? ` (was "${String(v)}")` : ''}`);
-              continue;
-            }
-            if (!fitted.ok && fitted.ambiguous && FIT_KEYS[opId]?.includes(f.key)) {
-              if (ctx.direct?.()) {
-                // Direct does not ask: the operation's fallback is used and shown on the plan.
-                const value = fitted.fallback?.[f.key] ?? f.default;
-                params[f.key] = value;
-                adjustments.push(`${s.id}: ${f.key} "${value}" (Direct does not ask: ${fitted.reason})`);
-                continue;
-              }
-              if (!asked) errors.push(`${where}: op "${opId}" needs ${f.key}: ${fitted.reason}. Ask the user, then propose again.`);
-              asked = true;
-            }
-            params[f.key] = f.default;
-            if (v != null) adjustments.push(`${s.id}: ${f.key} "${String(v)}" → ${f.default}`);
-          } else {
-            params[f.key] = typeof v === 'string' ? v : f.default;
-          }
-        }
+        // The request and the source (an asset, or the resolution of the step it comes from) fill what the agent left out;
+        // an impossibility is refused and an ambiguity asked or decided by mode (fit.ts).
+        const src = s.input ? parseRef(s.input) : null;
+        const srcAsset = src?.type === 'asset' ? ctx.asset(src.id) : undefined;
+        const srcStep = src?.type === 'step' ? steps.find((x) => x.id === src.id) : undefined;
+        const srcSettings = srcStep && 'settings' in srcStep ? (srcStep.settings as { resolution?: string; aspect?: string }) : undefined;
+        const fitted = fitStepParams({ id: s.id!, where, op: opId, input: s.input, params: s.params, loose: s as unknown as Record<string, unknown> }, def.fields, ctx.requestText?.() ?? '', {
+          sourceLongEdge: srcAsset?.width && srcAsset?.height ? Math.max(srcAsset.width, srcAsset.height) : longEdgeOf(srcSettings?.resolution),
+          sourceAspect: srcAsset?.width && srcAsset?.height ? aspectOfShape(srcAsset.width / srcAsset.height) : srcSettings?.aspect,
+          usedAngles: src?.type === 'asset' && ctx.usedAngles ? ctx.usedAngles(src.id) : [],
+        }, fit);
+        const params = fitted.params;
+        errors.push(...fitted.errors);
+        adjustments.push(...fitted.adjustments);
         if (opId === 'edit' && !String(params.instruction ?? '').trim()) {
           if (s.prompt?.trim()) params.instruction = s.prompt.trim();
           else errors.push(`${where}: op "edit" needs params.instruction.`);

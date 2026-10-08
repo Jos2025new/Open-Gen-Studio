@@ -12,7 +12,7 @@ const assets: Record<string, { kind: 'image'; width?: number; height?: number }>
   img3: { kind: 'image' },
 };
 
-function ctxWith(requestText: string, usedAngles: string[] = [], direct = false): PlanContext {
+function ctxWith(requestText: string, usedAngles: string[] = [], direct = false, ask: { canAsk?: boolean; answered?: boolean } = {}): PlanContext {
   return {
     workspace: 'chat',
     getModel: async () => null,
@@ -23,12 +23,14 @@ function ctxWith(requestText: string, usedAngles: string[] = [], direct = false)
     requestText: () => requestText,
     usedAngles: () => usedAngles,
     direct: () => direct,
+    canAsk: () => ask.canAsk ?? true,
+    answered: () => ask.answered ?? false,
   } as unknown as PlanContext;
 }
 
-async function oneOp(op: string, input: string, params: Record<string, unknown> | undefined, requestText: string, opts: { usedAngles?: string[]; direct?: boolean } = {}) {
+async function oneOp(op: string, input: string, params: Record<string, unknown> | undefined, requestText: string, opts: { usedAngles?: string[]; direct?: boolean; canAsk?: boolean; answered?: boolean } = {}) {
   const raw = { title: 'Test', steps: [{ id: 's1', kind: 'op', op, input, ...(params ? { params } : {}) }] } as unknown as Parameters<typeof normalizePlan>[0];
-  return normalizePlan(raw, ctxWith(requestText, opts.usedAngles ?? [], opts.direct ?? false), 'pln_test');
+  return normalizePlan(raw, ctxWith(requestText, opts.usedAngles ?? [], opts.direct ?? false, opts), 'pln_test');
 }
 
 const paramsOf = (plan: { steps: unknown[] } | null) => (plan!.steps[0] as { params: Record<string, string> }).params;
@@ -81,10 +83,24 @@ describe('reframe: a format is named, Instagram asks in Auto and uses the social
     expect(plan!.adjustments.join(' ')).toContain('Direct does not ask');
   });
 
-  it('a format the agent gave is kept, even when the request is ambiguous', async () => {
-    const { plan, errors } = await oneOp('reframe', 'asset:img2', { aspect: '9:16' }, 'cambia la imagen en formato para instagram');
+  it('an ambiguous request is asked in Auto even when the agent filled a format: the agent guessed for the user', async () => {
+    const { errors } = await oneOp('reframe', 'asset:img2', { aspect: '4:5' }, 'cambia la imagen en formato para instagram');
+    expect(errors.join(' ')).toContain('Ask the user');
+  });
+
+  it('asked once: after an answer, or with no question left, the agent\'s format stands and is shown on the plan', async () => {
+    for (const opts of [{ answered: true }, { canAsk: false }]) {
+      const { plan, errors } = await oneOp('reframe', 'asset:img2', { aspect: '4:5' }, 'cambia la imagen en formato para instagram', opts);
+      expect(errors).toEqual([]);
+      expect(paramsOf(plan).aspect).toBe('4:5');
+      expect(plan!.adjustments.join(' ')).toContain('aspect "4:5"');
+    }
+  });
+
+  it('Direct keeps the agent\'s format for an ambiguous request and says so on the plan', async () => {
+    const { plan, errors } = await oneOp('reframe', 'asset:img2', { aspect: '4:5' }, 'cambia la imagen en formato para instagram', { direct: true });
     expect(errors).toEqual([]);
-    expect(paramsOf(plan).aspect).toBe('9:16');
+    expect(plan!.adjustments.join(' ')).toContain('Direct does not ask');
   });
 
   it('"otro aspecto" takes a format other than the source\'s', async () => {
@@ -130,10 +146,29 @@ describe('several angles: one angle step per angle; Auto asks how many, Direct u
     expect(errors.join(' ')).toContain('needs a number');
   });
 
-  it('a single angle step for "múltiples ángulos" is corrected to 3 steps in Direct, without a question', async () => {
+  it('Direct makes the 3 angle steps itself, each with its own angle: no plan sent back, no extra call', async () => {
     const raw = { title: 'Ángulos', steps: [angleStep('s1')] } as unknown as Parameters<typeof normalizePlan>[0];
-    const { errors } = await normalizePlan(raw, ctxWith(plural, [], true), 'pln_test');
-    expect(errors.join(' ')).toContain('takes 3 angle steps');
+    const { plan, errors } = await normalizePlan(raw, ctxWith(plural, [], true), 'pln_test');
+    expect(errors).toEqual([]);
+    const angles = plan!.steps.map((x) => (x as { params: Record<string, string> }).params.angle);
+    expect(angles).toHaveLength(3);
+    expect(new Set(angles).size).toBe(3);
+    expect(plan!.adjustments.join(' ')).toContain('3 angle steps');
+  });
+
+  it('two angle steps on one image never get the same angle from the fill', async () => {
+    const raw = { title: 'Ángulos', steps: [angleStep('s1'), angleStep('s2')] } as unknown as Parameters<typeof normalizePlan>[0];
+    const { plan } = await normalizePlan(raw, ctxWith('ponla de perfil'), 'pln_test');
+    const angles = plan!.steps.map((x) => (x as { params: Record<string, string> }).params.angle);
+    expect(angles[0]).toBe('profile-left');
+    expect(angles[1]).not.toBe('profile-left');
+  });
+
+  it('"tres vistas" made as angle steps, with no sheet and no "por vista": Auto asks, Direct and "por vista" do not', async () => {
+    const raw = () => ({ title: 'Vistas', steps: [angleStep('s1', 'front'), angleStep('s2', 'profile-left'), angleStep('s3', 'back')] }) as unknown as Parameters<typeof normalizePlan>[0];
+    expect((await normalizePlan(raw(), ctxWith('tres vistas de este personaje'), 'pln_test')).errors.join(' ')).toContain('reference sheet (one image) or one image per view');
+    expect((await normalizePlan(raw(), ctxWith('tres vistas de este personaje', [], true), 'pln_test')).errors).toEqual([]);
+    expect((await normalizePlan(raw(), ctxWith('tres vistas de este personaje, una imagen por vista'), 'pln_test')).errors).toEqual([]);
   });
 
   it('three angle steps, each with its own angle, fit "múltiples ángulos"', async () => {
@@ -151,3 +186,19 @@ describe('contact sheet: unnamed keeps its default, nothing is reported', () => 
     expect(plan!.adjustments.join(' ')).not.toContain('angles');
   });
 });
+
+describe('upscale says what it does', () => {
+  it('8K from a 1024 px image is ×4 and the plan says it falls short', async () => {
+    const { plan, errors } = await oneOp('upscale', 'asset:img1', undefined, 'súbela a 8K');
+    expect(errors).toEqual([]);
+    expect(paramsOf(plan).factor).toBe('4');
+    expect(plan!.adjustments.join(' ')).toContain('short of 8K');
+  });
+
+  it('an unknown source size is missing data: a factor the agent gave settles it without a question', async () => {
+    const { plan, errors } = await oneOp('upscale', 'asset:img3', { factor: '4' }, 'pásala a 4K');
+    expect(errors).toEqual([]);
+    expect(paramsOf(plan).factor).toBe('4');
+  });
+});
+

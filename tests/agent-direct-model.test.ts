@@ -18,7 +18,7 @@ const SEEDREAM = 'atlas::bytedance/seedream-v5.0-pro/text-to-image';
 const before = useStore.getState();
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 
-async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; text?: string }) {
+async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; text?: string; steps?: unknown[] }) {
   vi.stubGlobal('location', { href: 'http://localhost/' });
   const sent: string[] = [];
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -28,7 +28,7 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
     const step = { id: 's1', kind: 'image', title: 'Imagen', prompt: 'a red bicycle', count: 1, ...(opts.planModel ? { model: opts.planModel } : {}) };
     const delta = sent.length > 1
       ? { content: 'Listo.' }
-      : { tool_calls: [{ index: 0, id: 'p', function: { name: 'propose_plan', arguments: JSON.stringify({ title: 't', steps: [step] }) } }] };
+      : { tool_calls: [{ index: 0, id: 'p', function: { name: 'propose_plan', arguments: JSON.stringify({ title: 't', steps: opts.steps ?? [step] }) } }] };
     return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: sent.length > 1 ? 'stop' : 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
   });
   const models = await atlas.listModels(undefined);
@@ -81,3 +81,19 @@ describe('Direct video guides follow the models that can run', () => {
     expect(earlyModelGuide(sid, 'model:wan')).toContain('direct mode');
   });
 });
+
+describe('a chained upscale reads the source size from the step it comes from', () => {
+  it('"súbela a 4K" on a generated 1K image is ×4, without a question', async () => {
+    const steps = [
+      { id: 's1', kind: 'image', title: 'Imagen', prompt: 'a red bicycle', count: 1 },
+      { id: 's2', kind: 'op', op: 'upscale', input: 's1' },
+    ];
+    const r = await run({ style: 'direct', userPicked: true, text: 'Una bicicleta roja y súbela a 4K', steps });
+    const s1 = r.plan!.plan.steps[0] as ImageStep;
+    const s2 = r.plan!.plan.steps[1] as unknown as { params: Record<string, string> };
+    expect(String(s1.settings.resolution).toLowerCase()).toBe('1k');
+    expect(s2.params.factor).toBe('4');
+    expect(r.plan!.plan.adjustments.join(' ')).not.toContain('source size is unknown');
+  });
+});
+
