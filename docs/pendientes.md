@@ -12,7 +12,8 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
 - [ ] Fusionar `task/agent-forcing` en `task/modelo-general`. Avance directo, sin conflictos: ver [fusion-agent-forcing.md](fusion-agent-forcing.md). **2026-10-08**, decide el usuario.
 - [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
-- [ ] Texto a voz y efectos de sonido: **implementar** (usuario, **2026-10-08**). Falta elegir los modelos concretos y aprobar el coste máximo de las pruebas.
+- [ ] Texto a voz y efectos de sonido: **implementar** (usuario, **2026-10-08**). Falta que el usuario elija los modelos; datos y propuesta en el [catálogo de voz y efectos](catalogo-voz-y-efectos.md). Atlas no tiene efectos de sonido, así que irán por NanoGPT (ElevenLabs Sound Effects v2, salvo otra elección).
+- [ ] Prueba con gasto real de los modelos de voz y efectos. **2026-10-08**, la hará el usuario.
 
 ## Por probar
 
