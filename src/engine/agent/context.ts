@@ -256,7 +256,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   // State only, no orders: these lines stay in the history and are re-read in later requests.
   lines.push(
     opts.style === 'auto'
-      ? `mode: auto (one round of questions, for the user's data only) · rounds used for this request: ${Math.min(opts.round, 1)} of 1`
+      ? `mode: auto (ask only missing user data, once; decide the rest) · rounds used for this request: ${Math.min(opts.round, 1)} of 1`
       : opts.style === 'direct'
         ? 'mode: direct (no questions and no settings card: the models are the ones chosen in the composer, and the plan card is the only decision) · ask_questions and confirm_settings are not available'
         : `mode: guided (ask before each plan; settings confirmed per request; creative options allowed) · rounds used for this request: ${opts.round} of ${opts.maxRounds}`,

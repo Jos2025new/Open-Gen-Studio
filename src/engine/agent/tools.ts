@@ -226,7 +226,7 @@ export const TOOLS: ToolSpec[] = [
           continuity: {
             type: 'array', maxItems: 12,
             description: 'Declare shared preservation requirements when outputs must keep identity, geometry, product details, style or other properties. Each source is an existing asset:<id>/layer:<id> or a source step (possibly the first requested output); steps lists its consumers, excluding the source itself. Consumers must receive it through compatible actual content inputs or derived inputs, not repeated text. Omit for independent work. Does not save, generate or regenerate anything.',
-            items: { type: 'object', properties: { source: { type: 'string' }, preserve: { type: 'string', description: 'What must remain, in the user language; exclude requested changes.' }, steps: { type: 'array', items: { type: 'string' } } }, required: ['source', 'preserve', 'steps'] },
+            items: { type: 'object', properties: { source: { type: 'string' }, preserve: { type: 'string', description: 'What must remain, max 200 chars, user language; not changes asked.' }, steps: { type: 'array', items: { type: 'string' } } }, required: ['source', 'preserve', 'steps'] },
           },
           revision: { type: 'boolean', description: 'true when this plan changes the pending plan the user just commented on; false or omitted for a different request.' },
           total_duration: { type: 'number', description: 'Seconds the video steps add up to when the user gave a total; the app splits it over the video steps that set no duration.' },

@@ -40,3 +40,15 @@ describe('one procedure instead of per-case rules', () => {
     expect(guideIndex()).toContain('skill:staged');
   });
 });
+
+describe('limits and mode lines the agent reads', () => {
+  it('the continuity preserve limit is stated where the agent reads it, and matches the schema', async () => {
+    const { TOOLS } = await import('../src/engine/agent/tools');
+    expect(JSON.stringify(TOOLS)).toContain('max 200 chars');
+  });
+  it('the auto mode line says what to do, not which cards exist', async () => {
+    const source = (await import('node:fs')).readFileSync('src/engine/agent/context.ts', 'utf8');
+    expect(source).toContain('mode: auto (ask only missing user data, once; decide the rest)');
+    expect(source).not.toContain("for the user's data only");
+  });
+});
