@@ -29,6 +29,7 @@ const POSITIVES: Array<[string, string]> = [
   ['vista frontal del producto', 'angle'],
   ['three views of her: front, side and back', 'reference_sheet'],
   ['dame un ángulo diferente de esta escena', 'angle'],
+  ['hazme tres vistas de este personaje, una imagen por vista', 'angle'],
   ['dame múltiples ángulos de esta escena', 'angle'],
   ['hazme una hoja de contacto de esta escena', 'contact_sheet'],
   ['seis ángulos de la misma escena', 'contact_sheet'],

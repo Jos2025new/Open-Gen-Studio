@@ -3,8 +3,11 @@ import { normalizeRequest } from './triggers';
 
 /*
  * Fitting a request to an operation's parameters. A trigger names an operation; these functions fill its parameters
- * from the request text and from the source image, so the operation runs with a value, never with a guess. Where the
- * request names no value, the rule is stated per parameter below and is the same every time.
+ * from the request text and from the source image, so the operation runs with a value, never with a guess.
+ *
+ * A failure is one of two things. An impossibility (a place as a reference sheet, a camera angle already made) is
+ * refused in every mode. An ambiguity (an Instagram format with no feed or stories, a sheet or one image per view) is
+ * asked about in Auto and Guided; in Direct, which does not ask, it takes the fallback value, shown on the plan.
  */
 
 export interface FitContext {
@@ -16,7 +19,9 @@ export interface FitContext {
   usedAngles?: string[];
 }
 
-export type FitResult = { ok: true; params: Record<string, string> } | { ok: false; reason: string };
+export type FitResult =
+  | { ok: true; params: Record<string, string> }
+  | { ok: false; reason: string; ambiguous?: boolean; fallback?: Record<string, string> };
 
 /** The parameters each operation's fit fills. A missing or invalid value for one of them is taken from the fit. */
 export const FIT_KEYS: Record<string, string[]> = {
@@ -30,11 +35,21 @@ export const FIT_KEYS: Record<string, string[]> = {
 /** Camera angles, in the order a new one is picked when the request names none ("un ángulo diferente"). */
 export const ANGLE_ORDER = ['three-quarter-left', 'profile-left', 'back', 'high', 'low', 'close-up', 'wide', 'three-quarter-right', 'profile-right', 'top-down', 'front'];
 
-/** Reframe formats, in the order a new one is picked when the request names none ("otro aspecto"). */
+/** Reframe formats, from the operation's own options. */
 export const ASPECT_OPTIONS: string[] = (OPS.reframe.fields.find((f) => f.key === 'aspect')?.options ?? []).map((o) => String(o.value));
 const ASPECT_ORDER = ['4:5', '9:16', '1:1', '16:9', '3:4', '2:3', '3:2', '21:9'];
 
+/** Instagram with no feed or stories named: the social default of the app's own guide (social.md: 9:16). */
+const INSTAGRAM_DEFAULT = '9:16';
+
 const CHANGE_WORDS = /\b(otro|otra|otros|distinto|distinta|diferente|nuevo|nueva|different|another|other|new)\b/;
+
+/** "Tres vistas, una imagen por vista": one image per view takes angle steps; a reference sheet is one image. */
+const PER_VIEW = /\b(por vista|per view|one image per view|independientes|separadas|separate views|cada vista)\b/;
+/** A sheet is named: "hoja", "sheet", "turnaround", "referencias de personaje". */
+const SHEET_CUE = /\b(hoja|sheet|turnaround|referencias? de (personaje|personajes|persona|objeto|producto))\b/;
+/** The request counts views: "tres vistas", "two views". */
+const VIEW_COUNT = /\b(dos|tres|cuatro|2|3|4)\s+(vistas|paneles)\b|\b(two|three|four)\s+(views|panels)\b/;
 
 const ANGLE_VALUES: Array<[string, RegExp]> = [
   ['three-quarter-left', /\btres cuartos (a la )?izquierd\w*|three.quarter left/],
@@ -51,6 +66,11 @@ const ANGLE_VALUES: Array<[string, RegExp]> = [
   ['close-up', /\bprimer plano\b|\bclose.?up\b/],
   ['wide', /\bplano general\b|\bplano amplio\b|\bwide shot\b/],
 ];
+
+/** A request that asks for several angles without a number: how many is the agent's question (or the Direct default). */
+export function pluralAngles(text: string): boolean {
+  return /\b(multiples|varios|muchos) angulos\b|\b(multiple|several|many) angles\b/.test(normalizeRequest(text));
+}
 
 /** The angle a request names, or the first angle not produced yet. */
 export function fitAngle(text: string, usedAngles: string[] = []): FitResult {
@@ -74,13 +94,13 @@ export function fitAspect(text: string, sourceAspect?: string): FitResult {
   // Instagram is two formats: the feed post (4:5) or stories and reels (9:16). Only "post" or "feed" settles it.
   if (/\binstagram\b/.test(s)) {
     if (/\b(post|feed|publicacion)\b/.test(s)) return { ok: true, params: { aspect: '4:5' } };
-    return { ok: false, reason: 'Instagram is a feed post (4:5) or stories and reels (9:16): ask which' };
+    return { ok: false, ambiguous: true, reason: 'Instagram is a feed post (4:5) or stories and reels (9:16)', fallback: { aspect: INSTAGRAM_DEFAULT } };
   }
   if (CHANGE_WORDS.test(s) || /\b(cambia|cambiar|adapta|adaptar|pasa|pasala|convierte)\b/.test(s)) {
     const free = ASPECT_ORDER.find((a) => a !== sourceAspect);
     return { ok: true, params: { aspect: free ?? '4:5' } };
   }
-  return { ok: false, reason: 'no format named' };
+  return { ok: false, ambiguous: true, reason: 'no format is named' };
 }
 
 /** The reframe format closest to an image's shape (width ÷ height), on a log scale. */
@@ -106,7 +126,7 @@ export function fitUpscale(text: string, sourceLongEdge?: number): FitResult {
   const target = s.match(/\b(2|4|8)\s?k\b/);
   // Without a factor or a target size the request names no value: the operation keeps its own default.
   if (!target) return { ok: true, params: {} };
-  if (!sourceLongEdge) return { ok: false, reason: 'the source size is unknown, so the factor to reach the target cannot be computed' };
+  if (!sourceLongEdge) return { ok: false, ambiguous: true, reason: 'the source size is unknown, so the factor to reach the target cannot be computed', fallback: { factor: '2' } };
   const targetEdge = { '2': 2048, '4': 3840, '8': 7680 }[target[1]]!;
   const ratio = targetEdge / sourceLongEdge;
   if (ratio <= 1.25) return { ok: false, reason: 'the image is already at that size' };
@@ -128,7 +148,7 @@ const OBJECT = /\b(producto\w*|objeto\w*|product|object|bolso\w*|botella\w*|zapa
 
 /**
  * The subject of a reference sheet: a character, a person or an object. A place is refused. A request that names none of
- * the three keeps the operation's default (a character): the source image usually settles it, and asking is optional.
+ * the three keeps the operation's default (a character): the source image usually settles it.
  */
 export function fitSubject(text: string): FitResult {
   const s = normalizeRequest(text);
@@ -138,13 +158,23 @@ export function fitSubject(text: string): FitResult {
   return { ok: true, params: {} };
 }
 
-/** A reference sheet fits when its subject does and its view count is set. */
+/**
+ * A reference sheet fits when the request asks for a sheet (not one image per view), its subject is a character, a
+ * person or an object, and its view count is set. A request that only counts views ("tres vistas") is ambiguous: a
+ * sheet, or one image per view. Auto asks; Direct makes the sheet, the operation's own choice.
+ */
 export function fitSheet(text: string): FitResult {
+  const s = normalizeRequest(text);
+  if (PER_VIEW.test(s)) return { ok: false, reason: 'a reference sheet is one image; one image per view takes one angle step per view' };
   const subject = fitSubject(text);
   if (!subject.ok) return subject;
   const panels = fitPanels(text);
   if (!panels.ok) return panels;
-  return { ok: true, params: { ...subject.params, ...panels.params } };
+  const params = { ...subject.params, ...panels.params };
+  // The request counts views but names no sheet: a sheet or one image per view is the question. A request that says
+  // nothing about views leaves the agent's own choice of a sheet standing.
+  if (!SHEET_CUE.test(s) && VIEW_COUNT.test(s)) return { ok: false, ambiguous: true, reason: 'a reference sheet, or one image per view?', fallback: params };
+  return { ok: true, params };
 }
 
 /** Angles of a contact sheet: 9 (3×3) or 6 (2×3). Unnamed: no value (the default, 9). */

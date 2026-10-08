@@ -27,6 +27,7 @@ const tool = (c: Call) => sse([{ choices: [{ delta: { tool_calls: [{ index: 0, i
 
 let replies: Array<Response | Call> = [];
 let toolNames: string[][] = [];
+let sentMessages: string[] = [];
 const sid = () => useStore.getState().activeSessionId;
 const feedOf = (type: string) => useStore.getState().sessions[sid()].feed.filter((f) => f.type === type);
 
@@ -39,6 +40,7 @@ beforeEach(() => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
     toolNames.push((body.tools ?? []).map((t: { function: { name: string } }) => t.function.name));
+    sentMessages.push(JSON.stringify(body.messages));
     const next = replies.shift();
     if (!next) return text('ok');
     return next instanceof Response ? next : tool(next);
@@ -92,6 +94,19 @@ describe('direct mode in a request', () => {
     expect(feedOf('plan')).toHaveLength(1);
     expect(feedOf('settings')).toHaveLength(0);
     expect((feedOf('plan')[0] as unknown as PlanFeedItem).status).toBe('awaiting');
+  });
+});
+
+describe('direct mode guides: the composer\'s model prompts are written for that model, never a generic one', () => {
+  it('the composer\'s video guide comes with the request, and reading it is not blocked as unconfirmed', async () => {
+    setMode('direct');
+    useStore.setState((s) => ({ composer: { ...s.composer, video: { ...s.composer.video, modelRef: 'nanogpt::seedance-2.0' } } }));
+    replies = [tool({ name: 'read_guide', args: { id: 'model:seedance' } }), text('Listo.')];
+    sentMessages = [];
+    await sendAgentMessage('Un vídeo de una taza girando sobre una mesa');
+    expect(sentMessages[0]).toContain('Prompting guide of');
+    expect(sentMessages[0]).toContain('model:seedance');
+    expect(sentMessages[1]).not.toContain('Not loaded');
   });
 });
 

@@ -200,6 +200,7 @@ function planContext(sessionId: string, workspace: Workspace) {
       .map((g) => String(g.op?.params.angle ?? ''))
       .filter(Boolean),
     requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
+    direct: () => get().composer.agentStyle === 'direct',
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
     confirmedParts: (kind: MediaKind) => (workspace !== 'node' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
@@ -334,7 +335,8 @@ function earlyModelGuide(sessionId: string, id: string): string | undefined {
   const [type, gid] = id.trim().split(':');
   const guide = type === 'model' ? modelGuide(gid ?? '') : undefined;
   if (!guide || guide.optional || guide.id === 'video-edit') return undefined;
-  const confirmed = session(sessionId).agent.settings?.video;
+  // In Direct there is no card: the composer's video model is the one that runs, so its guide is available as it is.
+  const confirmed = session(sessionId).agent.settings?.video ?? (get().composer.agentStyle === 'direct' ? directChoice('video') : undefined);
   const confirmedGuide = confirmed ? guideForModel(confirmed.modelRef.split('::')[1] ?? '')?.id : undefined;
   if (!confirmed) return `Not loaded: the video model is not confirmed yet. Call confirm_settings first; the prompting guide of the model the user confirms comes with the confirmation.`;
   if (confirmedGuide !== guide.id) return `Not loaded: the confirmed video model is ${modelSummary(confirmed.modelRef)?.name ?? confirmed.modelRef}${confirmedGuide ? ` (its guide is model:${confirmedGuide})` : ''}. To use another model, call confirm_settings again.`;
@@ -347,7 +349,28 @@ function earlyModelGuide(sessionId: string, id: string): string | undefined {
  */
 function pickedWorkflowGuides(sessionId: string): string {
   const id = get().composer.workflowId;
-  return id ? modelGuidesFor(sessionId, `workflow:${id}`) : '';
+  return (id ? modelGuidesFor(sessionId, `workflow:${id}`) : '') + directModelGuides(sessionId);
+}
+
+/** The composer's model of a kind, as a choice: what Direct uses in place of a confirmed card. */
+function directChoice(kind: 'image' | 'video'): SettingsChoice {
+  return { modelRef: get().composer[kind].modelRef, needsImage: false } as SettingsChoice;
+}
+
+/**
+ * Direct has no settings card, so no confirmation brings the prompting guides of the composer's models. They come with
+ * the request instead: a prompt is written for the model that will run, never a generic one.
+ */
+function directModelGuides(sessionId: string): string {
+  if (get().composer.agentStyle !== 'direct') return '';
+  let out = '';
+  for (const kind of ['image', 'video'] as const) {
+    const ref = get().composer[kind].modelRef;
+    const guide = ref ? guideForModel(ref.split('::')[1] ?? '') : undefined;
+    const text = guide ? readGuide(`model:${guide.id}`) : undefined;
+    if (guide && text && !inConversation(sessionId, text)) out += `\n\n---\nPrompting guide of ${modelSummary(ref)?.name ?? ref} (model:${guide.id}); write its prompts in this format:\n${text}`;
+  }
+  return out;
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */

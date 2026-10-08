@@ -3,7 +3,7 @@ import { continuityErrors } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { FIT_KEYS, aspectOfShape, fitOp } from './agent/fit';
+import { FIT_KEYS, aspectOfShape, fitOp, pluralAngles } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
@@ -174,6 +174,8 @@ export interface PlanContext {
   requestText?: () => string;
   /** Angle values already made from this source image, so "a different angle" takes one that is not made yet. */
   usedAngles?: (assetId: string) => string[];
+  /** Direct mode: no questions, so an ambiguity takes the operation's visible default instead of asking. */
+  direct?: () => boolean;
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -382,6 +384,13 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   const rawSteps = Array.isArray(raw.steps) ? raw.steps : [];
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
+  // "Múltiples ángulos" is one angle step per angle: how many is asked in Auto and Guided, and Direct uses 3.
+  const angleSteps = rawSteps.filter((s) => s.kind === 'op' && s.op === 'angle').length;
+  if (angleSteps === 1 && pluralAngles(ctx.requestText?.() ?? '')) {
+    errors.push(ctx.direct?.()
+      ? 'Direct does not ask how many angles: "múltiples ángulos" takes 3 angle steps (the default), one per angle, each with its own angle.'
+      : '"Múltiples ángulos" needs a number: ask how many angles, then propose one angle step per angle.');
+  }
   // A total length is split evenly over the video steps that set none (each share then snaps to the model's lengths).
   const total = Number(raw.total_duration);
   const unset = rawSteps.filter((s) => s.kind === 'video' && s.duration == null);
@@ -818,6 +827,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           sourceAspect: source?.width && source?.height ? aspectOfShape(source.width / source.height) : undefined,
           usedAngles: sourceId && ctx.usedAngles ? ctx.usedAngles(sourceId) : [],
         });
+        // An impossibility is refused in every mode; an ambiguity is asked about below, or decided in Direct.
+        if (!fitted.ok && !fitted.ambiguous) errors.push(`${where}: op "${opId}" does not fit this request: ${fitted.reason}.`);
+        let asked = false;
         for (const f of def.fields) {
           // A field written on the step itself ("instruction": …) instead of in params counts as given.
           const loose = (s as unknown as Record<string, unknown>)[f.key];
@@ -834,7 +846,17 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
               adjustments.push(`${s.id}: ${f.key} "${fill}" from the request${v != null ? ` (was "${String(v)}")` : ''}`);
               continue;
             }
-            if (!fitted.ok && FIT_KEYS[opId]?.includes(f.key)) errors.push(`${where}: op "${opId}" needs ${f.key}: ${fitted.reason}. Ask the user, then propose again.`);
+            if (!fitted.ok && fitted.ambiguous && FIT_KEYS[opId]?.includes(f.key)) {
+              if (ctx.direct?.()) {
+                // Direct does not ask: the operation's fallback is used and shown on the plan.
+                const value = fitted.fallback?.[f.key] ?? f.default;
+                params[f.key] = value;
+                adjustments.push(`${s.id}: ${f.key} "${value}" (Direct does not ask: ${fitted.reason})`);
+                continue;
+              }
+              if (!asked) errors.push(`${where}: op "${opId}" needs ${f.key}: ${fitted.reason}. Ask the user, then propose again.`);
+              asked = true;
+            }
             params[f.key] = f.default;
             if (v != null) adjustments.push(`${s.id}: ${f.key} "${String(v)}" → ${f.default}`);
           } else {

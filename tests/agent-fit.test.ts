@@ -81,23 +81,29 @@ describe('upscale takes its factor from the target size and the source image', (
   });
 });
 
-describe('a reference sheet is for a character, a person or an object, never a place', () => {
-  it('a place does not fit, and the agent may ask', () => {
-    expect(fitOp('reference_sheet', 'tres vistas de la ciudad').ok).toBe(false);
-    expect(fitOp('reference_sheet', 'tres vistas de la casa').ok).toBe(false);
+describe('a reference sheet is a sheet, for a character, a person or an object, never a place', () => {
+  it('a place is refused outright (an impossibility, not a question)', () => {
+    expect(fitOp('reference_sheet', 'hoja de la ciudad')).toMatchObject({ ok: false });
+    expect(fitOp('reference_sheet', 'hoja de la ciudad')).not.toHaveProperty('ambiguous', true);
   });
 
-  it('a character or a person fits, with 3 views unless 4 are named', () => {
-    expect(fitOp('reference_sheet', 'hazme tres vistas de este personaje')).toEqual({ ok: true, params: { subject: 'character', panels: '3' } });
-    expect(fitOp('reference_sheet', 'cuatro vistas de ella')).toEqual({ ok: true, params: { subject: 'character', panels: '4' } });
+  it('a sheet of a character, or of a person, fits with its views', () => {
+    expect(fitOp('reference_sheet', 'hoja de personaje con tres vistas de este personaje')).toEqual({ ok: true, params: { subject: 'character', panels: '3' } });
+    expect(fitOp('reference_sheet', 'hoja de ella con cuatro vistas')).toEqual({ ok: true, params: { subject: 'character', panels: '4' } });
   });
 
-  it('an object or a product fits as an object', () => {
-    expect(fitOp('reference_sheet', 'tres vistas del producto')).toEqual({ ok: true, params: { subject: 'object', panels: '3' } });
+  it('a sheet of an object or a product fits as an object', () => {
+    expect(fitOp('reference_sheet', 'hoja del producto con tres vistas')).toEqual({ ok: true, params: { subject: 'object', panels: '3' } });
   });
 
-  it('a request that names none of the three keeps the default subject (a character), no refusal', () => {
-    expect(fitOp('reference_sheet', 'tres vistas de esto')).toEqual({ ok: true, params: { panels: '3' } });
+  it('"tres vistas" alone is ambiguous: a sheet or one image per view, so Auto asks and Direct makes the sheet', () => {
+    expect(fitOp('reference_sheet', 'tres vistas de este personaje')).toMatchObject({ ok: false, ambiguous: true, fallback: { subject: 'character', panels: '3' } });
+  });
+
+  it('"una imagen por vista" is never a sheet: one image per view takes angle steps (an impossibility)', () => {
+    const r = fitOp('reference_sheet', 'tres vistas de este personaje, una imagen por vista');
+    expect(r).toMatchObject({ ok: false });
+    expect(r).not.toHaveProperty('ambiguous', true);
   });
 });
 
