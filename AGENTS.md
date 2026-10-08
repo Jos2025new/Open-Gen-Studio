@@ -11,7 +11,7 @@
 - [Decisiones](docs/README.md#decisiones): datos, confirmaciones, sandbox y coste máximo.
 - [Historial](docs/README.md#historial): cargar solo los fragmentos pertinentes, en orden numérico. Es evidencia histórica, no descripción garantizada del código actual.
 - Persistencia: server/local-store.js, src/lib/disk.ts, src/lib/idb.ts y src/store/store.ts.
-- Salvaguardas: scripts/dev-sandbox.mjs, scripts/check-safeguards.mjs y scripts/check-docs.mjs. npm test ejecuta los controles antes de la suite.
+- Salvaguardas: scripts/dev-sandbox.mjs, check-safeguards.mjs, check-docs.mjs y check-sizes.mjs. npm test ejecuta los controles antes de la suite.
 
 ## Reglas duras
 

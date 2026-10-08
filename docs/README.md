@@ -27,6 +27,7 @@
 - [0005 — Contrato operativo del agente: implementación transversal y límites](decisions/0005-contrato-operativo-agente.md).
 - [0006 — Modelo general generativo: automatización por coste e intentos enlazados](decisions/0006-modelo-general-generativo.md).
 - [0007 — Modos del agente y encaje de parámetros de las operaciones](decisions/0007-modos-y-encaje-del-agente.md).
+- [0008 — Límite de 30 KB en el código: los archivos que ya lo superan no crecen](decisions/0008-limite-de-tamano-en-codigo.md).
 
 ## Historial
 
@@ -49,7 +50,7 @@
 - [017-2026-10-W40](history/017-2026-10-W40.md) — 7357 bytes.
 
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
-- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 10413 bytes.
+- [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 10564 bytes.
 
 ## Trazabilidad
 
@@ -76,6 +77,6 @@ Tabla «Registro» de [`TRAZABILIDAD.md`](../TRAZABILIDAD.md), dividida por tama
 - [Prueba manual de revisión de precio: Continuar y Cancelar sin gasto](price-review-sandbox.md).
 - [NanoGPT expansion-2: resultados por llamada, diagnóstico, coste, caché y límites](nanogpt-price-expansion-2.md).
 
-`node scripts/check-docs.mjs` comprueba tamaños, índice, ADRs, enlaces de las fichas y posibles secretos. `npm test` ejecuta primero las salvaguardas y esta comprobación. La lectura de data/ real no forma parte de estos controles.
+`node scripts/check-docs.mjs` comprueba tamaños, índice, ADRs, enlaces de las fichas y posibles secretos. `node scripts/check-sizes.mjs` aplica el límite de 30 KB fuera de `docs/` (ADR 0008). `npm test` ejecuta primero las salvaguardas y estas dos comprobaciones. La lectura de data/ real no forma parte de estos controles.
 
 - [Corrección: variantes compatibles tras confirmar ajustes](confirmed-input-variants.md).

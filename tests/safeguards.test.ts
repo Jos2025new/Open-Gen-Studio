@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import { prepareSandbox, sandboxDirectory, SANDBOX_PORT } from '../scripts/dev-sandbox.mjs';
 import { checkDocs, checkSafeguards } from '../scripts/check-safeguards.mjs';
+import { checkSizes, MAX_BYTES, sizeViolations } from '../scripts/check-sizes.mjs';
 
 const roots: string[] = [];
 function fixture() {
@@ -58,4 +59,16 @@ it('fails on nested docs keys without printing their values', async () => {
   await expect(checkDocs(join(root, 'docs'))).rejects.toThrow('Possible keys in docs');
   writeFileSync(join(root, 'docs/nested/key.md'), 'API_KEY=<your-key>');
   await expect(checkDocs(join(root, 'docs'))).resolves.toBeUndefined();
+});
+it('checks the real repository sizes against the baseline', () => {
+  checkSizes(process.cwd());
+});
+it('holds files over 30 KB at their baseline, rejects new ones and exempts generated files', () => {
+  const over = MAX_BYTES + 1;
+  const baseline = { 'src/big.ts': 50_000 };
+  expect(sizeViolations([{ path: 'src/big.ts', bytes: 50_000 }, { path: 'src/big.ts', bytes: 40_000 }], baseline)).toEqual([]);
+  expect(sizeViolations([{ path: 'src/big.ts', bytes: 50_001 }], baseline)).toEqual([expect.stringContaining('grew from 50000')]);
+  expect(sizeViolations([{ path: 'src/new.ts', bytes: over }, { path: 'docs/x.md', bytes: over }], baseline)).toHaveLength(2);
+  expect(sizeViolations([{ path: 'src/new.ts', bytes: MAX_BYTES }], baseline)).toEqual([]);
+  expect(sizeViolations(['package-lock.json', 'tests/fixtures/live/fal.json', 'bench/run.json'].map((path) => ({ path, bytes: over })), baseline)).toEqual([]);
 });

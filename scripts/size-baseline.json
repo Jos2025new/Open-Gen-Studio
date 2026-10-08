@@ -1,0 +1,15 @@
+{
+  "src/components/designer/Stage.tsx": 78731,
+  "src/components/node/nodes.tsx": 44895,
+  "src/engine/actions.ts": 40714,
+  "src/engine/agent/context.ts": 44464,
+  "src/engine/agent/runtime.ts": 116475,
+  "src/engine/agent/tools.ts": 31490,
+  "src/engine/flow/actions.ts": 31176,
+  "src/engine/jobs.ts": 67471,
+  "src/engine/params.ts": 61913,
+  "src/engine/plan.ts": 63956,
+  "src/engine/providers/nanogpt.ts": 32487,
+  "src/engine/types.ts": 37306,
+  "src/styles/shell.css": 42582
+}
