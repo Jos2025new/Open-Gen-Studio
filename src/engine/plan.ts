@@ -4,7 +4,6 @@ import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
-import { forcedCheck, type ForcedState } from './agent/force';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
@@ -180,8 +179,6 @@ export interface PlanContext {
   /** A question round is left in this request, and whether the user already answered one (fit.ts asks once). */
   canAsk?: () => boolean;
   answered?: () => boolean;
-  /** Operations the request forces (agent/force.ts): the plan must contain them. */
-  forced?: () => ForcedState | undefined;
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -953,10 +950,6 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       }
     }
   }
-  // The floor the request sets: each forced operation has its op step, said on the plan (agent/force.ts).
-  const floor = forcedCheck(rawSteps, ctx.forced?.());
-  errors.push(...floor.errors);
-  adjustments.push(...floor.adjustments);
   if (!errors.length) {
     try {
       topoOrder(steps);

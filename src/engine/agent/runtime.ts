@@ -76,7 +76,7 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
-import { forcedFor, forcedNote } from './force';
+import { STEER_TOOL, steerNote, steerOps } from './force';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -95,11 +95,14 @@ function session(id: string): Session {
   return get().sessions[id];
 }
 
-/** What the current request forces (agent/force.ts), from its words and its attachments. */
-function requestForced(sessionId: string) {
+/** The operations the current request's keywords name (agent/force.ts), with its attachments as inputs. */
+function requestSteer(sessionId: string) {
   const draft = session(sessionId).agent.draft;
-  return forcedFor(sessionId, draft?.request ?? '', (draft?.attachments ?? []).map((id) => ({ id, kind: get().assets[id]?.kind })));
+  return steerOps(draft?.request ?? '', (draft?.attachments ?? []).map((id) => ({ id, kind: get().assets[id]?.kind })));
 }
+
+/** Sessions whose next model call must be propose_plan: the first call of a request whose keywords named an operation. */
+const steerNext = new Set<string>();
 
 function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...(typeof patch === 'function' ? patch(s.agent) : patch) } }));
@@ -212,8 +215,6 @@ function planContext(sessionId: string, workspace: Workspace) {
     direct: () => get().composer.agentStyle === 'direct',
     canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
-    // The local planner cannot be sent back: only the LLM agent gets the floor.
-    forced: () => (workspace === 'node' || agentEngine().kind !== 'llm' ? undefined : requestForced(sessionId)),
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
     // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
@@ -325,7 +326,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
-  const forced = workspace === 'node' ? '' : forcedNote(requestForced(sessionId).ops);
+  // Keywords that name operations direct the agent: a note with the request, and propose_plan as the first call (tool_choice).
+  const steer = workspace === 'node' ? [] : requestSteer(sessionId);
+  if (steer.length) steerNext.add(sessionId);
+  const forced = steerNote(steer);
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}${forced}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
@@ -1379,6 +1383,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           system: AGENT_SYSTEM,
           messages: repairHistory(session(sessionId).agent.history),
           tools: toolsFor(get().composer.agentStyle),
+          toolChoice: steerNext.delete(sessionId) ? STEER_TOOL : undefined,
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
           onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
