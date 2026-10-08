@@ -38,3 +38,4 @@ El agente tiene tres modos (Auto, Guided y Direct). Tras probar el disparo por p
 - La precisión de los disparadores no está medida contra la intención del usuario: hace falta un conjunto etiquetado por el usuario.
 - Pendiente de aprobación: la reversión de la regla "ajustes solo para la petición" (`0006`), el umbral de 0,50 USD (`0006`) y la fusión de las ramas de esta sesión en `task/modelo-general`.
 - Sin verificar con generación real: los cortes de cuatro vistas y de 2×3.
+- Enmendada por [0009](0009-disparo-forzado.md): modelo del compositor en Direct pese a confirmaciones anteriores, ambigüedades preguntadas aunque el agente rellene, sujeto de hoja con lugar, ángulos en Direct sin vuelta extra y upscale encadenado.

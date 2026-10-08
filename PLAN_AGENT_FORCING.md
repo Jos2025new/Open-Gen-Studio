@@ -1,6 +1,6 @@
 # Plan: disparo forzado y correcciones de encaje del agente
 
-Fecha: 2026-10-07. Rama: `task/agent-forcing`, creada desde `task/modelo-general` @ `ba46a7c`. Estado: **en curso**.
+Fecha: 2026-10-07. Rama: `task/agent-forcing`, creada desde `task/modelo-general` @ `ba46a7c`. Estado: **implementado** (F1 `c1d74be`, F2 `1306849`, F3–F5 `eefe611`, F6 `bc8c505`); sin prueba en el sandbox ni con proveedores. Registro: `docs/history/020-2026-10-W41.md`.
 Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en verde al cerrar cada fase. No se fusiona.
 
 ## Origen de cada punto
@@ -19,7 +19,7 @@ Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en v
 
 ## Restricciones
 
-- **ADR 0008.** `plan.ts`, `runtime.ts` y `context.ts` superan los 30 KB y no pueden crecer. Lo nuevo va en módulos propios (`agent/fit.ts`, `agent/direct.ts` y `agent/force.ts`), y se extrae código de esos tres archivos para que ninguno crezca.
+- **ADR 0008.** `plan.ts`, `runtime.ts` y `context.ts` superan los 30 KB y no pueden crecer. Lo nuevo va en módulos propios (`agent/fit.ts`, `agent/requestGuides.ts` y `agent/force.ts`), y se extrae código de esos archivos para que ninguno crezca. `context.ts` no se tocó.
 - **Sin llamadas nuevas al LLM** en el caso normal. El prompt del sistema no cambia: la orientación del disparo viaja en el mensaje de la petición, detrás del prefijo que cachea el proveedor.
 - Sin proveedores ni gasto. La validación lee `.sandbox/data` (copia del sandbox) en solo lectura, y los resultados detallados quedan fuera del repositorio.
 

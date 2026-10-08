@@ -28,6 +28,7 @@
 - [0006 — Modelo general generativo: automatización por coste e intentos enlazados](decisions/0006-modelo-general-generativo.md).
 - [0007 — Modos del agente y encaje de parámetros de las operaciones](decisions/0007-modos-y-encaje-del-agente.md).
 - [0008 — Límite de 30 KB en el código: los archivos que ya lo superan no crecen](decisions/0008-limite-de-tamano-en-codigo.md).
+- [0009 — Disparo forzado con suelo, y enmiendas a 0007](decisions/0009-disparo-forzado.md).
 
 ## Historial
 
@@ -51,6 +52,7 @@
 
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 - [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
+- [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 5378 bytes.
 
 ## Trazabilidad
 
