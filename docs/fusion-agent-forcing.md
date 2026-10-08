@@ -33,7 +33,7 @@ Cada decisión con su origen, su commit y lo que impide revertirla sin darse cue
 
 | Antes | Ahora | Quién lo decidió |
 | --- | --- | --- |
-| ADR 0007-9: las operaciones heredan el modelo de su origen, sin tarjeta | Las operaciones con modelo de imagen confirman su modelo (ADR 0009). Las operaciones locales y las de modelo dedicado siguen sin tarjeta. | El usuario, al describir el flujo completo (historial 021, sección 11, 06:55). **Por confirmar:** en otra sesión de la misma madrugada (≈01:00) el usuario dijo que las operaciones heredan el modelo de su origen y que nunca deben tener tarjeta de modelo. |
+| ADR 0007-9: las operaciones heredan el modelo de su origen, sin tarjeta | Las operaciones con modelo de imagen confirman su modelo (ADR 0009). Las operaciones locales y las de modelo dedicado siguen sin tarjeta. | El usuario, al describir el flujo completo (historial 021, sección 11, 06:55). En otra sesión de la misma madrugada (≈01:00) el usuario había dicho que las operaciones heredan el modelo de su origen, sin tarjeta. **Resuelto el 2026-10-08: rige lo más nuevo**, la confirmación (palabras del usuario). |
 | Descripción de `reference_sheet`: «character, object or place» | Sin lugares | Revisión; coherente con ADR 0007 |
 
 ## Decisiones retiradas: no reintroducir
