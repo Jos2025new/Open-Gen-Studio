@@ -1,4 +1,4 @@
-# 0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0006 y 0007
+# 0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0007
 
 ## Estado
 
@@ -36,10 +36,9 @@ El usuario fijó también cómo se comporta cada modo. La revisión de `task/mod
 3. **Ambigüedades.** Las resuelve el modelo preguntando, una sola vez por petición. Después de una respuesta, o sin rondas libres, la app no le pide volver a preguntar.
 4. **Modos.**
    - **Guided:** el modelo pregunta siempre antes del plan, y la app pide confirmar los ajustes en cada petición.
-   - **Auto:** el modelo pregunta solo lo esencial y una vez. Los ajustes confirmados se heredan en la sesión y no se vuelven a pedir por coste. La tarjeta aparece para lo que no se ha aprobado.
+   - **Auto:** el modelo pregunta solo lo esencial y una vez. Los ajustes confirmados se heredan en la sesión. La tarjeta aparece para lo que no se ha aprobado y, como protección contra sobrecargos (0004, 0006), cuando un plan que reutiliza ajustes tiene coste desconocido o superior a 0,50 USD.
    - **Direct:** sin tarjetas de pregunta ni de ajustes. Valores por defecto de la app y modelos del compositor; un modelo que nombra el usuario se usa.
 5. **Enmiendas.**
-   - **0006 (1):** se retira el umbral de coste (0,50 USD o coste desconocido) para volver a pedir ajustes confirmados.
    - **0007 (1 y 9):** en Direct corre siempre el modelo del compositor, aunque antes se confirmara otro, y se envían las guías de los modelos que pueden correr.
    - **0007 (2):** una ambigüedad de intención se pregunta aunque el agente haya puesto un valor.
    - **0007 (4):** un lugar solo se rechaza como sujeto de hoja cuando no se nombra persona ni objeto.

@@ -25,7 +25,7 @@ El modelo general separa operación (qué se pide) e intento (una corrida concre
 
 ## Consecuencias
 
-- Sustituido por [0009](0009-disparo-forzado.md): no hay umbral de coste. En Auto los ajustes confirmados se heredan y no se vuelven a pedir; en Guided se confirman en cada petición.
+- En Auto y Guided, un plan caro o de coste desconocido no llega al feed hasta que el usuario confirma ajustes. Es una protección contra sobrecargos y se mantiene (0009). En Guided, además, cada petición confirma sus ajustes.
 - En Direct ([0007](0007-modos-y-encaje-del-agente.md), decisión 1) este gate no se aplica: `presentPlan` omite `needsConfirmation` cuando el modo es Direct, así que un plan caro o de coste desconocido llega al feed y su tarjeta de aprobación es el control antes de generar. La autorización de gasto sigue siendo independiente.
 - Los planes con vídeo o varios candidatos se muestran en la tarjeta de aprobación en lugar de pedir ajustes.
 - La aprobación del plan y la autorización de gasto siguen siendo independientes (SETTINGS_POLICY).

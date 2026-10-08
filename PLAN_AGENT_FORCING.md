@@ -56,12 +56,12 @@ Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en v
 ### F6. Disparo forzado: dirigir al agente hacia su tool call — tu petición
 
 - **Corrección.** Dos versiones retiradas: un suelo determinista con 5 disparadores que devolvía el plan (`bc8c505`), y `tool_choice` enviado al proveedor (`187ca48`, `ae4c86d`), ajeno al harness de la app.
-- **Qué (versión final).** Puerta por operación según tu mapa de parámetros: dispara si está nombrada (puntuación con vetos), su entrada está adjunta y sus parámetros se leen del texto. Lo disparado llega al agente como la ruta a seguir, en orden n1, n2…; sin disparo, nada. Nada se envía al proveedor. Guided pregunta siempre y confirma ajustes en cada petición; Auto hereda y no repite por coste.
+- **Qué (versión final).** Puerta por operación según tu mapa de parámetros: dispara si está nombrada (puntuación con vetos), su entrada está adjunta y sus parámetros se leen del texto. Lo disparado llega al agente como la ruta a seguir, en orden n1, n2…; sin disparo, nada. Nada se envía al proveedor. Guided pregunta siempre y confirma ajustes en cada petición; Auto hereda, y vuelve a pedir la tarjeta solo si algo no está aprobado o si el coste es desconocido o supera 0,50 USD (protección contra sobrecargos).
 
 ### F7. Validación y documentación
 
 - **Validación.** Los cinco disparadores se pasan por las peticiones de las 18 sesiones del sandbox (solo lectura): aciertos, falsos positivos y precondiciones que faltan.
-- **Documentación.** ADR 0009 (puerta, modos y enmiendas a 0006 y 0007), historial 020 y la ficha `features/agente.md`.
+- **Documentación.** ADR 0009 (puerta, modos y enmiendas a 0007), historial 020 y la ficha `features/agente.md`.
 
 ## Lo que no se cambia, y por qué
 

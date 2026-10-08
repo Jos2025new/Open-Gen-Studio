@@ -567,9 +567,10 @@ async function presentPlan(
       kinds: settingKinds,
       settings: session(sessionId).agent.settings,
       userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
+      estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
     });
-    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds) };
+    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds, total.usd) };
   }
   const style = get().composer.agentStyle;
   const item: PlanFeedItem = {

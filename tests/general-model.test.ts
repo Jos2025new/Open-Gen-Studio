@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUTOMATION_POLICY, costAskMessage, needsConfirmation, planRequiresSettings } from '../src/engine/procedure';
+import { AUTOMATION_POLICY, costAskMessage, LOW_COST_USD, needsConfirmation, planRequiresSettings } from '../src/engine/procedure';
 import type { MediaKind, SettingsChoice, Workspace } from '../src/engine/types';
 
 vi.hoisted(() => Object.assign(globalThis, {
@@ -15,11 +15,11 @@ vi.mock('../src/lib/idb', () => ({
 const settingsWith = (kinds: MediaKind[]): Partial<Record<MediaKind, SettingsChoice>> =>
   Object.fromEntries(kinds.map(k => [k, { modelRef: 'x', count: 1, duration: undefined, needsImage: false }])) as Partial<Record<MediaKind, SettingsChoice>>;
 
-const base = { workspace: 'chat' as Workspace, kinds: ['image'] as MediaKind[], settings: settingsWith(['image']), userChoseModel: false, hasMultipleCandidates: false };
+const base = { workspace: 'chat' as Workspace, kinds: ['image'] as MediaKind[], settings: settingsWith(['image']), userChoseModel: false, estimatedCost: 0.05, hasMultipleCandidates: false };
 
-/* ── Settings reuse: confirmed once, inherited; never asked again for cost ── */
+/* ── Automation policy (§11): needsConfirmation decides what the app does ── */
 
-describe('needsConfirmation — settings reuse', () => {
+describe('needsConfirmation — automation policy', () => {
   it('asks when a kind was never confirmed in this session', () => {
     expect(needsConfirmation({ ...base, settings: undefined })).toBe('ask');
   });
@@ -28,31 +28,51 @@ describe('needsConfirmation — settings reuse', () => {
     expect(needsConfirmation({ ...base, kinds: ['image', 'video'], settings: settingsWith(['image']) })).toBe('ask');
   });
 
-  it('exposes the plan when the user named a model, it is a video, or several candidates', () => {
+  it('asks when the cost is unknown, even for a confirmed kind', () => {
+    expect(needsConfirmation({ ...base, estimatedCost: null })).toBe('ask');
+  });
+
+  it('asks when the cost is above the low-cost limit', () => {
+    expect(needsConfirmation({ ...base, estimatedCost: LOW_COST_USD + 0.01 })).toBe('ask');
+    expect(needsConfirmation({ ...base, kinds: ['video'], settings: settingsWith(['video']), estimatedCost: 2 })).toBe('ask');
+  });
+
+  it('keeps the limit inclusive: a cost of exactly the limit is still low', () => {
+    expect(needsConfirmation({ ...base, estimatedCost: LOW_COST_USD })).toBe('automate');
+  });
+
+  it('exposes a low-cost plan when the user named a model', () => {
     expect(needsConfirmation({ ...base, userChoseModel: true })).toBe('expose');
-    expect(needsConfirmation({ ...base, kinds: ['video'], settings: settingsWith(['video']) })).toBe('expose');
+  });
+
+  it('exposes a low-cost video without asking', () => {
+    expect(needsConfirmation({ ...base, kinds: ['video'], settings: settingsWith(['video']), estimatedCost: 0.2 })).toBe('expose');
+  });
+
+  it('exposes several candidates of a low-cost plan without asking', () => {
     expect(needsConfirmation({ ...base, hasMultipleCandidates: true })).toBe('expose');
   });
 
-  it('automates a single image with confirmed settings and no named model', () => {
-    expect(needsConfirmation(base)).toBe('automate');
+  it('automates a low-cost single image with confirmed settings and no named model', () => {
+    expect(needsConfirmation({ ...base, estimatedCost: 0.1 })).toBe('automate');
   });
 
   it('automates on the node canvas always: nodes own their settings', () => {
-    expect(needsConfirmation({ ...base, workspace: 'node', settings: undefined })).toBe('automate');
+    expect(needsConfirmation({ ...base, workspace: 'node', settings: undefined, estimatedCost: null })).toBe('automate');
   });
 });
 
 describe('costAskMessage and policy text match the decision', () => {
-  it('names the kind never confirmed and the call to make', () => {
-    expect(costAskMessage(['image'])).toContain('image settings were never confirmed');
-    expect(costAskMessage(['image'])).toContain('confirm_settings');
+  it('explains an unknown cost and a cost above the limit', () => {
+    expect(costAskMessage(['image'], null)).toContain('cannot be predicted');
+    expect(costAskMessage(['image'], 2)).toContain(`above $${LOW_COST_USD.toFixed(2)}`);
+    expect(costAskMessage(['image'], 2)).toContain('confirm_settings');
   });
 
-  it('AUTOMATION_POLICY states no cost re-ask and the expose and ask cases', () => {
-    expect(AUTOMATION_POLICY).toContain('never asks them again for cost');
+  it('AUTOMATION_POLICY states the same limit and the same expose and ask cases', () => {
+    expect(AUTOMATION_POLICY).toContain(`$${LOW_COST_USD.toFixed(2)}`);
     expect(AUTOMATION_POLICY).toContain('never confirmed');
-    expect(AUTOMATION_POLICY).not.toMatch(/\$\d/);
+    expect(AUTOMATION_POLICY).not.toContain('pre-filled');
   });
 });
 
@@ -73,17 +93,16 @@ describe('planRequiresSettings — propose_plan gate before normalization', () =
   });
 });
 
-describe('system prompt describes the settings reuse', () => {
-  it('includes the preparation rule and the inherited settings', async () => {
+describe('system prompt describes the automation policy', () => {
+  it('includes the preparation rule and the single-image reuse case', async () => {
     const { SYSTEM_PROMPT } = await import('../src/engine/agent/context');
     expect(SYSTEM_PROMPT).toContain('Prepare only what is necessary');
-    expect(SYSTEM_PROMPT).toContain('never asks them again for cost');
+    expect(SYSTEM_PROMPT).toContain('low-cost single image');
   });
-  it('blocks only for a kind never confirmed; no cost threshold anywhere', async () => {
+  it('tells the agent the limit and when the app blocks', async () => {
     const { SYSTEM_PROMPT } = await import('../src/engine/agent/context');
     expect(SYSTEM_PROMPT).toContain('reuses those settings without a new card');
-    expect(SYSTEM_PROMPT).toContain('only when a kind was never confirmed');
-    expect(SYSTEM_PROMPT).not.toContain('0.50');
+    expect(SYSTEM_PROMPT).toContain('above 0.50 USD');
   });
 });
 
