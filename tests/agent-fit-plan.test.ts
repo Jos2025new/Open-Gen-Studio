@@ -202,6 +202,29 @@ describe('upscale says what it does', () => {
   });
 });
 
+describe('a subject the lists do not know is not a place (review 2026-10-08)', () => {
+  it('a sheet of someone in a place is made; a sheet of the place itself is refused', async () => {
+    for (const text of ['Haz una hoja de referencia del chef de la cocina', 'Hoja de referencia del policía en la calle', 'Hoja de referencia del robot en la ciudad', 'Hoja de referencia de la lámpara de la habitación', 'Reference sheet of the knight in the forest']) {
+      expect((await oneOp('reference_sheet', 'asset:img1', { subject: 'character' }, text)).errors, text).toEqual([]);
+    }
+    expect((await oneOp('reference_sheet', 'asset:img1', { subject: 'character' }, 'Hoja de referencia de la cocina')).errors.join(' ')).toContain('a place is not a reference sheet subject');
+  });
+});
+
+describe('the upscale note names the factor the plan runs (review 2026-10-08)', () => {
+  it('8K with the agent\'s ×2 says ×2 and what it gives, never ×4', async () => {
+    const { plan } = await oneOp('upscale', 'asset:img1', { factor: '2' }, 'súbela a 8K');
+    expect(paramsOf(plan).factor).toBe('2');
+    expect(plan!.adjustments.join(' ')).toContain('×2 gives 2048 px, short of 8K');
+    expect(plan!.adjustments.join(' ')).not.toContain('×4');
+  });
+
+  it('4K with the agent\'s ×2 is not silent: 2048 px is short of 4K', async () => {
+    const { plan } = await oneOp('upscale', 'asset:img1', { factor: '2' }, 'pásala a 4K');
+    expect(plan!.adjustments.join(' ')).toContain('×2 gives 2048 px, short of 4K (3840 px)');
+  });
+});
+
 describe('a contact sheet cut by grid_split takes its own grid', () => {
   it('six angles are cut 2×3, nine 3×3', async () => {
     for (const [angles, grid] of [['6', '2x3'], ['9', '3']]) {

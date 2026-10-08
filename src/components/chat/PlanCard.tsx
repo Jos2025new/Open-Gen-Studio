@@ -36,6 +36,9 @@ function stepIcon(s: PlanStep) {
 
 /** An adjustment about a model the user picked (kept it, could not use it, a stand-in). */
 const aboutUserModel = (a: string) => /\byour [\w-]+ model\b/.test(a);
+/** A result short of what the user asked ("short of 8K") is a promise the plan cannot keep: never folded either. */
+const shortOfRequest = (a: string) => /\bshort of\b/.test(a);
+const neverFolded = (a: string) => aboutUserModel(a) || shortOfRequest(a);
 
 /** `ref` names an input in words for the card: a step by its title, an asset as "your image" or "the earlier clip". */
 type RefName = (ref: string) => string;
@@ -53,6 +56,7 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: Re
     case 'op':
       return [
         `${OPS[s.op].label} of ${refName(s.input)}`,
+        s.op === 'upscale' && s.params.factor ? `×${String(s.params.factor)}` : '',
         OPS[s.op].engine === 'local' ? 'Local operation' : authorization?.modelRef ? modelName(authorization.modelRef) : 'Model pending',
         authorization?.parameters.aspect ? aspectLabel(authorization.parameters.aspect) : '',
         authorization?.parameters.resolution ?? '',
@@ -218,9 +222,9 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           <span>Style: {plan.style}</span>
         </p>
       ) : null}
-      {/* Changes to a model the user picked are never folded away. */}
-      {plan.adjustments.filter(aboutUserModel).map((a, i) => (
-        <p key={`u${i}`} className="plan-user-model"><CircleAlert size={12} /> {a}</p>
+      {/* Changes to a model the user picked, and results short of what was asked, are never folded away. */}
+      {plan.adjustments.filter(neverFolded).map((a, i) => (
+        <p key={`u${i}`} className="plan-user-model"><CircleAlert size={12} /> {shortOfRequest(a) ? a.replace(/^[\w-]+: /, '') : a}</p>
       ))}
       {plan.adjustments.length ? (
         <div className="plan-note faint">

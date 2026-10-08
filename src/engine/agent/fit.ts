@@ -136,14 +136,28 @@ export function fitUpscale(text: string, sourceLongEdge?: number): FitResult {
   // Without a factor or a target size the request names no value: the operation keeps its own default.
   if (!target) return { ok: true, params: {} };
   if (!sourceLongEdge) return { ok: false, ambiguous: true, agentSettles: true, reason: 'the source size is unknown, so the factor to reach the target cannot be computed', fallback: { factor: '2' } };
-  const targetEdge = { '2': 2048, '4': 3840, '8': 7680 }[target[1]]!;
+  const targetEdge = TARGET_EDGE[target[1]]!;
   const ratio = targetEdge / sourceLongEdge;
   if (ratio <= 1.25) return { ok: false, reason: 'the image is already at that size' };
   // Nearest of 2× and 4× on a log scale: the boundary between them is √8, about 2.83.
   const factor = ratio < Math.sqrt(8) ? 2 : 4;
-  // ×4 is the largest factor: a target beyond it is said, not silently missed (8K from 1024 px reaches 4096 px).
-  const short = sourceLongEdge * factor < targetEdge * 0.9;
-  return { ok: true, params: { factor: String(factor) }, ...(short ? { note: `×${factor} reaches ${sourceLongEdge * factor} px, short of ${target[1]}K (${targetEdge} px)` } : {}) };
+  return { ok: true, params: { factor: String(factor) } };
+}
+
+const TARGET_EDGE: Record<string, number> = { '2': 2048, '4': 3840, '8': 7680 };
+
+/**
+ * What an upscale really gives, from the factor the plan runs (not the one the request suggested): "×2 gives 2048 px",
+ * and ", short of 4K (3840 px)" when a size the user asked for is not reached (×4 is the largest factor).
+ */
+export function upscaleNote(text: string, sourceLongEdge: number | undefined, factor: unknown): string | undefined {
+  const f = Number(factor);
+  if (!sourceLongEdge || !(f > 1)) return undefined;
+  const out = sourceLongEdge * f;
+  const target = normalizeRequest(text).match(/\b(2|4|8)\s?k\b/);
+  const edge = target ? TARGET_EDGE[target[1]]! : undefined;
+  const short = edge !== undefined && out < edge * 0.9;
+  return `×${f} gives ${out} px${short ? `, short of ${target![1]}K (${edge} px)` : ''}`;
 }
 
 /** Views of a character turnaround: 3 or 4. "Dos" is the nearest possible value, 3. Unnamed: no value (the default). */
@@ -158,16 +172,20 @@ const PLACE = /\b(ciudad\w*|city|pueblo|town|casa|house|edificio|building|habita
 const PERSON = /\b(personaj\w*|persona\w*|character|people|person|mujer\w*|hombre\w*|nin[oa]s?|chic[oa]s?|ella|ellos|conejo\w*|animal\w*|perro\w*|gato\w*|actor\w*|actriz\w*|modelo)\b/;
 const OBJECT = /\b(producto\w*|objeto\w*|product|object|bolso\w*|botella\w*|zapato\w*|reloj\w*|mochila\w*|taza\w*|silla\w*|mueble\w*)\b/;
 
+/** The sheet is of the place itself: the place is the word right after the sheet's "de"/"of" ("hoja de la cocina"). */
+const SHEET_OF_PLACE = new RegExp(`\\b(?:hojas?|sheet|turnaround)(?:\\s+de\\s+(?:referencias?|personajes?)|\\s+reference)?\\s+(?:de|del|of)\\s+(?:(?:la|el|los|las|mi|mis|su|esta|este|the|my|this)\\s+)?${PLACE.source}`);
+
 /**
- * The subject of a reference sheet: a character, a person or an object. A place is refused only when the request names
- * a place and no character, person or object: "la chica que está en la playa" or "la casa de mi personaje" are about the
- * character. A request that names none keeps the operation's default (a character): the source image usually settles it.
+ * The subject of a reference sheet: a character, a person or an object. A place is refused only when it is certainly
+ * the sheet's subject ("hoja de la cocina"). A place elsewhere in the request ("el chef de la cocina", "the knight in the
+ * forest") names where the subject is: a subject the lists do not know is not a place, so it is not refused, and the
+ * agent's value or the operation's default (a character) stands.
  */
 export function fitSubject(text: string): FitResult {
   const s = normalizeRequest(text);
   if (PERSON.test(s)) return { ok: true, params: { subject: 'character' } };
   if (OBJECT.test(s)) return { ok: true, params: { subject: 'object' } };
-  if (PLACE.test(s)) return { ok: false, reason: 'a place is not a reference sheet subject (only characters, people or objects)' };
+  if (SHEET_OF_PLACE.test(s)) return { ok: false, reason: 'a place is not a reference sheet subject (only characters, people or objects)' };
   return { ok: true, params: {} };
 }
 
@@ -294,7 +312,9 @@ export function fitStepParams(step: RawOpStep, fields: OpField[], text: string, 
     params[f.key] = f.default;
     if (v != null) adjustments.push(`${step.id}: ${f.key} "${String(v)}" → ${f.default}`);
   }
-  if (fitted.ok && fitted.note) adjustments.push(`${step.id}: ${fitted.note}`);
+  // The upscale note is computed from the factor kept here, so the card never names another one.
+  const note = step.op === 'upscale' ? upscaleNote(text, ctx.sourceLongEdge, params.factor) : fitted.ok ? fitted.note : undefined;
+  if (note) adjustments.push(`${step.id}: ${note}`);
   if (step.op === 'angle' && params.angle) state.angles.set(step.input ?? '', [...planAngles, String(params.angle)]);
   return { params, errors, adjustments };
 }
