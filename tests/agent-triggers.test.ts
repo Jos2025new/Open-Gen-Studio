@@ -28,7 +28,7 @@ describe('the request names the operations in the order it names them', () => {
   });
 
   it('counts an operation once, at its first mention', () => {
-    expect(detectOps('una voz, otra voz y una voz más')).toEqual(['create_voice']);
+    expect(detectOps('quiero una voz, otra voz y una voz más')).toEqual(['create_voice']);
   });
 });
 
@@ -61,6 +61,10 @@ describe('requests that name no operation', () => {
   });
 
   it('a request with no trigger returns nothing', () => {
-    expect(detectOps('Hazme una serie de tres vistas de este personaje')).toEqual([]);
+    expect(detectOps('Quiero que el cuento tenga un final feliz')).toEqual([]);
+  });
+
+  it('"tres vistas" names the angle operation', () => {
+    expect(detectOps('Hazme una serie de tres vistas de este personaje')).toEqual(['angle']);
   });
 });

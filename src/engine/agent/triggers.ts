@@ -6,15 +6,15 @@ import { AGENT_OP_IDS } from '../ops';
  * compared without accents and in lower case.
  */
 export const OP_TRIGGERS: Record<string, RegExp[]> = {
-  angle: [/\b(angulos?|vista desde|camera angle|angles?)\b/],
-  relight: [/\b(iluminacion|lighting|relight|cambia (la )?luz|change (the )?light|pon(le)? luz|luz (cenital|lateral|de estudio|suave|dura))\b/],
+  angle: [/\b(tres vistas|three views|3 views|vistas? (frontal|lateral|trasera|trasero|superior|cenital)|(front|side|back|top|rear) view|camera angle|(otro|nuevo|diferente|distinto) angulo|desde (otro|un|este|el) angulo|angulo (frontal|lateral|trasero|superior|picado|contrapicado))\b/],
+  relight: [/\b(iluminacion|lighting|relight|cambia (la )?luz|change (the )?light|pon(le)? luz( (cenital|lateral|de estudio|suave|dura))?)\b/],
   upscale: [/\b(upscale|mas resolucion|4k)\b/],
-  remove_bg: [/\b(quita(r)? el fondo|quitar fondo|fondo transparente|remove (the )?background|transparent background)\b/],
+  remove_bg: [/\b(quit\w* (el )?fondo|sin (el )?fondo|fondo transparente|remove (the )?background|transparent background)\b/],
   reframe: [/\b(otro aspect|nuevo aspect|new aspect|extiende (la imagen )?a|extend (the )?(scene|image) to|reframe)\b/],
   reference_sheet: [/\b(hoja de (referencias?|personajes?)|character sheet|reference sheet|turnaround)\b/],
   contact_sheet: [/\b(contact sheet|hoja de contacto|nueve angulos|nine angles|3x3)\b/],
   grid_split: [/\b(cuadricula|grid split|split (the )?grid|grid image|grid)\b/],
-  extract_frame: [/\b(fotograma|ultimo frame|first frame|last frame|frame)\b/],
+  extract_frame: [/\b(fotograma|ultimo frame|(primer|first) frame|last frame|(get|grab|save|extract|capture) (a |the |an )?frame|(saca|extrae|captura|dame) (un |el |the )?frame|frame del (video|clip))\b/],
   join_clips: [/\b(une (los )?clips|junta (los )?clips|join (the )?clips|merge (the )?clips|concatenate)\b/],
   video_upscale: [/\b(mas resolucion del (video|clip)|upscale (the )?(video|clip)|video upscale)\b/],
   edit: [/\b(edita|editar|edit|cambia|cambiar|modifica|modificar|quita|quitar|agrega|agregar)\b/],
@@ -24,14 +24,14 @@ export const OP_TRIGGERS: Record<string, RegExp[]> = {
   continue: [/\b((continua|continuar|continue) (el |the )?clip|(nuevo clip|new clip) (desde|from) (el )?(ultimo frame|last frame))\b/],
   animate: [/\b(anima|animar|animate|image to video|video (de|from) (esta|this) imagen|convierte (la|esta) imagen en (un )?video)\b/],
   transcribe: [/\b(transcribe|transcribir|transcripcion|speech to text|pasa a texto|texto del audio)\b/],
-  create_voice: [/\b(voz|voces|voice|voices|clona (la )?voz|clone (the )?voice|crea una voz|make a voice|create (a )?voice)\b/],
+  create_voice: [/\b((muestr\w*|dame|hazme|quiero|necesito|crea|crear|haz|genera|generar) (me )?(una |su |mi )?voz|voz (para|que)|clona(r)? (mi|la|su) voz|clone (my|her|his|the) voice|(hable|suene|hablar) con (mi|su|la) voz|(make|create|need|show) (a |her |his |my )?voice|\ba voice (i|to|so|that)\b)\b/],
 };
 
 interface Hit { op: string; index: number; length: number }
 
 /** Lower case, no accents: the form every pattern above is written in. */
 export function normalizeRequest(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ');
 }
 
 /**
