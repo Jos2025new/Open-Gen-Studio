@@ -9,6 +9,7 @@ Revisado el 2026-10-08 contra el código de `task/agent-forcing` y con las respu
 | Calidad por defecto = resolución media del modelo (`mediumResolution`) | **Aprobado** por el usuario (lo confirmó el 2026-10-08). |
 | Modelos `-spicy` excluidos salvo que se nombren | **Pendiente.** Aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. |
 | ADR 0005, 0006, 0008 y 0009 | **Propuestos**, implementados y en uso. Falta su aprobación formal. |
+| ¿Las operaciones con modelo de imagen confirman su modelo (`454d721`, ADR 0009) o heredan el de su origen sin tarjeta (lo dicho en otra sesión ≈01:00)? | **Por confirmar.** Hoy rige la primera. |
 | Fusionar `task/agent-forcing` en `task/modelo-general` | **Pendiente del usuario.** Comparación y decisiones en [fusion-agent-forcing.md](fusion-agent-forcing.md): avance directo, sin conflictos. |
 | Publicar la app (plataforma, acceso, claves en servidor) | **Sin decidir.** Hoy es solo local; ver [seguridad](seguridad.md). |
 | Designer: máscaras de capa, capas de ajuste, estilos de capa, PSD y gestión de color | **Próximo trabajo del usuario.** Nada de esto existe hoy. |
