@@ -4,6 +4,8 @@
 
 - [Reglas de trabajo](../AGENTS.md).
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
+- [Pendientes y propuestas](pendientes.md): qué falta decidir, probar o implementar, con su estado.
+- [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
 - Cada ficha de feature enlaza comportamiento, código y test; «sin test» marca falta de cobertura directa.
 - Los ADRs conservan contexto, decisión y consecuencias.
@@ -55,7 +57,7 @@
 - [018-2026-10-W40: Designer, correcciones y revisión con evidencia](history/018-2026-10-W40.md) — 20805 bytes.
 - [019-2026-10-W41: Agente, ramas, fallos encontrados y pendientes](history/019-2026-10-W41.md) — 12788 bytes.
 - [020-2026-10-W41: Disparo forzado y correcciones de encaje](history/020-2026-10-W41.md) — 9214 bytes.
-- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 16828 bytes.
+- [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 18091 bytes.
 
 ## Trazabilidad
 

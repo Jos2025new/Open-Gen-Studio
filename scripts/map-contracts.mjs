@@ -41,9 +41,27 @@ export default [
     sides: [
       ['src/engine/procedure.ts', 'export const AUTOMATION_POLICY'],
       ['src/engine/procedure.ts', 'export function needsConfirmation'],
-      ['src/engine/procedure.ts', 'export const LOW_COST_USD'],
+      ['src/engine/procedure.ts', 'export const LOW_COST_USD = 0.5'],
     ],
     tests: ['tests/general-model.test.ts', 'tests/general-model-gate.test.ts'],
+  },
+  {
+    id: 'no-forced-tool-choice',
+    what: 'Decisión del usuario (2026-10-08): las palabras clave dirigen al agente con una señal en el mensaje; nunca se envía al proveedor un tool_choice con nombre.',
+    sides: [
+      ['src/engine/providers/llm.ts', "tool_choice: 'auto'"],
+      ['src/engine/agent/force.ts', 'export function steerNote'],
+    ],
+    tests: ['tests/agent-force.test.ts'],
+  },
+  {
+    id: 'ops-confirm-model',
+    what: 'Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor).',
+    sides: [
+      ['src/engine/procedure.ts', 'An op step that runs on an image model (edit engine) needs the image kind confirmed'],
+      ['src/engine/agent/runtime.ts', 'An operation that runs on an image model needs the image kind confirmed'],
+    ],
+    tests: ['tests/agent-force.test.ts', 'tests/agent-fit-plan.test.ts'],
   },
   {
     id: 'cost-recheck',
