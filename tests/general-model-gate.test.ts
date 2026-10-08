@@ -24,7 +24,7 @@ vi.mock('../src/engine/executor', async (importOriginal) => {
   };
 });
 
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
@@ -98,3 +98,19 @@ describe('propose_plan with a confirmed image kind, decided by the plan cost', (
     expect(feedOf('plan')).toHaveLength(1);
   });
 });
+
+describe('a costly plan after the card was confirmed in this request', () => {
+  it('is shown: the confirmation already covers the cost (no loop of cards)', async () => {
+    forcedUsd = 2;
+    replies = [imagePlan(1), { name: 'confirm_settings', args: { parts: [{ kind: 'image', refs: 0 }] } }];
+    await sendAgentMessage('Una imagen de este vestido');
+    expect(feedOf('plan')).toHaveLength(0);
+    const card = useStore.getState().sessions[sid()].feed.find((f) => f.type === 'settings') as unknown as SettingsFeedItem;
+    expect(card).toBeTruthy();
+    expect(sentMessages.join('\n')).toContain('for image; then');
+    replies = [imagePlan(1), 'Listo.'];
+    await confirmSettings(sid(), card.id, [card.sections[0].recommended]);
+    expect(feedOf('plan')).toHaveLength(1);
+  });
+});
+

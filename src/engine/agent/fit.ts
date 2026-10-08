@@ -69,7 +69,7 @@ const ANGLE_VALUES: Array<[string, RegExp]> = [
   ['profile-left', /\bperfil\b|\bprofile\b|\blateral\b|\bside view\b/],
   ['back', /\btrasera\w*|\btrasero\w*|\bespalda\b|\bde espaldas\b|\bback view\b|\bfrom behind\b|\bposterior\b/],
   ['front', /\bfrontal\w*|\bde frente\b|\bfront view\b/],
-  ['top-down', /\bcenital\b|\btop.?down\b|\bplano cenital\b|\bvista aerea\b/],
+  ['top-down', /\bcenital\b|\btop.?down\b|\bplano cenital\b|\bvista (aerea|area)\b|\baerial\b|\bbird.?s.eye\b/],
   ['high', /\bpicado\b|\bdesde arriba\b|\bhigh angle\b/],
   ['low', /\bcontrapicado\b|\bdesde abajo\b|\blow angle\b/],
   ['close-up', /\bprimer plano\b|\bclose.?up\b/],

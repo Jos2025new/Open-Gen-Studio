@@ -186,3 +186,15 @@ describe('your flow: keyword → tool call; Auto and Guided confirm the image mo
   });
 });
 
+describe('phrases from the sandbox session of 2026-10-08', () => {
+  it('"cambia el ángulo … a una vista aérea" fires angle (top-down), not the edit catch-all', () => {
+    withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
+    const g = gateOps('Ahora cambia el angulo de esta imagen a una vista area.', inputs(['img1']), false).filter((x) => x.fired);
+    expect(g.map((x) => [x.op, x.params.angle])).toEqual([['angle', 'top-down']]);
+  });
+  it('"2 hojas de personajes" fires reference_sheet', () => {
+    withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
+    expect(fired('De ella quiero 2 hojas de personajes: una normal y otra de poses', ['img1'])).toContain('reference_sheet');
+  });
+});
+

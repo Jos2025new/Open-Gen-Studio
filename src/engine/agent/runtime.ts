@@ -576,7 +576,9 @@ async function presentPlan(
       estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
     });
-    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds, total.usd) };
+    // The card the user just confirmed in this request already covers the cost: asking again looped (4 cards for one video).
+    const confirmedNow = settingKinds.every((k) => (session(sessionId).agent.settingsParts ?? []).some((p) => p.kind === k));
+    if (action === 'ask' && !confirmedNow) return { errors: [], settingsNeeded: costAskMessage([...new Set(settingKinds)], total.usd) };
   }
   const style = get().composer.agentStyle;
   const item: PlanFeedItem = {
