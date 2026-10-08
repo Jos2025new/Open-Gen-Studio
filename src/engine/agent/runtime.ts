@@ -76,7 +76,7 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
-import { gateOps, STEER_TOOL, steerNote } from './force';
+import { gateOps, steerNote } from './force';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -102,8 +102,6 @@ function requestGate(sessionId: string) {
   return gateOps(draft?.request ?? '', inputs, get().composer.agentStyle === 'direct');
 }
 
-/** Sessions whose next model call must be propose_plan: the first call of a request whose keywords named an operation. */
-const steerNext = new Set<string>();
 
 function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...(typeof patch === 'function' ? patch(s.agent) : patch) } }));
@@ -304,7 +302,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // Confirmed settings stay confirmed for this session (General Model, Phase 1: reuse the context). Whether a later
   // plan may reuse them without a card is decided by its cost and choices (needsConfirmation in presentPlan), so a
   // costly, multi-candidate or video plan is still shown or asked. Per-request comparison parts are cleared.
-  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined });
+  // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
+  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
@@ -327,10 +326,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
-  // The keyword gate (force.ts): fired operations direct the first call to propose_plan (tool_choice); all named ones are told.
-  const steer = workspace === 'node' ? [] : requestGate(sessionId);
-  if (steer.some((g) => g.fired)) steerNext.add(sessionId);
-  const forced = steerNote(steer);
+  // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
+  const forced = workspace === 'node' ? '' : steerNote(requestGate(sessionId));
   pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}${forced}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
@@ -570,10 +567,9 @@ async function presentPlan(
       kinds: settingKinds,
       settings: session(sessionId).agent.settings,
       userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
-      estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
     });
-    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds, total.usd) };
+    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds) };
   }
   const style = get().composer.agentStyle;
   const item: PlanFeedItem = {
@@ -1384,7 +1380,6 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           system: AGENT_SYSTEM,
           messages: repairHistory(session(sessionId).agent.history),
           tools: toolsFor(get().composer.agentStyle),
-          toolChoice: steerNext.delete(sessionId) ? STEER_TOOL : undefined,
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
           onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
@@ -1759,7 +1754,11 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           }
           // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
           // Before normalization: a kind never confirmed in this session still blocks.
-          // After normalization (presentPlan): the cost-based automation policy (needsConfirmation).
+          // After normalization (presentPlan): reuse or expose (needsConfirmation). Guided always asks before a plan.
+          if (workspace !== 'node' && get().composer.agentStyle === 'guided' && session(sessionId).agent.questionRound === 0) {
+            respond('Guided mode: ask your questions first (ask_questions, one card), then propose the plan.');
+            continue;
+          }
           if (workspace !== 'node' && get().composer.agentStyle !== 'direct') {
             const kinds = v.data.steps.map((st) => st.kind);
             const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);

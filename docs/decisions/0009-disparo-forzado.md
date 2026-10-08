@@ -1,4 +1,4 @@
-# 0009 — Disparo forzado: las palabras clave dirigen al agente hacia su llamada, y enmiendas a 0007
+# 0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0006 y 0007
 
 ## Estado
 
@@ -10,38 +10,50 @@ Propuesto
 
 ## Contexto
 
-Los disparadores por palabra clave (`triggers.ts`, uno por cada una de las 19 operaciones) solo existían como dato. El usuario pidió que forzaran. Una primera versión de esta decisión lo interpretó como enrutado determinista (`bc8c505`): un suelo de código que devolvía el plan si faltaba la operación, limitado a 5 disparadores. El usuario lo corrigió: **forzar es dirigir al agente hacia una tool call, no enrutar de forma determinista**, y `tool_choice` se usa solo cuando aplican las palabras clave.
+Los disparadores por palabra clave (`triggers.ts`, uno por operación) solo existían como dato. El usuario pidió que una petición mapeada empujara al agente por la ruta de su operación, y fijó tres escenarios:
 
-La revisión de `task/modelo-general` encontró además cinco fallos en lo aprobado en 0007. Los detalles, la evidencia y los commits están en `docs/history/020-2026-10-W41.md`.
+1. Una pregunta que no encaja en el mapa sigue el flujo general, sin cambios.
+2. Una petición concreta que no encaja en el mapa sigue el flujo general, sin cambios.
+3. Una petición que encaja en el mapa: el sistema envía la señal al agente para que siga la ruta de la operación. Nada más.
+
+El mapa existe para no disparar en cualquier petición.
+
+Dos versiones intermedias se retiraron:
+- un suelo determinista que devolvía el plan si faltaba la operación (`bc8c505`);
+- `tool_choice` enviado al proveedor (`187ca48`, `ae4c86d`), un mecanismo ajeno al harness de la app.
+
+El usuario fijó también cómo se comporta cada modo. La revisión de `task/modelo-general` encontró cinco fallos en 0007. El detalle está en `docs/history/020-2026-10-W41.md`.
 
 ## Decisión
 
-1. **Puerta por operación, determinista.** Una operación (cualquiera de las 19) se dispara cuando se cumplen tres condiciones:
-   - **Está nombrada:** puntuación de palabras asociadas en español e inglés, donde una frase propia vale 1, cada palabra asociada 0,5 y un veto −1; dispara con 1 o más.
+1. **Puerta por operación, determinista.** Una operación se dispara cuando se cumplen tres condiciones:
+   - **Está nombrada:** puntuación de palabras asociadas en español e inglés; una frase propia vale 1, cada palabra asociada 0,5 y un veto −1; dispara con 1 o más.
    - **Su entrada está adjunta.**
    - **Sus parámetros obligatorios se leen del texto:** el ángulo; el formato; el factor o los «K» según el tamaño de origen; el sujeto de la hoja; el preset de luz; el fotograma; la cuadrícula; dos clips para unir; una muestra de voz de 5 a 30 s.
 
-   `edit` es el comodín: solo dispara si ninguna operación específica cubre la misma imagen. Una ambigüedad se pregunta en Auto y se resuelve en Direct.
-2. **Forzar es dirigir.** Las operaciones disparadas llegan al agente en orden (n1, n2…) con sus parámetros, y su primera llamada lleva `tool_choice` con `propose_plan`. Las nombradas que no disparan llegan con su motivo y decide el agente: pregunta o niega la operación. Sin operaciones disparadas, `tool_choice` va en `auto`. Si el proveedor rechaza un `tool_choice` con nombre, se repite una vez con `auto`.
-3. **Sin puerta.** No se rechaza ningún plan por no incluir una operación nombrada. El agente escribe los pasos, los prompts y los parámetros, y el plan pasa por el mismo normalizador que cualquier otro.
-4. **Alcance.** Fuera del lienzo de nodos.
-5. **Enmiendas a 0007.**
-   - **(1 y 9)** En Direct corre siempre el modelo del compositor, aunque se haya confirmado otro antes en la sesión, y las guías enviadas son las de los modelos que pueden correr.
-   - **(2)** Una ambigüedad de intención se pregunta en Auto y Guided aunque el agente haya puesto un valor, una sola vez por petición.
-   - **(4)** Un lugar solo se rechaza como sujeto de hoja cuando no se nombra persona ni objeto.
-   - **(5)** En Direct, «múltiples ángulos» amplía el paso a tres en el normalizador, sin devolver el plan.
-   - **(7)** Un upscale que no alcanza el objetivo con ×4 lo dice, y uno encadenado toma el tamaño de su paso de origen.
+   `edit` es el comodín: solo dispara si ninguna operación específica cubre la misma imagen.
+2. **La señal, y nada más.** Las operaciones disparadas llegan al agente con la petición, en orden (n1, n2…) y con sus parámetros, con la instrucción de seguir esa ruta. No se envía nada al proveedor. Sin disparo, el agente no recibe nada y sigue el flujo general.
+3. **Ambigüedades.** Las resuelve el modelo preguntando, una sola vez por petición. Después de una respuesta, o sin rondas libres, la app no le pide volver a preguntar.
+4. **Modos.**
+   - **Guided:** el modelo pregunta siempre antes del plan, y la app pide confirmar los ajustes en cada petición.
+   - **Auto:** el modelo pregunta solo lo esencial y una vez. Los ajustes confirmados se heredan en la sesión y no se vuelven a pedir por coste. La tarjeta aparece para lo que no se ha aprobado.
+   - **Direct:** sin tarjetas de pregunta ni de ajustes. Valores por defecto de la app y modelos del compositor; un modelo que nombra el usuario se usa.
+5. **Enmiendas.**
+   - **0006 (1):** se retira el umbral de coste (0,50 USD o coste desconocido) para volver a pedir ajustes confirmados.
+   - **0007 (1 y 9):** en Direct corre siempre el modelo del compositor, aunque antes se confirmara otro, y se envían las guías de los modelos que pueden correr.
+   - **0007 (2):** una ambigüedad de intención se pregunta aunque el agente haya puesto un valor.
+   - **0007 (4):** un lugar solo se rechaza como sujeto de hoja cuando no se nombra persona ni objeto.
+   - **0007 (5):** en Direct, «múltiples ángulos» amplía el paso a tres sin devolver el plan.
+   - **0007 (7):** un upscale que no alcanza el objetivo con ×4 lo dice, y uno encadenado toma el tamaño de su paso de origen.
 
 ## Alternativas
 
-- **Suelo determinista que devuelve el plan** (primera versión, `bc8c505`). Se rechaza: el usuario pidió dirigir, no enrutar, y cada plan devuelto es una llamada extra.
-- **Dirigir solo 5 disparadores fuertes.** Se rechaza: hay un disparador por operación y todos dirigen.
-- **Nota sin `tool_choice`.** Se rechaza: el usuario pidió `tool_choice` cuando aplican las palabras clave.
-- **`tool_choice` en todas las llamadas de la petición.** Se rechaza: impediría responder a una pregunta, leer una guía o terminar después del plan.
+- **Suelo que devuelve el plan.** Se rechaza: es enrutado, no señal, y añade llamadas.
+- **`tool_choice` al proveedor.** Se rechaza: es un mecanismo ajeno al harness de la app y depende del proveedor.
+- **Disparar con la palabra sola.** Se rechaza: el mapa existe para evitar el disparo en cualquier petición.
 
 ## Consecuencias
 
-- **Primera llamada sin alternativas.** Con palabras clave, la primera llamada no puede ser `read_guide` ni `ask_questions`. Si el plan necesita una pregunta o la tarjeta de ajustes, el normalizador lo dice y la siguiente llamada ya es libre.
-- **Falsos positivos acotados.** Con la puerta, «iluminación» en una imagen nueva con referencia ya no dispara `relight` (veto), y «cambia la iluminación» sin un preset no fuerza. Queda el comodín `edit` sobre una imagen adjunta cuando ninguna operación específica encaja.
+- **Lo que pide la ruta lo cumple el agente.** La señal no se impone por código. Si el agente la ignora, el plan pasa por el normalizador como cualquier otro.
 - **El planificador local (sin clave) usa la misma puerta** para las operaciones de imagen.
-- **Soporte de proveedor sin verificar.** No se ha comprobado con proveedores reales que NanoGPT y OpenRouter acepten un `tool_choice` con nombre; el reintento con `auto` cubre el rechazo explícito.
+- **Guided pierde los ajustes heredados.** Cada petición empieza sin ajustes confirmados. Al volver a Auto, la tarjeta aparece una vez para lo no aprobado.

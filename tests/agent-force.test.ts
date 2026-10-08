@@ -13,8 +13,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 
-import { gateOps, STEER_TOOL, steerNote } from '../src/engine/agent/force';
-import { chat } from '../src/engine/providers/llm';
+import { gateOps, steerNote } from '../src/engine/agent/force';
 import { offlinePlan } from '../src/engine/agent/offline';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
@@ -22,8 +21,8 @@ import { useStore } from '../src/store/store';
 /*
  * The keyword gate (agent/force.ts). An operation fires when it is named (a deterministic score of associated words,
  * Spanish and English, in request order), its input is attached and its required parameters can be read from the text.
- * A fired operation directs the first call to propose_plan (tool_choice); a named one that does not fire is told to the
- * agent with its reason. Stubbed fetch and store, nothing reaches a provider.
+ * A fired operation reaches the agent as the signal to follow its route; nothing else changes (no tool_choice sent to the
+ * provider). A request that fires nothing follows the general workflow untouched. Stubbed fetch and store.
  */
 const before = useStore.getState();
 function withAssets(list: Array<{ id: string; kind: string; width?: number; height?: number; duration?: number; generationId?: string }>, generations: Record<string, unknown> = {}) {
@@ -105,11 +104,12 @@ describe('each operation, by its parameters', () => {
 });
 
 describe('what the agent reads', () => {
-  it('the fired operations to plan in order, and the named ones it decides', () => {
+  it('only the fired operations, in order; a named one that does not fire adds nothing', () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
     const note = steerNote(gateOps('quita el fondo y crea una voz para ella', inputs(['img1']), false));
-    expect(note).toContain('Operations this request fires, in order: n1_remove-bg remove_bg on asset:img1');
-    expect(note).toContain('Named but not fired: n2_create-voice create_voice');
+    expect(note).toContain('This request fires, in order: n1_remove-bg remove_bg on asset:img1');
+    expect(note).not.toContain('create_voice');
+    expect(steerNote(gateOps('crea una voz para ella', [], false))).toBe('');
     expect(steerNote([])).toBe('');
   });
 });
@@ -122,7 +122,7 @@ async function request(text: string, attachments: string[]) {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
     calls.push({ toolChoice: body.tool_choice, messages: JSON.stringify(body.messages) });
-    const plan = body.tool_choice !== 'auto' ? plans.shift() : undefined;
+    const plan = plans.shift();
     const delta = plan ? { tool_calls: [{ index: 0, id: `c${calls.length}`, function: { name: 'propose_plan', arguments: JSON.stringify(plan) } }] } : { content: 'Listo.' };
     return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: plan ? 'tool_calls' : 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
   });
@@ -138,38 +138,22 @@ async function request(text: string, attachments: string[]) {
   return calls;
 }
 
-describe('in a request, end to end', () => {
-  it('a fired operation directs the first call to propose_plan; later calls are free', async () => {
+describe('in a request, end to end (scenarios 1 to 3)', () => {
+  it('3: a mapped request carries the signal; the provider gets nothing of ours (tool_choice stays auto)', async () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
     const calls = await request('Quítale el fondo a esta foto', ['img1']);
-    expect(calls[0].toolChoice).toEqual({ type: 'function', function: { name: STEER_TOOL } });
     expect(calls[0].messages).toContain('n1_remove-bg remove_bg on asset:img1');
-    expect(calls.slice(1).every((c) => c.toolChoice === 'auto')).toBe(true);
+    expect(calls.every((c) => c.toolChoice === 'auto')).toBe(true);
   });
-  it('named but not fired (no input): told, not directed', async () => {
+  it('2: a specific request that does not fit the map (no input) follows the general workflow, no signal', async () => {
     const calls = await request('Quítale el fondo', []);
     expect(calls[0].toolChoice).toBe('auto');
-    expect(calls[0].messages).toContain('Named but not fired: n1_remove-bg');
+    expect(calls[0].messages).not.toContain('This request fires');
   });
-  it('no keyword: no note, free choice', async () => {
+  it('1: no keyword, general workflow, no signal', async () => {
     const calls = await request('Una bicicleta roja en la playa', []);
     expect(calls[0].toolChoice).toBe('auto');
-    expect(calls[0].messages).not.toContain('Operations this request fires');
-  });
-});
-
-describe('a provider that refuses a named tool_choice', () => {
-  it('is asked again once with "auto"', async () => {
-    const sent: unknown[] = [];
-    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body));
-      sent.push(body.tool_choice);
-      if (sent.length === 1) return new Response(JSON.stringify({ error: { message: 'tool_choice with a named function is not supported' } }), { status: 400 });
-      return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
-    });
-    await chat({ provider: 'nanogpt', apiKey: 'k', model: 'm', system: 's', messages: [], tools: [], toolChoice: STEER_TOOL, signal: new AbortController().signal });
-    expect(sent).toEqual([{ type: 'function', function: { name: STEER_TOOL } }, 'auto']);
-    vi.unstubAllGlobals();
+    expect(calls[0].messages).not.toContain('This request fires');
   });
 });
 

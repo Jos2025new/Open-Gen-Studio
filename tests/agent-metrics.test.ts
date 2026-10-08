@@ -49,7 +49,7 @@ const metrics = () => useStore.getState().sessions[sid()].agentMetrics ?? [];
 const plans = () => useStore.getState().sessions[sid()].feed.filter((f): f is PlanFeedItem => f.type === 'plan');
 
 describe('agent metrics per request (R0)', () => {
-  beforeEach(() => setup('guided'));
+  beforeEach(() => setup('direct'));
 
   it('counts calls, tokens, the plan, a revision and the approval of one request', async () => {
     replies = [{ plan: { texts: ['a', 'b'] } }];
@@ -77,6 +77,7 @@ describe('agent metrics per request (R0)', () => {
   });
 
   it('answering questions stays in the same request and counts the round', async () => {
+    setup('guided'); // questions are cards of Auto and Guided; Direct has none
     replies = [{ questions: true }];
     await sendAgentMessage('animate this');
     expect(metrics()[0]).toMatchObject({ questionRounds: 1, llmCalls: 1, plans: 0 });
@@ -145,7 +146,7 @@ describe('questions with a recommended option (R6)', () => {
 });
 
 describe('guides on demand (R4)', () => {
-  beforeEach(() => setup('guided'));
+  beforeEach(() => setup('direct'));
 
   it('read_guide answers locally and costs one more model round, recorded in the metrics', async () => {
     const bodies: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
@@ -164,7 +165,7 @@ describe('guides on demand (R4)', () => {
 });
 
 describe('a guide is sent once per conversation (C4)', () => {
-  beforeEach(() => setup('guided'));
+  beforeEach(() => setup('direct'));
 
   it('asking again for a guide already in the history gets a short reminder, not the full text', async () => {
     const tools: string[] = [];

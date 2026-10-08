@@ -33,7 +33,7 @@ it('publishes the plan after confirming Edit through the real runtime and record
   useStore.setState({
     ui: { ...before.ui, workspace: 'chat' },
     settings: { ...before.settings, keys: { ...before.settings.keys, atlas: 'fixture', nanogpt: 'fixture' }, agent: { ...before.settings.agent, provider: 'nanogpt', model: 'fixture' } },
-    composer: { ...before.composer, agentStyle: 'guided', attachments: [] },
+    composer: { ...before.composer, agentStyle: 'auto', attachments: [] },
     catalog: { ...before.catalog, models: Object.fromEntries(models.map(m => [m.ref, m])), schemas },
     sessions: { ...before.sessions, [sid]: { ...before.sessions[sid], feed: [card], agent: { busy: false, questionRound: 0, notes: [], history: [{ role: 'assistant', content: '', tool_calls: [{ id: 'settings-call', type: 'function', function: { name: 'confirm_settings', arguments: '{"parts":[{"kind":"image","refs":1}]}' } }] }], pending: { kind: 'settings', toolCallId: 'settings-call', feedItemId: card.id } } } },
   });

@@ -7,7 +7,7 @@ export function roundsFor(style: AgentStyle, guidedRounds: number): number {
 }
 
 /** Same boundary used by the runtime and described by both agent-facing contracts. */
-export const SETTINGS_POLICY = 'Outside Nodes, only image/video steps require confirm_settings before prompts. An op step, including one using an uploaded image, does not require that card. A confirmed image/video kind stays confirmed for later requests in this session: a plan reuses it without a new card only when the automation policy allows it (low cost, single image, no named model); otherwise the plan is shown with its choices or the card is asked again. A kind never confirmed needs its own confirmation. Settings confirmation is separate from plan approval and spending authorization.';
+export const SETTINGS_POLICY = 'Outside Nodes, only image/video steps require confirm_settings before prompts. An op step, including one using an uploaded image, does not require that card. A confirmed image/video kind stays confirmed for later requests in this session and is not asked again; a kind never confirmed needs its own confirmation (the mode line says when settings are confirmed again). Settings confirmation is separate from plan approval and spending authorization.';
 
 export function missingSettingsKind(workspace: Workspace, kinds: string[], settings: Partial<Record<MediaKind, SettingsChoice>> | undefined): 'image' | 'video' | null {
   if (workspace === 'node') return null;
@@ -31,60 +31,40 @@ export interface ConfirmationInput {
   settings: Partial<Record<MediaKind, SettingsChoice>> | undefined;
   /** True when the user named or explicitly picked a model for this request. */
   userChoseModel: boolean;
-  /** Estimated cost in USD for the plan (null = unknown). */
-  estimatedCost: number | null;
   /** The plan has multiple candidate counts (count > 1 per step). */
   hasMultipleCandidates: boolean;
 }
 
-/** Cost above which a plan's price is not reused silently (USD). Default chosen by the implementer; the user can change it. */
-export const LOW_COST_USD = 0.5;
-
 /**
- * Automation policy (§11): impact, detectability and reversibility decide, not confidence alone.
+ * Settings reuse (the user's rule): what was confirmed once in the session is inherited and never asked again for its
+ * cost; a kind never confirmed asks. Guided confirms in every request because the runtime starts each request in
+ * guided mode without settings.
  *
- * - **ask** (block until confirm_settings): a kind was never confirmed in this session, or the plan's
- *   cost is unknown or above LOW_COST_USD (costly and hard to undo once paid).
- * - **expose** (no block; the plan card shows the model, count, duration and cost before approval):
- *   a confirmed kind whose cost is low, but the user named a model, the plan is a video, or it asks for
- *   several candidates (count > 1). The decision is visible, not hidden.
- * - **automate**: a confirmed kind, low cost, single result, no model named by the user.
+ * - **ask** (block until confirm_settings): a kind was never confirmed in this session.
+ * - **expose** (no block; the plan card shows the model, count, duration and cost before approval): the user named a
+ *   model, the plan is a video, or it asks for several candidates.
+ * - **automate**: a confirmed kind, a single result, no model named by the user.
  *
- * Plan approval and spending authorization stay separate (SETTINGS_POLICY); this only decides whether the
- * settings card must come first.
+ * Plan approval and spending authorization stay separate (SETTINGS_POLICY); this only decides whether the settings
+ * card must come first.
  */
 export function needsConfirmation(input: ConfirmationInput): ConfirmationAction {
-  const { workspace, kinds, settings, userChoseModel, estimatedCost, hasMultipleCandidates } = input;
+  const { workspace, kinds, settings, userChoseModel, hasMultipleCandidates } = input;
   if (workspace === 'node') return 'automate'; // Nodes own their settings per-node.
-
   // A kind never confirmed in this session has nothing to reuse.
   if (kinds.some((kind) => !settings?.[kind])) return 'ask';
-
-  // Unknown or costly plans must be confirmed: the price cannot be bounded enough to reuse silently.
-  if (estimatedCost === null || estimatedCost > LOW_COST_USD) return 'ask';
-
-  // Low cost, but a choice the user should see on the card before approving.
+  // A choice the user should see on the card before approving.
   if (userChoseModel || hasMultipleCandidates || kinds.includes('video')) return 'expose';
-
   return 'automate';
-}
-
-/** Why a plan needs its settings card, for the agent (empty when it does not). */
-export function settingsAskReason(estimatedCost: number | null): string {
-  return estimatedCost === null
-    ? 'its cost cannot be predicted'
-    : `its estimated cost is $${estimatedCost.toFixed(2)}, above $${LOW_COST_USD.toFixed(2)}`;
 }
 
 /**
  * Human-readable policy for agent-facing text. Must describe exactly what needsConfirmation does.
  */
 export const AUTOMATION_POLICY =
-  'The app reuses settings confirmed earlier in this session, without a new card, when the plan is a low-cost ' +
-  'single image and the user did not name a model. It shows the same plan with its model, count and cost on the card ' +
-  '(without asking) when the user named a model, the plan is a video, or it asks for several candidates. ' +
-  'It asks and blocks when a kind was never confirmed in this session, or when the plan\'s cost is unknown or above $' +
-  LOW_COST_USD.toFixed(2) + '.';
+  'The app reuses settings confirmed earlier in this session without a new card and never asks them again for cost. ' +
+  'It shows the plan with its model, count and cost on the card (without asking) when the user named a model, the plan ' +
+  'is a video, or it asks for several candidates. It asks only for a kind never confirmed in this session.';
 
 /**
  * The gate before a plan is normalized: a kind that was never confirmed still blocks, as before.
@@ -96,9 +76,9 @@ export function planRequiresSettings(workspace: Workspace, kinds: string[], sett
   return `Not shown: call confirm_settings first (kind "${missing}") so the user confirms the model, resolution${missing === 'video' ? ', duration' : ', how many images'} and aspect; then write the prompts for the confirmed model and call propose_plan.`;
 }
 
-/** The message for a normalized plan whose cost needs the settings card (see needsConfirmation). */
-export function costAskMessage(kinds: string[], estimatedCost: number | null): string {
-  return `Not shown: ${settingsAskReason(estimatedCost)}. Call confirm_settings so the user confirms the model, resolution and count for ${kinds.join(' and ')}; then call propose_plan again with the confirmed values.`;
+/** The message for a normalized plan whose kind was never confirmed (see needsConfirmation). */
+export function costAskMessage(kinds: string[]): string {
+  return `Not shown: ${kinds.join(' and ')} settings were never confirmed in this session. Call confirm_settings so the user confirms the model, resolution and count for ${kinds.join(' and ')}; then call propose_plan again with the confirmed values.`;
 }
 
 /** Derived from the execution registry, not a second list of operation capabilities. */

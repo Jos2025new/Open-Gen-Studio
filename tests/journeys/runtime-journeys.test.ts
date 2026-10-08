@@ -47,7 +47,7 @@ function setup() {
   sessionId = st.activeSessionId;
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'test-only' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'test-model' } },
-    composer: { ...st.composer, agentStyle: 'guided', attachments: [], userPicked: {} },
+    composer: { ...st.composer, agentStyle: 'direct', attachments: [], userPicked: {} },
     sessions: { ...st.sessions, [sessionId]: { ...st.sessions[sessionId], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
   });
 }
@@ -72,6 +72,8 @@ describe('runtime request and card decisions', () => {
   });
 
   it('a reply to a questions card is recorded separately from settings confirmation', async () => {
+    // Questions are cards of Auto and Guided; Direct has none.
+    useStore.setState((s) => ({ composer: { ...s.composer, agentStyle: 'guided' } }));
     replies = [{ name: 'ask_questions', args: { questions: [{ id: 'subject', question: 'Who is in the clip?', options: ['A', 'B'] }] } }, { text: 'Understood.' }];
     await sendAgentMessage('Create a clip');
     const question = useStore.getState().sessions[sessionId].feed.find((f) => f.type === 'questions');

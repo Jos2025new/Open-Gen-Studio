@@ -26,7 +26,7 @@ describe('one procedure instead of per-case rules', () => {
   it('tells the agent the app\'s order and checks up front, so plans pass the first time', () => {
     const head = SYSTEM_PROMPT.slice(0, 9000);
     expect(head).toContain('How the app works');
-    expect(head).toContain('ask_questions (only for missing user data) → confirm_settings (when the settings policy below requires it) → propose_plan. The mode line of each request says which of these you have.');
+    expect(head).toContain('ask_questions (only for missing user data) → confirm_settings (when the settings policy below requires it) → propose_plan. Each request\'s mode line says which of these you have.');
     // The fixed prompt names no mode: only each request's mode line does, so the agent does not reason about other modes.
     expect(SYSTEM_PROMPT).not.toMatch(/\b(auto and guided|direct mode|guided only)\b/i);
     expect(head).toContain('candidates end the plan');

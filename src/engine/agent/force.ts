@@ -7,13 +7,10 @@ import { detectOps, normalizeRequest, OP_TRIGGERS, OP_WEAK, sequenceNames } from
  * The keyword gate. A request's words name operations (triggers.ts: a deterministic score of associated words, Spanish
  * and English, in request order: n1_reference-sheet, n2_create-voice). An operation fires when three things hold: it
  * is named, its input is attached to the request, and its required parameters can be read from the text (fit.ts and
- * the extractors below). A fired operation directs the agent: its first call is propose_plan (tool_choice) with the
- * operation as an op step, and the agent only orders the steps and writes the prompts. A named operation that does not
- * fire is told to the agent with the reason, and the agent decides (asks, or refuses the operation).
+ * the extractors below). A fired operation reaches the agent with the request as the signal to follow its route: the
+ * operation as an op step, in request order, the agent writing only prompts and instructions. Nothing is sent to the
+ * provider. A request that fires nothing (no mapped keyword, or a condition missing) follows the general workflow.
  */
-
-/** The tool a fired operation directs the agent to: the plan, where operations are steps. */
-export const STEER_TOOL = 'propose_plan';
 
 export interface GatedOp {
   op: string;
@@ -119,14 +116,10 @@ export function gateOps(text: string, inputs: GateInput[], direct: boolean): Gat
   return out.map((g) => (g.op === 'edit' && g.fired && g.input && imageOpsFired.has(g.input) ? { ...g, fired: false, note: 'a specific operation already covers this image' } : g));
 }
 
-/** The lines the agent reads with the request: the fired operations to plan, in order, and the named ones it decides. */
+/** The signal the agent reads with the request: the fired operations and their route, in order. Nothing otherwise. */
 export function steerNote(gated: GatedOp[]): string {
-  if (!gated.length) return '';
-  const params = (p: Record<string, string>) => (Object.keys(p).length ? ` {${Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(', ')}}` : '');
   const fired = gated.filter((g) => g.fired);
-  const held = gated.filter((g) => !g.fired);
-  const lines = [];
-  if (fired.length) lines.push(`Operations this request fires, in order: ${fired.map((g) => `${g.seq} ${g.op} on ${g.input}${params(g.params)}${g.note ? ` (${g.note})` : ''}`).join('; ')}. Call propose_plan with them as op steps in this order; write only their prompts or instructions and any steps the request adds.`);
-  if (held.length) lines.push(`Named but not fired: ${held.map((g) => `${g.seq} ${g.op} («${g.phrase}»): ${g.note}`).join('; ')}.`);
-  return `\n\n---\n${lines.join('\n')}`;
+  if (!fired.length) return '';
+  const params = (p: Record<string, string>) => (Object.keys(p).length ? ` {${Object.entries(p).map(([k, v]) => `${k}: ${v}`).join(', ')}}` : '');
+  return `\n\n---\nThis request fires, in order: ${fired.map((g) => `${g.seq} ${g.op} on ${g.input}${params(g.params)}${g.note ? ` (${g.note})` : ''}`).join('; ')}.\nYou MUST follow this route: propose_plan with these op steps in this order, writing only their prompts or instructions and any step the request adds.`;
 }

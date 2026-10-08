@@ -232,14 +232,12 @@ export async function chat(opts: {
   onReasoning?: (delta: string, full: string) => void;
   /** Called once, when the first tool-call fragment arrives (the plan is being written). */
   onToolCall?: () => void;
-  /** A tool the model must call in this answer (a request's keywords named an operation); otherwise "auto". */
-  toolChoice?: string;
 }): Promise<ChatResult> {
   const body: Record<string, unknown> = {
     model: opts.model,
     messages: [{ role: 'system', content: opts.system }, ...opts.messages],
     tools: opts.tools,
-    tool_choice: opts.toolChoice ? { type: 'function', function: { name: opts.toolChoice } } : 'auto',
+    tool_choice: 'auto',
     stream: true,
     max_tokens: 16000,
   };
@@ -274,13 +272,12 @@ export async function chat(opts: {
 
   async function stream(): Promise<ChatResult> {
   const t0 = Date.now();
-  const send = async (withReasoning: boolean, named = true): Promise<Response> => {
-    const sent = named ? body : { ...body, tool_choice: 'auto' };
+  const send = async (withReasoning: boolean): Promise<Response> => {
     try {
       return await fetch(ENDPOINTS[opts.provider].chat, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...headers(opts.provider, opts.apiKey) },
-        body: JSON.stringify(withReasoning ? { ...sent, ...reasoning } : sent),
+        body: JSON.stringify(withReasoning ? { ...body, ...reasoning } : body),
         signal: watch.signal,
       });
     } catch (err) {
@@ -298,21 +295,12 @@ export async function chat(opts: {
     }
     return new HttpError(r.status, extractErrorMessage(parsed, `${LLM_LABELS[opts.provider]} error ${r.status}`), parsed);
   };
-  let withReasoning = Object.keys(reasoning).length > 0;
-  let res = await send(withReasoning);
-  if (!res.ok && res.status === 400 && withReasoning) {
+  let res = await send(Object.keys(reasoning).length > 0);
+  if (!res.ok && res.status === 400 && Object.keys(reasoning).length) {
     // A model that refuses the reasoning fields still answers without them (one retry, same request otherwise).
     const err = await failure(res);
     if (!/reason|effort|think/i.test(err.message)) throw err;
-    withReasoning = false;
     res = await send(false);
-  }
-  if (!res.ok && res.status === 400 && opts.toolChoice) {
-    // A provider or model that refuses a named tool_choice still answers with "auto" (one retry; the request's note
-    // still names the operation).
-    const err = await failure(res);
-    if (!/tool.?choice/i.test(err.message)) throw err;
-    res = await send(withReasoning, false);
   }
   if (!res.ok || !res.body) throw await failure(res);
   const ttfbMs = Date.now() - t0;

@@ -14,7 +14,7 @@ Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en v
 | **Tú** | «Aplica todo eso», en una rama a partir de `modelo-general`. | Este encargo |
 | **Sesión anterior** | Solo 3 a 5 disparadores fuertes. Lo apliqué primero y lo retiré tras tu corrección. | Texto pegado |
 | **Yo** | Fallos (a) a (e) encontrados al revisar `modelo-general`, con prueba o lectura de código. | Revisión |
-| **Tú** | Forzar es dirigir al agente hacia una tool call, no un enrutado determinista; `tool_choice` solo cuando aplican las palabras clave. | Corrección de F6 |
+| **Tú** | Escenarios 1 a 3: sin encaje en el mapa, flujo general; con encaje, solo la señal al agente. Sin `tool_choice`. Reglas de Guided, Auto y Direct. | Corrección de F6 |
 
 ## Restricciones
 
@@ -55,13 +55,13 @@ Una fase por commit, cada una con su test. `npm test` y `npm run typecheck` en v
 
 ### F6. Disparo forzado: dirigir al agente hacia su tool call — tu petición
 
-- **Corrección.** La primera versión (`bc8c505`) era un suelo determinista con 5 disparadores que devolvía el plan. Me corregiste: forzar es dirigir al agente hacia una tool call, no enrutar, y `tool_choice` solo cuando aplican las palabras clave.
-- **Qué (versión final).** Puerta por operación según tu mapa de parámetros: una operación dispara si está nombrada (puntuación con vetos), su entrada está adjunta y sus parámetros se leen del texto. Las disparadas dirigen la primera llamada a `propose_plan` (`tool_choice`), en orden n1, n2…; las nombradas sin disparar llegan con su motivo. El planificador local usa la misma puerta.
+- **Corrección.** Dos versiones retiradas: un suelo determinista con 5 disparadores que devolvía el plan (`bc8c505`), y `tool_choice` enviado al proveedor (`187ca48`, `ae4c86d`), ajeno al harness de la app.
+- **Qué (versión final).** Puerta por operación según tu mapa de parámetros: dispara si está nombrada (puntuación con vetos), su entrada está adjunta y sus parámetros se leen del texto. Lo disparado llega al agente como la ruta a seguir, en orden n1, n2…; sin disparo, nada. Nada se envía al proveedor. Guided pregunta siempre y confirma ajustes en cada petición; Auto hereda y no repite por coste.
 
 ### F7. Validación y documentación
 
 - **Validación.** Los cinco disparadores se pasan por las peticiones de las 18 sesiones del sandbox (solo lectura): aciertos, falsos positivos y precondiciones que faltan.
-- **Documentación.** ADR 0009 (dirección con `tool_choice` y enmiendas a 0007), historial 020 y la ficha `features/agente.md`.
+- **Documentación.** ADR 0009 (puerta, modos y enmiendas a 0006 y 0007), historial 020 y la ficha `features/agente.md`.
 
 ## Lo que no se cambia, y por qué
 

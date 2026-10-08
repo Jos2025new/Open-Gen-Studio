@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
- * The cost-based automation gate (needsConfirmation) on a real propose_plan call: a plan whose cost is unknown is not
- * shown, the agent is told to ask for confirm_settings; a low-cost plan with several candidates is shown without a card.
+ * Settings reuse (needsConfirmation) on a real propose_plan call: settings confirmed once are inherited and never asked
+ * again for cost; a plan with several candidates is shown with its choices, without a card.
  * The price is forced through estimateSteps; nothing reaches a provider.
  */
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
@@ -72,13 +72,13 @@ const imagePlan = (count: number, model?: string) => ({
   args: { title: 'Propuestas del vestido', steps: [{ id: 's1', kind: 'image', title: 'Propuestas', prompt: 'the dress on a model', count, ...(model ? { model } : {}) }] },
 });
 
-describe('propose_plan with a confirmed image kind, decided by the plan cost', () => {
-  it('does not show a plan whose cost cannot be predicted; the agent is told to confirm the settings', async () => {
+describe('propose_plan with a confirmed image kind: inherited, never asked again for cost', () => {
+  it('shows a plan whose cost cannot be predicted: settings confirmed once are not asked again', async () => {
     forcedUsd = null;
-    replies = [imagePlan(1), 'Necesito confirmar los ajustes.'];
+    replies = [imagePlan(1), 'Listo.'];
     await sendAgentMessage('Una imagen de este vestido');
-    expect(feedOf('plan')).toHaveLength(0);
-    expect(sentMessages.join('\n')).toContain('cannot be predicted');
+    expect(feedOf('plan')).toHaveLength(1);
+    expect(sentMessages.join('\n')).not.toContain('settings were never confirmed in this session');
   });
 
   it('shows a low-cost plan with several candidates without a settings card (expose)', async () => {

@@ -37,7 +37,7 @@ beforeEach(() => {
   const st = useStore.getState();
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
-    composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
+    composer: { ...st.composer, agentStyle: 'direct', attachments: [] },
     sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
   });
 });

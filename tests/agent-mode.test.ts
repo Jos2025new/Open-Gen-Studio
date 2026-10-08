@@ -120,3 +120,24 @@ describe('auto stays as before', () => {
     expect(toolNames[0]).toContain('confirm_settings');
   });
 });
+
+describe('guided always asks, and confirms settings in every request', () => {
+  it('a plan proposed before any question is sent back: ask first', async () => {
+    setMode('guided');
+    replies = [imagePlan, text('Primero te pregunto.')];
+    await sendAgentMessage('Una imagen de una bicicleta roja en la playa');
+    expect(feedOf('plan')).toHaveLength(0);
+    expect(sentMessages.join('\n')).toContain('Guided mode: ask your questions first');
+  });
+
+  it('settings confirmed in an earlier request are not inherited in guided; auto inherits them', async () => {
+    const confirmed = { image: { modelRef: 'local::studio-image', needsImage: false } };
+    for (const [style, kept] of [['guided', false], ['auto', true]] as const) {
+      setMode(style);
+      useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, settings: confirmed as never } } } }));
+      replies = [text('ok')];
+      await sendAgentMessage('Otra imagen');
+      expect(Boolean(useStore.getState().sessions[sid()].agent.settings?.image)).toBe(kept);
+    }
+  });
+});
