@@ -73,6 +73,17 @@ const ANGLE_VALUES: Array<[string, RegExp]> = [
   ['wide', /\bplano general\b|\bplano amplio\b|\bwide shot\b/],
 ];
 
+/** The camera angle a request names ("de perfil", "vista trasera", "contrapicado"), if any. */
+export function namedAngle(text: string): string | undefined {
+  const s = normalizeRequest(text);
+  return ANGLE_VALUES.find(([, re]) => re.test(s))?.[0];
+}
+
+/** Whether a request names a sheet ("hoja", "sheet", "turnaround", "referencias de personaje"). */
+export function namesSheet(text: string): boolean {
+  return SHEET_CUE.test(normalizeRequest(text));
+}
+
 /** A request that asks for several angles without a number: how many is the agent's question (or the Direct default). */
 export function pluralAngles(text: string): boolean {
   return /\b(multiples|varios|muchos) angulos\b|\b(multiple|several|many) angles\b/.test(normalizeRequest(text));

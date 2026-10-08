@@ -76,6 +76,7 @@ import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
+import { forcedFor, forcedNote } from './force';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -92,6 +93,12 @@ const controllers = new Map<string, AbortController>();
 
 function session(id: string): Session {
   return get().sessions[id];
+}
+
+/** What the current request forces (agent/force.ts), from its words and its attachments. */
+function requestForced(sessionId: string) {
+  const draft = session(sessionId).agent.draft;
+  return forcedFor(sessionId, draft?.request ?? '', (draft?.attachments ?? []).map((id) => ({ id, kind: get().assets[id]?.kind })));
 }
 
 function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentState) => Partial<AgentState>)): void {
@@ -205,6 +212,8 @@ function planContext(sessionId: string, workspace: Workspace) {
     direct: () => get().composer.agentStyle === 'direct',
     canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
+    // The local planner cannot be sent back: only the LLM agent gets the floor.
+    forced: () => (workspace === 'node' || agentEngine().kind !== 'llm' ? undefined : requestForced(sessionId)),
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
     // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
@@ -316,7 +325,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // the reference tools (guides, model list, library): they can be asked for again, and they are what made the
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
-  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
+  const forced = workspace === 'node' ? '' : forcedNote(requestForced(sessionId).ops);
+  pushHistory(sessionId, userMessage(`${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}${forced}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
 
