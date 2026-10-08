@@ -136,6 +136,16 @@ export default [
     tests: ['tests/safeguards.test.ts'],
   },
   {
+    id: 'store-local-only',
+    what: 'El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba.',
+    sides: [
+      ['server/local-store.js', "if (!isLoopback(req.socket?.remoteAddress)) return send(403, 'only from this computer')"],
+      ['docs/seguridad.md', 'only from this computer'],
+      ['README.md', 'el almacén solo responde a tu propio ordenador'],
+    ],
+    tests: ['tests/store-server.test.ts'],
+  },
+  {
     id: 'automated-writes',
     what: 'El servidor rechaza escrituras automatizadas (cabecera X-OGS-Automated) fuera del sandbox.',
     sides: [['server/local-store.js', "req.headers['x-ogs-automated'] === '1' && !sandbox"]],

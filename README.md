@@ -232,10 +232,15 @@ Por dónde empezar:
 
 Hecho con React 19, Vite, TypeScript, zustand, @xyflow/react, IndexedDB, zod y Vitest.
 
+## Seguridad, en corto
+
+- **Tus claves están en texto plano** en `data/state.json` y en el navegador. Es tu ordenador: no compartas esa carpeta.
+- **Otra web que visites no puede leer ni borrar tus datos**, y con `--host` ningún otro dispositivo de tu red puede tocarlos: el almacén solo responde a tu propio ordenador.
+- El detalle, con la prueba de cada punto, está en [docs/seguridad.md](docs/seguridad.md).
+
 ## Limitaciones conocidas
 
-- **Pensada para uso local.** Publicada como web estática perdería la copia en disco y las rutas auxiliares `/x/*`.
-- **Las claves viven en tu navegador**, y las llamadas a los proveedores salen directamente desde él.
+- **Pensada para uso local y para una sola persona.** No tiene usuarios ni contraseña; publicada como web estática perdería la copia en disco y las rutas auxiliares `/x/*`.
 - **Atlas Cloud** publica solo su tarifa más baja, así que algunos costes se muestran como mínimo (`≥`).
 - **Vídeos de entrada grandes:** fal y NanoGPT los reciben embebidos y pueden superar su tamaño máximo.
 

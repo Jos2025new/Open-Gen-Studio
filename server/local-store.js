@@ -150,6 +150,9 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
     return Buffer.concat(chunks);
   }
 
+  /** 127.0.0.0/8 and ::1, also as IPv4-mapped IPv6 (::ffff:127.x.x.x). */
+  const isLoopback = (addr) => typeof addr === 'string' && (addr === '::1' || /^(::ffff:)?127\.\d+\.\d+\.\d+$/.test(addr));
+
   async function handle(req, res) {
     const url = new URL(req.url, 'http://local');
     const path = url.pathname.slice('/x/store'.length);
@@ -159,6 +162,10 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       res.setHeader('Cache-Control', 'no-store');
       res.end(data);
     };
+
+    // Only this computer: with `vite --host` the server is reachable from the local network, and a device there could
+    // read state.json (API keys included) or write. Every real request has a socket; one without it is refused too.
+    if (!isLoopback(req.socket?.remoteAddress)) return send(403, 'only from this computer');
 
     if (path === '/ping') return send(200, 'ok');
 

@@ -8,7 +8,7 @@ const last = { headers: {} as Record<string, string> };
 /** Drive the plugin's middleware with a fake request; resolves with the status code. */
 function call(mw: (req: unknown, res: unknown, next: () => void) => void, method: string, url: string, body = '', headers: Record<string, string> = { 'x-ogs': '1', host: 'localhost:5173' }): Promise<number> {
   return new Promise((resolve) => {
-    const req = { method, url, headers, async *[Symbol.asyncIterator]() { if (body) yield new TextEncoder().encode(body); } };
+    const req = { method, url, headers, socket: { remoteAddress: '127.0.0.1' }, async *[Symbol.asyncIterator]() { if (body) yield new TextEncoder().encode(body); } };
     const res = { statusCode: 0, headers: {} as Record<string, string>, setHeader: (k: string, v: string) => { res.headers[k.toLowerCase()] = v; }, end: () => { last.headers = res.headers; resolve(res.statusCode); } };
     mw(req, res, () => resolve(404));
   });
@@ -36,6 +36,25 @@ describe('local store: writes only from the app', () => {
   });
 });
 
+describe('local store: only from this computer (vite --host exposes the port to the network)', () => {
+  it('a device on the network can neither read the state (API keys) nor write; loopback works', async () => {
+    const { root, mw } = setup();
+    const from = (remoteAddress: string | undefined, method: string, url: string, headers: Record<string, string>) => new Promise<number>((resolve) => {
+      const req = { method, url, headers, socket: { remoteAddress }, async *[Symbol.asyncIterator]() { /* no body */ } };
+      const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
+      mw(req, res, () => resolve(404));
+    });
+    const app = { host: '192.168.1.20:5173', origin: 'http://192.168.1.20:5173', 'x-ogs': '1' };
+    expect(await from('192.168.1.50', 'GET', '/x/store/state', { host: '192.168.1.20:5173' })).toBe(403);
+    expect(await from('::ffff:192.168.1.50', 'POST', '/x/store/wipe', app)).toBe(403);
+    expect(await from(undefined, 'GET', '/x/store/state', { host: 'localhost:5173' })).toBe(403);
+    expect(String(readFileSync(join(root, 'data', 'state.json')))).toContain('"x":0');
+    expect(await from('127.0.0.1', 'GET', '/x/store/state', { host: 'localhost:5173' })).toBe(200);
+    expect(await from('::1', 'GET', '/x/store/ping', { host: 'localhost:5173' })).toBe(200);
+    expect(await from('::ffff:127.0.0.1', 'GET', '/x/store/ping', { host: 'localhost:5173' })).toBe(200);
+  });
+});
+
 describe('local store: only a whole saved state replaces the file', () => {
   it('refuses a body that is not a stamped state, or one without baseAt, and keeps the file', async () => {
     const { root, mw } = setup();
@@ -52,7 +71,7 @@ describe('local store: media is served as data', () => {
     const { mw } = setup();
     const svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>';
     const put = await new Promise<number>((resolve) => {
-      const req = { method: 'PUT', url: '/x/store/blob/asset%3Aa1', headers: { 'x-ogs': '1', host: 'localhost:5173', 'content-type': 'image/svg+xml' }, async *[Symbol.asyncIterator]() { yield new TextEncoder().encode(svg); } };
+      const req = { method: 'PUT', url: '/x/store/blob/asset%3Aa1', socket: { remoteAddress: '127.0.0.1' }, headers: { 'x-ogs': '1', host: 'localhost:5173', 'content-type': 'image/svg+xml' }, async *[Symbol.asyncIterator]() { yield new TextEncoder().encode(svg); } };
       const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
       mw(req, res, () => resolve(404));
     });
@@ -94,7 +113,7 @@ describe('local store: automated writes', () => {
       ['PUT', '/x/store/state'], ['PUT', '/x/store/blob/asset%3Aprobe'],
       ['DELETE', '/x/store/blob/asset%3Aprobe'], ['POST', '/x/store/log'], ['POST', '/x/store/wipe'],
     ]) {
-      const req = { method, url, headers, async *[Symbol.asyncIterator]() { throw new Error('Body must not be read'); } };
+      const req = { method, url, headers, socket: { remoteAddress: '127.0.0.1' }, async *[Symbol.asyncIterator]() { throw new Error('Body must not be read'); } };
       const status = await new Promise<number>((resolve) => {
         const res = { statusCode: 0, setHeader: () => undefined, end: () => resolve(res.statusCode) };
         mw(req, res, () => resolve(404));
