@@ -241,7 +241,7 @@ Hecho con React 19, Vite, TypeScript, zustand, @xyflow/react, IndexedDB, zod y V
 ## Limitaciones conocidas
 
 - **Pensada para uso local y para una sola persona.** No tiene usuarios ni contraseña; publicada como web estática perdería la copia en disco y las rutas auxiliares `/x/*`.
-- **Atlas Cloud** publica solo su tarifa más baja, así que algunos costes se muestran como mínimo (`≥`).
+- **Precios de Atlas Cloud:** antes de generar, la app pide a Atlas el precio exacto de esa petición. Si esa consulta falla, muestra un mínimo (`≥`) y el plan sigue esperando tu aprobación: nunca se toma un mínimo como precio cerrado.
 - **Vídeos de entrada grandes:** fal y NanoGPT los reciben embebidos y pueden superar su tamaño máximo.
 
 ## Licencia
