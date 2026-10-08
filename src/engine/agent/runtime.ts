@@ -189,6 +189,16 @@ function planContext(sessionId: string, workspace: Workspace) {
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
     subjectNames: () => get().library.map((x) => x.name),
     userText: () => userWords(sessionId),
+    // The request being handled, not the whole conversation: an old "un ángulo diferente" must not fit a new request.
+    requestText: () => {
+      const draft = session(sessionId).agent.draft;
+      return [draft?.request ?? '', ...Object.values(draft?.answers ?? {})].join('\n');
+    },
+    // Angles already made from this source image, by finished angle operations on it.
+    usedAngles: (assetId: string) => Object.values(get().generations)
+      .filter((g) => g.status === 'done' && g.op?.id === 'angle' && g.op.sourceAssetId === assetId)
+      .map((g) => String(g.op?.params.angle ?? ''))
+      .filter(Boolean),
     requestImages: () => (session(sessionId).agent.draft?.attachments ?? []).filter((id) => get().assets[id]?.kind === 'image'),
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),

@@ -3,6 +3,7 @@ import { continuityErrors } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
+import { FIT_KEYS, aspectOfShape, fitOp } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import type {
@@ -169,6 +170,10 @@ export interface PlanContext {
   confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
   /** Every confirmed part of that kind, in card order: several when the card compared models (A/B in one plan). */
   confirmedParts?: (kind: MediaKind) => SettingsChoice[];
+  /** The request being handled: its message and its answers. What a fitted operation parameter is read from. */
+  requestText?: () => string;
+  /** Angle values already made from this source image, so "a different angle" takes one that is not made yet. */
+  usedAngles?: (assetId: string) => string[];
 }
 
 /** "@Name" in a prompt, as the app reads mentions (params.mentionSubjects). */
@@ -804,14 +809,34 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (inputKind !== def.input) errors.push(`${where}: op "${opId}" needs a${def.input === 'image' ? 'n image' : ' video'} input, "${s.input}" is ${inputKind}.${def.input === 'image' && inputKind === 'video' ? ` Fix: add a step { kind: "op", op: "extract_frame", input: "${s.input}", params: { which: "last" } } and use it as input.` : def.input === 'video' && inputKind === 'image' ? ' Fix: make a clip from it first (a video step with first_frame) and use that step as input.' : ''}`);
         }
         const params: Record<string, AdvancedValue> = {};
+        // The request and the source image fill what the agent left out (fit.ts). A valid value the agent gave is kept;
+        // a value the request cannot give (a place as a reference sheet, an unclear Instagram format) is refused with its reason.
+        const sourceId = String(s.input ?? '').replace(/^asset:/, '');
+        const source = sourceId ? ctx.asset(sourceId) : undefined;
+        const fitted = fitOp(opId, ctx.requestText?.() ?? '', {
+          sourceLongEdge: source?.width && source?.height ? Math.max(source.width, source.height) : undefined,
+          sourceAspect: source?.width && source?.height ? aspectOfShape(source.width / source.height) : undefined,
+          usedAngles: sourceId && ctx.usedAngles ? ctx.usedAngles(sourceId) : [],
+        });
         for (const f of def.fields) {
           // A field written on the step itself ("instruction": …) instead of in params counts as given.
           const loose = (s as unknown as Record<string, unknown>)[f.key];
           const v = s.params?.[f.key] ?? (typeof loose === 'string' || typeof loose === 'number' ? (loose as AdvancedValue) : undefined);
           if (f.type === 'choice') {
             const ok = f.options?.some((o) => o.value === String(v));
-            params[f.key] = ok ? String(v) : f.default;
-            if (v != null && !ok) adjustments.push(`${s.id}: ${f.key} "${String(v)}" → ${f.default}`);
+            if (ok) {
+              params[f.key] = String(v);
+              continue;
+            }
+            const fill = fitted.ok ? fitted.params[f.key] : undefined;
+            if (fill !== undefined) {
+              params[f.key] = fill;
+              adjustments.push(`${s.id}: ${f.key} "${fill}" from the request${v != null ? ` (was "${String(v)}")` : ''}`);
+              continue;
+            }
+            if (!fitted.ok && FIT_KEYS[opId]?.includes(f.key)) errors.push(`${where}: op "${opId}" needs ${f.key}: ${fitted.reason}. Ask the user, then propose again.`);
+            params[f.key] = f.default;
+            if (v != null) adjustments.push(`${s.id}: ${f.key} "${String(v)}" → ${f.default}`);
           } else {
             params[f.key] = typeof v === 'string' ? v : f.default;
           }

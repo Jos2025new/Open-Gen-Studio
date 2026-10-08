@@ -104,7 +104,7 @@ export function subjectFromAsset(assetId: string, name: string, kind: SubjectKin
   return subject;
 }
 
-/** A 2×2 reference sheet saved as separate views (Grid-split, local and free): panel 1 frontal, 2–4 extra views. */
+/** A reference sheet saved as separate views (Grid-split, local and free): the main view first, then the others. */
 export async function saveSheetViews(assetId: string, name: string, kind: SubjectKind, replace: boolean): Promise<Subject | null> {
   const sessionId = get().assets[assetId]?.sessionId ?? get().activeSessionId;
   // The cut and its order come from sheet.ts: a turnaround is one row of 3 or 4 views, other sheets 2×2.

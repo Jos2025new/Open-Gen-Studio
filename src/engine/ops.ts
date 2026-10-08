@@ -203,8 +203,8 @@ export const OPS: Record<OpId, OpDef> = {
       ].join(' ');
     },
   },
-  // Buzzy / Higgsfield: a multi-view sheet anchors an identity that repeats across steps. Four equal panels — a 2×2
-  // grid, or one row for a character turnaround — so Grid-split can turn it into separate reference views.
+  // Buzzy / Higgsfield: a multi-view sheet anchors an identity that repeats across steps. Equal panels — a 2×2 grid, or
+  // one row of 3 or 4 views for a character turnaround — so Grid-split can turn it into separate reference views.
   reference_sheet: {
     id: 'reference_sheet',
     label: 'Reference sheet',
@@ -285,7 +285,7 @@ export const OPS: Record<OpId, OpDef> = {
   },
   contact_sheet: {
     id: 'contact_sheet',
-    label: 'Nine-grid',
+    label: 'Contact sheet',
     description: 'A contact sheet: the same scene from 9 camera angles (3×3) or 6 (2×3), set by angles.',
     input: 'image',
     output: 'image',
@@ -413,7 +413,7 @@ export const OPS: Record<OpId, OpDef> = {
 const SHEET_RULES =
   'Plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions (head size, build, body shape, height; never stretched, elongated or slimmed), hair length and style, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
 
-/** The four panels of a reference sheet by subject and sheet type. */
+/** The layout of a reference sheet by subject and sheet type: a 2×2 grid, or a row of 3 or 4 turnaround views. */
 export function sheetLayout(subject: string, sheet: string, panels = '3'): string {
   const grid = 'A 2×2 grid of four equal panels with thin white gutters.';
   if (sheet === 'expressions') return grid + ' Reference sheet of this character: four head-and-shoulders panels with neutral, happy, angry and surprised expressions, same angle and lighting.';

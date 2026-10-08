@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { fitAngle, fitAspect, fitContactAngles, fitOp, fitPanels, fitUpscale } from '../src/engine/agent/fit';
+import { ASPECT_OPTIONS, fitAngle, fitAspect, fitContactAngles, fitOp, fitPanels, fitUpscale } from '../src/engine/agent/fit';
+import { OPS } from '../src/engine/ops';
 
 const value = (r: ReturnType<typeof fitOp>, key: string) => (r.ok ? r.params[key] : `NOT OK: ${r.ok ? '' : r.reason}`);
 
@@ -28,6 +29,14 @@ describe('angle takes a value from the request, or the first angle not made yet'
 describe('reframe takes a format: named, a platform, or another one than the source', () => {
   it('uses an explicit ratio', () => {
     expect(value(fitAspect('adapta esta imagen a 9:16'), 'aspect')).toBe('9:16');
+  });
+
+  it('"historia" alone is a story in the narrative sense, not a format', () => {
+    expect(value(fitAspect('quiero otro aspecto para mi historia', '16:9'), 'aspect')).toBe('4:5');
+  });
+
+  it('the formats it picks from are the reframe operation\'s own options', () => {
+    expect(ASPECT_OPTIONS).toEqual(OPS.reframe.fields.find((f) => f.key === 'aspect')!.options!.map((o) => String(o.value)));
   });
 
   it('Instagram alone is ambiguous (feed 4:5 or stories 9:16): the agent asks', () => {
@@ -87,8 +96,8 @@ describe('a reference sheet is for a character, a person or an object, never a p
     expect(fitOp('reference_sheet', 'tres vistas del producto')).toEqual({ ok: true, params: { subject: 'object', panels: '3' } });
   });
 
-  it('a request that names none of the three is asked about, not guessed', () => {
-    expect(fitOp('reference_sheet', 'tres vistas de esto').ok).toBe(false);
+  it('a request that names none of the three keeps the default subject (a character), no refusal', () => {
+    expect(fitOp('reference_sheet', 'tres vistas de esto')).toEqual({ ok: true, params: { panels: '3' } });
   });
 });
 
@@ -100,7 +109,7 @@ describe('reference sheet and contact sheet take their count', () => {
   });
 
   it('contact sheet: 9 angles unless 6 are named', () => {
-    expect(value(fitContactAngles('dame múltiples ángulos'), 'angles')).toBe('9');
+    expect(fitContactAngles('hoja de contacto de esta escena')).toEqual({ ok: true, params: {} });
     expect(value(fitContactAngles('seis ángulos de la escena'), 'angles')).toBe('6');
     expect(value(fitContactAngles('nueve ángulos'), 'angles')).toBe('9');
   });
