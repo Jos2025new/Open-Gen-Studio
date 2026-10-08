@@ -25,7 +25,8 @@ El modelo general separa operación (qué se pide) e intento (una corrida concre
 
 ## Consecuencias
 
-- Un plan caro o de coste desconocido no llega al feed hasta que el usuario confirma ajustes.
+- En Auto y Guided, un plan caro o de coste desconocido no llega al feed hasta que el usuario confirma ajustes.
+- En Direct ([0007](0007-modos-y-encaje-del-agente.md), decisión 1) este gate no se aplica: `presentPlan` omite `needsConfirmation` cuando el modo es Direct, así que un plan caro o de coste desconocido llega al feed y su tarjeta de aprobación es el control antes de generar. La autorización de gasto sigue siendo independiente.
 - Los planes con vídeo o varios candidatos se muestran en la tarjeta de aprobación en lugar de pedir ajustes.
 - La aprobación del plan y la autorización de gasto siguen siendo independientes (SETTINGS_POLICY).
 - Límites: el umbral y la reversión de la regla de ajustes necesitan aprobación del usuario. No se implementan traits, Project, Export/Assemble, estado outdated ni decisiones editoriales por contexto; no hay caso real que los exija todavía. No hay prueba en sandbox ni con proveedores reales de los tres recorridos (una imagen suelta, «ahora en un sofá» y regenerar un nodo).
