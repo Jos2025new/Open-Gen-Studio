@@ -22,6 +22,7 @@ import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, describeMentions, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { ADAPTERS } from './providers/registry';
+import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
@@ -232,19 +233,12 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
     const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
     images.push(await frameInput(sourceAssetId, which));
   } else if (id === 'grid_split') {
-    // 'row3' / 'row4': one row of three or four views (a character turnaround sheet); otherwise an n×n grid.
-    const row = params.grid === 'row3' ? 3 : params.grid === 'row4' ? 4 : 0;
-    const cols = row || (Number(params.grid) === 2 ? 2 : 3);
-    const rows = row ? 1 : cols;
+    // Cells come from sheet.ts: squares (2, 3), 2×3 (six views), or one row of 3 or 4 views (a turnaround sheet).
     const src = await blobToCanvas((await mediaInput(sourceAssetId)).blob);
-    const w = Math.floor(src.width / cols);
-    const h = Math.floor(src.height / rows);
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const c = createCanvas(w, h);
-        ctx2d(c).drawImage(src, col * w, row * h, w, h, 0, 0, w, h);
-        images.push({ blob: await canvasToBlob(c, 'image/png'), width: w, height: h });
-      }
+    for (const cell of cellRects(gridShape(params.grid), src.width, src.height)) {
+      const c = createCanvas(cell.w, cell.h);
+      ctx2d(c).drawImage(src, cell.x, cell.y, cell.w, cell.h, 0, 0, cell.w, cell.h);
+      images.push({ blob: await canvasToBlob(c, 'image/png'), width: cell.w, height: cell.h });
     }
   } else {
     throw new Error(`${id} is not a local operation`);

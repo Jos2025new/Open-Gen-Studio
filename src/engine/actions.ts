@@ -18,6 +18,7 @@ import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './
 import { deleteBuffers, rasterBufferIds } from './design/raster';
 import { dropHistory } from './design/history';
 import { designerDims } from './agent/runtime';
+import { sheetCut } from './sheet';
 import type { AdvancedValue, Asset, Estimate, Generation, GraphNode, MediaKind, OpId, Subject, SubjectKind, Workspace } from './types';
 import {
   addAssets,
@@ -106,16 +107,13 @@ export function subjectFromAsset(assetId: string, name: string, kind: SubjectKin
 /** A 2×2 reference sheet saved as separate views (Grid-split, local and free): panel 1 frontal, 2–4 extra views. */
 export async function saveSheetViews(assetId: string, name: string, kind: SubjectKind, replace: boolean): Promise<Subject | null> {
   const sessionId = get().assets[assetId]?.sessionId ?? get().activeSessionId;
-  // A character turnaround is one row of 3 or 4 views (its "panels"); other sheets are 2×2.
-  const made = get().generations[get().assets[assetId]?.generationId ?? '']?.op;
-  const turnaround = made?.id === 'reference_sheet' && made.params.sheet === 'turnaround' && (made.params.subject ?? 'character') === 'character';
-  const panels = made?.params.panels === '4' ? 4 : 3;
-  const grid = turnaround ? (panels === 4 ? 'row4' : 'row3') : '2';
+  // The cut and its order come from sheet.ts: a turnaround is one row of 3 or 4 views, other sheets 2×2.
+  const { grid, order } = sheetCut(get().generations[get().assets[assetId]?.generationId ?? '']?.op);
   try {
     const g = createGeneration(await opSpec({ sessionId, sourceAssetId: assetId, op: 'grid_split', params: { grid }, origin: 'op' }));
     const cut = await runGeneration(g.id);
-    // A 3-view turnaround reads side, front, back: the front view is the main image. A 4-view one is written front first.
-    const views = turnaround && panels === 3 && cut.length === 3 ? [cut[1], cut[0], cut[2]] : cut;
+    // The main image comes first: a turnaround's front view.
+    const views = cut.length === order.length ? order.map((i) => cut[i]) : cut;
     return subjectFromAsset(assetId, name, kind, { replace, views: views.length >= 3 ? views : undefined });
   } catch (err) {
     toast((err as Error).message, 'error');

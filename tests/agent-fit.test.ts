@@ -30,8 +30,12 @@ describe('reframe takes a format: named, a platform, or another one than the sou
     expect(value(fitAspect('adapta esta imagen a 9:16'), 'aspect')).toBe('9:16');
   });
 
-  it('reads Instagram as the feed post (4:5) and stories or reels as 9:16', () => {
-    expect(value(fitAspect('cambia la imagen en formato para instagram'), 'aspect')).toBe('4:5');
+  it('Instagram alone is ambiguous (feed 4:5 or stories 9:16): the agent asks', () => {
+    expect(fitAspect('cambia la imagen en formato para instagram').ok).toBe(false);
+  });
+
+  it('Instagram with "post" or "feed" is the feed, 4:5; stories and reels are 9:16', () => {
+    expect(value(fitAspect('haz un post de instagram con esta imagen'), 'aspect')).toBe('4:5');
     expect(value(fitAspect('pásala a formato de historia de instagram'), 'aspect')).toBe('9:16');
     expect(value(fitAspect('para reels'), 'aspect')).toBe('9:16');
   });
@@ -65,6 +69,26 @@ describe('upscale takes its factor from the target size and the source image', (
 
   it('an image already at the target size does not fit', () => {
     expect(fitUpscale('pásala a 4K', 3840).ok).toBe(false);
+  });
+});
+
+describe('a reference sheet is for a character, a person or an object, never a place', () => {
+  it('a place does not fit, and the agent may ask', () => {
+    expect(fitOp('reference_sheet', 'tres vistas de la ciudad').ok).toBe(false);
+    expect(fitOp('reference_sheet', 'tres vistas de la casa').ok).toBe(false);
+  });
+
+  it('a character or a person fits, with 3 views unless 4 are named', () => {
+    expect(fitOp('reference_sheet', 'hazme tres vistas de este personaje')).toEqual({ ok: true, params: { subject: 'character', panels: '3' } });
+    expect(fitOp('reference_sheet', 'cuatro vistas de ella')).toEqual({ ok: true, params: { subject: 'character', panels: '4' } });
+  });
+
+  it('an object or a product fits as an object', () => {
+    expect(fitOp('reference_sheet', 'tres vistas del producto')).toEqual({ ok: true, params: { subject: 'object', panels: '3' } });
+  });
+
+  it('a request that names none of the three is asked about, not guessed', () => {
+    expect(fitOp('reference_sheet', 'tres vistas de esto').ok).toBe(false);
   });
 });
 

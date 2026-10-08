@@ -57,11 +57,14 @@ export function fitAspect(text: string, sourceAspect?: string): FitResult {
   const explicit = s.match(/\b(\d{1,2}):(\d{1,2})\b/);
   if (explicit && ASPECT_OPTIONS.includes(`${explicit[1]}:${explicit[2]}`)) return { ok: true, params: { aspect: `${explicit[1]}:${explicit[2]}` } };
   if (/\bcuadrad\w*|\bsquare\b/.test(s)) return { ok: true, params: { aspect: '1:1' } };
-  if (/\b(story|stories|historia de instagram|reels?|tiktok|shorts|vertical)\b/.test(s)) return { ok: true, params: { aspect: '9:16' } };
+  if (/\b(story|stories|historias?|reels?|tiktok|shorts|vertical)\b/.test(s)) return { ok: true, params: { aspect: '9:16' } };
   if (/\b(youtube|horizontal|panoramica|widescreen)\b/.test(s)) return { ok: true, params: { aspect: '16:9' } };
   if (/\b(cine|cinematic|cinemascope|ultrawide)\b/.test(s)) return { ok: true, params: { aspect: '21:9' } };
-  // Instagram alone means the feed post: 4:5.
-  if (/\binstagram\b/.test(s)) return { ok: true, params: { aspect: '4:5' } };
+  // Instagram is two formats: the feed post (4:5) or stories and reels (9:16). Only "post" or "feed" settles it.
+  if (/\binstagram\b/.test(s)) {
+    if (/\b(post|feed|publicacion)\b/.test(s)) return { ok: true, params: { aspect: '4:5' } };
+    return { ok: false, reason: 'Instagram is a feed post (4:5) or stories and reels (9:16): ask which' };
+  }
   if (CHANGE_WORDS.test(s) || /\b(cambia|cambiar|adapta|adaptar|pasa|pasala|convierte)\b/.test(s)) {
     const free = ASPECT_ORDER.find((a) => a !== sourceAspect);
     return { ok: true, params: { aspect: free ?? '4:5' } };
@@ -91,6 +94,31 @@ export function fitPanels(text: string): FitResult {
   return { ok: true, params: { panels: '3' } };
 }
 
+const PLACE = /\b(ciudad\w*|city|pueblo|town|casa|house|edificio|building|habitacion|room|cocina|kitchen|calle|street|plaza|paisaje|landscape|lugar|place|interior|exterior|fachada|facade|jardin|garden|oficina|office|hotel|parque|park|bosque|forest|playa|beach|montana|mountain)\b/;
+const PERSON = /\b(personaj\w*|persona\w*|character|people|person|mujer\w*|hombre\w*|nin[oa]s?|chic[oa]s?|ella|ellos|conejo\w*|animal\w*|perro\w*|gato\w*|actor\w*|actriz\w*|modelo)\b/;
+const OBJECT = /\b(producto\w*|objeto\w*|product|object|bolso\w*|botella\w*|zapato\w*|reloj\w*|mochila\w*|taza\w*|silla\w*|mueble\w*)\b/;
+
+/**
+ * The subject of a reference sheet: a character, a person or an object. A place is not a reference sheet subject, and a
+ * request that names none of the three is asked about, not guessed.
+ */
+export function fitSubject(text: string): FitResult {
+  const s = normalizeRequest(text);
+  if (PLACE.test(s)) return { ok: false, reason: 'a place is not a reference sheet subject (only characters, people or objects)' };
+  if (PERSON.test(s)) return { ok: true, params: { subject: 'character' } };
+  if (OBJECT.test(s)) return { ok: true, params: { subject: 'object' } };
+  return { ok: false, reason: 'the subject is not clear: a character, a person or an object?' };
+}
+
+/** A reference sheet fits when its subject does and its view count is set. */
+export function fitSheet(text: string): FitResult {
+  const subject = fitSubject(text);
+  if (!subject.ok) return subject;
+  const panels = fitPanels(text);
+  if (!panels.ok) return panels;
+  return { ok: true, params: { ...subject.params, ...panels.params } };
+}
+
 /** Angles of a contact sheet: 9 (3×3) or 6 (2×3). Without a number, 9. */
 export function fitContactAngles(text: string): FitResult {
   const s = normalizeRequest(text);
@@ -104,7 +132,7 @@ export function fitOp(op: string, text: string, ctx: FitContext = {}): FitResult
     case 'angle': return fitAngle(text, ctx.usedAngles);
     case 'reframe': return fitAspect(text, ctx.sourceAspect);
     case 'upscale': return fitUpscale(text, ctx.sourceLongEdge);
-    case 'reference_sheet': return fitPanels(text);
+    case 'reference_sheet': return fitSheet(text);
     case 'contact_sheet': return fitContactAngles(text);
     default: return { ok: true, params: {} };
   }

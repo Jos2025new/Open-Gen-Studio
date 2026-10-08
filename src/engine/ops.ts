@@ -1,4 +1,5 @@
 import type { AdvancedValue, AssetKind, OpId } from './types';
+import { gridShape } from './sheet';
 
 export interface OpField {
   key: string;
@@ -213,7 +214,7 @@ export const OPS: Record<OpId, OpDef> = {
     engine: 'edit',
     quick: false,
     fields: [
-      { key: 'subject', label: 'Subject', type: 'choice', default: 'character', options: opt(['character', 'Character'], ['object', 'Object / product'], ['location', 'Place']) },
+      { key: 'subject', label: 'Subject', type: 'choice', default: 'character', options: opt(['character', 'Character'], ['object', 'Object / product']) },
       { key: 'sheet', label: 'Sheet', type: 'choice', default: 'turnaround', options: opt(['turnaround', 'Turnaround'], ['expressions', 'Expressions'], ['outfits', 'Outfits']) },
       { key: 'panels', label: 'Views', type: 'choice', default: '3', options: opt(['3', '3 views'], ['4', '4 views']) },
       { key: 'aspect', label: 'Format', type: 'choice', default: '16:9', options: opt(['16:9', '16:9'], ['3:2', '3:2'], ['4:3', '4:3'], ['1:1', '1:1']) },
@@ -306,7 +307,7 @@ export const OPS: Record<OpId, OpDef> = {
     output: 'image',
     engine: 'local',
     quick: false,
-    fields: [{ key: 'grid', label: 'Grid', type: 'choice', default: '3', options: opt(['2', '2×2'], ['3', '3×3']) }],
+    fields: [{ key: 'grid', label: 'Grid', type: 'choice', default: '3', options: opt(['2', '2×2'], ['3', '3×3'], ['2x3', '2×3 (six)']) }],
   },
   join_clips: {
     id: 'join_clips',
@@ -442,7 +443,10 @@ export function defaultOpParams(op: OpDef): Record<string, AdvancedValue> {
 
 export function opCount(op: OpDef, params: Record<string, AdvancedValue>): number {
   if (op.id === 'variations' || op.id === 'reference_sheet') return Math.max(1, Math.min(4, Number(params.count) || 1));
-  if (op.id === 'grid_split') return params.grid === 'row3' ? 3 : (Number(params.grid) || 3) ** 2;
+  if (op.id === 'grid_split') {
+    const shape = gridShape(params.grid);
+    return shape.rows * shape.cols;
+  }
   return 1;
 }
 
