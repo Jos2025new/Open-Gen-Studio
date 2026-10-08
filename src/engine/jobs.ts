@@ -24,8 +24,8 @@ import { audioInputProblem, songProblem, clipTrim, coerceSettings, describeMenti
 import { ADAPTERS } from './providers/registry';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
-import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationOrigin, MediaKind, ModelSchema, OpId, RemoteJob } from './types';
-import { addAssets, addSpend, patchAsset, patchGeneration, upsertGeneration, useStore } from '../store/store';
+import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
+import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
 const controllers = new Map<string, AbortController>();
@@ -858,7 +858,36 @@ export function retryGeneration(id: string): Promise<string[]> {
     estimate: g.estimate,
     variants: g.variants,
   });
+  // Whoever showed the failed attempt now shows this one: otherwise the retry is charged and its result is never seen.
+  relinkAttempt(g.id, newG.id);
   return runGeneration(newG.id);
+}
+
+/**
+ * Point every reference to a previous attempt at the new one: a node's generationId, a chat generation card,
+ * the step → generation map of a plan. The previous record stays in the store as history.
+ */
+function relinkAttempt(oldId: string, newId: string): void {
+  for (const [sessionId, session] of Object.entries(useStore.getState().sessions)) {
+    const nodes = session.graph?.nodes ?? [];
+    if (nodes.some((n) => 'generationId' in n.data && n.data.generationId === oldId)) {
+      setGraph(sessionId, (gr) => ({
+        ...gr,
+        nodes: gr.nodes.map((n): GraphNode => ('generationId' in n.data && n.data.generationId === oldId
+          ? { ...n, data: { ...n.data, generationId: newId } as GraphNode['data'] } : n)),
+      }));
+    }
+    for (const item of session.feed) {
+      if (item.type === 'generation' && item.generationId === oldId) {
+        updateFeedItem<GenerationFeedItem>(sessionId, item.id, { generationId: newId });
+      } else if (item.type === 'plan' && Object.values(item.stepGenerations).includes(oldId)) {
+        updateFeedItem<PlanFeedItem>(sessionId, item.id, (it) => ({
+          ...it,
+          stepGenerations: Object.fromEntries(Object.entries(it.stepGenerations).map(([step, gid]) => [step, gid === oldId ? newId : gid])),
+        }));
+      }
+    }
+  }
 }
 
 /**

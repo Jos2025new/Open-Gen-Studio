@@ -25,6 +25,7 @@
 - [0003 — Probar la app solo en el sandbox](decisions/0003-pruebas-en-sandbox.md).
 - [0004 — Aprobar un coste máximo antes de usar proveedores de pago](decisions/0004-coste-maximo.md).
 - [0005 — Contrato operativo del agente: implementación transversal y límites](decisions/0005-contrato-operativo-agente.md).
+- [0006 — Modelo general generativo: automatización por coste e intentos enlazados](decisions/0006-modelo-general-generativo.md).
 
 ## Historial
 

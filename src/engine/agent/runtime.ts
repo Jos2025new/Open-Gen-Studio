@@ -1,4 +1,4 @@
-import { missingSettingsKind, planRequiresSettings } from '../procedure';
+import { costAskMessage, needsConfirmation, planRequiresSettings } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
 import { nodeIdsSchema } from './tools';
@@ -273,9 +273,10 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // A fresh request.
   if (pending) resolvePendingAsSuperseded(sessionId);
   beginJourney(sessionId, 'settings-response');
-  // Confirmed settings belong to one request (its plan and its revisions): a new request shows the card again,
-  // so old values (a sheet's 16:9 ×2) never silently apply to new work.
-  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settings: undefined, settingsParts: undefined });
+  // Confirmed settings stay confirmed for this session (General Model, Phase 1: reuse the context). Whether a later
+  // plan may reuse them without a card is decided by its cost and choices (needsConfirmation in presentPlan), so a
+  // costly, multi-candidate or video plan is still shown or asked. Per-request comparison parts are cleared.
+  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
@@ -551,7 +552,7 @@ async function presentPlan(
   revision = false,
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
-): Promise<{ errors: string[]; itemId?: string }> {
+): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
@@ -563,6 +564,20 @@ async function presentPlan(
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey, event: plan ? 'plan.normalized' : 'plan.rejected', reason: plan ? 'normalizer accepted resolved steps' : 'normalizer rejected plan', sessionId, planId, before: (raw.steps ?? []).map((step) => ({ stepId: step.id, kind: step.kind, model: step.model, references: step.refs, firstFrame: step.first_frame, lastFrame: step.last_frame })), after: plan ? plan.steps.map((step) => ({ stepId: step.id, kind: step.kind, modelRef: 'modelRef' in step ? step.modelRef : undefined, inputs: summarizeInputs(step), settings: 'settings' in step ? step.settings : undefined, adjustments: plan.adjustments.filter((a) => a.startsWith(`${step.id}:`)) })) : { errors } });
   if (!plan) return { errors };
   const { total } = estimateSteps(plan.steps);
+  // Automation policy (§11) on the normalized plan: cost and candidates are known only here.
+  // Nothing is stored or shown before this check: a plan that needs the settings card is not presented.
+  const settingKinds = plan.steps.map((st) => st.kind).filter((k): k is 'image' | 'video' => k === 'image' || k === 'video');
+  if (workspace !== 'node' && settingKinds.length) {
+    const action = needsConfirmation({
+      workspace,
+      kinds: settingKinds,
+      settings: session(sessionId).agent.settings,
+      userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
+      estimatedCost: total.usd,
+      hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
+    });
+    if (action === 'ask') return { errors: [], settingsNeeded: costAskMessage(settingKinds, total.usd) };
+  }
   const style = get().composer.agentStyle;
   const item: PlanFeedItem = {
     ...feedBase(workspace),
@@ -1159,22 +1174,14 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         return;
       }
       // A step that fails again rejects here; its card already shows the error, the plan must still settle.
-      const oldId = g.id;
       await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
-      // retryGeneration may have created a new generation (same operation, new attempt).
-      // Find the latest attempt for this operation to check its status.
+      // A retry creates a new attempt and relinks the plan's step → generation mapping itself (jobs.ts relinkAttempt).
+      // The latest attempt of the same operation is the one whose status counts.
       const opId = g.operationId ?? g.id;
       const latestAttempt = Object.values(get().generations)
         .filter(x => (x.operationId ?? x.id) === opId)
         .sort((a, b) => b.createdAt - a.createdAt)[0];
       const after = latestAttempt ?? get().generations[g.id];
-      // Update the plan's step → generation mapping if a new attempt was created.
-      if (after && after.id !== oldId) {
-        updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
-          ...it,
-          stepGenerations: { ...it.stepGenerations, [id]: after.id },
-        }));
-      }
       if (after?.status === 'done') recovered.add(id);
       else if (after?.status === 'review') waiting.add(id);
       else blocked.set(id, after?.error ?? 'Failed');
@@ -1747,8 +1754,8 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             continue;
           }
           // Settings belong to generation kinds; revisions reuse confirmed kinds and confirm newly introduced ones.
-          // The gate uses planRequiresSettings: a kind that was never confirmed still blocks;
-          // reuse of an existing confirmed kind is allowed automatically (Phase 1 of the General Model).
+          // Before normalization: a kind never confirmed in this session still blocks.
+          // After normalization (presentPlan): the cost-based automation policy (needsConfirmation).
           if (workspace !== 'node') {
             const kinds = v.data.steps.map((st) => st.kind);
             const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);
@@ -1760,6 +1767,13 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           }
           patchAgent(sessionId, { phase: 'checking' });
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
+          if (presented.settingsNeeded) {
+            // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
+            if (textItemId) removeFeedItem(sessionId, textItemId);
+            recordMetric(sessionId, { type: 'rejected' });
+            respond(presented.settingsNeeded);
+            continue;
+          }
           if (presented.errors.length) {
             // What the agent wrote before a rejected plan promised it; the feed drops it (the history keeps it).
             if (textItemId) removeFeedItem(sessionId, textItemId);
