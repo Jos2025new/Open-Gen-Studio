@@ -64,7 +64,7 @@ describe('requests that name no operation', () => {
     expect(detectOps('Quiero que el cuento tenga un final feliz')).toEqual([]);
   });
 
-  it('"tres vistas" names the angle operation', () => {
-    expect(detectOps('Hazme una serie de tres vistas de este personaje')).toEqual(['angle']);
+  it('"tres vistas" of a character names the reference sheet, not the angle', () => {
+    expect(detectOps('Hazme una serie de tres vistas de este personaje')).toEqual(['reference_sheet']);
   });
 });

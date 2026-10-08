@@ -207,7 +207,7 @@ export const OPS: Record<OpId, OpDef> = {
   reference_sheet: {
     id: 'reference_sheet',
     label: 'Reference sheet',
-    description: 'A four-panel reference sheet (turnaround, expressions or outfits) of a character, object or place, to keep it identical in later steps.',
+    description: 'A reference sheet (turnaround, expressions or outfits) of a character, object or place, to keep it identical in later steps. A character turnaround has 3 or 4 views, set by panels.',
     input: 'image',
     output: 'image',
     engine: 'edit',
@@ -215,11 +215,12 @@ export const OPS: Record<OpId, OpDef> = {
     fields: [
       { key: 'subject', label: 'Subject', type: 'choice', default: 'character', options: opt(['character', 'Character'], ['object', 'Object / product'], ['location', 'Place']) },
       { key: 'sheet', label: 'Sheet', type: 'choice', default: 'turnaround', options: opt(['turnaround', 'Turnaround'], ['expressions', 'Expressions'], ['outfits', 'Outfits']) },
+      { key: 'panels', label: 'Views', type: 'choice', default: '3', options: opt(['3', '3 views'], ['4', '4 views']) },
       { key: 'aspect', label: 'Format', type: 'choice', default: '16:9', options: opt(['16:9', '16:9'], ['3:2', '3:2'], ['4:3', '4:3'], ['1:1', '1:1']) },
       { key: 'count', label: 'Candidates', type: 'choice', default: '1', options: opt(['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']) },
       { key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'e.g. full body, sneakers' },
     ],
-    instruction: (p) => `${sheetLayout(String(p.subject), String(p.sheet))} ${SHEET_RULES}${note(p)}`,
+    instruction: (p) => `${sheetLayout(String(p.subject), String(p.sheet), String(p.panels ?? '3'))} ${SHEET_RULES}${note(p)}`,
   },
   variations: {
     id: 'variations',
@@ -284,14 +285,18 @@ export const OPS: Record<OpId, OpDef> = {
   contact_sheet: {
     id: 'contact_sheet',
     label: 'Nine-grid',
-    description: 'A 3×3 contact sheet: the same scene from nine camera angles.',
+    description: 'A contact sheet: the same scene from 9 camera angles (3×3) or 6 (2×3), set by angles.',
     input: 'image',
     output: 'image',
     engine: 'edit',
     quick: false,
-    fields: [{ key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'Optional detail, e.g. keep the rain' }],
-    instruction: (p) =>
-      `Create a 3×3 contact sheet: nine equal panels in a grid with thin gutters, each showing this exact scene from a different camera angle and shot size (wide, medium, close-up, low angle, high angle, over the shoulder, profile, top-down, detail). ${PRESERVE}${note(p)}`,
+    fields: [
+      { key: 'angles', label: 'Angles', type: 'choice', default: '9', options: opt(['9', '9 angles (3×3)'], ['6', '6 angles (2×3)']) },
+      { key: 'note', label: 'Note', type: 'text', default: '', placeholder: 'Optional detail, e.g. keep the rain' },
+    ],
+    instruction: (p) => (String(p.angles ?? '9') === '6'
+      ? `Create a 2×3 contact sheet: six equal panels in two rows of three with thin gutters, each showing this exact scene from a different camera angle and shot size (wide, medium, close-up, low angle, high angle, profile). ${PRESERVE}${note(p)}`
+      : `Create a 3×3 contact sheet: nine equal panels in a grid with thin gutters, each showing this exact scene from a different camera angle and shot size (wide, medium, close-up, low angle, high angle, over the shoulder, profile, top-down, detail). ${PRESERVE}${note(p)}`),
   },
   grid_split: {
     id: 'grid_split',
@@ -408,14 +413,16 @@ const SHEET_RULES =
   'Plain neutral grey background, even studio light, the same scale in every panel, no text, no labels, no props that are not part of the subject. Keep the identity, proportions (head size, build, body shape, height; never stretched, elongated or slimmed), hair length and style, colors, materials and every established detail exactly as in the source; do not stylize it differently. Characters are original and adults read as adults.';
 
 /** The four panels of a reference sheet by subject and sheet type. */
-export function sheetLayout(subject: string, sheet: string): string {
+export function sheetLayout(subject: string, sheet: string, panels = '3'): string {
   const grid = 'A 2×2 grid of four equal panels with thin white gutters.';
   if (sheet === 'expressions') return grid + ' Reference sheet of this character: four head-and-shoulders panels with neutral, happy, angry and surprised expressions, same angle and lighting.';
   if (sheet === 'outfits') return `${grid} Reference sheet of this ${subject === 'character' ? 'character' : 'subject'}: four full panels, the same identity in four different outfits or finishes, same pose and angle.`;
   if (subject === 'location') return grid + ' Reference sheet of this place: panel 1 establishing wide shot, panel 2 top-down plan view, panel 3 close detail of its main materials, panel 4 reverse angle.';
   if (subject === 'object' || subject === 'product') return grid + ' Reference sheet of this object: panel 1 front, panel 2 side, panel 3 back, panel 4 top-down, centered and whole in each.';
-  // Three full-body views side by side on one canvas, no cells: narrow panels pushed models to stretch the body.
-  return 'Character turnaround reference sheet: the same character three times side by side on one canvas, side view, front view and back view, full body from head to feet at the same scale and height, relaxed neutral pose. Body proportions exactly as in the source: head size, chest, hips and leg length; never taller, longer-legged or slimmer.';
+  // Full-body views side by side on one canvas, no cells: narrow panels pushed models to stretch the body.
+  const proportions = 'Body proportions exactly as in the source: head size, chest, hips and leg length; never taller, longer-legged or slimmer.';
+  if (panels === '4') return `Character turnaround reference sheet: the same character four times side by side on one canvas, front view, three-quarter view, side view and back view, full body from head to feet at the same scale and height, relaxed neutral pose. ${proportions}`;
+  return `Character turnaround reference sheet: the same character three times side by side on one canvas, side view, front view and back view, full body from head to feet at the same scale and height, relaxed neutral pose. ${proportions}`;
 }
 
 function note(p: Record<string, AdvancedValue>): string {

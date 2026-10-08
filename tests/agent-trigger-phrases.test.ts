@@ -24,10 +24,21 @@ const POSITIVES: Array<[string, string]> = [
   ['crea una voz para la narradora', 'create_voice'],
   ['make a voice for her so I can hear it', 'create_voice'],
   ['clone my voice', 'create_voice'],
-  ['hazme tres vistas de este personaje: frontal, lateral y trasera', 'angle'],
+  ['hazme tres vistas de este personaje: frontal, lateral y trasera', 'reference_sheet'],
   ['una vista lateral de la casa', 'angle'],
   ['vista frontal del producto', 'angle'],
-  ['three views of her: front, side and back', 'angle'],
+  ['three views of her: front, side and back', 'reference_sheet'],
+  ['dame un ángulo diferente de esta escena', 'angle'],
+  ['dame múltiples ángulos de esta escena', 'contact_sheet'],
+  ['seis ángulos de la misma escena', 'contact_sheet'],
+  ['pásala a 4K', 'upscale'],
+  ['sube la resolución a 4K', 'upscale'],
+  ['upscale this image to 8k', 'upscale'],
+  ['adapta esta imagen a 9:16', 'reframe'],
+  ['quiero otro aspecto para esta imagen', 'reframe'],
+  ['cambia la imagen en formato para instagram', 'reframe'],
+  ['pásala a formato de historia de instagram', 'reframe'],
+  ['make it 9:16 for tiktok', 'reframe'],
 ];
 
 // Each operation gets its own hard negatives: the word or a close one appears, nothing is requested.
@@ -58,6 +69,11 @@ const NEGATIVES: string[] = [
   'una vista de pájaro sobre el pueblo',
   // relight
   'con un fondo azul pastel y luz suave',
+  // upscale: 4K as a subject of a new image is not a request to upscale
+  'genera un paisaje en 4K de montañas al amanecer',
+  // reframe: a post for Instagram is a new image, not a change of format
+  'haz un post para instagram de mi cafetería',
+  'genera una imagen 16:9 de un castillo',
   // unrelated
   'una historia de un fotógrafo que viaja al sur',
 ];

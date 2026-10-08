@@ -232,9 +232,10 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
     const which = params.which === 'first' ? 'first' : params.which === 'time' && Number.isFinite(seconds) ? seconds : 'last';
     images.push(await frameInput(sourceAssetId, which));
   } else if (id === 'grid_split') {
-    // 'row3': one row of three views (a character turnaround sheet); otherwise an n×n grid.
-    const cols = params.grid === 'row3' ? 3 : Number(params.grid) === 2 ? 2 : 3;
-    const rows = params.grid === 'row3' ? 1 : cols;
+    // 'row3' / 'row4': one row of three or four views (a character turnaround sheet); otherwise an n×n grid.
+    const row = params.grid === 'row3' ? 3 : params.grid === 'row4' ? 4 : 0;
+    const cols = row || (Number(params.grid) === 2 ? 2 : 3);
+    const rows = row ? 1 : cols;
     const src = await blobToCanvas((await mediaInput(sourceAssetId)).blob);
     const w = Math.floor(src.width / cols);
     const h = Math.floor(src.height / rows);
