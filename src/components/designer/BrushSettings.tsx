@@ -34,10 +34,12 @@ function BrushPreview({ brush, erase }: { brush: Brush; erase: boolean }) {
     const tip = tipFor({ ...brush, size }, erase);
     const img = ctx.createImageData(W, H), rgb = erase ? ([200, 200, 200] as [number, number, number]) : hexRgb(brush.color);
     const n = 48, pt = (i: number) => { const t = i / n; return [12 + t * (W - 24), H / 2 + Math.sin(t * Math.PI * 2) * (H / 2 - size / 2 - 4) * 0.6, Math.sin(t * Math.PI)] as const; };
+    let last: { width: number; density: number } | undefined;
     for (let i = 0; i < n; i++) {
       const [ax, ay] = pt(i), [bx, by, p] = pt(i + 1);
       const { width, density } = atPressure({ ...brush, size }, p);
-      stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb);
+      stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last);
+      last = { width, density };
     }
     const mask = document.createElement('canvas');
     mask.width = W; mask.height = H;

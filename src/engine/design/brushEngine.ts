@@ -126,19 +126,21 @@ export interface AlphaImage { data: Uint8ClampedArray; width: number; height: nu
  * Lay one segment into an RGBA mask (ox/oy: the mask's top-left in layer pixels), keeping each pixel's strongest
  * coverage. The colour is written with it, so the mask can be composited as the paint itself.
  */
-export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: readonly number[], density: number, tip: BrushTip, rgb: [number, number, number]): void {
+export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: readonly number[], density: number, tip: BrushTip, rgb: [number, number, number], from?: { width: number; density: number }): void {
+  // Width and density run from the previous segment's to this one's, so pressure changes blend instead of stepping.
   const [ax, ay, bx, by, width] = seg;
-  const r = Math.max(0.5, width / 2), dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+  const w0 = from?.width ?? width, d0 = clamp01(from?.density ?? density), d1 = clamp01(density);
+  const r = Math.max(0.5, Math.max(w0, width) / 2), dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
   const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - r - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - r - 1 - oy));
   const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + r + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + r + 1 - oy));
-  const strength = clamp01(tip.textureStrength ?? 0), dens = clamp01(density);
+  const strength = clamp01(tip.textureStrength ?? 0);
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const px = x + ox + 0.5, py = y + oy + 0.5;
       const t = len2 ? clamp01(((px - ax) * dx + (py - ay) * dy) / len2) : 0;
-      const d = Math.hypot(px - ax - t * dx, py - ay - t * dy);
-      if (d > r + 0.5) continue;
-      let cov = profile(d, r, tip.hardness) * dens;
+      const d = Math.hypot(px - ax - t * dx, py - ay - t * dy), rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
+      if (d > rt + 0.5) continue;
+      let cov = profile(d, rt, tip.hardness) * (d0 + (d1 - d0) * t);
       if (tip.texture && strength) cov *= 1 - strength * (1 - textureAt(tip.texture, x + ox, y + oy));
       const a = Math.round(cov * 255), i = (y * img.width + x) * 4;
       if (a > img.data[i + 3]) {

@@ -93,3 +93,19 @@ describe('stamping', () => {
     }
   });
 });
+
+describe('pressure changes blend along a segment (no steps)', () => {
+  it('the width runs from the previous segment to this one, column by column', () => {
+    const i = img(60, 40);
+    stampSegment(i, 0, 0, [10, 20, 50, 20, 24], 1, { hardness: 1 }, [0, 0, 0], { width: 4, density: 1 });
+    const height = (x: number) => { let n = 0; for (let y = 0; y < 40; y++) if (alpha(i, x, y) > 127) n++; return n; };
+    const cols = [12, 20, 30, 40, 48].map(height);
+    for (let k = 1; k < cols.length; k++) expect(cols[k]).toBeGreaterThan(cols[k - 1]);
+  });
+  it('density too: faint where the previous segment was faint', () => {
+    const i = img(60, 20);
+    stampSegment(i, 0, 0, [10, 10, 50, 10, 10], 1, { hardness: 1 }, [0, 0, 0], { width: 10, density: 0.2 });
+    expect(alpha(i, 12, 10)).toBeLessThan(alpha(i, 30, 10));
+    expect(alpha(i, 30, 10)).toBeLessThan(alpha(i, 48, 10));
+  });
+});

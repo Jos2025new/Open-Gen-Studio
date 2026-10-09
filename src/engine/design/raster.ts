@@ -110,7 +110,7 @@ function drawTipStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke, tip:
   const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
   const w = Math.max(...boxes.map((b) => b.x + b.w)) - x, h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
   const mask = createCanvas(w, h), m = ctx2d(mask), img = m.createImageData(mask.width, mask.height), rgb = hexRgb(stroke.color);
-  stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb));
+  stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ? { width: stroke.segments[i - 1][4], density: tip.densities?.[i - 1] ?? 1 } : undefined));
   m.putImageData(img, 0, 0);
   layMask(ctx, mask, 0, 0, x + stroke.x, y + stroke.y, mask.width, mask.height, tip, stroke.opacity, stroke.erase);
 }
@@ -159,6 +159,8 @@ export interface LiveStroke {
   clip?: HTMLCanvasElement | null;
   /** The brush tip (brushEngine.ts); absent = canvas lines, as strokes were painted before the engine. */
   tip?: BrushTip;
+  /** The last segment's width and density: the next one starts from them. */
+  last?: { width: number; density: number };
 }
 
 export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null, tip?: BrushTip): LiveStroke {
@@ -166,17 +168,20 @@ export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity:
 }
 
 export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
+  // A segment starts at the previous width: its box covers the wider of the two.
+  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
   if (live.tip) {
     // The tip engine: the segment's coverage goes into the mask where it is stronger than what is there.
-    const box = segmentBox([a.x, a.y, b.x, b.y, width]);
+    const box = segmentBox([a.x, a.y, b.x, b.y, reach]);
     const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
     if (w > 0 && h > 0) {
       const m = ctx2d(live.mask), img = m.getImageData(x, y, w, h);
-      stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color));
+      stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
       m.putImageData(img, x, y);
+      live.last = { width, density };
     }
   } else strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
-  const pad = width / 2 + 2;
+  const pad = reach / 2 + 2;
   const x = Math.max(0, Math.floor(Math.min(a.x, b.x) - pad)), y = Math.max(0, Math.floor(Math.min(a.y, b.y) - pad));
   const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
   const w = x1 - x, h = y1 - y;
