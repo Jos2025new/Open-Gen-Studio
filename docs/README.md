@@ -39,6 +39,7 @@
 - [0010 — Estrategia de pruebas: tests fiables con carga y cobertura por riesgo](decisions/0010-estrategia-de-pruebas.md).
 - [0011 — Capas de filtros y efectos no destructivos (FX)](decisions/0011-capas-fx.md).
 - [0012 — Registro de rendimiento para sesiones de prueba](decisions/0012-registro-de-rendimiento.md).
+- [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
 
 ## Historial
 

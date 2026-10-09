@@ -5,11 +5,12 @@ import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel, toLayerSpace } from '../../engine/design/render';
+import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel } from '../../engine/design/render';
 import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
-import { beginLiveStroke, paintLive, type LiveStroke } from '../../engine/design/raster';
+import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
+import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -834,11 +835,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
       const before = getBuffer(target.id)!;
       beginEdit(prepared);
-      const stroke: RasterStroke = { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase };
+      const stroke = newBrushStroke(brush, erase);
       // With a pixel selection, the stroke lands only inside it.
       const clip = selectionClipFor(current, prepared);
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
-      paintSegment(target, p, p);
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
+      paintSegment(target, p, p, penPressure(e));
       return;
     }
 
@@ -904,19 +905,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
   };
 
-  const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }) => {
-    if (layer.type !== 'raster') return;
-    const buf = beginEditCurrent(layer.id);
-    if (!buf) return;
-    const kx = layer.pxWidth / layer.width;
-    const ky = layer.pxHeight / layer.height;
-    // A rotated image: the pointer is taken back into the image's own space, so the stroke lands under it.
-    if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
-    const segment: [number, number, number, number, number] = [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (brush.size * (kx + ky)) / 2];
-    const d = drag.current;
-    if (d?.kind !== 'paint') return;
-    d.stroke.segments.push(segment);
-    paintLive(buf, d.live, { x: segment[0], y: segment[1] }, { x: segment[2], y: segment[3] }, segment[4]);
+  // Brush and eraser (design/brushStroke.ts): size and density follow the pen's pressure.
+  const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }, pressure: number) => {
+    const d = drag.current, buf = layer.type === 'raster' && beginEditCurrent(layer.id);
+    if (buf && layer.type === 'raster' && d?.kind === 'paint') addBrushSegment(d.stroke, d.live, buf, brushSegment(layer, a, b, brush, pressure));
   };
 
   const rasterMoveAt = useRef<{ d: Extract<Drag, { kind: 'objMove' }>; x: number; y: number } | null>(null);
@@ -1055,7 +1047,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       for (const sample of samples.length ? samples : [e.nativeEvent]) {
         const point = toDoc(sample.clientX, sample.clientY);
         const next = brushPoint(d.last, d.control, point, brush.smoothing ?? 0, brush.stabilization ?? 0, view.zoom, sample.timeStamp - d.time);
-        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint);
+        if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint, penPressure(sample));
         d.last = next.paint;
         d.control = next.control;
         d.time = sample.timeStamp;
@@ -1155,6 +1147,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }
     if (d.kind === 'paint') {
+      const pl = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === d.layerId), pb = getBuffer(d.layerId);
+      if (pl?.type === 'raster' && pb) endBrushStroke(d.stroke, d.live, pb, pl, brush);
       flushPaintFrame();
       commitEdit(d.layerId);
       if (d.live.clip) {

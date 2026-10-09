@@ -44,7 +44,8 @@ async function setup(page: Page, trace?: string) {
   });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error' && /localhost:5183/.test(m.location().url ?? '')) errors.push(m.text()); });
+  // The app's own errors; a provider host refusing a fetch (CORS) is the network, as in the stress test.
+  page.on('console', (m) => { if (m.type() === 'error' && /localhost:5183/.test(m.location().url ?? '') && !/Access to fetch at 'https?:\/\/(?!localhost:5183)/.test(m.text())) errors.push(m.text()); });
   await page.goto(trace ? `${ORIGIN}/?trace=${encodeURIComponent(trace)}` : ORIGIN);
   assertSandbox(page);
   await page.waitForFunction(() => (window as any).__OGS_TEST__?.().hydrated);
@@ -88,7 +89,13 @@ test.describe('each filter and effect on a layer', () => {
       // On the text layer (active): "Layer below", like a filter on that layer.
       await applyFx(page, label);
       // A black shadow does not show on the dark page: the same shadow in white, set in the FX layer's editor.
-      if (label === 'Drop shadow') { await page.getByLabel('Color', { exact: true }).first().fill('#ffffff'); await page.waitForTimeout(250); }
+      // The FX editor's colour is the app's colour field (InlineControls): open it and type the hex.
+      if (label === 'Drop shadow') {
+        await layers(page).getByRole('button', { name: /^Color · / }).last().click();
+        await page.getByRole('textbox', { name: 'Hex' }).fill('#ffffff');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(250);
+      }
       const after = await measure(page);
       await page.locator('canvas.stage-canvas').screenshot({ path: `${SHOTS}/${label.toLowerCase().replace(/ /g, '-')}.png` });
       // White text: colour filters other than these leave it white; they show on the rest only with "Everything below".

@@ -84,33 +84,22 @@
 .stroke-controls {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); width: 100%;
 }
-.designer-context .opt-slider, .stroke-controls .opt-slider {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center;
-  height: auto; min-height: 56px; padding: 8px 10px; gap: 6px;
-  background: var(--surface); border: 1px solid transparent; border-radius: var(--radius);
-}
-.opt-slider .opt-label { grid-column: 1; grid-row: 1; }
-.opt-slider .opt-num { grid-column: 2; grid-row: 1; text-align: right; font-variant-numeric: tabular-nums; }
-.opt-slider .opt-unit { grid-column: 3; grid-row: 1; margin-left: -3px; }
-.designer-context .opt-slider .opt-range, .stroke-controls .opt-slider .opt-range {
-  grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; min-width: 0; margin: 0;
-}
 .stroke-controls .opt-color, .stroke-controls .opt-pick {
-  min-width: 0; height: 56px; padding: 8px 10px; background: var(--surface); border-color: transparent;
-  border-radius: var(--radius); flex-wrap: wrap; gap: 6px;
+  min-width: 0; height: 36px; padding: 0 12px; background: var(--surface-2); border-color: transparent;
+  border-radius: var(--radius); gap: 6px;
 }
 .stroke-controls .opt-color .opt-value { margin-left: auto; font-variant-numeric: tabular-nums; }
 .stroke-controls .opt-pick .opt-value { flex: 1; text-align: right; max-width: none; }
 .stroke-controls .opt-pick svg { margin-left: 0; }
-.stroke-controls .field { min-width: 0; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); }
+.stroke-controls .field { min-width: 0; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); }
 .layer-properties .stroke-controls .opt { background: var(--surface-2); }
 .designer-context .tool-settings > .opt-slider { flex: 1 1 170px; }
 .designer-context .tool-settings > .opt-pick, .designer-context .tool-settings > .opt-color {
-  flex: 1 1 130px; height: 38px; justify-content: space-between; padding: 0 10px;
+  flex: 1 1 130px; height: 36px; justify-content: space-between; padding: 0 12px; border-radius: var(--radius);
 }
 .designer-context .tool-settings > .stroke-controls { flex-basis: 100%; }
 .designer-context .tool-setting { padding: 7px 10px; }
-.stroke-controls > .opt-pick { grid-column: 1 / -1; height: 38px; }
+.stroke-controls > .opt-pick { grid-column: 1 / -1; height: 36px; }
 .palette-quick .opt { height: var(--control-h); padding: 0 6px; border: 0; background: transparent; }
 .palette-quick .opt-color { width: var(--control-h); padding: 0; justify-content: center; }
 .palette-quick .opt-color .opt-label { display: none; }
@@ -149,10 +138,9 @@
 
 .sidebar-tool-settings { padding: 12px 10px; border-bottom: 1px solid var(--border); }
 .sidebar-tool-settings .tool-settings { display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; max-width: none; overflow: visible; gap: 8px; }
-.sidebar-tool-settings .tool-settings > .opt-slider { flex: 1 1 140px; display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; height: auto; min-height: 56px; padding: 8px 10px; gap: 6px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
-.sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 38px; padding: 0 10px; background: var(--surface-2); border: 0; border-radius: var(--radius-s); }
+.sidebar-tool-settings .tool-settings > .opt-slider { flex: 1 1 140px; }
+.sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 36px; padding: 0 12px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
 .sidebar-tool-settings .tool-settings > .stroke-controls { flex-basis: 100%; }
-.sidebar-tool-settings .opt-slider .opt-range { grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; min-width: 0; margin: 0; }
 .sidebar-tool-settings .tool-settings .edit-mode { flex-basis: 100%; justify-content: space-between; }
 .sidebar-tool-settings .opt-hint { white-space: normal; }
 .layer-details > summary { padding: 12px 10px; cursor: pointer; font-size: 12px; color: var(--text-2); }
@@ -195,3 +183,72 @@
 .composer-tools-bar .designer-palette.is-docked .tool-rail { width: auto; max-width: 100%; background: transparent; border: 0; box-shadow: none; padding: 0; overflow: visible; }
 .composer-tools-bar .designer-palette.is-docked .icon-btn.is-active::after { top: auto; bottom: -5px; }
 @media (max-width: 900px) { .composer-tools-bar { flex-wrap: wrap; } }
+
+/*
+ * One field per setting (InlineControls.tsx): the whole field is the control. A slider is filled up to its value
+ * with a bar at the value; the name sits left, the value right; a short range shows its steps as dots. Toggles,
+ * choices, colors and lists use the same field, so every tool and panel reads the same way.
+ */
+.opt.opt-slider, .opt.opt-toggle, .opt.opt-choice, .opt.opt-presets {
+  position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 36px; min-width: 0; padding: 0 12px; overflow: hidden; flex: 1 1 100%;
+  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius); font-size: 12px; color: var(--text-2);
+}
+.opt-slider::before {
+  content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
+  background: rgba(255, 255, 255, .085); border-right: 2px solid var(--text-2); pointer-events: none;
+}
+.opt-slider:hover::before, .opt-slider:focus-within::before { border-right-color: var(--accent); }
+.opt-slider:focus-within { border-color: var(--accent-line, var(--accent)); }
+.opt.opt-slider .opt-range, .opt.opt-slider .opt-range:disabled { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; opacity: 0; cursor: ew-resize; }
+.opt-slider .opt-label, .opt-slider .opt-readout { position: relative; pointer-events: none; }
+.opt-slider .opt-label { overflow: hidden; text-overflow: ellipsis; }
+.opt-slider .opt-readout { display: inline-flex; align-items: baseline; gap: 2px; color: var(--text); }
+.opt-slider .opt-num { pointer-events: auto; cursor: text; text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+.opt-slider .opt-unit { margin-left: 0; }
+.opt-ticks { position: absolute; inset: 0; pointer-events: none; }
+.opt-ticks i { position: absolute; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: var(--text-3, var(--text-2)); opacity: .55; }
+.opt-slider.is-disabled { opacity: .45; }
+.opt-slider.is-disabled .opt-range { cursor: default; }
+.opt-toggle { cursor: pointer; text-align: left; }
+.opt-toggle:hover, .opt-choice:hover, .opt-presets:hover { color: var(--text); }
+.opt-choice .opt-choices { display: flex; gap: 2px; }
+.opt-choice .opt-choices button { display: grid; place-items: center; width: 34px; height: 26px; border-radius: var(--radius-s); color: var(--text-3, var(--text-2)); }
+.opt-choice .opt-choices button:hover { color: var(--text); background: var(--surface-3); }
+.opt-choice .opt-choices button.is-on { color: var(--accent-ink, #111); background: var(--accent); }
+.opt.opt-presets { height: auto; padding: 6px; gap: 2px; flex-wrap: wrap; justify-content: flex-start; }
+.opt-presets button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 34px; height: 40px; padding-bottom: 3px; border-radius: var(--radius-s); color: var(--text-2); font-size: 9px; }
+.opt-presets button i { display: block; border-radius: 50%; background: currentColor; }
+.opt-presets button:hover { background: var(--surface-3); color: var(--text); }
+.opt-presets button.is-on { background: var(--accent-soft); color: var(--accent); }
+.brush-preview { display: block; width: 100%; height: 56px; border-radius: var(--radius); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 12px 12px; flex-basis: 100%; }
+/* In the panel the fields line up in two columns; previews, presets and toggles span the row when they need it. */
+.designer-context .tool-settings > .brush-preview, .designer-context .tool-settings > .opt-presets { flex-basis: 100%; }
+/* The top bar is a single row: fields keep a fixed width there. */
+.tool-rail .opt.opt-slider { width: 150px; height: var(--control-h); flex: 0 0 auto; }
+/* A colour field reads like the others: name on the left, its swatch and value together on the right. */
+.opt.opt-color .opt-swatch { margin-left: auto; }
+.opt.opt-color .opt-value, .stroke-controls .opt.opt-color .opt-value { margin-left: 4px; }
+/* A list's value sits on the right, next to its chevron, like every other field's value. */
+.opt.opt-pick .opt-value { margin-left: auto; text-align: right; }
+.opt.opt-pick svg { margin-left: 4px; }
+.brush-pressure { flex-basis: 100%; margin: 0; padding: 2px 4px; font-size: 11px; white-space: normal; color: var(--text-2); }
+.brush-pressure.is-warn { color: var(--warn, #f5b54a); }
+/* Brush: colour, size, opacity and texture in one row; colour and texture as round buttons. */
+/* Every brush row spans the panel and shares it out, so no field is left alone with a gap beside it. */
+.tool-settings > .brush-row { display: flex; gap: 8px; flex: 1 1 100%; width: 100%; min-width: 0; }
+.tool-settings > .brush-row > .opt-slider, .tool-settings > .brush-row > .opt.opt-pick:not(.is-icon) { flex: 1 1 0; min-width: 0; height: 36px; }
+.tool-settings > .brush-row > .opt.opt-pick:not(.is-icon) { justify-content: space-between; padding: 0 12px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
+.tool-settings > .opt-choice, .tool-settings > .brush-check, .tool-settings > .brush-pressure, .tool-settings > .opt-toggle { flex: 1 1 100%; }
+.opt.opt-color.is-icon, .opt.opt-pick.is-icon { flex: 0 0 36px; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; background: var(--surface-2); border: 1px solid transparent; }
+.opt.opt-color.is-icon .opt-swatch { margin: 0; width: 22px; height: 22px; border-radius: 50%; }
+.opt.is-icon:hover, .opt.is-icon[aria-expanded="true"] { border-color: var(--accent-line, var(--accent)); }
+.texture-icon { display: block; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border); }
+.texture-icon.is-none { background: linear-gradient(135deg, transparent 46%, #e5484d 46%, #e5484d 54%, transparent 54%); }
+.brush-check { flex-basis: 100%; padding: 4px 4px 0; font-size: 12px; color: var(--text-2); }
+/* In a shared row the name keeps its width and the value gives way first. */
+.tool-settings > .brush-row > .opt-slider { padding: 0 8px; gap: 4px; font-size: 11px; }
+.tool-settings > .brush-row > .opt-slider .opt-unit { display: none; }
+.tool-settings > .brush-row > .opt-slider .opt-label svg { display: block; }
+.tool-settings > .brush-row > .opt-slider .opt-label { flex: 0 0 auto; overflow: visible; }
+.tool-settings > .brush-row > .opt-slider .opt-readout { min-width: 0; }

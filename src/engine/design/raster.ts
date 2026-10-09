@@ -4,6 +4,7 @@ import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media
 import { uid } from '../../lib/id';
 import type { Layer, RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
+import { compositeOp, hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
 
 /*
  * Pixel buffers of raster layers. Buffers are treated as immutable snapshots:
@@ -77,6 +78,7 @@ export function withPaintBase(layer: RasterLayer): RasterLayer {
  * 100 % the overlapping round ends of separate segments would add up into beads along the line.
  */
 export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke): void {
+  if (stroke.tip) return drawTipStroke(ctx, stroke, stroke.tip);
   const segs = stroke.segments;
   let i = 0;
   while (i < segs.length) {
@@ -101,6 +103,47 @@ export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterSt
   }
 }
 
+/** A stroke with a brush tip (brushEngine.ts): its mask built the same way as while it was painted, laid once. */
+function drawTipStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke, tip: BrushTip): void {
+  if (!stroke.segments.length) return;
+  const boxes = stroke.segments.map(segmentBox);
+  const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
+  const w = Math.max(...boxes.map((b) => b.x + b.w)) - x, h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
+  const mask = createCanvas(w, h), m = ctx2d(mask), img = m.createImageData(mask.width, mask.height), rgb = hexRgb(stroke.color);
+  stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ? { width: stroke.segments[i - 1][4], density: tip.densities?.[i - 1] ?? 1 } : undefined));
+  m.putImageData(img, 0, 0);
+  layMask(ctx, mask, 0, 0, x + stroke.x, y + stroke.y, mask.width, mask.height, tip, stroke.opacity, stroke.erase);
+}
+
+/**
+ * The mask laid on the layer region (dx, dy, w, h) from (sx, sy) in the mask: at the stroke's opacity, with its blend;
+ * Keep Opacity then keeps the layer's alpha as it was before the stroke.
+ */
+function layMask(ctx: CanvasRenderingContext2D, mask: HTMLCanvasElement, sx: number, sy: number, dx: number, dy: number, w: number, h: number, tip: BrushTip | undefined, opacity: number, erase: boolean, before?: HTMLCanvasElement): void {
+  const keep = tip?.keepOpacity && !erase;
+  // The pixels under the stroke before it lands, for Keep Opacity (the live stroke passes its base).
+  let base = before, bx = dx, by = dy;
+  if (keep && !base) {
+    base = createCanvas(w, h);
+    ctx2d(base).drawImage(ctx.canvas, dx, dy, w, h, 0, 0, w, h);
+    bx = 0; by = 0;
+  }
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  ctx.globalCompositeOperation = compositeOp(tip, erase);
+  ctx.drawImage(mask, sx, sy, w, h, dx, dy, w, h);
+  if (keep && base) {
+    // destination-in clears outside what it draws: kept to the stroke's region.
+    ctx.beginPath();
+    ctx.rect(dx, dy, w, h);
+    ctx.clip();
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(base, bx, by, w, h, dx, dy, w, h);
+  }
+  ctx.restore();
+}
+
 /**
  * A stroke being painted, as SAI does it: segments go into a mask at full strength (overlaps cannot add up), and
  * the layer is the pixels it had before the stroke with the mask laid over at the brush opacity. Only the area
@@ -114,15 +157,31 @@ export interface LiveStroke {
   erase: boolean;
   /** The pixel selection in this layer's pixels: paint and erase land only inside it (as GIMP and Krita do). */
   clip?: HTMLCanvasElement | null;
+  /** The brush tip (brushEngine.ts); absent = canvas lines, as strokes were painted before the engine. */
+  tip?: BrushTip;
+  /** The last segment's width and density: the next one starts from them. */
+  last?: { width: number; density: number };
 }
 
-export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null): LiveStroke {
-  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase, clip };
+export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null, tip?: BrushTip): LiveStroke {
+  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase, clip, tip };
 }
 
-export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number): void {
-  strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
-  const pad = width / 2 + 2;
+export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
+  // A segment starts at the previous width: its box covers the wider of the two.
+  const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
+  if (live.tip) {
+    // The tip engine: the segment's coverage goes into the mask where it is stronger than what is there.
+    const box = segmentBox([a.x, a.y, b.x, b.y, reach]);
+    const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
+    if (w > 0 && h > 0) {
+      const m = ctx2d(live.mask), img = m.getImageData(x, y, w, h);
+      stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
+      m.putImageData(img, x, y);
+      live.last = { width, density };
+    }
+  } else strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
+  const pad = reach / 2 + 2;
   const x = Math.max(0, Math.floor(Math.min(a.x, b.x) - pad)), y = Math.max(0, Math.floor(Math.min(a.y, b.y) - pad));
   const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
   const w = x1 - x, h = y1 - y;
@@ -139,10 +198,36 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
   ctx.save();
   ctx.clearRect(x, y, w, h);
   ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
-  ctx.globalAlpha = live.opacity;
-  ctx.globalCompositeOperation = live.erase ? 'destination-out' : 'source-over';
-  ctx.drawImage(live.mask, x, y, w, h, x, y, w, h);
   ctx.restore();
+  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
+}
+
+/**
+ * Paint again the part of the live stroke that `changed` covered (their old extent), from all of `segments`: what
+ * the end taper needs, since a mask that keeps the strongest coverage cannot shrink in place.
+ */
+export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): void {
+  if (!live.tip || !changed.length) return;
+  const boxes = changed.map(segmentBox);
+  const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
+  const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
+  if (w <= 0 || h <= 0) return;
+  const m = ctx2d(live.mask), img = m.createImageData(w, h), rgb = hexRgb(live.color);
+  segments.forEach((seg, i) => {
+    const b = segmentBox(seg);
+    if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, seg, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
+  });
+  m.putImageData(img, x, y);
+  if (live.clip) {
+    m.save();
+    m.globalCompositeOperation = 'destination-in';
+    m.drawImage(live.clip, x, y, w, h, x, y, w, h);
+    m.restore();
+  }
+  const ctx = ctx2d(buf);
+  ctx.clearRect(x, y, w, h);
+  ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
+  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
 }
 
 /** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */
