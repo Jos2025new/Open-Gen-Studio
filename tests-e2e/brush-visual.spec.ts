@@ -8,6 +8,8 @@ import { mkdir } from 'node:fs/promises';
  */
 const ORIGIN = 'http://localhost:5183';
 const SHOTS = 'tests-e2e/screens/brush';
+// Strokes drive the real canvas move by move: 20–25 s each on a loaded machine, too close to the default 30 s.
+test.describe.configure({ timeout: 90_000 });
 test.use({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2, launchOptions: { executablePath: chromium.executablePath() } });
 
 const panel = (page: Page) => page.getByRole('complementary', { name: 'Layers', exact: true });
