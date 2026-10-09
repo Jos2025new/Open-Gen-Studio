@@ -2,11 +2,11 @@
 
 ## Estado
 
-Aceptado (2026-10-09: el usuario probó y aprobó la brocha y el panel)
+Aceptado
 
 ## Fecha
 
-2026-10-09
+2026-10-09 (aceptado el mismo día: el usuario probó y aprobó la brocha y el panel)
 
 ## Contexto
 
