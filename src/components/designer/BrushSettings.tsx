@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
-import { atPressure, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
+import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 /*
@@ -34,11 +34,15 @@ function BrushPreview({ brush, erase }: { brush: Brush; erase: boolean }) {
     const tip = tipFor({ ...brush, size }, erase);
     const img = ctx.createImageData(W, H), rgb = erase ? ([200, 200, 200] as [number, number, number]) : hexRgb(brush.color);
     const n = 48, pt = (i: number) => { const t = i / n; return [12 + t * (W - 24), H / 2 + Math.sin(t * Math.PI * 2) * (H / 2 - size / 2 - 4) * 0.6, Math.sin(t * Math.PI)] as const; };
+    // The tapers as the canvas lays them: in px along the stroke, at the preview's scale of the size.
+    const k = size / brush.size, along = [0];
+    for (let i = 0; i < n; i++) { const [ax, ay] = pt(i), [bx, by] = pt(i + 1); along.push(along[i] + Math.hypot(bx - ax, by - ay)); }
     let last: { width: number; density: number } | undefined;
     for (let i = 0; i < n; i++) {
       const [ax, ay] = pt(i), [bx, by, p] = pt(i + 1);
-      const { width, density } = atPressure({ ...brush, size }, p);
-      stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last);
+      const { width: full, density } = atPressure({ ...brush, size }, p);
+      const width = full * taperAt(along[i + 1], (brush.taperStart ?? 0) * k, 'start') * taperAt(along[n] - along[i + 1], (brush.taperEnd ?? 0) * k, 'end');
+      stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ?? { width: full * taperAt(0, (brush.taperStart ?? 0) * k, 'start'), density });
       last = { width, density };
     }
     const mask = document.createElement('canvas');
@@ -92,6 +96,8 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <InlineSelect label="Texture" value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.texture || brush.texture === 'none'} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />
+    <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />
+    <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={brush.taperEnd ?? 0} onChange={(v) => set({ taperEnd: v })} />
     <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
     {!brush.simulatePressure && <PressureReadout />}
     <InlineToggle label="Pressure → size" tip="With a pen, lighter pressure paints thinner, down to the minimum size" checked={brush.pressureSize !== false} onChange={(v) => set({ pressureSize: v })} />

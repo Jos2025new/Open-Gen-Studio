@@ -1,7 +1,7 @@
 import { uid } from '../../lib/id';
 import type { RasterLayer, RasterStroke } from '../types';
-import { atPressure, simulatedPressure, tipFor, type BrushOptions } from './brushEngine';
-import { paintLive, type LiveStroke } from './raster';
+import { atPressure, simulatedPressure, taperAt, tipFor, type BrushOptions } from './brushEngine';
+import { paintLive, repaintLive, type LiveStroke } from './raster';
 import { toLayerSpace } from './render';
 
 /* A brush or eraser stroke on a raster layer: what the canvas records as the pointer moves (Stage.tsx). */
@@ -28,11 +28,14 @@ export function penPressure(e: { pointerType: string; pressure: number }): numbe
   return real ? e.pressure : 1;
 }
 
-// The simulated pressure of the stroke being painted (one at a time); perfect-freehand starts a stroke at 0.5.
+// The stroke being painted (one at a time): its simulated pressure (perfect-freehand starts at 0.5) and how far
+// it has gone, for the start taper.
 let simulated = 0.5;
+let travelled = 0;
 
 export function newBrushStroke(brush: BrushOptions & { color: string; opacity: number }, erase: boolean): RasterStroke {
   simulated = 0.5;
+  travelled = 0;
   const tip = tipFor(brush, erase);
   return { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase, tip };
 }
@@ -42,9 +45,12 @@ export function brushSegment(layer: RasterLayer, a: { x: number; y: number }, b:
   const kx = layer.pxWidth / layer.width, ky = layer.pxHeight / layer.height;
   // A rotated image: the pointer is taken back into the image's own space, so the stroke lands under it.
   if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
-  if (brush.simulatePressure) pressure = simulated = simulatedPressure(simulated, Math.hypot(b.x - a.x, b.y - a.y), brush.size);
-  const { width, density } = atPressure(brush, pressure);
-  return { seg: [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (width * (kx + ky)) / 2], density };
+  const step = Math.hypot(b.x - a.x, b.y - a.y);
+  travelled += step;
+  if (brush.simulatePressure) pressure = simulated = simulatedPressure(simulated, step, brush.size);
+  // The start taper: the first touch is a point, and the width opens over Taper start (then pressure shapes it).
+  const { width, density } = atPressure(brush, pressure), w = width * taperAt(travelled, brush.taperStart, 'start');
+  return { seg: [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (w * (kx + ky)) / 2], density };
 }
 
 /** Record the segment in the stroke (its density too, when the tip keeps them) and paint it live. */
@@ -52,4 +58,20 @@ export function addBrushSegment(stroke: RasterStroke, live: LiveStroke, buf: HTM
   stroke.segments.push(s.seg);
   stroke.tip?.densities?.push(s.density);
   paintLive(buf, live, { x: s.seg[0], y: s.seg[1] }, { x: s.seg[2], y: s.seg[3] }, s.seg[4], s.density);
+}
+
+/**
+ * The end taper, when the pointer lifts (only then is the end known): the last Taper end of the stroke closes to a
+ * point, and that part is painted again. The saved widths are the tapered ones, so the replay matches.
+ */
+export function endBrushStroke(stroke: RasterStroke, live: LiveStroke, buf: HTMLCanvasElement, layer: RasterLayer, brush: BrushOptions): void {
+  const length = (brush.taperEnd ?? 0) * (layer.pxWidth / layer.width + layer.pxHeight / layer.height) / 2, segs = stroke.segments;
+  if (!(length > 0) || !segs.length) return;
+  const before = segs.map((s) => s.slice() as typeof s);
+  let i = segs.length - 1;
+  for (let fromEnd = 0; i >= 0 && fromEnd < length; i--) {
+    segs[i][4] *= taperAt(fromEnd, length, 'end');
+    fromEnd += Math.hypot(segs[i][2] - segs[i][0], segs[i][3] - segs[i][1]);
+  }
+  repaintLive(buf, live, before.slice(i + 1), segs, stroke.tip?.densities);
 }

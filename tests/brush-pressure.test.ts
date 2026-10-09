@@ -34,3 +34,40 @@ describe('simulated pressure (as Lineart, perfect-freehand)', () => {
     expect(widths(30)).toBeLessThan(widths(1));
   });
 });
+
+import { taperAt } from '../src/engine/design/brushEngine';
+import { endBrushStroke } from '../src/engine/design/brushStroke';
+
+describe('tapers (as Lineart: perfect-freehand curves, in px)', () => {
+  it('the share of the width grows from 0 at the end of the stroke to all of it at the taper length', () => {
+    expect(taperAt(0, 40, 'start')).toBe(0);
+    expect(taperAt(40, 40, 'start')).toBe(1);
+    expect(taperAt(10, 40, 'start')).toBeGreaterThan(0.25);
+    expect(taperAt(10, 40, 'end')).toBeGreaterThan(taperAt(10, 40, 'start'));
+    expect(taperAt(0, 0, 'start')).toBe(1);
+    expect(taperAt(0, undefined, 'end')).toBe(1);
+  });
+  const layer = { x: 0, y: 0, width: 100, height: 100, pxWidth: 100, pxHeight: 100 } as never;
+  it('with Taper start the first touch is a point, not a disc, and the width opens along the stroke', () => {
+    const brush = { size: 20, taperStart: 40, color: '#000', opacity: 1 };
+    newBrushStroke(brush, false);
+    const dab = brushSegment(layer, { x: 0, y: 0 }, { x: 0, y: 0 }, brush, 1).seg[4];
+    const ws = [1, 2, 3, 4, 5, 6].map((i) => brushSegment(layer, { x: (i - 1) * 10, y: 0 }, { x: i * 10, y: 0 }, brush, 1).seg[4]);
+    expect(dab).toBe(0);
+    for (let i = 1; i < ws.length; i++) expect(ws[i]).toBeGreaterThanOrEqual(ws[i - 1]);
+    expect(ws[3]).toBe(20);
+    newBrushStroke({ ...brush, taperStart: 0 }, false);
+    expect(brushSegment(layer, { x: 0, y: 0 }, { x: 0, y: 0 }, { ...brush, taperStart: 0 }, 1).seg[4]).toBe(20);
+  });
+  it('on lift, Taper end closes the last stretch to a point; the rest keeps its width', () => {
+    const brush = { size: 20, taperEnd: 30, color: '#000', opacity: 1 };
+    const stroke = newBrushStroke(brush, false);
+    for (let i = 0; i < 10; i++) stroke.segments.push([i * 10, 0, (i + 1) * 10, 0, 20]);
+    endBrushStroke(stroke, { tip: undefined } as never, {} as never, layer, brush);
+    const w = stroke.segments.map((s) => s[4]);
+    expect(w.slice(0, 6)).toEqual([20, 20, 20, 20, 20, 20]);
+    expect(w[9]).toBe(0);
+    expect(w[8]).toBeLessThan(w[7]);
+    expect(w[7]).toBeLessThan(20);
+  });
+});

@@ -38,6 +38,9 @@ export interface BrushOptions {
   /** Pressure from the pointer's speed, as Lineart does it (perfect-freehand): fast is light, slow is full. */
   simulatePressure?: boolean;
   pressureDensity?: boolean;
+  /** Distance (px, as the size) over which the stroke grows from a point at its start / shrinks to one at its end. */
+  taperStart?: number;
+  taperEnd?: number;
   texture?: BrushTexture;
   textureStrength?: number;
   blend?: BrushBlend;
@@ -75,6 +78,17 @@ export function atPressure(o: BrushOptions, pressure: number): { width: number; 
 export function simulatedPressure(previous: number, distance: number, size: number): number {
   const r = Math.min(1, distance / Math.max(1e-6, size));
   return Math.min(1, previous + (Math.min(1, 1 - r) - previous) * (r * 0.275));
+}
+
+/**
+ * The share of the width a taper leaves at `distance` from its end of the stroke: 0 at the end, all of it from
+ * `length` on. The curves are perfect-freehand's defaults (the ones Lineart's tapers use): the start opens fast
+ * (ease-out quad), the end closes late (ease-out cubic). Pressure then shapes the middle, as it already did.
+ */
+export function taperAt(distance: number, length: number | undefined, end: 'start' | 'end'): number {
+  if (!length || length <= 0) return 1;
+  const t = clamp01(distance / length);
+  return end === 'start' ? t * (2 - t) : 1 - (1 - t) ** 3;
 }
 
 /** The tip a new stroke records (always: even the plain hard tip replays through this engine). */

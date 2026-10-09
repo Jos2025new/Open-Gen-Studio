@@ -29,6 +29,7 @@ Antes de este cambio:
 2. **Motor de la punta** (`src/engine/design/brushEngine.ts`), basado en SAI:
    - dureza con cuatro perfiles (duro, firme, suave, aerógrafo), cuyos iconos dibuja la misma curva del motor;
    - presión sobre el tamaño (tamaño mínimo) y sobre la densidad (densidad mínima);
+   - afinado de los extremos (Taper start / Taper end, en px, con las curvas de perfect-freehand que usa Lineart): el primer toque es un punto y no un disco, y el final se cierra al levantar el puntero, porque solo entonces se conoce. La presión da forma al tramo del medio;
    - textura (papel, lienzo, grano) con intensidad;
    - modo de fusión del trazo y Keep Opacity;
    - tamaños rápidos y una vista previa del trazo que dibuja el propio motor.

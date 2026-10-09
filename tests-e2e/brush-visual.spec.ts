@@ -70,6 +70,7 @@ async function reset(page: Page) {
   await page.getByRole('button', { name: 'None', exact: true }).click();
   const sim = panel(page).getByRole('switch', { name: 'Simulate pressure' });
   if ((await sim.getAttribute('aria-checked')) === 'true') await sim.click();
+  for (const name of ['Taper start', 'Taper end']) await panel(page).getByRole('slider', { name, exact: true }).fill('0');
 }
 
 test('the brush settings, and a stroke for each tip', async ({ page }) => {
@@ -125,6 +126,7 @@ test('a saved stroke replays as it was painted, for every tip setting', async ({
       { size: 30, hardness: 0.05, pressureDensity: true, minDensity: 0.1 },
       { size: 30, hardness: 0.4, texture: 'paper', textureStrength: 0.8, blend: 'multiply' },
       { size: 30, hardness: 0.7, keepOpacity: true, minSize: 0.2 },
+      { size: 30, hardness: 0.4, taperStart: 40, taperEnd: 40 },
     ];
     const out: number[] = [];
     for (const t of tips) {
@@ -142,6 +144,8 @@ test('a saved stroke replays as it was painted, for every tip setting', async ({
         brush.addBrushSegment(stroke, ls, live, brush.brushSegment(layer, prev, next, opts, Math.abs(Math.sin(i / 8))));
         prev = next;
       }
+      // The pointer lifts: the end taper paints the tail again.
+      brush.endBrushStroke(stroke, ls, live, layer, opts);
       const replay = document.createElement('canvas'); replay.width = 200; replay.height = 120;
       const r = replay.getContext('2d')!; r.drawImage(base, 0, 0);
       raster.drawRasterStroke(r, stroke);
@@ -157,7 +161,7 @@ test('a saved stroke replays as it was painted, for every tip setting', async ({
     return out;
   });
   // Every new stroke, the plain hard one included, replays within one level (canvas rounding).
-  expect(diffs).toHaveLength(4);
+  expect(diffs).toHaveLength(5);
   for (const d of diffs) expect(d).toBeLessThanOrEqual(1);
 });
 
@@ -243,5 +247,35 @@ test('simulate pressure: a stroke that speeds up thins smoothly, without steps',
   // It does get thinner, and no column jumps more than a couple of device pixels from its neighbour.
   expect(jumps.last).toBeLessThan(jumps.first);
   expect(jumps.max).toBeLessThanOrEqual(3);
+  expect(errors).toEqual([]);
+});
+
+test('tapers: the stroke starts and ends in a point, as Lineart; the middle keeps its width', async ({ page }) => {
+  const errors = await setup(page);
+  await reset(page);
+  await panel(page).getByRole('slider', { name: 'Size', exact: true }).fill('40');
+  await panel(page).getByRole('slider', { name: 'Taper start', exact: true }).fill('150');
+  await panel(page).getByRole('slider', { name: 'Taper end', exact: true }).fill('150');
+  await panel(page).screenshot({ path: `${SHOTS}/taper-settings.png` });
+  const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const y = b.y + b.height * 0.45, x0 = b.x + b.width * 0.15, x1 = b.x + b.width * 0.85;
+  // Slow and steady, as a mouse at full pressure: only the tapers change the width.
+  await page.mouse.move(x0, y);
+  await page.mouse.down();
+  await page.mouse.move(x1, y, { steps: 140 });
+  await page.mouse.up();
+  await page.waitForTimeout(250);
+  await page.locator('canvas.stage-canvas').screenshot({ path: `${SHOTS}/taper.png` });
+  const h = await page.evaluate(([xa, xb, yc]) => {
+    const c = document.querySelector('canvas.stage-canvas') as HTMLCanvasElement, r = c.getBoundingClientRect(), k = c.width / r.width;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    const at = (x: number) => { let n = 0; const px = Math.round((x - r.left) * k); for (let py = Math.round((yc - r.top) * k) - 150; py < Math.round((yc - r.top) * k) + 150; py++) { const i = (py * c.width + px) * 4; if (d[i] > 127 && d[i + 2] > 127) n++; } return n; };
+    return { start: at(xa + 2), near: at(xa + 20), mid: at((xa + xb) / 2), end: at(xb - 2) };
+  }, [x0, x1, y]);
+  // The first touch is a point, not a disc; the stroke opens along the taper and closes again at its end.
+  expect(h.start).toBeLessThan(h.mid * 0.25);
+  expect(h.near).toBeGreaterThan(h.start);
+  expect(h.near).toBeLessThan(h.mid);
+  expect(h.end).toBeLessThan(h.mid * 0.25);
   expect(errors).toEqual([]);
 });

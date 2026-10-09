@@ -10,7 +10,7 @@ import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, ins
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
-import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
+import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -1147,6 +1147,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }
     if (d.kind === 'paint') {
+      const pl = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === d.layerId), pb = getBuffer(d.layerId);
+      if (pl?.type === 'raster' && pb) endBrushStroke(d.stroke, d.live, pb, pl, brush);
       flushPaintFrame();
       commitEdit(d.layerId);
       if (d.live.clip) {

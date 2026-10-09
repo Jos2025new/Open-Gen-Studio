@@ -202,6 +202,34 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
   layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
 }
 
+/**
+ * Paint again the part of the live stroke that `changed` covered (their old extent), from all of `segments`: what
+ * the end taper needs, since a mask that keeps the strongest coverage cannot shrink in place.
+ */
+export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): void {
+  if (!live.tip || !changed.length) return;
+  const boxes = changed.map(segmentBox);
+  const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
+  const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
+  if (w <= 0 || h <= 0) return;
+  const m = ctx2d(live.mask), img = m.createImageData(w, h), rgb = hexRgb(live.color);
+  segments.forEach((seg, i) => {
+    const b = segmentBox(seg);
+    if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, seg, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
+  });
+  m.putImageData(img, x, y);
+  if (live.clip) {
+    m.save();
+    m.globalCompositeOperation = 'destination-in';
+    m.drawImage(live.clip, x, y, w, h, x, y, w, h);
+    m.restore();
+  }
+  const ctx = ctx2d(buf);
+  ctx.clearRect(x, y, w, h);
+  ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
+  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
+}
+
 /** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */
 export function composeRaster(layer: RasterLayer, persist = true): boolean {
   const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
