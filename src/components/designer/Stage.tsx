@@ -246,10 +246,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const active = activeLayer(doc);
   const cursor = useCursorPreview(view, canvasRef, { tool, brushSize: brush.size, lineartSize: lineart.size, lineartMode, influence, active, curveSelected: Boolean(selectedCurve) }, drag.current?.kind === 'bend' ? drag.current : null);
 
-  /** What the transform handles act on: the picked objects (Objects mode; an image or a text is its own object), or
-      the picked layers (Layer mode). Locked and hidden layers are left out. */
+  /** What the transform handles act on: the picked objects (Objects mode; an image or text is its own object) or
+      picked layers (Layer mode). Locked, hidden and FX (no geometry) layers are out. */
   const xformTargets = (d0: DesignDoc): Array<{ layer: Layer; ids: string[] | null }> => {
-    const ok = (l: Layer | undefined | null): l is Layer => Boolean(l && l.visible && !l.locked);
+    const ok = (l: Layer | undefined | null): l is Layer => Boolean(l?.visible && !l.locked && l.type !== 'fx');
     if (!editLayers) {
       const pk = objectPick(d0.id);
       const pl = pk ? d0.layers.find((l) => l.id === pk.layerId) : null;
@@ -734,8 +734,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           return;
         }
         if (ctrl) {
-          // Whole layers (images, text): Ctrl-press adds the layer under the pointer to the picked layers and a drag
-          // moves them all; a Ctrl-click on one already picked takes it out.
+          // Whole layers (images, text): Ctrl-press adds the layer under the pointer and a drag moves all picked;
+          // a Ctrl-click on a picked one takes it out.
           const hit = hitTestPixel(current, p.x, p.y);
           if (!hit || hit.locked || layerObjects(hit).length || hit.type === 'vector') return;
           const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));

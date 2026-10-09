@@ -2,12 +2,22 @@
 
 Plan de validación de [ADR 0011](decisions/0011-capas-fx.md), rama `task/fx` (commit `9364125`). Formato: casilla, caso, cómo se prueba, qué se espera y la evidencia que lo cierra. Al cerrar uno, marca `[x]`, pon la fecha y la evidencia.
 
-Evidencia: **test** = cubierto por `npm test` · **sandbox** = probado a mano en `npm run dev:sandbox` (puerto 5183) · **medido** = con cifras del registro de rendimiento ([ADR 0012](decisions/0012-registro-de-rendimiento.md), propuesto) · **externo** = en otro programa (Inkscape, navegador).
+Evidencia: **test** = cubierto por `npm test` · **script** = `npm run fx:check` en el sandbox, con capturas en `tests-e2e/screens/fx/` · **sandbox** = probado a mano en `npm run dev:sandbox` (puerto 5183) · **medido** = con cifras del registro de rendimiento ([ADR 0012](decisions/0012-registro-de-rendimiento.md)) · **externo** = en otro programa (Inkscape, navegador).
+
+Cómo correr el script y el banco: [depuracion.md](depuracion.md).
 
 ## Ya cubierto
 
 - [x] Comandos, alcance, deshacer, SVG y agente: 33 tests en `tests/fx-*.test.ts`. **2026-10-08**, test.
 - [x] Glow sobre un texto con alcance «Layer below»: halo visible, el texto no cambia de tamaño, menú FX, ocultar y mostrar, y el doble clic que abre el editor. **2026-10-08**, sandbox. Esa prueba encontró la escala aplicada dos veces (corregido en `9364125`).
+
+- [x] `npm run fx:check` (12 casos, 2026-10-08, Chromium headless):
+  - cada uno de los 11 filtros y efectos sobre un texto con «Layer below»: cambia el lienzo, el contenido conserva sitio y tamaño, y un deshacer lo devuelve;
+  - una capa de filtros «Everything below» con escala de grises: el rectángulo de color pasa a gris.
+  
+  **2026-10-08**, script. Encontró dos fallos, ya corregidos:
+  - el destello se colocaba en coordenadas de la página y quedaba recortado fuera de la capa; ahora se coloca dentro de la capa destino, como en GIMP;
+  - con una capa FX activa, arrastrar en el lienzo intentaba mover la capa FX, que no tiene geometría, y no movía nada.
 
 ## 1. Corrección visual (sandbox)
 
@@ -49,7 +59,27 @@ Cada caso: una imagen o un texto de prueba, aplicar, comparar con lo esperado y 
 
 ## 5. Escala y rendimiento (medido)
 
-Hoy no hay cifras. El render recalcula todas las capas FX en cada fotograma, sin caché, a la resolución de la vista. Es el primer cuello de botella esperado, y estos casos sirven para medirlo antes de optimizar.
+**Primera medición (2026-10-08).** `FX_BENCH=100 npm run fx:check -- -g bench`, Chromium headless, 8 núcleos, sin GPU dedicada y con la máquina cargada. Documento de 1920×1080 a la escala de la vista (unos 0,5 Mpx por lienzo). N capas «Desenfoque» apiladas sobre un texto, arrastrando un rectángulo de otra capa a 60 Hz:
+
+| Capas FX | Fotograma p50 | Lienzos / Mpx por fotograma | Parte de los pasos FX | Memoria JS |
+| --- | --- | --- | --- | --- |
+| 1 | 11,4 ms | 3 / 1,6 | 10 % | 66–75 MB |
+| 5 | 45,4 ms | 8 / 4,2 | 58 % | 51–65 MB |
+| 10 | 96 ms | 13 / 6,9 | 78 % | 59–67 MB |
+| 25 | 203 ms | 28 / 14,7 | 91 % | 63–65 MB |
+| 50 | 398 ms | 53 / 27,9 | 95 % | 55–72 MB |
+
+La sesión de 100 capas no terminó: la app se cerró mientras añadía capas (código 137), así que no se sabe si fue por memoria.
+
+**Lectura:**
+- El coste crece en línea: unos 8 ms por capa de desenfoque y fotograma (7,7 ms por paso).
+- **El cuello de botella son los pasos FX, que se recalculan en cada fotograma:** del 91 al 95 % del tiempo con 25 capas o más. El rectángulo arrastrado ni siquiera está bajo esas capas, y aun así el texto se vuelve a desenfocar 50 veces por fotograma.
+- La memoria de JavaScript no crece. Lo que crece son los lienzos temporales: uno nuevo por paso, 28 Mpx por fotograma con 50 capas, que van a la GPU.
+- Con 5 capas ya no se llega a 60 fps (45 ms). La latencia de añadir una capa con 50 apiladas es de unos 320 ms (p50).
+
+**Siguiente paso** (pendiente en [pendientes.md](pendientes.md)): una caché del resultado de cada capa FX, como GIMP e Inkscape. Después, repetir esta medición para comprobar la mejora.
+
+Casos aún sin medir:
 
 | Caso | Variable | Valores |
 | --- | --- | --- |
@@ -57,18 +87,9 @@ Hoy no hay cifras. El render recalcula todas las capas FX en cada fotograma, sin
 | Operaciones por capa | número de operaciones en una sola capa FX | 1, 5, 20 |
 | Tamaño del lienzo | documento | 1080², 4K (3840×2160), 8K |
 | Zoom | escala de la vista | 25 %, 100 %, 400 % (el tope de 16 Mpx actúa aquí) |
-| Interacción | qué ocurre durante la medición | quieto, arrastrar una capa, mover un deslizador del editor |
-| Tipo de efecto | coste por paso | filtro CSS (barato), glow (varios pases), destello (gradientes) |
-
-Para cada caso se registra:
-- tiempo de `drawDoc`, total y por capa FX;
-- latencia desde la acción hasta el primer fotograma que la muestra;
-- fotogramas por encima de 16,7 ms mientras se arrastra;
-- lienzos creados y píxeles reservados por fotograma;
-- memoria de JavaScript (solo Chrome);
-- tareas largas del navegador.
-
-El resultado buscado es saber, para N capas, si el tiempo crece en línea y qué parte domina: pintar (GPU), reservar lienzos (memoria) o el trabajo de JavaScript. El cómo medir está en la propuesta [0012](decisions/0012-registro-de-rendimiento.md).
+| Interacción | qué ocurre durante la medición | quieto, mover un deslizador del editor |
+| Tipo de efecto | coste por paso | glow (varios pases), destello (gradientes) |
+| Modo profundo | `&deep=1` | qué parte es espera de la GPU |
 
 ## 6. Robustez
 

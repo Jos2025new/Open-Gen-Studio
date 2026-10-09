@@ -20,6 +20,7 @@ e2e-runs/
 
 # Manual Playwright stress artifacts
 tests-e2e/failures/
+tests-e2e/screens/
 test-results/
 
 # Local working notes and tool settings: kept on the owner's machine, not in the repo

@@ -10,6 +10,8 @@ import { promisify } from 'node:util';
 const run = promisify(execFile);
 /** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
 const LOG_MAX_BYTES = 5 * 1024 * 1024;
+/** A performance trace (ADR 0012) stops growing here: a session left on cannot fill the disk. */
+const TRACE_MAX_BYTES = 50 * 1024 * 1024;
 
 /**
  * ffmpeg arguments that join clips in order into one MP4 (join_clips). Every clip is scaled and padded to the
@@ -169,7 +171,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
 
     if (path === '/ping') return send(200, 'ok');
 
-    // Writes (state, media, log, join, wipe) only from the app itself: they carry X-OGS, which a page on another site
+    // Writes (state, media, log, trace, join, wipe) only from the app itself: they carry X-OGS, which a page on another site
     // cannot send without a preflight the dev server refuses, and any Origin they carry is this server's own.
     // A plain cross-site POST (no preflight needed) would otherwise reach /wipe.
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -299,6 +301,20 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       const size = await stat(logFile).then((s) => s.size).catch(() => 0);
       if (size > LOG_MAX_BYTES) await rename(logFile, join(logDir, 'app.log.1')).catch(() => undefined);
       await appendFile(logFile, `${text}\n`, { mode: 0o600 });
+      return send(204);
+    }
+
+    // Performance trace of a test session (ADR 0012): JSON lines appended to logs/trace-<id>.jsonl, capped per file.
+    if (path === '/trace' && req.method === 'POST') {
+      const id = url.searchParams.get('id') ?? '';
+      if (!/^[\w-]{1,100}$/.test(id)) return send(400, 'bad trace id');
+      const lines = (await body(req)).toString('utf8').split('\n').filter((l) => l.startsWith('{') && l.length < 20_000);
+      const logDir = join(dir, 'logs');
+      const file = join(logDir, `trace-${id}.jsonl`);
+      await mkdir(logDir, { recursive: true });
+      const size = await stat(file).then((s) => s.size).catch(() => 0);
+      if (size > TRACE_MAX_BYTES) return send(413, 'trace file is full');
+      if (lines.length) await appendFile(file, `${lines.join('\n')}\n`, { mode: 0o600 });
       return send(204);
     }
 

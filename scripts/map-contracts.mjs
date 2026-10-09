@@ -220,4 +220,22 @@ export default [
     ],
     tests: ['tests/fx-agent.test.ts'],
   },
+  {
+    id: 'trace-store',
+    what: 'ADR 0012: el registro de rendimiento escribe en /x/store/trace y el servidor lo añade a logs/trace-<id>.jsonl con las protecciones de escritura de la app.',
+    sides: [
+      ['src/lib/trace.ts', 'fetch(`/x/store/trace?id='],
+      ['server/local-store.js', "if (path === '/trace' && req.method === 'POST')"],
+    ],
+    tests: ['tests/trace.test.ts'],
+  },
+  {
+    id: 'trace-key',
+    what: 'La tecla del registro de rendimiento: el manejador y la lista de atajos (Ajustes y README) dicen lo mismo.',
+    sides: [
+      ['src/components/shell/TraceControl.tsx', "e.altKey && !e.shiftKey && e.code === 'KeyP'"],
+      ['src/engine/shortcuts.ts', "keys: 'Mod + Alt + P'"],
+    ],
+    tests: ['tests/readme-shortcuts.test.ts'],
+  },
 ];

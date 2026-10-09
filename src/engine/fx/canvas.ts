@@ -1,6 +1,7 @@
 import { createCanvas, ctx2d } from '../../lib/media';
 import { numParam, rgba } from './defs';
 import type { FxLayer, FxOp } from './types';
+import { span, traceDeep } from '../../lib/trace';
 
 /*
  * FX on canvas: each op is one pass (ctx.filter, screen, gradients), never a JavaScript pixel loop. The source canvas
@@ -8,7 +9,12 @@ import type { FxLayer, FxOp } from './types';
  */
 
 /** `scale` = canvas px per document px (lengths are given in document px); `clip` keeps light inside the source alpha. */
-export interface FxContext { scale: number; clip: boolean }
+export interface FxContext {
+  scale: number;
+  clip: boolean;
+  /** Where the target is, in canvas px: the lens flare is placed in it, as GIMP places it in the drawable. Default: all. */
+  region?: { x: number; y: number; w: number; h: number };
+}
 
 /** The ctx.filter string for ops CSS can do; null for glow and flare, drawn by hand. */
 export function cssFilter(op: FxOp, scale: number): string | null {
@@ -35,10 +41,11 @@ export function glowPasses(strength: number): number[] {
 }
 
 /** Light of the lens flare, on its own transparent canvas the size of the target. */
-export function flareCanvas(op: FxOp, width: number, height: number): HTMLCanvasElement {
+export function flareCanvas(op: FxOp, width: number, height: number, region = { x: 0, y: 0, w: width, h: height }): HTMLCanvasElement {
   const c = createCanvas(width, height), x = ctx2d(c);
   const i = numParam(op, 'intensity'), color = String(op.params.color);
-  const sx = numParam(op, 'x') * width, sy = numParam(op, 'y') * height, r = Math.max(1, numParam(op, 'size') * Math.min(width, height));
+  // Position and size are fractions of the region (the target layer, or the whole page).
+  const sx = region.x + numParam(op, 'x') * region.w, sy = region.y + numParam(op, 'y') * region.h, r = Math.max(1, numParam(op, 'size') * Math.min(region.w, region.h));
   const blob = (cx: number, cy: number, radius: number, stops: Array<[number, string]>) => {
     const g = x.createRadialGradient(cx, cy, 0, cx, cy, radius);
     for (const [at, col] of stops) g.addColorStop(at, col);
@@ -48,8 +55,8 @@ export function flareCanvas(op: FxOp, width: number, height: number): HTMLCanvas
   x.globalCompositeOperation = 'lighter';
   blob(sx, sy, r, [[0, rgba('#ffffff', i)], [0.08, rgba(color, 0.85 * i)], [0.35, rgba(color, 0.22 * i)], [1, rgba(color, 0)]]);
   blob(sx, sy, r * 1.5, [[0.8, rgba(color, 0)], [0.88, rgba(color, 0.14 * i)], [0.96, rgba(color, 0)]]);
-  // Ghosts along the line from the light through the centre of the frame.
-  const dx = width / 2 - sx, dy = height / 2 - sy;
+  // Ghosts along the line from the light through the centre of the region.
+  const dx = region.x + region.w / 2 - sx, dy = region.y + region.h / 2 - sy;
   for (const [t, k, a] of [[0.6, 0.18, 0.16], [1.1, 0.08, 0.22], [1.45, 0.3, 0.1], [1.9, 0.14, 0.14]] as const) {
     blob(sx + dx * t, sy + dy * t, r * k, [[0, rgba(color, a * i)], [0.7, rgba(color, a * i * 0.6)], [1, rgba(color, 0)]]);
   }
@@ -57,6 +64,18 @@ export function flareCanvas(op: FxOp, width: number, height: number): HTMLCanvas
 }
 
 function pass(src: HTMLCanvasElement, op: FxOp, c: FxContext): HTMLCanvasElement {
+  const end = span('fx', 'pass', { kind: op.kind, size: `${src.width}x${src.height}` });
+  const out = draw(src, op, c);
+  if (traceDeep()) {
+    // Deep trace: the time the script took, then the wait until the GPU has painted it (a 1-px read forces it).
+    const script = end();
+    ctx2d(out).getImageData(0, 0, 1, 1);
+    span('fx', 'pass-gpu', { kind: op.kind, size: `${src.width}x${src.height}`, scriptMs: Math.round(script * 1000) / 1000 })();
+  } else end();
+  return out;
+}
+
+function draw(src: HTMLCanvasElement, op: FxOp, c: FxContext): HTMLCanvasElement {
   const out = createCanvas(src.width, src.height), x = ctx2d(out);
   const css = cssFilter(op, c.scale);
   if (css) {
@@ -75,7 +94,7 @@ function pass(src: HTMLCanvasElement, op: FxOp, c: FxContext): HTMLCanvasElement
     }
     x.filter = 'none';
   } else if (op.kind === 'flare') {
-    const light = flareCanvas(op, src.width, src.height);
+    const light = flareCanvas(op, src.width, src.height, c.region);
     if (c.clip) {
       const lx = ctx2d(light);
       lx.globalCompositeOperation = 'destination-in';

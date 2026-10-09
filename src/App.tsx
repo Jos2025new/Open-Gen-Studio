@@ -15,6 +15,7 @@ import { DesignerWorkspace } from './components/designer/DesignerWorkspace';
 import { Composer } from './components/composer/Composer';
 import { Toasts } from './components/ui/Toasts';
 import { TooltipLayer } from './components/ui/TooltipLayer';
+import { TraceControl } from './components/shell/TraceControl';
 
 export function App() {
   const hydrated = useStore((s) => s.hydrated);
@@ -63,6 +64,7 @@ export function App() {
         <SidePanel />
         <Lightbox />
         <SketchEditor />
+        <TraceControl />
         <Toasts />
         <TooltipLayer />
       </div>

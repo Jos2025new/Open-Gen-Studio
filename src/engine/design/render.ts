@@ -9,6 +9,7 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { fxPlan } from '../fx/plan';
 import { mixFx } from '../fx/canvas';
+import { frameShown, span, takeCanvasCount, tracing } from '../../lib/trace';
 
 /* One renderer for both the editor view and exports, so what you see is what you export. */
 
@@ -239,6 +240,10 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
   ctx.rect(0, 0, doc.width, doc.height);
   ctx.clip();
   const steps = fxPlan(doc.layers, opts.hideLayerId);
+  // Trace (ADR 0012): the editor's frames only (thumbnails and exports also draw the page).
+  const stage = tracing('render') && (ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas');
+  const end = stage ? span('render', 'frame', { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` }) : null;
+  if (stage) takeCanvasCount();
   if (steps.every((s) => s.t === 'draw')) {
     if (doc.background) {
       ctx.fillStyle = doc.background;
@@ -247,6 +252,10 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
     for (const s of steps) drawLayer(ctx, s.layer);
   } else drawWithFx(ctx, doc, steps);
   ctx.restore();
+  if (end) {
+    end(takeCanvasCount());
+    frameShown();
+  }
 }
 
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
@@ -268,12 +277,15 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
     x.fillRect(0, 0, doc.width, doc.height);
   }
   for (const s of steps) {
+    const end = s.t === 'draw' ? null : span('fx', 'layer', { scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${W}x${H}` });
     if (s.t === 'draw') drawLayer(at(acc), s.layer);
     else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false });
     else {
       let own = createCanvas(W, H);
       drawLayer(at(own), s.layer, true);
-      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true });
+      const box = layerBox(s.layer);
+      const region = box ? { x: box.x * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale } : undefined;
+      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region });
       // In canvas px: `own` is already at the composite's scale.
       const x = ctx2d(acc);
       x.setTransform(1, 0, 0, 1, 0, 0);
@@ -283,6 +295,7 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
       x.globalAlpha = 1;
       x.globalCompositeOperation = 'source-over';
     }
+    end?.();
   }
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(acc, 0, 0, doc.width, doc.height);

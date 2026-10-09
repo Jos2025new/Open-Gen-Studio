@@ -16,6 +16,10 @@ export interface ShortcutGroup {
 export function shortcutGroups(): ShortcutGroup[] {
   return [
     {
+      title: 'Testing',
+      items: [{ keys: 'Mod + Alt + P', action: 'Start or stop a performance trace (logs/trace-…jsonl)' }],
+    },
+    {
       title: 'Prompt and chat',
       items: [
         { keys: 'Enter', action: 'Send or generate' },

@@ -133,6 +133,12 @@ Guarda un personaje, un producto o un lugar en la **biblioteca** con un nombre y
 También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mientras escribes en un campo, los atajos no se activan.
 
 <!-- shortcuts:start -->
+**Testing**
+
+| Teclas | Acción |
+| --- | --- |
+| Mod + Alt + P | Start or stop a performance trace (logs/trace-…jsonl) |
+
 **Prompt and chat**
 
 | Teclas | Acción |

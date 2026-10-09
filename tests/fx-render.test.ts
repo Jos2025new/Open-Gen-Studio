@@ -43,7 +43,7 @@ function page(fx: ReturnType<typeof newFxLayer>[] = [], at = 1): DesignDoc {
   layers.splice(at, 0, ...(fx as never[]));
   return { ...createDoc('p', 200, 100), layers };
 }
-const view = (scale = 1) => { const c = recordingCanvas(400, 200); const x = c.getContext() as CanvasRenderingContext2D; x.setTransform(scale, 0, 0, scale, 0, 0); return { c, x }; };
+const view = (scale = 1) => { const c = recordingCanvas(400, 200); const x = c.getContext() as unknown as CanvasRenderingContext2D; x.setTransform(scale, 0, 0, scale, 0, 0); return { c, x }; };
 beforeEach(() => { calls.length = 0; made = 0; });
 
 describe('drawDoc with FX layers', () => {

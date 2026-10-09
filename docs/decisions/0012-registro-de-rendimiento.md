@@ -2,7 +2,7 @@
 
 ## Estado
 
-Propuesto
+Aceptado
 
 ## Fecha
 
@@ -22,7 +22,7 @@ Nuestra app ya escribe eventos en `data/logs/app.log` mediante `logEvent` (`src/
 
 ## Decisión
 
-Propuesta, pendiente de aprobación:
+Aprobado por el usuario (2026-10-08): generalista, con sondas finas que no obliguen a correr toda la suite, y con el alcance que menos esfuerzo le pida y más cubra.
 
 1. **Apagado por defecto, coste casi nulo.** Un módulo `src/lib/trace.ts` con `trace.on` falso. Cada punto medido comprueba ese booleano, como el framecheck de Inkscape. Nunca se guarda en el estado ni se activa solo.
 2. **Sesión de prueba con marcadores (modelo GIMP).** Se inicia con una etiqueta («50 capas de desenfoque en 4K»). Durante la sesión, el usuario o el agente añaden marcadores de texto («ahora arrastro la capa»). Se detiene a mano o al cerrar la pestaña.
@@ -42,7 +42,8 @@ Propuesta, pendiente de aprobación:
    
    Un agente lo lee sin abrir la app.
 6. **Banco reproducible.** Un script de Playwright sobre el sandbox (como `npm run stress`) genera documentos sintéticos con N capas FX (1 a 300) y tamaños de 1080² a 8K, y graba una sesión por caso. Así el escenario de un proyecto profesional se reproduce sin datos reales.
-7. **Activación.** En el sandbox, el agente lo activa por el gancho de pruebas del puerto 5183 (como `__OGS_TEST__`). En la app real, solo el usuario, desde un menú de desarrollo. **Pendiente de decidir:** si debe existir en la app real o solo en el sandbox.
+7. **Activación (decidida).** El registro vive en el código de la app, apagado. Funciona igual en el sandbox, donde el usuario suele trabajar y donde pueden usarlo los agentes, y en la app real, para medir proyectos reales. En ambos lo enciende `Ctrl+Alt+P` o `?trace=<etiqueta>`. Los agentes solo lo usan en el sandbox, mediante `window.__OGS_TRACE__`. No toca los datos: solo añade archivos en `logs/`.
+8. **Sondas finas.** Cualquier función se mide con una línea (`span`), y los dominios limitan qué se graba. Para una sola pieza no hace falta toda la suite: `npx vitest run <test> -t <caso>` o `npm run fx:check -- -g <caso>`. La guía está en [depuracion.md](../depuracion.md).
 
 ## Alternativas
 
@@ -51,6 +52,8 @@ Propuesta, pendiente de aprobación:
 - **Optimizar ya (caché y teselas).** Aplazado: sin cifras no se sabe qué domina. El registro decide qué optimizar primero. Lo probable, por cómo está hecho hoy, es que pese recalcular todas las capas FX en cada fotograma: GIMP e Inkscape lo evitan con caché.
 
 ## Consecuencias
+
+- Implementado en `task/fx`: `src/lib/trace.ts`, `TraceControl.tsx`, `/x/store/trace` y `scripts/trace-report.mjs`, con pruebas en `tests/trace.test.ts`. Primera medición en [fx-pruebas.md](../fx-pruebas.md), sección 5.
 
 - Hay que instrumentar `drawDoc`, `applyFx`, `runFx` y el bucle de fotogramas de `Stage.tsx`, y añadir una ruta de escritura al servidor local con las mismas protecciones que `app.log`.
 - Los números de una máquina no valen para otra: cada informe guarda el navegador, los núcleos (`navigator.hardwareConcurrency`) y la carga si se conoce.

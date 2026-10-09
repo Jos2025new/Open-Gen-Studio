@@ -33,7 +33,7 @@ export const FX_DEFS: Record<FxKind, FxDef> = {
   blur: def('blur', 'filter', 'Blur', 'Soften with a Gaussian blur.', [num('radius', 'Radius', 0, 100, 0.5, 4, 'px')]),
   glow: def('glow', 'effect', 'Glow', 'A soft halo of the content’s own light.', [num('strength', 'Strength', 0, 2, 0.05, 0.8), num('radius', 'Radius', 1, 100, 1, 12, 'px')]),
   shadow: def('shadow', 'effect', 'Drop shadow', 'A shadow behind the content.', [num('blur', 'Blur', 0, 100, 1, 12, 'px'), num('x', 'Offset x', -200, 200, 1, 8, 'px'), num('y', 'Offset y', -200, 200, 1, 8, 'px'), color('color', 'Color', '#000000'), num('opacity', 'Opacity', 0, 1, 0.05, 0.6)]),
-  flare: def('flare', 'effect', 'Lens flare', 'A bright light source with rings and ghosts toward the centre.', [num('intensity', 'Intensity', 0, 2, 0.05, 1), num('x', 'Position x', 0, 1, 0.01, 0.75), num('y', 'Position y', 0, 1, 0.01, 0.25), num('size', 'Size', 0.05, 1, 0.01, 0.3), color('color', 'Color', '#ffd9a0')], false),
+  flare: def('flare', 'effect', 'Lens flare', 'A bright light with rings and ghosts toward the centre; placed within the layer it acts on (or the page).', [num('intensity', 'Intensity', 0, 2, 0.05, 1), num('x', 'Position x', 0, 1, 0.01, 0.75), num('y', 'Position y', 0, 1, 0.01, 0.25), num('size', 'Size', 0.05, 1, 0.01, 0.3), color('color', 'Color', '#ffd9a0')], false),
 };
 
 export const FX_KINDS = Object.keys(FX_DEFS) as FxKind[];

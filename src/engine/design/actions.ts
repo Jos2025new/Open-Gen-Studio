@@ -14,6 +14,7 @@ import { exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
+import { awaitFrame } from '../../lib/trace';
 
 export { fxSummary } from '../fx/commands';
 
@@ -38,6 +39,8 @@ export function mutateDoc(sessionId: string, docId: string, fn: (d: DesignDoc) =
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   if (opts.record !== false) record(doc);
+  // Trace (ADR 0012): from any Designer change to the frame that shows it.
+  awaitFrame('designer', 'change');
   setDoc(sessionId, docId, fn);
   // Any change (delete, group, merge…) leaves no pick on a layer or object that is gone.
   const next = getDoc(sessionId, docId);

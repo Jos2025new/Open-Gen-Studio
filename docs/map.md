@@ -35,6 +35,8 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **fx-svg-match** — Los filtros SVG coinciden con ctx.filter: sRGB en cada <filter> y el radio de la sombra dividido entre dos (CSS drop-shadow). | [svg.ts](../src/engine/fx/svg.ts), [canvas.ts](../src/engine/fx/canvas.ts) | [fx-svg.test.ts](../tests/fx-svg.test.ts) |
 | **fx-commands** — ADR 0011: el panel de capas y el agente cambian las capas FX con los mismos comandos (runFx), en un solo paso de deshacer. | [fx.ts](../src/engine/design/fx.ts), [FxPanel.tsx](../src/components/designer/FxPanel.tsx), [designerFx.ts](../src/engine/agent/designerFx.ts), [designerTools.ts](../src/engine/agent/designerTools.ts) | [fx-commands.test.ts](../tests/fx-commands.test.ts), [fx-agent.test.ts](../tests/fx-agent.test.ts) |
 | **fx-designer-route** — En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva. | [designer.md](../src/engine/skills/app/designer.md), [runtime.ts](../src/engine/agent/runtime.ts) | [fx-agent.test.ts](../tests/fx-agent.test.ts) |
+| **trace-store** — ADR 0012: el registro de rendimiento escribe en /x/store/trace y el servidor lo añade a logs/trace-<id>.jsonl con las protecciones de escritura de la app. | [trace.ts](../src/lib/trace.ts), [local-store.js](../server/local-store.js) | [trace.test.ts](../tests/trace.test.ts) |
+| **trace-key** — La tecla del registro de rendimiento: el manejador y la lista de atajos (Ajustes y README) dicen lo mismo. | [TraceControl.tsx](../src/components/shell/TraceControl.tsx), [shortcuts.ts](../src/engine/shortcuts.ts) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
 
 ## Módulos centrales
 
@@ -43,7 +45,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 136 | 90 |
-| [store.ts](../src/store/store.ts) | 91 | 85 |
+| [store.ts](../src/store/store.ts) | 92 | 85 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 42 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
@@ -74,7 +76,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 15 | 1 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
-| `src/components/shell` | 10 | 0 |
+| `src/components/shell` | 11 | 0 |
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 28 | 113 |
 | `src/engine/agent` | 19 | 54 |
@@ -84,10 +86,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 15 | 107 |
+| `src/lib` | 16 | 108 |
 | `src/store` | 1 | 85 |
 
-87 de 212 módulos no tienen ningún test que los importe directamente.
+88 de 214 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -120,6 +122,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
 - [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)
 - [TopBar.tsx](../src/components/shell/TopBar.tsx)
+- [TraceControl.tsx](../src/components/shell/TraceControl.tsx)
 - [WorkspaceMenu.tsx](../src/components/shell/WorkspaceMenu.tsx)
 - [CanvasFilter.tsx](../src/components/ui/CanvasFilter.tsx)
 - [ImportFromChat.tsx](../src/components/ui/ImportFromChat.tsx)

@@ -11,7 +11,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] Modelos `-spicy` excluidos salvo que se nombren: aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. **2026-10-08**, pendiente del usuario.
 - [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
 - [ ] Fusionar `task/agent-forcing` en `task/modelo-general`. Avance directo, sin conflictos: ver [fusion-agent-forcing.md](fusion-agent-forcing.md). **2026-10-08**, decide el usuario.
-- [ ] Registro de rendimiento para sesiones de prueba ([ADR 0012](decisions/0012-registro-de-rendimiento.md), propuesto): aprobarlo y decidir si existe también en la app real. **2026-10-08**, decide el usuario.
+- [x] Registro de rendimiento para sesiones de prueba ([ADR 0012](decisions/0012-registro-de-rendimiento.md)): aprobado; en la app y en el sandbox, apagado por defecto. **2026-10-08**, el usuario delegó el alcance.
 - [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
 - [ ] Prueba con gasto real de voz y efectos (NanoGPT): voz, instrucciones de tono y sonido. **2026-10-08**, la hará el usuario. **Sin verificar:** el formato real de la respuesta de cada modelo (audio directo o JSON con URL; se aceptan ambos) y si el efecto admite fijar la duración (hoy la elige el modelo).
 
@@ -25,6 +25,12 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
+- [ ] **Caché de las capas FX** (cuello de botella medido; [fx-pruebas.md](fx-pruebas.md), sección 5). Hoy cada fotograma recalcula todas las capas FX: con 50 desenfoques, 398 ms por fotograma, y el 95 % del tiempo son pasos FX. Propuesta, como GIMP e Inkscape (`Drawing::setCacheBudget`):
+  - guardar el resultado de cada capa FX con una clave (versión de su contenido debajo, parámetros y escala) y un presupuesto de memoria;
+  - reutilizar los lienzos temporales en vez de crear uno por paso;
+  - después, renderizar por teselas solo la zona que cambia.
+  
+  Repetir el banco tras cada mejora. **2026-10-08**, pendiente; recordatorio pedido por el usuario.
 - [ ] Importar el `.zip` de datos (el exportar ya existe). **2026-10-08**, pendiente.
 - [ ] Recortar un vídeo o quitarle el audio. El servidor local ya usa ffmpeg para `join_clips`; sería la vía más ligera. **2026-10-08**, pendiente.
 - [ ] Quitar el fondo de un vídeo (`pixelcut/video-background-removal`, NanoGPT; ID verificado). **2026-10-08**, pendiente.
