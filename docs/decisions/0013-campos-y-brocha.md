@@ -6,9 +6,11 @@ Aceptado
 
 ## Fecha
 
-2026-10-09 (aceptado el mismo día: el usuario probó y aprobó la brocha y el panel)
+2026-10-09
 
 ## Contexto
+
+Aceptado el 2026-10-09: el usuario probó y aprobó la brocha y el panel.
 
 El usuario pidió (2026-10-09) llevar a nuestra brocha las funciones del panel de PaintTool SAI y mejorar la legibilidad de los ajustes. Puso como referencia un panel en el que toda la fila es el control: el nombre a la izquierda, el valor a la derecha y un relleno hasta el valor. Pidió una sola fuente de verdad para los elementos gráficos: nada de un tirador distinto en una esquina.
 
