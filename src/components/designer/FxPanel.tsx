@@ -6,8 +6,9 @@ import { FX_DEFS, fxKindsOf, type FxParam } from '../../engine/fx/defs';
 import { fxTarget } from '../../engine/fx/plan';
 import type { FxCommand } from '../../engine/fx/commands';
 import { runFx } from '../../engine/design/fx';
-import { Field, IconButton, MenuItem, Range, Segmented, Toggle } from '../ui/primitives';
+import { Field, IconButton, MenuItem, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
+import { InlineColor, InlineSlider } from './InlineControls';
 import { toast } from '../../store/store';
 
 /* FX in the layers panel (ADR 0011): the FX menu next to Operations and the editor of an FX layer. */
@@ -47,14 +48,9 @@ export function FxMenu({ sessionId, doc, layer }: { sessionId: string; doc: Desi
 }
 
 function ParamField({ p, value, disabled, onChange }: { p: FxParam; value: unknown; disabled?: boolean; onChange: (v: number | string) => void }) {
-  if (p.type === 'color') return <Field label={p.label}><input type="color" value={String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)} /></Field>;
-  const v = Number(value);
-  return <Field label={`${p.label}${p.unit ? ` (${p.unit})` : ''}`}>
-    <div className="opacity-field">
-      <Range min={p.min} max={p.max} step={p.step} value={v} disabled={disabled} onChange={(e) => onChange(+e.target.value)} aria-label={p.label} />
-      <input type="number" min={p.min} max={p.max} step={p.step} value={v} disabled={disabled} onChange={(e) => onChange(+e.target.value)} aria-label={`${p.label} value`} />
-    </div>
-  </Field>;
+  // The app's own fields, as every tool uses them (InlineControls.tsx).
+  if (p.type === 'color') return <InlineColor label={p.label} value={String(value)} showValue onChange={onChange} />;
+  return <InlineSlider label={p.label} unit={p.unit ?? ''} min={p.min} max={p.max} step={p.step} value={Number(value)} disabled={disabled} onChange={onChange} />;
 }
 
 function OpRow({ sessionId, doc, layer, op, index, open, onOpen }: { sessionId: string; doc: DesignDoc; layer: FxLayer; op: FxOp; index: number; open: boolean; onOpen: () => void }) {

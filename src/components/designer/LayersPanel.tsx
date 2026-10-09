@@ -8,14 +8,14 @@ import { OPS } from '../../engine/ops';
 import { drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
-import { Field, IconButton, MenuItem, Range } from '../ui/primitives';
+import { Field, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { ToolSettings } from './ToolSettings';
-import { InlineColor } from './InlineControls';
+import { InlineColor, InlineSlider } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
@@ -151,7 +151,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
         <div className="prop-row">
-          <Field label="Opacity"><div className="opacity-field"><Range min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: +e.target.value / 100 })} aria-label="Opacity" /><input type="number" min={0} max={100} value={Math.round(layer.opacity * 100)} onChange={(e) => patch({ opacity: Math.min(100, Math.max(0, +e.target.value)) / 100 })} aria-label="Opacity percent" /></div></Field>
+          <InlineSlider label="Opacity" unit="%" scale={100} min={0} max={1} step={0.01} value={layer.opacity} onChange={(v) => patch({ opacity: v })} />
           <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
     </fieldset>}

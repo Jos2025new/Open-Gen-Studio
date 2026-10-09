@@ -110,7 +110,8 @@ export interface UiState {
   sketch: { assetId: string; nodeId?: string; mode?: 'paint' | 'mask' } | null;
   toasts: Toast[];
   tool: DesignTool;
-  brush: { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
+  /** Brush and eraser; the tip fields (hardness, pressure, texture, blend, Keep Opacity) are design/brushEngine.ts. */
+  brush: Omit<import('../engine/design/brushEngine').BrushOptions, 'size'> & { size: number; color: string; opacity: number; smoothing?: number; stabilization?: number; fillThreshold?: number; fillExpand?: number; fillSmooth?: number };
   /** Designer colors: the last ones used (newest first) and the ones the user saved. */
   swatches?: { recent: string[]; saved: string[] };
   /** Pixel selection tool: rectangle (default) or lasso. */

@@ -25,6 +25,9 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
+- [ ] **Brocha, lo que falta de SAI** ([ADR 0013](decisions/0013-campos-y-brocha.md)): mezcla húmeda (Blending, Dilution, Persistence), calidad y multiplicador de tamaño. Medir antes el coste por movimiento de la punta con el [protocolo](depuracion.md#protocolo). **2026-10-09**, pendiente.
+- [ ] **Mismo campo fuera del Designer:** los deslizadores de la galería (columnas), el boceto (tamaño de brocha), el visor 3D y la tarjeta de ajustes siguen con su propio estilo. **2026-10-09**, pendiente; cambia la interfaz de otros espacios, así que hay que preguntar antes.
+- [ ] **Presión con un lápiz real:** tamaño y densidad mínimos solo se han probado con tests y con ratón (presión total). **2026-10-09**, lo prueba el usuario.
 - [ ] **Caché de las capas FX** (coste medido; reparto pendiente de confirmar; [fx-pruebas.md](fx-pruebas.md), sección 5). Hoy cada fotograma recalcula todas las capas FX: con 50 desenfoques, 398 ms por fotograma, el 95 % atribuido a pasos FX se calculó con una fórmula defectuosa y está pendiente de confirmar con la atribución corregida. Propuesta, como GIMP e Inkscape (`Drawing::setCacheBudget`):
   - guardar el resultado de cada capa FX con una clave (versión de su contenido debajo, parámetros y escala) y un presupuesto de memoria;
   - reutilizar los lienzos temporales en vez de crear uno por paso;
@@ -45,6 +48,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 - [ ] 4 tests fallaron una vez con la carga en 42 (procesos ajenos): `agent-direct-model`, `agent-retry`, `chat-to-nodes` y `join-clips`. Pasaron por separado y en dos ejecuciones completas posteriores (cargas 33 y 29). No se capturó el error: la causa no está confirmada, aunque probablemente sea el margen de tiempo superado con más carga que la medida en el [ADR 0010](decisions/0010-estrategia-de-pruebas.md). **2026-10-08**. Si se repite, guardar la salida de `npx vitest run` con el error.
 - [ ] 11 tests de 7 archivos fallaron una vez con la carga en 47–52 (`agent-contract-journey`, `agent-direct-model`, `composer-choice`, `join-clips`, `settings-phase`, `journeys/composer-variant`, `journeys/import-safety`); pasaron por separado (51 de 51) y en la ejecución completa siguiente. La auditoría externa vio fallar `import-safety` igual. Misma causa probable que el caso anterior; tampoco se capturó el error. **2026-10-08**.
+- [ ] El renderizador de líneas de los trazos raster anteriores al motor de punta no reconstruye fiel a lo pintado: 132 píxeles con más de 4 niveles de alfa de diferencia, máximo 72 (medido en `npm run brush:check`, 2026-10-09). Solo afecta a trazos antiguos al reconstruirse (al mover objetos). Los nuevos usan el motor y coinciden. **2026-10-09**.
 - [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
 - [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**.
 - [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.

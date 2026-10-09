@@ -267,4 +267,25 @@ export default [
     ],
     tests: ['tests/trace-domains.test.ts'],
   },
+  {
+    id: 'single-controls',
+    what: 'ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color.',
+    sides: [
+      ['src/components/designer/InlineControls.tsx', 'export function InlineSlider'],
+      ['src/components/designer/InlineControls.tsx', 'export function InlineToggle'],
+      ['src/styles/designer-connected.css', 'One field per setting (InlineControls.tsx)'],
+    ],
+    tests: ['tests/ui-single-slider.test.ts'],
+  },
+  {
+    id: 'brush-one-engine',
+    what: 'ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment).',
+    sides: [
+      ['src/engine/design/brushEngine.ts', 'export function stampSegment'],
+      ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip'],
+      ['src/engine/design/raster.ts', "stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb));"],
+      ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb)'],
+    ],
+    tests: ['tests/brush-engine.test.ts'],
+  },
 ];

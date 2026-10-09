@@ -40,6 +40,8 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **trace-key** — La tecla del registro de rendimiento: el manejador y la lista de atajos (Ajustes y README) dicen lo mismo. | [TraceControl.tsx](../src/components/shell/TraceControl.tsx), [shortcuts.ts](../src/engine/shortcuts.ts) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
 | **render-attribution** — Cada paso FX lleva el renderId y origen de su compositor; el porcentaje del editor excluye todos los renders fuera de pantalla. | [renderTrace.ts](../src/lib/renderTrace.ts), [render.ts](../src/engine/design/render.ts), [canvas.ts](../src/engine/fx/canvas.ts), [op.ts](../src/engine/fx/op.ts), [fill.ts](../src/engine/design/fill.ts), [swatches.ts](../src/engine/design/swatches.ts), [pixelSelection.ts](../src/engine/design/pixelSelection.ts), [canvasView.ts](../src/engine/agent/canvasView.ts), [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx), [trace-report.mjs](../scripts/trace-report.mjs), [depuracion.md](../docs/depuracion.md) | [fx-render.test.ts](../tests/fx-render.test.ts), [trace.test.ts](../tests/trace.test.ts) |
 | **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
+| **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
+| **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts) |
 
 ## Módulos centrales
 
@@ -47,8 +49,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 136 | 90 |
-| [store.ts](../src/store/store.ts) | 92 | 85 |
+| [types.ts](../src/engine/types.ts) | 138 | 90 |
+| [store.ts](../src/store/store.ts) | 93 | 85 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 42 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
@@ -58,13 +60,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [doc.ts](../src/engine/design/doc.ts) | 23 | 18 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |
-| [raster.ts](../src/engine/design/raster.ts) | 21 | 4 |
+| [raster.ts](../src/engine/design/raster.ts) | 22 | 4 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
-| [id.ts](../src/lib/id.ts) | 20 | 0 |
+| [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 101 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [render.ts](../src/engine/design/render.ts) | 13 | 3 |
+| [render.ts](../src/engine/design/render.ts) | 14 | 3 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
 | [history.ts](../src/engine/design/history.ts) | 12 | 5 |
 
@@ -76,14 +78,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 15 | 1 |
+| `src/components/designer` | 16 | 1 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 11 | 0 |
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 28 | 113 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 39 | 34 |
+| `src/engine/design` | 41 | 35 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
@@ -92,7 +94,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 108 |
 | `src/store` | 1 | 85 |
 
-89 de 215 módulos no tienen ningún test que los importe directamente.
+91 de 218 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -131,6 +133,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ImportFromChat.tsx](../src/components/ui/ImportFromChat.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
+- [brushStroke.ts](../src/engine/design/brushStroke.ts)
 - [gradient.ts](../src/engine/design/gradient.ts)
 - [useCursorPreview.ts](../src/engine/design/useCursorPreview.ts)
 - [main.tsx](../src/main.tsx)

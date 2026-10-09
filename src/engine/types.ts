@@ -5,7 +5,7 @@ import type { FxLayer } from './fx/types';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
-/** Agent mode: auto (one card when something that changes the result is missing), guided (question rounds), direct (no questions, no settings card). */
+/** Agent mode: auto (one card when something that changes the result is missing), guided (asks), direct (no card). */
 export type AgentStyle = 'auto' | 'guided' | 'direct';
 /** Every generated media type is also a persistable asset type. */
 export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
@@ -338,7 +338,7 @@ export interface Generation {
   delivery?: string[];
   /** What the app did about this request on its own (a retry it made), kept after it ends (T4). */
   notes?: string[];
-  /** What the last request to the provider looked like: endpoint, mapped parameters, which try and job id (T5). Never a key, never the media. */
+  /** The last request to the provider: endpoint, mapped parameters, which try and job id (T5). Never a key, never the media. */
   sent?: SentRequest;
 }
 
@@ -796,6 +796,7 @@ export interface RasterStroke {
   color: string;
   opacity: number;
   erase: boolean;
+  tip?: import('./design/brushEngine').BrushTip;
 }
 
 export interface RasterLayer extends LayerBase {
