@@ -33,7 +33,7 @@ Aprobado por el usuario (2026-10-08): generalista, con sondas finas que no oblig
    - **latencia de aplicación:** de la acción (`runFx`, deslizador, comando del agente) al primer fotograma que la muestra;
    - intervalos entre fotogramas mientras se arrastra, y tareas largas (`PerformanceObserver`);
    - memoria de JavaScript donde exista (`performance.memory`, Chrome).
-4. **GPU frente a CPU.** Los pases de canvas se encolan en la GPU: el tiempo de JavaScript no incluye el pintado. Un modo «profundo» opcional fuerza la espera leyendo un píxel tras cada paso. Así separa el tiempo de JavaScript del de pintado, a cambio de ralentizar la medida, y el informe lo indica.
+4. **Lectura sincronizada.** El modo «profundo» opcional mide la espera con lectura sincronizada de un píxel tras cada paso. Incluye la lectura y el trabajo pendiente que esta obliga a completar; no separa exactamente CPU y GPU. Altera y puede ralentizar el render. El nombre histórico `pass-gpu` se conserva, pero el informe lo describe como lectura sincronizada.
 5. **Dónde queda.** Un archivo JSON Lines por sesión en `data/logs/trace-<fecha>-<etiqueta>.jsonl` (en el sandbox, `.sandbox/data/logs/`), escrito por el servidor local como `app.log`. `npm run trace:report <archivo>` resume:
    - p50, p95 y máximo por evento;
    - la evolución con el número de capas;

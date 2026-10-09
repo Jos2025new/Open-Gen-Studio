@@ -11,7 +11,7 @@ Para agentes y para quien mida. Se aplica **solo a lo que ya tiene sondas**: los
 3. **Cómo.**
    - Un caso reproducible: `FX_BENCH=n npm run fx:check -- -g bench`, o un escenario propio con `window.__OGS_TRACE__.start(etiqueta, { domains })`.
    - Un marcador antes de cada paso (`.mark('…')`).
-   - `deep: true` solo para separar el tiempo de JavaScript del de la GPU.
+   - `deep: true` mide la espera con lectura sincronizada de un píxel; altera el render y no separa exactamente CPU y GPU.
 4. **Leer.** `npm run trace:report` (o `--json`). Comparar tramos entre marcadores, no cifras sueltas.
 5. **Informar.** Cada cifra va con:
    - navegador, núcleos, tamaño del documento y zoom;
@@ -27,7 +27,7 @@ Para agentes y para quien mida. Se aplica **solo a lo que ya tiene sondas**: los
 2. Abajo a la derecha aparece un indicador rojo con el tiempo. Antes de cada paso, pulsa la bandera y escribe un **marcador**: «ahora arrastro la foto». El informe separa las cifras por marcadores.
 3. Pulsa **Ctrl+Alt+P** otra vez, o el cuadrado, para parar. El aviso dice dónde quedó: `logs/trace-<fecha>-<etiqueta>.jsonl`, dentro de `data/` en la app real y de `.sandbox/data/` en el sandbox.
 
-Sin teclado: añade `?trace=<etiqueta>` a la dirección. Para grabar solo unas partes: `&domains=fx,render`. Para separar el tiempo de JavaScript del de pintado en la GPU: `&deep=1` (hace más lenta la medida).
+Sin teclado: añade `?trace=<etiqueta>` a la dirección. Para grabar solo unas partes: `&domains=fx,render`. Para medir la espera con lectura sincronizada de un píxel: `&deep=1` (hace más lenta la medida; no separa exactamente CPU y GPU).
 
 Apagado, el registro no graba nada y su coste es comprobar un booleano. Nunca escribe en tus datos: solo añade archivos en `logs/`, con un tope de 50 MB por archivo.
 
@@ -41,7 +41,7 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 
 - **Fotogramas:** p50, p95 y máximo, cuántos pasan de 16,7 ms (60 fps) y los huecos entre fotogramas al arrastrar (tirones visibles).
 - **Coste por número de capas FX:** cómo crece el fotograma.
-- **Reparto del tiempo:** qué parte es de los pasos FX, y en modo profundo cuánto es espera de la GPU.
+- **Reparto del tiempo:** qué parte es de los pasos FX, y en modo profundo cuánto dura la espera con lectura sincronizada.
 - **Memoria:** lienzos y megapíxeles creados por fotograma (presión sobre la GPU) y memoria de JavaScript (solo Chrome).
 - **Latencia:** desde la acción (cualquier cambio del Designer, o un comando FX) hasta el fotograma que la muestra.
 - **Tareas largas:** momentos en que la página no podía responder.
@@ -52,7 +52,7 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 | Dominio | Eventos |
 | --- | --- |
 | `render` | `frame`: cada fotograma del lienzo del Designer, con capas, capas FX, lienzos y píxeles creados |
-| `fx` | `layer` (cada capa FX), `pass` (cada operación), `pass-gpu` (modo profundo), `apply` (de un comando FX a su fotograma) |
+| `fx` | `layer` (cada capa FX), `pass` (cada operación), `pass-gpu` (lectura sincronizada de un píxel, modo profundo), `apply` (de un comando FX a su fotograma) |
 | `designer` | `change`: de cualquier cambio del documento a su fotograma |
 | `memory` | `heap`, cada segundo |
 | `browser` | `longtask` (más de 50 ms) |

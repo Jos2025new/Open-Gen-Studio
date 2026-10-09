@@ -23,7 +23,7 @@ export interface TraceOptions {
   label: string;
   /** Only these domains are recorded; empty = all. */
   domains?: string[];
-  /** Waits for the GPU after each FX pass, to split script time from painting (slows what it measures). */
+  /** Times a synchronized 1-pixel read after each FX pass; perturbs rendering, not an exact CPU/GPU split. */
   deep?: boolean;
 }
 

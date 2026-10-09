@@ -81,7 +81,7 @@ function sectionText(s) {
   const fx = Object.entries(s.framesByFxLayers);
   if (fx.length > 1 || fx[0]?.[0] !== '0') out.push(`- Frame time by active FX layers: ${fx.map(([k, v]) => `${k} → p50 ${v.p50} / p95 ${v.p95} ms (${v.n})`).join('; ')}.`);
   if (s.canvasesPerFrame.n) out.push(`- Off-screen canvases per frame: p50 ${s.canvasesPerFrame.p50}, max ${s.canvasesPerFrame.max}; megapixels per frame: p50 ${s.megapixelsPerFrame.p50}, max ${s.megapixelsPerFrame.max}.`);
-  if (s.fxShareOfFrames != null) out.push(`- FX passes are ${s.fxShareOfFrames}% of frame time${s.gpuWait ? ` (deep: GPU wait p50 ${s.gpuWait.p50} ms vs script p50 ${s.gpuWait.scriptP50} ms per pass)` : ''}.`);
+  if (s.fxShareOfFrames != null) out.push(`- FX passes are ${s.fxShareOfFrames}% of frame time${s.gpuWait ? ` (deep: synchronized read p50 ${s.gpuWait.p50} ms vs script p50 ${s.gpuWait.scriptP50} ms per pass)` : ''}.`);
   for (const [k, v] of Object.entries(s.fxPassByKind)) out.push(`- FX pass ${k}: p50 ${v.p50} ms, p95 ${v.p95} ms (${v.n}).`);
   for (const [k, v] of Object.entries(s.latency)) out.push(`- Latency ${k} (action → frame shown): p50 ${v.p50} ms, p95 ${v.p95} ms, max ${v.max} ms (${v.n}).`);
   if (s.heapMB) out.push(`- JS heap: ${s.heapMB.min}–${s.heapMB.max} MB.`);

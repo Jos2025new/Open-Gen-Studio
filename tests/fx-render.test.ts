@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
  * FX on the canvas (ADR 0011). A recording canvas double: it keeps the order of passes, the ctx.filter of each draw,
@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Call = { canvas: number; fn: string; src?: number; filter?: string; op?: string; alpha?: number; args?: unknown[]; scale?: number };
 const calls: Call[] = [];
 let made = 0;
+let readPixel = () => {};
 function recordingCanvas(width: number, height: number) {
   const id = ++made;
   let m = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -16,6 +17,7 @@ function recordingCanvas(width: number, height: number) {
     get(target, key: string) {
       if (key in target) return target[key];
       if (key === 'getTransform') return () => m;
+      if (key === 'getImageData') return () => readPixel();
       if (key === 'setTransform') return (a: number, b: number, c: number, d: number, e: number, f: number) => { m = { a, b, c, d, e, f }; };
       if (key === 'save') return () => saved.push({ ...state });
       if (key === 'restore') return () => Object.assign(state, saved.pop());
@@ -35,6 +37,17 @@ import { applyFx, cssFilter, glowPasses, mixFx } from '../src/engine/fx/canvas';
 import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
 import type { DesignDoc } from '../src/engine/types';
+import { startTrace, stopTrace, type TraceEvent } from '../src/lib/trace';
+
+const events: TraceEvent[] = [];
+function recordTrace(domains: string[], deep = false) {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+    events.push(...String(init?.body).split('\n').map((line) => JSON.parse(line) as TraceEvent));
+    return new Response(null, { status: 204 });
+  });
+  startTrace({ label: 'FX regression', domains, deep });
+}
+afterEach(() => { stopTrace(); events.length = 0; readPixel = () => {}; vi.restoreAllMocks(); });
 
 const rect = { id: 's', type: 'rect' as const, x: 0, y: 0, w: 10, h: 10, fill: '#f00', stroke: null, strokeWidth: 0, radius: 0 };
 function page(fx: ReturnType<typeof newFxLayer>[] = [], at = 1): DesignDoc {
@@ -89,6 +102,15 @@ describe('drawDoc with FX layers', () => {
 });
 
 describe('passes', () => {
+  it('deep trace includes the synchronized pixel read in pass-gpu', () => {
+    let now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
+    readPixel = () => { now += 25; };
+    recordTrace(['fx'], true);
+    applyFx(recordingCanvas(10, 10) as unknown as HTMLCanvasElement, [newFxOp('blur')], { scale: 1, clip: false });
+    stopTrace();
+    expect(events.find((e) => e.n === 'pass-gpu')?.ms).toBeGreaterThanOrEqual(25);
+  });
   it('maps every filter to ctx.filter; the shadow keeps its colour and opacity', () => {
     expect(cssFilter(newFxOp('hue', { degrees: -45 }), 1)).toBe('hue-rotate(-45deg)');
     expect(cssFilter(newFxOp('saturation', { amount: 0 }), 1)).toBe('saturate(0)');

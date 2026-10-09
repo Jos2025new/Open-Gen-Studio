@@ -67,10 +67,11 @@ function pass(src: HTMLCanvasElement, op: FxOp, c: FxContext): HTMLCanvasElement
   const end = span('fx', 'pass', { kind: op.kind, size: `${src.width}x${src.height}` });
   const out = draw(src, op, c);
   if (traceDeep()) {
-    // Deep trace: the time the script took, then the wait until the GPU has painted it (a 1-px read forces it).
+    // The read synchronizes pending work; its duration is not pure GPU time.
     const script = end();
+    const read = span('fx', 'pass-gpu', { kind: op.kind, size: `${src.width}x${src.height}`, scriptMs: Math.round(script * 1000) / 1000 });
     ctx2d(out).getImageData(0, 0, 1, 1);
-    span('fx', 'pass-gpu', { kind: op.kind, size: `${src.width}x${src.height}`, scriptMs: Math.round(script * 1000) / 1000 })();
+    read();
   } else end();
   return out;
 }
