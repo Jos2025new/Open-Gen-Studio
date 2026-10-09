@@ -2,7 +2,7 @@
 
 ## Estado
 
-Propuesto
+Aceptado (2026-10-09: el usuario probó y aprobó la brocha y el panel)
 
 ## Fecha
 
