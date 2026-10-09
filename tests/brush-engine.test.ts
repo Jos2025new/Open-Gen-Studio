@@ -10,7 +10,9 @@ const alpha = (i: AlphaImage, x: number, y: number) => i.data[(y * i.width + x) 
 
 describe('pressure', () => {
   it('a full-pressure stroke is the brush size and full density; min size and min density set the light end', () => {
-    expect(atPressure({ size: 20 }, 0.2)).toEqual({ width: 20, density: 1 });
+    // Defaults: pressure on size from 20 % (as soon as the toggle is on), density not affected.
+    expect(atPressure({ size: 20 }, 0)).toEqual({ width: 4, density: 1 });
+    expect(atPressure({ size: 20 }, 1)).toEqual({ width: 20, density: 1 });
     expect(atPressure({ size: 20, minSize: 0.25 }, 0)).toMatchObject({ width: 5 });
     expect(atPressure({ size: 20, minSize: 0.25 }, 1)).toMatchObject({ width: 20 });
     expect(atPressure({ size: 20, minSize: 0.25, pressureSize: false }, 0)).toMatchObject({ width: 20 });

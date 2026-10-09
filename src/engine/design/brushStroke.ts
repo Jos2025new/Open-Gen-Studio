@@ -6,8 +6,27 @@ import { toLayerSpace } from './render';
 
 /* A brush or eraser stroke on a raster layer: what the canvas records as the pointer moves (Stage.tsx). */
 
-/** Pen pressure (0–1); a mouse or a finger paints at full pressure, so the minimum size never applies to them. */
-export const penPressure = (e: { pointerType: string; pressure: number }) => (e.pointerType === 'pen' ? e.pressure || 0.5 : 1);
+/** The last input the brush read: what the settings show, so a missing pen pressure is visible, not silent. */
+export interface PressureReading { device: string; pressure: number | null }
+let lastReading: PressureReading | null = null;
+const readers = new Set<() => void>();
+export const lastPressure = () => lastReading;
+export function onPressure(fn: () => void): () => void { readers.add(fn); return () => readers.delete(fn); }
+
+/**
+ * Pressure (0–1) when the device reports one: a pen, or any pointer whose pressure is not the fixed values a mouse
+ * sends (0.5 pressed, 0 released). Some tablets reach the browser as a "mouse" with real pressure (Linux). Without
+ * pressure the brush paints at full size and density.
+ */
+export function penPressure(e: { pointerType: string; pressure: number }): number {
+  const real = e.pressure > 0 && (e.pointerType === 'pen' || e.pressure !== 0.5);
+  const reading = { device: e.pointerType || 'mouse', pressure: real ? e.pressure : null };
+  if (reading.device !== lastReading?.device || (reading.pressure === null) !== (lastReading?.pressure === null) || Math.abs((reading.pressure ?? 0) - (lastReading?.pressure ?? 0)) > 0.02) {
+    lastReading = reading;
+    readers.forEach((fn) => fn());
+  }
+  return real ? e.pressure : 1;
+}
 
 export function newBrushStroke(brush: BrushOptions & { color: string; opacity: number }, erase: boolean): RasterStroke {
   const tip = tipFor(brush, erase);

@@ -232,3 +232,5 @@
 /* A list's value sits on the right, next to its chevron, like every other field's value. */
 .opt.opt-pick .opt-value { margin-left: auto; text-align: right; }
 .opt.opt-pick svg { margin-left: 4px; }
+.brush-pressure { flex-basis: 100%; margin: 0; padding: 2px 4px; font-size: 11px; white-space: normal; color: var(--text-2); }
+.brush-pressure.is-warn { color: var(--warn, #f5b54a); }

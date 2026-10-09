@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
 import { atPressure, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
@@ -45,7 +46,7 @@ function BrushPreview({ brush, erase }: { brush: Brush; erase: boolean }) {
     ctx.drawImage(mask, 0, 0);
     ctx.globalAlpha = 1;
   }, [brush, erase]);
-  return <canvas ref={ref} className="brush-preview" width={260} height={56} aria-label="Stroke preview: light to full pressure and back" role="img" />;
+  return <canvas ref={ref} className="brush-preview" width={260} height={56} aria-label="Stroke preview with a pen: light to full pressure and back" title="With a pen: light to full pressure and back" role="img" />;
 }
 
 /** One-click sizes: each dot is the size it sets (capped to fit), as in SAI's size grid. */
@@ -55,6 +56,15 @@ function SizePresets({ value, onChange }: { value: number; onChange: (v: number)
       <i style={{ width: Math.max(2, Math.min(18, Math.sqrt(s) * 1.7)), height: Math.max(2, Math.min(18, Math.sqrt(s) * 1.7)) }} /><span className="num">{s}</span>
     </button>)}
   </div>;
+}
+
+/** What the last stroke received: a pen with pressure, or a device without (then pressure settings do nothing). */
+function PressureReadout() {
+  const r = useSyncExternalStore(onPressure, lastPressure);
+  const text = !r ? 'Pressure: paint once to see what your device sends'
+    : r.pressure === null ? `No pressure from your ${r.device}: it paints at full size and density. Use a pen for pressure.`
+    : `Pressure from your ${r.device}: ${Math.round(r.pressure * 100)} %`;
+  return <p className={`opt-hint brush-pressure${r && r.pressure === null ? ' is-warn' : ''}`} role="status">{text}</p>;
 }
 
 export function BrushSettings({ erase, compact = false }: { erase: boolean; compact?: boolean }) {
@@ -80,6 +90,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <InlineSelect label="Texture" value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.texture || brush.texture === 'none'} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />
+    <PressureReadout />
     <InlineToggle label="Pressure → size" tip="With a pen, lighter pressure paints thinner, down to the minimum size" checked={brush.pressureSize !== false} onChange={(v) => set({ pressureSize: v })} />
     <InlineSlider label="Min size" unit="%" scale={100} min={0} max={1} step={0.01} disabled={brush.pressureSize === false} value={brush.minSize ?? BRUSH_DEFAULTS.minSize} onChange={(v) => set({ minSize: v })} />
     <InlineToggle label="Pressure → density" tip="With a pen, lighter pressure paints fainter, down to the minimum density" checked={!!brush.pressureDensity} onChange={(v) => set({ pressureDensity: v })} />

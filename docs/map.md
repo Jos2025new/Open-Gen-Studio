@@ -85,7 +85,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 28 | 113 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 41 | 35 |
+| `src/engine/design` | 41 | 36 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
@@ -94,7 +94,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 108 |
 | `src/store` | 1 | 85 |
 
-91 de 218 módulos no tienen ningún test que los importe directamente.
+90 de 218 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -133,7 +133,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ImportFromChat.tsx](../src/components/ui/ImportFromChat.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
-- [brushStroke.ts](../src/engine/design/brushStroke.ts)
 - [gradient.ts](../src/engine/design/gradient.ts)
 - [useCursorPreview.ts](../src/engine/design/useCursorPreview.ts)
 - [main.tsx](../src/main.tsx)

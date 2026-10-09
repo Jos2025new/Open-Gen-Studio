@@ -49,7 +49,8 @@ export const BRUSH_TEXTURES: Array<{ value: BrushTexture; label: string }> = [
 /** The four tip profiles of SAI's tip row, hard to soft. */
 export const TIP_PRESETS = [1, 0.7, 0.4, 0.05];
 /** Values a brush has before the user sets them (the settings show the same ones). */
-export const BRUSH_DEFAULTS = { hardness: 1, minSize: 1, minDensity: 0.2, textureStrength: 0.5 };
+// minSize below 1 so "Pressure → size" does something as soon as it is on (SAI starts near 15 %).
+export const BRUSH_DEFAULTS = { hardness: 1, minSize: 0.2, minDensity: 0.2, textureStrength: 0.5 };
 /** One-click sizes, as SAI's size grid. */
 export const SIZE_PRESETS = [1, 2, 3, 5, 8, 12, 16, 24, 32, 48, 64, 96, 128, 200];
 
