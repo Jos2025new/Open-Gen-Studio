@@ -6,6 +6,8 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Decisiones del usuario
 
+- [x] Brocha y panel del Designer: orden del panel, avanzados ocultos por defecto, aviso de presión solo sin simulación, extremos finos y un solo motor de punta. **2026-10-09**, probado y aprobado por el usuario. Antes de tocar el Designer o la exportación, revisar la tabla «Qué revisar a futuro» de [022](history/022-2026-10-W41.md).
+- [x] Conflictos entre ramas: rigen los cambios más nuevos salvo que introduzcan fallos; dejar una sola rama, `task/agent-forcing`. **2026-10-09**, el usuario.
 - [x] Calidad por defecto = resolución media (`mediumResolution`). **2026-10-08**, aprobado por el usuario.
 - [x] Operaciones con modelo de imagen: confirman su modelo; Auto una vez por sesión, Guided en cada petición, Direct usa el compositor (`454d721`, ADR 0009). **2026-10-08**, el usuario: «rige lo más nuevo». Sustituye la regla anterior, en la que heredaban el modelo de su origen.
 - [ ] Modelos `-spicy` excluidos salvo que se nombren: aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. **2026-10-08**, pendiente del usuario.
