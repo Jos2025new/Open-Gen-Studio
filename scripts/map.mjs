@@ -91,6 +91,7 @@ Generado por \`node scripts/map.mjs --write\` a partir de [map-contracts.mjs](..
 2. Al terminar cada cambio, \`npm run test:related\`: ejecuta solo los tests que alcanzan los archivos modificados.
 3. Si cambias un lado de un contrato, cambia los otros en el mismo commit; si descubres uno nuevo, añádelo a \`scripts/map-contracts.mjs\`.
 4. Antes de dar el trabajo por hecho, \`npm test\` completo.
+5. Para medir rendimiento, el [protocolo](depuracion.md#protocolo), solo en lo que tiene sondas (tabla «Qué se mide hoy»). Una sonda nueva va a esa tabla en el mismo commit: lo comprueba \`tests/trace-domains.test.ts\`.
 
 ## Contratos que el compilador no ve
 

@@ -238,4 +238,15 @@ export default [
     ],
     tests: ['tests/readme-shortcuts.test.ts'],
   },
+  {
+    id: 'trace-probes',
+    what: 'El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda.',
+    sides: [
+      ['docs/depuracion.md', '## Qué se mide hoy'],
+      ['docs/depuracion.md', '## Protocolo'],
+      ['src/lib/trace.ts', 'export function span('],
+      ['AGENTS.md', 'docs/depuracion.md#protocolo'],
+    ],
+    tests: ['tests/trace-domains.test.ts'],
+  },
 ];

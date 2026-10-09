@@ -8,6 +8,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 2. Al terminar cada cambio, `npm run test:related`: ejecuta solo los tests que alcanzan los archivos modificados.
 3. Si cambias un lado de un contrato, cambia los otros en el mismo commit; si descubres uno nuevo, añádelo a `scripts/map-contracts.mjs`.
 4. Antes de dar el trabajo por hecho, `npm test` completo.
+5. Para medir rendimiento, el [protocolo](depuracion.md#protocolo), solo en lo que tiene sondas (tabla «Qué se mide hoy»). Una sonda nueva va a esa tabla en el mismo commit: lo comprueba `tests/trace-domains.test.ts`.
 
 ## Contratos que el compilador no ve
 
@@ -37,6 +38,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **fx-designer-route** — En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva. | [designer.md](../src/engine/skills/app/designer.md), [runtime.ts](../src/engine/agent/runtime.ts) | [fx-agent.test.ts](../tests/fx-agent.test.ts) |
 | **trace-store** — ADR 0012: el registro de rendimiento escribe en /x/store/trace y el servidor lo añade a logs/trace-<id>.jsonl con las protecciones de escritura de la app. | [trace.ts](../src/lib/trace.ts), [local-store.js](../server/local-store.js) | [trace.test.ts](../tests/trace.test.ts) |
 | **trace-key** — La tecla del registro de rendimiento: el manejador y la lista de atajos (Ajustes y README) dicen lo mismo. | [TraceControl.tsx](../src/components/shell/TraceControl.tsx), [shortcuts.ts](../src/engine/shortcuts.ts) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
+| **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
 
 ## Módulos centrales
 
