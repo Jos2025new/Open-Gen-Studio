@@ -7,9 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 type Call = { canvas: number; fn: string; src?: number; filter?: string; op?: string; alpha?: number; args?: unknown[]; scale?: number };
 const calls: Call[] = [];
 let made = 0;
+const sizes: Array<[number, number]> = [];
+let encoded = 0;
+let contextLost = false;
 let readPixel = () => {};
 function recordingCanvas(width: number, height: number, editor = false) {
   const id = ++made;
+  sizes.push([width, height]);
   const canvas = { id, width, height, classList: { contains: (name: string) => editor && name === 'stage-canvas' }, getContext: () => ctx };
   let m = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   const state = { filter: 'none', globalCompositeOperation: 'source-over', globalAlpha: 1 };
@@ -17,6 +21,7 @@ function recordingCanvas(width: number, height: number, editor = false) {
   const ctx: Record<string, unknown> = new Proxy(state as Record<string, unknown>, {
     get(target, key: string) {
       if (key in target) return target[key];
+      if (key === 'isContextLost') return () => contextLost;
       if (key === 'canvas') return canvas;
       if (key === 'getTransform') return () => m;
       if (key === 'getImageData') return () => readPixel();
@@ -31,7 +36,7 @@ function recordingCanvas(width: number, height: number, editor = false) {
   });
   return canvas;
 }
-vi.mock('../src/lib/media', () => ({ createCanvas: (w: number, h: number) => recordingCanvas(Math.round(w), Math.round(h)), ctx2d: (c: { getContext: () => unknown }) => c.getContext(), canvasToBlob: async () => new Blob() }));
+vi.mock('../src/lib/media', () => ({ createCanvas: (w: number, h: number) => recordingCanvas(Math.round(w), Math.round(h)), ctx2d: (c: { getContext: () => unknown }) => c.getContext(), canvasToBlob: async () => { encoded++; return new Blob(); } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
 
 import { drawDoc, exportDoc } from '../src/engine/design/render';
@@ -62,7 +67,7 @@ function page(fx: ReturnType<typeof newFxLayer>[] = [], at = 1): DesignDoc {
   return { ...createDoc('p', 200, 100), layers };
 }
 const view = (scale = 1) => { const c = recordingCanvas(400, 200); const x = c.getContext() as unknown as CanvasRenderingContext2D; x.setTransform(scale, 0, 0, scale, 0, 0); return { c, x }; };
-beforeEach(() => { calls.length = 0; made = 0; });
+beforeEach(() => { calls.length = 0; made = 0; sizes.length = 0; encoded = 0; contextLost = false; });
 
 describe('drawDoc with FX layers', () => {
   it.each([['fx', 'apply'], ['designer', 'change']])('records %s latency without the render domain', (domain, name) => {
@@ -131,6 +136,35 @@ describe('drawDoc with FX layers', () => {
     const { x } = view();
     drawDoc(x, page(idle, 1));
     expect(made).toBe(1);
+  });
+});
+
+describe('full-resolution FX export', () => {
+  const largePage = (width = 7680, height = 4320) => ({ ...page([newFxLayer('filter', { scope: 'below', ops: [newFxOp('blur', { radius: 3 })] })]), width, height });
+  it.each(['image/png', 'image/jpeg'] as const)('composes 8K FX at document resolution for %s', async (type) => {
+    await exportDoc(largePage(), type);
+    expect(sizes.length).toBeGreaterThanOrEqual(3);
+    expect(sizes.every(([w, h]) => w === 7680 && h === 4320)).toBe(true);
+    expect(calls.find((c) => c.filter?.startsWith('blur('))?.filter).toBe('blur(3px)');
+    expect(encoded).toBe(1);
+  });
+  it('keeps the editor FX preview capped and follows a smaller view scale', () => {
+    const { x } = view(2);
+    drawDoc(x, largePage());
+    expect(sizes.slice(1).every(([w, h]) => w * h <= 16_000_000)).toBe(true);
+    sizes.length = 0;
+    drawDoc(view(0.1).x, largePage());
+    expect(sizes.slice(1)).toContainEqual([768, 432]);
+  });
+  it.each([[8192, 8192], [8193, 100], [NaN, 100]])('rejects %s × %s before any allocation or encoding, with an actionable message', async (width, height) => {
+    await expect(exportDoc(largePage(width, height))).rejects.toThrow(/Export cancelled.*33,554,432 pixels.*8,192.*No file/i);
+    expect(sizes).toEqual([]);
+    expect(encoded).toBe(0);
+  });
+  it('reports a lost browser context instead of encoding a broken export', async () => {
+    contextLost = true;
+    await expect(exportDoc(largePage(200, 100))).rejects.toThrow(/Export failed.*full resolution.*No file/i);
+    expect(encoded).toBe(0);
   });
 });
 

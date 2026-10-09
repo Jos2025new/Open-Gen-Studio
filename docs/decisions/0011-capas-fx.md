@@ -49,7 +49,7 @@ La opacidad de la capa FX mezcla el resultado con el original; con un modo de fu
 
 ### D4 · Render
 
-`drawDoc` compone en un lienzo fuera de pantalla solo si hay capas FX visibles; si no, el camino de render no cambia. La resolución del lienzo sigue al zoom de la vista (con un tope de 16 Mpx). Cada operación es un pase de canvas (`ctx.filter`, `screen`, gradientes): no hay bucles de píxeles en JavaScript.
+`drawDoc` compone en un lienzo fuera de pantalla solo si hay capas FX visibles; si no, el camino de render no cambia. La previsualización sigue al zoom de la vista (con un tope de 16 Mpx). PNG/JPG y Save to gallery componen siempre a la resolución del documento, con el mismo plan FX. La entrega raster se limita a 33.554.432 píxeles y 8.192 px por lado: admite 7680×4320 y limita cada lienzo RGBA a 128 MiB, aunque una pila usa varios. Es un límite de la aplicación, no una garantía del navegador ni un presupuesto de memoria total. Por encima, se rechaza antes de reservar el lienzo; si el navegador falla al dibujar/codificar dentro del límite, también se rechaza. El error llega al toast de exportación: no se reduce ni entrega un archivo en silencio. Un cierre del proceso por falta de memoria no permite mostrar un toast. Cada operación es un pase de canvas (`ctx.filter`, `screen`, gradientes): no hay bucles de píxeles en JavaScript.
 
 ### D5 · Exportación SVG
 
