@@ -44,9 +44,24 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] Cobertura por riesgo ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): pocas pruebas de recorrido completo en el sandbox, con el LLM y los proveedores simulados (petición → plan → aprobación → resultado; paso a Nodes y Designer). Hoy 129 de 199 módulos no tienen test directo. **2026-10-08**, decidido; sin implementar.
 
 - [ ] 4 tests fallaron una vez con la carga en 42 (procesos ajenos): `agent-direct-model`, `agent-retry`, `chat-to-nodes` y `join-clips`. Pasaron por separado y en dos ejecuciones completas posteriores (cargas 33 y 29). No se capturó el error: la causa no está confirmada, aunque probablemente sea el margen de tiempo superado con más carga que la medida en el [ADR 0010](decisions/0010-estrategia-de-pruebas.md). **2026-10-08**. Si se repite, guardar la salida de `npx vitest run` con el error.
+- [ ] 11 tests de 7 archivos fallaron una vez con la carga en 47–52 (`agent-contract-journey`, `agent-direct-model`, `composer-choice`, `join-clips`, `settings-phase`, `journeys/composer-variant`, `journeys/import-safety`); pasaron por separado (51 de 51) y en la ejecución completa siguiente. La auditoría externa vio fallar `import-safety` igual. Misma causa probable que el caso anterior; tampoco se capturó el error. **2026-10-08**.
 - [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
 - [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**.
 - [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.
+
+## Auditoría externa (GPT 6 Astra, 2026-10-08)
+
+Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada punto se comprobó contra `9c877cc` (**código** = leído; **sin comprobar** = depende de uso real). Son propuestas: el orden lo decide el usuario. La auditoría ordena pensando en vídeo, y el próximo trabajo del usuario es el Designer.
+
+- [ ] **Una sola revisión candidata** antes de evaluar o seguir: hoy hay tres líneas vivas (`modelo-general`, `agent-forcing` y `fx`). Primer paso: `task/fx` en `task/agent-forcing` (avance directo, preparado el 2026-10-08). **2026-10-08**, el usuario lo pidió.
+- [ ] **Producción de varios planos revisable y retomable:** brief, planos ordenados, toma elegida, duración y revisión, reutilizando `Asset`, `Generation`, `Plan` y `nodeIsCurrent` (`flow/freshness.ts:53`, código), sin hacerlo obligatorio para una imagen suelta. **2026-10-08**, propuesta.
+- [ ] **De Nodes a la entrega:** `join_clips` se rechaza en Nodes (`plan.ts:860`, código). Habilitarlo con el ejecutor existente; después, un montaje mínimo (orden, entrada y salida, duración, audio y exportación), no un editor completo. **2026-10-08**, propuesta.
+- [ ] **Continuidad declarada, conexión válida y calidad visual son cosas distintas:** `continuity` comprueba conexiones, no identidad ni geometría (código; ya lo dice [continuity-contract.md](continuity-contract.md)). Primero revisión humana por contacto; comprobaciones automáticas solo cuando compensen. **2026-10-08**, propuesta.
+- [ ] **El presupuesto no es un máximo:** `budget.ts:24-27` avisa, se puede aceptar seguir, y los precios desconocidos no cuentan (código). Para «hazlo solo hasta X» haría falta un modo con reservas, conciliación y una política para precios desconocidos. Nunca reintentar a ciegas un envío incierto. **2026-10-08**, propuesta.
+- [ ] **Una regla, un propietario:** sacar del runtime (1921 líneas) la política de preguntas y aprobaciones, la resolución de la petición efectiva y el ciclo de ejecución. Las decisiones creativas, en guías; los requisitos duros, en validadores. Enlaza con «Partir los 13 archivos». **2026-10-08**, propuesta.
+- [ ] **Ejecución fuera de la pestaña,** solo cuando haga falta para lotes o producciones largas: un ejecutor local con estado, intentos y cola acotada. Hoy una recarga recupera trabajos remotos, pero no reanuda los pasos que no habían empezado (sin comprobar en un caso real). **2026-10-08**, propuesta.
+- [ ] **Medir por recorridos:** unos pocos pedidos reales con su resultado esperado (planes válidos al primer intento, preguntas redundantes, pasos rehechos, tiempo hasta un resultado útil). Coincide con el ADR 0010. El protocolo de [depuracion.md](depuracion.md) da la base de medida sin gasto; la evaluación de pago, aparte y con presupuesto aprobado. **2026-10-08**, propuesta.
+- [ ] **Carga de la app:** paquete principal de 1,64 MB minificado (521 KB comprimido) y avisos de imports dinámicos que no separan módulos (dato de la auditoría, sin comprobar aquí). Medir el arranque con una sonda antes de optimizar. **2026-10-08**, propuesta.
 
 ## Hecho
 
