@@ -83,6 +83,7 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 
 ## Hecho
 
+- [x] Sondas y exportación FX corregidas; plan del Designer documentado. **2026-10-09**, Astra, **test** y **sandbox**: cinco commits, en orden: `eb2c7f4b66b0fa65ecf88d7cef3cea6922724b8e`, `c19fdf31e7431b27645cccc46288a962d218050b`, `4e53d5ded1ccda1769cbaa6a661bd3165ba48785`, `722564ab26dc091d0521a38c9ee67b33d4321d81`, `6f0d84644bf4ba2289d4d42da940932cc3351b9b`. Línea final sin commit por decisión del usuario.
 - [x] Generar voz y efectos de sonido. **2026-10-08**, **test** ([nanogpt-speech](../tests/nanogpt-speech.test.ts), 10 casos, con proveedor simulado). Modelos elegidos por el usuario: GPT-4o mini TTS 2025-12-15, Gemini 3.8 Flash TTS (por defecto: entre los tres primeros de Artificial Analysis y 0,05 USD por 1000 caracteres), ElevenLabs v4 y v4 Turbo, MiniMax Speech 2.8 Turbo y HD; efectos con ElevenLabs Sound Effects v2. Ver [catálogo](catalogo-voz-y-efectos.md).
 - [x] Tests fiables con carga ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): reloj falso en lugar de esperas reales, esperas por condición y 20 s de margen global para trabajo de CPU. **2026-10-08**, **real**: 4 de 4 ejecuciones completas sin fallos con carga entre 25 y 39 (antes, hasta 8 fallos).
 - [x] Exportar los datos en un `.zip`. **2026-10-08**, **real**: ruta `/x/store/export` en un servidor Vite con datos de prueba. Devuelve 200 y un zip con `asset/` y `state.json`, con las claves vaciadas (0 apariciones). Sin test automático.
