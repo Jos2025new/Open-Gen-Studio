@@ -9,7 +9,7 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { fxPlan } from '../fx/plan';
 import { mixFx } from '../fx/canvas';
-import { frameShown, span, takeCanvasCount, tracing } from '../../lib/trace';
+import { frameShown, span, takeCanvasCount, traceStatus, tracing } from '../../lib/trace';
 
 /* One renderer for both the editor view and exports, so what you see is what you export. */
 
@@ -241,8 +241,8 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
   ctx.clip();
   const steps = fxPlan(doc.layers, opts.hideLayerId);
   // Trace (ADR 0012): the editor's frames only (thumbnails and exports also draw the page).
-  const stage = tracing('render') && (ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas');
-  const end = stage ? span('render', 'frame', { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` }) : null;
+  const stage = traceStatus() !== null && (ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas');
+  const end = stage && tracing('render') ? span('render', 'frame', { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` }) : null;
   if (stage) takeCanvasCount();
   if (steps.every((s) => s.t === 'draw')) {
     if (doc.background) {
@@ -254,8 +254,8 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
   ctx.restore();
   if (end) {
     end(takeCanvasCount());
-    frameShown();
   }
+  if (stage) frameShown();
 }
 
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */

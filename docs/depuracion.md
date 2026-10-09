@@ -58,6 +58,8 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 | `browser` | `longtask` (más de 50 ms) |
 | `mark` | tus marcadores |
 
+La latencia de `fx` o `designer` se registra aunque no se active el dominio `render`: el dibujo del lienzo del editor resuelve la acción pendiente de forma independiente de grabar su duración. Un dibujo fuera de pantalla no la resuelve.
+
 ## Añadir una sonda
 
 Una línea en cualquier función, sin tocar nada más:

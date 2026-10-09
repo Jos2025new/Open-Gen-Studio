@@ -8,14 +8,16 @@ type Call = { canvas: number; fn: string; src?: number; filter?: string; op?: st
 const calls: Call[] = [];
 let made = 0;
 let readPixel = () => {};
-function recordingCanvas(width: number, height: number) {
+function recordingCanvas(width: number, height: number, editor = false) {
   const id = ++made;
+  const canvas = { id, width, height, classList: { contains: (name: string) => editor && name === 'stage-canvas' }, getContext: () => ctx };
   let m = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   const state = { filter: 'none', globalCompositeOperation: 'source-over', globalAlpha: 1 };
   const saved: Array<typeof state> = [];
   const ctx: Record<string, unknown> = new Proxy(state as Record<string, unknown>, {
     get(target, key: string) {
       if (key in target) return target[key];
+      if (key === 'canvas') return canvas;
       if (key === 'getTransform') return () => m;
       if (key === 'getImageData') return () => readPixel();
       if (key === 'setTransform') return (a: number, b: number, c: number, d: number, e: number, f: number) => { m = { a, b, c, d, e, f }; };
@@ -27,7 +29,7 @@ function recordingCanvas(width: number, height: number) {
     },
     set(target, key: string, value) { target[key] = value; return true; },
   });
-  return { id, width, height, getContext: () => ctx };
+  return canvas;
 }
 vi.mock('../src/lib/media', () => ({ createCanvas: (w: number, h: number) => recordingCanvas(Math.round(w), Math.round(h)), ctx2d: (c: { getContext: () => unknown }) => c.getContext(), canvasToBlob: async () => new Blob() }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
@@ -37,7 +39,7 @@ import { applyFx, cssFilter, glowPasses, mixFx } from '../src/engine/fx/canvas';
 import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
 import type { DesignDoc } from '../src/engine/types';
-import { startTrace, stopTrace, type TraceEvent } from '../src/lib/trace';
+import { awaitFrame, startTrace, stopTrace, type TraceEvent } from '../src/lib/trace';
 
 const events: TraceEvent[] = [];
 function recordTrace(domains: string[], deep = false) {
@@ -60,6 +62,14 @@ const view = (scale = 1) => { const c = recordingCanvas(400, 200); const x = c.g
 beforeEach(() => { calls.length = 0; made = 0; });
 
 describe('drawDoc with FX layers', () => {
+  it.each([['fx', 'apply'], ['designer', 'change']])('records %s latency without the render domain', (domain, name) => {
+    recordTrace([domain]);
+    awaitFrame(domain, name);
+    drawDoc(recordingCanvas(200, 100, true).getContext() as unknown as CanvasRenderingContext2D, page());
+    stopTrace();
+    expect(events).toContainEqual(expect.objectContaining({ d: domain, n: name, ms: expect.any(Number) }));
+    expect(events.some((e) => e.d === 'render')).toBe(false);
+  });
   it('without FX the page is drawn straight into the view (no off-screen canvas)', () => {
     const { x } = view();
     drawDoc(x, page());
