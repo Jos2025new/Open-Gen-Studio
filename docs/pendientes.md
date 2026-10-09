@@ -11,11 +11,13 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] Modelos `-spicy` excluidos salvo que se nombren: aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. **2026-10-08**, pendiente del usuario.
 - [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
 - [ ] Fusionar `task/agent-forcing` en `task/modelo-general`. Avance directo, sin conflictos: ver [fusion-agent-forcing.md](fusion-agent-forcing.md). **2026-10-08**, decide el usuario.
+- [ ] Registro de rendimiento para sesiones de prueba ([ADR 0012](decisions/0012-registro-de-rendimiento.md), propuesto): aprobarlo y decidir si existe también en la app real. **2026-10-08**, decide el usuario.
 - [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
 - [ ] Prueba con gasto real de voz y efectos (NanoGPT): voz, instrucciones de tono y sonido. **2026-10-08**, la hará el usuario. **Sin verificar:** el formato real de la respuesta de cada modelo (audio directo o JSON con URL; se aceptan ambos) y si el efecto admite fijar la duración (hoy la elige el modelo).
 
 ## Por probar
 
+- [ ] Capas FX (ADR 0011, rama `task/fx`): plan completo en [fx-pruebas.md](fx-pruebas.md). **2026-10-08**, pendiente.
 - [ ] Bucle de tarjetas con un vídeo caro (`3f551d1`), y P2, P3 y P4 (`95eab99`). **2026-10-08**, lo prueba el usuario en el sandbox.
 - [ ] Precisión de `remove_bg`, `extract_frame` y `create_voice` con casos reales. **2026-10-08**, pendiente.
 - [ ] Calidad de los cortes de `grid_split` con una generación real. **2026-10-08**, pendiente.

@@ -5,6 +5,7 @@
 - [Reglas de trabajo](../AGENTS.md).
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
 - [Pendientes y propuestas](pendientes.md): qué falta decidir, probar o implementar, con su estado.
+- [Capas FX: pruebas pendientes](fx-pruebas.md): validación visual, interfaz, exportación, agente y escala de ADR 0011.
 - [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Catálogo de voz y efectos](catalogo-voz-y-efectos.md): modelos de texto a voz y efectos de Atlas y NanoGPT, precios por 1000 caracteres y propuesta (2026-10-08).
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
@@ -36,6 +37,7 @@
 - [0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0007](decisions/0009-disparo-forzado.md).
 - [0010 — Estrategia de pruebas: tests fiables con carga y cobertura por riesgo](decisions/0010-estrategia-de-pruebas.md).
 - [0011 — Capas de filtros y efectos no destructivos (FX)](decisions/0011-capas-fx.md).
+- [0012 — Registro de rendimiento para sesiones de prueba (propuesto)](decisions/0012-registro-de-rendimiento.md).
 
 ## Historial
 
