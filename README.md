@@ -62,7 +62,7 @@ Tu mensaje
 
 ## Herramientas sobre tus resultados
 
-Sobre cualquier imagen o vídeo puedes pedir, con palabras o desde el menú, una de estas operaciones. Las que dicen «gratis, local» no llaman a ningún proveedor.
+Sobre cualquier imagen o vídeo puedes pedir, con palabras o desde el menú, una de estas operaciones. Las que dicen «gratis, local» no llaman a ningún proveedor. Si pides algo que una herramienta no alcanza, por ejemplo 8K con upscale, la tarjeta del plan te lo dice antes de aprobar.
 
 <!-- tools:start -->
 | Herramienta | De → a | Qué hace |
@@ -111,6 +111,15 @@ Encargos completos que el agente sabe organizar paso a paso. Pídelos con tus pa
 | Sketch to render | De boceto, maqueta o plano a render fotorrealista que respeta el diseño. |
 | Poster layout | Póster por capas: fondo, titular y acentos editables. |
 <!-- flows:end -->
+
+## Voz y efectos de sonido
+
+En el modo **Audio** del compositor, o pidiéndoselo al agente:
+
+- **Voz:** escribe exactamente lo que se dice. Elige la voz y, con Gemini o GPT-4o mini, describe el tono en **Delivery** («cálida, pausada»). Si no eliges modelo, se usa **Gemini 3.8 Flash TTS**, uno de los mejor valorados, a 0,05 USD por cada 1000 caracteres. También están GPT-4o mini TTS (el más barato), ElevenLabs v4 y MiniMax Speech 2.8.
+- **Efectos:** describe el sonido («olas suaves en la orilla»). Se usa **ElevenLabs Sound Effects v2**. Como la duración la decide el modelo, el coste se presupuesta a su máximo, 22 s.
+
+Funcionan con una clave de **NanoGPT**. La música sigue con MiniMax en Atlas Cloud.
 
 ## Tus personajes y productos, siempre iguales
 
@@ -199,7 +208,7 @@ La app se ejecuta en tu navegador. Mientras corre `npm run dev`, el servidor loc
 - `data/asset/`: tus imágenes y vídeos como archivos normales.
 - `data/raster/`: las capas del Designer.
 
-Si borras el almacenamiento del navegador, todo vuelve desde `data/` al recargar. Para hacer una copia de seguridad, copia esa carpeta. «Wipe all data» no la borra: la aparta como `data.bak-<fecha>`. La app también guarda copias automáticas y rechaza un guardado que perdería de golpe gran parte de tus sesiones.
+Si borras el almacenamiento del navegador, todo vuelve desde `data/` al recargar. Para hacer una copia de seguridad, copia esa carpeta, o descárgala desde **Settings → Download all as ZIP** (sale sin tus claves). «Wipe all data» no la borra: la aparta como `data.bak-<fecha>`. La app también guarda copias automáticas y rechaza un guardado que perdería de golpe gran parte de tus sesiones.
 
 `data/` está fuera de git.
 
