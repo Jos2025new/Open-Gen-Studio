@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -7,9 +7,11 @@ import { describe, expect, it } from 'vitest';
  * mide hoy». This keeps the table and the code in step: every probe in src is listed, and every listed event exists.
  */
 const PROBE = /\b(span|note|awaitFrame)\('([a-z]+)', '([a-z-]+)'/g;
-const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => {
+// The project's node:fs types have no statSync: a folder is whatever can be listed.
+const list = (dir: string): string[] | null => { try { return readdirSync(dir); } catch { return null; } };
+const files = (dir: string): string[] => (list(dir) ?? []).flatMap((f) => {
   const p = join(dir, f);
-  return statSync(p).isDirectory() ? files(p) : /\.tsx?$/.test(f) ? [p] : [];
+  return /\.tsx?$/.test(f) ? [p] : files(p);
 });
 
 function probesInCode(): Set<string> {
