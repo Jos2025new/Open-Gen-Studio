@@ -35,6 +35,8 @@ export interface BrushOptions {
   minSize?: number;
   minDensity?: number;
   pressureSize?: boolean;
+  /** Pressure from the pointer's speed, as Lineart does it (perfect-freehand): fast is light, slow is full. */
+  simulatePressure?: boolean;
   pressureDensity?: boolean;
   texture?: BrushTexture;
   textureStrength?: number;
@@ -64,6 +66,15 @@ export function atPressure(o: BrushOptions, pressure: number): { width: number; 
     width: o.pressureSize === false ? o.size : o.size * (minSize + (1 - minSize) * p),
     density: o.pressureDensity ? minDensity + (1 - minDensity) * p : 1,
   };
+}
+
+/**
+ * The simulated pressure after a move of `distance`, from the previous one: perfect-freehand's own formula (the one
+ * Lineart strokes use), so both tools respond to speed the same way.
+ */
+export function simulatedPressure(previous: number, distance: number, size: number): number {
+  const r = Math.min(1, distance / Math.max(1e-6, size));
+  return Math.min(1, previous + (Math.min(1, 1 - r) - previous) * (r * 0.275));
 }
 
 /** The tip a new stroke records (always: even the plain hard tip replays through this engine). */

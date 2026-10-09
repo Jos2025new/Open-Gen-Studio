@@ -90,7 +90,8 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <InlineSelect label="Texture" value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.texture || brush.texture === 'none'} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />
-    <PressureReadout />
+    <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
+    {!brush.simulatePressure && <PressureReadout />}
     <InlineToggle label="Pressure → size" tip="With a pen, lighter pressure paints thinner, down to the minimum size" checked={brush.pressureSize !== false} onChange={(v) => set({ pressureSize: v })} />
     <InlineSlider label="Min size" unit="%" scale={100} min={0} max={1} step={0.01} disabled={brush.pressureSize === false} value={brush.minSize ?? BRUSH_DEFAULTS.minSize} onChange={(v) => set({ minSize: v })} />
     <InlineToggle label="Pressure → density" tip="With a pen, lighter pressure paints fainter, down to the minimum density" checked={!!brush.pressureDensity} onChange={(v) => set({ pressureDensity: v })} />

@@ -169,3 +169,27 @@ test('every tool shows its settings in the same fields (screenshots for review)'
   }
   expect(errors).toEqual([]);
 });
+
+test('simulate pressure: with a mouse, a fast stroke paints thinner than a slow one', async ({ page }) => {
+  const errors = await setup(page);
+  await reset(page);
+  await panel(page).getByRole('slider', { name: 'Size', exact: true }).fill('40');
+  const sim = panel(page).getByRole('switch', { name: 'Simulate pressure' });
+  if ((await sim.getAttribute('aria-checked')) !== 'true') await sim.click();
+  const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const line = async (steps: number) => {
+    const empty = await coverage(page);
+    await page.mouse.move(b.x + b.width * 0.2, b.y + b.height * 0.4);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width * 0.6, b.y + b.height * 0.4, { steps });
+    await page.mouse.up();
+    await page.waitForTimeout(200);
+    const painted = (await coverage(page)).painted - empty.painted;
+    await undo(page);
+    return painted;
+  };
+  const slow = await line(120), fast = await line(6);
+  await page.locator('canvas.stage-canvas').screenshot({ path: `${SHOTS}/simulated.png` });
+  expect(fast).toBeLessThan(slow * 0.8);
+  expect(errors).toEqual([]);
+});

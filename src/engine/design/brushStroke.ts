@@ -1,6 +1,6 @@
 import { uid } from '../../lib/id';
 import type { RasterLayer, RasterStroke } from '../types';
-import { atPressure, tipFor, type BrushOptions } from './brushEngine';
+import { atPressure, simulatedPressure, tipFor, type BrushOptions } from './brushEngine';
 import { paintLive, type LiveStroke } from './raster';
 import { toLayerSpace } from './render';
 
@@ -28,7 +28,11 @@ export function penPressure(e: { pointerType: string; pressure: number }): numbe
   return real ? e.pressure : 1;
 }
 
+// The simulated pressure of the stroke being painted (one at a time); perfect-freehand starts a stroke at 0.5.
+let simulated = 0.5;
+
 export function newBrushStroke(brush: BrushOptions & { color: string; opacity: number }, erase: boolean): RasterStroke {
+  simulated = 0.5;
   const tip = tipFor(brush, erase);
   return { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase, tip };
 }
@@ -38,6 +42,7 @@ export function brushSegment(layer: RasterLayer, a: { x: number; y: number }, b:
   const kx = layer.pxWidth / layer.width, ky = layer.pxHeight / layer.height;
   // A rotated image: the pointer is taken back into the image's own space, so the stroke lands under it.
   if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
+  if (brush.simulatePressure) pressure = simulated = simulatedPressure(simulated, Math.hypot(b.x - a.x, b.y - a.y), brush.size);
   const { width, density } = atPressure(brush, pressure);
   return { seg: [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (width * (kx + ky)) / 2], density };
 }
