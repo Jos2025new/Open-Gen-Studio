@@ -25,7 +25,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
-- [ ] **Caché de las capas FX** (cuello de botella medido; [fx-pruebas.md](fx-pruebas.md), sección 5). Hoy cada fotograma recalcula todas las capas FX: con 50 desenfoques, 398 ms por fotograma, y el 95 % del tiempo son pasos FX. Propuesta, como GIMP e Inkscape (`Drawing::setCacheBudget`):
+- [ ] **Caché de las capas FX** (coste medido; reparto pendiente de confirmar; [fx-pruebas.md](fx-pruebas.md), sección 5). Hoy cada fotograma recalcula todas las capas FX: con 50 desenfoques, 398 ms por fotograma, el 95 % atribuido a pasos FX se calculó con una fórmula defectuosa y está pendiente de confirmar con la atribución corregida. Propuesta, como GIMP e Inkscape (`Drawing::setCacheBudget`):
   - guardar el resultado de cada capa FX con una clave (versión de su contenido debajo, parámetros y escala) y un presupuesto de memoria;
   - reutilizar los lienzos temporales en vez de crear uno por paso;
   - después, renderizar por teselas solo la zona que cambia.

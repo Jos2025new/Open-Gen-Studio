@@ -61,7 +61,7 @@ Cada caso: una imagen o un texto de prueba, aplicar, comparar con lo esperado y 
 
 **Primera medición (2026-10-08).** `FX_BENCH=100 npm run fx:check -- -g bench`, Chromium headless, 8 núcleos, sin GPU dedicada y con la máquina cargada. Documento de 1920×1080 a la escala de la vista (unos 0,5 Mpx por lienzo). N capas «Desenfoque» apiladas sobre un texto, arrastrando un rectángulo de otra capa a 60 Hz:
 
-| Capas FX | Fotograma p50 | Lienzos / Mpx por fotograma | Parte de los pasos FX | Memoria JS |
+| Capas FX | Fotograma p50 | Lienzos / Mpx por fotograma | Parte de los pasos FX (fórmula antigua; sin confirmar) | Memoria JS |
 | --- | --- | --- | --- | --- |
 | 1 | 11,4 ms | 3 / 1,6 | 10 % | 66–75 MB |
 | 5 | 45,4 ms | 8 / 4,2 | 58 % | 51–65 MB |
@@ -69,11 +69,13 @@ Cada caso: una imagen o un texto de prueba, aplicar, comparar con lo esperado y 
 | 25 | 203 ms | 28 / 14,7 | 91 % | 63–65 MB |
 | 50 | 398 ms | 53 / 27,9 | 95 % | 55–72 MB |
 
+**Corrección 2026-10-09, test:** los porcentajes de esta tabla, incluido el 95 %, usaban una fórmula que mezclaba FX fuera de pantalla con fotogramas del editor. No se ha repetido el banco con la atribución corregida: quedan pendientes de confirmar y no demuestran ese reparto del tiempo.
+
 La sesión de 100 capas no terminó: la app se cerró mientras añadía capas (código 137), así que no se sabe si fue por memoria.
 
 **Lectura:**
 - El coste crece en línea: unos 8 ms por capa de desenfoque y fotograma (7,7 ms por paso).
-- **El cuello de botella son los pasos FX, que se recalculan en cada fotograma:** del 91 al 95 % del tiempo con 25 capas o más. El rectángulo arrastrado ni siquiera está bajo esas capas, y aun así el texto se vuelve a desenfocar 50 veces por fotograma.
+- **Los pasos FX se recalculan en cada fotograma (lectura de código):** el porcentaje del tiempo que ocupan requiere repetir la medida corregida. El rectángulo arrastrado ni siquiera está bajo esas capas, y aun así el texto se vuelve a desenfocar 50 veces por fotograma.
 - La memoria de JavaScript no crece. Lo que crece son los lienzos temporales: uno nuevo por paso, 28 Mpx por fotograma con 50 capas, que van a la GPU.
 - Con 5 capas ya no se llega a 60 fps (45 ms). La latencia de añadir una capa con 50 apiladas es de unos 320 ms (p50).
 
@@ -89,7 +91,7 @@ Casos aún sin medir:
 | Zoom | escala de la vista | 25 %, 100 %, 400 % (el tope de 16 Mpx actúa aquí) |
 | Interacción | qué ocurre durante la medición | quieto, mover un deslizador del editor |
 | Tipo de efecto | coste por paso | glow (varios pases), destello (gradientes) |
-| Modo profundo | `&deep=1` | qué parte es espera de la GPU |
+| Modo profundo | `&deep=1` | duración de la lectura sincronizada; no separa exactamente CPU y GPU |
 
 ## 6. Robustez
 

@@ -154,7 +154,7 @@ export function wandSelection(doc: DesignDoc, x: number, y: number, o: WandOptio
   if (layers.some((l) => l.visible && l.type === 'raster' && !getBuffer(l.id))) return 'Layer pixels are still loading. Try again in a moment.';
   const sample = createCanvas(w, h);
   const sc = ctx2d(sample);
-  if (only) drawLayer(sc, { ...only, visible: true }); else drawDoc(sc, doc);
+  if (only) drawLayer(sc, { ...only, visible: true }); else drawDoc(sc, doc, { origin: 'selection' });
   const region = floodMask(sc.getImageData(0, 0, w, h).data, w, h, x, y, Math.max(0, Math.min(255, o.threshold ?? 24)), Math.round(Math.max(0, Math.min(12, o.expand ?? 0))));
   const mask = createCanvas(w, h);
   const mc = ctx2d(mask);

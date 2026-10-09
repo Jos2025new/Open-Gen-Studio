@@ -28,7 +28,7 @@ Aprobado por el usuario (2026-10-08): generalista, con sondas finas que no oblig
 2. **Sesión de prueba con marcadores (modelo GIMP).** Se inicia con una etiqueta («50 capas de desenfoque en 4K»). Durante la sesión, el usuario o el agente añaden marcadores de texto («ahora arrastro la capa»). Se detiene a mano o al cerrar la pestaña.
 3. **Qué se mide (eventos con inicio y fin, modelo framecheck):**
    - `drawDoc`: total, número de capas FX y resolución de la composición;
-   - cada paso FX: tipo, alcance, tamaño del lienzo y ms;
+   - cada paso FX: tipo, alcance, tamaño del lienzo y ms, vinculado al identificador y origen de su render. El porcentaje usa solo intervalos FX dentro de su fotograma del editor; exportación, relleno, vista del agente, miniaturas y operación sobre assets se informan por separado;
    - lienzos creados y píxeles reservados por fotograma;
    - **latencia de aplicación:** de la acción (`runFx`, deslizador, comando del agente) al primer fotograma que la muestra;
    - intervalos entre fotogramas mientras se arrastra, y tareas largas (`PerformanceObserver`);

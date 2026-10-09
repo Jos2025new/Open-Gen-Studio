@@ -21,7 +21,7 @@ export async function canvasParts(sessionId: string, layerId?: string): Promise<
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.scale(k, k);
   if (layer) drawLayer(ctx, layer);
-  else drawDoc(ctx, doc);
+  else drawDoc(ctx, doc, { origin: 'agent-view' });
   const url = await blobToDataUrl(await canvasToBlob(c, 'image/jpeg', 0.85));
   const what = layer ? `layer ${layer.id} "${layer.name}"` : `designer page "${doc.name}"`;
   return [

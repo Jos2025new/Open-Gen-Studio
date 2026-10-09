@@ -41,7 +41,7 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 
 - **Fotogramas:** p50, p95 y máximo, cuántos pasan de 16,7 ms (60 fps) y los huecos entre fotogramas al arrastrar (tirones visibles).
 - **Coste por número de capas FX:** cómo crece el fotograma.
-- **Reparto del tiempo:** qué parte es de los pasos FX, y en modo profundo cuánto dura la espera con lectura sincronizada.
+- **Reparto del tiempo:** qué parte del fotograma del editor ocupan sus pasos FX, y cuánto dura la lectura sincronizada en modo profundo. Los dibujos de exportación, relleno, vista del agente, miniaturas y operación FX sobre assets se muestran por origen, fuera de ese porcentaje.
 - **Memoria:** lienzos y megapíxeles creados por fotograma (presión sobre la GPU) y memoria de JavaScript (solo Chrome).
 - **Latencia:** desde la acción (cualquier cambio del Designer, o un comando FX) hasta el fotograma que la muestra.
 - **Tareas largas:** momentos en que la página no podía responder.
@@ -51,14 +51,16 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 
 | Dominio | Eventos |
 | --- | --- |
-| `render` | `frame`: cada fotograma del lienzo del Designer, con capas, capas FX, lienzos y píxeles creados |
-| `fx` | `layer` (cada capa FX), `pass` (cada operación), `pass-gpu` (lectura sincronizada de un píxel, modo profundo), `apply` (de un comando FX a su fotograma) |
+| `render` | `frame`: cada fotograma del lienzo del Designer, con capas, capas FX, lienzos y píxeles creados; `offscreen`: un dibujo fuera del editor. Ambos llevan identificador de render y origen |
+| `fx` | `layer` (cada capa FX), `pass` (cada operación), `pass-gpu` (lectura sincronizada de un píxel, modo profundo), vinculados al identificador y origen del render, `apply` (de un comando FX a su fotograma) |
 | `designer` | `change`: de cualquier cambio del documento a su fotograma |
 | `memory` | `heap`, cada segundo |
 | `browser` | `longtask` (más de 50 ms) |
 | `mark` | tus marcadores |
 
 La latencia de `fx` o `designer` se registra aunque no se active el dominio `render`: el dibujo del lienzo del editor resuelve la acción pendiente de forma independiente de grabar su duración. Un dibujo fuera de pantalla no la resuelve.
+
+El informe cruza `renderId` y `origin` de cada paso con su fotograma: suma la unión de sus intervalos dentro del fotograma, sin contar dos veces los solapamientos del reloj redondeado. Orígenes: editor, export, fill, agent-view, thumbnail, selection, color-sample, asset-fx y offscreen (llamante sin etiqueta). Las trazas antiguas sin atribución se muestran como unattributed; no se calcula su porcentaje. Una sesión solo con FX conserva el origen, pero no tiene el denominador de fotogramas. Los totales de eventos anidados no se deben sumar como tiempo de pared.
 
 ## Añadir una sonda
 

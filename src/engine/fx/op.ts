@@ -1,3 +1,4 @@
+import { beginRender } from '../../lib/renderTrace';
 import type { AdvancedValue } from '../types';
 import { FX_DEFS, FX_KINDS, fxParams, isFxKind } from './defs';
 import { applyFx } from './canvas';
@@ -22,7 +23,9 @@ export function fxOpFromParams(params: Record<string, AdvancedValue>): FxOp {
 
 /** The result of the operation on an image, at its own resolution (lengths in image px). */
 export function fxOnCanvas(src: HTMLCanvasElement, params: Record<string, AdvancedValue>): HTMLCanvasElement {
-  return applyFx(src, [fxOpFromParams(params)], { scale: 1, clip: false });
+  const { context, end } = beginRender('asset-fx', { page: `${src.width}x${src.height}` });
+  try { return applyFx(src, [fxOpFromParams(params)], { scale: 1, clip: false, trace: context }); }
+  finally { end?.(); }
 }
 
 /** Words that name one filter or effect, in Spanish and English (normalized text: lower case, no accents). */

@@ -239,6 +239,24 @@ export default [
     tests: ['tests/readme-shortcuts.test.ts'],
   },
   {
+    id: 'render-attribution',
+    what: 'Cada paso FX lleva el renderId y origen de su compositor; el porcentaje del editor excluye todos los renders fuera de pantalla.',
+    sides: [
+      ['src/lib/renderTrace.ts', 'export function beginRender'],
+      ['src/engine/design/render.ts', 'beginRender(opts.origin'],
+      ['src/engine/fx/canvas.ts', '...c.trace'],
+      ['src/engine/fx/op.ts', "beginRender('asset-fx'"],
+      ['src/engine/design/fill.ts', "origin: 'fill'"],
+      ['src/engine/design/swatches.ts', "origin: 'color-sample'"],
+      ['src/engine/design/pixelSelection.ts', "origin: 'selection'"],
+      ['src/engine/agent/canvasView.ts', "origin: 'agent-view'"],
+      ['src/components/designer/DocumentPicker.tsx', "origin: 'thumbnail'"],
+      ['scripts/trace-report.mjs', 'function timeInFrame'],
+      ['docs/depuracion.md', 'renderId'],
+    ],
+    tests: ['tests/fx-render.test.ts', 'tests/trace.test.ts'],
+  },
+  {
     id: 'trace-probes',
     what: 'El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda.',
     sides: [

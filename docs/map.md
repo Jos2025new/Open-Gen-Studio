@@ -38,6 +38,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **fx-designer-route** — En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva. | [designer.md](../src/engine/skills/app/designer.md), [runtime.ts](../src/engine/agent/runtime.ts) | [fx-agent.test.ts](../tests/fx-agent.test.ts) |
 | **trace-store** — ADR 0012: el registro de rendimiento escribe en /x/store/trace y el servidor lo añade a logs/trace-<id>.jsonl con las protecciones de escritura de la app. | [trace.ts](../src/lib/trace.ts), [local-store.js](../server/local-store.js) | [trace.test.ts](../tests/trace.test.ts) |
 | **trace-key** — La tecla del registro de rendimiento: el manejador y la lista de atajos (Ajustes y README) dicen lo mismo. | [TraceControl.tsx](../src/components/shell/TraceControl.tsx), [shortcuts.ts](../src/engine/shortcuts.ts) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
+| **render-attribution** — Cada paso FX lleva el renderId y origen de su compositor; el porcentaje del editor excluye todos los renders fuera de pantalla. | [renderTrace.ts](../src/lib/renderTrace.ts), [render.ts](../src/engine/design/render.ts), [canvas.ts](../src/engine/fx/canvas.ts), [op.ts](../src/engine/fx/op.ts), [fill.ts](../src/engine/design/fill.ts), [swatches.ts](../src/engine/design/swatches.ts), [pixelSelection.ts](../src/engine/design/pixelSelection.ts), [canvasView.ts](../src/engine/agent/canvasView.ts), [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx), [trace-report.mjs](../scripts/trace-report.mjs), [depuracion.md](../docs/depuracion.md) | [fx-render.test.ts](../tests/fx-render.test.ts), [trace.test.ts](../tests/trace.test.ts) |
 | **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
 
 ## Módulos centrales
@@ -88,10 +89,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 16 | 108 |
+| `src/lib` | 17 | 108 |
 | `src/store` | 1 | 85 |
 
-88 de 214 módulos no tienen ningún test que los importe directamente.
+89 de 215 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

@@ -44,7 +44,7 @@ export function sampleColor(doc: DesignDoc, x: number, y: number): string | null
   const canvas = createCanvas(1, 1);
   const ctx = ctx2d(canvas);
   ctx.translate(-Math.floor(x), -Math.floor(y));
-  drawDoc(ctx, doc);
+  drawDoc(ctx, doc, { origin: 'color-sample' });
   const [r, g, b, a] = ctx.getImageData(0, 0, 1, 1).data;
   if (!a) return null;
   return `#${hex(r)}${hex(g)}${hex(b)}`;

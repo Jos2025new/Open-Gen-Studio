@@ -89,6 +89,24 @@ describe('the local server', () => {
 });
 
 describe('trace-report', () => {
+  it('counts only FX time inside its editor frame and reports other origins separately', () => {
+    const data = (renderId: number, origin: string) => ({ renderId, origin, kind: 'blur' });
+    const events = [
+      { t: 0, d: 'render', n: 'frame', ms: 10, data: data(1, 'editor') },
+      { t: 1, d: 'fx', n: 'pass', ms: 8, data: data(1, 'editor') },
+      { t: 8, d: 'fx', n: 'pass-gpu', ms: 3, data: data(1, 'editor') },
+      { t: 20, d: 'render', n: 'offscreen', ms: 40, data: data(2, 'export') },
+      { t: 20, d: 'fx', n: 'pass', ms: 35, data: data(2, 'export') },
+      { t: 70, d: 'render', n: 'offscreen', ms: 50, data: data(3, 'fill') },
+      { t: 70, d: 'fx', n: 'pass', ms: 45, data: data(3, 'fill') },
+    ];
+    const r = report(events);
+    expect(r.overall.fxShareOfFrames).toBe(90);
+    expect(r.overall.fxByOrigin).toMatchObject({ editor: { passes: { total: 8 } }, export: { passes: { total: 35 } }, fill: { passes: { total: 45 } } });
+    expect(reportText(r, 'origins')).toContain('FX origin export');
+    expect(report(events.filter((e) => e.d === 'fx')).overall.fxShareOfFrames).toBeNull();
+    expect(report(events.map((e) => ({ ...e, data: undefined }))).overall.fxShareOfFrames).toBeNull();
+  });
   const ev = [
     { t: 0, d: 'session', n: 'start', data: { label: 'bench', cores: 8 } },
     { t: 10, d: 'render', n: 'frame', ms: 10, data: { fx: 1, canvases: 3, px: 3e6 } },

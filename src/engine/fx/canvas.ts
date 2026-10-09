@@ -1,6 +1,7 @@
 import { createCanvas, ctx2d } from '../../lib/media';
 import { numParam, rgba } from './defs';
 import type { FxLayer, FxOp } from './types';
+import type { RenderTrace } from '../../lib/renderTrace';
 import { span, traceDeep } from '../../lib/trace';
 
 /*
@@ -10,6 +11,7 @@ import { span, traceDeep } from '../../lib/trace';
 
 /** `scale` = canvas px per document px (lengths are given in document px); `clip` keeps light inside the source alpha. */
 export interface FxContext {
+  trace?: RenderTrace;
   scale: number;
   clip: boolean;
   /** Where the target is, in canvas px: the lens flare is placed in it, as GIMP places it in the drawable. Default: all. */
@@ -64,12 +66,12 @@ export function flareCanvas(op: FxOp, width: number, height: number, region = { 
 }
 
 function pass(src: HTMLCanvasElement, op: FxOp, c: FxContext): HTMLCanvasElement {
-  const end = span('fx', 'pass', { kind: op.kind, size: `${src.width}x${src.height}` });
+  const end = span('fx', 'pass', { ...c.trace, kind: op.kind, size: `${src.width}x${src.height}` });
   const out = draw(src, op, c);
   if (traceDeep()) {
     // The read synchronizes pending work; its duration is not pure GPU time.
     const script = end();
-    const read = span('fx', 'pass-gpu', { kind: op.kind, size: `${src.width}x${src.height}`, scriptMs: Math.round(script * 1000) / 1000 });
+    const read = span('fx', 'pass-gpu', { ...c.trace, kind: op.kind, size: `${src.width}x${src.height}`, scriptMs: Math.round(script * 1000) / 1000 });
     ctx2d(out).getImageData(0, 0, 1, 1);
     read();
   } else end();

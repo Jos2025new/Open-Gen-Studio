@@ -18,7 +18,7 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
   if (doc.layers.some((l) => l.visible && l.type === 'raster' && !getBuffer(l.id))) throw new Error('Layer pixels are still loading. Try again in a moment.');
   const canvas = createCanvas(w, h);
   const ctx = ctx2d(canvas);
-  drawDoc(ctx, doc);
+  drawDoc(ctx, doc, { origin: 'fill' });
   const pixels = ctx.getImageData(0, 0, w, h).data;
   const region = floodMask(pixels, w, h, x, y, threshold, expand);
   const out = ctx.createImageData(w, h);

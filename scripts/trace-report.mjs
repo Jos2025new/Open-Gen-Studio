@@ -24,6 +24,16 @@ export function parseTrace(text) {
 /** Frame budget at 60 fps. */
 const FRAME_MS = 1000 / 60;
 
+// Union of pass intervals clipped to their own frame: no offscreen work or overlapping rounded spans.
+function timeInFrame(frame, passes) {
+  const intervals = passes.filter((p) => p.data?.origin === 'editor' && p.data?.renderId === frame.data.renderId)
+    .map((p) => [Math.max(frame.t, p.t), Math.min(frame.t + frame.ms, p.t + (p.ms ?? 0))])
+    .filter(([a, b]) => b > a).sort(([a], [b]) => a - b);
+  let total = 0, end = -Infinity;
+  for (const [a, b] of intervals) { total += Math.max(0, b - Math.max(a, end)); end = Math.max(end, b); }
+  return total;
+}
+
 function section(events) {
   const frames = events.filter((e) => e.d === 'render' && e.n === 'frame');
   const starts = frames.map((f) => f.t);
@@ -35,8 +45,14 @@ function section(events) {
   const byKind = {};
   for (const p of passes) (byKind[p.data?.kind ?? '?'] ??= []).push(p.ms);
   const gpu = events.filter((e) => e.d === 'fx' && e.n === 'pass-gpu');
-  const fxTime = passes.reduce((a, p) => a + (p.ms ?? 0), 0) + gpu.reduce((a, p) => a + (p.ms ?? 0), 0);
-  const frameTime = frames.reduce((a, f) => a + (f.ms ?? 0), 0);
+  const attributed = frames.filter((f) => f.data?.origin === 'editor' && f.data?.renderId != null);
+  const fxTime = attributed.reduce((sum, f) => sum + timeInFrame(f, [...passes, ...gpu]), 0);
+  const frameTime = attributed.reduce((sum, f) => sum + (f.ms ?? 0), 0);
+  const origins = [...new Set([...passes, ...gpu].map((p) => p.data?.origin ?? 'unattributed'))];
+  const fxByOrigin = Object.fromEntries(origins.map((origin) => [origin, {
+    passes: stats(passes.filter((p) => (p.data?.origin ?? 'unattributed') === origin).map((p) => p.ms)),
+    synchronizedRead: stats(gpu.filter((p) => (p.data?.origin ?? 'unattributed') === origin).map((p) => p.ms)),
+  }]));
   const heap = events.filter((e) => e.d === 'memory').map((e) => e.data?.usedMB);
   return {
     frames: { ...stats(frames.map((f) => f.ms)), over16ms: frames.filter((f) => f.ms > FRAME_MS).length },
@@ -45,6 +61,7 @@ function section(events) {
     canvasesPerFrame: stats(frames.map((f) => f.data?.canvases)),
     megapixelsPerFrame: stats(frames.map((f) => (f.data?.px ?? 0) / 1e6)),
     fxPassByKind: Object.fromEntries(Object.entries(byKind).map(([k, v]) => [k, stats(v)])),
+    fxByOrigin,
     fxShareOfFrames: frameTime ? round((fxTime / frameTime) * 100) : null,
     gpuWait: gpu.length ? { ...stats(gpu.map((g) => g.ms)), scriptP50: stats(gpu.map((g) => g.data?.scriptMs)).p50 } : null,
     latency: Object.fromEntries(Object.entries(events.filter((e) => e.n === 'apply' || e.n === 'change').reduce((acc, e) => ((acc[`${e.d}.${e.n}`] ??= []).push(e.ms), acc), {})).map(([k, v]) => [k, stats(v)])),
@@ -81,7 +98,9 @@ function sectionText(s) {
   const fx = Object.entries(s.framesByFxLayers);
   if (fx.length > 1 || fx[0]?.[0] !== '0') out.push(`- Frame time by active FX layers: ${fx.map(([k, v]) => `${k} → p50 ${v.p50} / p95 ${v.p95} ms (${v.n})`).join('; ')}.`);
   if (s.canvasesPerFrame.n) out.push(`- Off-screen canvases per frame: p50 ${s.canvasesPerFrame.p50}, max ${s.canvasesPerFrame.max}; megapixels per frame: p50 ${s.megapixelsPerFrame.p50}, max ${s.megapixelsPerFrame.max}.`);
-  if (s.fxShareOfFrames != null) out.push(`- FX passes are ${s.fxShareOfFrames}% of frame time${s.gpuWait ? ` (deep: synchronized read p50 ${s.gpuWait.p50} ms vs script p50 ${s.gpuWait.scriptP50} ms per pass)` : ''}.`);
+  if (s.fxShareOfFrames != null) out.push(`- Editor FX passes are ${s.fxShareOfFrames}% of attributed editor frame time${s.gpuWait ? ` (deep: synchronized read p50 ${s.gpuWait.p50} ms vs script p50 ${s.gpuWait.scriptP50} ms per pass)` : ''}.`);
+  if (s.fxShareOfFrames == null) out.push('- Editor FX share unavailable: no attributed editor frames.');
+  for (const [origin, v] of Object.entries(s.fxByOrigin)) out.push(`- FX origin ${origin}: ${v.passes.n} passes, ${v.passes.total} ms; synchronized read ${v.synchronizedRead.total} ms.`);
   for (const [k, v] of Object.entries(s.fxPassByKind)) out.push(`- FX pass ${k}: p50 ${v.p50} ms, p95 ${v.p95} ms (${v.n}).`);
   for (const [k, v] of Object.entries(s.latency)) out.push(`- Latency ${k} (action → frame shown): p50 ${v.p50} ms, p95 ${v.p95} ms, max ${v.max} ms (${v.n}).`);
   if (s.heapMB) out.push(`- JS heap: ${s.heapMB.min}–${s.heapMB.max} MB.`);

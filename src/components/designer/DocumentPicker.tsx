@@ -20,7 +20,7 @@ function Thumbnail({ doc }: { doc: DesignDoc }) {
     ctx.save();
     ctx.translate((144 - doc.width * scale) / 2, (96 - doc.height * scale) / 2);
     ctx.scale(scale, scale);
-    drawDoc(ctx, doc);
+    drawDoc(ctx, doc, { origin: 'thumbnail' });
     ctx.restore();
   }, [doc, version]);
   return <canvas ref={ref} width={144} height={96} className="document-thumb" aria-hidden="true" />;

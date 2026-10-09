@@ -34,12 +34,15 @@ function recordingCanvas(width: number, height: number, editor = false) {
 vi.mock('../src/lib/media', () => ({ createCanvas: (w: number, h: number) => recordingCanvas(Math.round(w), Math.round(h)), ctx2d: (c: { getContext: () => unknown }) => c.getContext(), canvasToBlob: async () => new Blob() }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
 
-import { drawDoc } from '../src/engine/design/render';
+import { drawDoc, exportDoc } from '../src/engine/design/render';
 import { applyFx, cssFilter, glowPasses, mixFx } from '../src/engine/fx/canvas';
 import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
 import type { DesignDoc } from '../src/engine/types';
 import { awaitFrame, startTrace, stopTrace, type TraceEvent } from '../src/lib/trace';
+
+import { fxOnCanvas } from '../src/engine/fx/op';
+import { report } from '../scripts/trace-report.mjs';
 
 const events: TraceEvent[] = [];
 function recordTrace(domains: string[], deep = false) {
@@ -69,6 +72,26 @@ describe('drawDoc with FX layers', () => {
     stopTrace();
     expect(events).toContainEqual(expect.objectContaining({ d: domain, n: name, ms: expect.any(Number) }));
     expect(events.some((e) => e.d === 'render')).toBe(false);
+  });
+  it('attributes an editor frame and two offscreen FX renders without inflating the editor share', async () => {
+    let now = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => ++now);
+    recordTrace(['fx', 'render'], true);
+    const doc = page([newFxLayer('filter', { scope: 'below', ops: [newFxOp('blur')] })]);
+    drawDoc(recordingCanvas(200, 100, true).getContext() as unknown as CanvasRenderingContext2D, doc);
+    await exportDoc(doc);
+    fxOnCanvas(recordingCanvas(200, 100) as unknown as HTMLCanvasElement, { effect: 'blur' });
+    stopTrace();
+    const renders = events.filter((e) => e.d === 'render');
+    expect(renders.map((e) => e.data?.origin)).toEqual(['editor', 'export', 'asset-fx']);
+    expect(new Set(renders.map((e) => e.data?.renderId)).size).toBe(3);
+    for (const pass of events.filter((e) => e.d === 'fx' && e.n !== 'apply')) {
+      expect(renders.some((r) => r.data?.renderId === pass.data?.renderId && r.data?.origin === pass.data?.origin)).toBe(true);
+    }
+    const r = report(events).overall;
+    expect(r.fxShareOfFrames).toBeGreaterThan(0);
+    expect(r.fxShareOfFrames).toBeLessThanOrEqual(100);
+    expect(r.fxByOrigin).toMatchObject({ editor: { passes: { n: 1 } }, export: { passes: { n: 1 } }, 'asset-fx': { passes: { n: 1 } } });
   });
   it('without FX the page is drawn straight into the view (no off-screen canvas)', () => {
     const { x } = view();

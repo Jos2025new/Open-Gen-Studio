@@ -9,7 +9,9 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { fxPlan } from '../fx/plan';
 import { mixFx } from '../fx/canvas';
-import { frameShown, span, takeCanvasCount, traceStatus, tracing } from '../../lib/trace';
+import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
+
+import { beginRender, type RenderOrigin, type RenderTrace } from '../../lib/renderTrace';
 
 /* One renderer for both the editor view and exports, so what you see is what you export. */
 
@@ -234,15 +236,15 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
 }
 
 /** Draw the document in doc coordinates (caller sets the transform). */
-export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string } = {}): void {
+export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string; origin?: RenderOrigin } = {}): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, doc.width, doc.height);
   ctx.clip();
   const steps = fxPlan(doc.layers, opts.hideLayerId);
-  // Trace (ADR 0012): the editor's frames only (thumbnails and exports also draw the page).
+  // Editor latency is independent of the domains selected for recording.
   const stage = traceStatus() !== null && (ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas');
-  const end = stage && tracing('render') ? span('render', 'frame', { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` }) : null;
+  const { context, end } = beginRender(opts.origin ?? (stage ? 'editor' : 'offscreen'), { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` });
   if (stage) takeCanvasCount();
   if (steps.every((s) => s.t === 'draw')) {
     if (doc.background) {
@@ -250,11 +252,9 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
       ctx.fillRect(0, 0, doc.width, doc.height);
     }
     for (const s of steps) drawLayer(ctx, s.layer);
-  } else drawWithFx(ctx, doc, steps);
+  } else drawWithFx(ctx, doc, steps, context);
   ctx.restore();
-  if (end) {
-    end(takeCanvasCount());
-  }
+  end?.(stage ? takeCanvasCount() : undefined);
   if (stage) frameShown();
 }
 
@@ -265,7 +265,7 @@ const FX_MAX_PX = 16_000_000;
  * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
  * FX see everything under them, background included. Lengths in FX params are document px.
  */
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>): void {
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, trace?: RenderTrace): void {
   const m = ctx.getTransform();
   const scale = Math.max(0.05, Math.min(Math.hypot(m.a, m.b) || 1, Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height))));
   const W = Math.max(1, Math.round(doc.width * scale)), H = Math.max(1, Math.round(doc.height * scale));
@@ -277,15 +277,15 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
     x.fillRect(0, 0, doc.width, doc.height);
   }
   for (const s of steps) {
-    const end = s.t === 'draw' ? null : span('fx', 'layer', { scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${W}x${H}` });
+    const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${W}x${H}` });
     if (s.t === 'draw') drawLayer(at(acc), s.layer);
-    else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false });
+    else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false, trace });
     else {
       let own = createCanvas(W, H);
       drawLayer(at(own), s.layer, true);
       const box = layerBox(s.layer);
       const region = box ? { x: box.x * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale } : undefined;
-      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region });
+      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region, trace });
       // In canvas px: `own` is already at the composite's scale.
       const x = ctx2d(acc);
       x.setTransform(1, 0, 0, 1, 0, 0);
@@ -308,7 +308,7 @@ export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg'
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, doc.width, doc.height);
   }
-  drawDoc(ctx, doc);
+  drawDoc(ctx, doc, { origin: 'export' });
   return canvasToBlob(c, type, type === 'image/jpeg' ? 0.92 : undefined);
 }
 
