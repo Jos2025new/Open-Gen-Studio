@@ -12,7 +12,7 @@ Para agentes y para quien mida. Se aplica **solo a lo que ya tiene sondas**: los
    - Un caso reproducible: `FX_BENCH=n npm run fx:check -- -g bench`, o un escenario propio con `window.__OGS_TRACE__.start(etiqueta, { domains })`.
    - Un marcador antes de cada paso (`.mark('…')`).
    - `deep: true` mide la espera con lectura sincronizada de un píxel; altera el render y no separa exactamente CPU y GPU.
-4. **Leer.** `npm run trace:report` (o `--json`). Comparar tramos entre marcadores, no cifras sueltas.
+4. **Leer.** `npm run trace:report` (o `--json`). Comparar tramos entre marcadores, no cifras sueltas. Para porcentaje FX activar tanto `fx` como `render`: sin fotogramas atribuidos no hay denominador. Comprobar el origen antes de comparar; un export no es un fotograma del editor.
 5. **Informar.** Cada cifra va con:
    - navegador, núcleos, tamaño del documento y zoom;
    - cuántas veces se midió;
@@ -59,6 +59,8 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 | `mark` | tus marcadores |
 
 La latencia de `fx` o `designer` se registra aunque no se active el dominio `render`: el dibujo del lienzo del editor resuelve la acción pendiente de forma independiente de grabar su duración. Un dibujo fuera de pantalla no la resuelve.
+
+No usar una sesión con `&deep=1` como si tuviera el mismo coste que la normal: la lectura fuerza sincronización. Las estadísticas generales de pasos y lecturas abarcan todos los orígenes; el desglose por origen permite separarlos.
 
 El informe cruza `renderId` y `origin` de cada paso con su fotograma: suma la unión de sus intervalos dentro del fotograma, sin contar dos veces los solapamientos del reloj redondeado. Orígenes: editor, export, fill, agent-view, thumbnail, selection, color-sample, asset-fx y offscreen (llamante sin etiqueta). Las trazas antiguas sin atribución se muestran como unattributed; no se calcula su porcentaje. Una sesión solo con FX conserva el origen, pero no tiene el denominador de fotogramas. Los totales de eventos anidados no se deben sumar como tiempo de pared.
 

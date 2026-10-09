@@ -2,7 +2,7 @@
 
 Lista viva, revisada contra el código de `task/agent-forcing`. Formato de cada línea: casilla, asunto, **fecha** del último cambio de estado, quién lo dijo y la evidencia. Al cerrar una, marca `[x]`, pon la fecha y la evidencia (commit, test o prueba), y muévela a «Hecho».
 
-Evidencia: **código** = leído en el código · **test** = cubierto por `npm test` · **real** = ejecutado contra el servidor o el proveedor real · **usuario** = lo afirma el usuario.
+Evidencia: **código** = leído en el código · **test** = cubierto por `npm test` · **real** = ejecutado contra el servidor o el proveedor real · **usuario** = lo afirma el usuario · **sandbox** = recorrido en el puerto 5183 · **propuesta** = trabajo o decisión aún sin implementar ni validar.
 
 ## Decisiones del usuario
 
@@ -25,18 +25,36 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
-- [ ] **Caché de las capas FX** (coste medido; reparto pendiente de confirmar; [fx-pruebas.md](fx-pruebas.md), sección 5). Hoy cada fotograma recalcula todas las capas FX: con 50 desenfoques, 398 ms por fotograma, el 95 % atribuido a pasos FX se calculó con una fórmula defectuosa y está pendiente de confirmar con la atribución corregida. Propuesta, como GIMP e Inkscape (`Drawing::setCacheBudget`):
-  - guardar el resultado de cada capa FX con una clave (versión de su contenido debajo, parámetros y escala) y un presupuesto de memoria;
-  - reutilizar los lienzos temporales en vez de crear uno por paso;
-  - después, renderizar por teselas solo la zona que cambia.
-  
-  Repetir el banco tras cada mejora. **2026-10-08**, pendiente; recordatorio pedido por el usuario.
 - [ ] Importar el `.zip` de datos (el exportar ya existe). **2026-10-08**, pendiente.
 - [ ] Recortar un vídeo o quitarle el audio. El servidor local ya usa ffmpeg para `join_clips`; sería la vía más ligera. **2026-10-08**, pendiente.
 - [ ] Quitar el fondo de un vídeo (`pixelcut/video-background-removal`, NanoGPT; ID verificado). **2026-10-08**, pendiente.
 - [ ] Subir vídeos grandes a fal con su API de subida. Ligado a «fal no probado». **2026-10-08**, pendiente.
-- [ ] Designer: máscaras de capa, capas de ajuste, estilos de capa, PSD y gestión de color. **2026-10-08**, próximo trabajo del usuario.
+- [ ] Designer: seguir el orden y los criterios de cierre de «Plan del Designer» más abajo. **2026-10-09**, **usuario**: máscaras, ajustes, PSD y color son el próximo trabajo; **propuesta**: orden de ejecución de Astra.
 - [ ] Limpiar copias `data.bak-*`: se crean solo al pulsar «Wipe all data» y solo ocupan disco, sin efecto en el funcionamiento ni en la interfaz. Las copias automáticas de `data/backups/` ya se limitan a 20. **2026-10-08**, solo si hace falta.
+
+## Plan del Designer (orden de ejecución)
+
+Afinar por partes, sin reescribir el motor. Este es el plan del Designer; las propuestas de producción de vídeo de la auditoría siguen aparte y no condicionan este recorrido.
+
+- [x] **1. Sondas y exportación (esta tarea).** Cronometrar la lectura sincronizada; resolver latencia aun sin dominio render; atribuir pasos FX por render y origen; separar resolución de vista y entrega. **2026-10-09**, Astra, **test**: regresiones que fallan al retirar temporalmente cada arreglo; 1029 tests aprobados y build correcto. **sandbox**: aviso al exportar 8192×8192, latencia solo FX, tres orígenes y PNG real 256×128 con FX; 8K se comprobó con canvas doble. Commits de código: `eb2c7f4`, `c19fdf3`, `4e53d5d`, `722564a`.
+- [ ] **2. Caché de FX con presupuesto de memoria.** Clave por contenido y dependencias efectivas, parámetros, alcance y resolución; invalidar solo lo afectado. Mover una capa ajena no debe recalcular los FX que no dependen de ella; cambiar una capa bajo «Everything below» sí. Limitar bytes, liberar al cerrar documentos y separar resultados de vista y exportación. **2026-10-09**, Astra, **código**: hoy se recompone cada fotograma; **propuesta**: primero caché acotada, reutilización de temporales si la medida la justifica, teselas después si siguen haciendo falta. Cierre: `FX_BENCH=50 npm run fx:check -- -g bench` y `npm run trace:report` antes y después, mismo documento, zoom, navegador y carga anotada, incluyendo aciertos/fallos y memoria de caché con sondas previas. El 95 % histórico no sirve de línea base confirmada.
+- [ ] **3. Recorrido completo de máscara.** Crear, pintar, mover con y sin vínculo a su capa, desactivar, deshacer/rehacer, guardar, recargar y exportar. Conservar máscaras de regiones vectoriales existentes; comprobar alfa y bordes con FX, sin perder píxeles ni buffers. Empezar después de cerrar los cinco contratos siguientes. **2026-10-09**, Astra, **propuesta**; **código**: `vectorMask.ts` ya cubre máscaras de regiones, no una máscara general de capa con todo este recorrido.
+- [ ] **4. Ajustes, composición de grupos y color.** Reutilizar el registro y el plan FX para ajustes no destructivos; definir grupos que realmente compongan, opacidad, fusión y alcance, con compatibilidad de documentos existentes; hacer explícito el color y las conversiones. Cada incorporación debe cerrar vista, undo, guardado y entrega antes de añadir otra. **2026-10-09**, Astra, **propuesta**; **código**: las carpetas actuales no aíslan composición y no limitan «Everything below» (ADR 0011).
+- [ ] **5. PSD.** Implementar el subconjunto acordado, probar con archivos externos y un recorrido de ida y vuelta, y avisar de lo no representable antes de exportar. No deducir fidelidad por poder abrir un archivo. **2026-10-09**, Astra, **propuesta**; **externo sin verificar**: compatibilidad con Photoshop/GIMP, máscaras, texto, ajustes, FX y perfiles.
+
+### Cinco contratos que cerrar antes de las máscaras
+
+Estas son decisiones de diseño propuestas y criterios de cierre; no describen funciones nuevas ya implementadas.
+
+- [ ] **Orden máscara/efectos.** Propuesta: máscara del contenido antes de los FX de esa capa, conservando el orden de las máscaras vectoriales actuales; una futura máscara del resultado FX sería un objeto distinto. Especificar alfa parcial, halo/sombra fuera de la silueta y «Everything below», con ejemplos de píxeles esperados en vista y exportación. **2026-10-09**, Astra, **código**: `drawMaskedVector` precede al plan de FX de capa; **propuesta**: fijar el contrato general y su prueba antes de implementarlo.
+- [ ] **Carpetas y grupos.** Conservar las carpetas actuales como organización sin aislamiento de composición. Un grupo que componga deberá ser explícito, con versión/compatibilidad y alcance de FX definido; no cambiar la semántica de archivos guardados en silencio. **2026-10-09**, Astra, **código**: ADR 0011 y `fx/plan.ts`; **propuesta**: especificar los nuevos grupos antes de combinarlos con máscaras.
+- [ ] **Vida de los buffers.** Definir identidad y propiedad de cada máscara, incluirla en guardado, restauración y undo/redo, y evitar que borrar o deshacer libere un buffer todavía referenciado. Probar borrado, recuperación, recarga y fallo de escritura, sin introducir un segundo sistema de persistencia. **2026-10-09**, Astra, **propuesta**; **código**: `raster.ts`, historial y máscaras vectoriales son los mecanismos a extender, no a reemplazar.
+- [ ] **Promesa PSD.** Propuesta inicial: capas raster y máscaras alfa editables; texto, vectores, ajustes, FX y perfiles solo se anuncian como editables tras demostrarlo. Definir por separado qué se importa, qué se exporta y qué exige rasterizar con aviso. El modelo de máscara debe admitir esa correspondencia; no prometer un PSD idéntico ni round-trip completo. **2026-10-09**, Astra, **propuesta**, compatibilidad externa sin verificar.
+- [ ] **Espacio de color explícito.** Propuesta inicial: sRGB, 8 bits por canal; documentar alfa y dónde ocurren mezcla y ajustes. Definir conversión o rechazo visible para entradas fuera del contrato; perfiles ICC, gamut amplio y mayor profundidad quedan fuera hasta tener implementación y pruebas de entrega. **2026-10-09**, Astra, **código**: los filtros SVG declaran sRGB; **propuesta**: no confundirlo con gestión completa de color del documento.
+
+### Observación abierta
+
+- [ ] **Clics nativos en el menú FX.** En la auditoría del sandbox algunos clics cerraron el menú sin añadir la capa; la invocación del comando compartido sí la añadió. Reproducir desde un perfil aislado y registrar eventos, selección y estado del menú antes de corregir. **2026-10-09**, Astra, **sandbox**: observación de la auditoría, causa sin confirmar; esta tarea no arregla ni da por resuelto ese comportamiento.
 
 ## Calidad del código
 

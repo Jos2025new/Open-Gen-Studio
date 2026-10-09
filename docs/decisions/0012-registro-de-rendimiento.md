@@ -33,7 +33,7 @@ Aprobado por el usuario (2026-10-08): generalista, con sondas finas que no oblig
    - **latencia de aplicación:** de la acción (`runFx`, deslizador, comando del agente) al primer fotograma que la muestra;
    - intervalos entre fotogramas mientras se arrastra, y tareas largas (`PerformanceObserver`);
    - memoria de JavaScript donde exista (`performance.memory`, Chrome).
-4. **Lectura sincronizada.** El modo «profundo» opcional mide la espera con lectura sincronizada de un píxel tras cada paso. Incluye la lectura y el trabajo pendiente que esta obliga a completar; no separa exactamente CPU y GPU. Altera y puede ralentizar el render. El nombre histórico `pass-gpu` se conserva, pero el informe lo describe como lectura sincronizada.
+4. **Lectura sincronizada.** El modo «profundo» opcional mide la espera con lectura sincronizada de un píxel tras cada paso. Incluye la lectura y el trabajo pendiente que esta obliga a completar; no separa exactamente CPU y GPU. Altera y puede ralentizar el render. El nombre histórico `pass-gpu` se conserva, pero el informe lo describe como lectura sincronizada. Se activa con `?trace=<etiqueta>&domains=fx,render&deep=1`; `deep=1` sin sesión no activa el registro. No comparar una sesión profunda y una normal como si tuvieran el mismo coste.
 5. **Dónde queda.** Un archivo JSON Lines por sesión en `data/logs/trace-<fecha>-<etiqueta>.jsonl` (en el sandbox, `.sandbox/data/logs/`), escrito por el servidor local como `app.log`. `npm run trace:report <archivo>` resume:
    - p50, p95 y máximo por evento;
    - la evolución con el número de capas;
