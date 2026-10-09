@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
 import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
+import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
 /*
@@ -109,16 +110,20 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
     <div className="brush-row">
       {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} />}
-      <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
-      <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
+      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
+      <InlineSlider label="Opacity" icon={<Droplet size={13} />} unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
       <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
     </div>
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
-    <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />
-    <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={brush.taperEnd ?? 0} onChange={(v) => set({ taperEnd: v })} />
-    <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
-    <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
-    {!erase && <InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} />}
+    <div className="brush-row">
+      <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />
+      <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={brush.taperEnd ?? 0} onChange={(v) => set({ taperEnd: v })} />
+    </div>
+    <div className="brush-row">
+      <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
+      <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
+    </div>
+    {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <label className="check-row brush-check" data-tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner"><input type="checkbox" checked={!!brush.simulatePressure} onChange={(e) => set({ simulatePressure: e.target.checked })} />Simulate pressure</label>

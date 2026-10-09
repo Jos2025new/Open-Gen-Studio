@@ -13,7 +13,7 @@ import { ColorChannels } from './ColorChannels';
  * name on the left and the value on the right. Drag anywhere on it, use the arrow keys, scroll over it, or click
  * the value to type it. A short range shows its steps as dots. Every tool and panel uses this one.
  */
-export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, allowManualOverflow = false, disabled, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; allowManualOverflow?: boolean; disabled?: boolean; onChange: (v: number) => void }) {
+export function InlineSlider({ label, value, min, max, step = 1, unit = '', scale = 1, allowManualOverflow = false, disabled, icon, onChange }: { label: string; value: number; min: number; max: number; step?: number; unit?: string; scale?: number; allowManualOverflow?: boolean; disabled?: boolean; /** Shown in place of the name where space is short; the name stays as its label and tooltip. */ icon?: ReactNode; onChange: (v: number) => void }) {
   const shown = Math.round(value * scale * 100) / 100;
   const set = (v: number) => onChange(Math.min(max, Math.max(min, v)));
   const fill = max > min ? Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100)) : 0;
@@ -21,7 +21,7 @@ export function InlineSlider({ label, value, min, max, step = 1, unit = '', scal
   return <label className={`opt opt-slider${disabled ? ' is-disabled' : ''}`} style={{ '--fill': `${fill}%` } as CSSProperties} onWheel={(e) => { if (!disabled) set(+(value + (e.deltaY < 0 ? step : -step)).toFixed(4)); }}>
     {steps > 1 && steps <= 12 && <span className="opt-ticks" aria-hidden="true">{Array.from({ length: steps - 1 }, (_, i) => <i key={i} style={{ left: `${((i + 1) / steps) * 100}%` }} />)}</span>}
     <Range className="opt-range" min={min} max={max} step={step} value={value} disabled={disabled} aria-label={label} onChange={(e) => set(+e.target.value)} />
-    <span className="opt-label">{label}</span>
+    <span className="opt-label" data-tip={icon ? label : undefined}>{icon ?? label}</span>
     <span className="opt-readout">
       <input className="opt-num num" style={{ width: `${Math.max(1, String(shown).length) + 0.6}ch` }} type="number" disabled={disabled} min={min * scale} max={allowManualOverflow ? undefined : max * scale} step={step * scale} value={shown} aria-label={`${label} value`} onChange={(e) => { const v = +e.target.value / scale; if (Number.isFinite(v)) allowManualOverflow ? onChange(Math.max(min, v)) : set(v); }} />
       {unit && <span className="opt-unit">{unit}</span>}
