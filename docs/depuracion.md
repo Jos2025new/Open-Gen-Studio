@@ -2,6 +2,25 @@
 
 Cómo grabar qué hace la app mientras pruebas algo, y cómo leerlo después (tú o un agente). Decisión: [ADR 0012](decisions/0012-registro-de-rendimiento.md).
 
+## Protocolo
+
+Para agentes y para quien mida. Se aplica **solo a lo que ya tiene sondas**: los dominios de la tabla «[Qué se mide hoy](#qué-se-mide-hoy-dominios)» y los casos de `npm run fx:check`. Para cualquier otra cosa, primero se añade la sonda ([Añadir una sonda](#añadir-una-sonda)) y su fila en esa tabla, en el mismo commit; después se mide.
+
+1. **Cuándo.** El usuario pide medir, o una afirmación sobre rendimiento («va lento», «aguanta 100 capas») necesita cifras. Sin registro no se afirma nada de rendimiento: se dice «sin medir».
+2. **Dónde.** Solo en el sandbox (`npm run dev:sandbox`, puerto 5183), y se detiene al terminar. Si el usuario grabó en su app real, se lee el archivo que él indique, sin abrir la app ni tocar `data/`.
+3. **Cómo.**
+   - Un caso reproducible: `FX_BENCH=n npm run fx:check -- -g bench`, o un escenario propio con `window.__OGS_TRACE__.start(etiqueta, { domains })`.
+   - Un marcador antes de cada paso (`.mark('…')`).
+   - `deep: true` solo para separar el tiempo de JavaScript del de la GPU.
+4. **Leer.** `npm run trace:report` (o `--json`). Comparar tramos entre marcadores, no cifras sueltas.
+5. **Informar.** Cada cifra va con:
+   - navegador, núcleos, tamaño del documento y zoom;
+   - cuántas veces se midió;
+   - lo que no llegó a medirse.
+   
+   Las cifras quedan en el documento de pruebas de la función (por ejemplo, [fx-pruebas.md](fx-pruebas.md), sección 5) y, si revelan un cuello de botella, en [pendientes.md](pendientes.md).
+6. **Optimizar.** Solo después de medir. Se repite la misma medición tras el cambio para comprobar la mejora.
+
 ## Grabar una sesión
 
 1. Con la app abierta (sandbox o real), pulsa **Ctrl+Alt+P** (⌘+Alt+P en Mac) y escribe qué vas a probar: «100 capas de desenfoque en 4K».

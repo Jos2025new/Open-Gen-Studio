@@ -7,20 +7,21 @@
 
 ## Dónde mirar
 
-- [Índice documental](docs/README.md): features (código y test, o «sin test»), decisiones e historial.
-- [Historial](docs/README.md#historial): solo los fragmentos pertinentes, en orden numérico. Es evidencia histórica, no el estado actual del código.
+- [Índice](docs/README.md): features (código y test, o «sin test»), decisiones e historial.
+- [Historial](docs/README.md#historial): solo lo pertinente, en orden numérico; evidencia histórica, no el estado actual.
 - [Seguridad](docs/seguridad.md): riesgos reales y descartados; léela antes de avisar.
 - Persistencia: server/local-store.js, src/lib/{disk,idb}.ts, src/store/store.ts.
-- Salvaguardas: scripts/dev-sandbox.mjs y check-*.mjs; npm test los ejecuta, con el mapa, antes de la suite.
+- Salvaguardas: scripts/dev-sandbox.mjs y check-*.mjs; npm test los corre, y el mapa, antes de tests.
+- Rendimiento: [protocolo](docs/depuracion.md#protocolo); si no lo cubre, primero la sonda.
 
 ## Reglas duras
 
-- Trabaja en un worktree propio (`git worktree add ../ogs-<t> -b task/<t>`), nunca en la carpeta original, de la que corre la app real. No fusiones: deja la rama lista con `npm test` y repórtala. Puerto del sandbox ocupado: espera o pregunta; no mates procesos ajenos.
-- Nada de navegadores automatizados, perfiles, CDP, extensiones ni copias de IndexedDB sobre la app real, ni arrancarla para verificar. Las pruebas usan solo el sandbox y terminan deteniéndolo.
+- Trabaja en un worktree propio (`git worktree add ../ogs-<t> -b task/<t>`), nunca en la carpeta original, de la que corre la app real. No fusiones: deja la rama lista con `npm test` y repórtala. Sandbox ocupado: espera o pregunta; no mates procesos ajenos.
+- Nada de navegadores automatizados, perfiles, CDP, extensiones ni copias de IndexedDB sobre la app real, ni arrancarla. Las pruebas usan solo el sandbox y terminan deteniéndolo.
 - No escribir en data/, sus copias ni el almacenamiento del navegador del usuario. Cualquier borrado o migración requiere aprobación explícita. Sandbox: .sandbox/data y puerto 5183; otro puerto con los mismos datos no aísla.
 - Conservar serialización, baseAt, copias, rechazo de pérdida masiva de sesiones, de escrituras automatizadas y de peticiones de fuera del ordenador.
-- Ningún archivo de más de 30 KB; AGENTS.md, menos de 3 KB. Dividir la documentación; índice completo.
+- Ningún archivo de más de 30 KB; AGENTS.md, menos de 3 KB. Dividir docs; índice completo.
 - Nada de secretos en docs/ ni en commits; no imprimir valores detectados. Si check-docs falla, parar y reportar.
 - Antes de usar proveedores de pago: coste máximo, selección concreta y aprobación explícita. Un coste estimado o mínimo no es un máximo.
 - No usar confirm() nativo para acciones de la app; conservar confirmaciones contextuales con cancelación.
-- Revisar instrucciones, estado y diff antes de editar; preservar trabajo ajeno. Usar una skill directora y el sistema de planificación existente. Usar dk-* cuando cubra la operación; sus fallos no autorizan reimplementarla.
+- Revisar instrucciones, estado y diff antes de editar; preservar lo ajeno. Usar una skill directora y el sistema de planificación existente. Usar dk-* cuando cubra la operación; sus fallos no autorizan reimplementarla.
