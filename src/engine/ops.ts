@@ -1,5 +1,6 @@
 import type { AdvancedValue, AssetKind, OpId } from './types';
 import { gridShape } from './sheet';
+import { FX_OP_CHOICES } from './fx/op';
 
 export interface OpField {
   key: string;
@@ -406,6 +407,19 @@ export const OPS: Record<OpId, OpDef> = {
         default: 'auto',
         options: opt(['auto', 'Detect'], ['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['pt', 'Portuguese'], ['it', 'Italian'], ['ja', 'Japanese'], ['zh', 'Chinese']),
       },
+    ],
+  },
+  fx: {
+    id: 'fx',
+    label: 'Filters & effects',
+    description: 'Apply one filter (brightness, contrast, saturation, hue, grayscale, sepia, invert, blur) or effect (glow, drop shadow, lens flare) to an image: a new image, the original stays (free, on this computer). params.effect names it; params.amount is its main value; other values by name (radius, x, y, color…).',
+    input: 'image',
+    output: 'image',
+    engine: 'local',
+    quick: false,
+    fields: [
+      { key: 'effect', label: 'Filter or effect', type: 'choice', default: 'brightness', options: FX_OP_CHOICES },
+      { key: 'amount', label: 'Amount', type: 'text', default: '', placeholder: 'Main value; empty = default' },
     ],
   },
 };

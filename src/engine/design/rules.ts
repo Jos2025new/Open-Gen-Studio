@@ -4,13 +4,15 @@ import type { Layer, LayerType } from '../types';
 
 export type PlaceableContent = 'image' | 'video' | 'text' | 'shapes';
 
-const ACCEPTS: Record<LayerType, PlaceableContent> = {
+const ACCEPTS: Record<Layer['type'], PlaceableContent | null> = {
   raster: 'image',
   text: 'text',
   vector: 'shapes',
+  // FX layers hold filters and effects, never content.
+  fx: null,
 };
 
-export function layerAccepts(layerType: LayerType, content: PlaceableContent): boolean {
+export function layerAccepts(layerType: LayerType | Layer['type'], content: PlaceableContent): boolean {
   return ACCEPTS[layerType] === content;
 }
 

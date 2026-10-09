@@ -35,6 +35,7 @@
 - [0008 — Límite de 30 KB en el código: los archivos que ya lo superan no crecen](decisions/0008-limite-de-tamano-en-codigo.md).
 - [0009 — Puerta de disparo por operación, comportamiento de los modos y enmiendas a 0007](decisions/0009-disparo-forzado.md).
 - [0010 — Estrategia de pruebas: tests fiables con carga y cobertura por riesgo](decisions/0010-estrategia-de-pruebas.md).
+- [0011 — Capas de filtros y efectos no destructivos (FX)](decisions/0011-capas-fx.md).
 
 ## Historial
 

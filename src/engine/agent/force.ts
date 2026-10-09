@@ -1,4 +1,5 @@
 import { useStore } from '../../store/store';
+import { fxKindIn } from '../fx/op';
 import { OPS } from '../ops';
 import { aspectOfShape, fitOp, pluralAngles } from './fit';
 import { detectOps, normalizeRequest, OP_TRIGGERS, OP_WEAK, sequenceNames } from './triggers';
@@ -94,6 +95,10 @@ export function gateOps(text: string, inputs: GateInput[], direct: boolean): Gat
       case 'grid_split': {
         const grid = gridOf(s, src.a);
         return grid ? fire({ grid }) : hold('which grid to cut: 2×2, 3×3 or 2×3?');
+      }
+      case 'fx': {
+        const effect = fxKindIn(s);
+        return effect ? fire({ effect }) : hold('which filter or effect: name one (blur, grayscale, glow…)');
       }
       case 'join_clips':
         return sources.length >= 2 ? fire() : hold('needs two or more clips attached');

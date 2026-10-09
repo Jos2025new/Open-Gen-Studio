@@ -29,7 +29,7 @@ Cada sesión tiene tres lienzos. Pasas de uno a otro sin perder nada, y el agent
 | --- | --- |
 | **Chat** | Conversar con el agente. Ves sus preguntas, el plan, el coste y los resultados como tarjetas. |
 | **Node** | Ver el trabajo como un flujo de tarjetas conectadas: cambiar un ajuste, volver a ejecutar un paso, ramificar. Cada nodo guarda sus propios ajustes. |
-| **Designer** | Componer con capas raster, vectoriales y de texto. Exporta en PNG, JPG, SVG o PDF. |
+| **Designer** | Componer con capas raster, vectoriales y de texto, y con capas de filtros y efectos no destructivas (botón FX). Exporta en PNG, JPG, SVG o PDF. |
 
 Puedes pedirle al agente que se mueva por ti: «llévalo a nodos», «mándalo al Designer», «vuelve al chat». Los resultados viajan contigo y no se generan de nuevo.
 
@@ -88,6 +88,7 @@ Sobre cualquier imagen o vídeo puedes pedir, con palabras o desde el menú, una
 | Remove object | imagen → imagen | Pinta un objeto y desaparece; el fondo se rellena. |
 | Create Kling voice | audio → texto | Crea una voz reutilizable a partir de 5–30 s de habla limpia. |
 | Transcribe | audio → texto | Convierte una grabación de voz en texto. |
+| Filters & effects | imagen → imagen · gratis, local | Un filtro (brillo, saturación, tono, blanco y negro, desenfoque…) o un efecto (glow, sombra, destello) en una imagen nueva; en el Designer son capas FX editables. |
 <!-- tools:end -->
 
 ## Flujos listos

@@ -2,11 +2,15 @@ import { pathTransform } from './path';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
 import { strokeSvg } from './brushTextures';
+import { fxPlan } from '../fx/plan';
+import { fxFilter } from '../fx/svg';
+import type { FxLayer } from '../fx/types';
 
 /*
  * Vector export. Each layer stays an editable object: shapes as SVG shapes, text as <text> (editable when the
  * font is installed), images as embedded PNG (never a blob: URL). Layers become Inkscape layers (inkscape:label)
  * so the structure survives. Blend modes use CSS mix-blend-mode; how far other editors honor it is not verified.
+ * FX layers become SVG filters (fx/svg.ts).
  */
 
 export type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
@@ -18,6 +22,8 @@ export interface SvgDeps {
   layout: (layer: TextLayer) => { lines: string[]; width: number; lineHeightPx: number };
   /** Distance from the top of the em box to the baseline, in px (canvas 'top' baseline → SVG alphabetic). */
   ascent: (layer: TextLayer) => number;
+  /** What the SVG could not keep (an FX with no SVG equivalent), said once per export. */
+  notice?: (message: string) => void;
 }
 
 export function xmlEscape(s: string): string {
@@ -64,10 +70,27 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
-  const body: string[] = [];
+  const body: string[] = [], defs: string[] = [], skipped = new Set<string>();
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
-  for (const l of doc.layers) {
-    if (!l.visible || l.opacity <= 0) continue;
+  // FX (ADR 0011): the same plan as the canvas. 'below' wraps everything before it, 'layer' wraps its target's content.
+  const filtered = (content: string, fx: FxLayer, asLayer: boolean): string => {
+    const id = `fx-${xmlEscape(fx.id)}`, f = fxFilter(fx, id, doc.width, doc.height);
+    f.skipped.forEach((label) => skipped.add(label));
+    const layerAttrs = asLayer ? ` id="${xmlEscape(fx.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(fx.name)}"` : '';
+    if (!f.markup) return asLayer ? `<g${layerAttrs}>${content}</g>` : content;
+    defs.push(f.markup);
+    if (fx.opacity >= 1 && fx.blend === 'normal') return `<g${layerAttrs} filter="url(#${id})">${content}</g>`;
+    // Mixed by opacity or blend: a filtered copy over the original (ids stay on the original only).
+    const copy = content.replace(/ id="[^"]*"/g, '').replace(/ inkscape:groupmode="layer"/g, '');
+    const style = fx.blend !== 'normal' ? ` style="mix-blend-mode:${fx.blend}"` : '';
+    return `<g${layerAttrs}>${content}<g filter="url(#${id})" opacity="${n(fx.opacity)}"${style}>${copy}</g></g>`;
+  };
+  for (const step of fxPlan(doc.layers)) {
+    if (step.t === 'below') {
+      body.splice(0, body.length, filtered(body.join(''), step.fx, true));
+      continue;
+    }
+    const l = step.layer;
     let inner: string;
     if (l.type === 'raster') {
       const href = await deps.rasterHref(l);
@@ -91,14 +114,17 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
     const opacity = l.opacity < 1 ? ` opacity="${n(l.opacity)}"` : '';
     // A rotated or skewed image or text keeps its transform, as Inkscape writes it (inner group: the layer stays plain).
     if (l.transform && l.type !== 'vector') inner = `<g transform="matrix(${l.transform.map(n).join(' ')})">${inner}</g>`;
+    // Its FX act on the content in page space, before the layer's own opacity and blend (as on the canvas).
+    if (step.t === 'clip') inner = step.fx.reduce((acc, fx) => filtered(acc, fx, false), inner);
     body.push(`<g id="${xmlEscape(l.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(l.name)}"${opacity}${style}>${inner}</g>`);
   }
+  if (skipped.size) deps.notice?.(`SVG has no equivalent for ${[...skipped].join(', ')}: left out of this file. PNG and JPG keep it.`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`,
     `<title>${xmlEscape(doc.name)}</title>`,
     // Content outside the page is cut, as in the editor.
-    `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath></defs>`,
+    `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,
     `<g clip-path="url(#page)">${body.join('')}</g>`,
     '</svg>',
   ].join('\n');

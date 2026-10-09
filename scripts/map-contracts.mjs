@@ -180,4 +180,44 @@ export default [
     sides: [['server/local-store.js', "req.headers['x-ogs-automated'] === '1' && !sandbox"]],
     tests: ['tests/automated-write.test.ts', 'tests/store-server.test.ts'],
   },
+  {
+    id: 'fx-plan',
+    what: 'ADR 0011: el lienzo y la exportación SVG aplican las capas FX con el mismo plan (qué filtra cada capa y en qué orden).',
+    sides: [
+      ['src/engine/fx/plan.ts', 'export function fxPlan'],
+      ['src/engine/design/render.ts', 'const steps = fxPlan(doc.layers, opts.hideLayerId)'],
+      ['src/engine/design/export.ts', 'for (const step of fxPlan(doc.layers))'],
+    ],
+    tests: ['tests/fx-render.test.ts', 'tests/fx-svg.test.ts'],
+  },
+  {
+    id: 'fx-svg-match',
+    what: 'Los filtros SVG coinciden con ctx.filter: sRGB en cada <filter> y el radio de la sombra dividido entre dos (CSS drop-shadow).',
+    sides: [
+      ['src/engine/fx/svg.ts', 'color-interpolation-filters="sRGB"'],
+      ['src/engine/fx/svg.ts', "numParam(op, 'blur') / 2"],
+      ['src/engine/fx/canvas.ts', "case 'shadow': return `drop-shadow("],
+    ],
+    tests: ['tests/fx-svg.test.ts'],
+  },
+  {
+    id: 'fx-commands',
+    what: 'ADR 0011: el panel de capas y el agente cambian las capas FX con los mismos comandos (runFx), en un solo paso de deshacer.',
+    sides: [
+      ['src/engine/design/fx.ts', 'export function runFx'],
+      ['src/components/designer/FxPanel.tsx', 'const r = runFx(sessionId, docId, commands)'],
+      ['src/engine/agent/designerFx.ts', 'runFx(sessionId, doc.id, v.data.commands'],
+      ['src/engine/agent/designerTools.ts', "name: 'designer_fx'"],
+    ],
+    tests: ['tests/fx-commands.test.ts', 'tests/fx-agent.test.ts'],
+  },
+  {
+    id: 'fx-designer-route',
+    what: 'En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva.',
+    sides: [
+      ['src/engine/skills/app/designer.md', 'En el Designer no uses la operación fx'],
+      ['src/engine/agent/runtime.ts', "workspace !== 'designer' || g.op !== 'fx'"],
+    ],
+    tests: ['tests/fx-agent.test.ts'],
+  },
 ];

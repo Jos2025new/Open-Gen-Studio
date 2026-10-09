@@ -31,6 +31,10 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **sandbox** — El sandbox usa .sandbox/data y el puerto 5183; las salvaguardas comprueban ese aislamiento. | [dev-sandbox.mjs](../scripts/dev-sandbox.mjs), [check-safeguards.mjs](../scripts/check-safeguards.mjs) | [safeguards.test.ts](../tests/safeguards.test.ts) |
 | **store-local-only** — El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba. | [local-store.js](../server/local-store.js), [seguridad.md](../docs/seguridad.md), [README.md](../README.md) | [store-server.test.ts](../tests/store-server.test.ts) |
 | **automated-writes** — El servidor rechaza escrituras automatizadas (cabecera X-OGS-Automated) fuera del sandbox. | [local-store.js](../server/local-store.js) | [automated-write.test.ts](../tests/automated-write.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
+| **fx-plan** — ADR 0011: el lienzo y la exportación SVG aplican las capas FX con el mismo plan (qué filtra cada capa y en qué orden). | [plan.ts](../src/engine/fx/plan.ts), [render.ts](../src/engine/design/render.ts), [export.ts](../src/engine/design/export.ts) | [fx-render.test.ts](../tests/fx-render.test.ts), [fx-svg.test.ts](../tests/fx-svg.test.ts) |
+| **fx-svg-match** — Los filtros SVG coinciden con ctx.filter: sRGB en cada <filter> y el radio de la sombra dividido entre dos (CSS drop-shadow). | [svg.ts](../src/engine/fx/svg.ts), [canvas.ts](../src/engine/fx/canvas.ts) | [fx-svg.test.ts](../tests/fx-svg.test.ts) |
+| **fx-commands** — ADR 0011: el panel de capas y el agente cambian las capas FX con los mismos comandos (runFx), en un solo paso de deshacer. | [fx.ts](../src/engine/design/fx.ts), [FxPanel.tsx](../src/components/designer/FxPanel.tsx), [designerFx.ts](../src/engine/agent/designerFx.ts), [designerTools.ts](../src/engine/agent/designerTools.ts) | [fx-commands.test.ts](../tests/fx-commands.test.ts), [fx-agent.test.ts](../tests/fx-agent.test.ts) |
+| **fx-designer-route** — En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva. | [designer.md](../src/engine/skills/app/designer.md), [runtime.ts](../src/engine/agent/runtime.ts) | [fx-agent.test.ts](../tests/fx-agent.test.ts) |
 
 ## Módulos centrales
 
@@ -38,26 +42,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 131 | 86 |
-| [store.ts](../src/store/store.ts) | 90 | 83 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 41 | 0 |
-| [media.ts](../src/lib/media.ts) | 33 | 22 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 30 | 1 |
+| [types.ts](../src/engine/types.ts) | 136 | 90 |
+| [store.ts](../src/store/store.ts) | 91 | 85 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 42 | 0 |
+| [media.ts](../src/lib/media.ts) | 34 | 23 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
+| [actions.ts](../src/engine/design/actions.ts) | 24 | 11 |
+| [doc.ts](../src/engine/design/doc.ts) | 23 | 18 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |
-| [actions.ts](../src/engine/design/actions.ts) | 22 | 9 |
-| [doc.ts](../src/engine/design/doc.ts) | 22 | 15 |
 | [raster.ts](../src/engine/design/raster.ts) | 21 | 4 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
-| [id.ts](../src/lib/id.ts) | 19 | 0 |
+| [id.ts](../src/lib/id.ts) | 20 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 98 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 101 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [render.ts](../src/engine/design/render.ts) | 13 | 2 |
+| [render.ts](../src/engine/design/render.ts) | 13 | 3 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
-| [history.ts](../src/engine/design/history.ts) | 12 | 3 |
+| [history.ts](../src/engine/design/history.ts) | 12 | 5 |
 
 ## Por área
 
@@ -67,22 +71,23 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 14 | 1 |
+| `src/components/designer` | 15 | 1 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 10 | 0 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 28 | 109 |
-| `src/engine/agent` | 17 | 53 |
-| `src/engine/design` | 38 | 30 |
+| `src/engine` | 28 | 113 |
+| `src/engine/agent` | 19 | 54 |
+| `src/engine/design` | 39 | 34 |
 | `src/engine/flow` | 10 | 11 |
+| `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 15 | 104 |
-| `src/store` | 1 | 83 |
+| `src/lib` | 15 | 107 |
+| `src/store` | 1 | 85 |
 
-84 de 201 módulos no tienen ningún test que los importe directamente.
+87 de 212 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -96,6 +101,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [CanvasSize.tsx](../src/components/designer/CanvasSize.tsx)
 - [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
 - [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx)
+- [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)

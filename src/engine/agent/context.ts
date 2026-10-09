@@ -10,7 +10,7 @@ import { routeHead, VIDEO_PURPOSES } from '../routing';
 import { guideForModel } from '../guides';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
 import { useStore } from '../../store/store';
-import { activeDoc } from '../design/actions';
+import { activeDoc, fxSummary } from '../design/actions';
 import { REFERENCE_PROTOCOLS, modelFit } from '../modelRules';
 import { remainingBudget } from '../budget';
 import { describeChoice } from './settingsCard';
@@ -316,7 +316,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   if (opts.workspace === 'designer') {
     const doc = activeDoc(session.id);
     if (doc) {
-      const layers = doc.layers.map((l, i) => `  ${i + 1}. ${l.id} ${l.type} "${l.name}"${l.id === doc.activeLayerId ? ' (active)' : ''}${l.locked ? ' (locked)' : ''}`);
+      const layers = doc.layers.map((l, i) => `  ${i + 1}. ${l.id} ${l.type} "${l.name}"${fxSummary(l)}${l.id === doc.activeLayerId ? ' (active)' : ''}${l.locked ? ' (locked)' : ''}`);
       lines.push(`designer document "${doc.name}" ${doc.width}×${doc.height}px; layers bottom→top:\n${layers.join('\n') || '  (empty)'}`);
       const active = doc.layers.find((l) => l.id === doc.activeLayerId);
       if (active?.type === 'vector') {

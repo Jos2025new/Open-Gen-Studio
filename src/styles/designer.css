@@ -204,3 +204,22 @@
 .stage-hint.has-close { display: flex; align-items: center; gap: 8px; pointer-events: auto; padding-right: 4px; }
 .stage-hint-close { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--text-2); flex-shrink: 0; }
 .stage-hint-close:hover { background: var(--surface-2); color: var(--text); }
+/* FX layers (ADR 0011): row icon, editor and op list. */
+.layer-thumb-wrap.is-fx { display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }
+.fx-editor { border: 0; margin: 0; padding: 0; min-width: 0; }
+.fx-editor:disabled { opacity: .5; }
+.fx-pop-head { display: flex; align-items: center; gap: 7px; padding: 4px 2px 10px; font-size: 12px; color: var(--accent); }
+.fx-pop-head strong { color: var(--text-1, inherit); font-weight: 600; }
+.fx-pop-head + .fx-editor { padding: 0 2px 4px; }
+.fx-ops { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.fx-op { border-bottom: 1px solid var(--border); }
+.fx-op.is-off .fx-op-name { color: var(--text-2); }
+.fx-op-head { display: flex; align-items: center; gap: 4px; padding: 4px 0; min-width: 0; }
+.fx-op-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; font-size: 12px; text-align: left; padding: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-op-confirm { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); }
+.fx-op-confirm button { font-size: 11px; padding: 2px 6px; border-radius: var(--radius-s); }
+.fx-op-confirm button.is-danger { color: var(--danger, #ff6b6b); }
+.fx-op-params { display: flex; flex-direction: column; gap: 8px; padding: 2px 0 10px; }
+.fx-op-params input[type=color] { width: 44px; height: 26px; padding: 0; border: 0; background: none; }
+.fx-expose { align-self: flex-start; gap: 5px; }
+.fx-menu .menu-item { padding: 6px 9px; }

@@ -1,6 +1,7 @@
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
+import { designerFxTool } from './designerFx';
 import { nodeIdsSchema } from './tools';
 import { restoreNodeDeletion } from '../flow/actions';
 import { prepareNodeRun, previewRun, runNodes } from '../flow/actions';
@@ -329,7 +330,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // history grow without bound (T6).
   patchAgent(sessionId, (a) => ({ history: trimReferenceResults(refreshLoadedGuides(stripImages(a.history))) }));
   // The keyword gate (force.ts): a request that fires mapped operations carries the signal to follow their route.
-  const gate = workspace === 'node' ? [] : requestGate(sessionId);
+  // In the Designer filters and effects are FX layers (designer_fx), not the fx operation that makes a new image.
+  const gate = workspace === 'node' ? [] : requestGate(sessionId).filter((g) => workspace !== 'designer' || g.op !== 'fx');
   // Auto and Guided confirm the image model of an image-model operation first (Auto once per session; Guided each request).
   const confirmFirst = get().composer.agentStyle !== 'direct' && !session(sessionId).agent.settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
   const forced = steerNote(gate, confirmFirst);
@@ -1624,6 +1626,12 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); continue; }
           log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
           ignoreRest(index); flushToolResults(sessionId, toolResults); return;
+        }
+        if (call.name === 'designer_fx') {
+          const r = workspace === 'designer' ? designerFxTool(sessionId, parsed.value) : { text: 'designer_fx works only in the Designer.', done: false };
+          if (r.done) log.action({ icon: 'fix', label: 'Changed filters and effects', detail: r.text });
+          respond(r.text);
+          continue;
         }
         if (call.name === 'view_canvas') {
           // Read-only look at the page or one layer; the image follows the tool results (they carry no images).

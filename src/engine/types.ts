@@ -1,6 +1,7 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
 import type { SentRequest } from '../lib/debug';
+import type { FxLayer } from './fx/types';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
@@ -266,28 +267,7 @@ export interface SavedView3D {
   grid: boolean;
 }
 
-export type OpId =
-  | 'relight'
-  | 'angle'
-  | 'upscale'
-  | 'remove_bg'
-  | 'reframe'
-  | 'variations'
-  | 'reference_sheet'
-  | 'edit'
-  | 'animate'
-  | 'extract_frame'
-  | 'continue'
-  | 'contact_sheet'
-  | 'grid_split'
-  | 'video_upscale'
-  | 'video_edit'
-  | 'video_extend'
-  | 'transcribe'
-  | 'create_voice'
-  | 'edit_region'
-  | 'remove_object'
-  | 'join_clips';
+export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | 'variations' | 'reference_sheet' | 'edit' | 'animate' | 'extract_frame' | 'continue' | 'contact_sheet' | 'grid_split' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'create_voice' | 'edit_region' | 'remove_object' | 'join_clips' | 'fx';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
@@ -789,20 +769,9 @@ export interface Graph {
 // Designer
 
 export type LayerType = 'raster' | 'vector' | 'text';
-export type BlendMode =
-  | 'normal'
-  | 'multiply'
-  | 'screen'
-  | 'overlay'
-  | 'darken'
-  | 'lighten'
-  | 'soft-light'
-  | 'hard-light'
-  | 'difference'
-  | 'color'
-  | 'luminosity';
+export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'soft-light' | 'hard-light' | 'difference' | 'color' | 'luminosity';
 
-interface LayerBase {
+export interface LayerBase {
   id: string;
   name: string;
   /** The folder this layer belongs to (DesignDoc.groups), if any. */
@@ -906,7 +875,7 @@ export interface TextLayer extends LayerBase, TextStyle {
   text: string;
 }
 
-export type Layer = RasterLayer | VectorLayer | TextLayer;
+export type Layer = RasterLayer | VectorLayer | TextLayer | FxLayer;
 
 export interface LayerGroup {
   id: string;

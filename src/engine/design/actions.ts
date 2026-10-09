@@ -15,6 +15,8 @@ import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
 
+export { fxSummary } from '../fx/commands';
+
 const get = useStore.getState;
 
 export function sessionDocs(sessionId: string): DesignDoc[] {

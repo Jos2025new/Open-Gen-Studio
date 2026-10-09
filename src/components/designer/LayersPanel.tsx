@@ -18,6 +18,7 @@ import { ToolSettings } from './ToolSettings';
 import { InlineColor } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
+import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -79,6 +80,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const pop = usePopover();
   const addPop = usePopover();
   const [op, setOp] = useState<OpId | null>(null);
+  // The FX layer whose editor is open next to its row (double-click), and that row.
+  const [fxEdit, setFxEdit] = useState<string | null>(null);
+  const fxRow = useRef<HTMLElement | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
   const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
@@ -153,7 +157,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     </fieldset>}
     <section className="layer-shelf">
     <div className="layer-list">
-      {[...doc.layers].reverse().map((l, d, shown) => { const Icon = l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes;
+      {[...doc.layers].reverse().map((l, d, shown) => { const Icon = l.type === 'fx' ? fxIcon(l.group) : l.type === 'raster' ? Image : l.type === 'text' ? Type : Shapes;
         // A folder's header sits above its topmost layer; a collapsed folder hides its layers' rows.
         const group = l.groupId ? groups.find((g) => g.id === l.groupId) : undefined;
         const header = group && shown.findIndex((x) => x.groupId === group.id) === d ? <GroupRow key={`g:${group.id}`} sessionId={sessionId} doc={doc} group={group} onSelect={() => { const top = selectGroup(doc, group.id); if (top) setActiveLayer(sessionId, doc.id, top); }} /> : null;
@@ -171,18 +175,19 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           if (!drag.active) e.currentTarget.setPointerCapture(e.pointerId);
           setDrag({ ...drag, active: true, slot: slotAt(e.clientY) });
         }}
-        onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}>
+        onPointerUp={endDrag} onPointerCancel={() => setDrag(null)}
+        onDoubleClick={l.type === 'fx' ? (e) => { if ((e.target as HTMLElement).closest('input, .layer-name, .layer-toggle')) return; fxRow.current = e.currentTarget; setFxEdit(l.id); } : undefined}>
         <button className="layer-select" aria-label={`Select ${l.name}`} aria-pressed={layer?.id === l.id} onClick={(e) => {
           if (drag?.active) return;
           // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
           if (e.shiftKey && !(e.ctrlKey || e.metaKey)) { pickLayerRange(doc.id, doc.activeLayerId, l.id, doc.layers.map((x) => x.id)); pop.close(); return; }
           pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
         }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
-          <span className="layer-thumb-wrap"><LayerThumb doc={doc} layer={l} /></span>
+          <span className={`layer-thumb-wrap${l.type === 'fx' ? ' is-fx' : ''}`} title={l.type === 'fx' ? 'Double-click to edit' : undefined}>{l.type === 'fx' ? <Icon size={16} /> : <LayerThumb doc={doc} layer={l} />}</span>
           {layer?.id !== l.id && <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />}
         </button>
         {layer?.id === l.id && <input key={l.id + l.name} className="layer-name-inline" aria-label="Name" defaultValue={l.name} disabled={l.locked} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== l.name && !l.locked) patchLayer(sessionId, doc.id, l.id, { name: e.target.value.trim() }); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = l.name; e.currentTarget.blur(); } e.stopPropagation(); }} />}
-        <span className="layer-kind" data-tip={`${l.type} layer`} aria-label={`${l.type} layer`}><Icon size={13} /></span>
+        <span className="layer-kind" data-tip={l.type === 'fx' ? `${l.group} layer · ${l.scope === 'layer' ? 'layer below' : 'everything below'}` : `${l.type} layer`} aria-label={l.type === 'fx' ? `${l.group} layer` : `${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
       </div></Fragment>; })}
@@ -197,6 +202,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           <MenuItem icon={Type} label="Text" onClick={() => { addEmptyLayer(sessionId, doc.id, 'text'); addPop.close(); }} />
         </div>
       </Popover>
+      <FxMenu sessionId={sessionId} doc={doc} layer={layer} />
       {layer && <>
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         {layer.type === 'raster' && <IconButton ref={pop.ref} size="sm" icon={Sparkles} label="Operations" className="layer-ops-btn" disabled={layer.locked} data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }} />}
@@ -219,7 +225,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       {tab === 'props' && <details className="layer-details" open={propertiesOpen} onToggle={(e) => setPropertiesOpen(e.currentTarget.open)}>
       <summary>Layer properties</summary>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
-        <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />
+        {layer.type === 'fx' ? <FxEditor key={layer.id} sessionId={sessionId} doc={doc} layer={layer} /> : <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />}
         {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
         {layer.type === 'text' && <>
           <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
@@ -244,9 +250,10 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </fieldset>
       </details>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>
-        {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image').map((o) => <MenuItem key={o.id} label={o.label} detail={o.description} onClick={() => setOp(o.id)} />)}
+        {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image' && o.id !== 'fx').map((o) => <MenuItem key={o.id} label={o.label} detail={o.description} onClick={() => setOp(o.id)} />)}
       </Popover>
     </>}
+    {(() => { const f = doc.layers.find((l) => l.id === fxEdit); return f?.type === 'fx' ? <FxEditorPopover sessionId={sessionId} doc={doc} layer={f} anchor={fxRow} onClose={() => setFxEdit(null)} /> : null; })()}
     </div>
   </aside>;
 }

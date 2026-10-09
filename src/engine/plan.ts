@@ -145,7 +145,7 @@ export interface PlanContext {
   defaultModel: (kind: MediaKind, needsImage: boolean) => string | null;
   defaultSettings: (kind: MediaKind) => Partial<GenSettings>;
   asset: (id: string) => { kind: AssetKind; width?: number; height?: number } | undefined;
-  layer: (id: string) => { type: LayerType } | undefined;
+  layer: (id: string) => { type: string } | undefined;
   maxSteps?: number;
   /**
    * Whether the user picked the composer's model by hand (C2). When false, video steps without a model follow

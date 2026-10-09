@@ -137,6 +137,7 @@ export function cloneLayer(layer: Layer): Layer {
 }
 
 export function translateLayer(layer: Layer, dx: number, dy: number): Layer {
+  if (layer.type === 'fx') return layer;
   // A rotated image or text moves its transform, so it moves on the page however it is turned.
   if (layer.transform && layer.type !== 'vector') return { ...layer, transform: multiply(translation(dx, dy), layer.transform) };
   if (layer.type === 'vector') return { ...layer, ...(layer.pixelMask ? { pixelMask: translateLayer(layer.pixelMask, dx, dy) as RasterLayer } : {}), shapes: layer.shapes.map((s) => ({ ...s, x: s.x + dx, y: s.y + dy })), ...(layer.strokes ? { strokes: layer.strokes.map((s) => translateStroke(s, dx, dy)) } : {}) };
@@ -168,6 +169,7 @@ export function unionBox(boxes: Box[]): Box | null {
 
 /** Scale a layer about an anchor point (used by the transform handles). */
 export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay: number): Layer {
+  if (layer.type === 'fx') return layer;
   if (layer.transform && layer.type !== 'vector') return { ...layer, transform: multiply(scaleAbout(sx, sy, ax, ay), layer.transform) };
   const fx = (x: number) => ax + (x - ax) * sx;
   const fy = (y: number) => ay + (y - ay) * sy;

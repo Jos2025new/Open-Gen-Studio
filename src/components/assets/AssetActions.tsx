@@ -9,6 +9,7 @@ import {
   Crop,
   Download,
   Ellipsis,
+  Sparkle,
   FastForward,
   FileText,
   Film,
@@ -61,6 +62,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   edit_region: Brush,
   remove_object: Eraser,
   join_clips: Film,
+  fx: Sparkle,
 };
 
 const QUICK_LABEL: Partial<Record<OpId, string>> = {

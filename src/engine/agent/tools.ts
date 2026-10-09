@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
 import { AGENT_OP_IDS } from '../ops';
+import { DESIGNER_TOOLS } from './designerTools';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
@@ -125,15 +126,7 @@ export const TOOLS: ToolSpec[] = [
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'view_canvas',
-      description:
-        'Designer only: see the page again, or one layer alone (layer_id), as a reduced image with the scale back to document px. The page already comes with each new request; call this only for a single layer or after changes.',
-      parameters: { type: 'object', properties: { layer_id: { type: 'string', description: 'A layer id from the context; omit for the whole page.' } } },
-    },
-  },
+  ...DESIGNER_TOOLS,
   {
     type: 'function',
     function: {

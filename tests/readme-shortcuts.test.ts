@@ -35,6 +35,7 @@ const TOOL_ES: Record<string, string> = {
   remove_object: 'Pinta un objeto y desaparece; el fondo se rellena.',
   create_voice: 'Crea una voz reutilizable a partir de 5–30 s de habla limpia.',
   transcribe: 'Convierte una grabación de voz en texto.',
+  fx: 'Un filtro (brillo, saturación, tono, blanco y negro, desenfoque…) o un efecto (glow, sombra, destello) en una imagen nueva; en el Designer son capas FX editables.',
 };
 const FLOW_ES: Record<string, string> = {
   'image-to-video': 'Diseña la imagen clave y después la anima.',

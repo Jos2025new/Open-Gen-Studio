@@ -7,6 +7,8 @@ import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { getBuffer, rasterVersion } from './raster';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
+import { fxPlan } from '../fx/plan';
+import { mixFx } from '../fx/canvas';
 
 /* One renderer for both the editor view and exports, so what you see is what you export. */
 
@@ -141,6 +143,8 @@ function untransformedBox(l: Layer): Box | null {
       const t = layoutText(l);
       return { x: l.x, y: l.y, w: t.width, h: t.height };
     }
+    case 'fx':
+      return null;
   }
 }
 
@@ -205,11 +209,13 @@ function drawText(ctx: CanvasRenderingContext2D, l: TextLayer): void {
   applyLetterSpacing(ctx, 0);
 }
 
-export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer): void {
-  if (!l.visible || l.opacity <= 0) return;
+/** `plain`: at full opacity and normal blend, for FX that filter the layer before it is composited. */
+export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false): void {
+  // FX layers have no pixels of their own: drawDoc applies them (fx/plan.ts).
+  if (!l.visible || l.opacity <= 0 || l.type === 'fx') return;
   ctx.save();
-  ctx.globalAlpha = l.opacity;
-  ctx.globalCompositeOperation = GCO[l.blend] ?? 'source-over';
+  ctx.globalAlpha = plain ? 1 : l.opacity;
+  ctx.globalCompositeOperation = plain ? 'source-over' : GCO[l.blend] ?? 'source-over';
   if (l.transform && l.type !== 'vector') ctx.transform(...l.transform);
   if (l.type === 'raster') {
     const buf = getBuffer(l.id);
@@ -232,15 +238,54 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
   ctx.beginPath();
   ctx.rect(0, 0, doc.width, doc.height);
   ctx.clip();
-  if (doc.background) {
-    ctx.fillStyle = doc.background;
-    ctx.fillRect(0, 0, doc.width, doc.height);
-  }
-  for (const l of doc.layers) {
-    if (l.id === opts.hideLayerId) continue;
-    drawLayer(ctx, l);
-  }
+  const steps = fxPlan(doc.layers, opts.hideLayerId);
+  if (steps.every((s) => s.t === 'draw')) {
+    if (doc.background) {
+      ctx.fillStyle = doc.background;
+      ctx.fillRect(0, 0, doc.width, doc.height);
+    }
+    for (const s of steps) drawLayer(ctx, s.layer);
+  } else drawWithFx(ctx, doc, steps);
   ctx.restore();
+}
+
+/** Most canvas pixels an FX composite uses (the view's resolution, capped). */
+const FX_MAX_PX = 16_000_000;
+
+/**
+ * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
+ * FX see everything under them, background included. Lengths in FX params are document px.
+ */
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>): void {
+  const m = ctx.getTransform();
+  const scale = Math.max(0.05, Math.min(Math.hypot(m.a, m.b) || 1, Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height))));
+  const W = Math.max(1, Math.round(doc.width * scale)), H = Math.max(1, Math.round(doc.height * scale));
+  let acc = createCanvas(W, H);
+  const at = (c: HTMLCanvasElement) => { const x = ctx2d(c); x.setTransform(scale, 0, 0, scale, 0, 0); return x; };
+  if (doc.background) {
+    const x = at(acc);
+    x.fillStyle = doc.background;
+    x.fillRect(0, 0, doc.width, doc.height);
+  }
+  for (const s of steps) {
+    if (s.t === 'draw') drawLayer(at(acc), s.layer);
+    else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false });
+    else {
+      let own = createCanvas(W, H);
+      drawLayer(at(own), s.layer, true);
+      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true });
+      // In canvas px: `own` is already at the composite's scale.
+      const x = ctx2d(acc);
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.globalAlpha = s.layer.opacity;
+      x.globalCompositeOperation = GCO[s.layer.blend] ?? 'source-over';
+      x.drawImage(own, 0, 0);
+      x.globalAlpha = 1;
+      x.globalCompositeOperation = 'source-over';
+    }
+  }
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(acc, 0, 0, doc.width, doc.height);
 }
 
 export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {

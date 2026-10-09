@@ -7,6 +7,7 @@ import { LOCAL_WRITE } from '../lib/disk';
 import { disk, diskAvailable } from '../lib/disk';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d, extractVideoFrame, jpegThumbnail, fetchBlob, maskToAlpha, probeMedia, type MediaInfo } from '../lib/media';
 import { randomSeed } from '../lib/rng';
+import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
@@ -231,6 +232,9 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
       ctx2d(c).drawImage(src, cell.x, cell.y, cell.w, cell.h, 0, 0, cell.w, cell.h);
       images.push({ blob: await canvasToBlob(c, 'image/png'), width: cell.w, height: cell.h });
     }
+  } else if (id === 'fx') {
+    const out = fxOnCanvas(await blobToCanvas((await mediaInput(sourceAssetId)).blob), params);
+    images.push({ blob: await canvasToBlob(out, 'image/png'), width: out.width, height: out.height });
   } else {
     throw new Error(`${id} is not a local operation`);
   }
@@ -1063,7 +1067,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'video', prompt: `${def.label} (${n} clips)`, modelRef: 'local::join', settings: { count: 1, advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'local') {
-    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : (input.params.grid === 'row3' ? '1×3' : `${input.params.grid}×${input.params.grid}`);
+    const detail = input.op === 'extract_frame' ? (input.params.which === 'time' ? `${input.params.seconds}s` : input.params.which) : input.op === 'fx' ? fxOpDetail(input.params) : (input.params.grid === 'row3' ? '1×3' : `${input.params.grid}×${input.params.grid}`);
     return { ...base, kind: 'image', prompt: `${def.label} (${detail})`, modelRef: 'local::frame', settings: { count: opCount(def, input.params), advanced: {} }, op, estimate: { usd: 0, approximate: false } };
   }
   if (def.engine === 'voice') {

@@ -1,4 +1,5 @@
 import { AGENT_OP_IDS } from '../ops';
+import { FX_WORDS } from '../fx/op';
 
 /*
  * Keyword triggers for the agent's operations, in Spanish and English. A match only names an operation and where it
@@ -6,6 +7,7 @@ import { AGENT_OP_IDS } from '../ops';
  * compared without accents and in lower case.
  */
 export const OP_TRIGGERS: Record<string, RegExp[]> = {
+  fx: [FX_WORDS, /\b(filtros?|filters?|(sube|baja|aumenta|reduce|mas|menos|more|less|raise|lower) (el |la |the )?(brillo|contraste|saturacion|brightness|contrast|saturation))\b/],
   angle: [/\b(vistas? (frontal|lateral|trasera|trasero|superior|cenital)|(front|side|back|top|rear) view|camera angle|(una |1 )?imagen por vista|una por vista|one (image )?per view|(cambia|cambiar|change) (el |la |the )?(angulo|angle|vista|view)|vista (aerea|area|cenital|desde arriba)|(aerial|bird.?s.eye|top.?down) view|(otro|nuevo|diferente|distinto) angulo|angulo (de vista |de camara )?(diferente|distinto|nuevo|otro)|angulo de vista|(a |an )?(different|another|other|new) (camera |view )?angle|from (another|a different|other|a new) angle|(multiples|varios|muchos) angulos|(multiple|several|many) angles|desde (otro|un|este|el) angulo|angulo (frontal|lateral|trasero|superior|picado|contrapicado))\b/],
   relight: [/\b(iluminacion|lighting|relight|cambia (la )?luz|change (the )?light|pon(le)? luz( (cenital|lateral|de estudio|suave|dura))?)\b/],
   upscale: [/\b(upscale|(sube|subir|aumenta|aumentar) (la )?resolucion|mas resolucion|(sube|subela|subelo|subir|pasa|pasala|pasalo|lleva|llevala|llevalo|ponla|ponlo|escala|escalar|make it|bring it|upscale (it|this|the image)) (a |la |el |al |to |in )?(2|4|8) ?k|(2|4|8)k (upscale|resolution))\b/],
@@ -39,6 +41,7 @@ const NEW_IMAGE = /\b(como referencia|de referencia|as (a )?reference|usa (esta|
 export const OP_VETO: Record<string, RegExp[]> = {
   edit: [NEW_IMAGE],
   relight: [NEW_IMAGE],
+  fx: [NEW_IMAGE],
 };
 const THRESHOLD = 1;
 
