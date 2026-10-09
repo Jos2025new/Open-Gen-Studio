@@ -33,6 +33,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **store-local-only** — El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba. | [local-store.js](../server/local-store.js), [seguridad.md](../docs/seguridad.md), [README.md](../README.md) | [store-server.test.ts](../tests/store-server.test.ts) |
 | **automated-writes** — El servidor rechaza escrituras automatizadas (cabecera X-OGS-Automated) fuera del sandbox. | [local-store.js](../server/local-store.js) | [automated-write.test.ts](../tests/automated-write.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 | **fx-plan** — ADR 0011: el lienzo y la exportación SVG aplican las capas FX con el mismo plan (qué filtra cada capa y en qué orden). | [plan.ts](../src/engine/fx/plan.ts), [render.ts](../src/engine/design/render.ts), [export.ts](../src/engine/design/export.ts) | [fx-render.test.ts](../tests/fx-render.test.ts), [fx-svg.test.ts](../tests/fx-svg.test.ts) |
+| **raster-export-resolution** — PNG/JPG y galería entregan el documento completo con el mismo plan FX; el límite raster se rechaza y llega al toast de exportación, sin reducir silenciosamente. | [render.ts](../src/engine/design/render.ts), [exportLimits.ts](../src/engine/design/exportLimits.ts), [actions.ts](../src/engine/design/actions.ts), [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx), [designer.md](../docs/features/designer.md) | [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **fx-svg-match** — Los filtros SVG coinciden con ctx.filter: sRGB en cada <filter> y el radio de la sombra dividido entre dos (CSS drop-shadow). | [svg.ts](../src/engine/fx/svg.ts), [canvas.ts](../src/engine/fx/canvas.ts) | [fx-svg.test.ts](../tests/fx-svg.test.ts) |
 | **fx-commands** — ADR 0011: el panel de capas y el agente cambian las capas FX con los mismos comandos (runFx), en un solo paso de deshacer. | [fx.ts](../src/engine/design/fx.ts), [FxPanel.tsx](../src/components/designer/FxPanel.tsx), [designerFx.ts](../src/engine/agent/designerFx.ts), [designerTools.ts](../src/engine/agent/designerTools.ts) | [fx-commands.test.ts](../tests/fx-commands.test.ts), [fx-agent.test.ts](../tests/fx-agent.test.ts) |
 | **fx-designer-route** — En el Designer los filtros y efectos son capas FX: la guía lo dice y el runtime no dirige a la operación fx, que crea una imagen nueva. | [designer.md](../src/engine/skills/app/designer.md), [runtime.ts](../src/engine/agent/runtime.ts) | [fx-agent.test.ts](../tests/fx-agent.test.ts) |
@@ -85,7 +86,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 28 | 113 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 41 | 36 |
+| `src/engine/design` | 42 | 36 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
@@ -94,7 +95,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 108 |
 | `src/store` | 1 | 85 |
 
-90 de 218 módulos no tienen ningún test que los importe directamente.
+91 de 219 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

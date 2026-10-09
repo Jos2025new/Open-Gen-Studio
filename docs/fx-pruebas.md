@@ -79,7 +79,7 @@ La sesión de 100 capas no terminó: la app se cerró mientras añadía capas (c
 - La memoria de JavaScript no crece. Lo que crece son los lienzos temporales: uno nuevo por paso, 28 Mpx por fotograma con 50 capas, que van a la GPU.
 - Con 5 capas ya no se llega a 60 fps (45 ms). La latencia de añadir una capa con 50 apiladas es de unos 320 ms (p50).
 
-**Siguiente paso** (pendiente en [pendientes.md](pendientes.md)): una caché del resultado de cada capa FX, como GIMP e Inkscape. Después, repetir esta medición para comprobar la mejora.
+**Siguiente paso** (orden en [pendientes.md](pendientes.md)): registrar primero una línea base con atribución corregida; después, una caché acotada por memoria y dependencias. Antes y después: `FX_BENCH=50 npm run fx:check -- -g bench` y `npm run trace:report`, con las mismas condiciones. Esta tarea no repitió ese banco.
 
 Casos aún sin medir:
 

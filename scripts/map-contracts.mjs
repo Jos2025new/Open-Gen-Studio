@@ -191,6 +191,18 @@ export default [
     tests: ['tests/fx-render.test.ts', 'tests/fx-svg.test.ts'],
   },
   {
+    id: 'raster-export-resolution',
+    what: 'PNG/JPG y galería entregan el documento completo con el mismo plan FX; el límite raster se rechaza y llega al toast de exportación, sin reducir silenciosamente.',
+    sides: [
+      ['src/engine/design/render.ts', "resolution: 'document'"],
+      ['src/engine/design/exportLimits.ts', 'export function checkExportSize'],
+      ['src/engine/design/actions.ts', 'downloadBlob(await exportDoc('],
+      ['src/components/designer/DesignerWorkspace.tsx', "toast(err instanceof Error ? err.message : 'Export failed', 'error')"],
+      ['docs/features/designer.md', '33.554.432'],
+    ],
+    tests: ['tests/fx-render.test.ts'],
+  },
+  {
     id: 'fx-svg-match',
     what: 'Los filtros SVG coinciden con ctx.filter: sRGB en cada <filter> y el radio de la sombra dividido entre dos (CSS drop-shadow).',
     sides: [
@@ -284,7 +296,7 @@ export default [
       ['src/engine/design/brushEngine.ts', 'export function stampSegment'],
       ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last)'],
       ['src/engine/design/raster.ts', 'stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ?'],
-      ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last)'],
+      ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ??'],
     ],
     tests: ['tests/brush-engine.test.ts'],
   },

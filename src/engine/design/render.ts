@@ -1,3 +1,4 @@
+import { checkExportSize } from './exportLimits';
 import { drawMaskedVector, maskContains, maskBounds } from './vectorMask';
 import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
@@ -236,7 +237,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
 }
 
 /** Draw the document in doc coordinates (caller sets the transform). */
-export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string; origin?: RenderOrigin } = {}): void {
+export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { hideLayerId?: string; origin?: RenderOrigin; resolution?: 'preview' | 'document' } = {}): void {
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, doc.width, doc.height);
@@ -252,7 +253,7 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
       ctx.fillRect(0, 0, doc.width, doc.height);
     }
     for (const s of steps) drawLayer(ctx, s.layer);
-  } else drawWithFx(ctx, doc, steps, context);
+  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context);
   ctx.restore();
   end?.(stage ? takeCanvasCount() : undefined);
   if (stage) frameShown();
@@ -263,12 +264,12 @@ const FX_MAX_PX = 16_000_000;
 
 /**
  * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
- * FX see everything under them, background included. Lengths in FX params are document px.
+ * FX see everything under them, background included. Delivery uses scale 1 with this same plan. Lengths in FX params are document px.
  */
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, trace?: RenderTrace): void {
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace): void {
   const m = ctx.getTransform();
-  const scale = Math.max(0.05, Math.min(Math.hypot(m.a, m.b) || 1, Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height))));
-  const W = Math.max(1, Math.round(doc.width * scale)), H = Math.max(1, Math.round(doc.height * scale));
+  const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
+  const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
   let acc = createCanvas(W, H);
   const at = (c: HTMLCanvasElement) => { const x = ctx2d(c); x.setTransform(scale, 0, 0, scale, 0, 0); return x; };
   if (doc.background) {
@@ -302,14 +303,20 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
 }
 
 export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {
-  const c = createCanvas(doc.width, doc.height);
-  const ctx = ctx2d(c);
-  if (type === 'image/jpeg' && !doc.background) {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, doc.width, doc.height);
+  checkExportSize(doc.width, doc.height);
+  try {
+    const c = createCanvas(doc.width, doc.height);
+    const ctx = ctx2d(c);
+    if (type === 'image/jpeg' && !doc.background) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, doc.width, doc.height);
+    }
+    drawDoc(ctx, doc, { origin: 'export', resolution: 'document' });
+    if (ctx.isContextLost?.()) throw new Error('The browser lost the canvas context.');
+    return await canvasToBlob(c, type, type === 'image/jpeg' ? 0.92 : undefined);
+  } catch (error) {
+    throw new Error(`Export failed at full resolution (${doc.width} × ${doc.height}). No file was created. Try a smaller document or fewer FX layers. ${error instanceof Error ? error.message : ''}`);
   }
-  drawDoc(ctx, doc, { origin: 'export' });
-  return canvasToBlob(c, type, type === 'image/jpeg' ? 0.92 : undefined);
 }
 
 /** Render a single raster layer's pixels (as displayed) into a standalone image, for ops. */
