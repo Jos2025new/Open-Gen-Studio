@@ -234,3 +234,12 @@
 .opt.opt-pick svg { margin-left: 4px; }
 .brush-pressure { flex-basis: 100%; margin: 0; padding: 2px 4px; font-size: 11px; white-space: normal; color: var(--text-2); }
 .brush-pressure.is-warn { color: var(--warn, #f5b54a); }
+/* Brush: colour, size, opacity and texture in one row; colour and texture as round buttons. */
+.designer-context .tool-settings > .brush-row { display: flex; gap: 4px; flex-basis: 100%; min-width: 0; }
+.brush-row > .opt-slider { flex: 1 1 0; }
+.opt.opt-color.is-icon, .opt.opt-pick.is-icon { flex: 0 0 36px; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; background: var(--surface-2); border: 1px solid transparent; }
+.opt.opt-color.is-icon .opt-swatch { margin: 0; width: 22px; height: 22px; border-radius: 50%; }
+.opt.is-icon:hover, .opt.is-icon[aria-expanded="true"] { border-color: var(--accent-line, var(--accent)); }
+.texture-icon { display: block; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border); }
+.texture-icon.is-none { background: linear-gradient(135deg, transparent 46%, #e5484d 46%, #e5484d 54%, transparent 54%); }
+.brush-check { flex-basis: 100%; padding: 4px 4px 0; font-size: 12px; color: var(--text-2); }

@@ -70,8 +70,7 @@ async function reset(page: Page) {
   await panel(page).getByRole('radio', { name: 'Hard', exact: true }).click();
   await panel(page).getByRole('button', { name: /^Texture/ }).click();
   await page.getByRole('button', { name: 'None', exact: true }).click();
-  const sim = panel(page).getByRole('switch', { name: 'Simulate pressure' });
-  if ((await sim.getAttribute('aria-checked')) === 'true') await sim.click();
+  await panel(page).getByRole('checkbox', { name: 'Simulate pressure' }).setChecked(false);
   for (const name of ['Taper start', 'Taper end']) await panel(page).getByRole('slider', { name, exact: true }).fill('0');
 }
 
@@ -183,8 +182,7 @@ test('simulate pressure: with a mouse, a fast stroke paints thinner than a slow 
   const errors = await setup(page);
   await reset(page);
   await panel(page).getByRole('slider', { name: 'Size', exact: true }).fill('40');
-  const sim = panel(page).getByRole('switch', { name: 'Simulate pressure' });
-  if ((await sim.getAttribute('aria-checked')) !== 'true') await sim.click();
+  await panel(page).getByRole('checkbox', { name: 'Simulate pressure' }).setChecked(true);
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const line = async (steps: number) => {
     const empty = await coverage(page);
@@ -207,8 +205,7 @@ test('simulate pressure: a stroke that speeds up thins smoothly, without steps',
   const errors = await setup(page);
   await reset(page);
   await panel(page).getByRole('slider', { name: 'Size', exact: true }).fill('60');
-  const sim = panel(page).getByRole('switch', { name: 'Simulate pressure' });
-  if ((await sim.getAttribute('aria-checked')) !== 'true') await sim.click();
+  await panel(page).getByRole('checkbox', { name: 'Simulate pressure' }).setChecked(true);
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const y = b.y + b.height * 0.45;
   let x = b.x + b.width * 0.15;
@@ -221,6 +218,9 @@ test('simulate pressure: a stroke that speeds up thins smoothly, without steps',
   await page.locator('canvas.stage-canvas').screenshot({ path: `${SHOTS}/simulated-ramp.png` });
   // The case reported (2026-10-09): a soft tip with pressure on density showed steps; drawn for review.
   await panel(page).getByRole('radio', { name: 'Soft', exact: true }).click();
+  // Pressure curves live under Advanced settings, hidden by default.
+  const adv = panel(page).getByRole('switch', { name: 'Advanced settings' });
+  if ((await adv.getAttribute('aria-checked')) !== 'true') await adv.click();
   const dens = panel(page).getByRole('switch', { name: 'Pressure → density' });
   if ((await dens.getAttribute('aria-checked')) !== 'true') await dens.click();
   let x2 = b.x + b.width * 0.15;
@@ -259,6 +259,9 @@ test('tapers: the stroke starts and ends in a point, as Lineart; the middle keep
   await panel(page).getByRole('slider', { name: 'Taper start', exact: true }).fill('150');
   await panel(page).getByRole('slider', { name: 'Taper end', exact: true }).fill('150');
   await panel(page).screenshot({ path: `${SHOTS}/taper-settings.png` });
+  await panel(page).getByRole('switch', { name: 'Advanced settings' }).click();
+  await panel(page).screenshot({ path: `${SHOTS}/settings-advanced.png` });
+  await panel(page).getByRole('switch', { name: 'Advanced settings' }).click();
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const y = b.y + b.height * 0.45, x0 = b.x + b.width * 0.15, x1 = b.x + b.width * 0.85;
   // Slow and steady, as a mouse at full pressure: only the tapers change the width.

@@ -48,7 +48,7 @@ export function InlineChoice<T extends string | number>({ label, value, options,
  * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
  * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
  */
-export function InlineColor({ label, value, onChange, showValue = false, children }: { label: string; value: string; showValue?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
+export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, children }: { label: string; value: string; showValue?: boolean; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
   const [hex, setHex] = useState(value);
@@ -61,8 +61,8 @@ export function InlineColor({ label, value, onChange, showValue = false, childre
       onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
   );
   return <>
-    <button type="button" ref={pop.ref} className="opt opt-color" aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
-      <span className="opt-label">{label}</span><span className="opt-swatch" style={{ background: value }} />{(showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
+    <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
+      {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
       <div className="swatch-panel">
@@ -82,13 +82,13 @@ export function InlineColor({ label, value, onChange, showValue = false, childre
 }
 
 /** A short list in the bar: the value with a chevron; the choices open in the app's own menu. */
-export function InlineSelect<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; onChange: (v: T) => void }) {
+export function InlineSelect<T extends string | number>({ label, value, options, icon, onChange }: { label: string; value: T; options: Array<T | { value: T; label: string }>; /** Shown alone, as a round button, instead of the name and value (the brush row). */ icon?: ReactNode; onChange: (v: T) => void }) {
   const pop = usePopover();
   const items = options.map((o) => (typeof o === 'object' ? o : { value: o, label: String(o) }));
   const current = items.find((o) => o.value === value)?.label ?? String(value);
   return <>
-    <button type="button" ref={pop.ref} className="opt opt-pick" aria-haspopup="listbox" aria-expanded={pop.open} onClick={pop.toggle}>
-      <span className="opt-label">{label}</span><span className="opt-value">{current}</span><ChevronDown size={12} />
+    <button type="button" ref={pop.ref} className={`opt opt-pick${icon ? ' is-icon' : ''}`} aria-label={icon ? `${label} · ${current}` : undefined} data-tip={icon ? `${label}: ${current}` : undefined} aria-haspopup="listbox" aria-expanded={pop.open} onClick={pop.toggle}>
+      {icon ?? <><span className="opt-label">{label}</span><span className="opt-value">{current}</span><ChevronDown size={12} /></>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={170} label={label}>
       <div className="menu" role="listbox">
