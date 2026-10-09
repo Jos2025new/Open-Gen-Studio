@@ -35,6 +35,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] Partir los 13 archivos de más de 30 KB (`runtime.ts`, 115 KB). Afecta al desarrollo; no pueden crecer (ADR 0008). **2026-10-07**.
 - [ ] Cobertura por riesgo ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): pocas pruebas de recorrido completo en el sandbox, con el LLM y los proveedores simulados (petición → plan → aprobación → resultado; paso a Nodes y Designer). Hoy 129 de 199 módulos no tienen test directo. **2026-10-08**, decidido; sin implementar.
 
+- [ ] 4 tests fallaron una vez con la carga en 42 (procesos ajenos): `agent-direct-model`, `agent-retry`, `chat-to-nodes` y `join-clips`. Pasaron por separado y en dos ejecuciones completas posteriores (cargas 33 y 29). No se capturó el error: la causa no está confirmada, aunque probablemente sea el margen de tiempo superado con más carga que la medida en el [ADR 0010](decisions/0010-estrategia-de-pruebas.md). **2026-10-08**. Si se repite, guardar la salida de `npx vitest run` con el error.
 - [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
 - [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**.
 - [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.
