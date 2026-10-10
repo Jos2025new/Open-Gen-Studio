@@ -14,14 +14,14 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [x] Operaciones con modelo de imagen: confirman su modelo; Auto una vez por sesión, Guided en cada petición, Direct usa el compositor (`454d721`, ADR 0009). **2026-10-08**, el usuario: «rige lo más nuevo». Sustituye la regla anterior, en la que heredaban el modelo de su origen.
 - [ ] Modelos `-spicy` excluidos salvo que se nombren: aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. **2026-10-08**, pendiente del usuario.
 - [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
-- [ ] Fusionar `task/agent-forcing` en `task/modelo-general`. Avance directo, sin conflictos: ver [fusion-agent-forcing.md](fusion-agent-forcing.md). **2026-10-08**, decide el usuario.
+- [x] ~~Fusionar `task/agent-forcing` en `task/modelo-general`~~ (ver [fusion-agent-forcing.md](fusion-agent-forcing.md)). **Superado el 2026-10-09:** el usuario dejó una sola rama, `task/agent-forcing`, que contiene todo; `task/modelo-general` se borró en la purga. Queda decidir la fusión a `main`.
 - [x] Registro de rendimiento para sesiones de prueba ([ADR 0012](decisions/0012-registro-de-rendimiento.md)): aprobado; en la app y en el sandbox, apagado por defecto. **2026-10-08**, el usuario delegó el alcance.
 - [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
 - [ ] Prueba con gasto real de voz y efectos (NanoGPT): voz, instrucciones de tono y sonido. **2026-10-08**, la hará el usuario. **Sin verificar:** el formato real de la respuesta de cada modelo (audio directo o JSON con URL; se aceptan ambos) y si el efecto admite fijar la duración (hoy la elige el modelo).
 
 ## Por probar
 
-- [ ] Capas FX (ADR 0011, rama `task/fx`): plan completo en [fx-pruebas.md](fx-pruebas.md). **2026-10-08**, pendiente.
+- [ ] Capas FX (ADR 0011): plan completo en [fx-pruebas.md](fx-pruebas.md). La rama `task/fx` ya está dentro de `task/agent-forcing` (2026-10-08) y se borró en la purga del 2026-10-09. **2026-10-08**, pendiente.
 - [ ] Bucle de tarjetas con un vídeo caro (`3f551d1`), y P2, P3 y P4 (`95eab99`). **2026-10-08**, lo prueba el usuario en el sandbox.
 - [ ] Precisión de `remove_bg`, `extract_frame` y `create_voice` con casos reales. **2026-10-08**, pendiente.
 - [ ] Calidad de los cortes de `grid_split` con una generación real. **2026-10-08**, pendiente.
@@ -88,7 +88,7 @@ Estas son decisiones de diseño propuestas y criterios de cierre; no describen f
 
 Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada punto se comprobó contra `9c877cc` (**código** = leído; **sin comprobar** = depende de uso real). Son propuestas: el orden lo decide el usuario. La auditoría ordena pensando en vídeo, y el próximo trabajo del usuario es el Designer.
 
-- [ ] **Una sola revisión candidata** antes de evaluar o seguir: hoy hay tres líneas vivas (`modelo-general`, `agent-forcing` y `fx`). Primer paso: `task/fx` en `task/agent-forcing` (avance directo, preparado el 2026-10-08). **2026-10-08**, el usuario lo pidió.
+- [x] **Una sola revisión candidata.** Hecho el **2026-10-09**: la purga dejó solo `task/agent-forcing` (más `main` y la rama de la app real), con todo el trabajo dentro. antes de evaluar o seguir: hoy hay tres líneas vivas (`modelo-general`, `agent-forcing` y `fx`). Primer paso: `task/fx` en `task/agent-forcing` (avance directo, preparado el 2026-10-08). **2026-10-08**, el usuario lo pidió.
 - [ ] **Producción de varios planos revisable y retomable:** brief, planos ordenados, toma elegida, duración y revisión, reutilizando `Asset`, `Generation`, `Plan` y `nodeIsCurrent` (`flow/freshness.ts:53`, código), sin hacerlo obligatorio para una imagen suelta. **2026-10-08**, propuesta.
 - [ ] **De Nodes a la entrega:** `join_clips` se rechaza en Nodes (`plan.ts:860`, código). Habilitarlo con el ejecutor existente; después, un montaje mínimo (orden, entrada y salida, duración, audio y exportación), no un editor completo. **2026-10-08**, propuesta.
 - [ ] **Continuidad declarada, conexión válida y calidad visual son cosas distintas:** `continuity` comprueba conexiones, no identidad ni geometría (código; ya lo dice [continuity-contract.md](continuity-contract.md)). Primero revisión humana por contacto; comprobaciones automáticas solo cuando compensen. **2026-10-08**, propuesta.
