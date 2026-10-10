@@ -53,7 +53,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 138 | 90 |
-| [store.ts](../src/store/store.ts) | 93 | 85 |
+| [store.ts](../src/store/store.ts) | 93 | 86 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 42 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 101 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 102 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [render.ts](../src/engine/design/render.ts) | 14 | 3 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
@@ -94,8 +94,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 17 | 108 |
-| `src/store` | 2 | 86 |
+| `src/lib` | 17 | 109 |
+| `src/store` | 2 | 87 |
 
 91 de 220 módulos no tienen ningún test que los importe directamente.
 

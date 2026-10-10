@@ -261,10 +261,21 @@ const MAX_WRITE_WAIT_MS = 2000;
 let pendingWrite: { name: string; value: StorageValue<Persisted> } | null = null;
 let wiping = false;
 
+// The write runs when the browser is idle (not mid-stroke or mid-drag), within IDLE_TIMEOUT_MS at the latest, so
+// saving never shows as a hitch while the user works. Closing or hiding the page still writes at once (flushWrite).
+const IDLE_TIMEOUT_MS = 1000;
+let idleHandle: number | undefined;
+function flushWhenIdle(): void {
+  const ric = typeof window !== 'undefined' ? window.requestIdleCallback : undefined;
+  if (!ric) return flushWrite();
+  if (idleHandle === undefined) idleHandle = ric(() => { idleHandle = undefined; flushWrite(); }, { timeout: IDLE_TIMEOUT_MS });
+}
+
 function flushWrite(): void {
   clearTimeout(writeTimer);
   clearTimeout(maxWaitTimer);
-  writeTimer = maxWaitTimer = undefined;
+  if (idleHandle !== undefined && typeof window !== 'undefined') window.cancelIdleCallback?.(idleHandle);
+  writeTimer = maxWaitTimer = idleHandle = undefined;
   if (!pendingWrite || wiping) return;
   const { name, value } = pendingWrite;
   pendingWrite = null;
@@ -281,8 +292,8 @@ const idbStorage: PersistStorage<Persisted> = {
     pendingWrite = { name, value };
     // The global timers, not window's: tests (Node) write state too.
     clearTimeout(writeTimer);
-    writeTimer = setTimeout(flushWrite, 350);
-    maxWaitTimer ??= setTimeout(flushWrite, MAX_WRITE_WAIT_MS);
+    writeTimer = setTimeout(flushWhenIdle, 350);
+    maxWaitTimer ??= setTimeout(flushWhenIdle, MAX_WRITE_WAIT_MS);
   },
   removeItem: (name) => stateDb.del(name),
 };

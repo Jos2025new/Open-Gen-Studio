@@ -92,3 +92,21 @@ No hace falta correr toda la suite:
 
 - En el sandbox (puerto 5183): `window.__OGS_TRACE__.start(label, { domains, deep })`, `.mark(texto)`, `.stop()`. Nunca sobre la app real ni sobre `data/`: si el usuario graba en su app, que te pase la ruta del archivo.
 - Cita las cifras con su contexto: navegador, núcleos, tamaño del documento y zoom. Los números de una máquina no valen para otra.
+
+## Decisiones de rendimiento del Designer (2026-10-09)
+
+Pedido del usuario: el Designer iba lento al pintar «o hacer cualquier cosa», y «una interfaz que vaya lenta conforme más se usa deja la app inviable». Criterio que fijó: primero lo que más aporte al usuario y a la UX, con menos riesgo y más escalable.
+
+- **Hecho (Claude, `585919a`):**
+  - Caché de FX del editor para capas con FX «layer».
+  - Guardado que reutiliza el texto de las sesiones sin cambios: 131 ms → 24 ms en el estado del sandbox (7,9 MB, Node, mediana de 10).
+  - Contratos `fx-editor-cache` y `persist-json-exact` en el [mapa](map.md).
+- **Hecho (Claude, este commit):** la escritura del estado espera a que el navegador esté libre (`requestIdleCallback`, plazo 1 s). No abarata el guardado, pero deja de notarse a mitad de un gesto. Cerrar u ocultar la página sigue escribiendo al momento. **test**: `tests/idle-save.test.ts`.
+- **Medido, lo que queda:** de esos 24 ms, convertir la sesión activa (142 KB) cuesta 3,5 ms; unir las 95 sesiones en un texto de 8 MB, ~20–29 ms. Ese coste **crece con el número de sesiones**.
+- **Pendiente, el arreglo que escala:** guardar cada sesión por separado, o escribir por trozos sin unirlos. Toca el formato del guardado (zona protegida por AGENTS.md); hacerlo con revisión de Astra, que avisó de que hoy el JSON y los blobs no se guardan como una operación conjunta.
+- **Descartado:**
+  - **Serializar en un worker:** enviarle el estado cuesta casi lo mismo que convertirlo ([surma.dev](https://surma.dev/things/is-postmessage-slow), [Mozilla 1356546](https://bugzilla.mozilla.org/show_bug.cgi?id=1356546)).
+  - **Redondear decimales de los trazos:** aporta poco y toca los datos.
+  - **Rust o WASM:** no ataca ninguna de las causas medidas.
+- **Pendiente, el FX sobre la capa que se pinta:** si se pinta en la misma capa que filtra un FX, el FX se recalcula entero en cada movimiento. Krita y GIMP recalculan solo la zona tocada, a menudo en segundo plano (no verificado aquí). Corresponde al render por regiones (pendientes, plan del Designer, punto 3).
+- **Sin medir en el navegador del usuario:** no hay sonda del guardado ni de la brocha. El estabilizador del usuario estaba en 10, que retrasa la brocha a propósito.
