@@ -253,15 +253,25 @@ describe('editor FX cache (filters run again only when what they read changes)',
     commitEdit('paint');
     drawDoc(stage(), doc);
     expect(blurs()).toBe(n);
-    // A live stroke on the filtered layer: pixels change before the stroke ends (no commit yet).
-    const live = beginLiveStroke(recordingCanvas(200, 100) as never, '#ffffff', 1, false, null, { hardness: 1 });
-    paintLive(getBuffer('img')!, live, { x: 10, y: 10 }, { x: 40, y: 10 }, 6);
-    drawDoc(stage(), doc);
-    const afterLive = blurs();
-    expect(afterLive).toBeGreaterThan(n);
+    // A live stroke on the filtered layer: the filter may trail it by up to 120 ms (as in Krita/GIMP), then catches up;
+    // the stroke's commit always brings it up to date.
+    let now = 1000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
     commitEdit('img');
     drawDoc(stage(), doc);
-    expect(blurs()).toBeGreaterThan(afterLive);
+    const before = blurs();
+    const live = beginLiveStroke(recordingCanvas(200, 100) as never, '#ffffff', 1, false, null, { hardness: 1 });
+    paintLive(getBuffer('img')!, live, { x: 10, y: 10 }, { x: 40, y: 10 }, 6);
+    now += 50;
+    drawDoc(stage(), doc);
+    expect(blurs()).toBe(before);
+    now += 100;
+    drawDoc(stage(), doc);
+    const caughtUp = blurs();
+    expect(caughtUp).toBeGreaterThan(before);
+    commitEdit('img');
+    drawDoc(stage(), doc);
+    expect(blurs()).toBeGreaterThan(caughtUp);
     expect(getBuffer('img')).toBeDefined();
     vi.unstubAllGlobals();
   });

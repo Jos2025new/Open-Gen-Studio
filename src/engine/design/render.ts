@@ -5,7 +5,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
-import { bufferVersion, getBuffer, rasterBufferIds, rasterVersion } from './raster';
+import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion } from './raster';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
@@ -267,22 +267,31 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
  * FX_CACHE_PX pixels in all; the oldest entry goes first.
  */
 const FX_CACHE_PX = 48_000_000;
-const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement }>();
+const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
 if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
 function contentKey(l: Layer, s: { fx: FxLayer[] }, scale: number, W: number, H: number): unknown[] {
-  return [l, ...rasterBufferIds([l]).map(bufferVersion), ...s.fx, scale, W, H, fontEpoch];
+  // The pixels' versions go last: while a stroke is painted only they change (see cachedFx).
+  return [l, ...s.fx, scale, W, H, fontEpoch, ...rasterBufferIds([l]).map(bufferVersion)];
 }
-function cachedFx(id: string, key: unknown[]): HTMLCanvasElement | undefined {
+/*
+ * Mid-stroke on the filtered layer itself, the result may be up to FX_LIVE_MS old instead of filtering on every
+ * move (as Krita and GIMP let filters trail the brush); the stroke's commit brings it up to date.
+ */
+const FX_LIVE_MS = 120;
+function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasElement | undefined {
   const hit = fxCache.get(id);
-  if (!hit || hit.key.length !== key.length || hit.key.some((k, i) => k !== key[i])) return undefined;
+  if (!hit || hit.key.length !== key.length) return undefined;
+  const same = (n: number) => key.slice(0, n).every((k, i) => k === hit.key[i]);
+  const fresh = same(key.length), trailing = !fresh && paintingLive() && same(key.length - versions) && performance.now() - hit.at < FX_LIVE_MS;
+  if (!fresh && !trailing) return undefined;
   fxCache.delete(id);
   fxCache.set(id, hit);
   return hit.canvas;
 }
 function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
   fxCache.delete(id);
-  fxCache.set(id, { key, canvas });
+  fxCache.set(id, { key, canvas, at: performance.now() });
   let px = 0;
   for (const e of fxCache.values()) px += e.canvas.width * e.canvas.height;
   for (const [k, e] of fxCache) {
@@ -316,7 +325,7 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
     else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false, trace });
     else {
       const key = editor ? contentKey(s.layer, s, scale, W, H) : null;
-      let own = key && cachedFx(s.layer.id, key);
+      let own = key && cachedFx(s.layer.id, key, rasterBufferIds([s.layer]).length);
       if (!own) {
         own = createCanvas(W, H);
         drawLayer(at(own), s.layer, true);

@@ -181,7 +181,13 @@ export interface LiveStroke {
   last?: { width: number; density: number };
 }
 
+// A brush stroke is being painted (from its first segment until its edit is committed): the FX cache may then
+// show a filtered result a few frames old instead of filtering again on every move (render.ts).
+let liveStroke = false;
+export const paintingLive = () => liveStroke;
+
 export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null, tip?: BrushTip): LiveStroke {
+  liveStroke = true;
   return { base, mask: createCanvas(base.width, base.height), color, opacity, erase, clip, tip };
 }
 
@@ -279,6 +285,7 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
 }
 
 export function commitEdit(layerId: string): void {
+  liveStroke = false;
   touchBuffer(buffers.get(layerId));
   schedulePersist(layerId);
   notify();

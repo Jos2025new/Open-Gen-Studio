@@ -103,10 +103,16 @@ Pedido del usuario: el Designer iba lento al pintar «o hacer cualquier cosa», 
   - Contratos `fx-editor-cache` y `persist-json-exact` en el [mapa](map.md).
 - **Hecho (Claude, este commit):** la escritura del estado espera a que el navegador esté libre (`requestIdleCallback`, plazo 1 s). No abarata el guardado, pero deja de notarse a mitad de un gesto. Cerrar u ocultar la página sigue escribiendo al momento. **test**: `tests/idle-save.test.ts`.
 - **Medido, lo que queda:** de esos 24 ms, convertir la sesión activa (142 KB) cuesta 3,5 ms; unir las 95 sesiones en un texto de 8 MB, ~20–29 ms. Ese coste **crece con el número de sesiones**.
-- **Pendiente, el arreglo que escala:** guardar cada sesión por separado, o escribir por trozos sin unirlos. Toca el formato del guardado (zona protegida por AGENTS.md); hacerlo con revisión de Astra, que avisó de que hoy el JSON y los blobs no se guardan como una operación conjunta.
+- **Pendiente, revisar con GPT 6 Astra antes de tocar código — guardar cada sesión por separado** (el usuario lo prefiere, 2026-10-09). Es el arreglo que escala: el coste dejaría de crecer con el número de sesiones. Es lo más delicado del proyecto, por cuatro motivos:
+  - cambia el formato del guardado en el navegador (`src/lib/idb.ts`, `src/store/store.ts`) y en disco (`server/local-store.js`);
+  - hay que llevar a sesiones sueltas las copias, `baseAt` y el rechazo de pérdidas masivas (AGENTS.md);
+  - hay que leer el formato viejo y migrarlo, con aprobación explícita del usuario;
+  - hoy el JSON y los blobs no se guardan como una operación conjunta (aviso de Astra).
+
+  Paso 1: un ADR con el formato, la lectura del viejo, cómo se mantienen las protecciones y cómo se comprueba; lo revisa Astra y lo aprueba el usuario. Paso 2: el código, ampliando los tests de persistencia existentes.
 - **Descartado:**
   - **Serializar en un worker:** enviarle el estado cuesta casi lo mismo que convertirlo ([surma.dev](https://surma.dev/things/is-postmessage-slow), [Mozilla 1356546](https://bugzilla.mozilla.org/show_bug.cgi?id=1356546)).
   - **Redondear decimales de los trazos:** aporta poco y toca los datos.
   - **Rust o WASM:** no ataca ninguna de las causas medidas.
-- **Pendiente, el FX sobre la capa que se pinta:** si se pinta en la misma capa que filtra un FX, el FX se recalcula entero en cada movimiento. Krita y GIMP recalculan solo la zona tocada, a menudo en segundo plano (no verificado aquí). Corresponde al render por regiones (pendientes, plan del Designer, punto 3).
+- **Hecho, el FX sobre la capa que se pinta (2026-10-09, Claude):** mientras se pinta en la misma capa que filtra un FX, el filtro puede ir hasta 120 ms por detrás del trazo y se pone al día al soltar, como hacen Krita y GIMP en parte. El usuario: «que sea como Krita o GIMP también sirve». Se eligió esto, en lugar de recalcular solo la zona tocada, por no tener riesgo de costuras y ser pocas líneas. **test**: el caso de trazo en vivo de `fx-render.test.ts`. Las regiones siguen en pendientes (plan del Designer, punto 3), solo si el retraso molesta.
 - **Sin medir en el navegador del usuario:** no hay sonda del guardado ni de la brocha. El estabilizador del usuario estaba en 10, que retrasa la brocha a propósito.
