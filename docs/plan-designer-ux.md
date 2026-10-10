@@ -43,3 +43,24 @@ Criterio: completarlas sin buscar controles, sin confundir su alcance y sin perd
 - `Stage.tsx` está en su tope de tamaño: lo que se añada va en componentes aparte.
 - Cada paso, su commit, `npm run test:related` y una captura. Al final, `npm test`, build, `brush:check` y `tools:check`.
 - Lo que cambie la distribución se le enseña al usuario con capturas antes de integrarlo en `task/agent-forcing`.
+
+## Estado al 2026-10-10 (Claude)
+
+| Paso | Estado | Commit | Evidencia |
+|---|---|---|---|
+| 0. Inventario | **Hecho.** La barra se pinta desde `RAIL`; la **Regla** vuelve a tener botón | `236893a` | `designer-inventory.test.ts` (también exige una línea de ayuda por herramienta); falla si se quita una herramienta (probado) |
+| 1. Franja contextual | **Hecho.** «Herramienta → destino», sus controles compactos, «Follow stroke ruler» y «Settings…»; sin desplazamiento | `236893a` | Capturas del sandbox con pincel, texto, selección, Edit, rectángulo y relleno |
+| 2. Inspector y capas | **Hecho.** Inspector arriba, capas abajo, separador recordado, «Restore panel layout»; los FX dicen «→ destino» | `6db23d9` | Capturas con 8 capas y un FX |
+| 3. Interruptores por efecto | **Hecho, en parte.** Las reglas de página van al grupo del zoom; seguir la regla de trazo va en la franja; el imán sigue con Editar. No hay interruptor de vista de píxeles: es automática a 400 % | este commit | Captura |
+| 4. Familias | **Hecho** con el paso 0: Editar, Seleccionar, Pintar (pincel, borrador, Lineart y grupo Relleno y degradado), Formas y texto, Guías y color | `236893a` | Inventario; sin flechas a 1500×940 |
+| 5. Ayuda contextual | **Hecho.** Línea arriba del lienzo, se cierra con × y se activa con ? en el grupo del zoom; los textos solo dicen atajos comprobados en el código | este commit | Captura; inventario |
+| 6. Ampliaciones | **No se hacen aquí**, como decía el plan | — | — |
+
+**Corrección propia:** la primera versión de la ayuda afirmaba atajos que no existen (`[` y `]` para el tamaño, Mayús para formas proporcionales, Alt con el borrador). Se quitaron tras buscarlos en el código.
+
+**Comprobaciones:** `npm test`, build, `npm run brush:check` 7/7 y `npm run tools:check` 3/3, en el sandbox.
+
+**Falta:**
+- que el usuario vea las capturas y lo pruebe antes de integrarlo en `task/agent-forcing`;
+- la validación con las tres tareas de Astra, hecha por una persona;
+- la cabecera del panel en la pestaña Layers sigue justa de ancho (las pestañas se recortan con el tamaño del documento al lado).

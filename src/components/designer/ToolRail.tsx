@@ -1,4 +1,4 @@
-import { DraftingCompass, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { DraftingCompass, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
@@ -84,7 +84,7 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
       {RAIL.map((f) => <div key={f.family} className="tool-family" role="group" aria-label={f.family}>
         {f.family === 'Paint' && <InlineColor label="Active color" value={color} onChange={setColor} />}
         {f.items.map(item)}
-        {f.family === 'Edit' && <><span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></>}
+        {f.family === 'Edit' && <><span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span></>}
       </div>)}
     </div>
 

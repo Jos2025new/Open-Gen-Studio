@@ -53,8 +53,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 139 | 90 |
-| [store.ts](../src/store/store.ts) | 96 | 86 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 42 | 0 |
+| [store.ts](../src/store/store.ts) | 97 | 86 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 43 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
@@ -81,7 +81,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 18 | 2 |
+| `src/components/designer` | 19 | 2 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 11 | 0 |
@@ -97,7 +97,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 111 |
 | `src/store` | 2 | 87 |
 
-92 de 223 módulos no tienen ningún test que los importe directamente.
+92 de 224 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

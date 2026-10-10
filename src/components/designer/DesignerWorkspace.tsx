@@ -1,4 +1,5 @@
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
+import { ToolHelpLine, ViewToggles } from './ToolHelp';
 import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
 import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
@@ -279,7 +280,9 @@ export function DesignerWorkspace() {
           </label>
           <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: 0.8 }))} />
           <IconButton icon={Maximize} label="Fit canvas" size="sm" onClick={() => window.dispatchEvent(new Event('ogs:designer-fit'))} />
+          <ViewToggles />
         </>} />
+      <ToolHelpLine />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :
