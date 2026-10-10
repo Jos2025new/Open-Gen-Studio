@@ -37,6 +37,8 @@ const FX_NAMES: Array<[FxKind, RegExp]> = [
   ['glow', /\b(glow|resplandor|halo)\b/],
   ['flare', /\b(destello|lens flare|flare)\b/],
   ['shadow', /\b(sombra paralela|drop shadow)\b/],
+  ['levels', /\b(niveles|levels)\b/],
+  ['curves', /\b(curvas|curves)\b/],
   ['brightness', /\b(brillo|brightness)\b/],
   ['contrast', /\b(contraste|contrast)\b/],
   ['saturation', /\b(saturacion|saturation)\b/],

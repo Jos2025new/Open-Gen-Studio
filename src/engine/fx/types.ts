@@ -7,7 +7,7 @@ import type { LayerBase } from '../types';
 export type FxGroup = 'filter' | 'effect';
 
 export type FxKind =
-  | 'brightness' | 'contrast' | 'saturation' | 'hue' | 'grayscale' | 'sepia' | 'invert' | 'blur'
+  | 'brightness' | 'contrast' | 'saturation' | 'hue' | 'grayscale' | 'sepia' | 'invert' | 'blur' | 'levels' | 'curves'
   | 'glow' | 'shadow' | 'flare';
 
 export type FxValue = number | string;

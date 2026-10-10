@@ -1,4 +1,4 @@
-import { FX_DEFS, numParam } from './defs';
+import { FX_DEFS, numParam, toneTable } from './defs';
 import { glowPasses } from './canvas';
 import type { FxLayer, FxOp } from './types';
 
@@ -36,6 +36,7 @@ export function opPrimitives(op: FxOp, src: string, out: string): string | null 
     case 'grayscale': return `<feColorMatrix ${io} ${matrix(grayscaleMatrix(a))}/>`;
     case 'sepia': return `<feColorMatrix ${io} ${matrix(sepiaMatrix(a))}/>`;
     case 'invert': return `<feComponentTransfer ${io}>${funcs(() => `type="table" tableValues="${r3(a)} ${r3(1 - a)}"`)}</feComponentTransfer>`;
+    case 'levels': case 'curves': return `<feComponentTransfer ${io}>${funcs(() => `type="table" tableValues="${toneTable(op).map(r3).join(' ')}"`)}</feComponentTransfer>`;
     case 'blur': return `<feGaussianBlur ${io} stdDeviation="${r3(numParam(op, 'radius'))}"/>`;
     // CSS drop-shadow(): the blur is a radius, twice the Gaussian standard deviation (Filter Effects spec).
     case 'shadow': return `<feDropShadow ${io} dx="${r3(numParam(op, 'x'))}" dy="${r3(numParam(op, 'y'))}" stdDeviation="${r3(numParam(op, 'blur') / 2)}" flood-color="${String(op.params.color)}" flood-opacity="${r3(numParam(op, 'opacity'))}"/>`;

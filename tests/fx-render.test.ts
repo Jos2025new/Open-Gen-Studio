@@ -318,3 +318,21 @@ describe('raster layers close up', () => {
     expect(smoothingAt(2)).toBe(true);
   });
 });
+
+import { toneTable, TONE_STEPS } from '../src/engine/fx/defs';
+import { opPrimitives } from '../src/engine/fx/svg';
+describe('levels and curves (one tone table for the view and the SVG export)', () => {
+  it('levels: input points clip, gamma bends the midtones, output range limits; defaults are identity', () => {
+    const id = toneTable(newFxOp('levels', {}));
+    expect(id[0]).toBe(0); expect(id[TONE_STEPS - 1]).toBe(1); expect(id[16]).toBeCloseTo(0.5, 5);
+    const t = toneTable(newFxOp('levels', { inBlack: 0.25, inWhite: 0.75, outBlack: 0.1, outWhite: 0.9, gamma: 2 }));
+    expect(t[0]).toBeCloseTo(0.1, 5); expect(t[TONE_STEPS - 1]).toBeCloseTo(0.9, 5);
+    expect(t[16]).toBeGreaterThan(0.5);
+  });
+  it('curves: through the points, never reversing; the canvas and SVG share the primitive', () => {
+    const t = toneTable(newFxOp('curves', { shadows: 0.15, midtones: 0.5, highlights: 0.9 }));
+    expect(t[8]).toBeCloseTo(0.15, 2); expect(t[16]).toBeCloseTo(0.5, 2); expect(t[24]).toBeCloseTo(0.9, 2);
+    for (let i = 1; i < t.length; i++) expect(t[i]).toBeGreaterThanOrEqual(t[i - 1]);
+    expect(opPrimitives(newFxOp('curves', {}), 'SourceGraphic', 'o')).toMatch(/feComponentTransfer.*type="table" tableValues="0 /);
+  });
+});

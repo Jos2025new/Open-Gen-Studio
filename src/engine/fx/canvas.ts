@@ -1,5 +1,6 @@
 import { createCanvas, ctx2d } from '../../lib/media';
 import { numParam, rgba } from './defs';
+import { opPrimitives } from './svg';
 import type { FxLayer, FxOp } from './types';
 import type { RenderTrace } from '../../lib/renderTrace';
 import { span, traceDeep } from '../../lib/trace';
@@ -29,10 +30,37 @@ export function cssFilter(op: FxOp, scale: number): string | null {
     case 'grayscale': return `grayscale(${a})`;
     case 'sepia': return `sepia(${a})`;
     case 'invert': return `invert(${a})`;
+    case 'levels': case 'curves': return svgFilterUrl(op);
     case 'blur': return `blur(${numParam(op, 'radius') * scale}px)`;
     case 'shadow': return `drop-shadow(${numParam(op, 'x') * scale}px ${numParam(op, 'y') * scale}px ${numParam(op, 'blur') * scale}px ${rgba(String(op.params.color), numParam(op, 'opacity'))})`;
     default: return null;
   }
+}
+
+/*
+ * Levels and Curves have no CSS filter function: the canvas uses the same SVG primitive the export writes, from a
+ * hidden <svg> in the page (ctx.filter = url(#…)), one <filter> per distinct table. Without a page (tests), none.
+ */
+const toneFilters = new Map<string, string>();
+function svgFilterUrl(op: FxOp): string | null {
+  if (typeof document === 'undefined' || !document.body) return null;
+  const prim = opPrimitives(op, 'SourceGraphic', 'out');
+  if (!prim) return null;
+  let id = toneFilters.get(prim);
+  if (!id) {
+    id = `ogs-tone-${toneFilters.size + 1}`;
+    toneFilters.set(prim, id);
+    let host: Element | null = document.getElementById('ogs-tone-filters');
+    if (!host) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.id = 'ogs-tone-filters';
+      svg.setAttribute('aria-hidden', 'true');
+      svg.setAttribute('style', 'position:absolute;width:0;height:0;overflow:hidden');
+      host = document.body.appendChild(svg);
+    }
+    host.insertAdjacentHTML('beforeend', `<filter id="${id}" color-interpolation-filters="sRGB">${prim}</filter>`);
+  }
+  return `url(#${id})`;
 }
 
 /** Glow passes: one screen pass per whole unit of strength, the rest in the last one (strength 1.5 → 1, 0.5). */
