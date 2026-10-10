@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -19,6 +19,7 @@ import { InlineColor, InlineSlider } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
+import { fxTarget } from '../../engine/fx/plan';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -84,6 +85,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const [fxEdit, setFxEdit] = useState<string | null>(null);
   const fxRow = useRef<HTMLElement | null>(null);
   const [width, setWidth] = usePref('ogs:layers-width', 260);
+  // The layer list's height under the inspector (dragged on the split); double-click or Restore layout resets it.
+  const [listH, setListH] = usePref('ogs:layers-list-h', 240);
+  const split = useRef<{ y: number; h: number } | null>(null);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
   const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
   const [propertiesOpen, setPropertiesOpen] = useState(true);
@@ -133,14 +137,20 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty('--layers-w', collapsed ? '40px' : `${width}px`);
-    return () => { root.removeProperty('--layers-w'); };
-  }, [width, collapsed]);
+    root.setProperty('--layers-list-h', `${listH}px`);
+    return () => { root.removeProperty('--layers-w'); root.removeProperty('--layers-list-h'); };
+  }, [width, collapsed, listH]);
 
   if (collapsed) return <aside className="layers-panel is-collapsed" aria-label="Layers">
     <IconButton icon={PanelRightOpen} label="Show layers panel" size="sm" onClick={() => setCollapsed(false)} />
   </aside>;
 
-  return <aside className="layers-panel" aria-label="Layers">
+  return <aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}`} aria-label="Layers">
+    <div className="layers-split" role="separator" aria-orientation="horizontal" aria-label="Resize the layer list" data-tip="Drag to give the layers more or less room · double-click resets"
+      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); split.current = { y: e.clientY, h: listH }; }}
+      onPointerMove={(e) => { const r = split.current; if (r) setListH(Math.round(Math.min(window.innerHeight * 0.75, Math.max(96, r.h + r.y - e.clientY)))); }}
+      onPointerUp={() => { split.current = null; }} onPointerCancel={() => { split.current = null; }}
+      onDoubleClick={() => setListH(240)} />
     <div className="layers-resize" role="separator" aria-orientation="vertical" aria-label="Resize layers panel"
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); resize.current = { x: e.clientX, w: width }; }}
       onPointerMove={(e) => { const r = resize.current; if (r) setWidth(Math.round(Math.min(MAX_W, Math.max(MIN_W, r.w + r.x - e.clientX)))); }}
@@ -153,6 +163,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
       ))}
       <span className="panel-tabs-gap" />
+      {tab === 'props' && <IconButton icon={RotateCcw} label="Restore panel layout" size="sm" data-tip="Restore panel layout · width, layer list height and tab" onClick={() => { setWidth(260); setListH(240); setTab('props'); }} />}
       {tab === 'layers' ? <div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div> : <IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} />}
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
@@ -190,6 +201,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
         }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
           <span className={`layer-thumb-wrap${l.type === 'fx' ? ' is-fx' : ''}`} title={l.type === 'fx' ? 'Double-click to edit' : undefined}>{l.type === 'fx' ? <Icon size={16} /> : <LayerThumb doc={doc} layer={l} />}</span>
+          {l.type === 'fx' && <span className="layer-fx-target" data-tip="What this FX layer acts on">→ {l.scope === 'layer' ? fxTarget(doc.layers, l.id)?.name ?? 'no layer under it' : 'everything below'}</span>}
           {layer?.id !== l.id && <LayerName name={l.name} onRename={(name) => { if (!l.locked) patchLayer(sessionId, doc.id, l.id, { name }); }} />}
         </button>
         {layer?.id === l.id && <input key={l.id + l.name} className="layer-name-inline" aria-label="Name" defaultValue={l.name} disabled={l.locked} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== l.name && !l.locked) patchLayer(sessionId, doc.id, l.id, { name: e.target.value.trim() }); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = l.name; e.currentTarget.blur(); } e.stopPropagation(); }} />}

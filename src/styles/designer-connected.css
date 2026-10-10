@@ -260,7 +260,9 @@
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
 .stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }
 /* Context strip (ContextStrip.tsx): the active tool's essentials above the tool box; lines wrap, nothing scrolls. */
-.designer-palette { position: relative; }
+.composer-tools-bar .designer-palette.is-docked { position: relative; }
+/* Not docked, the palette floats at the top of the page: the strip opens below it. */
+.designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }
 .context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
 .context-strip .tool-settings { display: contents; }
 .context-strip .opt { height: var(--control-h); }
@@ -270,3 +272,18 @@
 .context-target strong { color: var(--text); font-weight: 600; }
 .context-target span { color: var(--accent); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .context-more { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }
+/* Right panel (LayersPanel.tsx, plan step 2): the inspector on top, the layers below with a draggable split. */
+.layers-panel > .panel-tabs { order: 0; }
+.layers-panel > .layers-body { order: 1; flex: 1 1 auto; min-height: 120px; }
+.layers-panel > .layers-split { order: 2; }
+.layers-panel > .layer-appearance { order: 3; }
+.layers-panel > .layer-shelf { order: 4; border-bottom: 0; border-top: 1px solid var(--border); }
+.layers-panel .layer-shelf .layer-list { max-height: none; height: var(--layers-list-h, 240px); overflow: auto; }
+.layers-panel.is-layers-only > .layers-body, .layers-panel.is-layers-only > .layers-split { display: none; }
+.layers-panel.is-layers-only .layer-shelf { flex: 1 1 auto; display: flex; flex-direction: column; }
+.layers-panel.is-layers-only .layer-shelf .layer-list { height: auto; flex: 1 1 auto; }
+.layers-split { height: 7px; flex: 0 0 7px; cursor: row-resize; background: transparent; border-top: 1px solid var(--border); touch-action: none; }
+.layers-split:hover, .layers-split:active { background: var(--accent-line); }
+.layers-panel .layer-shelf .layer-row { position: relative; }
+/* Under the FX layer's name: what it acts on ("→ Photo"), small, after the thumbnail. */
+.layer-fx-target { position: absolute; left: 52px; right: 56px; bottom: 4px; font-size: 9px; line-height: 1; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
