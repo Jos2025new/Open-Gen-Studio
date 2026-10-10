@@ -32,7 +32,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] **Designer, tras el 2026-10-09 (segunda parte):**
   - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
   - guardar cada sesión por separado (revisar antes con Astra; ADR primero);
-  - ~~niveles y curvas~~ y ~~reglas recta y elipse~~: hechos el 2026-10-10; falta la regla de **perspectiva**;
+  - ~~niveles y curvas~~ y ~~reglas recta y elipse~~: hechos el 2026-10-10, también la regla de perspectiva (uno o dos puntos de fuga);
   - sondas de brocha y guardado;
   - ~~margen del ajuste a pantalla~~: hecho el 2026-10-10.
 

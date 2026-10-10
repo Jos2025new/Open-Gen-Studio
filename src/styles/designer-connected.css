@@ -258,3 +258,4 @@
 .stroke-ruler-guide line, .stroke-ruler-guide ellipse { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 4; filter: drop-shadow(0 0 1px #000); }
 .stroke-ruler.is-off .stroke-ruler-guide { opacity: .35; }
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
+.stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }

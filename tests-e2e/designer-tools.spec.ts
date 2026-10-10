@@ -67,6 +67,9 @@ test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints al
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const y0 = b.y + b.height * 0.4;
   await page.keyboard.press('k');
+  // The kind is kept in the settings: choose it, whatever an earlier run left.
+  await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('button', { name: /^Ruler/ }).click();
+  await page.getByRole('button', { name: 'Straight', exact: true }).click();
   await page.mouse.move(b.x + b.width * 0.2, y0); await page.mouse.down(); await page.mouse.move(b.x + b.width * 0.7, y0, { steps: 5 }); await page.mouse.up();
   await page.keyboard.press('b');
   // A diagonal drag: with the ruler on, it lands as a horizontal line through its start.
@@ -84,4 +87,48 @@ test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints al
   console.log('RULER rows', rows.length, 'span', span);
   expect(rows.length).toBeGreaterThan(0);
   expect(span).toBeLessThan(40);
+});
+
+test('perspective ruler: a stroke heads straight to the vanishing point it starts toward', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => { if (location.port === '5183') Object.defineProperty(navigator, 'webdriver', { get: () => false }); });
+  await page.goto('http://localhost:5183');
+  await page.waitForFunction(() => (window as any).__OGS_TEST__?.().hydrated);
+  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  if (!(await page.getByRole('button', { name: 'New document', exact: true }).isVisible())) { await page.getByRole('button', { name: 'Switch workspace', exact: true }).click(); await page.getByText('Designer', { exact: true }).click(); }
+  await page.getByRole('button', { name: 'New document', exact: true }).click();
+  await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  await page.keyboard.press('k');
+  await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('button', { name: /^Ruler/ }).click();
+  await page.getByRole('button', { name: 'Perspective', exact: true }).click();
+  const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const vp1 = { x: b.x + b.width * 0.1, y: b.y + b.height * 0.3 }, vp2 = { x: b.x + b.width * 0.9, y: b.y + b.height * 0.3 };
+  await page.mouse.move(vp1.x, vp1.y); await page.mouse.down(); await page.mouse.move(vp2.x, vp2.y, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('b');
+  // Start low in the middle and move up-left, a little off: the stroke must lie on the line to the left point.
+  const s = { x: b.x + b.width * 0.5, y: b.y + b.height * 0.7 };
+  await page.mouse.move(s.x, s.y); await page.mouse.down();
+  for (let i = 1; i <= 25; i++) await page.mouse.move(s.x - i * 9, s.y - i * 4 + (i % 3) * 3);
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await page.locator('canvas.stage-canvas').screenshot({ path: 'tests-e2e/screens/perspective.png' });
+  const off = await page.evaluate(([sx, sy, vx, vy]) => {
+    const c = document.querySelector('canvas.stage-canvas') as HTMLCanvasElement, r = c.getBoundingClientRect(), k = c.width / r.width;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    const ux = vx - sx, uy = vy - sy, ul = Math.hypot(ux, uy);
+    let worst = 0, n = 0;
+    for (let py = 0; py < c.height; py += 2) for (let px = 0; px < c.width; px += 2) {
+      const i = (py * c.width + px) * 4;
+      // Opaque white only: transparent pixels outside the page can keep a white colour.
+      if (!(d[i] > 220 && d[i + 1] > 220 && d[i + 2] > 220 && d[i + 3] > 200)) continue;
+      const x = px / k + r.left, y = py / k + r.top;
+      if (Math.hypot(x - sx, y - sy) > 260) continue;
+      n++; worst = Math.max(worst, Math.abs(((x - sx) * uy - (y - sy) * ux) / ul));
+    }
+    return { n, worst: Math.round(worst) };
+  }, [s.x, s.y, vp1.x, vp1.y]);
+  console.log('PERSPECTIVE', JSON.stringify(off));
+  expect(off.n).toBeGreaterThan(20);
+  expect(off.worst).toBeLessThan(14);
 });

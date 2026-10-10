@@ -24,4 +24,24 @@ describe('stroke ruler', () => {
     beginRulerStroke('d', { x: 10, y: 50 });
     expect(rulerPoint('d', { x: 80, y: 90 })).toEqual({ x: 80, y: 90 });
   });
+  it('perspective, two points: the stroke heads to the vanishing point its first pixels point at, or runs vertical', () => {
+    setRuler({ docId: 'd', kind: 'perspective', a: { x: 0, y: 0 }, b: { x: 1000, y: 0 }, on: true, points: 2 });
+    beginRulerStroke('d', { x: 500, y: 500 });
+    expect(rulerPoint('d', { x: 501, y: 501 })).toEqual({ x: 500, y: 500 });
+    const p = rulerPoint('d', { x: 450, y: 460 });
+    expect(p.x - 500).toBeCloseTo(p.y - 500, 5);
+    expect(p.x).toBeLessThan(500);
+    endRulerStroke();
+    beginRulerStroke('d', { x: 500, y: 500 });
+    const v = rulerPoint('d', { x: 503, y: 560 });
+    expect(v.x).toBeCloseTo(500); expect(v.y).toBeGreaterThan(550);
+    endRulerStroke();
+  });
+  it('perspective, one point: toward it, or horizontal, or vertical; no second end needed', () => {
+    setRuler({ docId: 'd', kind: 'perspective', a: { x: 0, y: 0 }, b: { x: 0, y: 0 }, on: true, points: 1 });
+    beginRulerStroke('d', { x: 100, y: 100 });
+    const h = rulerPoint('d', { x: 160, y: 104 });
+    expect(h.y).toBeCloseTo(100); expect(h.x).toBeGreaterThan(150);
+    endRulerStroke();
+  });
 });
