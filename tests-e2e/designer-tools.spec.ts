@@ -53,3 +53,35 @@ test('merge, rasterize, grow/shrink and mirror in the real browser', async ({ pa
   expect(r.mirror.left[1]).toBe(255); expect(r.mirror.right[1]).toBe(255); expect(r.mirror.segments).toBe(2);
   expect(errors).toEqual([]);
 });
+
+test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints along it', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.addInitScript(() => { if (location.port === '5183') Object.defineProperty(navigator, 'webdriver', { get: () => false }); });
+  await page.goto('http://localhost:5183');
+  await page.waitForFunction(() => (window as any).__OGS_TEST__?.().hydrated);
+  await page.getByRole('button', { name: 'New session', exact: true }).click();
+  if (!(await page.getByRole('button', { name: 'New document', exact: true }).isVisible())) { await page.getByRole('button', { name: 'Switch workspace', exact: true }).click(); await page.getByText('Designer', { exact: true }).click(); }
+  await page.getByRole('button', { name: 'New document', exact: true }).click();
+  await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const y0 = b.y + b.height * 0.4;
+  await page.keyboard.press('k');
+  await page.mouse.move(b.x + b.width * 0.2, y0); await page.mouse.down(); await page.mouse.move(b.x + b.width * 0.7, y0, { steps: 5 }); await page.mouse.up();
+  await page.keyboard.press('b');
+  // A diagonal drag: with the ruler on, it lands as a horizontal line through its start.
+  const ys = y0 + 80;
+  await page.mouse.move(b.x + b.width * 0.3, ys); await page.mouse.down(); await page.mouse.move(b.x + b.width * 0.6, ys + 150, { steps: 25 }); await page.mouse.up();
+  await page.waitForTimeout(300);
+  await page.locator('canvas.stage-canvas').screenshot({ path: 'tests-e2e/screens/ruler.png' });
+  const rows = await page.evaluate(([x0, x1, y]) => {
+    const c = document.querySelector('canvas.stage-canvas') as HTMLCanvasElement, r = c.getBoundingClientRect(), k = c.width / r.width;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data, hit = new Set<number>();
+    for (let py = Math.round((y - 40 - r.top) * k); py < Math.round((y + 200 - r.top) * k); py++) for (let px = Math.round((x0 - r.left) * k); px < Math.round((x1 - r.left) * k); px += 3) { const i = (py * c.width + px) * 4; if (d[i] > 200 && d[i + 1] > 200 && d[i + 2] > 200) hit.add(Math.round(py / k)); }
+    return [...hit];
+  }, [b.x + b.width * 0.35, b.x + b.width * 0.55, ys]);
+  const span = Math.max(...rows) - Math.min(...rows);
+  console.log('RULER rows', rows.length, 'span', span);
+  expect(rows.length).toBeGreaterThan(0);
+  expect(span).toBeLessThan(40);
+});

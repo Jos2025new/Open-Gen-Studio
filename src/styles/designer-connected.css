@@ -252,3 +252,9 @@
 .tool-settings > .brush-row > .opt-slider .opt-label svg { display: block; }
 .tool-settings > .brush-row > .opt-slider .opt-label { flex: 0 0 auto; overflow: visible; }
 .tool-settings > .brush-row > .opt-slider .opt-readout { min-width: 0; }
+/* Stroke ruler (StrokeRulerOverlay.tsx): a dashed guide over the page; with the Ruler tool it takes the pointer. */
+.stroke-ruler { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 3; overflow: visible; }
+.stroke-ruler.is-placing { pointer-events: auto; cursor: crosshair; }
+.stroke-ruler-guide line, .stroke-ruler-guide ellipse { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 6 4; filter: drop-shadow(0 0 1px #000); }
+.stroke-ruler.is-off .stroke-ruler-guide { opacity: .35; }
+.stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }

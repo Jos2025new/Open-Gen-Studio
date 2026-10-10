@@ -18,6 +18,7 @@ import { clearSelected, fillSelection, getSelection, growSelection, invertSelect
 import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
+import { RulerSettings } from './StrokeRulerOverlay';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -246,7 +247,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
           <InlineSelect label="Align" value={text.align} options={['left', 'center', 'right'] as const as unknown as Array<typeof text.align>} onChange={(v) => setUi({ text: { ...text, align: v } })} />
           <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={text.lineHeight} onChange={(v) => setUi({ text: { ...text, lineHeight: v } })} />
           <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={text.letterSpacing} onChange={(v) => setUi({ text: { ...text, letterSpacing: v } })} />
-        </> : tool === 'fill' ? <>
+        </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <>
           <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
           <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />
           <InlineSlider label="Threshold" min={0} max={255} value={brush.fillThreshold ?? 24} onChange={(v) => setUi({ brush: { ...brush, fillThreshold: v } })} />

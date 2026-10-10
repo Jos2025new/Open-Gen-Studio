@@ -11,6 +11,8 @@ import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
+import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
+import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -287,7 +289,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   }, []);
 
   const fit = useCallback(() => {
-    // A thin margin, as Photoshop or Krita fit on screen; the bottom keeps clear of the docked toolbar (2026-10-10).
+    // Thin margin, as Photoshop or Krita; the bottom clears the toolbar.
     const pad = size.w < 500 ? 12 : 24;
     const bottom = window.innerWidth < 768 ? 12 : 120; // composer is below the canvas on narrow screens
     const zoom = Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4);
@@ -769,7 +771,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // Layer mode: Ctrl/Cmd-click adds the layer under the pointer to the selection (or takes it out).
       setObjectPick(doc.id, null);
       if (e.ctrlKey || e.metaKey) {
-        // Ctrl-press adds the layer and a drag moves all picked layers; a Ctrl-click on a picked one takes it out.
+        // Ctrl-press adds the layer; a drag moves all picked; Ctrl-click on a picked one removes it.
         const hit = hitTestPixel(current, p.x, p.y);
         if (hit) {
           const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
@@ -807,7 +809,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       const hit = hitTest(current, p.x, p.y);
       const sel = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-      // A plain click on a layer outside the selection starts a new selection; inside it, the group moves together.
+      // A click outside the selection starts a new one; inside, the group moves.
       if (!hit || !sel.includes(hit.id)) pickLayer(doc.id, hit?.id ?? '', false, sel);
       setActiveLayer(sessionId, doc.id, hit?.id ?? null);
       if (hit && !hit.locked) {
@@ -839,8 +841,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const stroke = newBrushStroke(brush, erase);
       // With a pixel selection, the stroke lands only inside it.
       const clip = selectionClipFor(current, prepared);
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p, control: p, time: e.timeStamp, erase };
-      paintSegment(target, p, p, penPressure(e));
+      const p0 = beginRulerStroke(doc.id, p);
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p0, control: p0, time: e.timeStamp, erase };
+      paintSegment(target, p0, p0, penPressure(e));
       return;
     }
 
@@ -922,7 +925,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (!at) return;
     const { d } = at;
     const moved = translateObjects(d.base, d.ids, at.x - d.startX, at.y - d.startY);
-    // A painted layer is recomposed from its base and strokes (each compose copies the whole layer: once a frame).
+    // A painted layer is recomposed from its base and strokes (once a frame).
     if (moved.type === 'raster' && !composeRaster(moved, false)) return;
     setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
   };
@@ -935,7 +938,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const ax = box.x + box.w / 2 - (h.fx * box.w) / 2, ay = box.y + box.h / 2 - (h.fy * box.h) / 2;
       const clamp = (v: number) => (Math.abs(v) < 0.01 ? Math.sign(v || 1) * 0.01 : v);
       let sx = h.fx ? (p.x - ax) / (h.x - ax) : 1, sy = h.fy ? (p.y - ay) / (h.y - ay) : 1;
-      // Ctrl or Shift (as Inkscape's Ctrl): width and height keep their ratio. A side handle then scales both axes,
+      // Ctrl or Shift (Inkscape's Ctrl): width and height keep their ratio. A side handle scales both axes,
       // about the opposite side's middle.
       if (shift && h.fx && h.fy) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; }
       else if (shift && h.fx) return scaleAbout(clamp(sx), clamp(Math.abs(sx)), ax, box.y + box.h / 2);
@@ -1048,6 +1051,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       for (const sample of samples.length ? samples : [e.nativeEvent]) {
         const point = toDoc(sample.clientX, sample.clientY);
         const next = brushPoint(d.last, d.control, point, brush.smoothing ?? 0, brush.stabilization ?? 0, view.zoom, sample.timeStamp - d.time);
+        next.paint = rulerPoint(doc.id, next.paint);
         if (layer && (next.paint.x !== d.last.x || next.paint.y !== d.last.y)) paintSegment(layer, d.last, next.paint, penPressure(sample));
         d.last = next.paint;
         d.control = next.control;
@@ -1325,6 +1329,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         onDoubleClick={onDoubleClick}
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
+      <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {
@@ -1388,7 +1393,7 @@ function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onD
       style={{
         left: view.x + layer.x * z,
         top: view.y + layer.y * z,
-        // A rotated or skewed text: the editor takes the same transform, so typing happens on the text as it shows.
+        // Rotated or skewed text: the editor takes its transform.
         ...(layer.transform ? {
           transform: `matrix(${layer.transform[0]}, ${layer.transform[1]}, ${layer.transform[2]}, ${layer.transform[3]}, ${layer.transform[4] * z}, ${layer.transform[5] * z})`,
           transformOrigin: `${-layer.x * z}px ${-layer.y * z}px`,

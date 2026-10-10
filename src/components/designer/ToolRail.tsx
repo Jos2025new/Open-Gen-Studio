@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, DraftingCompass, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
@@ -16,6 +16,7 @@ const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'fill', icon: PaintBucket, label: 'Fill (G) · contiguous visible color, on a new layer' },
   { id: 'gradient', icon: Blend, label: 'Gradient (U) · drag a line; on a new layer, inside the selection if there is one' },
   { id: 'brush', icon: Brush, label: 'Brush (B)' }, { id: 'lineart', icon: PenTool, label: 'Lineart (P) · editable pressure strokes; Alt-drag bends a stroke' }, { id: 'eraser', icon: Eraser, label: 'Eraser (E)' },
+  { id: 'ruler', icon: DraftingCompass, label: 'Ruler (K) · place a straight or ellipse guide; the brush follows it while it is on' },
   { id: 'text', icon: Type, label: 'Text (T)' },
 ];
 

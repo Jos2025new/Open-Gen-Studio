@@ -181,6 +181,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | O | Ellipse |
 | L | Line |
 | T | Text |
+| K | Ruler |
 | Space (hold) | Pan |
 | Alt-click (Brush, Fill) | Pick a color from the canvas |
 | Ctrl+A / Ctrl+D | Select all pixels / deselect |

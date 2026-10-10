@@ -121,6 +121,9 @@ export interface UiState {
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
   /** Designer rulers (and the guides dragged from them) shown. */
   rulers?: boolean;
+  /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
+  strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
+  strokeRulerKind?: import('../engine/design/strokeRuler').RulerKind;
   /** Designer bottom bar: the toolbox (default) or the prompt box. */
   designerDock?: 'tools' | 'prompt';
   /** Gradient tool (the main color is the brush color). */
@@ -307,7 +310,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind'>;
 };
 
 export const useStore = create<AppState>()(
@@ -325,7 +328,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;
