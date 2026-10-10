@@ -6,6 +6,8 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Decisiones del usuario
 
+- [x] La velocidad va primero: «una interfaz que vaya lenta conforme más se usa deja la app inviable». Ordenar los arreglos por lo que más aporte al usuario y a la UX, con menos riesgo y más escalable. **2026-10-09**, el usuario.
+- [x] Cuando el usuario prueba un cambio, se anota con fecha qué cambio concreto probó y qué no. **2026-10-09**, el usuario (precedente en [depuracion.md](depuracion.md)).
 - [x] Brocha y panel del Designer: orden del panel, avanzados ocultos por defecto, aviso de presión solo sin simulación, extremos finos y un solo motor de punta. **2026-10-09**, probado y aprobado por el usuario. Antes de tocar el Designer o la exportación, revisar la tabla «Qué revisar a futuro» de [022](history/022-2026-10-W41.md).
 - [x] Conflictos entre ramas: rigen los cambios más nuevos salvo que introduzcan fallos; dejar una sola rama, `task/agent-forcing`. **2026-10-09**, el usuario.
 - [x] Calidad por defecto = resolución media (`mediumResolution`). **2026-10-08**, aprobado por el usuario.
@@ -27,6 +29,15 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
+- [ ] **Designer, tras el 2026-10-09 (segunda parte):**
+  - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
+  - guardar cada sesión por separado (revisar antes con Astra; ADR primero);
+  - niveles y curvas en la capa de filtros (`feComponentTransfer`);
+  - reglas de trazo;
+  - sondas de brocha y guardado;
+  - margen del ajuste a pantalla.
+
+  Detalle y razones en [022](history/022-2026-10-W41.md), sección «Pendiente al cierre de la segunda parte». **2026-10-09**, pendiente.
 - [ ] **Brocha, lo que falta de SAI** ([ADR 0013](decisions/0013-campos-y-brocha.md)): mezcla húmeda (Blending, Dilution, Persistence), calidad y multiplicador de tamaño. Medir antes el coste por movimiento de la punta con el [protocolo](depuracion.md#protocolo). **2026-10-09**, pendiente.
 - [ ] **Mismo campo fuera del Designer:** los deslizadores de la galería (columnas), el boceto (tamaño de brocha), el visor 3D y la tarjeta de ajustes siguen con su propio estilo. **2026-10-09**, pendiente; cambia la interfaz de otros espacios, así que hay que preguntar antes.
 - [ ] **Presión con un lápiz real:** tamaño y densidad mínimos solo se han probado con tests y con ratón (presión total). **2026-10-09**, lo prueba el usuario.
