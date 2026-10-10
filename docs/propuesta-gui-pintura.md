@@ -139,3 +139,23 @@ Lo que ya tenemos, mejor dispuesto; sin funciones nuevas:
 7. **Girar el lienzo, histograma en Niveles, rueda de color.**
 
 Comprobación de cada paso: capturas en el sandbox y que el usuario lo vea antes del siguiente. Los pasos 1, 2 y 5 no cambian la distribución general. El 3 y el 4 sí: primero se enseñan como maqueta.
+
+## Correcciones del usuario a la segunda ronda (2026-10-10)
+
+- **Paneles:** «son muy configurables, a veces incluso puedes ponerle pestañas… sus paneles son empotrables y pueden sacarse de su lugar». La bandeja no sustituye las pestañas por secciones fijas. **Decisión:** cada panel puede ir plegado en la bandeja o agrupado con otro como pestaña. El orden, el pliegue y la agrupación se recuerdan. Sacar un panel flotante queda para una fase posterior.
+- **Herramientas por familia:** «no hay que perder tools ni features, ya me ha pasado». **Decisión:** antes de mover nada, un **inventario** de todas las herramientas, acciones y ajustes del Designer, con dónde está cada uno, y un test que falle si alguno deja de ser alcanzable. Pasa a ser el **paso 0**.
+- **Lo de cada segundo:** «hay que mejorar esto, sin duda». Confirmado, es el paso 2.
+- **Interruptores sobre el lienzo:** «hay que pensar bien dónde colocar esto». **Propuesta, sin decidir:** juntarlos con el control de zoom de abajo a la izquierda, que ya es el grupo de la vista. El de la regla iría también en la tira rápida mientras haya una regla.
+- **Barra de estado:** «tenemos una cajita de tools abajo, poner la barra de estado ahí puede no ser lo mejor… o ponerla pero siendo capaz de desactivarse». **Propuesta:** una línea fina **arriba del lienzo**, bajo la barra superior, que se puede desactivar y que la primera vez muestra cómo apagarla. Alternativa: una pastilla flotante en la esquina superior izquierda del lienzo, junto al selector de documento.
+- **En general:** «me parece que me gusta un poco».
+
+## Secuencia vigente (2026-10-10)
+
+0. **Inventario y test de alcance:** cada herramienta, acción y ajuste del Designer, con su lugar en la interfaz y su atajo. Un test falla si alguno desaparece de la interfaz.
+1. **Barra de estado contextual,** arriba del lienzo y desactivable.
+2. **Tira rápida a la izquierda,** con deshacer y rehacer.
+3. **Bandeja configurable:** paneles plegables o agrupados como pestañas, con su disposición recordada.
+4. **Herramientas por familia, sin desbordamiento,** comprobadas contra el inventario.
+5. **Interruptores con el grupo de la vista** (zoom).
+6. **Capas al estilo Photoshop,** dentro de la bandeja.
+7. **Girar el lienzo, histograma y rueda de color;** después, paneles flotantes.
