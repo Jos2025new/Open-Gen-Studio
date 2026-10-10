@@ -3,8 +3,8 @@
  * when they change (the store's rule), so a session object that is the same as last time has the same JSON: its text
  * is kept and reused. The result is byte for byte what JSON.stringify(value) gives (tests/persist-json.test.ts).
  *
- * Safety net: if some code ever mutated a stored session in place, its kept text would be stale. At least every
- * FULL_EVERY_MS every session is serialized afresh and compared with its kept text; a difference is logged and the
+ * Safety net: if some code ever mutated a stored session in place, its kept text would be stale. On the first save
+ * after FULL_EVERY_MS has passed, every session is serialized afresh and compared with its kept text; a difference is logged and the
  * fresh text is the one saved, so a stale session can never outlive that interval.
  */
 

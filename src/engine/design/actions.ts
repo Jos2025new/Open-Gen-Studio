@@ -270,8 +270,9 @@ export function deleteLayers(sessionId: string, docId: string, layerIds: string[
 
 /**
  * Layers drawn, as they show, into one new raster layer that takes the place of the first (bottom) one: what merge
- * down and rasterize do. The bottom layer is drawn at full opacity and normal blend, and the result keeps its opacity,
- * blend and folder, as Photoshop does; masks and FX between the layers are baked in, through the same renderer as the
+ * down and rasterize do. The bottom layer is drawn with its own opacity (normal blend) so the result looks the same:
+ * an opaque upper layer stays opaque over a half-transparent lower one. The result is at full opacity and keeps the
+ * bottom layer's blend and folder; masks and FX between the layers are baked in, through the same renderer as the
  * view. One undo step.
  */
 export async function flattenLayers(sessionId: string, docId: string, ids: string[], name?: string): Promise<string | null> {
@@ -282,8 +283,8 @@ export async function flattenLayers(sessionId: string, docId: string, ids: strin
   await ensureBuffers(layers);
   const [base, ...rest] = layers;
   const c = createCanvas(doc.width, doc.height);
-  drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: true, opacity: 1, blend: 'normal' } as Layer, ...rest] }, { resolution: 'document' });
-  const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: base.opacity, blend: base.blend, visible: base.visible, groupId: base.groupId };
+  drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: true, blend: 'normal' } as Layer, ...rest] }, { resolution: 'document' });
+  const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: 1, blend: base.blend, visible: base.visible, groupId: base.groupId };
   setBuffer(out.id, c);
   const gone = new Set(layers.map((l) => l.id));
   mutateDoc(sessionId, docId, (d) => ({ ...d, activeLayerId: out.id, layers: d.layers.flatMap((l) => (l.id === base.id ? [out] : gone.has(l.id) ? [] : [l])) }));

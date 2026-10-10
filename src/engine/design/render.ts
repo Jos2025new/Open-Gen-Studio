@@ -5,7 +5,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
-import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion } from './raster';
+import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion, redrawSoon } from './raster';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
@@ -297,6 +297,8 @@ function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasEleme
   const same = (n: number) => key.slice(0, n).every((k, i) => k === hit.key[i]);
   const fresh = same(key.length), trailing = !fresh && paintingLive() && same(key.length - versions) && performance.now() - hit.at < FX_LIVE_MS;
   if (!fresh && !trailing) return undefined;
+  // A held, unmoving pointer sends no new frame: one is asked for when the trailing result runs out.
+  if (trailing) redrawSoon(FX_LIVE_MS - (performance.now() - hit.at));
   fxCache.delete(id);
   fxCache.set(id, hit);
   return hit.canvas;

@@ -311,6 +311,12 @@ export function commitEdit(layerId: string): void {
   notify();
 }
 
+/** Redraw the views once, `ms` from now, without changing any pixels' version (the FX cache catching up). */
+let redrawTimer: ReturnType<typeof setTimeout> | undefined;
+export function redrawSoon(ms: number): void {
+  redrawTimer ??= setTimeout(() => { redrawTimer = undefined; notify(); }, Math.max(0, ms));
+}
+
 export function touchRaster(): void {
   // Which buffer changed is unknown: every content version moves on.
   for (const c of buffers.values()) touchBuffer(c);

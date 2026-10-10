@@ -224,7 +224,7 @@ describe('passes', () => {
   });
 });
 
-import { beginLiveStroke, commitEdit, getBuffer, paintLive, setBuffer } from '../src/engine/design/raster';
+import { beginLiveStroke, commitEdit, getBuffer, paintLive, setBuffer, subscribeRaster } from '../src/engine/design/raster';
 import { newRasterLayer } from '../src/engine/design/doc';
 
 describe('editor FX cache (filters run again only when what they read changes)', () => {
@@ -273,8 +273,16 @@ describe('editor FX cache (filters run again only when what they read changes)',
     const live = beginLiveStroke(recordingCanvas(200, 100) as never, '#ffffff', 1, false, null, { hardness: 1 });
     paintLive(getBuffer('img')!, live, { x: 10, y: 10 }, { x: 40, y: 10 }, 6);
     now += 50;
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    const redraws = vi.fn();
+    const off = subscribeRaster(redraws);
     drawDoc(stage(), doc);
     expect(blurs()).toBe(before);
+    // Held still, no frame would come: one is asked for when the trailing result runs out.
+    vi.advanceTimersByTime(120);
+    expect(redraws).toHaveBeenCalled();
+    off();
+    vi.useRealTimers();
     now += 100;
     drawDoc(stage(), doc);
     const caughtUp = blurs();
