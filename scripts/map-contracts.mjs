@@ -300,4 +300,23 @@ export default [
     ],
     tests: ['tests/brush-engine.test.ts'],
   },
+  {
+    id: 'fx-editor-cache',
+    what: '2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan.',
+    sides: [
+      ['src/engine/design/render.ts', 'function contentKey('],
+      ['src/engine/design/raster.ts', 'export function bufferVersion('],
+      ['src/engine/design/raster.ts', 'export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {\n  touchBuffer(buf);'],
+    ],
+    tests: ['tests/fx-render.test.ts'],
+  },
+  {
+    id: 'persist-json-exact',
+    what: '2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio.',
+    sides: [
+      ['src/store/store.ts', 'stateDb.set(name, persistJson(value))'],
+      ['src/store/persistJson.ts', 'export function persistJson('],
+    ],
+    tests: ['tests/persist-json.test.ts'],
+  },
 ];

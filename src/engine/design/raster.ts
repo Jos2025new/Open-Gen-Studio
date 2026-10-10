@@ -22,6 +22,22 @@ function notify(): void {
   listeners.forEach((l) => l());
 }
 
+/*
+ * Each buffer's own content version: bumped whenever its pixels change, live strokes included (they write in place
+ * and only notify when the stroke ends). The FX cache (render.ts) keys on it, so painting one layer does not throw
+ * away the cached FX of another.
+ */
+const contentVersions = new WeakMap<HTMLCanvasElement, number>();
+let contentClock = 0;
+function touchBuffer(c: HTMLCanvasElement | undefined): void {
+  if (c) contentVersions.set(c, ++contentClock);
+}
+/** The content version of a layer's pixels (-1 = no buffer yet). */
+export function bufferVersion(layerId: string): number {
+  const c = buffers.get(layerId);
+  return c ? contentVersions.get(c) ?? 0 : -1;
+}
+
 export function subscribeRaster(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
@@ -47,6 +63,7 @@ export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasEleme
 /** Replace a layer's buffer (no copy) and persist it. */
 export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = true): void {
   buffers.set(layerId, canvas);
+  touchBuffer(canvas);
   if (persist) schedulePersist(layerId);
   notify();
 }
@@ -54,6 +71,7 @@ export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = 
 export function restoreBuffers(map: Map<string, HTMLCanvasElement>): void {
   for (const [id, c] of map) {
     buffers.set(id, c);
+    touchBuffer(c);
     schedulePersist(id);
   }
   notify();
@@ -168,6 +186,7 @@ export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity:
 }
 
 export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
+  touchBuffer(buf);
   // A segment starts at the previous width: its box covers the wider of the two.
   const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
   if (live.tip) {
@@ -208,6 +227,7 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
  */
 export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): void {
   if (!live.tip || !changed.length) return;
+  touchBuffer(buf);
   const boxes = changed.map(segmentBox);
   const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
   const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
@@ -259,11 +279,14 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
 }
 
 export function commitEdit(layerId: string): void {
+  touchBuffer(buffers.get(layerId));
   schedulePersist(layerId);
   notify();
 }
 
 export function touchRaster(): void {
+  // Which buffer changed is unknown: every content version moves on.
+  for (const c of buffers.values()) touchBuffer(c);
   notify();
 }
 

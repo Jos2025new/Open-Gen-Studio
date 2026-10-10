@@ -213,3 +213,63 @@ describe('passes', () => {
     expect(calls.filter((k) => k.fn === 'drawImage').slice(-2).map((k) => [k.op, k.alpha])).toEqual([['source-over', 1], ['multiply', 0.25]]);
   });
 });
+
+import { beginLiveStroke, commitEdit, getBuffer, paintLive, setBuffer } from '../src/engine/design/raster';
+import { newRasterLayer } from '../src/engine/design/doc';
+
+describe('editor FX cache (filters run again only when what they read changes)', () => {
+  const blurs = () => calls.filter((c) => c.fn === 'drawImage' && c.filter?.startsWith('blur(')).length;
+  const stage = () => recordingCanvas(200, 100, true).getContext() as unknown as CanvasRenderingContext2D;
+  const fxOn = () => newFxLayer('filter', { scope: 'layer', ops: [newFxOp('blur', { radius: 2 })] });
+  it('a second editor frame of the same page reuses the filtered layer', () => {
+    const doc = page([fxOn()]);
+    drawDoc(stage(), doc);
+    const first = blurs();
+    expect(first).toBeGreaterThan(0);
+    drawDoc(stage(), doc);
+    expect(blurs()).toBe(first);
+  });
+  it('editing the filtered layer, or its FX, runs the filter again', () => {
+    const fx = fxOn(), doc = page([fx]);
+    drawDoc(stage(), doc);
+    const n = blurs();
+    drawDoc(stage(), { ...doc, layers: doc.layers.map((l) => (l.id === 'a' ? { ...l, opacity: 0.5 } : l)) });
+    expect(blurs()).toBeGreaterThan(n);
+    const m = blurs();
+    drawDoc(stage(), { ...doc, layers: doc.layers.map((l) => (l.id === fx.id ? { ...fx, ops: [newFxOp('blur', { radius: 5 })] } : l)) });
+    expect(blurs()).toBeGreaterThan(m);
+  });
+  it('painting another layer keeps the cache; new pixels in the filtered layer (even mid-stroke) do not', () => {
+    const img = { ...newRasterLayer('Image', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'img' };
+    const paint = { ...newRasterLayer('Paint', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'paint' };
+    readPixel = (() => ({ data: new Uint8ClampedArray(200 * 100 * 4) })) as never;
+    // commitEdit schedules the layer's save on window timers; nothing is written here.
+    vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined });
+    setBuffer('img', recordingCanvas(200, 100) as never, false);
+    setBuffer('paint', recordingCanvas(200, 100) as never, false);
+    const doc = { ...createDoc('p', 200, 100), layers: [img, fxOn(), paint] } as DesignDoc;
+    drawDoc(stage(), doc);
+    const n = blurs();
+    commitEdit('paint');
+    drawDoc(stage(), doc);
+    expect(blurs()).toBe(n);
+    // A live stroke on the filtered layer: pixels change before the stroke ends (no commit yet).
+    const live = beginLiveStroke(recordingCanvas(200, 100) as never, '#ffffff', 1, false, null, { hardness: 1 });
+    paintLive(getBuffer('img')!, live, { x: 10, y: 10 }, { x: 40, y: 10 }, 6);
+    drawDoc(stage(), doc);
+    const afterLive = blurs();
+    expect(afterLive).toBeGreaterThan(n);
+    commitEdit('img');
+    drawDoc(stage(), doc);
+    expect(blurs()).toBeGreaterThan(afterLive);
+    expect(getBuffer('img')).toBeDefined();
+    vi.unstubAllGlobals();
+  });
+  it('exports and other offscreen renders always compute', () => {
+    const doc = page([fxOn()]);
+    drawDoc(view().x, doc);
+    const n = blurs();
+    drawDoc(view().x, doc);
+    expect(blurs()).toBe(2 * n);
+  });
+});

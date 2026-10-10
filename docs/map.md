@@ -43,6 +43,8 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
 | **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
 | **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts) |
+| **fx-editor-cache** — 2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan. | [render.ts](../src/engine/design/render.ts), [raster.ts](../src/engine/design/raster.ts) | [fx-render.test.ts](../tests/fx-render.test.ts) |
+| **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts) | [persist-json.test.ts](../tests/persist-json.test.ts) |
 
 ## Módulos centrales
 
@@ -61,7 +63,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [doc.ts](../src/engine/design/doc.ts) | 23 | 18 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |
-| [raster.ts](../src/engine/design/raster.ts) | 22 | 4 |
+| [raster.ts](../src/engine/design/raster.ts) | 22 | 5 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
@@ -93,9 +95,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/providers` | 13 | 36 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 17 | 108 |
-| `src/store` | 1 | 85 |
+| `src/store` | 2 | 86 |
 
-91 de 219 módulos no tienen ningún test que los importe directamente.
+91 de 220 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

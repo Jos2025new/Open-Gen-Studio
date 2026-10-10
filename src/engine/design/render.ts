@@ -5,7 +5,8 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
-import { getBuffer, rasterVersion } from './raster';
+import { bufferVersion, getBuffer, rasterBufferIds, rasterVersion } from './raster';
+import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { fxPlan } from '../fx/plan';
@@ -253,10 +254,42 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
       ctx.fillRect(0, 0, doc.width, doc.height);
     }
     for (const s of steps) drawLayer(ctx, s.layer);
-  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context);
+  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context, !!(ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas'));
   ctx.restore();
   end?.(stage ? takeCanvasCount() : undefined);
   if (stage) frameShown();
+}
+
+/*
+ * The editor's FX cache: a layer's filtered pixels are kept while nothing they come from changes (the layer object,
+ * its pixels' content version, its FX layers and the view scale), so moving, zooming the page around it or painting
+ * another layer does not run the filters again every frame. Editor frames only (exports always compute), at most
+ * FX_CACHE_PX pixels in all; the oldest entry goes first.
+ */
+const FX_CACHE_PX = 48_000_000;
+const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement }>();
+let fontEpoch = 0;
+if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
+function contentKey(l: Layer, s: { fx: FxLayer[] }, scale: number, W: number, H: number): unknown[] {
+  return [l, ...rasterBufferIds([l]).map(bufferVersion), ...s.fx, scale, W, H, fontEpoch];
+}
+function cachedFx(id: string, key: unknown[]): HTMLCanvasElement | undefined {
+  const hit = fxCache.get(id);
+  if (!hit || hit.key.length !== key.length || hit.key.some((k, i) => k !== key[i])) return undefined;
+  fxCache.delete(id);
+  fxCache.set(id, hit);
+  return hit.canvas;
+}
+function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
+  fxCache.delete(id);
+  fxCache.set(id, { key, canvas });
+  let px = 0;
+  for (const e of fxCache.values()) px += e.canvas.width * e.canvas.height;
+  for (const [k, e] of fxCache) {
+    if (px <= FX_CACHE_PX || fxCache.size <= 1) break;
+    px -= e.canvas.width * e.canvas.height;
+    fxCache.delete(k);
+  }
 }
 
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
@@ -266,7 +299,7 @@ const FX_MAX_PX = 16_000_000;
  * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
  * FX see everything under them, background included. Delivery uses scale 1 with this same plan. Lengths in FX params are document px.
  */
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace): void {
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false): void {
   const m = ctx.getTransform();
   const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
   const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
@@ -282,11 +315,16 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
     if (s.t === 'draw') drawLayer(at(acc), s.layer);
     else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false, trace });
     else {
-      let own = createCanvas(W, H);
-      drawLayer(at(own), s.layer, true);
-      const box = layerBox(s.layer);
-      const region = box ? { x: box.x * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale } : undefined;
-      for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region, trace });
+      const key = editor ? contentKey(s.layer, s, scale, W, H) : null;
+      let own = key && cachedFx(s.layer.id, key);
+      if (!own) {
+        own = createCanvas(W, H);
+        drawLayer(at(own), s.layer, true);
+        const box = layerBox(s.layer);
+        const region = box ? { x: box.x * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale } : undefined;
+        for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region, trace });
+        if (key) keepFx(s.layer.id, key, own);
+      }
       // In canvas px: `own` is already at the composite's scale.
       const x = ctx2d(acc);
       x.setTransform(1, 0, 0, 1, 0, 0);

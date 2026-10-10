@@ -1,3 +1,4 @@
+import { persistJson } from './persistJson';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
@@ -267,7 +268,7 @@ function flushWrite(): void {
   if (!pendingWrite || wiping) return;
   const { name, value } = pendingWrite;
   pendingWrite = null;
-  stateDb.set(name, JSON.stringify(value)).catch((err) => console.error('Could not save state', err));
+  stateDb.set(name, persistJson(value)).catch((err) => console.error('Could not save state', err));
 }
 
 const idbStorage: PersistStorage<Persisted> = {
