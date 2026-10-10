@@ -1,5 +1,6 @@
 import { uid } from '../../lib/id';
 import type { BlendMode, DesignDoc, Layer } from '../types';
+import { BLEND_MODES } from '../design/render';
 import { removeLayer } from '../design/doc';
 import { FX_DEFS, fxParams, isFxKind } from './defs';
 import type { FxGroup, FxKind, FxLayer, FxOp, FxScope } from './types';
@@ -9,7 +10,7 @@ import type { FxGroup, FxKind, FxLayer, FxOp, FxScope } from './types';
  * same ones (ADR 0011, D6). A list runs in order and applies only if all of it is valid; the caller records one undo.
  */
 
-const BLENDS: BlendMode[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'soft-light', 'hard-light', 'difference', 'color', 'luminosity'];
+const BLENDS: BlendMode[] = BLEND_MODES;
 
 export type FxOpInput = { kind: string; params?: Record<string, unknown>; enabled?: boolean };
 

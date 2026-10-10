@@ -126,6 +126,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
+    <label className="check-row brush-check" data-tip="Every stroke is also painted reflected across the page's vertical centre line"><input type="checkbox" checked={!!brush.mirror} onChange={(e) => set({ mirror: e.target.checked })} />Mirror</label>
     <label className="check-row brush-check" data-tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner"><input type="checkbox" checked={!!brush.simulatePressure} onChange={(e) => set({ simulatePressure: e.target.checked })} />Simulate pressure</label>
     {/* Only without simulation: then a missing pen pressure matters. */}
     {!brush.simulatePressure && <PressureReadout />}

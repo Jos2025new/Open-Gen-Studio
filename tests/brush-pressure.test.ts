@@ -71,3 +71,23 @@ describe('tapers (as Lineart: perfect-freehand curves, in px)', () => {
     expect(w[7]).toBeLessThan(20);
   });
 });
+
+describe('mirror (reflection across the page centre)', () => {
+  const layer = { x: 0, y: 0, width: 100, height: 100, pxWidth: 100, pxHeight: 100 } as never;
+  it('each segment comes with its reflection, same width; the end taper treats each pair as one', () => {
+    const brush = { size: 10, mirror: true, taperEnd: 20, color: '#000', opacity: 1 };
+    const stroke = newBrushStroke(brush, false);
+    const s = brushSegment(layer, { x: 10, y: 5 }, { x: 20, y: 5 }, brush, 1, 100);
+    expect(s.mirror).toEqual([90, 5, 80, 5, s.seg[4]]);
+    expect(stroke.tip?.mirror).toBe(true);
+    for (let i = 0; i < 5; i++) stroke.segments.push([i * 10, 0, (i + 1) * 10, 0, 10], [100 - i * 10, 0, 90 - i * 10, 0, 10]);
+    endBrushStroke(stroke, { tip: undefined } as never, {} as never, layer, brush);
+    const w = stroke.segments.map((x) => x[4]);
+    for (let i = 0; i < w.length; i += 2) expect(w[i]).toBe(w[i + 1]);
+    expect(w.slice(-2)).toEqual([0, 0]);
+    expect(w.slice(0, 4)).toEqual([10, 10, 10, 10]);
+  });
+  it('without mirror, no reflection', () => {
+    expect(brushSegment(layer, { x: 10, y: 5 }, { x: 20, y: 5 }, { size: 10 }, 1, 100).mirror).toBeUndefined();
+  });
+});

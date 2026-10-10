@@ -24,14 +24,23 @@ const GCO: Record<BlendMode, GlobalCompositeOperation> = {
   overlay: 'overlay',
   darken: 'darken',
   lighten: 'lighten',
+  'color-dodge': 'color-dodge',
+  'color-burn': 'color-burn',
   'soft-light': 'soft-light',
   'hard-light': 'hard-light',
   difference: 'difference',
+  exclusion: 'exclusion',
+  hue: 'hue',
+  saturation: 'saturation',
   color: 'color',
   luminosity: 'luminosity',
 };
 
+// Every blend the canvas and CSS mix-blend-mode share (the SVG export writes the same names): the one list of them.
 export const BLEND_MODES = Object.keys(GCO) as BlendMode[];
+
+/** Screen pixels per layer pixel from which raster layers are drawn without smoothing. */
+export const PIXEL_VIEW_FROM = 4;
 
 let measureCtx: CanvasRenderingContext2D | null = null;
 
@@ -225,6 +234,9 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
   if (l.type === 'raster') {
     const buf = getBuffer(l.id);
     if (buf) {
+      // Close up (each pixel 4 screen px or more), pixels show as squares, as in Photoshop, Krita or SAI.
+      const m = ctx.getTransform(), px = Math.hypot(m.a, m.b) * (l.width / Math.max(1, buf.width));
+      ctx.imageSmoothingEnabled = px < PIXEL_VIEW_FROM;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(buf, l.x, l.y, l.width, l.height);
     }

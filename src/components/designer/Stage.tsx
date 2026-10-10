@@ -908,7 +908,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   // Brush and eraser (design/brushStroke.ts): size and density follow the pen's pressure.
   const paintSegment = (layer: Layer, a: { x: number; y: number }, b: { x: number; y: number }, pressure: number) => {
     const d = drag.current, buf = layer.type === 'raster' && beginEditCurrent(layer.id);
-    if (buf && layer.type === 'raster' && d?.kind === 'paint') addBrushSegment(d.stroke, d.live, buf, brushSegment(layer, a, b, brush, pressure));
+    if (buf && layer.type === 'raster' && d?.kind === 'paint') addBrushSegment(d.stroke, d.live, buf, brushSegment(layer, a, b, brush, pressure, doc.width));
   };
 
   const rasterMoveAt = useRef<{ d: Extract<Drag, { kind: 'objMove' }>; x: number; y: number } | null>(null);

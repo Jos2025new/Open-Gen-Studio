@@ -75,6 +75,31 @@ export function invertSelection(doc: DesignDoc): void {
   setSelection(doc.id, { ...sel, inverted: !sel.inverted });
 }
 
+/**
+ * Grow (px > 0) or shrink (px < 0) the selection by that many pixels, as Photoshop's Select > Modify. A square
+ * neighbourhood, done with the mask drawn shifted (2·px + 1 draws per axis, on the GPU); shrinking grows the outside.
+ */
+export function growSelection(doc: DesignDoc, px: number): void {
+  const sel = getSelection(doc.id), r = Math.round(Math.abs(px));
+  if (!sel || !r) return;
+  const flip = (src: HTMLCanvasElement) => {
+    const out = createCanvas(src.width, src.height), c = ctx2d(out);
+    c.fillStyle = '#fff';
+    c.fillRect(0, 0, out.width, out.height);
+    c.globalCompositeOperation = 'destination-out';
+    c.drawImage(src, 0, 0);
+    return out;
+  };
+  const spread = (src: HTMLCanvasElement, dx: number, dy: number) => {
+    const out = createCanvas(src.width, src.height), c = ctx2d(out);
+    for (let k = -r; k <= r; k++) c.drawImage(src, k * dx, k * dy);
+    return out;
+  };
+  const mask = selectionMask(doc, sel);
+  const grown = (m: HTMLCanvasElement) => spread(spread(m, 1, 0), 0, 1);
+  setSelection(doc.id, maskSelection(px > 0 ? grown(mask) : flip(grown(flip(mask)))));
+}
+
 const masks = new WeakMap<PixelSelection, HTMLCanvasElement>();
 /** The selection as a page-sized mask (alpha = selected), whatever its kind. Cached per selection. */
 export function selectionMask(doc: Pick<DesignDoc, 'width' | 'height'>, sel: PixelSelection): HTMLCanvasElement {

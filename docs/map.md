@@ -68,8 +68,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 102 |
+| [render.ts](../src/engine/design/render.ts) | 15 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [render.ts](../src/engine/design/render.ts) | 14 | 3 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
 | [history.ts](../src/engine/design/history.ts) | 12 | 5 |
 

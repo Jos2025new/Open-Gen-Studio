@@ -1,6 +1,6 @@
 import { uid } from '../../lib/id';
 import { getAssetBlob, putAssetBlob } from '../../lib/idb';
-import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, downloadBlob, fetchBlob } from '../../lib/media';
+import { blobToCanvas, blobToDataUrl, canvasToBlob, createCanvas, ctx2d, downloadBlob, fetchBlob } from '../../lib/media';
 import type { Asset, DesignDoc, Layer, LayerStep, RasterLayer, OpId, AdvancedValue, ShapeSpec, StrokeSpec, TextStyle } from '../types';
 import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../store/store';
 import * as D from './doc';
@@ -10,7 +10,7 @@ import { objectPick, setObjectPick } from './objectSelection';
 import { layerObjects } from './objectOps';
 import { composeRaster, rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
-import { exportDoc, layoutText, textAscent } from './render';
+import { drawDoc, exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
@@ -266,6 +266,40 @@ export function deleteLayers(sessionId: string, docId: string, layerIds: string[
   const gone = layerIds.filter((id) => doc.layers.some((l) => l.id === id && !l.locked));
   if (gone.length) mutateDoc(sessionId, docId, (d) => gone.reduce((acc, id) => D.removeLayer(acc, id), d));
   return layerIds.length - gone.length;
+}
+
+/**
+ * Layers drawn, as they show, into one new raster layer that takes the place of the first (bottom) one: what merge
+ * down and rasterize do. The bottom layer is drawn at full opacity and normal blend, and the result keeps its opacity,
+ * blend and folder, as Photoshop does; masks and FX between the layers are baked in, through the same renderer as the
+ * view. One undo step.
+ */
+export async function flattenLayers(sessionId: string, docId: string, ids: string[], name?: string): Promise<string | null> {
+  const doc = getDoc(sessionId, docId);
+  const layers = doc?.layers.filter((l) => ids.includes(l.id)) ?? [];
+  if (!doc || !layers.length) return null;
+  if (layers.some((l) => l.locked)) { toast('Unlock the layers first.', 'error'); return null; }
+  await ensureBuffers(layers);
+  const [base, ...rest] = layers;
+  const c = createCanvas(doc.width, doc.height);
+  drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: true, opacity: 1, blend: 'normal' } as Layer, ...rest] }, { resolution: 'document' });
+  const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: base.opacity, blend: base.blend, visible: base.visible, groupId: base.groupId };
+  setBuffer(out.id, c);
+  const gone = new Set(layers.map((l) => l.id));
+  mutateDoc(sessionId, docId, (d) => ({ ...d, activeLayerId: out.id, layers: d.layers.flatMap((l) => (l.id === base.id ? [out] : gone.has(l.id) ? [] : [l])) }));
+  return out.id;
+}
+
+/** Merge the layer into the one under it (Ctrl+E): the result takes the lower layer's place. */
+export function mergeDown(sessionId: string, docId: string, layerId: string): Promise<string | null> {
+  const doc = getDoc(sessionId, docId), i = doc?.layers.findIndex((l) => l.id === layerId) ?? -1;
+  if (!doc || i < 1) return Promise.resolve(null);
+  return flattenLayers(sessionId, docId, [doc.layers[i - 1].id, layerId]);
+}
+
+/** Text, shapes or lineart turned into pixels, as they show. */
+export function rasterizeLayer(sessionId: string, docId: string, layerId: string): Promise<string | null> {
+  return flattenLayers(sessionId, docId, [layerId]);
 }
 
 export function duplicateLayer(sessionId: string, docId: string, layerId: string): void {

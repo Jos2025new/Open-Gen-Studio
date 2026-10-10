@@ -280,7 +280,7 @@ export interface RemoteJob {
 }
 
 export interface Generation {
-  /** Its session was deleted while it ran: it finishes (its charge goes to Spending once) and is then removed with its results. */
+  /** Its session was deleted while running: it finishes (charged to Spending once), then is removed. */
   discard?: boolean;
   /** One variation per result, appended to the prompt of its own request (candidates that differ). */
   variants?: string[];
@@ -769,7 +769,7 @@ export interface Graph {
 // Designer
 
 export type LayerType = 'raster' | 'vector' | 'text';
-export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'soft-light' | 'hard-light' | 'difference' | 'color' | 'luminosity';
+export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' | 'lighten' | 'color-dodge' | 'color-burn' | 'soft-light' | 'hard-light' | 'difference' | 'exclusion' | 'hue' | 'saturation' | 'color' | 'luminosity';
 
 export interface LayerBase {
   id: string;
@@ -985,7 +985,7 @@ export interface AgentRequestMetrics {
   callTimings?: Array<{ ttfbMs: number; reasoningMs?: number; outputMs?: number; toolMs?: number; totalMs: number; reasoningTokens?: number; cachedTokens?: number }>;
   /** Calls that ended in an error: what failed and how long it took (no token sample, there was none). */
   failedCalls?: Array<{ error: string; seconds: number }>;
-  /** App time per plan card: from the end of the model call to the card in the chat (validation, model schemas, estimate). */
+  /** App time per plan card: from the model call's end to the card in the chat. */
   planCheckMs?: number[];
   /** Agent time until the first plan card. */
   msToPlan?: number;

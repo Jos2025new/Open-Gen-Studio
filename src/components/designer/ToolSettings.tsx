@@ -14,7 +14,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import type { DesignDoc, StrokeStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
-import { clearSelected, fillSelection, getSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
+import { clearSelected, fillSelection, getSelection, growSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
@@ -172,6 +172,7 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
   const setWand = (patch: Partial<typeof WAND_DEFAULT>) => setUi({ wand: { ...wand, ...patch } });
   const brush = useStore((s) => s.ui.brush);
   const sel = getSelection(doc.id);
+  const [grow, setGrow] = useState(2);
   const run = (fn: () => string | null) => { const err = fn(); if (err) toast(err, 'error'); };
   const cur = () => getDoc(sessionId, doc.id)!;
   return <div className="tool-settings" role="toolbar" aria-label="Selection settings">
@@ -187,6 +188,9 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
     <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Ctrl+A">All</button>
     <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
+    <InlineSlider label="Grow / shrink" unit="px" min={1} max={50} value={grow} onChange={setGrow} />
+    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), grow); }} data-tip={`Grows the selection ${grow} px on every side`}>Grow</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); growSelection(cur(), -grow); }} data-tip={`Shrinks the selection ${grow} px on every side`}>Shrink</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => clearSelected(sessionId, cur()))} data-tip="Delete · erases the selected pixels of the active raster layer">Delete</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => fillSelection(sessionId, cur(), brush.color, brush.opacity))} data-tip="Fills the selection with the brush color, on a new layer">Fill</button>
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>

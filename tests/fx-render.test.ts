@@ -283,3 +283,20 @@ describe('editor FX cache (filters run again only when what they read changes)',
     expect(blurs()).toBe(2 * n);
   });
 });
+
+describe('raster layers close up', () => {
+  it('from 4 screen px per pixel they are drawn without smoothing (pixels as squares); below, smoothed', async () => {
+    const { drawLayer, PIXEL_VIEW_FROM } = await import('../src/engine/design/render');
+    const layer = { ...newRasterLayer('R', { x: 0, y: 0, width: 100, height: 100 }, { width: 100, height: 100 }), id: 'px' };
+    setBuffer('px', recordingCanvas(100, 100) as never, false);
+    const smoothingAt = (zoom: number) => {
+      let seen: boolean | undefined;
+      const ctx = { save() {}, restore() {}, transform() {}, getTransform: () => ({ a: zoom, b: 0 }), drawImage() { seen = ctx.imageSmoothingEnabled; }, imageSmoothingEnabled: true, imageSmoothingQuality: 'low', globalAlpha: 1, globalCompositeOperation: 'source-over' };
+      drawLayer(ctx as never, layer);
+      return seen;
+    };
+    expect(smoothingAt(PIXEL_VIEW_FROM)).toBe(false);
+    expect(smoothingAt(8)).toBe(false);
+    expect(smoothingAt(2)).toBe(true);
+  });
+});

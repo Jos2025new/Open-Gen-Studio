@@ -40,8 +40,23 @@ export function newBrushStroke(brush: BrushOptions & { color: string; opacity: n
   return { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase, tip };
 }
 
-/** A segment in the layer's pixels, its width and density taken from the pressure. */
-export function brushSegment(layer: RasterLayer, a: { x: number; y: number }, b: { x: number; y: number }, brush: BrushOptions, pressure: number): { seg: [number, number, number, number, number]; density: number } {
+type Seg = [number, number, number, number, number];
+/** A segment in the layer's pixels, its width and density taken from the pressure; with mirror, its reflection too. */
+export function brushSegment(layer: RasterLayer, a: { x: number; y: number }, b: { x: number; y: number }, brush: BrushOptions, pressure: number, pageWidth?: number): { seg: Seg; density: number; mirror?: Seg } {
+  const one = brushSegmentOnly(layer, a, b, brush, pressure);
+  if (!brush.mirror || !pageWidth) return one;
+  // The reflection has the same width and density; it does not count again toward the start taper.
+  const m = segmentIn(layer, { x: pageWidth - a.x, y: a.y }, { x: pageWidth - b.x, y: b.y });
+  return { ...one, mirror: [...m, one.seg[4]] };
+}
+
+function segmentIn(layer: RasterLayer, a: { x: number; y: number }, b: { x: number; y: number }): [number, number, number, number] {
+  const kx = layer.pxWidth / layer.width, ky = layer.pxHeight / layer.height;
+  if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
+  return [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky];
+}
+
+function brushSegmentOnly(layer: RasterLayer, a: { x: number; y: number }, b: { x: number; y: number }, brush: BrushOptions, pressure: number): { seg: Seg; density: number } {
   const kx = layer.pxWidth / layer.width, ky = layer.pxHeight / layer.height;
   // A rotated image: the pointer is taken back into the image's own space, so the stroke lands under it.
   if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
@@ -54,10 +69,12 @@ export function brushSegment(layer: RasterLayer, a: { x: number; y: number }, b:
 }
 
 /** Record the segment in the stroke (its density too, when the tip keeps them) and paint it live. */
-export function addBrushSegment(stroke: RasterStroke, live: LiveStroke, buf: HTMLCanvasElement, s: { seg: [number, number, number, number, number]; density: number }): void {
-  stroke.segments.push(s.seg);
-  stroke.tip?.densities?.push(s.density);
-  paintLive(buf, live, { x: s.seg[0], y: s.seg[1] }, { x: s.seg[2], y: s.seg[3] }, s.seg[4], s.density);
+export function addBrushSegment(stroke: RasterStroke, live: LiveStroke, buf: HTMLCanvasElement, s: { seg: Seg; density: number; mirror?: Seg }): void {
+  for (const seg of s.mirror ? [s.seg, s.mirror] : [s.seg]) {
+    stroke.segments.push(seg);
+    stroke.tip?.densities?.push(s.density);
+    paintLive(buf, live, { x: seg[0], y: seg[1] }, { x: seg[2], y: seg[3] }, seg[4], s.density);
+  }
 }
 
 /**
@@ -68,9 +85,12 @@ export function endBrushStroke(stroke: RasterStroke, live: LiveStroke, buf: HTML
   const length = (brush.taperEnd ?? 0) * (layer.pxWidth / layer.width + layer.pxHeight / layer.height) / 2, segs = stroke.segments;
   if (!(length > 0) || !segs.length) return;
   const before = segs.map((s) => s.slice() as typeof s);
+  // With mirror the segments come in pairs (stroke, reflection): both get the same share; the length counts once.
+  const step = stroke.tip?.mirror ? 2 : 1;
   let i = segs.length - 1;
-  for (let fromEnd = 0; i >= 0 && fromEnd < length; i--) {
-    segs[i][4] *= taperAt(fromEnd, length, 'end');
+  for (let fromEnd = 0; i >= 0 && fromEnd < length; i -= step) {
+    const k = taperAt(fromEnd, length, 'end');
+    for (let j = i; j > i - step && j >= 0; j--) segs[j][4] *= k;
     fromEnd += Math.hypot(segs[i][2] - segs[i][0], segs[i][3] - segs[i][1]);
   }
   repaintLive(buf, live, before.slice(i + 1), segs, stroke.tip?.densities);

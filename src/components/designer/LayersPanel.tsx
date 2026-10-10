@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
-import { addEmptyLayer, deleteLayers, duplicateLayer, moveLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
+import { addEmptyLayer, deleteLayers, duplicateLayer, mergeDown, moveLayer, rasterizeLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
-import { drawLayer } from '../../engine/design/render';
+import { BLEND_MODES, drawLayer } from '../../engine/design/render';
 import { layerSelection, pickLayer, pickLayerRange, useLayerSelection } from '../../engine/design/selection';
 import { ensureBuffers, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { Field, IconButton, MenuItem } from '../ui/primitives';
@@ -24,7 +24,7 @@ const MIN_W = 200;
 const MAX_W = 520;
 
 
-const BLENDS: Layer['blend'][] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'soft-light', 'hard-light', 'difference', 'color', 'luminosity'];
+const BLENDS: Layer['blend'][] = BLEND_MODES;
 
 /** The layer alone, small, over a checkerboard: what it holds at a glance (drawn with the editor's renderer). */
 function LayerThumb({ doc, layer }: { doc: DesignDoc; layer: Layer }) {
@@ -205,6 +205,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       <FxMenu sessionId={sessionId} doc={doc} layer={layer} />
       {layer && <>
         <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
+        <IconButton icon={Merge} label="Merge down (Ctrl+E)" size="sm" disabled={index === 0 || layer.locked} data-tip="Merge down (Ctrl+E) · this layer and the one under it become one raster layer" onClick={() => void mergeDown(sessionId, doc.id, layer.id)} />
+        {layer.type !== 'raster' && layer.type !== 'fx' && <IconButton icon={Grid2x2} label="Rasterize layer" size="sm" disabled={layer.locked} data-tip="Rasterize · turns this layer into pixels you can paint on" onClick={() => void rasterizeLayer(sessionId, doc.id, layer.id)} />}
         {layer.type === 'raster' && <IconButton ref={pop.ref} size="sm" icon={Sparkles} label="Operations" className="layer-ops-btn" disabled={layer.locked} data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }} />}
         <span className="layer-actions-gap" />
         {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)

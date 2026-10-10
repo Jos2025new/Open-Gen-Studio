@@ -26,6 +26,8 @@ export interface BrushTip {
   keepOpacity?: boolean;
   /** Density of each segment (pressure), parallel to the stroke's segments; absent = full. */
   densities?: number[];
+  /** Painted with mirror: segments come in pairs, each followed by its reflection across the page's centre. */
+  mirror?: boolean;
 }
 
 /** The brush settings the tip comes from (ui.brush). */
@@ -38,6 +40,8 @@ export interface BrushOptions {
   /** Pressure from the pointer's speed, as Lineart does it (perfect-freehand): fast is light, slow is full. */
   simulatePressure?: boolean;
   pressureDensity?: boolean;
+  /** Paint a reflection of every stroke across the page's vertical centre line. */
+  mirror?: boolean;
   /** Distance (px, as the size) over which the stroke grows from a point at its start / shrinks to one at its end. */
   taperStart?: number;
   taperEnd?: number;
@@ -97,7 +101,7 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const texture = o.texture && o.texture !== 'none' && (o.textureStrength ?? 0) > 0 ? o.texture : undefined;
   const blend = !erase && o.blend && o.blend !== 'normal' ? o.blend : undefined;
   const keepOpacity = !erase && o.keepOpacity ? true : undefined;
-  return { hardness, ...(texture ? { texture, textureStrength: clamp01(o.textureStrength ?? 0) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}) };
+  return { hardness, ...(texture ? { texture, textureStrength: clamp01(o.textureStrength ?? 0) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */

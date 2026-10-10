@@ -13,7 +13,7 @@ import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, 
 import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
-import { deleteLayers, exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
+import { deleteLayers, exportDocFile, mergeDown, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, record, subscribeHistory } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
@@ -155,6 +155,10 @@ export function DesignerWorkspace() {
         const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
         if (ids.length < 2) toast('Select two or more layers (Ctrl or Shift-click) to group them.', 'info');
         else groupLayers(session.id, doc.id, ids);
+      } else if (mod && k === 'e' && !e.shiftKey && doc.activeLayerId) {
+        // Ctrl+E: merge the active layer down, as in Photoshop, Krita and SAI.
+        e.preventDefault();
+        void mergeDown(session.id, doc.id, doc.activeLayerId);
       } else if (mod && (k === 'a' || k === 'd' || k === 'j' || (k === 'i' && e.shiftKey))) {
         // Pixel selection: all, deselect, to a new layer, invert.
         e.preventDefault();
