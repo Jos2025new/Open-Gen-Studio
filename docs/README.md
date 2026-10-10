@@ -42,6 +42,10 @@
 - [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
 - [0014 — Guardar cada sesión por separado (propuesto, pendiente de aprobación)](decisions/0014-sesiones-separadas.md).
 
+## Propuestas de interfaz
+
+- [La interfaz del Designer según la filosofía de ibisPaint y Photoshop](propuesta-gui-pintura.md) (2026-10-10), sin implementar.
+
 ## Historial
 
 - [001-2026-10-W40](history/001-2026-10-W40.md) — 29393 bytes.

@@ -29,6 +29,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
+- [ ] **Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca a cada segundo siempre visible (tamaño y opacidad del pincel, deshacer, capas), herramientas con nombre y sin desbordamiento, capas con sus efectos dentro, interruptores de un toque, girar el lienzo e histograma. Secuencia de 8 pasos. **2026-10-10**, pedido por el usuario; sin decidir el orden.
 - [ ] **Designer, tras el 2026-10-09 (segunda parte):**
   - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
   - guardar cada sesión por separado (revisar antes con Astra; ADR primero);
