@@ -74,7 +74,8 @@ function OpRow({ sessionId, doc, layer, op, index, open, onOpen }: { sessionId: 
 
 /** The FX layer's settings: what it acts on, and its filters or effects (a single one, or the editable stack). */
 export function FxEditor({ sessionId, doc, layer }: { sessionId: string; doc: DesignDoc; layer: FxLayer }) {
-  const [open, setOpen] = useState<string | null>(layer.ops[layer.ops.length - 1]?.id ?? null);
+  // Each filter opens and closes on its own: opening one leaves the others as they are.
+  const [open, setOpen] = useState<ReadonlySet<string>>(() => new Set(layer.ops.length ? [layer.ops[layer.ops.length - 1].id] : []));
   const set = (c: Omit<Extract<FxCommand, { do: 'set' }>, 'do' | 'layer'>) => run(sessionId, doc.id, [{ do: 'set', layer: layer.id, ...c }]);
   const target = layer.scope === 'layer' ? fxTarget(doc.layers, layer.id) : null;
   const single = layer.simple && layer.ops.length === 1 ? layer.ops[0] : null;
@@ -87,7 +88,7 @@ export function FxEditor({ sessionId, doc, layer }: { sessionId: string; doc: De
       <button type="button" className="btn btn-sm fx-expose" onClick={() => set({ simple: false })}><LayersIcon size={13} />Edit as {layer.group} layer</button>
     </> : <>
       <div className="fx-ops" aria-label={layer.group === 'filter' ? 'Filters, last applied on top' : 'Effects, last applied on top'}>
-        {[...layer.ops].map((op, i) => ({ op, i })).reverse().map(({ op, i }) => <OpRow key={op.id} sessionId={sessionId} doc={doc} layer={layer} op={op} index={i} open={open === op.id} onOpen={() => setOpen(open === op.id ? null : op.id)} />)}
+        {[...layer.ops].map((op, i) => ({ op, i })).reverse().map(({ op, i }) => <OpRow key={op.id} sessionId={sessionId} doc={doc} layer={layer} op={op} index={i} open={open.has(op.id)} onOpen={() => setOpen((o) => { const n = new Set(o); if (!n.delete(op.id)) n.add(op.id); return n; })} />)}
         {!layer.ops.length && <p className="field-hint">No {layer.group === 'filter' ? 'filters' : 'effects'} yet: add one below.</p>}
       </div>
       <Field label={`Add ${layer.group}`}>

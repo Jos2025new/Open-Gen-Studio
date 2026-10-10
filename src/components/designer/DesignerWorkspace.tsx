@@ -1,3 +1,4 @@
+import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
 import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
 import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
@@ -266,7 +267,7 @@ export function DesignerWorkspace() {
               const raw = e.target.value.trim().replace(',', '.');
               const percent = Number(raw);
               setZoomDraft(null);
-              if (raw && Number.isFinite(percent)) window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: Math.min(800, Math.max(5, percent)) / (zoom * 100) }));
+              if (raw && Number.isFinite(percent)) window.dispatchEvent(new CustomEvent('ogs:designer-zoom', { detail: Math.min(MAX_ZOOM * 100, Math.max(5, percent)) / (zoom * 100) }));
             }} onKeyDown={(e) => {
               if (e.key === 'Enter') e.currentTarget.blur();
               if (e.key === 'Escape') { e.currentTarget.value = String(Math.round(zoom * 100)); e.currentTarget.blur(); e.stopPropagation(); }

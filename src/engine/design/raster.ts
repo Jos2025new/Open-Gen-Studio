@@ -179,6 +179,17 @@ export interface LiveStroke {
   tip?: BrushTip;
   /** The last segment's width and density: the next one starts from them. */
   last?: { width: number; density: number };
+  /**
+   * The mask's pixels, kept in memory: segments are stamped here and only the touched area is written to the mask
+   * canvas, never read back (a canvas read waits for the GPU on every move). Absent for very large layers.
+   */
+  pixels?: ImageData;
+}
+// Above this many pixels the live mask is read per segment as before, instead of holding a full copy in memory.
+const LIVE_PIXELS_MAX = 16_000_000;
+function livePixels(live: LiveStroke): ImageData | undefined {
+  if (!live.pixels && typeof ImageData !== 'undefined' && live.mask.width * live.mask.height <= LIVE_PIXELS_MAX) live.pixels = new ImageData(live.mask.width, live.mask.height);
+  return live.pixels;
 }
 
 // A brush stroke is being painted (from its first segment until its edit is committed): the FX cache may then
@@ -200,9 +211,15 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
     const box = segmentBox([a.x, a.y, b.x, b.y, reach]);
     const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
     if (w > 0 && h > 0) {
-      const m = ctx2d(live.mask), img = m.getImageData(x, y, w, h);
-      stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
-      m.putImageData(img, x, y);
+      const m = ctx2d(live.mask), all = livePixels(live);
+      if (all) {
+        stampSegment(all, 0, 0, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
+        m.putImageData(all, 0, 0, x, y, w, h);
+      } else {
+        const img = m.getImageData(x, y, w, h);
+        stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
+        m.putImageData(img, x, y);
+      }
       live.last = { width, density };
     }
   } else strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
@@ -238,12 +255,15 @@ export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: r
   const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
   const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
   if (w <= 0 || h <= 0) return;
-  const m = ctx2d(live.mask), img = m.createImageData(w, h), rgb = hexRgb(live.color);
+  const m = ctx2d(live.mask), rgb = hexRgb(live.color), img = m.createImageData(w, h);
   segments.forEach((seg, i) => {
     const b = segmentBox(seg);
     if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, seg, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
   });
   m.putImageData(img, x, y);
+  // The in-memory copy follows, so a later segment never writes back the tail as it was before the taper.
+  const all = live.pixels;
+  if (all) for (let row = 0; row < h; row++) all.data.set(img.data.subarray(row * w * 4, (row + 1) * w * 4), ((y + row) * all.width + x) * 4);
   if (live.clip) {
     m.save();
     m.globalCompositeOperation = 'destination-in';

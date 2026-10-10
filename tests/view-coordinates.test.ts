@@ -24,7 +24,7 @@ describe('pointer stays under the mouse when the canvas view changes', () => {
     const view = { x: -20, y: 70, zoom: 1 }, anchor = { x: 300, y: 400 }, local = { left: 0, top: 0 };
     const point = screenToDocument(anchor, view, local);
     expect(documentToScreen(point, zoomAt(view, anchor.x, anchor.y, 2), local)).toEqual(anchor);
-    expect(zoomAt(view, 0, 0, 100).zoom).toBe(8);
+    expect(zoomAt(view, 0, 0, 100).zoom).toBe(32);
     expect(zoomAt(view, 0, 0, .001).zoom).toBe(.05);
   });
 });

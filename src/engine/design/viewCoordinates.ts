@@ -8,8 +8,11 @@ export function screenToDocument(point: Point, view: View, origin: Origin): Poin
 export function documentToScreen(point: Point, view: View, origin: Origin): Point {
   return { x: origin.left + view.x + point.x * view.zoom, y: origin.top + view.y + point.y * view.zoom };
 }
+export const MAX_ZOOM = 32;
+
 export function zoomAt(view: View, px: number, py: number, factor: number): View {
-  const zoom = Math.min(8, Math.max(0.05, view.zoom * factor));
+  // Up to 3200 %, as Photoshop: close enough to paint single pixels.
+  const zoom = Math.min(MAX_ZOOM, Math.max(0.05, view.zoom * factor));
   const k = zoom / view.zoom;
   return { zoom, x: px - (px - view.x) * k, y: py - (py - view.y) * k };
 }
