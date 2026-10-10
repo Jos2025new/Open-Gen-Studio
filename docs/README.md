@@ -44,7 +44,7 @@
 
 ## Propuestas de interfaz
 
-- [La interfaz del Designer según la filosofía de ibisPaint y Photoshop](propuesta-gui-pintura.md) (2026-10-10), sin implementar.
+- [La interfaz del Designer según la filosofía de ibisPaint, Photoshop, Feather 3D y SketchUp](propuesta-gui-pintura.md) (2026-10-10), sin implementar.
 
 ## Historial
 

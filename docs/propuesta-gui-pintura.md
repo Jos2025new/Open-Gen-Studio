@@ -59,3 +59,83 @@ Fecha: 2026-10-10. Estado: **propuesta, sin implementar**. La pidió el usuario 
 8. **Más adelante:** las herramientas dedo y desenfoque como pinceles, y una cuadrícula de puntas como la de Photoshop.
 
 Para cada paso: probarlo en el sandbox con capturas, y que el usuario lo vea antes de seguir. Los pasos 1, 2 y 5 no cambian nada guardado; el 4 y el 6 cambian la interfaz y necesitan el visto bueno del usuario sobre su aspecto.
+
+# Segunda ronda (2026-10-10): Feather 3D y SketchUp, cruzados con lo anterior
+
+El usuario añadió dos capturas: Feather 3D, que mezcla 2D y 3D, y SketchUp, que para él es de una «simplicidad y accesibilidad extrema». Sus palabras: «todo está accesible y lo que no se descubre cuando se usa una tool o se requiere una función». También recordó que «nosotros ni por asomo tenemos tantas funciones aún, así que debería ser relativamente fácil disponer mejor nuestras features», y que el dibujo debe ser «accesiblemente robusto» aunque no sea lo que la app quiere destacar.
+
+## Lo que se ve (inferido de las capturas)
+
+**Feather 3D:**
+- **Una tira vertical estrecha a la izquierda** con todo lo de cada segundo: la punta, el color, el tamaño («15»), la opacidad («100%»), la forma del trazo, el cuentagotas, deshacer y rehacer.
+- **Arriba a la derecha,** botones de modo y de vista (plano de dibujo, espejo, vistas).
+- **Abajo en el centro,** tres botones grandes para los modos principales: dibujar, plano y vista 3D.
+- **Arriba a la izquierda,** inicio y menú.
+- **El lienzo ocupa casi toda la pantalla.**
+
+**SketchUp:**
+1. **El lienzo,** que ocupa el centro.
+2. **El título.**
+3. **Un menú clásico** con todas las órdenes.
+4. **Una barra con las herramientas principales.**
+5. **Una barra de estado abajo** que **enseña la herramienta activa y sus modificadores** («Click or drag to select objects. Shift = Add/Subtract…»), y un campo **Measurements** para escribir valores exactos.
+6. **La bandeja derecha («Default Tray»)** con paneles plegables uno debajo de otro: Entity Info, Materials, Components, Styles, Tags, Shadows, Scenes e Instructor. Instructor explica la herramienta activa.
+
+Además, a la izquierda, una **paleta grande agrupada por familias** (seleccionar, pintar y borrar; dibujar; mover, girar y escalar; medir y texto; cámara).
+
+## Coincidencias entre las cuatro apps, con su peso
+
+Peso = cuántas de las cuatro lo hacen × cuánto le falta hoy al Designer × lo poco que cuesta. Alto, medio o bajo.
+
+| Patrón | ibisPaint | Photoshop | Feather | SketchUp | Designer hoy | Peso |
+|---|---|---|---|---|---|---|
+| **A. Lo de cada segundo siempre visible** (tamaño, opacidad, color, deshacer) | barra inferior | barra de opciones | tira izquierda | — | escondido en una pestaña o tras el desbordamiento | **Alto** |
+| **B. Herramientas a la vista, agrupadas por familia, sin desbordar** | barra con nombres | barra y grupos | pocas, grandes | paleta por familias | barra inferior que se desborda | **Alto** |
+| **C. Paneles apilados y plegables, varios a la vez** | — | paneles | — | bandeja | dos pestañas que se excluyen (capas o ajustes) | **Alto** |
+| **D. La herramienta activa se explica sola** (qué hace y sus modificadores) | — | — | — | barra de estado e Instructor | tres avisos sueltos (`StageHint`) y tooltips | **Alto** (lo que el usuario más valora de SketchUp) |
+| **E. Interruptores de un toque sobre el lienzo** | arriba a la derecha | — | arriba a la derecha | — | la regla y el ajuste dentro de sus menús | Medio |
+| **F. Pocos modos grandes y claros** | — | — | tres abajo | — | Edit / Objects / Layer en los ajustes | Medio |
+| **G. Valores exactos al escribir** | valores en la barra | campos | — | Measurements | `InlineSlider` ya admite escribir; posición y tamaño en propiedades | Bajo (casi resuelto) |
+| **H. El lienzo domina** | sí | — | sí | sí | sí, con márgenes ya reducidos | Bajo (hecho) |
+
+## La interfaz que se deduce para el Designer
+
+Lo que ya tenemos, mejor dispuesto; sin funciones nuevas:
+
+- **Izquierda, tira rápida (A, como Feather):**
+  - con pincel o borrador: color, tamaño y opacidad (cada uno con − y +), la punta y el cuentagotas;
+  - con las demás herramientas, sus dos o tres valores principales;
+  - siempre: deshacer y rehacer.
+
+  Sustituye a los ajustes compactos de la barra inferior.
+- **Abajo, solo herramientas (B, como SketchUp e ibisPaint),** agrupadas por familia:
+  - Editar (mover, mano);
+  - Seleccionar (rectángulo, lazo, varita);
+  - Pintar (pincel, Lineart, borrador, cubo, degradado);
+  - Formas, Líneas y Texto;
+  - Guías (Regla);
+  - Color (cuentagotas).
+
+  Cada grupo muestra su herramienta activa y se abre al pulsarlo, sin flechas de desbordamiento.
+- **Derecha, bandeja de paneles plegables (C, como SketchUp),** en lugar de dos pestañas:
+  - **Capas,** con fusión, opacidad y bloqueos arriba y los FX sangrados bajo su capa;
+  - **Ajustes de la herramienta** (completos);
+  - **Propiedades de la capa** y **FX**.
+
+  Cada uno se pliega por separado y recuerda su estado.
+- **Abajo del lienzo, barra de estado (D, como SketchUp):**
+  - una línea con la herramienta activa y sus modificadores («Pincel · Alt: cuentagotas · Mayús: …»), que reúne los avisos de hoy;
+  - a la derecha, el valor que se está cambiando (tamaño, ángulo, posición) para escribirlo.
+- **Arriba a la derecha del lienzo, interruptores (E):** regla activa, imán y alineación, vista de píxeles y reglas de página.
+
+## Secuencia revisada (sustituye a la de la primera ronda)
+
+1. **Barra de estado contextual (D).** Peso alto y coste bajo: reúne los avisos que ya existen y el texto de los tooltips; no mueve nada de sitio. Es lo que más acerca el Designer a SketchUp.
+2. **Tira rápida a la izquierda (A),** con deshacer y rehacer. Reutiliza `InlineSlider` y los campos compactos.
+3. **Bandeja de paneles plegables en lugar de pestañas (C).** Resuelve lo de «elegir entre ver las capas o el pincel».
+4. **Herramientas agrupadas por familia, sin desbordamiento (B).**
+5. **Interruptores sobre el lienzo (E).**
+6. **Capas al estilo Photoshop** (fusión y opacidad arriba, FX sangrados): va dentro de la bandeja.
+7. **Girar el lienzo, histograma en Niveles, rueda de color.**
+
+Comprobación de cada paso: capturas en el sandbox y que el usuario lo vea antes del siguiente. Los pasos 1, 2 y 5 no cambian la distribución general. El 3 y el 4 sí: primero se enseñan como maqueta.
