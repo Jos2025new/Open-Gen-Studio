@@ -287,8 +287,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   }, []);
 
   const fit = useCallback(() => {
-    const pad = size.w < 500 ? 24 : 72;
-    const bottom = window.innerWidth < 768 ? 24 : 150; // composer is below the canvas on narrow screens
+    // A thin margin, as Photoshop or Krita fit on screen; the bottom keeps clear of the docked toolbar (2026-10-10).
+    const pad = size.w < 500 ? 12 : 24;
+    const bottom = window.innerWidth < 768 ? 12 : 120; // composer is below the canvas on narrow screens
     const zoom = Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4);
     const z = Math.max(0.05, zoom);
     setView({ zoom: z, x: (size.w - doc.width * z) / 2, y: Math.max(pad / 2, (size.h - bottom - doc.height * z) / 2) });
