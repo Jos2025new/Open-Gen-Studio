@@ -3,7 +3,8 @@ import type { DesignTool } from './design/rules';
 /** Designer tool keys: the keyboard handler and Settings → Shortcuts both read this map, so they never drift. */
 export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'hand', m: 'select', i: 'eyedropper', b: 'brush', g: 'fill', u: 'gradient', p: 'lineart', e: 'eraser', r: 'rect', o: 'ellipse', l: 'line', t: 'text', k: 'ruler' };
 
-const TOOL_NAMES: Record<DesignTool, string> = {
+/** One name per tool; typed as a complete record, so a new tool cannot be left out (the inventory test reads it). */
+export const TOOL_NAMES: Record<DesignTool, string> = {
   move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler',
 };
 

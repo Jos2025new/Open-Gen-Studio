@@ -1,13 +1,14 @@
-import { ChevronLeft, ChevronRight, DraftingCompass, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { DraftingCompass, Ruler, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
-import { InlineColor, InlineSlider } from './InlineControls';
-import { EditOps, SnapControl, ToolSettings } from './ToolSettings';
+import { InlineColor } from './InlineControls';
+import { EditOps, SnapControl } from './ToolSettings';
+import { ContextStrip } from './ContextStrip';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'move', icon: MousePointer2, label: 'Edit (V) · drag to move and select objects' }, { id: 'hand', icon: Hand, label: 'Pan (H)' },
@@ -20,6 +21,20 @@ const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [
   { id: 'text', icon: Type, label: 'Text (T)' },
 ];
 
+/*
+ * Where every tool lives in the rail, by family (2026-10-10, docs/plan-designer-ux.md): the rail is drawn from this
+ * list and tests/designer-inventory.test.ts fails if a tool has no place in it, so none can get lost when the rail
+ * changes. Frequent tools stay one click away; only variants (shapes and lines, fill and gradient) share a button.
+ */
+export type RailItem = DesignTool | 'group:shapes' | 'group:fill';
+export const RAIL: Array<{ family: string; items: RailItem[] }> = [
+  { family: 'Edit', items: ['move', 'hand'] },
+  { family: 'Select', items: ['select'] },
+  { family: 'Paint', items: ['brush', 'eraser', 'lineart', 'group:fill'] },
+  { family: 'Shapes and text', items: ['group:shapes', 'text'] },
+  { family: 'Guides and color', items: ['ruler', 'eyedropper'] },
+];
+
 /** Tools that share one rail button: it shows the family's icon and opens its choices. */
 const GROUPS: Array<{ id: string; icon: LucideIcon; label: string; after: DesignTool; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }> = [
   { id: 'shapes', icon: Shapes, label: 'Shapes', after: 'eyedropper', tools: [
@@ -29,8 +44,16 @@ const GROUPS: Array<{ id: string; icon: LucideIcon; label: string; after: Design
     { id: 'line', icon: Minus, label: 'Straight line', key: 'L' }, { id: 'curve', icon: Spline, label: 'Curve' }, { id: 'arrow', icon: MoveUpRight, label: 'Arrow' },
   ] },
 ];
+const FILL_GROUP = { id: 'fill', icon: PaintBucket, label: 'Fill and gradient', after: 'eyedropper' as DesignTool, tools: [
+  { id: 'fill' as DesignTool, icon: PaintBucket, label: 'Fill', key: 'G' }, { id: 'gradient' as DesignTool, icon: Blend, label: 'Gradient', key: 'U' },
+] };
+const SHAPES_GROUP = { ...GROUPS[0], label: 'Shapes and lines', tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
+/** Every tool the rail offers, directly or inside a group: what the inventory test checks. */
+export function railTools(): DesignTool[] {
+  return RAIL.flatMap((f) => f.items).flatMap((i) => (i === 'group:shapes' ? SHAPES_GROUP.tools.map((t) => t.id) : i === 'group:fill' ? FILL_GROUP.tools.map((t) => t.id) : [i]));
+}
 
-function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: (typeof GROUPS)[number]; tool: DesignTool }) {
+function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: { id: string; icon: LucideIcon; label: string; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }; tool: DesignTool }) {
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>
@@ -43,32 +66,6 @@ function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: (typeof GROUPS
   </>;
 }
 
-function ContextControls({ tool, children }: { tool: DesignTool; children: ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ overflow: false, left: false, right: false });
-  const measure = () => {
-    const el = ref.current;
-    if (!el) return;
-    const next = { overflow: el.scrollWidth > el.clientWidth + 1, left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 };
-    setEdges((old) => old.overflow === next.overflow && old.left === next.left && old.right === next.right ? old : next);
-  };
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.scrollLeft = 0;
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    if (el.firstElementChild) observer.observe(el.firstElementChild);
-    measure();
-    return () => observer.disconnect();
-  }, [tool]);
-  return <div className="tool-family palette-quick">
-    {edges.overflow && <button type="button" className="context-scroll" aria-label="Scroll tool settings left" data-tip="Previous tool settings" disabled={!edges.left} onClick={() => ref.current?.scrollBy({ left: -180, behavior: 'smooth' })}><ChevronLeft size={12} /></button>}
-    <div ref={ref} className="palette-quick-scroll" onScroll={measure}><div className="palette-quick-content">{children}</div></div>
-    {edges.overflow && <button type="button" className="context-scroll" aria-label="Scroll tool settings right" data-tip="More tool settings" disabled={!edges.right} onClick={() => ref.current?.scrollBy({ left: 180, behavior: 'smooth' })}><ChevronRight size={12} /></button>}
-  </div>;
-}
-
 export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc; children?: ReactNode }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
@@ -76,26 +73,21 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
   const strokeTool = ['line', 'curve', 'arrow'].includes(tool);
   const color = tool === 'text' ? ui.text.color : tool === 'lineart' ? ui.lineart.color : shapeTool ? (strokeTool ? ui.shape.stroke ?? '#ffffff' : ui.shape.fill ?? '#d4f25a') : ui.brush.color;
   const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, [strokeTool ? 'stroke' : 'fill']: color } } : { brush: { ...ui.brush, color } });
-  const influence = tool === 'move' || (tool === 'lineart' && ui.lineartMode === 'edit');
-  const contextualSettings = ['select', 'fill', 'gradient'].includes(tool);
-  const size = influence ? ui.lineartInfluence ?? 80 : tool === 'text' ? ui.text.fontSize : tool === 'lineart' ? ui.lineart.size : shapeTool ? ui.shape.strokeWidth : ui.brush.size;
-  const setSize = (v: number) => setUi(influence ? { lineartInfluence: v } : tool === 'text' ? { text: { ...ui.text, fontSize: v } } : tool === 'lineart' ? { lineart: { ...ui.lineart, size: v } } : shapeTool ? { shape: { ...ui.shape, strokeWidth: v } } : { brush: { ...ui.brush, size: v } });
   const button = (id: DesignTool) => {
     const t = TOOLS.find((t) => t.id === id)!;
     const reason = toolBlockReason(id, activeLayer(doc));
     return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: id })} />;
   };
-  const shapes = { ...GROUPS[0], tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
-  return <div className="tool-rail" role="toolbar" aria-label="Design tools">
-    <div className="palette-fixed"><div className="tool-family">{button('move')}{button('hand')}<span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></div>
-    <div className="tool-family"><InlineColor label="Active color" value={color} onChange={setColor} />{button('brush')}{button('eraser')}<ToolGroup doc={doc} group={shapes} tool={tool} />{button('lineart')}{button('select')}{button('text')}{button('fill')}{button('gradient')}</div>
+  const item = (i: RailItem) => (i === 'group:shapes' ? <ToolGroup key={i} doc={doc} group={SHAPES_GROUP} tool={tool} /> : i === 'group:fill' ? <ToolGroup key={i} doc={doc} group={FILL_GROUP} tool={tool} /> : button(i));
+  return <><ContextStrip sessionId={sessionId} doc={doc} /><div className="tool-rail" role="toolbar" aria-label="Design tools">
+    <div className="palette-fixed">
+      {RAIL.map((f) => <div key={f.family} className="tool-family" role="group" aria-label={f.family}>
+        {f.family === 'Paint' && <InlineColor label="Active color" value={color} onChange={setColor} />}
+        {f.items.map(item)}
+        {f.family === 'Edit' && <><span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span><IconButton icon={Ruler} label={`${ui.rulers ? 'Hide' : 'Show'} rulers and guides (Shift+R)`} active={ui.rulers ?? false} aria-pressed={ui.rulers ?? false} size="sm" onClick={() => setUi({ rulers: !ui.rulers })} /></>}
+      </div>)}
     </div>
-    <ContextControls tool={tool}>
-      {contextualSettings ? <>{button('eyedropper')}<ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact /></> : <>
-      {button('eyedropper')}
-      {!['hand', 'select', 'eyedropper', 'fill', 'gradient'].includes(tool) && <InlineSlider label={influence ? 'Influence' : 'Size'} unit="px" min={1} max={influence || tool === 'text' ? 500 : tool === 'lineart' ? 120 : shapeTool ? 40 : 240} value={size} onChange={setSize} />}
-      </>}
-    </ContextControls>
 
-  </div>;
+
+  </div></>;
 }

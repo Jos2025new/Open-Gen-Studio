@@ -98,6 +98,12 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   useEffect(() => {
     if (previousTool.current !== tool) { setTab('props'); setCollapsed(false); previousTool.current = tool; }
   }, [tool, setTab, setCollapsed]);
+  // "Settings…" in the context strip opens this panel on the tool's full settings.
+  useEffect(() => {
+    const open = (e: Event) => { setTab((e as CustomEvent<'layers' | 'props'>).detail); setCollapsed(false); };
+    window.addEventListener('ogs:designer-panel', open);
+    return () => window.removeEventListener('ogs:designer-panel', open);
+  }, [setTab, setCollapsed]);
   const resize = useRef<{ x: number; w: number } | null>(null);
   const patch = (value: Partial<Layer>) => { if (layer && !layer.locked) patchLayer(sessionId, doc.id, layer.id, value); };
   const index = doc.layers.findIndex((l) => l.id === layer?.id);

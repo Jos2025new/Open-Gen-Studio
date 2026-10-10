@@ -259,3 +259,14 @@
 .stroke-ruler.is-off .stroke-ruler-guide { opacity: .35; }
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
 .stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }
+/* Context strip (ContextStrip.tsx): the active tool's essentials above the tool box; lines wrap, nothing scrolls. */
+.designer-palette { position: relative; }
+.context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
+.context-strip .tool-settings { display: contents; }
+.context-strip .opt { height: var(--control-h); }
+.context-strip .opt.opt-slider { flex: 0 0 auto; width: 150px; }
+.context-strip .opt-hint { display: none; }
+.context-target { display: inline-flex; gap: 4px; align-items: baseline; padding: 0 6px 0 2px; font-size: 11px; color: var(--text-2); white-space: nowrap; border-right: 1px solid var(--border-strong); margin-right: 2px; }
+.context-target strong { color: var(--text); font-weight: 600; }
+.context-target span { color: var(--accent); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.context-more { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }

@@ -46,6 +46,8 @@
 
 - [La interfaz del Designer según la filosofía de ibisPaint, Photoshop, Feather 3D y SketchUp](propuesta-gui-pintura.md) (2026-10-10), sin implementar.
 
+- [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
+
 ## Historial
 
 - [001-2026-10-W40](history/001-2026-10-W40.md) — 29393 bytes.
