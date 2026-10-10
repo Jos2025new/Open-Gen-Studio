@@ -192,7 +192,7 @@ export default [
   },
   {
     id: 'raster-export-resolution',
-    what: 'PNG/JPG y galería entregan el documento completo con el mismo plan FX; el límite raster se rechaza y llega al toast de exportación, sin reducir silenciosamente.',
+    what: 'PNG/JPG y galería entregan el documento completo con el mismo plan FX; el tope de píxeles solo limita FX efectivos; dimensiones inválidas y fallos reales llegan al toast de exportación, sin reducir silenciosamente.',
     sides: [
       ['src/engine/design/render.ts', "resolution: 'document'"],
       ['src/engine/design/exportLimits.ts', 'export function checkExportSize'],

@@ -109,7 +109,7 @@ Pedido del usuario: el Designer iba lento al pintar «o hacer cualquier cosa», 
   - hay que leer el formato viejo y migrarlo, con aprobación explícita del usuario;
   - hoy el JSON y los blobs no se guardan como una operación conjunta (aviso de Astra).
 
-  Paso 1: un ADR con el formato, la lectura del viejo, cómo se mantienen las protecciones y cómo se comprueba; lo revisa Astra y lo aprueba el usuario. Paso 2: el código, ampliando los tests de persistencia existentes.
+  Paso 1: [ADR 0014 propuesto](decisions/0014-sesiones-separadas.md), redactado y revisado contra código por Astra el 2026-10-10; incluye formato, lectura del viejo, protecciones, atomicidad y comprobación. **Pendiente de aprobación del usuario**. Paso 2: el código, ampliando los tests de persistencia existentes.
 - **Descartado:**
   - **Serializar en un worker:** enviarle el estado cuesta casi lo mismo que convertirlo ([surma.dev](https://surma.dev/things/is-postmessage-slow), [Mozilla 1356546](https://bugzilla.mozilla.org/show_bug.cgi?id=1356546)).
   - **Redondear decimales de los trazos:** aporta poco y toca los datos.

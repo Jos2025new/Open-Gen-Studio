@@ -40,6 +40,7 @@
 - [0011 — Capas de filtros y efectos no destructivos (FX)](decisions/0011-capas-fx.md).
 - [0012 — Registro de rendimiento para sesiones de prueba](decisions/0012-registro-de-rendimiento.md).
 - [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
+- [0014 — Guardar cada sesión por separado (propuesto, pendiente de aprobación)](decisions/0014-sesiones-separadas.md).
 
 ## Historial
 

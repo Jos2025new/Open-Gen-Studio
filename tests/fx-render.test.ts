@@ -161,6 +161,16 @@ describe('full-resolution FX export', () => {
     expect(sizes).toEqual([]);
     expect(encoded).toBe(0);
   });
+  it.each([[8192, 8192], [8000, 6000]])('exports %s × %s without FX at full resolution', async (width, height) => {
+    await exportDoc({ ...page(), width, height });
+    expect(sizes).toEqual([[width, height]]);
+    expect(encoded).toBe(1);
+  });
+  it.each([[8193, 100], [NaN, 100], [0, 100], [100.5, 100]])('rejects invalid dimensions without FX: %s × %s', async (width, height) => {
+    await expect(exportDoc({ ...page(), width, height })).rejects.toThrow(/Export cancelled.*8,192.*No file/i);
+    expect(sizes).toEqual([]);
+    expect(encoded).toBe(0);
+  });
   it('reports a lost browser context instead of encoding a broken export', async () => {
     contextLost = true;
     await expect(exportDoc(largePage(200, 100))).rejects.toThrow(/Export failed.*full resolution.*No file/i);

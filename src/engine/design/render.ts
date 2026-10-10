@@ -362,7 +362,7 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
 }
 
 export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {
-  checkExportSize(doc.width, doc.height);
+  checkExportSize(doc.width, doc.height, fxPlan(doc.layers).some((step) => step.t !== 'draw'));
   try {
     const c = createCanvas(doc.width, doc.height);
     const ctx = ctx2d(c);
