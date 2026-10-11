@@ -67,7 +67,16 @@ test('rectangle: one click transforms, double-click edits (corner and blur knots
   expect(s1.ry).toBeUndefined();
   // Ry alone: now an ellipse corner. Then Ctrl: both radii equal.
   await dragKnot(page, 'ry', 0, 30);
-  expect((await shape(page)).ry).not.toBeCloseTo(s1.rx, 1);
+  const sr = await shape(page);
+  expect(sr.ry).not.toBeCloseTo(s1.rx, 1);
+  // Only the dragged radius moves: Rx keeps its value (user's rule; Ctrl or «Lock radii» move both).
+  expect(sr.rx).toBeCloseTo(s1.rx, 6);
+  // «Lock radii» in the bar: a plain drag moves both, like Ctrl.
+  await strip(page).getByRole('switch', { name: /Lock radii/ }).click();
+  await dragKnot(page, 'rx', -10, 0);
+  const sl = await shape(page);
+  expect(sl.rx).toBeCloseTo(sl.ry, 6);
+  await strip(page).getByRole('switch', { name: /Lock radii/ }).click();
   await dragKnot(page, 'ry', 0, 40, 'Control');
   const s2 = await shape(page);
   expect(s2.rx).toBeCloseTo(s2.ry, 6);

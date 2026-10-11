@@ -124,6 +124,8 @@ export interface UiState {
   /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
   strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
   strokeRulerKind?: import('../engine/design/strokeRuler').RulerKind;
+  /** Shape edit mode: Rx and Ry move together, as with Ctrl held (ShapeKnots). */
+  shapeLockRadii?: boolean;
   /** The help line above the Designer canvas (ToolHelp.tsx); on unless turned off. */
   toolHelp?: boolean;
   /** Designer bottom bar: the toolbox (default) or the prompt box. */

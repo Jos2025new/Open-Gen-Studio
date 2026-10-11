@@ -60,19 +60,20 @@ export function cornerKnots(s: ShapeSpec): { rx: [number, number]; ry: [number, 
 export function dragRx(s: ShapeSpec, px: number, lock: boolean): Pick<ShapeSpec, 'rx' | 'ry'> {
   const b = rectBox(s);
   if (lock) { const r = clamp(b.x + b.w - px, 0, Math.min(b.w, b.h) / 2); return { rx: r, ry: r }; }
-  // Ry unset stays unset (it copies Rx, as in Inkscape); a legacy radius becomes Ry.
-  return { rx: clamp(b.x + b.w - px, 0, b.w / 2), ry: s.ry ?? (s.rx == null && s.radius ? cornerRadii(s).ry : undefined) };
+  // Without Ctrl (or the lock) only Rx moves: Ry keeps the radius it shows now. With no rounding yet (Ry 0), Ry stays
+  // unset and copies Rx, so the first drag rounds the corners at all (an Rx with Ry 0 draws sharp corners).
+  const cur = cornerRadii(s);
+  return { rx: clamp(b.x + b.w - px, 0, b.w / 2), ry: cur.ry > 0 ? cur.ry : s.ry };
 }
 
 /** Dragging the Ry knot to page y (Inkscape's RectKnotHolderEntityRY::knot_set). */
 export function dragRy(s: ShapeSpec, py: number, lock: boolean): Pick<ShapeSpec, 'rx' | 'ry'> {
   const b = rectBox(s), cur = cornerRadii(s);
   if (lock) { const r = clamp(py - b.y, 0, Math.min(b.w, b.h) / 2); return { rx: r, ry: r }; }
-  // Legacy radius: it becomes Rx, and Ry moves alone.
-  if (s.rx == null && s.ry == null && s.radius) return { rx: cur.rx, ry: clamp(py - b.y, 0, b.h / 2) };
-  // Rx unset or 0 (Inkscape checks the attribute, not the radius drawn): Ry alone, capped by the shorter side.
-  if (s.rx == null || s.rx === 0) return { rx: s.rx, ry: clamp(py - b.y, 0, Math.min(b.w, b.h) / 2) };
-  return { rx: s.rx, ry: clamp(py - b.y, 0, b.h / 2) };
+  // Without Ctrl (or the lock) only Ry moves: Rx keeps the radius it shows now (unset at 0, as above). With Rx unset or
+  // 0, Inkscape caps Ry by the shorter side.
+  const free = s.rx == null || s.rx === 0;
+  return { rx: cur.rx > 0 ? cur.rx : s.rx, ry: clamp(py - b.y, 0, free ? Math.min(b.w, b.h) / 2 : b.h / 2) };
 }
 
 /** Click on a knot: Shift makes the corners sharp; Ctrl copies this knot's radius to the other. */

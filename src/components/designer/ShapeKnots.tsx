@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { DesignDoc, VectorShape } from '../../engine/types';
 import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
 import { getDoc } from '../../engine/design/actions';
+import { useStore } from '../../store/store';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
@@ -37,7 +38,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   const knots: Array<{ knot: Knot; p: [number, number]; dx?: number; dy?: number; tip: string }> = [];
   if (ck) {
     const r = cornerRadii(s), near = (v: number) => v * view.zoom < NUDGE;
-    const tip = ' corner radius · Ctrl: both equal · Ctrl-click: copy to the other · Shift-click: sharp corners · double-click: exact value';
+    const tip = ' corner radius · alone; Ctrl or «Lock radii»: both together · Ctrl-click: copy to the other · Shift-click: sharp corners · double-click: exact value';
     knots.push({ knot: 'rx', p: ck.rx, dx: near(r.rx) ? -NUDGE : 0, tip: `Horizontal${tip}` });
     knots.push({ knot: 'ry', p: ck.ry, dy: near(r.ry) ? NUDGE : 0, tip: `Vertical${tip}` });
   }
@@ -45,11 +46,13 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   const out = Math.max(0, BLUR_GAP - BLUR_MARGIN * (s.blur ?? 0) * view.zoom);
   knots.push({ knot: 'top', p: bk.top, dy: -out, tip: 'Blur · drag out for more, in for less' });
   knots.push({ knot: 'right', p: bk.right, dx: out, tip: 'Blur · drag out for more, in for less' });
+  // Ctrl, or the «Lock radii» switch in the bar, moves both radii together.
+  const lock = (e: React.PointerEvent) => e.ctrlKey || e.metaKey || !!useStore.getState().ui.shapeLockRadii;
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
     const q = page(e), x = d.at[0] + q.x - d.from[0], y = d.at[1] + q.y - d.from[1];
-    const patch = d.knot === 'rx' ? dragRx(d.shape, x, e.ctrlKey || e.metaKey) : d.knot === 'ry' ? dragRy(d.shape, y, e.ctrlKey || e.metaKey) : { blur: dragBlur(d.shape, d.knot, x, y) };
+    const patch = d.knot === 'rx' ? dragRx(d.shape, x, lock(e)) : d.knot === 'ry' ? dragRy(d.shape, y, lock(e)) : { blur: dragBlur(d.shape, d.knot, x, y) };
     // The first change of a drag records the undo step; the rest of the drag joins it.
     patchShape(sessionId, doc.id, d.layerId, d.shape.id, patch, { record: !d.moved });
     d.moved = true;

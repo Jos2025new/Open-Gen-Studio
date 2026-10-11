@@ -45,7 +45,10 @@ describe('corner radii', () => {
     expect(cornerRadii({ ...rect(), ...dragRy(rect(), 35, false) })).toEqual({ rx: 15, ry: 15 });
     expect(dragRy(rect({ rx: 40 }), 999, true)).toEqual({ rx: 30, ry: 30 });
     // Review: Inkscape checks whether Rx is SET, not the radius drawn. Ry alone, capped by min(w,h)/2; Rx stays unset.
-    expect(dragRy(rect({ w: 20, h: 100, ry: 8 }), 999, false)).toEqual({ rx: undefined, ry: 10 });
+    expect(dragRy(rect({ w: 20, h: 100, ry: 8 }), 999, false)).toEqual({ rx: 8, ry: 10 });
+    // User's rule: without Ctrl only the dragged radius moves; the other keeps what it shows (Rx was copying 8).
+    expect(dragRx(rect({ rx: 10 }), 70, false)).toEqual({ rx: 40, ry: 10 });
+    expect(dragRy(rect({ rx: 10 }), 45, false)).toEqual({ rx: 10, ry: 25 });
     expect(dragRy(rect({ rx: 0, ry: 3 }), 999, false)).toEqual({ rx: 0, ry: 30 });
     // A legacy radius becomes Rx and Ry moves alone.
     expect(dragRy(rect({ radius: 6 }), 45, false)).toEqual({ rx: 6, ry: 25 });

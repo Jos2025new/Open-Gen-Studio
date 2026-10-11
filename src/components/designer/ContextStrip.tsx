@@ -1,5 +1,5 @@
 import { Settings2 } from 'lucide-react';
-import { useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { isProtectedImage } from '../../engine/design/rules';
@@ -34,6 +34,7 @@ export function editTarget(doc: DesignDoc, tool: string): string | null {
 export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const tool = useStore((s) => s.ui.tool);
   const ruler = useStore((s) => s.ui.strokeRuler);
+  const lockRadii = useStore((s) => !!s.ui.shapeLockRadii);
   const picked = usePickedShape(doc), edit = useShapeEdit((st) => st.byDoc[doc.id]);
   // Another tool leaves shape edit mode (docs/plan-edicion-formas.md).
   useEffect(() => { if (tool !== 'move') setShapeEdit(doc.id, null); }, [tool, doc.id]);
@@ -57,6 +58,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         <span className="context-mode" data-tip="Drag the round handles; Esc or Done to leave">Editing shape</span>
         <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
+        {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
         <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
       </> : <>
         <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
