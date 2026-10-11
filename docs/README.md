@@ -6,6 +6,7 @@
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
 - [Pendientes y propuestas](pendientes.md): qué falta decidir, probar o implementar, con su estado.
 - [Capas FX: pruebas pendientes](fx-pruebas.md): validación visual, interfaz, exportación, agente y escala de ADR 0011.
+- [Rendimiento raster y deshacer](raster-pruebas.md): medidas antes/después, exactitud de píxeles y límites.
 - [Depurar y medir](depuracion.md): registro de rendimiento (Ctrl+Alt+P), marcadores, informe, sondas y pruebas de una sola pieza.
 - [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Catálogo de voz y efectos](catalogo-voz-y-efectos.md): modelos de texto a voz y efectos de Atlas y NanoGPT, precios por 1000 caracteres y propuesta (2026-10-08).
@@ -78,7 +79,7 @@
 - [021-2026-10-W41: Conversación completa: revisión, consolidación y puerta de disparo](history/021-2026-10-W41.md) — 23113 bytes.
 - [022-2026-10-W41: Brocha de SAI, revisión de Astra, integración y purga (2026-10-09)](history/022-2026-10-W41.md) — 16469 bytes.
 - [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](history/023-2026-10-W41.md) — 4623 bytes.
-- [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 19566 bytes.
+- [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 22952 bytes.
 
 ## Trazabilidad
 

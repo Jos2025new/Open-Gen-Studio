@@ -32,6 +32,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
+- [ ] **e2e de presión simulada** (`brush-visual.spec.ts`, «a fast stroke paints thinner than a slow one»): falla 3 de 3 en la versión actual y 3 de 3 en `9b53324`, anterior a las optimizaciones raster; el trazo rápido cubre ~2 % más de lo que pide el test (32 000 frente a < 31 570). No lo causaron las optimizaciones; causa sin investigar (posible dependencia del tiempo con la máquina cargada, media de carga 8,5). **2026-10-11**, Claude.
 - [ ] **Nodos, lo que falta de Inkscape:** borrar segmento entre nodos elegidos (botón) y soldar nodos contiguos con Shift+J cuando no hay extremos ([plan](plan-edicion-formas.md)). **2026-10-11**, pendiente.
 - [ ] **Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca a cada segundo siempre visible (tamaño y opacidad del pincel, deshacer, capas), herramientas con nombre y sin desbordamiento, capas con sus efectos dentro, interruptores de un toque, girar el lienzo e histograma. Segunda ronda con Feather 3D y SketchUp y correcciones del usuario: secuencia vigente de 8 pasos; el primero es el inventario de herramientas y funciones con un test de alcance, para no perder nada al reorganizar. **2026-10-10**, pedido por el usuario; sin decidir el orden.
 - [ ] **Designer, tras el 2026-10-09 (segunda parte):**
@@ -104,6 +105,8 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 - [ ] **Carga de la app:** paquete principal de 1,64 MB minificado (521 KB comprimido) y avisos de imports dinámicos que no separan módulos (dato de la auditoría, sin comprobar aquí). Medir el arranque con una sonda antes de optimizar. **2026-10-08**, propuesta.
 
 ## Hecho
+
+- [x] **2026-10-11, rendimiento raster medido:** con 50 trazos, recomponer 1080p 235,45 → 9,1 ms y 4K 793,65 → 49,6 ms; límites/cobertura reutilizados sin cambiar historial. Las copias completas permanecen (4K ~40 ms); reconsiderarlas solo con medición y diseño seguro. [Método, exactitud y límites](raster-pruebas.md).
 
 - [x] Formas, siguiente pasada: nodos esquina/suave/simétrico (barra y Shift+C/S/Y, guardados como `sodipodi:nodetypes`), añadir nodo con doble clic en el contorno y borrar el elegido (Supr o botón, nunca la capa), pista según el modo e iconos en Unión/Punta. **2026-10-11**, commits `21e99ea`, `5dce5ee`, `846888e` y el de la pista; **test** (1 126), **e2e** (10 de 10 en `shape-knots.spec.ts` y `path-nodes.spec.ts`; los de tipos y Supr fallan sin su corrección). Borrar conserva la forma de un nodo suave o simétrico como Inkscape (ajuste de una cúbica; Ctrl+Supr, recta): e2e que falla sin el ajuste (90 px).
 - [x] Opacidad y fusión de capa iguales en lienzo y SVG: con más de una operación de pintado (dos formas, o relleno y trazo) la capa se compone aparte y se mezcla una vez, como un grupo SVG. **2026-10-11**, **e2e** (7 casos, 0 píxeles > 8/255; sin la corrección 8 544–32 721), **medida** (10 formas a 1500×900: mediana 1,3–1,5 → 2,3–2,4 ms, solo en esas capas).
