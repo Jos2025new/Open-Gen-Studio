@@ -69,3 +69,26 @@ Fuente: código de Inkscape en el commit [21f4270](https://gitlab.com/inkscape/i
 2. Unir y unir con segmento.
 3. Romper y borrar segmento.
 4. Segmento a recta o curva.
+
+### Contraste con SVG-Edit (editor web de SVG)
+
+Fuente: código de [SVG-Edit](https://github.com/SVG-Edit/svgedit) en el commit `c44f061`, leído por Haiku (`packages/svgcanvas/core/path-actions.js`, `path-method.js`, `path.js`, `src/editor/Editor.js`), y sus issues de GitHub. Es otro editor web como el nuestro, así que su experiencia es directamente aplicable.
+
+| Función | Inkscape | SVG-Edit | Coinciden / difieren | Más estable o más fácil |
+| --- | --- | --- | --- | --- |
+| Clic, Shift+clic, rectángulo | Sí | Sí (path-actions.js 508–524, 536–549, 676–684) | Coinciden | Los dos. Pocos issues en SVG-Edit: base segura |
+| Mover varios | Sí, con flechas | Arrastre sí (path-method.js 1011–1017); flechas no (mueven el elemento) | SVG-Edit no mueve nodos con flechas | Inkscape: es el comportamiento que espera el usuario. Exige desviar las flechas en edición de nodos, como hicimos con Supr |
+| Ctrl+A | Todos los nodos | Sale de la edición y selecciona la capa (Editor.js 280–290) | Difieren | Inkscape, para no salir del modo sin querer |
+| Unir extremos | Real: punto medio, cierra o une subtrazados | No existe: «subtrazado» solo añade otro trazado al final (path-actions.js 443) | Difieren | Inkscape. SVG-Edit no ofrece una alternativa |
+| Romper un nodo | Sí, dos extremos coincidentes | No; solo abrir o cerrar en un nodo (path-actions.js 985–1095) | Difieren | Inkscape. Las ediciones de la lista de SVG-Edit con índices y `Z` concentran sus fallos (#1093, #1100, #1107) |
+| Borrar nodo | Conserva la forma (ya hecho aquí) | Quita el segmento sin reajustar (path-method.js 932–956) | Difieren | Lo nuestro (Inkscape) |
+| Recta ↔ curva | Shift+L / Shift+U; curva a 1/3 | Doble clic en el nodo o desplegable; curva a 1/3 (path-method.js 1080–1083) | Misma regla del tercio | Los dos. Doble clic ya añade nodo aquí, así que atajos y botón |
+| Tipos de nodo | Esquina, suave, simétrico | Solo «enlazar puntos de control»: simétrico o libre (path-method.js 707) | Inkscape más completo | Lo nuestro (ya hecho) |
+| Añadir nodo | Doble clic en el contorno | Botón que divide por la mitad, con De Casteljau (path-method.js 891–930) | Mismo cálculo | Lo nuestro (ya hecho) |
+
+**Lecciones de los issues de SVG-Edit:**
+- **Los fallos se concentran en reescribir la lista de segmentos con índices**, sobre todo cerca de `Z` y del nodo de cierre: #1107 (abierto), nodos que no coinciden con el dibujo; #1093 y #1100, un trazado cerrado que no se movía.
+- **Nuestra base los evita por diseño:** editamos cada subtrazado como nodos y aristas (`toSubs`/`fromSubs`) y lo escribimos entero de nuevo. Esa base sirve para unir, romper y borrar segmento, siempre que haya tests de cerrados, varios subtrazados y nodos coincidentes.
+- **#637–#640:** manejadores dibujados en el trazado equivocado o solo la primera vez tras convertir. Nuestros tiradores se calculan en cada render a partir del estado; hay que conservar eso y no cachear posiciones.
+
+**Conclusión:** se mantiene el orden propuesto, con Inkscape como modelo. Lo más fácil y seguro, porque coincide en los dos editores, va primero: selección múltiple con el rectángulo y recta ↔ curva. Unir y romper, que SVG-Edit no tiene, se apoyan en nuestra representación por subtrazados y llevan más tests de casos límite. Las flechas y Ctrl+A, dentro de la edición de nodos, deben quedar desviados igual que Supr.
