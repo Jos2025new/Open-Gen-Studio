@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { DesignDoc, VectorShape } from '../../engine/types';
-import { blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
+import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
 import { getDoc } from '../../engine/design/actions';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
@@ -12,6 +12,7 @@ import { patchShape, usePickedShape } from './ShapeLookFields';
  */
 type Knot = 'rx' | 'ry' | 'top' | 'right';
 const NUDGE = 10; // screen px: a zero-radius knot sits beside the corner, so the corner's scale handle stays reachable
+const BLUR_GAP = 20; // screen px from the edge: clear of the side scale handle and its pick tolerance
 
 export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
@@ -29,8 +30,10 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     knots.push({ knot: 'ry', p: ck.ry, dy: near(r.ry) ? NUDGE : 0, tip: 'Vertical corner radius · Ctrl: both equal · Ctrl-click: copy to the other · Shift-click: sharp corners' });
   }
   if (bk) {
-    knots.push({ knot: 'top', p: bk.top, tip: 'Blur · drag out for more' });
-    knots.push({ knot: 'right', p: bk.right, tip: 'Blur · drag out for more' });
+    // Never on top of the side scale handles: at least BLUR_GAP screen px out (the drag stays relative).
+    const out = Math.max(0, BLUR_GAP - BLUR_MARGIN * s.blur! * view.zoom);
+    knots.push({ knot: 'top', p: bk.top, dy: -out, tip: 'Blur · drag out for more' });
+    knots.push({ knot: 'right', p: bk.right, dx: out, tip: 'Blur · drag out for more' });
   }
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
@@ -50,7 +53,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   };
   return <svg ref={ref} className="stroke-ruler shape-knots" aria-label="Shape handles">
     {bk && <g className="shape-knot-lines">
-      {([[bk.edgeTop, bk.top], [bk.edgeRight, bk.right]] as const).map(([a, b], i) => { const A = scr(a), B = scr(b); return <line key={i} x1={A.x} y1={A.y} x2={B.x} y2={B.y} />; })}
+      {knots.filter((k) => k.knot === 'top' || k.knot === 'right').map((k) => { const A = scr(k.knot === 'top' ? bk.edgeTop : bk.edgeRight), B = scr(k.p); return <line key={k.knot} x1={A.x} y1={A.y} x2={B.x + (k.dx ?? 0)} y2={B.y + (k.dy ?? 0)} />; })}
     </g>}
     {knots.map((k) => { const c = scr(k.p); return <circle key={k.knot} className="stroke-ruler-handle shape-knot" data-knot={k.knot} data-tip={k.tip} cx={c.x + (k.dx ?? 0)} cy={c.y + (k.dy ?? 0)} r={5}
       onPointerDown={(e) => {

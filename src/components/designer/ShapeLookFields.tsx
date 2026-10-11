@@ -1,5 +1,5 @@
 import type { DesignDoc, ShapeSpec, VectorShape } from '../../engine/types';
-import { blurPercent, blurSigma, cornerRadii, MITER_DEFAULT } from '../../engine/design/shapeLook';
+import { blurPercent, blurSigma, cornerRadii, MITER_DEFAULT, SHARP } from '../../engine/design/shapeLook';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
@@ -26,7 +26,7 @@ export function ShapeLookFields({ value, onChange, corners, stroke = true, blur,
     {corners && <>
       <InlineSlider label="Rx" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(w) / 2) || 200)} allowManualOverflow value={Math.round(r.rx * 10) / 10} step={0.5} onChange={(rx) => onChange({ rx, ry: value.ry ?? r.ry })} />
       <InlineSlider label="Ry" unit="px" min={0} max={Math.max(1, Math.round(Math.abs(h) / 2) || 200)} allowManualOverflow value={Math.round(r.ry * 10) / 10} step={0.5} onChange={(ry) => onChange({ ry, rx: value.rx ?? r.rx })} />
-      <button type="button" className="opt" disabled={!r.rx && !r.ry} onClick={() => onChange({ rx: 0, ry: 0, radius: 0 })} data-tip="Make corners sharp (Shift-click a corner handle does the same)">Sharp corners</button>
+      <button type="button" className="opt" disabled={!r.rx && !r.ry} onClick={() => onChange(SHARP)} data-tip="Make corners sharp (Shift-click a corner handle does the same)">Sharp corners</button>
     </>}
     {blur && <span data-tip="Inkscape's blur: σ = (blur/100)² · (width + height) / 4"><InlineSlider label="Blur" unit="%" min={0} max={100} step={0.1} value={Math.round(blurPercent(value.blur ?? 0, w, h) * 10) / 10} onChange={(p) => onChange({ blur: blurSigma(p, w, h) })} /></span>}
     {stroke && !compact && <>

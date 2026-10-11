@@ -64,7 +64,8 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
     }
     // Rect and ellipse: the same box turned (its center moves, its sides swap).
     const [mx, my] = rot(s.x + s.w / 2, s.y + s.h / 2);
-    return { ...s, x: mx - s.h / 2, y: my - s.w / 2, w: s.h, h: s.w };
+    // Its corner radii turn with it: Rx and Ry swap, set or unset alike.
+    return { ...s, x: mx - s.h / 2, y: my - s.w / 2, w: s.h, h: s.w, rx: s.ry, ry: s.rx };
   });
   const strokes = layer.strokes?.map((st) => ({ ...st, points: st.points.map(([x, y, p]) => [...rot(x, y), p] as [number, number, number]) }));
   return { ...layer, shapes, ...(strokes ? { strokes } : {}), ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(rotateAbout(cw ? Math.PI / 2 : -Math.PI / 2, cx, cy), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}) };

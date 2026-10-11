@@ -5,7 +5,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
-import { applyStrokeLook, blurFilter, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
+import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion, redrawSoon } from './raster';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
@@ -164,25 +164,58 @@ function untransformedBox(l: Layer): Box | null {
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
+  if (s.blur && s.blur > 0) { drawBlurredShape(ctx, s); return; }
   ctx.save();
-  // Blur and stroke style: shapeLook.ts (Inkscape's formulas).
-  if (s.blur) ctx.filter = blurFilter(ctx, s.blur);
+  paintShape(ctx, s);
+  ctx.restore();
+}
+
+/** Fill and stroke of one shape (stroke style: shapeLook.ts, Inkscape's formulas). */
+function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
   let p: Path2D | undefined, sw = s.strokeWidth;
   if (s.type === 'path') {
-    if (!s.d) { ctx.restore(); return; }
+    if (!s.d) return;
     const t = pathTransform(s);
     ctx.setTransform(ctx.getTransform().multiply(new DOMMatrix([t.sx, 0, 0, t.sy, t.tx, t.ty])));
     p = new Path2D(s.d);
     sw = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
   } else {
     ctx.beginPath();
-    if (s.type === 'rect') { const r = cornerRadii(s); traceRoundRect(ctx, rectBox(s), r.rx, r.ry); }
-    else if (s.type === 'ellipse') ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
+    if (s.type === 'rect') {
+      const r = cornerRadii(s), b = rectBox(s);
+      // A shape from before Rx/Ry keeps the native round rect it was always drawn with, pixel for pixel.
+      if (s.rx == null && s.ry == null) ctx.roundRect(b.x, b.y, b.w, b.h, r.rx);
+      else traceRoundRect(ctx, b, r.rx, r.ry);
+    } else if (s.type === 'ellipse') ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
     else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }
   const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; if (p) ctx.fill(p); else ctx.fill(); } };
   const stroke = () => { if (s.stroke && s.strokeWidth > 0) { ctx.strokeStyle = s.stroke; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); } };
   if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
+}
+
+/**
+ * A blurred shape, as SVG and Inkscape do it: fill and stroke composed first, then one blur over the result
+ * (blurring each apart mixes their colours differently). The off-screen piece covers only what can reach the
+ * target canvas: the shape's paint plus its blur margin, cut to the canvas grown by that margin.
+ */
+let blurScratch: HTMLCanvasElement | undefined;
+function drawBlurredShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
+  const m = ctx.getTransform(), k = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)), r = blurRegion(s);
+  const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  const pad = BLUR_MARGIN * s.blur! * k + 2;
+  const x0 = Math.floor(Math.max(-pad, Math.min(...pts.map((q) => q[0])))), y0 = Math.floor(Math.max(-pad, Math.min(...pts.map((q) => q[1]))));
+  const x1 = Math.ceil(Math.min(ctx.canvas.width + pad, Math.max(...pts.map((q) => q[0])))), y1 = Math.ceil(Math.min(ctx.canvas.height + pad, Math.max(...pts.map((q) => q[1]))));
+  if (x1 <= x0 || y1 <= y0) return;
+  // One scratch canvas reused for every blurred shape (no allocation per frame); resizing also clears it.
+  const off = (blurScratch ??= createCanvas(1, 1)), o = ctx2d(off);
+  if (off.width !== x1 - x0 || off.height !== y1 - y0) { off.width = x1 - x0; off.height = y1 - y0; } else { o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, off.width, off.height); }
+  o.setTransform(m.a, m.b, m.c, m.d, m.e - x0, m.f - y0);
+  paintShape(o, s);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = `blur(${s.blur! * k}px)`;
+  ctx.drawImage(off, x0, y0);
   ctx.restore();
 }
 

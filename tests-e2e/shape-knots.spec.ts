@@ -77,7 +77,7 @@ test('rectangle: corner knots, sharp corners, blur from the strip and its knots,
   // Shift-click on a corner knot: sharp corners.
   await knot(page, 'rx').click({ modifiers: ['Shift'] });
   const s3 = await shape(page);
-  expect([s3.rx, s3.ry]).toEqual([0, 0]);
+  expect([s3.rx, s3.ry, s3.radius]).toEqual([undefined, undefined, 0]);
 
   // Blur from the strip: Inkscape's % → σ = (b/100)² · (w + h) / 4.
   await strip(page).getByRole('slider', { name: 'Blur', exact: true }).fill('30');
@@ -89,5 +89,53 @@ test('rectangle: corner knots, sharp corners, blur from the strip and its knots,
   expect((await shape(page)).blur).toBeGreaterThan(s4.blur);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${SHOTS}/blur.png` });
+  // A small blur keeps its knots clear of the side scale handles (at least 20 screen px out from the edge).
+  await strip(page).getByRole('slider', { name: 'Blur', exact: true }).fill('3');
+  const len = await page.locator('.shape-knot-lines line').evaluateAll((ls) => ls.map((l: any) => Math.hypot(l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)));
+  expect(Math.min(...len)).toBeGreaterThanOrEqual(19.5);
+  expect(errors).toEqual([]);
+});
+
+/*
+ * Canvas and SVG draw a shape the same (review of 523dd35): a blurred line with no height, a thick stroke with
+ * little blur, fill + stroke blurred together; and a shape from before Rx/Ry is drawn pixel for pixel as before.
+ */
+test('canvas and SVG match for blurred shapes; legacy rounded rectangles are unchanged', async ({ page }) => {
+  const errors = await setup(page);
+  const out = await page.evaluate(async () => {
+    const R = await import('/src/engine/design/render.ts' as string); const E = await import('/src/engine/design/export.ts' as string);
+    const W = 400, H = 260;
+    const canvasOf = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+    const base = { id: 'v', type: 'vector', name: 'v', visible: true, locked: false, opacity: 1, blend: 'normal' };
+    const docOf = (shape: any) => ({ id: 'd', name: 'd', width: W, height: H, background: null, activeLayerId: 'v', layers: [{ ...base, shapes: [{ id: 's', radius: 0, fill: null, stroke: null, strokeWidth: 0, ...shape }] }] });
+    const viaCanvas = (doc: any) => { const c = canvasOf(); R.drawDoc(c.getContext('2d')!, doc, { resolution: 'document' }); return c.getContext('2d')!.getImageData(0, 0, W, H).data; };
+    const viaSvg = async (doc: any) => {
+      const svg = await E.docToSvg(doc, { rasterHref: async () => null, layout: () => ({ lines: [], width: 0, lineHeightPx: 0 }), ascent: () => 0 });
+      const img = new Image(); img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); await img.decode();
+      const c = canvasOf(); c.getContext('2d')!.drawImage(img, 0, 0, W, H); return c.getContext('2d')!.getImageData(0, 0, W, H).data;
+    };
+    const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => { let n = 0, max = 0, ink = 0; for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d > 8) n++; max = Math.max(max, d); if (i % 4 === 3 && a[i] > 0) ink++; } return { n, max, ink }; };
+    const cases: Record<string, any> = {
+      lineH: { type: 'line', x: 80, y: 130, w: 240, h: 0, stroke: '#ffffff', strokeWidth: 20, blur: 5 },
+      lineV: { type: 'line', x: 200, y: 20, w: 0, h: 220, stroke: '#ffffff', strokeWidth: 20, blur: 5 },
+      thickStroke: { type: 'rect', x: 80, y: 70, w: 240, h: 120, stroke: '#3366ff', strokeWidth: 50, blur: 2, join: 'miter' },
+      fillAndStroke: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, rx: 30, ry: 12 },
+      strokeBehind: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, paintOrder: 'stroke' },
+    };
+    const res: Record<string, any> = {};
+    for (const [k, shape] of Object.entries(cases)) { const doc = docOf(shape); res[k] = diff(viaCanvas(doc), await viaSvg(doc)); }
+    // Legacy: what the renderer drew before Rx/Ry (native roundRect), against what it draws now.
+    const legacy = { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#ffffff', strokeWidth: 2, radius: 8 };
+    const before = canvasOf(), b = before.getContext('2d')!;
+    b.beginPath(); b.roundRect(80, 70, 240, 120, 8); b.fillStyle = '#ffdd00'; b.fill(); b.strokeStyle = '#ffffff'; b.lineWidth = 2; b.lineCap = 'round'; b.lineJoin = 'round'; b.stroke();
+    res.legacy = diff(b.getImageData(0, 0, W, H).data, viaCanvas(docOf(legacy)));
+    return res;
+  });
+  console.log(JSON.stringify(out));
+  for (const k of ['lineH', 'lineV', 'thickStroke', 'fillAndStroke', 'strokeBehind']) {
+    expect(out[k].ink, `${k}: the canvas shows it`).toBeGreaterThan(1000);
+    expect(out[k].n, `${k}: canvas and SVG agree (pixels off by more than 8/255)`).toBeLessThan(out[k].ink * 0.01);
+  }
+  expect(out.legacy.max, 'a legacy rounded rectangle is drawn exactly as before').toBe(0);
   expect(errors).toEqual([]);
 });

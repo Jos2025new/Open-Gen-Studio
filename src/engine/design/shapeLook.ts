@@ -13,6 +13,8 @@ type Box = { x: number; y: number; w: number; h: number };
 const K = 0.5522847498; // cubic Bézier quarter-circle constant (affine.ts uses the same)
 export const BLUR_MARGIN = 2.4;
 export const MITER_DEFAULT = 4;
+/** Sharp corners: no radius at all (unset, as after Inkscape's Shift-click or «Make corners sharp»). */
+export const SHARP: Partial<ShapeSpec> = { rx: undefined, ry: undefined, radius: 0 };
 
 export function rectBox(s: Pick<ShapeSpec, 'x' | 'y' | 'w' | 'h'>): Box {
   return { x: Math.min(s.x, s.x + s.w), y: Math.min(s.y, s.y + s.h), w: Math.abs(s.w), h: Math.abs(s.h) };
@@ -62,17 +64,21 @@ export function dragRx(s: ShapeSpec, px: number, lock: boolean): Pick<ShapeSpec,
   return { rx: clamp(b.x + b.w - px, 0, b.w / 2), ry: s.ry ?? (s.rx == null && s.radius ? cornerRadii(s).ry : undefined) };
 }
 
-/** Dragging the Ry knot to page y. With no Rx yet, it stays a circle-cornered square limit, as in Inkscape. */
+/** Dragging the Ry knot to page y (Inkscape's RectKnotHolderEntityRY::knot_set). */
 export function dragRy(s: ShapeSpec, py: number, lock: boolean): Pick<ShapeSpec, 'rx' | 'ry'> {
   const b = rectBox(s), cur = cornerRadii(s);
   if (lock) { const r = clamp(py - b.y, 0, Math.min(b.w, b.h) / 2); return { rx: r, ry: r }; }
-  if (!cur.rx) { const r = clamp(py - b.y, 0, Math.min(b.w, b.h) / 2); return { rx: r, ry: r }; }
-  return { rx: cur.rx, ry: clamp(py - b.y, 0, b.h / 2) };
+  // Legacy radius: it becomes Rx, and Ry moves alone.
+  if (s.rx == null && s.ry == null && s.radius) return { rx: cur.rx, ry: clamp(py - b.y, 0, b.h / 2) };
+  // Rx unset or 0 (Inkscape checks the attribute, not the radius drawn): Ry alone, capped by the shorter side.
+  if (s.rx == null || s.rx === 0) return { rx: s.rx, ry: clamp(py - b.y, 0, Math.min(b.w, b.h) / 2) };
+  return { rx: s.rx, ry: clamp(py - b.y, 0, b.h / 2) };
 }
 
 /** Click on a knot: Shift makes the corners sharp; Ctrl copies this knot's radius to the other. */
 export function clickKnot(s: ShapeSpec, knot: 'rx' | 'ry', mods: { shift: boolean; ctrl: boolean }): Partial<ShapeSpec> | null {
-  if (mods.shift) return { rx: 0, ry: 0, radius: 0 };
+  // Shift: Inkscape removes both attributes, so a later drag of either knot starts from unset radii.
+  if (mods.shift) return SHARP;
   if (!mods.ctrl) return null;
   const r = cornerRadii(s)[knot];
   return { rx: r, ry: r };
@@ -122,13 +128,6 @@ export function applyStrokeLook(ctx: CanvasRenderingContext2D, s: ShapeSpec, wid
   ctx.lineDashOffset = (s.dashOffset ?? 0) * width;
 }
 
-/** Canvas blur: σ is in page px; the canvas filter works in device px, so it follows the current scale. */
-export function blurFilter(ctx: CanvasRenderingContext2D, sigma: number | undefined): string {
-  if (!sigma || sigma <= 0) return 'none';
-  const m = ctx.getTransform();
-  return `blur(${sigma * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c))}px)`;
-}
-
 /** SVG stroke attributes beyond colour and width. */
 export function strokeLookSvg(s: ShapeSpec, width: number): string {
   const dash = s.dash?.length ? ` stroke-dasharray="${s.dash.map((d) => r3(Math.max(0, d) * width)).join(' ')}"${s.dashOffset ? ` stroke-dashoffset="${r3(s.dashOffset * width)}"` : ''}` : '';
@@ -136,11 +135,23 @@ export function strokeLookSvg(s: ShapeSpec, width: number): string {
   return ` stroke-linecap="${s.cap ?? 'round'}" stroke-linejoin="${s.join ?? 'round'}"${miter}${dash}${s.paintOrder === 'stroke' ? ' paint-order="stroke"' : ''}`;
 }
 
-/** An SVG blur filter for one shape, with Inkscape's 2.4σ margin around its box (as fractions of the box). */
+/** How far the paint reaches past the geometric box: half the stroke, more at miter joins and square caps. */
+export function strokeReach(s: ShapeSpec): number {
+  if (!s.stroke || s.strokeWidth <= 0) return 0;
+  const join = (s.join ?? 'round') === 'miter' ? Math.max(1, s.miter ?? MITER_DEFAULT) : 1, cap = (s.cap ?? 'round') === 'square' ? Math.SQRT2 : 1;
+  return (s.strokeWidth / 2) * Math.max(join, cap);
+}
+
+/** The page area a blurred shape paints: its box, the stroke's reach and Inkscape's 2.4σ margin (never empty). */
+export function blurRegion(s: ShapeSpec): Box {
+  const b = rectBox(s), m = strokeReach(s) + BLUR_MARGIN * (s.blur ?? 0) + 1;
+  return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m };
+}
+
+/** An SVG blur filter for one shape, in page units (a line has a zero-height box, so no bounding-box units). */
 export function blurFilterSvg(id: string, s: ShapeSpec): string {
-  const b = rectBox(s), sg = s.blur ?? 0, m = BLUR_MARGIN * sg;
-  const fx = b.w ? m / b.w : 0, fy = b.h ? m / b.h : 0;
-  return `<filter id="${id}" x="${r3(-fx)}" y="${r3(-fy)}" width="${r3(1 + 2 * fx)}" height="${r3(1 + 2 * fy)}" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${r3(sg)}"/></filter>`;
+  const r = blurRegion(s);
+  return `<filter id="${id}" filterUnits="userSpaceOnUse" x="${r3(r.x)}" y="${r3(r.y)}" width="${r3(r.w)}" height="${r3(r.h)}" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${r3(s.blur ?? 0)}"/></filter>`;
 }
 
 function clamp(v: number, lo: number, hi: number): number { return Math.min(hi, Math.max(lo, v)); }

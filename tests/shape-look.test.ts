@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { blurFilterSvg, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
+import { blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
 import { scaleLayer } from '../src/engine/design/doc';
 import { transformShape } from '../src/engine/design/affine';
 import { shapeSvg } from '../src/engine/design/export';
+import { turnVector } from '../src/engine/design/transform';
 
 /* Inkscape's formulas, as read from its source (shapeLook.ts names each file and function). */
 const rect = (o: Partial<ShapeSpec> = {}): ShapeSpec => ({ type: 'rect', x: 10, y: 20, w: 100, h: 60, fill: '#000', stroke: '#fff', strokeWidth: 2, radius: 0, ...o });
@@ -40,13 +41,21 @@ describe('corner radii', () => {
   it('dragging Ry: py − y, clamped to h/2; with no Rx yet both follow (min(w,h)/2); Ctrl equal', () => {
     expect(dragRy(rect({ rx: 5, ry: 5 }), 45, false)).toEqual({ rx: 5, ry: 25 });
     expect(dragRy(rect({ rx: 5, ry: 5 }), 999, false).ry).toBe(30);
-    expect(dragRy(rect(), 35, false)).toEqual({ rx: 15, ry: 15 });
+    expect(dragRy(rect(), 35, false)).toEqual({ rx: undefined, ry: 15 });
+    expect(cornerRadii({ ...rect(), ...dragRy(rect(), 35, false) })).toEqual({ rx: 15, ry: 15 });
     expect(dragRy(rect({ rx: 40 }), 999, true)).toEqual({ rx: 30, ry: 30 });
+    // Review: Inkscape checks whether Rx is SET, not the radius drawn. Ry alone, capped by min(w,h)/2; Rx stays unset.
+    expect(dragRy(rect({ w: 20, h: 100, ry: 8 }), 999, false)).toEqual({ rx: undefined, ry: 10 });
+    expect(dragRy(rect({ rx: 0, ry: 3 }), 999, false)).toEqual({ rx: 0, ry: 30 });
+    // A legacy radius becomes Rx and Ry moves alone.
+    expect(dragRy(rect({ radius: 6 }), 45, false)).toEqual({ rx: 6, ry: 25 });
   });
 
   it('Shift-click makes corners sharp; Ctrl-click copies this radius to the other; a plain click changes nothing', () => {
     const s = rect({ rx: 12, ry: 4 });
-    expect(clickKnot(s, 'rx', { shift: true, ctrl: false })).toEqual({ rx: 0, ry: 0, radius: 0 });
+    expect(clickKnot(s, 'rx', { shift: true, ctrl: false })).toEqual(SHARP);
+    // Sharp means unset (as Inkscape removes the attributes): a later Ry drag rounds again.
+    expect(cornerRadii({ ...s, ...SHARP, ...dragRy({ ...s, ...SHARP }, 40, false) })).toEqual({ rx: 20, ry: 20 });
     expect(clickKnot(s, 'rx', { shift: false, ctrl: true })).toEqual({ rx: 12, ry: 12 });
     expect(clickKnot(s, 'ry', { shift: false, ctrl: true })).toEqual({ rx: 4, ry: 4 });
     expect(clickKnot(s, 'ry', { shift: false, ctrl: false })).toBeNull();
@@ -85,10 +94,14 @@ describe('blur', () => {
     expect(dragBlur(s, 'right', 50, 50)).toBe(0);
   });
 
-  it('the SVG filter carries σ and Inkscape\'s 2.4σ margin, as fractions of the box', () => {
-    const f = blurFilterSvg('b', rect({ blur: 5 }));
-    expect(f).toContain('stdDeviation="5"');
-    expect(f).toContain('x="-0.12" y="-0.2" width="1.24" height="1.4"');
+  it('the SVG filter is in page units and covers the stroke too (review: lines vanished, thick strokes were cut)', () => {
+    const line: ShapeSpec = { type: 'line', x: 80, y: 130, w: 240, h: 0, fill: null, stroke: '#fff', strokeWidth: 20, radius: 0, blur: 5 };
+    expect(blurRegion(line)).toEqual({ x: 80 - 23, y: 130 - 23, w: 240 + 46, h: 46 });
+    expect(blurFilterSvg('b', line)).toBe('<filter id="b" filterUnits="userSpaceOnUse" x="57" y="107" width="286" height="46" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="5"/></filter>');
+    expect(strokeReach(rect({ strokeWidth: 50 }))).toBe(25);
+    expect(strokeReach(rect({ strokeWidth: 50, join: 'miter' }))).toBe(100);
+    expect(strokeReach(rect({ strokeWidth: 10, cap: 'square' }))).toBeCloseTo(5 * Math.SQRT2);
+    expect(strokeReach(rect({ stroke: null, strokeWidth: 50 }))).toBe(0);
   });
 });
 
@@ -106,6 +119,14 @@ describe('scaling keeps the look', () => {
     const out = scaleLayer(layer as never, 2, 2, 0, 0) as typeof layer;
     expect(out.shapes[0].blur).toBeCloseTo(2 * s.blur!);
     expect(blurPercent(out.shapes[0].blur!, out.shapes[0].w, out.shapes[0].h)).toBeCloseTo(30);
+  });
+
+  it('a quarter turn swaps Rx and Ry with the sides (review: the corners stayed put)', () => {
+    const layer = { id: 'l', type: 'vector' as const, name: 'v', visible: true, locked: false, opacity: 1, blend: 'normal' as const, shapes: [{ ...rect({ w: 400, h: 200, rx: 100, ry: 10 }), id: 's' }] };
+    for (const turn of ['rotate-cw', 'rotate-ccw'] as const) expect(turnVector(layer as never, turn).shapes[0]).toMatchObject({ w: 200, h: 400, rx: 10, ry: 100 });
+    const one = { ...layer, shapes: [{ ...rect({ ry: 7 }), id: 's' }] };
+    const t = turnVector(one as never, 'rotate-cw').shapes[0];
+    expect([t.rx, t.ry]).toEqual([7, undefined]);
   });
 
   it('a rotated rounded rectangle becomes a path with the same elliptical corners and keeps its blur', () => {
