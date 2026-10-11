@@ -1,3 +1,4 @@
+import { statusChecker } from './checkStatus';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
 import { uid } from '../lib/id';
@@ -904,16 +905,12 @@ async function recoverJob(g: Generation): Promise<RemoteJob | null> {
   return ADAPTERS[parsed.provider].recover!({ modelId: parsed.id, apiKey: apiKeyFor(parsed.provider), since: g.startedAt!, until: g.finishedAt ?? Date.now(), taken });
 }
 
-/**
- * "Check status" on a generation in progress: a followed job is asked about now (its wait ends early); a job no
- * loop follows is resumed. Without a job id (a synchronous request still open) there is nothing to ask yet.
- */
-export function checkStatusNow(id: string): void {
-  const g = get().generations[id];
-  if (!g?.remoteJob) return;
-  if (running.has(id)) checkJobsNow();
-  else void recheckGeneration(id);
-}
+/** Check an existing remote job, interrupting a stalled local follower before resuming it. */
+export const checkStatusNow = statusChecker({
+  job: (id) => get().generations[id], pending: (id) => running.get(id),
+  controller: (id) => controllers.get(id), wake: checkJobsNow, resume: recheckGeneration,
+  restartable: (id) => { const g = get().generations[id]; return (g?.settings.count ?? 1) <= 1 && !g?.variants?.length; },
+});
 
 /** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
 export function recheckGeneration(id: string): Promise<string[]> {

@@ -1,5 +1,5 @@
 import { cacheDb } from '../../lib/idb';
-import { extractErrorMessage, fetchJsonWithRelay, JobFailedError, requestJson } from '../../lib/http';
+import { extractErrorMessage, fetchJsonWithRelay, isAbort, JobFailedError, requestJson } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { schemaFromJson, wireParams, type JsonProp } from '../params';
 import type { ModelSchema, ModelSummary, PriceRule, RemoteJob } from '../types';
@@ -297,12 +297,14 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
         return { outputs: [], text: lyricsText(lyrics) };
       }
       const found = kind === 'model3d' ? atlasModelOutputs(res.data ?? {}) : extractOutputs(res, kind);
+      ctx.onStatus('Downloading result');
       const outputs = await Promise.all(
         found.map(async (o): Promise<GenOutput> => {
           if (!o.url) return o;
           try {
             return { blob: await fetchBlob(o.url, { signal: ctx.signal }), mime: o.mime };
-          } catch {
+          } catch (err) {
+            if (isAbort(err)) throw err;
             return o;
           }
         }),

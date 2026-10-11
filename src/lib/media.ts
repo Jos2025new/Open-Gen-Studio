@@ -81,23 +81,36 @@ export async function blobToCanvas(blob: Blob): Promise<HTMLCanvasElement> {
   return c;
 }
 
-export async function fetchBlob(url: string, init?: RequestInit): Promise<Blob> {
-  let res: Response;
-  try {
-    res = await fetch(url, init);
-  } catch (err) {
-    if (isAbort(err)) throw new AbortedError();
-    // Storage without CORS: retry through the dev/preview relay (allow-listed hosts only; absent in production).
+/** Each download attempt bounds both the response and its body; a CORS failure uses the existing relay. */
+export async function fetchBlob(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Blob> {
+  const { timeoutMs = 30_000, signal, ...options } = init;
+  const download = async (target: string, opts: RequestInit): Promise<Blob> => {
+    const controller = new AbortController();
+    let timedOut = false;
+    const forward = () => controller.abort();
+    if (signal?.aborted) controller.abort();
+    else signal?.addEventListener('abort', forward, { once: true });
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
-      res = await fetch(`/x/media?url=${encodeURIComponent(url)}`, { signal: init?.signal });
-    } catch (relayErr) {
-      if (isAbort(relayErr)) throw new AbortedError();
-      throw new Error('Could not download the result (network or CORS).');
+      const res = await fetch(target, { ...opts, signal: controller.signal });
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      return await res.blob();
+    } catch (err) {
+      if (signal?.aborted) throw new AbortedError();
+      if (timedOut) throw new Error('Downloading the result timed out. Check status to recover the existing job.');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', forward);
     }
-    if (!res.ok) throw new Error('Could not download the result (network or CORS).');
+  };
+  try { return await download(url, options); }
+  catch (err) {
+    if (isAbort(err) || signal?.aborted) throw new AbortedError();
+    if (err instanceof Error && err.message.startsWith('Download failed (')) throw err;
+    // A failed or stalled direct download may still work through the allow-listed media relay.
+    return download(`/x/media?url=${encodeURIComponent(url)}`, {});
   }
-  if (!res.ok) throw new Error(`Download failed (${res.status})`);
-  return res.blob();
 }
 
 function loadAudio(src: string): Promise<HTMLAudioElement> {
@@ -113,12 +126,15 @@ function loadAudio(src: string): Promise<HTMLAudioElement> {
 function loadVideo(src: string): Promise<HTMLVideoElement> {
   return new Promise((resolve, reject) => {
     const v = document.createElement('video');
-    v.preload = 'metadata';
-    v.muted = true;
-    v.playsInline = true;
-    v.crossOrigin = 'anonymous';
-    v.onloadedmetadata = () => resolve(v);
-    v.onerror = () => reject(new Error('Video failed to load'));
+    const finish = (error?: Error) => {
+      clearTimeout(timer); v.onloadedmetadata = null; v.onerror = null;
+      if (error) { v.removeAttribute('src'); v.load(); reject(error); }
+      else resolve(v);
+    };
+    const timer = setTimeout(() => finish(new Error('Video metadata timed out')), 20_000);
+    v.preload = 'metadata'; v.muted = true; v.playsInline = true; v.crossOrigin = 'anonymous';
+    v.onloadedmetadata = () => finish();
+    v.onerror = () => finish(new Error('Video failed to load'));
     v.src = src;
   });
 }

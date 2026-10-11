@@ -40,7 +40,7 @@ function mediaRelay(): Plugin {
       res.statusCode = 403;
       return res.end('host not allowed');
     }
-    const upstream = await fetch(url).catch(() => null);
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(() => null);
     if (!upstream?.ok || !upstream.body) {
       res.statusCode = upstream?.status ?? 502;
       return res.end('upstream failed');
@@ -51,7 +51,8 @@ function mediaRelay(): Plugin {
     res.setHeader('Content-Type', /^(image|video|audio|model)\/|^application\/(octet-stream|zip)\b/i.test(type) ? type : 'application/octet-stream');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', 'sandbox');
-    res.end(new Uint8Array(await upstream.arrayBuffer()));
+    try { res.end(new Uint8Array(await upstream.arrayBuffer())); }
+    catch { res.statusCode = 504; res.end('media download timed out'); }
   };
   return {
     name: 'media-relay',
