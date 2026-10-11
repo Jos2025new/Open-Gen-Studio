@@ -29,10 +29,10 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
-- [ ] **Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca a cada segundo siempre visible (tamaño y opacidad del pincel, deshacer, capas), herramientas con nombre y sin desbordamiento, capas con sus efectos dentro, interruptores de un toque, girar el lienzo e histograma. Segunda ronda con Feather 3D y SketchUp y correcciones del usuario: secuencia vigente de 8 pasos; el primero es el inventario de herramientas y funciones con un test de alcance, para no perder nada al reorganizar. **2026-10-10**, pedido por el usuario; sin decidir el orden.
+- [ ] **Interfaz del Designer al estilo ibisPaint, Photoshop, Feather 3D y SketchUp** ([propuesta](propuesta-gui-pintura.md)): **aplicada en la rama `task/designer-ux` (`413fb82`), sin integrar.** Tiene la visión de Astra y sus dos revisiones; el plan, con el estado de cada pasada, está en `docs/plan-designer-ux.md` dentro de la rama. Falta que el usuario la pruebe y decida integrarla. Detalle en [023](history/023-2026-10-W41.md), punto 3. **2026-10-10**.
 - [ ] **Designer, tras el 2026-10-09 (segunda parte):**
-  - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
-  - guardar cada sesión por separado (revisar antes con Astra; ADR primero);
+  - ~~probar en el navegador la brocha sin lectura del canvas, fusionar, rasterizar, Grow/Shrink y el espejo~~: hecho el 2026-10-10 (`brush:check`, `tools:check`); falta que el usuario vea el zoom pixelado y los modos de fusión nuevos;
+  - guardar cada sesión por separado: [ADR 0014](decisions/0014-sesiones-separadas.md), escrito por Astra el 2026-10-10, **pendiente de aprobación del usuario** (recomendación: medir antes con una sonda de guardado);
   - ~~niveles y curvas~~ y ~~reglas recta y elipse~~: hechos el 2026-10-10, también la regla de perspectiva (uno o dos puntos de fuga);
   - sondas de brocha y guardado;
   - ~~margen del ajuste a pantalla~~: hecho el 2026-10-10.
