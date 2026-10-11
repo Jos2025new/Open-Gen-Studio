@@ -362,3 +362,47 @@ test('layer opacity and blend apply to the layer as a whole, as SVG groups them 
   for (const [k, v] of Object.entries(out) as Array<[string, { n: number; ink: number }]>) expect(v.n, `${k}: canvas and SVG agree`).toBeLessThan(v.ink * 0.01);
   expect(errors).toEqual([]);
 });
+
+test('node types: pick a node, make it smooth or symmetric (bar or Shift+S / Shift+Y); its handles follow; one undo', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('o');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.55, c.y + c.height * 0.65, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.42, c.y + c.height * 0.47);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  // Press the first node (no drag): it is picked and the bar offers its type.
+  const n0 = (await page.locator('rect.path-node').first().boundingBox())!;
+  await page.mouse.click(n0.x + n0.width / 2, n0.y + n0.height / 2);
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
+  await expect(strip(page).getByRole('radiogroup', { name: 'Node' })).toBeVisible();
+  await page.keyboard.press('Shift+Y');
+  let s = await shape(page);
+  expect(s.nodeTypes?.[0]).toBe('z');
+  // Drag one handle of that node: the other mirrors it (symmetric).
+  const h = page.locator('circle.path-handle');
+  const count = await h.count();
+  const near = async () => { let best = 0, d = 1e9; for (let i = 0; i < count; i++) { const b = (await h.nth(i).boundingBox())!; const v = Math.hypot(b.x - n0.x, b.y - n0.y); if (v < d) { d = v; best = i; } } return best; };
+  const hb = (await h.nth(await near()).boundingBox())!;
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2); await page.mouse.down();
+  for (let i = 1; i <= 5; i++) await page.mouse.move(hb.x + hb.width / 2 + 4 * i, hb.y + hb.height / 2 + 6 * i);
+  await page.mouse.up();
+  const before = s.d;
+  s = await shape(page);
+  expect(s.d).not.toBe(before);
+  // Symmetric: the node is the midpoint of its two handles (read from the saved path).
+  const sym = await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string); const P = await import('/src/engine/design/pathNodes.ts' as string);
+    const d = A.activeDoc(st.useStore.getState().activeSessionId), sh = d.layers.flatMap((l: any) => (l.type === 'vector' ? l.shapes : []))[0];
+    const segs = P.pageSegs(sh), h = P.nodeHandles(segs, 0), at = segs[0].p[0], a = segs[h.in[0]].p[h.in[1]], b = segs[h.out[0]].p[h.out[1]];
+    return Math.hypot((a[0] + b[0]) / 2 - at[0], (a[1] + b[1]) / 2 - at[1]);
+  });
+  expect(sym).toBeLessThan(0.05);
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(before);
+  // The bar's choice works too.
+  await strip(page).getByRole('radio', { name: /Cusp node/ }).click();
+  expect((await shape(page)).nodeTypes?.[0]).toBe('c');
+  expect(errors).toEqual([]);
+});

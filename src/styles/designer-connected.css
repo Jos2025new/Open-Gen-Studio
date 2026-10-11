@@ -304,3 +304,4 @@
 .shape-knot { cursor: pointer; }
 .shape-knot-lines line { stroke: var(--accent); stroke-width: 1; }
 .context-mode { font-weight: 600; color: var(--accent); padding: 0 6px; }
+.path-node.is-picked { fill: var(--accent); }

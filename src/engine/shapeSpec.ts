@@ -27,4 +27,6 @@ export interface ShapeSpec {
   blur?: number;
   /** Rectangle/ellipse turned or skewed: the linear part [a, b, c, d] about the shape's centre (design/shapeTransform.ts). */
   rot?: [number, number, number, number];
+  /** Path node types as Inkscape's sodipodi:nodetypes (c cusp, s smooth, z symmetric; design/pathNodes.ts). */
+  nodeTypes?: string;
 }

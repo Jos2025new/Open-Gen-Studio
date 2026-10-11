@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { moveNodePoint, nodePoints, pageSegs, parseSegs, serializeSegs, withSegs } from '../src/engine/design/pathNodes';
+import { moveNodePoint, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
 
@@ -62,5 +63,40 @@ describe('path nodes', () => {
     expect(pts.filter((p) => p.kind === 'handle')).toHaveLength(8);
     const ell = shapeToPath({ type: 'ellipse', x: 0, y: 0, w: 100, h: 60, fill: '#000', stroke: null, strokeWidth: 0, radius: 0 });
     expect(nodePoints(pageSegs(ell)).filter((p) => p.kind === 'node')).toHaveLength(4);
+  });
+
+  it('node types read and write as Inkscape\'s sodipodi:nodetypes: per subpath, the first again when closed', () => {
+    const closed = parseSegs('M 0 0 C 0 10 10 10 10 0 C 10 -10 0 -10 0 0 Z M 20 0 L 30 0');
+    expect(readTypes(closed, 'cssca')).toEqual(['c', 's', 'c', 's']);
+    expect(writeTypes(closed, ['c', 's', 'c', 's'])).toBe('cscs'.slice(0, 2) + 'c' + 'cs');
+    // Missing or wrong-length strings read as cusp: old documents keep their behaviour.
+    expect(readTypes(closed, undefined)).toEqual(['c', 'c', 'c', 'c']);
+  });
+
+  it('smooth puts both handles in line keeping their lengths; symmetric also equals them; cusp changes nothing', () => {
+    const segs = parseSegs('M 0 0 C 0 10 10 10 10 0 C 14 0 20 -6 20 0');
+    const h = nodeHandles(segs, 1);
+    expect(h).toEqual({ in: [1, 1], out: [2, 0] });
+    const sm = setNodeType(segs, 1, 's'), a = sm[1].p[1], b = sm[2].p[0], at = [10, 0];
+    // In line through the node, each with its own length.
+    expect(Math.abs((a[0] - at[0]) * (b[1] - at[1]) - (a[1] - at[1]) * (b[0] - at[0]))).toBeLessThan(1e-9);
+    expect(Math.hypot(a[0] - 10, a[1])).toBeCloseTo(10); expect(Math.hypot(b[0] - 10, b[1])).toBeCloseTo(4);
+    const sy = setNodeType(segs, 1, 'z');
+    expect(Math.hypot(sy[1].p[1][0] - 10, sy[1].p[1][1])).toBeCloseTo(7); expect(Math.hypot(sy[2].p[0][0] - 10, sy[2].p[0][1])).toBeCloseTo(7);
+    expect(serializeSegs(setNodeType(segs, 1, 'c'))).toBe(serializeSegs(segs));
+  });
+
+  it('dragging a handle of a smooth node turns the other in line (own length); of a symmetric one, mirrors it', () => {
+    const segs = setNodeType(parseSegs('M 0 0 C 0 10 0 10 10 0 C 20 -10 20 0 20 0'), 1, 'z');
+    const mv = moveNodePoint(segs, { kind: 'handle', seg: 1, k: 1 }, 0, 5, ['c', 'z', 'c']);
+    const a = mv[1].p[1], b = mv[2].p[0];
+    expect(a[0] + b[0]).toBeCloseTo(20); expect(a[1] + b[1]).toBeCloseTo(0);
+    const free = moveNodePoint(segs, { kind: 'handle', seg: 1, k: 1 }, 0, 5, ['c', 'c', 'c']);
+    expect(free[2].p[0]).toEqual(segs[2].p[0]);
+  });
+
+  it('SVG export writes sodipodi:nodetypes so Inkscape opens the nodes with their type', () => {
+    const p = { ...path('M 0 0 L 10 0 L 10 10 Z'), nodeTypes: 'cscc', id: 'p' };
+    expect(shapeSvg(p)).toContain('sodipodi:nodetypes="cscc"');
   });
 });

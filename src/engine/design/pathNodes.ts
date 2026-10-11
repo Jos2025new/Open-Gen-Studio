@@ -86,10 +86,26 @@ function closesOnStart(segs: Seg[], i: number): boolean {
 }
 
 /** Move one node or handle by (dx, dy). A node carries its handles (and its closing twin on a closed subpath). */
-export function moveNodePoint(segs: Seg[], pt: Pick<NodePoint, 'kind' | 'seg' | 'k'>, dx: number, dy: number): Seg[] {
+export function moveNodePoint(segs: Seg[], pt: Pick<NodePoint, 'kind' | 'seg' | 'k'>, dx: number, dy: number, types?: NodeType[]): Seg[] {
   const out = segs.map((s) => ({ c: s.c, p: s.p.map((q) => [...q] as Pt) }));
   const shift = (i: number, k: number) => { const q = out[i]?.p[k]; if (q) { q[0] += dx; q[1] += dy; } };
-  if (pt.kind === 'handle') { shift(pt.seg, pt.k); return out; }
+  if (pt.kind === 'handle') {
+    shift(pt.seg, pt.k);
+    // A smooth node keeps its other handle in line (its own length); a symmetric one mirrors it (Inkscape).
+    const node = handleNode(segs, pt.seg, pt.k), type = node != null ? types?.[node] : undefined;
+    if (node != null && (type === 's' || type === 'z')) {
+      const h = nodeHandles(segs, node), mine = pt.seg === h.in?.[0] && pt.k === h.in?.[1] ? h.in : h.out, other = mine === h.in ? h.out : h.in;
+      if (mine && other) {
+        const at = nodeAt(out, node), m = out[mine[0]].p[mine[1]], o = out[other[0]].p[other[1]];
+        const dm = Math.hypot(m[0] - at[0], m[1] - at[1]);
+        if (dm > 1e-9) {
+          const len = type === 'z' ? dm : Math.hypot(o[0] - at[0], o[1] - at[1]);
+          o[0] = at[0] - ((m[0] - at[0]) / dm) * len; o[1] = at[1] - ((m[1] - at[1]) / dm) * len;
+        }
+      }
+    }
+    return out;
+  }
   const carry = (i: number) => {
     const s = out[i];
     shift(i, s.p.length - 1);
@@ -120,4 +136,80 @@ export function withSegs<T extends ShapeSpec>(s: T, segs: Seg[]): T {
   if ('error' in r) return s;
   const box = { x: r.box.x, y: r.box.y, w: Math.max(1, r.box.w), h: Math.max(1, r.box.h) };
   return { ...s, d, box0: box, ...box };
+}
+
+/*
+ * Node types (Inkscape's Node tool: Shift+C cusp, Shift+S smooth, Shift+Y symmetric), stored as Inkscape stores them
+ * in sodipodi:nodetypes (path-manipulator.cpp _createTypeString, L1642–1654): one letter per node and subpath, and on
+ * a closed subpath the first node's letter once more at the end. Missing or unknown letters read as cusp; Inkscape's
+ * 'a' (auto) reads as smooth.
+ */
+export type NodeType = 'c' | 's' | 'z';
+
+/** The segment each node ends (in node order, closing twins left out), and the subpaths' node ranges. */
+export function nodeSegs(segs: Seg[]): { seg: number[]; subpaths: Array<{ from: number; to: number; closed: boolean }> } {
+  const seg: number[] = [], subpaths: Array<{ from: number; to: number; closed: boolean }> = [];
+  segs.forEach((g, i) => {
+    if (g.c === 'M') subpaths.push({ from: seg.length, to: seg.length, closed: false });
+    if (g.c === 'Z') { if (subpaths.length) subpaths[subpaths.length - 1].closed = true; return; }
+    if (!closesOnStart(segs, i)) { seg.push(i); if (subpaths.length) subpaths[subpaths.length - 1].to = seg.length; }
+  });
+  return { seg, subpaths };
+}
+
+export function readTypes(segs: Seg[], s?: string): NodeType[] {
+  const { seg, subpaths } = nodeSegs(segs), out: NodeType[] = [];
+  let i = 0;
+  for (const sp of subpaths) {
+    for (let n = sp.from; n < sp.to; n++) { const ch = s?.[i++]; out.push(ch === 's' || ch === 'a' ? 's' : ch === 'z' ? 'z' : 'c'); }
+    if (sp.closed) i++;
+  }
+  return out.length === seg.length ? out : seg.map(() => 'c');
+}
+
+export function writeTypes(segs: Seg[], types: NodeType[]): string {
+  return nodeSegs(segs).subpaths.map((sp) => types.slice(sp.from, sp.to).join('') + (sp.closed ? types[sp.from] ?? 'c' : '')).join('');
+}
+
+/** Where node `n` sits. */
+function nodeAt(segs: Seg[], n: number): Pt {
+  const i = nodeSegs(segs).seg[n], g = segs[i];
+  return g.p[g.p.length - 1];
+}
+
+/** A node's two handles as [segment, point]: in (end of the curve into it) and out (start of the curve out). */
+export function nodeHandles(segs: Seg[], n: number): { in?: [number, number]; out?: [number, number] } {
+  const i = nodeSegs(segs).seg[n], out: { in?: [number, number]; out?: [number, number] } = {};
+  if (segs[i].c === 'C') out.in = [i, 1];
+  if (segs[i].c === 'M') { for (let j = i + 1; j < segs.length && segs[j].c !== 'M'; j++) if (closesOnStart(segs, j) && segs[j].c === 'C') out.in = [j, 1]; }
+  if (segs[i + 1]?.c === 'C') out.out = [i + 1, 0];
+  return out;
+}
+
+/** The node a handle hangs from. */
+function handleNode(segs: Seg[], i: number, k: number): number | null {
+  const ns = nodeSegs(segs).seg;
+  let j = k === 1 ? i : i - 1;
+  if (k === 1 && closesOnStart(segs, i)) j = subpathStart(segs, i);
+  const n = ns.indexOf(j);
+  return n < 0 ? null : n;
+}
+
+/** Make node `n` cusp, smooth (handles in line) or symmetric (in line and of equal length), as Inkscape does. */
+export function setNodeType(segs: Seg[], n: number, type: NodeType): Seg[] {
+  const out = segs.map((g) => ({ c: g.c, p: g.p.map((q) => [...q] as Pt) }));
+  if (type === 'c') return out;
+  const h = nodeHandles(out, n);
+  if (!h.in || !h.out) return out;
+  const at = nodeAt(out, n), a = out[h.in[0]].p[h.in[1]], b = out[h.out[0]].p[h.out[1]];
+  const la = Math.hypot(a[0] - at[0], a[1] - at[1]), lb = Math.hypot(b[0] - at[0], b[1] - at[1]);
+  // The line through the node: from the in handle to the out handle.
+  let dx = b[0] - a[0], dy = b[1] - a[1];
+  const d = Math.hypot(dx, dy);
+  if (d < 1e-9) return out;
+  dx /= d; dy /= d;
+  const len = type === 'z' ? (la + lb) / 2 : 0;
+  a[0] = at[0] - dx * (len || la); a[1] = at[1] - dy * (len || la);
+  b[0] = at[0] + dx * (len || lb); b[1] = at[1] + dy * (len || lb);
+  return out;
 }

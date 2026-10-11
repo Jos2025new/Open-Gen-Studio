@@ -59,7 +59,7 @@ function shapeBody(s: VectorShape): string {
     const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
     // A turned path (converted shape): its turn and its own placement in one matrix.
     const m = multiply(s.rot ? shapeMatrix(s) : [1, 0, 0, 1, 0, 0], [t.sx, 0, 0, t.sy, t.tx, t.ty]);
-    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})" ${paint(s, s.strokeWidth / k)}/>`;
+    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})"${s.nodeTypes ? ` sodipodi:nodetypes="${xmlEscape(s.nodeTypes)}"` : ''} ${paint(s, s.strokeWidth / k)}/>`;
   }
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);
@@ -141,7 +141,7 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
   if (skipped.size) deps.notice?.(`SVG has no equivalent for ${[...skipped].join(', ')}: left out of this file. PNG and JPG keep it.`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`,
     `<title>${xmlEscape(doc.name)}</title>`,
     // Content outside the page is cut, as in the editor.
     `<defs><clipPath id="page"><rect width="${doc.width}" height="${doc.height}"/></clipPath>${defs.join('')}</defs>`,

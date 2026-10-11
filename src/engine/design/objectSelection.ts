@@ -25,7 +25,7 @@ export function setObjectPick(docId: string, pick: ObjectPick | null): void {
 }
 
 /** The shape being edited (double-click or «Edit shape»): its own knots show, the transform handles hide. */
-export interface ShapeEdit { layerId: string; shapeId: string }
+export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: the picked node (its type changes, Delete removes it). */ node?: number }
 export const useShapeEdit = create<{ byDoc: Record<string, ShapeEdit | undefined> }>(() => ({ byDoc: {} }));
 export function setShapeEdit(docId: string, edit: ShapeEdit | null): void {
   useShapeEdit.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: edit ?? undefined } }));

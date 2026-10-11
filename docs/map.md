@@ -115,7 +115,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
-- [PathNodes.tsx](../src/components/designer/PathNodes.tsx)
 - [ShapeKnots.tsx](../src/components/designer/ShapeKnots.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)
