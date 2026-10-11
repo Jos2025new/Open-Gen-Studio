@@ -195,27 +195,37 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
 }
 
 /**
- * A blurred shape, as SVG and Inkscape do it: fill and stroke composed first, then one blur over the result
- * (blurring each apart mixes their colours differently). The off-screen piece covers only what can reach the
- * target canvas: the shape's paint plus its blur margin, cut to the canvas grown by that margin.
+ * A blurred shape, as SVG and Inkscape do it: one blur over the painted shape. With fill and stroke both
+ * painted they are composed first off-screen (blurring each apart mixes their colours differently); with one
+ * of them alone that is the same image, so it is blurred straight on the target, without the off-screen pass.
  */
 let blurScratch: HTMLCanvasElement | undefined;
 function drawBlurredShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
-  const m = ctx.getTransform(), k = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)), r = blurRegion(s);
+  const m = ctx.getTransform(), k = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)), sigma = s.blur! * k;
+  const both = !!s.fill && s.type !== 'line' && !!s.stroke && s.strokeWidth > 0;
+  if (!both) { ctx.save(); ctx.filter = `blur(${sigma}px)`; paintShape(ctx, s); ctx.restore(); return; }
+  // The off-screen piece covers only what can reach the target: the shape's paint plus its blur margin,
+  // cut to the canvas grown by that margin.
+  const r = blurRegion(s), pad = BLUR_MARGIN * sigma + 2;
   const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
-  const pad = BLUR_MARGIN * s.blur! * k + 2;
   const x0 = Math.floor(Math.max(-pad, Math.min(...pts.map((q) => q[0])))), y0 = Math.floor(Math.max(-pad, Math.min(...pts.map((q) => q[1]))));
   const x1 = Math.ceil(Math.min(ctx.canvas.width + pad, Math.max(...pts.map((q) => q[0])))), y1 = Math.ceil(Math.min(ctx.canvas.height + pad, Math.max(...pts.map((q) => q[1]))));
-  if (x1 <= x0 || y1 <= y0) return;
-  // One scratch canvas reused for every blurred shape (no allocation per frame); resizing also clears it.
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return;
+  // One scratch canvas for every blurred shape: it only grows (a resize reallocates), and only the part used is
+  // cleared and drawn.
   const off = (blurScratch ??= createCanvas(1, 1)), o = ctx2d(off);
-  if (off.width !== x1 - x0 || off.height !== y1 - y0) { off.width = x1 - x0; off.height = y1 - y0; } else { o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, off.width, off.height); }
+  if (off.width < w || off.height < h) { off.width = Math.max(off.width, w); off.height = Math.max(off.height, h); }
+  else { o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, w, h); }
+  o.save();
+  o.beginPath(); o.rect(0, 0, w, h); o.clip();
   o.setTransform(m.a, m.b, m.c, m.d, m.e - x0, m.f - y0);
   paintShape(o, s);
+  o.restore();
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.filter = `blur(${s.blur! * k}px)`;
-  ctx.drawImage(off, x0, y0);
+  ctx.filter = `blur(${sigma}px)`;
+  ctx.drawImage(off, 0, 0, w, h, x0, y0, w, h);
   ctx.restore();
 }
 

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { DesignDoc, VectorShape } from '../../engine/types';
-import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
+import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, rectBox, stepClear, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
 import { getDoc } from '../../engine/design/actions';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
@@ -12,6 +12,7 @@ import { patchShape, usePickedShape } from './ShapeLookFields';
  */
 type Knot = 'rx' | 'ry' | 'top' | 'right';
 const NUDGE = 10; // screen px: a zero-radius knot sits beside the corner, so the corner's scale handle stays reachable
+const CLEAR = 18; // screen px between a corner knot and any scale/rotate handle
 const BLUR_GAP = 20; // screen px from the edge: clear of the side scale handle and its pick tolerance
 
 export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
@@ -34,6 +35,16 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     const out = Math.max(0, BLUR_GAP - BLUR_MARGIN * s.blur! * view.zoom);
     knots.push({ knot: 'top', p: bk.top, dy: -out, tip: 'Blur · drag out for more' });
     knots.push({ knot: 'right', p: bk.right, dx: out, tip: 'Blur · drag out for more' });
+  }
+  // A corner knot never sits on a scale or rotate handle (small shapes on screen): it steps out of the box,
+  // Rx up and Ry right, until clear. Only where it is drawn changes; the drag stays relative.
+  if (ck) {
+    const b = rectBox(s), hs = [0, 0.5, 1].flatMap((fx) => [0, 0.5, 1].map((fy) => scr([b.x + b.w * fx, b.y + b.h * fy])));
+    for (const k of knots) {
+      if (k.knot !== 'rx' && k.knot !== 'ry') continue;
+      const c = scr(k.p), [dx, dy] = stepClear({ x: c.x + (k.dx ?? 0), y: c.y + (k.dy ?? 0) }, hs, k.knot === 'rx' ? [0, -1] : [1, 0], CLEAR);
+      k.dx = (k.dx ?? 0) + dx; k.dy = (k.dy ?? 0) + dy;
+    }
   }
   const move = (e: React.PointerEvent) => {
     const d = drag.current;

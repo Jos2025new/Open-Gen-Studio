@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
+import { stepClear, blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
 import { scaleLayer } from '../src/engine/design/doc';
 import { transformShape } from '../src/engine/design/affine';
 import { shapeSvg } from '../src/engine/design/export';
@@ -66,6 +66,17 @@ describe('corner radii', () => {
     const d = roundRectPath({ x: 0, y: 0, w: 100, h: 60 }, 20, 10);
     expect(d.startsWith('M 20 0 L 80 0 C')).toBe(true);
     expect(d).toContain('100 10 L 100 50');
+  });
+});
+
+describe('knots stay clear of the scale handles', () => {
+  it('a knot on a handle steps out along its direction until 18 px clear; a clear one stays', () => {
+    const hs = [{ x: 100, y: 50 }, { x: 60, y: 50 }];
+    expect(stepClear({ x: 95, y: 50 }, hs, [0, -1], 18)).toEqual([0, -18]);
+    expect(stepClear({ x: 100, y: 50 }, hs, [1, 0], 18)).toEqual([18, 0]);
+    expect(stepClear({ x: 80, y: 20 }, hs, [0, -1], 18)).toEqual([0, 0]);
+    // A tiny shape: all handles within a few px; at most four steps out (36 px), never further.
+    expect(stepClear({ x: 0, y: 0 }, [{ x: 0, y: 0 }, { x: 0, y: -9 }, { x: 0, y: -18 }, { x: 0, y: -27 }, { x: 0, y: -36 }], [0, -1], 18)).toEqual([0, -36]);
   });
 });
 

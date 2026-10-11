@@ -120,6 +120,8 @@ test('canvas and SVG match for blurred shapes; legacy rounded rectangles are unc
       lineV: { type: 'line', x: 200, y: 20, w: 0, h: 220, stroke: '#ffffff', strokeWidth: 20, blur: 5 },
       thickStroke: { type: 'rect', x: 80, y: 70, w: 240, h: 120, stroke: '#3366ff', strokeWidth: 50, blur: 2, join: 'miter' },
       fillAndStroke: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, rx: 30, ry: 12 },
+      zeroWidthRect: { type: 'rect', x: 200, y: 60, w: 0, h: 120, stroke: '#ffffff', strokeWidth: 20, blur: 5 },
+      zeroWidthSharp: { type: 'rect', x: 200, y: 60, w: 0, h: 120, stroke: '#ffffff', strokeWidth: 20 },
       strokeBehind: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, paintOrder: 'stroke' },
     };
     const res: Record<string, any> = {};
@@ -132,7 +134,7 @@ test('canvas and SVG match for blurred shapes; legacy rounded rectangles are unc
     return res;
   });
   console.log(JSON.stringify(out));
-  for (const k of ['lineH', 'lineV', 'thickStroke', 'fillAndStroke', 'strokeBehind']) {
+  for (const k of ['lineH', 'lineV', 'thickStroke', 'fillAndStroke', 'strokeBehind', 'zeroWidthRect', 'zeroWidthSharp']) {
     expect(out[k].ink, `${k}: the canvas shows it`).toBeGreaterThan(1000);
     expect(out[k].n, `${k}: canvas and SVG agree (pixels off by more than 8/255)`).toBeLessThan(out[k].ink * 0.01);
   }

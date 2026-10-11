@@ -1,5 +1,5 @@
 import { pathTransform } from './path';
-import { blurFilterSvg, cornerRadii, strokeLookSvg } from './shapeLook';
+import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
 import { strokeSvg } from './brushTextures';
@@ -59,6 +59,8 @@ function shapeBody(s: VectorShape): string {
     const y = Math.min(s.y, s.y + s.h);
     const w = Math.abs(s.w);
     const h = Math.abs(s.h);
+    // A rectangle with no width or height: SVG skips <rect> then, the canvas strokes it as a line; draw that line.
+    if (!w || !h) return `<path d="${roundRectPath({ x, y, w, h }, 0, 0)}" ${paint(s, s.strokeWidth, null)}/>`;
     const r = cornerRadii(s);
     return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${r.rx > 0 && r.ry > 0 ? ` rx="${n(r.rx)}"${r.ry !== r.rx ? ` ry="${n(r.ry)}"` : ''}` : ''} ${paint(s, s.strokeWidth)}/>`;
   }

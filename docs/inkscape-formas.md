@@ -25,8 +25,11 @@ Investigación del 2026-10-11 para tiradores de esquina, estilo de trazo y desen
 - Un tirador con radio 0 se dibuja 10 px de pantalla al lado de la esquina para no tapar el tirador de escala. El arrastre es relativo, así que el valor no salta.
 - Tiradores de blur: solo aparecen con blur > 0, y siempre a 20 px de pantalla o más del borde, para no tapar los tiradores de escala de los lados. El arrastre es relativo.
 - «Rotate 90°» intercambia Rx y Ry junto con el ancho y el alto.
+- Los tiradores Rx/Ry se apartan del rectángulo (Rx hacia arriba, Ry a la derecha) hasta quedar a 18 px de pantalla de cualquier tirador de escala o giro: en formas pequeñas no los tapan.
+- Un rectángulo de ancho o alto 0 se exporta como trazado (SVG no dibuja `<rect>` vacíos; el lienzo sí traza la línea).
+- Rendimiento: con solo relleno o solo trazo el blur se aplica directamente, como antes; con ambos se componen en un lienzo auxiliar que solo crece. Medido (Chromium sin GPU, 10 formas, zoom): solo relleno, igual que antes; relleno y trazo, unas dos veces más rápido que antes (un blur en vez de dos).
 
 ## Revisión
 
-GPT revisó 523dd35 y 0f8ad16 y encontró siete fallos, ya corregidos con tests: líneas con blur que desaparecían del SVG, trazos gruesos recortados, blur de relleno y trazo distinto entre lienzo y SVG, Ry con Rx sin definir, tirador de blur sobre el de escala, Rotate 90° con las esquinas sin girar, y una diferencia de 3/255 en formas antiguas.
+GPT revisó 523dd35 y 0f8ad16 y encontró siete fallos, ya corregidos con tests: líneas con blur que desaparecían del SVG, trazos gruesos recortados, blur de relleno y trazo distinto entre lienzo y SVG, Ry con Rx sin definir, tirador de blur sobre el de escala, Rotate 90° con las esquinas sin girar, y una diferencia de 3/255 en formas antiguas. En la segunda revisión: Rx tapaba la escala en formas pequeñas, el rectángulo de ancho 0 desaparecía del SVG y el zoom era más lento (21,7 → 28,4 ms); los tres, corregidos. Queda aparte la opacidad y fusión de capa con formas superpuestas, que ya diferían entre lienzo y SVG antes de este trabajo.
 - Sin marcadores en esta pasada.
