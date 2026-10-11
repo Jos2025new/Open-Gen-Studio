@@ -17,6 +17,8 @@ Investigación del 2026-10-11 para tiradores de esquina, estilo de trazo y desen
 | Límite de inglete | 4 por defecto; solo con unión en inglete | [stroke-style.cpp 427](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/widget/stroke-style.cpp#L427) | `MITER_DEFAULT` |
 | Orden de pintado | CSS `paint-order` | [stroke-style.cpp 449–453](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/widget/stroke-style.cpp#L449-453) | `paintOrder: 'stroke'` |
 
+| Giro e inclinación | Un `<rect>` o `<ellipse>` girado sigue siéndolo: escala y posición van a x/y/ancho/alto y a cada radio por su eje; giro e inclinación quedan en `transform`. Los tiradores trabajan en las coordenadas propias de la forma. Solo «Objeto a trayecto» convierte. | [sp-rect.cpp 385–442](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/object/sp-rect.cpp#L385-442), [sp-ellipse.cpp 494–530](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/object/sp-ellipse.cpp#L494-530) | `shapeTransform.ts` (`rot`, `composeShape`, `toLocal`/`toPage`) |
+
 ## Diferencias deliberadas
 
 - Un `radius` antiguo (anterior a rx/ry) conserva su esquina circular con límite min(w,h)/2 y se sigue dibujando con `roundRect` nativo: idéntico píxel a píxel a como se veía. No sigue la regla de Inkscape, para no cambiar documentos ya guardados.

@@ -10,7 +10,7 @@ vi.mock('../src/lib/idb', () => ({
 
 import { transformLayer, transformObjects, transformShape } from '../src/engine/design/affine';
 import { apply, invert, multiply, rotateAbout, scaleAbout, skewAbout, type Mat } from '../src/engine/design/matrix';
-import { newRasterLayer, newVectorLayer, translateLayer } from '../src/engine/design/doc';
+import { newRasterLayer, newVectorLayer, shapeBox, translateLayer } from '../src/engine/design/doc';
 import { layerBox, toLayerSpace } from '../src/engine/design/render';
 import type { RasterLayer, VectorLayer } from '../src/engine/types';
 
@@ -28,18 +28,20 @@ describe('matrices', () => {
 });
 
 describe('one transform for every kind of content', () => {
-  it('a rectangle scaled stays a rectangle; rotated it becomes a path that sits where it turned', () => {
+  it('a rectangle scaled or rotated stays a rectangle (Inkscape keeps <rect> + transform) and sits where it turned', () => {
     const s = transformShape(rect, scaleAbout(2, 2, 0, 0));
     expect([s.type, s.w, s.h, s.strokeWidth]).toEqual(['rect', 200, 100, 4]);
     const r = transformShape(rect, rotateAbout(Math.PI / 2, 50, 25));
-    expect(r.type).toBe('path');
-    close([r.x, r.y, r.w, r.h], [25, -25, 50, 100]);
+    expect(r.type).toBe('rect');
+    const b = shapeBox(r);
+    close([b.x, b.y, b.w, b.h], [25, -25, 50, 100]);
   });
   it('only the picked objects of a vector layer move', () => {
     const l = { ...newVectorLayer('v'), shapes: [rect, { ...rect, id: 'q', x: 300 }] } as VectorLayer;
     const t = transformObjects(l, ['q'], rotateAbout(Math.PI / 4, 350, 25)) as VectorLayer;
     expect(t.shapes[0]).toEqual(rect);
-    expect(t.shapes[1].type).toBe('path');
+    expect(t.shapes[1].type).toBe('rect');
+    expect(t.shapes[1].rot).toBeDefined();
   });
   it('an image keeps its pixels and gains a matrix; its box and hit mapping follow; moving it moves the matrix', () => {
     const img = newRasterLayer('img', { x: 0, y: 0, width: 100, height: 50 }, { width: 100, height: 50 }, 'asset1') as RasterLayer;

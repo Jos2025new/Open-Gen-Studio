@@ -1,4 +1,5 @@
 import { pathTransform } from './path';
+import { shapeMatrix } from './shapeTransform';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
@@ -49,6 +50,9 @@ export function shapeSvg(s: VectorShape): string {
 }
 
 function shapeBody(s: VectorShape): string {
+  // A turned or skewed rectangle or ellipse keeps its element, with the turn as transform (as Inkscape writes it).
+  // Six decimals: three moved edges ~0.15 px at 300 px from the origin (visible in the canvas/SVG comparison).
+  if (s.rot && (s.type === 'rect' || s.type === 'ellipse')) { const m = shapeMatrix(s); return shapeBody({ ...s, rot: undefined }).replace(/^<(\w+) /, `<$1 transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})" `); }
   if (s.type === 'path') {
     const t = pathTransform(s);
     const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));

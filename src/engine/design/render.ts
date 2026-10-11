@@ -5,6 +5,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
+import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion, redrawSoon } from './raster';
 import type { FxLayer } from '../fx/types';
@@ -180,6 +181,8 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     p = new Path2D(s.d);
     sw = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
   } else {
+    // A turned or skewed rectangle or ellipse: drawn in its own coordinates (shapeTransform.ts).
+    if (s.rot) { const m = shapeMatrix(s); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); }
     ctx.beginPath();
     if (s.type === 'rect') {
       const r = cornerRadii(s), b = rectBox(s);

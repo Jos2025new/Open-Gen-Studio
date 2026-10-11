@@ -25,4 +25,6 @@ export interface ShapeSpec {
   paintOrder?: 'stroke';
   /** Gaussian blur σ in page px (Inkscape's stdDeviation); the panel shows it as Inkscape's blur %. */
   blur?: number;
+  /** Rectangle/ellipse turned or skewed: the linear part [a, b, c, d] about the shape's centre (design/shapeTransform.ts). */
+  rot?: [number, number, number, number];
 }

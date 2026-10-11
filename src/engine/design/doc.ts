@@ -2,6 +2,7 @@ import { multiply, scaleAbout, translation } from './matrix';
 import { uid } from '../../lib/id';
 import { scaleStroke, translateStroke } from './strokes';
 import { scaleLook } from './shapeLook';
+import { composeShape, pageBox } from './shapeTransform';
 import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
 
 /* Pure document/layer operations for the Designer. Layers are ordered bottom → top. */
@@ -153,6 +154,7 @@ export interface Box {
 }
 
 export function shapeBox(s: ShapeSpec): Box {
+  if (s.rot && s.type !== 'path' && s.type !== 'line') return pageBox(s);
   const x = Math.min(s.x, s.x + s.w);
   const y = Math.min(s.y, s.y + s.h);
   const pad = s.type === 'line' ? Math.max(4, s.strokeWidth / 2) : 0;
@@ -182,7 +184,7 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
     return {
       ...layer,
       ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(scaleAbout(sx, sy, ax, ay), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}),
-      shapes: layer.shapes.map((s: VectorShape) => ({ ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, ...scaleLook(s, sx, sy) })),
+      shapes: layer.shapes.map((s: VectorShape) => (s.rot ? composeShape(s, scaleAbout(sx, sy, ax, ay)) : { ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, ...scaleLook(s, sx, sy) })),
       ...(layer.strokes ? { strokes: layer.strokes.map((s) => scaleStroke(s, sx, sy, ax, ay)) } : {}),
     };
   }

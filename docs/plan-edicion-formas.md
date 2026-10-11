@@ -18,6 +18,10 @@ Crear la forma; un clic mueve; los tiradores de la forma completa escalan y rota
 | Campos según la figura: An, Al y Blur en las dos; Rx/Ry y «Sharp corners» solo en el rectángulo. | Mostrar solo lo que aplica. | Mejora 3 de Sol. |
 | Propiedades: con una forma elegida, solo su sección y en filas compactas. | Hacía falta desplazarse para ver «Sharp corners». | Observación propia. |
 
+## Giro libre (añadido)
+
+Girar o inclinar un rectángulo o una elipse ya no los convierte en trazado: siguen editables (doble clic, Rx/Ry, blur), con sus tiradores girados, como en Inkscape. El SVG los escribe como `<rect>`/`<ellipse>` con `transform`. Una línea girada sigue siendo línea.
+
 ## Qué queda fuera
 
 «Convert to path» y la edición de nodos de trazados de formas: segunda fase. No se ofrece un botón hasta que los nodos existan (Sol: no prometerlo antes). Opacidad/fusión de capa entre lienzo y SVG: tarea aparte.

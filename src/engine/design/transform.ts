@@ -1,3 +1,4 @@
+import { composeShape } from './shapeTransform';
 import { multiply, rotateAbout } from './matrix';
 import { mapPathShape } from './path';
 import { looksUnchanged, noChangeNote } from './symmetry';
@@ -62,6 +63,8 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
       const [x2, y2] = rot(s.x + s.w, s.y + s.h);
       return { ...s, x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
     }
+    // Already turned (shapeTransform.ts): one more quarter turn on its matrix.
+    if (s.rot) return composeShape(s, rotateAbout(cw ? Math.PI / 2 : -Math.PI / 2, cx, cy));
     // Rect and ellipse: the same box turned (its center moves, its sides swap).
     const [mx, my] = rot(s.x + s.w / 2, s.y + s.h / 2);
     // Its corner radii turn with it: Rx and Ry swap, set or unset alike.

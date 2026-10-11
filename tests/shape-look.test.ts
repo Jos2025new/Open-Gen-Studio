@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
 import { editableShapeAt, blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
 import { scaleLayer } from '../src/engine/design/doc';
-import { transformShape } from '../src/engine/design/affine';
+import { shapeToPath, transformShape } from '../src/engine/design/affine';
+import { pageBox, toLocal, toPage } from '../src/engine/design/shapeTransform';
+import { rotateAbout } from '../src/engine/design/matrix';
 import { shapeSvg } from '../src/engine/design/export';
 import { turnVector } from '../src/engine/design/transform';
 
@@ -157,13 +159,58 @@ describe('scaling keeps the look', () => {
     expect([t.rx, t.ry]).toEqual([7, undefined]);
   });
 
-  it('a rotated rounded rectangle becomes a path with the same elliptical corners and keeps its blur', () => {
+  it('a turned rectangle stays a rectangle (Inkscape set_transform): same radii, blur and stroke; the turn in rot', () => {
     const c = Math.cos(0.3), sn = Math.sin(0.3);
     const out = transformShape(rect({ rx: 12, ry: 6, blur: 4 }), [c, sn, -sn, c, 0, 0]);
-    expect(out.type).toBe('path');
-    expect(out.rx).toBeUndefined();
+    expect(out.type).toBe('rect');
+    expect([out.w, out.h, out.rx, out.ry, out.strokeWidth]).toEqual([100, 60, 12, 6, 2].map((v) => expect.closeTo(v, 9)));
     expect(out.blur).toBeCloseTo(4);
-    expect(out.d!.match(/C/g)).toHaveLength(4);
+    expect(out.rot!.map((v) => +v.toFixed(9))).toEqual([c, sn, -sn, c].map((v) => +v.toFixed(9)));
+    // Its centre turned with it.
+    const [cx, cy] = [60 * c - 50 * sn, 60 * sn + 50 * c];
+    expect(out.x + out.w / 2).toBeCloseTo(cx); expect(out.y + out.h / 2).toBeCloseTo(cy);
+    // Turning back gives the same rectangle and no rot left.
+    const back = transformShape(out, [c, -sn, sn, c, 0, 0]);
+    expect(back.rot).toBeUndefined();
+    expect([back.x, back.y, back.w, back.h]).toEqual([10, 20, 100, 60].map((v) => expect.closeTo(v, 9)));
+  });
+
+  it('a non-uniform scale of a turned rectangle keeps it a rectangle: each side by its own stretch (skew stays in rot)', () => {
+    const t = transformShape(rect({ rx: 10, ry: 10 }), [0, 1, -1, 0, 0, 0]);
+    const s2 = transformShape(t, [2, 0, 0, 1, 0, 0]);
+    expect(s2.type).toBe('rect');
+    // A quarter turn: page x is its own y, so its height doubles, not its width.
+    expect([s2.w, s2.h, s2.rx, s2.ry]).toEqual([100, 120, 10, 20].map((v) => expect.closeTo(v, 9)));
+  });
+
+  it('own ↔ page coordinates are inverse; the page box of a turned ellipse is its exact extent', () => {
+    const e = transformShape(rect({ type: 'ellipse', x: 0, y: 0, w: 200, h: 100 }), rotateAbout(Math.PI / 2, 100, 50));
+    expect(pageBox(e)).toEqual({ x: expect.closeTo(50, 9), y: expect.closeTo(-50, 9), w: expect.closeTo(100, 9), h: expect.closeTo(200, 9) });
+    const [px, py] = toPage(e, 30, 40), [lx, ly] = toLocal(e, px, py);
+    expect([lx, ly]).toEqual([expect.closeTo(30, 9), expect.closeTo(40, 9)]);
+    // Double-click finds it through its turn.
+    expect(editableShapeAt([{ ...e, id: 'e' }], 100, 140)?.id).toBe('e');
+    expect(editableShapeAt([{ ...e, id: 'e' }], 10, 50)).toBeNull();
+  });
+
+  it('a line turns as a line; Convert to path keeps the turned outline', () => {
+    const c = Math.cos(0.5), sn = Math.sin(0.5);
+    expect(transformShape(rect({ type: 'line', w: 100, h: 0 }), [c, sn, -sn, c, 0, 0]).type).toBe('line');
+    const t = transformShape(rect(), rotateAbout(Math.PI / 4, 60, 50));
+    const p = shapeToPath(t);
+    expect(p.type).toBe('path');
+    expect(p.rot).toBeUndefined();
+    const b = pageBox(t);
+    expect([p.x, p.y, p.w, p.h]).toEqual([b.x, b.y, b.w, b.h].map((v) => expect.closeTo(v, 1))); // paths keep 2 decimals
+  });
+
+  it('SVG keeps a turned rectangle as <rect> with transform, like Inkscape; a quarter turn of a turned shape composes', () => {
+    const t = transformShape(rect({ rx: 5 }), rotateAbout(0.4, 0, 0));
+    expect(shapeSvg({ ...t, id: 'r' })).toMatch(/^<rect transform="matrix\(/);
+    const layer = { id: 'l', type: 'vector' as const, name: 'v', visible: true, locked: false, opacity: 1, blend: 'normal' as const, shapes: [{ ...t, id: 's' }] };
+    const turned = turnVector(layer as never, 'rotate-cw').shapes[0];
+    expect(turned.type).toBe('rect');
+    expect(Math.atan2(turned.rot![1], turned.rot![0])).toBeCloseTo(0.4 + Math.PI / 2);
   });
 });
 

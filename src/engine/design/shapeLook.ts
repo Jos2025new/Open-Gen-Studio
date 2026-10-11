@@ -1,4 +1,5 @@
 import type { ShapeSpec } from '../types';
+import { pageBox, toLocal } from './shapeTransform';
 
 /*
  * Rounded corners, stroke style and blur of a shape, with Inkscape's formulas (read from its source, master):
@@ -100,9 +101,9 @@ export function clickKnot(s: ShapeSpec, knot: 'rx' | 'ry', mods: { shift: boolea
 }
 
 /** The topmost shape of a vector layer under a page point, if it has an edit mode (rectangle or ellipse). */
-export function editableShapeAt<T extends ShapeSpec>(shapes: T[], x: number, y: number): T | null {
+export function editableShapeAt<T extends ShapeSpec>(shapes: T[], px: number, py: number): T | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
-    const s = shapes[i], b = rectBox(s);
+    const s = shapes[i], b = rectBox(s), [x, y] = toLocal(s, px, py);
     // The topmost shape under the point decides: a path over a rectangle hides it (no edit mode through it).
     if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s.type === 'rect' || s.type === 'ellipse' ? s : null;
   }
@@ -169,7 +170,8 @@ export function strokeReach(s: ShapeSpec): number {
 
 /** The page area a blurred shape paints: its box, the stroke's reach and Inkscape's 2.4σ margin (never empty). */
 export function blurRegion(s: ShapeSpec): Box {
-  const b = rectBox(s), m = strokeReach(s) + BLUR_MARGIN * (s.blur ?? 0) + 1;
+  // A turned shape: the page box around it, with the reach scaled by its largest stretch.
+  const b = pageBox(s), m = (strokeReach(s) + BLUR_MARGIN * (s.blur ?? 0) + 1) * (s.rot ? Math.max(1, Math.hypot(s.rot[0], s.rot[2]), Math.hypot(s.rot[1], s.rot[3])) : 1);
   return { x: b.x - m, y: b.y - m, w: b.w + 2 * m, h: b.h + 2 * m };
 }
 

@@ -181,6 +181,8 @@ test('canvas and SVG match for blurred shapes; legacy rounded rectangles are unc
       fillAndStroke: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, rx: 30, ry: 12 },
       zeroWidthRect: { type: 'rect', x: 200, y: 60, w: 0, h: 120, stroke: '#ffffff', strokeWidth: 20, blur: 5 },
       zeroWidthSharp: { type: 'rect', x: 200, y: 60, w: 0, h: 120, stroke: '#ffffff', strokeWidth: 20 },
+      turnedRounded: { type: 'rect', x: 120, y: 80, w: 160, h: 100, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 8, rx: 30, ry: 14, blur: 3, rot: [Math.cos(0.5), Math.sin(0.5), -Math.sin(0.5), Math.cos(0.5)] },
+      turnedEllipse: { type: 'ellipse', x: 120, y: 80, w: 160, h: 100, fill: '#ff4488', rot: [Math.cos(-0.7), Math.sin(-0.7), -Math.sin(-0.7), Math.cos(-0.7)] },
       strokeBehind: { type: 'rect', x: 80, y: 70, w: 240, h: 120, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 20, blur: 10, paintOrder: 'stroke' },
     };
     const res: Record<string, any> = {};
@@ -193,10 +195,40 @@ test('canvas and SVG match for blurred shapes; legacy rounded rectangles are unc
     return res;
   });
   console.log(JSON.stringify(out));
-  for (const k of ['lineH', 'lineV', 'thickStroke', 'fillAndStroke', 'strokeBehind', 'zeroWidthRect', 'zeroWidthSharp']) {
+  for (const k of ['lineH', 'lineV', 'thickStroke', 'fillAndStroke', 'strokeBehind', 'zeroWidthRect', 'zeroWidthSharp', 'turnedRounded', 'turnedEllipse']) {
     expect(out[k].ink, `${k}: the canvas shows it`).toBeGreaterThan(1000);
     expect(out[k].n, `${k}: canvas and SVG agree (pixels off by more than 8/255)`).toBeLessThan(out[k].ink * 0.01);
   }
   expect(out.legacy.max, 'a legacy rounded rectangle is drawn exactly as before').toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('free rotation keeps a rectangle a rectangle: still editable, knots turned with it', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.35, c.y + c.height * 0.35); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.55, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  const mid = { x: c.x + c.width * 0.45, y: c.y + c.height * 0.48 };
+  // Click, then click again: rotate handles (Inkscape); drag a corner to turn it.
+  await page.mouse.click(mid.x, mid.y);
+  await page.waitForTimeout(400);
+  await page.mouse.click(mid.x, mid.y);
+  const corner = { x: c.x + c.width * 0.55, y: c.y + c.height * 0.6 };
+  await page.mouse.move(corner.x, corner.y); await page.mouse.down();
+  await page.mouse.move(corner.x + 60, corner.y - 10, { steps: 8 }); await page.mouse.up();
+  const s1 = await shape(page);
+  expect(s1.type).toBe('rect');
+  expect(s1.rot).toBeDefined();
+  // Still editable: double-click shows its knots; dragging Rx rounds the turned rectangle.
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(knot(page, 'rx')).toBeVisible();
+  await dragKnot(page, 'rx', -30, 0);
+  const s2 = await shape(page);
+  expect(s2.type).toBe('rect');
+  expect(s2.rx).toBeGreaterThan(3);
+  expect(s2.rot).toEqual(s1.rot);
+  await page.screenshot({ path: `${SHOTS}/turned.png` });
   expect(errors).toEqual([]);
 });

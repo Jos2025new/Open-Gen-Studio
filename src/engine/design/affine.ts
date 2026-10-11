@@ -3,6 +3,7 @@ import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../type
 import { createCanvas, ctx2d } from '../../lib/media';
 import { mapPathShape } from './path';
 import { cornerRadii, roundRectPath, scaleLook } from './shapeLook';
+import { composeShape, toPage } from './shapeTransform';
 import { apply, invert, isAxisAligned, lengthScale, multiply, type Mat } from './matrix';
 import { getBuffer, setBuffer, composeRaster } from './raster';
 
@@ -15,8 +16,9 @@ import { getBuffer, setBuffer, composeRaster } from './raster';
 
 const K = 0.5522847498; // cubic Bézier circle constant
 
-/** A rectangle, ellipse or line as an equivalent path (so it can rotate or skew). */
-function asPath<T extends ShapeSpec>(s: T): T {
+/** Convert to path (Inkscape's Object to Path): a rectangle, ellipse or line as the same outline, turn included. One-way. */
+export function shapeToPath<T extends ShapeSpec>(s: T): T {
+  if (s.type === 'path') return s;
   const x0 = s.x, y0 = s.y, x1 = s.x + s.w, y1 = s.y + s.h;
   let d: string;
   if (s.type === 'line') d = `M ${x0} ${y0} L ${x1} ${y1}`;
@@ -29,17 +31,20 @@ function asPath<T extends ShapeSpec>(s: T): T {
     d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry);
   }
   const box = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) || 1, h: Math.abs(y1 - y0) || 1 };
-  return { ...s, type: 'path', d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined };
+  const p = { ...s, type: 'path' as const, d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined, rot: undefined };
+  return (s.rot ? mapPathShape(p, (x, y) => toPage(s, x, y)) : p) as T;
 }
 
 export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
   const k = lengthScale(m);
-  if (s.type !== 'path' && isAxisAligned(m)) {
+  if (s.type !== 'path' && !s.rot && isAxisAligned(m)) {
     const [x0, y0] = apply(m, s.x, s.y), [x1, y1] = apply(m, s.x + s.w, s.y + s.h);
     return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, ...scaleLook(s, m[0], m[3]) };
   }
-  const p = s.type === 'path' ? s : asPath(s);
-  return { ...mapPathShape(p, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
+  // A rectangle or ellipse stays one when turned or skewed, as in Inkscape (shapeTransform.ts); a line stays a line.
+  if (s.type === 'rect' || s.type === 'ellipse') return composeShape(s, m);
+  if (s.type === 'line') { const [x0, y0] = apply(m, s.x, s.y), [x1, y1] = apply(m, s.x + s.w, s.y + s.h); return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) }; }
+  return { ...mapPathShape(s, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
 }
 
 export function transformStroke(s: Stroke, m: Mat): Stroke {
