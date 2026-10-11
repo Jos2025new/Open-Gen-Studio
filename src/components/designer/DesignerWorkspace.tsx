@@ -169,8 +169,9 @@ export function DesignerWorkspace() {
         else if (k === 'd') setSelection(doc.id, null);
         else if (k === 'i') invertSelection(doc);
         else { const err = selectionToLayer(session.id, doc); if (err) toast(err, 'error'); }
-      } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && deletePickedNode(session.id, doc.id)) {
-        // Editing a path with a node picked: Delete removes that node, never the layer (PathNodes.tsx).
+      } else if (!e.altKey && !e.shiftKey && (e.key === 'Delete' || e.key === 'Backspace') && deletePickedNode(session.id, doc.id, mod ? 'line' : 'auto')) {
+        // Editing a path with a node picked: Delete removes that node keeping the shape, Ctrl+Delete joins its
+        // neighbours straight (Inkscape); never the layer (PathNodes.tsx).
         e.preventDefault();
       } else if (!e.altKey && ((!mod && (e.key === 'Delete' || e.key === 'Backspace')) || (mod && k === 'x')) && getSelection(doc.id)) {
         // With a selection, Delete (or Ctrl+X, handled by cut) erases its pixels instead of deleting the layer.

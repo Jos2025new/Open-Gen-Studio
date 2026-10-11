@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { deleteNode, insertNode, moveNodePoint, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { deleteNode, fitCubic, insertNode, moveNodePoint, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -102,6 +102,23 @@ describe('path nodes', () => {
 });
 
 describe('adding and deleting nodes', () => {
+  it('deleting a smooth node keeps the shape (Inkscape): split a curve, delete the new node, get the curve back', () => {
+    const orig = parseSegs('M 0 0 C 10 40 60 40 80 0');
+    for (const t of [0.3, 0.5, 0.7]) {
+      const added = insertNode(orig, ['c', 'c'], { sub: 0, edge: 0, t });
+      const back = deleteNode(added.segs, added.types, added.node)!;
+      const [c1, c2] = [back.segs[1].p[0], back.segs[1].p[1]];
+      expect(c1[0]).toBeCloseTo(10, 0); expect(c1[1]).toBeCloseTo(40, 0);
+      expect(c2[0]).toBeCloseTo(60, 0); expect(c2[1]).toBeCloseTo(40, 0);
+    }
+  });
+  it('the fit keeps the end directions; a zero handle takes the direction of the curve there', () => {
+    const r = fitCubic([[0, 0], [5, 4], [10, 5], [15, 4], [20, 0]], [0, 10], [20, 10])!;
+    expect(r[0][0]).toBeCloseTo(0, 9); expect(r[1][0]).toBeCloseTo(20, 9);
+    const z = fitCubic([[0, 0], [5, 4], [10, 5], [15, 4], [20, 0]], [0, 0], [20, 0])!;
+    expect(z[0][1]).toBeGreaterThan(0); expect(z[1][1]).toBeGreaterThan(0);
+  });
+
   const box = (segs: ReturnType<typeof parseSegs>) => { const s = withSegs(path('M 0 0 L 1 1'), segs); return [s.x, s.y, s.w, s.h]; };
   it('adding a node keeps the outline (line and curve, De Casteljau), types move with nodes', () => {
     const segs = parseSegs('M 0 0 C 0 10 10 10 10 0 L 20 0');
@@ -126,7 +143,9 @@ describe('adding and deleting nodes', () => {
   });
   it('deleting joins the neighbours keeping their outer handles; ends of an open path just go; the last node stays', () => {
     const segs = parseSegs('M 0 0 C 0 5 3 8 5 8 C 7 8 10 5 10 0 L 20 0');
-    expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 1)!.segs)).toBe('M 0 0 C 0 5 10 5 10 0 L 20 0');
+    // A cusp node: neighbours joined plainly, keeping their outer handles; Ctrl+Delete ('line'): a straight segment.
+    expect(serializeSegs(deleteNode(segs, ['c', 'c', 'c', 'c'], 1)!.segs)).toBe('M 0 0 C 0 5 10 5 10 0 L 20 0');
+    expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 1, 'line')!.segs)).toBe('M 0 0 L 10 0 L 20 0');
     expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 0)!.segs)).toBe('M 5 8 C 7 8 10 5 10 0 L 20 0');
     expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 3)!.segs)).toBe('M 0 0 C 0 5 3 8 5 8 C 7 8 10 5 10 0');
     expect(deleteNode(parseSegs('M 0 0 L 10 0'), ['c', 'c'], 0)).toBeNull();

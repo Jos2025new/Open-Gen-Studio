@@ -298,9 +298,13 @@ export function insertNode(segs: Seg[], types: NodeType[], at: { sub: number; ed
   return { segs: fromSubs(subs), types: out, node };
 }
 
-/** Delete node `n`: its neighbours are joined by one edge keeping their outer handles. Null when it would leave the
-    path without a drawable subpath (the last node of the last subpath). */
-export function deleteNode(segs: Seg[], types: NodeType[], n: number): { segs: Seg[]; types: NodeType[] } | null {
+/**
+ * Delete node `n`, as Inkscape (path-manipulator.cpp L812–907): Delete ('auto') keeps the shape of a smooth or
+ * symmetric node, fitting one cubic to the old curve with the neighbours' outer handle directions fixed; a cusp
+ * node, or Ctrl+Delete ('line'), joins its neighbours plainly ('line': a straight segment). Null when it would leave
+ * the path without a drawable subpath (the last node of the last subpath).
+ */
+export function deleteNode(segs: Seg[], types: NodeType[], n: number, mode: 'auto' | 'line' = 'auto'): { segs: Seg[]; types: NodeType[] } | null {
   const subs = toSubs(segs);
   let si = 0, j = n;
   while (si < subs.length && j >= subs[si].nodes.length) { j -= subs[si].nodes.length; si++; }
@@ -315,22 +319,93 @@ export function deleteNode(segs: Seg[], types: NodeType[], n: number): { segs: S
     outTypes.splice(globalIndex(subs.concat(), si, 0), m - 1);
     return { segs: fromSubs(subs), types: outTypes };
   }
-  const merge = (ein: Edge, eout: Edge): Edge => (ein.c === 'L' && eout.c === 'L' ? { c: 'L' } : { c: 'C', c1: ein.c === 'C' ? ein.c1 : undefined, c2: eout.c === 'C' ? eout.c2 : undefined });
+  const join = (a: Pt, ein: Edge, mid: Pt, eout: Edge, b: Pt): Edge => joinEdges(a, ein, mid, eout, b, mode, types[n] ?? 'c');
   if (s.closed) {
-    const kin = (j - 1 + m) % m, merged = merge(s.edges[kin], s.edges[j]);
-    // Missing handles sit on their node (a straight start or end of the new curve).
-    if (merged.c === 'C') { merged.c1 ??= s.nodes[kin]; merged.c2 ??= s.nodes[(j + 1) % m]; }
-    s.edges[kin] = merged;
+    const kin = (j - 1 + m) % m;
+    s.edges[kin] = join(s.nodes[kin], s.edges[kin], s.nodes[j], s.edges[j], s.nodes[(j + 1) % m]);
     s.edges.splice(j, 1);
     s.nodes.splice(j, 1);
     // Edge k still runs from node k to node k + 1 (the merged one closes back to the new first node when j is 0).
   } else if (j === 0) { s.nodes.shift(); s.edges.shift(); }
   else if (j === m - 1) { s.nodes.pop(); s.edges.pop(); }
   else {
-    const merged = merge(s.edges[j - 1], s.edges[j]);
-    if (merged.c === 'C') { merged.c1 ??= s.nodes[j - 1]; merged.c2 ??= s.nodes[j + 1]; }
-    s.edges.splice(j - 1, 2, merged);
+    s.edges.splice(j - 1, 2, join(s.nodes[j - 1], s.edges[j - 1], s.nodes[j], s.edges[j], s.nodes[j + 1]));
     s.nodes.splice(j, 1);
   }
   return { segs: fromSubs(subs), types: outTypes };
+}
+
+/** The edge that replaces in-edge + out-edge around a deleted node. */
+function joinEdges(a: Pt, ein: Edge, mid: Pt, eout: Edge, b: Pt, mode: 'auto' | 'line', type: NodeType): Edge {
+  if (mode === 'line' || (ein.c === 'L' && eout.c === 'L')) return { c: 'L' };
+  const plain: Edge = { c: 'C', c1: ein.c === 'C' ? ein.c1 : a, c2: eout.c === 'C' ? eout.c2 : b };
+  if (type === 'c') return plain;
+  // Inkscape samples the old curve 10 times per segment, uniformly in t, and keeps the end tangents.
+  const pts: Pt[] = [];
+  for (let i = 0; i <= 10; i++) pts.push(edgePoint(a, ein, mid, i / 10));
+  for (let i = 1; i <= 10; i++) pts.push(edgePoint(mid, eout, b, i / 10));
+  // The samples are uniform in t on each old edge: their parameters on the new curve start from that, with the
+  // deleted node at the share of the length before it (far faster to settle than plain chord lengths).
+  const len = (from: number, to: number) => { let l = 0; for (let i = from + 1; i <= to; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return l; };
+  const tau = len(0, 10) / (len(0, 20) || 1);
+  const u0 = pts.map((_, i) => (i <= 10 ? (tau * i) / 10 : tau + ((1 - tau) * (i - 10)) / 10));
+  const fit = fitCubic(pts, plain.c1!, plain.c2!, u0);
+  return fit ? { c: 'C', c1: fit[0], c2: fit[1] } : plain;
+}
+
+/**
+ * One cubic through the first and last of `pts`, its end tangents along the given handles (a zero handle: the
+ * direction of the samples there, as Inkscape's splinefit does). Handle lengths by least squares with chord-length
+ * parameters and Newton reparameterization (Schneider; Inkscape's bezier-utils.cpp estimate_lengths, reparameterize),
+ * repeated until the parameters settle. Returns the two control points, or null when there is nothing to fit.
+ */
+export function fitCubic(pts: Pt[], h1: Pt, h2: Pt, u0?: number[]): [Pt, Pt] | null {
+  const n = pts.length, p0 = pts[0], p3 = pts[n - 1];
+  if (n < 3) return null;
+  const unit = (v: Pt): Pt | null => { const l = Math.hypot(v[0], v[1]); return l > 1e-9 ? [v[0] / l, v[1] / l] : null; };
+  const t1 = unit([h1[0] - p0[0], h1[1] - p0[1]]) ?? unit([pts[1][0] - p0[0], pts[1][1] - p0[1]]);
+  const t2 = unit([h2[0] - p3[0], h2[1] - p3[1]]) ?? unit([pts[n - 2][0] - p3[0], pts[n - 2][1] - p3[1]]);
+  if (!t1 || !t2) return null;
+  // Chord-length parameters, unless the caller knows better ones.
+  const u = u0 && u0.length === n ? [...u0] : [0];
+  if (!u0 || u0.length !== n) {
+    for (let i = 1; i < n; i++) u.push(u[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+    const total = u[n - 1] || 1;
+    for (let i = 0; i < n; i++) u[i] /= total;
+  }
+  const chord = Math.hypot(p3[0] - p0[0], p3[1] - p0[1]);
+  const at = (c1: Pt, c2: Pt, t: number): Pt => { const s = 1 - t; return [s * s * s * p0[0] + 3 * s * s * t * c1[0] + 3 * s * t * t * c2[0] + t * t * t * p3[0], s * s * s * p0[1] + 3 * s * s * t * c1[1] + 3 * s * t * t * c2[1] + t * t * t * p3[1]]; };
+  const solve = (): [Pt, Pt] => {
+    let c00 = 0, c01 = 0, c11 = 0, x0 = 0, x1 = 0;
+    for (let i = 0; i < n; i++) {
+      const t = u[i], s = 1 - t, b0 = s * s * s, b1 = 3 * s * s * t, b2 = 3 * s * t * t, b3 = t * t * t;
+      const a1: Pt = [t1[0] * b1, t1[1] * b1], a2: Pt = [t2[0] * b2, t2[1] * b2];
+      c00 += a1[0] * a1[0] + a1[1] * a1[1]; c01 += a1[0] * a2[0] + a1[1] * a2[1]; c11 += a2[0] * a2[0] + a2[1] * a2[1];
+      const r: Pt = [pts[i][0] - (p0[0] * (b0 + b1) + p3[0] * (b2 + b3)), pts[i][1] - (p0[1] * (b0 + b1) + p3[1] * (b2 + b3))];
+      x0 += a1[0] * r[0] + a1[1] * r[1]; x1 += a2[0] * r[0] + a2[1] * r[1];
+    }
+    const det = c00 * c11 - c01 * c01;
+    let al = det ? (x0 * c11 - c01 * x1) / det : 0, ar = det ? (c00 * x1 - c01 * x0) / det : 0;
+    // As bezier-utils.cpp: a degenerate or negative length falls back to a third of the chord.
+    if (!(al > 1e-6) || !(ar > 1e-6)) { al = chord / 3; ar = chord / 3; }
+    return [[p0[0] + t1[0] * al, p0[1] + t1[1] * al], [p3[0] + t2[0] * ar, p3[1] + t2[1] * ar]];
+  };
+  let c = solve();
+  // Inkscape stops after 4 extra rounds (a handle ~2 % off on an exact cubic); the alternation converges slowly, so
+  // it goes on until the handles settle (at most 5000 rounds of ~21 samples; only when a node is deleted).
+  for (let it = 0, moved = 1; it < 5000 && moved > 1e-4; it++) {
+    const prev = c;
+    // Newton: each sample's parameter moves to its nearest point on the current curve.
+    for (let i = 1; i < n - 1; i++) {
+      const t = u[i], s = 1 - t, q = at(c[0], c[1], t);
+      const d1: Pt = [3 * (s * s * (c[0][0] - p0[0]) + 2 * s * t * (c[1][0] - c[0][0]) + t * t * (p3[0] - c[1][0])), 3 * (s * s * (c[0][1] - p0[1]) + 2 * s * t * (c[1][1] - c[0][1]) + t * t * (p3[1] - c[1][1]))];
+      const d2: Pt = [6 * (s * (c[1][0] - 2 * c[0][0] + p0[0]) + t * (p3[0] - 2 * c[1][0] + c[0][0])), 6 * (s * (c[1][1] - 2 * c[0][1] + p0[1]) + t * (p3[1] - 2 * c[1][1] + c[0][1]))];
+      const num = (q[0] - pts[i][0]) * d1[0] + (q[1] - pts[i][1]) * d1[1], den = d1[0] * d1[0] + d1[1] * d1[1] + (q[0] - pts[i][0]) * d2[0] + (q[1] - pts[i][1]) * d2[1];
+      if (den) u[i] = Math.min(1, Math.max(0, t - num / den));
+    }
+    c = solve();
+    // Settled when the handles move less than 1e-4 page units a round (paths keep 2 decimals).
+    moved = Math.max(Math.abs(c[0][0] - prev[0][0]), Math.abs(c[0][1] - prev[0][1]), Math.abs(c[1][0] - prev[1][0]), Math.abs(c[1][1] - prev[1][1]));
+  }
+  return c;
 }

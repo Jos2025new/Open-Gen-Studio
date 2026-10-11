@@ -182,3 +182,36 @@ test('add a node by double-clicking the outline, delete it with Delete (never th
   await expect(page.locator('rect.path-node')).toHaveCount(4);
   expect(errors).toEqual([]);
 });
+
+test('Delete keeps the shape of a smooth node (Inkscape); Ctrl+Delete joins straight', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('o');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.55, c.y + c.height * 0.65, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.42, c.y + c.height * 0.47);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  const s0 = await shape(page);
+  // Add a node on the curve between the first two nodes (the outline's own point there), then Delete it.
+  const outline = page.locator('path.path-outline');
+  const pt = await outline.evaluate((p: SVGPathElement) => { const l = p.getTotalLength(), q = p.getPointAtLength(l * 0.1), r = p.ownerSVGElement!.getBoundingClientRect(); return { x: r.x + q.x, y: r.y + q.y }; });
+  await page.mouse.dblclick(pt.x, pt.y);
+  await expect(page.locator('rect.path-node')).toHaveCount(5);
+  await page.keyboard.press('Delete');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  const s1 = await shape(page);
+  // The outline is back: same box within a hair, and the same curve (control points within 0.5 px).
+  for (const k of ['x', 'y', 'w', 'h'] as const) expect(Math.abs(s1[k] - s0[k]), k).toBeLessThan(0.5);
+  const nums = (d: string) => d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+  const a = nums(s0.d), b = nums(s1.d);
+  expect(b.length).toBe(a.length);
+  expect(Math.max(...a.map((v, i) => Math.abs(v - b[i])))).toBeLessThan(0.5);
+  // Ctrl+Delete on a node: its neighbours joined by a straight segment.
+  const n = (await page.locator('rect.path-node').nth(1).boundingBox())!;
+  await page.mouse.click(n.x + n.width / 2, n.y + n.height / 2);
+  await page.keyboard.press('Control+Delete');
+  await expect(page.locator('rect.path-node')).toHaveCount(3);
+  expect((await shape(page)).d).toContain(' L ');
+  expect(errors).toEqual([]);
+});

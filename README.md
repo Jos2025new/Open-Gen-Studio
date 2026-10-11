@@ -196,6 +196,10 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Mod + C / V | Copy a layer's pixels, paste images |
 | Alt (while moving) | Move without snapping |
 | Alt + drag (Lineart) | Bend a stroke |
+| Double-click (Edit) | Edit a shape's handles or a path's nodes; Esc to finish |
+| Ctrl + drag a corner handle | Both corner radii together |
+| Shift+C / Shift+S / Shift+Y (nodes) | Cusp, smooth or symmetric node |
+| Delete / Ctrl+Delete (nodes) | Delete the picked node keeping the shape / joining straight |
 
 **Sketch**
 

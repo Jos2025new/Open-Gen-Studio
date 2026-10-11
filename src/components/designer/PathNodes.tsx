@@ -102,12 +102,12 @@ export function setPathNodeType(sessionId: string, docId: string, layerId: strin
 
 /** Delete the picked node of the path being edited (one undo step). True when a node was picked (the key is used
     for it even if the path cannot lose that node), so Delete never falls through to the layer. */
-export function deletePickedNode(sessionId: string, docId: string): boolean {
+export function deletePickedNode(sessionId: string, docId: string, mode: 'auto' | 'line' = 'auto'): boolean {
   const edit = useShapeEdit.getState().byDoc[docId];
   if (edit?.node == null) return false;
   const l = getDoc(sessionId, docId)?.layers.find((x) => x.id === edit.layerId), shape = l?.type === 'vector' ? l.shapes.find((x) => x.id === edit.shapeId) : undefined;
   if (!shape || shape.type !== 'path') return false;
-  const segs = pageSegs(shape), r = deleteNode(segs, readTypes(segs, shape.nodeTypes), edit.node);
+  const segs = pageSegs(shape), r = deleteNode(segs, readTypes(segs, shape.nodeTypes), edit.node, mode);
   if (r) {
     const next = withSegs(shape, r.segs);
     patchShape(sessionId, docId, edit.layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });

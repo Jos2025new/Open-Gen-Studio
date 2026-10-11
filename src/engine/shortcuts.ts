@@ -63,6 +63,10 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Mod + C / V', action: 'Copy a layer\'s pixels, paste images' },
         { keys: 'Alt (while moving)', action: 'Move without snapping' },
         { keys: 'Alt + drag (Lineart)', action: 'Bend a stroke' },
+        { keys: 'Double-click (Edit)', action: 'Edit a shape\'s handles or a path\'s nodes; Esc to finish' },
+        { keys: 'Ctrl + drag a corner handle', action: 'Both corner radii together' },
+        { keys: 'Shift+C / Shift+S / Shift+Y (nodes)', action: 'Cusp, smooth or symmetric node' },
+        { keys: 'Delete / Ctrl+Delete (nodes)', action: 'Delete the picked node keeping the shape / joining straight' },
       ],
     },
     {
