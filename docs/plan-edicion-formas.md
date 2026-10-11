@@ -86,12 +86,19 @@ Fuente: código de [SVG-Edit](https://github.com/SVG-Edit/svgedit) en el commit 
 | Tipos de nodo | Esquina, suave, simétrico | Solo «enlazar puntos de control»: simétrico o libre (path-method.js 707) | Inkscape más completo | Lo nuestro (ya hecho) |
 | Añadir nodo | Doble clic en el contorno | Botón que divide por la mitad, con De Casteljau (path-method.js 891–930) | Mismo cálculo | Lo nuestro (ya hecho) |
 
-**Lecciones de los issues de SVG-Edit:**
-- **Los fallos se concentran en reescribir la lista de segmentos con índices**, sobre todo cerca de `Z` y del nodo de cierre: #1107 (abierto), nodos que no coinciden con el dibujo; #1093 y #1100, un trazado cerrado que no se movía.
-- **Nuestra base los evita por diseño:** editamos cada subtrazado como nodos y aristas (`toSubs`/`fromSubs`) y lo escribimos entero de nuevo. Esa base sirve para unir, romper y borrar segmento, siempre que haya tests de cerrados, varios subtrazados y nodos coincidentes.
-- **#637–#640:** manejadores dibujados en el trazado equivocado o solo la primera vez tras convertir. Nuestros tiradores se calculan en cada render a partir del estado; hay que conservar eso y no cachear posiciones.
+**Lo que se puede deducir de sus issues** (corregido tras la revisión de GPT con Luna):
+- No prueban un problema común de índices. #1100, #638 y #640 son correcciones de los reportes citados, con causas distintas: el cierre `Z`, la visibilidad de los tiradores y el trazado activo. #1107 sigue sin reproducción ni causa confirmada.
+- Reconstruir cada subtrazado entero (`toSubs`/`fromSubs`) simplifica el trabajo, pero no evita estos fallos por diseño. Cierre, selección y nodos coincidentes hay que comprobarlos igual.
+- Que SVG-Edit no tenga Ctrl+A de nodos, flechas para nodos, unir ni romper se dedujo de lo que Haiku leyó; esas citas no bastan para afirmarlo.
+- Lo confirmado en los dos editores: clic, Shift+clic, rectángulo, arrastre múltiple, controles a un tercio y subdivisión con De Casteljau.
 
-**Conclusión:** se mantiene el orden propuesto, con Inkscape como modelo. Lo más fácil y seguro, porque coincide en los dos editores, va primero: selección múltiple con el rectángulo y recta ↔ curva. Unir y romper, que SVG-Edit no tiene, se apoyan en nuestra representación por subtrazados y llevan más tests de casos límite. Las flechas y Ctrl+A, dentro de la edición de nodos, deben quedar desviados igual que Supr.
+**Orden de los commits** (sustituye al anterior):
+1. Selección y atajos.
+2. Recta y curva.
+3. Unir.
+4. Romper.
+
+En cada paso se comprueban el deshacer y que los índices elegidos se recalculan. Borrar segmento va después, como botón.
 
 ### Correcciones tras la revisión de GPT (2026-10-11)
 
