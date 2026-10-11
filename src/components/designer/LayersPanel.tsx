@@ -166,9 +166,10 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
+        <legend className="layer-appearance-title">Layer · {layer.name}</legend>
         <div className="prop-row">
-          <InlineSlider label="Layer" unit="%" scale={100} min={0} max={1} step={0.01} value={layer.opacity} onChange={(v) => patch({ opacity: v })} />
-          <Field label="Layer blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
+          <InlineSlider label="Opacity" unit="%" scale={100} min={0} max={1} step={0.01} value={layer.opacity} onChange={(v) => patch({ opacity: v })} />
+          <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
     </fieldset>}
     <section className="layer-shelf">
@@ -198,7 +199,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
           if (e.shiftKey && !(e.ctrlKey || e.metaKey)) { pickLayerRange(doc.id, doc.activeLayerId, l.id, doc.layers.map((x) => x.id)); pop.close(); return; }
           pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
-          if (tab === 'tool') setTab('props');
+          // Choosing where to paint keeps the brush settings in view; an FX layer is chosen to edit it, so its settings open.
+          if (tab === 'tool' && l.type === 'fx') setTab('props');
         }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
           <span className={`layer-thumb-wrap${l.type === 'fx' ? ' is-fx' : ''}`} title={l.type === 'fx' ? 'Double-click to edit' : undefined}>{l.type === 'fx' ? <Icon size={16} /> : <LayerThumb doc={doc} layer={l} />}</span>
           {l.type === 'fx' && <span className="layer-fx-target" data-tip="What this FX layer acts on">→ {l.scope === 'layer' ? fxTarget(doc.layers, l.id)?.name ?? 'no layer under it' : 'everything below'}</span>}
@@ -222,15 +224,15 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </Popover>
       <FxMenu sessionId={sessionId} doc={doc} layer={layer} />
       {layer && <>
-        <IconButton icon={Merge} label="Merge down (Ctrl+E)" size="sm" disabled={index === 0 || layer.locked} data-tip="Merge down (Ctrl+E) · this layer and the one under it become one raster layer" onClick={() => void mergeDown(sessionId, doc.id, layer.id)} />
+        <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         {layer.type === 'raster' && <IconButton ref={pop.ref} size="sm" icon={Sparkles} label="Operations" className="layer-ops-btn" disabled={layer.locked} data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }} />}
         <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, 1); }} />
         <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, -1); }} />
         <IconButton icon={Trash} label={picked.length > 1 ? `Delete ${picked.length} layers` : 'Delete layer'} size="sm" tone="danger" disabled={picked.every((id) => doc.layers.find((l) => l.id === id)?.locked)} onClick={() => deleteLayers(sessionId, doc.id, picked)} />
-        <IconButton ref={morePop.ref} icon={MoreHorizontal} label="More layer actions" size="sm" aria-haspopup="menu" aria-expanded={morePop.open} data-tip="Duplicate, rasterize, group · panel layout" onClick={morePop.toggle} />
+        <IconButton ref={morePop.ref} icon={MoreHorizontal} label="More layer actions" size="sm" aria-haspopup="menu" aria-expanded={morePop.open} data-tip="Merge down, rasterize, group · panel layout" onClick={morePop.toggle} />
         <Popover open={morePop.open} anchor={morePop.ref} onClose={morePop.close} placement="top-start" width={220} label="More layer actions">
           <div className="menu" role="menu">
-            <MenuItem icon={Copy} label="Duplicate layer" onClick={() => { duplicateLayer(sessionId, doc.id, layer.id); morePop.close(); }} />
+            <MenuItem icon={Merge} label="Merge down" right={<span className="kbd">Ctrl+E</span>} detail="This layer and the one under it become one raster layer" disabled={index === 0 || layer.locked} onClick={() => { void mergeDown(sessionId, doc.id, layer.id); morePop.close(); }} />
             {layer.type !== 'raster' && layer.type !== 'fx' && <MenuItem icon={Grid2x2} label="Rasterize layer" detail="Turn it into pixels you can paint on" disabled={layer.locked} onClick={() => { void rasterizeLayer(sessionId, doc.id, layer.id); morePop.close(); }} />}
             {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
               ? <MenuItem icon={FolderOutput} label="Ungroup this folder" onClick={() => { ungroup(sessionId, doc.id, layer.groupId!); morePop.close(); }} />

@@ -86,3 +86,27 @@ Astra revisó hasta `21e73f8`. Su veredicto: conservar la distribución y pasar 
 **Comprobado:** `npm test` y build; en el sandbox, `brush:check` 7/7, `tools:check` 3/3 y `flows:check` 3/3.
 
 **Sin comprobar:** que el usuario lo pruebe; ventanas aún más pequeñas que 1280×720; la ayuda superior sigue enumerando posibilidades en vez de orientar sobre el próximo gesto (propuesta de Astra, no hecha).
+
+## Tercera pasada, tras la segunda revisión de Astra (2026-10-10)
+
+Astra: conservar esta versión como base, pero aún no dar por cerrados la coherencia del texto ni los tres recorridos. Tenía razón también en que Claude exageró el alcance de las pruebas: las llamó «recorridos completos» cuando solo comprobaban partes.
+
+| Qué | Archivos | Comprobación |
+|---|---|---|
+| **«Settings…» con un texto seleccionado abre sus propiedades,** no los ajustes del próximo texto. Esos ajustes dicen ahora «For the next text you add» | `ContextStrip.tsx`, `ToolSettings.tsx` | «compose»: «Settings…» abre «Properties» con los campos del texto |
+| **Elegir otra capa de pintura mantiene «Tool».** Solo elegir un FX abre sus propiedades | `LayersPanel.tsx` | «retouch»: elegir «Base» desde «Tool» la mantiene |
+| **Sección «Layer · nombre»** sobre la opacidad y la fusión, que vuelven a llamarse «Opacity» y «Blend» | `LayersPanel.tsx`, CSS | captura |
+| **Duplicar, visible; fusionar, en «More»** (Ctrl+E sigue igual), porque crear variantes y comparar es central al diseñar | `LayersPanel.tsx` | «FX»: «Duplicate layer» visible; «More» contiene «Merge down» y «Restore panel layout» |
+| **A 1280×720 la franja no toca nada:** máximo `100 % − 230 px` en ventanas estrechas | CSS | «small window»: comprueba automáticamente que la franja no se solapa con «Conversation» ni con la caja, y que la caja cabe en la pantalla |
+
+**Pruebas ampliadas** (`npm run flows:check`, 4/4), ahora verifican resultados:
+- **compose:** una imagen y un texto encima. Se comprueban los píxeles de los dos en pantalla, que el texto está sobre la imagen, que el texto es exactamente «Title», el tamaño de creación (60) frente al del seleccionado (80), y «Settings…».
+- **retouch:** «To layer» y «Deselect» desde la franja; el trazo cae en **la capa que la franja nombra** (se buscan sus píxeles); cambiar de herramienta o de capa de pintura mantiene «Tool».
+- **FX:** cambiar el radio del desenfoque desde el panel cambia el parámetro **y lo que se ve** (más luz junto al borde de la imagen).
+- **small window:** sin solapamientos y con la caja dentro de la pantalla.
+
+**Observación, sin corregir:** si se escribe en el mismo instante en que aparece el cuadro de texto, se pierde la primera letra («Title» quedó «itle»), porque aún no tiene el foco. Una persona tarda más; la prueba espera 200 ms y comprueba el texto exacto. Habría que verlo si alguien lo nota al teclear rápido.
+
+**Sigue sin cubrir:** la composición con mover y alinear objetos, y ventanas menores de 1280×720. La línea de ayuda que oriente sobre el siguiente gesto queda aparcada, como pidió Astra.
+
+**Comprobado:** `npm test` y build; en el sandbox, `flows:check` 4/4, `tools:check` 3/3 y `brush:check` 7/7.

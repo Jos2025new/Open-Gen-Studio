@@ -45,6 +45,6 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
       <TextStyleFields value={selectedText} compact onChange={(p) => { if (!selectedText.locked) patchLayer(sessionId, doc.id, selectedText.id, p as Partial<Layer>); }} />
     </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
-    <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: 'tool' }))} data-tip="All the settings of this tool, in the right panel"><Settings2 size={13} />Settings…</button>
+    <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
   </div>;
 }

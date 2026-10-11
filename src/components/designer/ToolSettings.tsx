@@ -263,6 +263,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
   if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
+          {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
           <TextStyleFields value={text} compact={compact} onChange={(p) => setUi({ text: { ...text, ...p } })} />
         </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <>
           <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
