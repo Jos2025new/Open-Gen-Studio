@@ -92,3 +92,20 @@ Fuente: código de [SVG-Edit](https://github.com/SVG-Edit/svgedit) en el commit 
 - **#637–#640:** manejadores dibujados en el trazado equivocado o solo la primera vez tras convertir. Nuestros tiradores se calculan en cada render a partir del estado; hay que conservar eso y no cachear posiciones.
 
 **Conclusión:** se mantiene el orden propuesto, con Inkscape como modelo. Lo más fácil y seguro, porque coincide en los dos editores, va primero: selección múltiple con el rectángulo y recta ↔ curva. Unir y romper, que SVG-Edit no tiene, se apoyan en nuestra representación por subtrazados y llevan más tests de casos límite. Las flechas y Ctrl+A, dentro de la edición de nodos, deben quedar desviados igual que Supr.
+
+### Correcciones tras la revisión de GPT (2026-10-11)
+
+GPT 6.1 contrastó cada fila con Inkscape en `21f4270`, y GPT 6 Luna revisó el código local. Las correcciones prevalecen sobre las filas de arriba:
+
+- **Rectángulo de selección:** Shift añade, Ctrl selecciona lo que queda fuera del área, Ctrl+Shift resta ([node-tool.cpp 734–765](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tools/node-tool.cpp#L734-765)). «Ctrl añade» era incorrecto. Clic y Shift+clic sí están confirmados en el código.
+- **Arrastrar varios:** al pulsar un nodo que ya está elegido se conserva el grupo para arrastrarlo; la selección solo se reduce a ese nodo si se suelta sin arrastrar.
+- **Alt+Supr** en Inkscape borra nodos dejando un hueco, no «borrar segmento» ([multi-path-manipulator.cpp 771–781](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/multi-path-manipulator.cpp#L771-781)). Aquí borrar segmento será un botón; si además se le da un atajo, se dirá que es propio y no de Inkscape.
+- **Recta y curva:** retraer manejadores puede convertir un nodo simétrico en suave o de esquina ([node.cpp 203–239](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/node.cpp#L203-239)); los tipos se recalculan.
+- **Prioridad de eventos:**
+  - Shift+B, Shift+L y Shift+U también cambian de herramienta: en edición de nodos se consumen antes que el manejador global, porque `preventDefault` solo no basta.
+  - Esc va en dos pasos: primero vacía la selección y después sale del modo.
+  - Supr sin nodos elegidos se consume dentro del modo, nunca borra la forma ni la capa.
+  - Ctrl+A y las flechas también se quedan dentro del modo.
+- **Índices:** insertar, borrar, unir y romper rehacen los índices elegidos junto con la geometría y los tipos. No hacen falta identificadores persistentes por nodo.
+
+**Orden:** se mantiene, pero el commit 1 resuelve por completo selección, prioridad de eventos, rehacer los índices y deshacer, antes que las operaciones que cambian la estructura del trazado.
