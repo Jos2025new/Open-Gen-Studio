@@ -101,8 +101,13 @@ test('rectangle: one click transforms, double-click edits (corner and blur knots
   await expect(strip(page).getByRole('spinbutton', { name: 'Rx value' })).toBeFocused();
   await page.keyboard.press('Escape');
   // Done leaves edit mode; double-click again and Esc leaves too. The shape stays picked, the knots go.
+  const canvasSig = () => page.evaluate(() => { const c = document.querySelector('canvas.stage-canvas') as HTMLCanvasElement; const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data; let h = 0; for (let i = 0; i < d.length; i += 97) h = (h * 31 + d[i]) | 0; return h; });
+  const editingSig = await canvasSig();
   await strip(page).getByRole('button', { name: 'Done' }).click();
   await expect(knot(page, 'rx')).toHaveCount(0);
+  // Review: Done redraws the canvas at once, with the transform handles back.
+  await page.waitForTimeout(150);
+  expect(await canvasSig()).not.toBe(editingSig);
   await expect(strip(page).getByRole('button', { name: 'Edit shape' })).toBeVisible();
   await strip(page).getByRole('button', { name: 'Edit shape' }).click();
   await expect(knot(page, 'rx')).toBeVisible();
@@ -127,6 +132,16 @@ test('rectangle: one click transforms, double-click edits (corner and blur knots
   const tiny = await page.locator('.shape-knot-lines line').evaluateAll((ls) => ls.map((l: any) => Math.hypot(l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)));
   expect(Math.min(...tiny)).toBeGreaterThanOrEqual(19.5);
   await page.screenshot({ path: `${SHOTS}/tiny.png` });
+  // The same at 5 %, 100 % and 400 % zoom: knots apart, no transform handles in the way (only knots are hit).
+  for (const z of ['5', '100', '400']) {
+    await page.getByRole('textbox', { name: 'Zoom percent' }).fill(z);
+    await page.getByRole('textbox', { name: 'Zoom percent' }).press('Enter');
+    await expect(strip(page)).toContainText('Editing shape');
+    const [a, b2] = [await at('rx'), await at('ry')];
+    expect(Math.hypot(a[0] - b2[0], a[1] - b2[1]), `zoom ${z}`).toBeGreaterThanOrEqual(10);
+    const lines = await page.locator('.shape-knot-lines line').evaluateAll((ls) => ls.map((l: any) => Math.hypot(l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)));
+    expect(Math.min(...lines), `zoom ${z}`).toBeGreaterThanOrEqual(19.5);
+  }
   await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
 });

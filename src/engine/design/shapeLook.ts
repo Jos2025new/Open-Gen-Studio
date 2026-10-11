@@ -84,11 +84,12 @@ export function clickKnot(s: ShapeSpec, knot: 'rx' | 'ry', mods: { shift: boolea
   return { rx: r, ry: r };
 }
 
-/** The topmost rectangle or ellipse of a vector layer under a page point (the shapes that have an edit mode). */
+/** The topmost shape of a vector layer under a page point, if it has an edit mode (rectangle or ellipse). */
 export function editableShapeAt<T extends ShapeSpec>(shapes: T[], x: number, y: number): T | null {
   for (let i = shapes.length - 1; i >= 0; i--) {
     const s = shapes[i], b = rectBox(s);
-    if ((s.type === 'rect' || s.type === 'ellipse') && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s;
+    // The topmost shape under the point decides: a path over a rectangle hides it (no edit mode through it).
+    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s.type === 'rect' || s.type === 'ellipse' ? s : null;
   }
   return null;
 }
