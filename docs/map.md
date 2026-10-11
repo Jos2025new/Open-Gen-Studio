@@ -52,7 +52,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 139 | 90 |
+| [types.ts](../src/engine/types.ts) | 140 | 90 |
 | [store.ts](../src/store/store.ts) | 97 | 86 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 43 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
@@ -60,7 +60,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [actions.ts](../src/engine/design/actions.ts) | 25 | 11 |
-| [doc.ts](../src/engine/design/doc.ts) | 24 | 18 |
+| [doc.ts](../src/engine/design/doc.ts) | 25 | 18 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |
 | [raster.ts](../src/engine/design/raster.ts) | 22 | 5 |
@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 104 |
-| [render.ts](../src/engine/design/render.ts) | 15 | 3 |
+| [render.ts](../src/engine/design/render.ts) | 16 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
 | [history.ts](../src/engine/design/history.ts) | 12 | 5 |
@@ -81,7 +81,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 19 | 2 |
+| `src/components/designer` | 20 | 2 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 11 | 0 |
@@ -97,7 +97,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 111 |
 | `src/store` | 2 | 87 |
 
-92 de 224 módulos no tienen ningún test que los importe directamente.
+93 de 225 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -115,6 +115,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)
+- [TextEditor.tsx](../src/components/designer/TextEditor.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
 - [GalleryPanel.tsx](../src/components/gallery/GalleryPanel.tsx)
 - [CanvasNavigation.tsx](../src/components/node/CanvasNavigation.tsx)

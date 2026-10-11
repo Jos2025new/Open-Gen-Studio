@@ -5,14 +5,15 @@ import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, layoutText, hitTest, hitTestPixel } from '../../engine/design/render';
-import { activeLayer, fontStack, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
+import { drawDoc, layerBox, hitTest, hitTestPixel } from '../../engine/design/render';
+import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
+import { TextEditor } from './TextEditor';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -1363,55 +1364,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   );
 }
 
-function TextEditor({ layer, view, onDone }: { layer: TextLayer; view: View; onDone: (text: string) => void }) {
-  const [text, setText] = useState(layer.text);
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    // Focus after the canvas mousedown has moved focus to <body>, or it would blur us at once.
-    const t = requestAnimationFrame(() => {
-      ref.current?.focus();
-      ref.current?.select();
-    });
-    return () => cancelAnimationFrame(t);
-  }, []);
-  const lay = layoutText({ ...layer, text });
-  const z = view.zoom;
-  return (
-    <textarea
-      ref={ref}
-      className="text-editor"
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={() => onDone(text)}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape' || (e.key === 'Enter' && (e.metaKey || e.ctrlKey))) {
-          e.preventDefault();
-          (e.target as HTMLTextAreaElement).blur();
-        }
-        e.stopPropagation();
-      }}
-      style={{
-        left: view.x + layer.x * z,
-        top: view.y + layer.y * z,
-        // Rotated or skewed text: the editor takes its transform.
-        ...(layer.transform ? {
-          transform: `matrix(${layer.transform[0]}, ${layer.transform[1]}, ${layer.transform[2]}, ${layer.transform[3]}, ${layer.transform[4] * z}, ${layer.transform[5] * z})`,
-          transformOrigin: `${-layer.x * z}px ${-layer.y * z}px`,
-        } : {}),
-        width: Math.max(8, lay.width * z) + layer.fontSize * 0.3 * z,
-        height: lay.height * z + 2,
-        whiteSpace: layer.width > 0 ? 'pre-wrap' : 'pre',
-        font: `${layer.fontWeight} ${layer.fontSize * z}px ${fontStack(layer.fontFamily)}`,
-        lineHeight: `${layer.lineHeight}`,
-        letterSpacing: `${layer.letterSpacing * z}px`,
-        color: layer.color,
-        textAlign: layer.align,
-        paddingTop: ((layer.fontSize * layer.lineHeight - layer.fontSize) / 2) * z,
-      }}
-      aria-label="Edit text"
-    />
-  );
-}
 
 function corners(b: { x: number; y: number; w: number; h: number }): Array<[number, number]> {
   return [

@@ -58,8 +58,7 @@ test('compose: an image and a text over it; the chosen size is the one created; 
   await expect(strip(page)).toContainText('new text');
   await strip(page).getByRole('slider', { name: 'Size', exact: true }).fill('60');
   await page.mouse.click(b.x + b.width * 0.3, b.y + b.height * 0.35);
-  // Typing in the very instant the box appears loses the first key (it is not focused yet); a person is slower.
-  await page.waitForTimeout(200);
+  // Typed in the very instant the box appears: the first keys must not be lost (TextEditor keeps them until focused).
   await page.keyboard.type('Title');
   await page.keyboard.press('Escape');
   let s = await docState(page);

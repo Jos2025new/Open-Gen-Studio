@@ -105,7 +105,9 @@ Astra: conservar esta versión como base, pero aún no dar por cerrados la coher
 - **FX:** cambiar el radio del desenfoque desde el panel cambia el parámetro **y lo que se ve** (más luz junto al borde de la imagen).
 - **small window:** sin solapamientos y con la caja dentro de la pantalla.
 
-**Observación, sin corregir:** si se escribe en el mismo instante en que aparece el cuadro de texto, se pierde la primera letra («Title» quedó «itle»), porque aún no tiene el foco. Una persona tarda más; la prueba espera 200 ms y comprueba el texto exacto. Habría que verlo si alguien lo nota al teclear rápido.
+**Primera letra perdida al escribir texto: corregido (2026-10-10).** Astra lo calificó como posible fallo del producto. **Causa (código):** el cuadro de texto toma el foco en el siguiente fotograma, para que el clic sobre el lienzo no se lo quite, y las teclas anteriores se perdían. Un documento pesado retrasa ese fotograma, así que también afecta al uso real. **Arreglo:** `TextEditor` (movido a su propio archivo, lo que además libera unos 2 KB de `Stage.tsx`) guarda las teclas que llegan antes del foco y las escribe en cuanto lo tiene. **Prueba:** «compose» escribe sin esperar y exige «Title» exacto; pasó cinco veces seguidas.
+
+**Sobre las pruebas (Astra, tras comentarios del usuario):** no se amplían por inercia. La posición exacta del trazo no se afirma como verificada (la prueba comprueba la capa, no el punto). Los solapamientos se comprueban en un caso concreto, 1280×720 con el pincel; no se convierte cada combinación de ventana y herramienta en una prueba. Si se revisa la suite, el objetivo será quitar redundancia y conservar lo que protege datos, dinero y trabajo.
 
 **Sigue sin cubrir:** la composición con mover y alinear objetos, y ventanas menores de 1280×720. La línea de ayuda que oriente sobre el siguiente gesto queda aparcada, como pidió Astra.
 
