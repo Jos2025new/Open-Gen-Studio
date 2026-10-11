@@ -48,6 +48,8 @@
 
 - [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
 
+- [Timeline breve de esta sesión de Designer UX](timeline-designer-ux.md) (desde 2026-10-11).
+
 ## Historial
 
 - [001-2026-10-W40](history/001-2026-10-W40.md) — 29393 bytes.
