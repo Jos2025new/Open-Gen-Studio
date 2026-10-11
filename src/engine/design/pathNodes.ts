@@ -106,6 +106,16 @@ export function moveNodePoint(segs: Seg[], pt: Pick<NodePoint, 'kind' | 'seg' | 
 
 /** The shape with these segments (page coordinates): a plain path whose own box is where it sits. */
 export function withSegs<T extends ShapeSpec>(s: T, segs: Seg[]): T {
+  // A turned path (rot about its box centre): editing a node moves the centre, which would shift every other node on
+  // the page. Shifting the own coordinates by t = (L − I)(C′ − C) keeps every untouched node exactly where it was.
+  if (s.rot) {
+    const r0 = parsePath(serializeSegs(segs));
+    if (!('error' in r0)) {
+      const [a, b, c, dd] = s.rot, C = [s.x + s.w / 2, s.y + s.h / 2], C2 = [r0.box.x + r0.box.w / 2, r0.box.y + r0.box.h / 2];
+      const ex = C2[0] - C[0], ey = C2[1] - C[1], tx = (a - 1) * ex + c * ey, ty = b * ex + (dd - 1) * ey;
+      segs = segs.map((g) => ({ c: g.c, p: g.p.map(([x, y]) => [x + tx, y + ty] as Pt) }));
+    }
+  }
   const d = serializeSegs(segs), r = parsePath(d);
   if ('error' in r) return s;
   const box = { x: r.box.x, y: r.box.y, w: Math.max(1, r.box.w), h: Math.max(1, r.box.h) };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
 import { moveNodePoint, nodePoints, pageSegs, parseSegs, serializeSegs, withSegs } from '../src/engine/design/pathNodes';
 import { shapeToPath } from '../src/engine/design/affine';
+import { toPage } from '../src/engine/design/shapeTransform';
 
 /* Inkscape's Node tool on path shapes (pathNodes.ts). */
 const path = (d: string, o: Partial<ShapeSpec> = {}): ShapeSpec => ({ type: 'path', d, fill: '#000', stroke: null, strokeWidth: 0, radius: 0, ...withBox(d), ...o });
@@ -37,6 +38,16 @@ describe('path nodes', () => {
     const out = withSegs(s, moveNodePoint(pageSegs(s), { kind: 'node', seg: 2, k: 0 }, 10, 0));
     expect([out.x, out.y, out.w, out.h]).toEqual([100, 50, 30, 20]);
     expect(out.box0).toEqual({ x: 100, y: 50, w: 30, h: 20 });
+  });
+
+  it('review of b904858: dragging one node of a turned path leaves every other node where it was on the page', () => {
+    const c = Math.cos(0.5), sn = Math.sin(0.5);
+    const s: ShapeSpec = { ...path('M 0 0 L 100 0 L 100 60 L 0 60 Z'), rot: [c, sn, -sn, c] };
+    const before = nodePoints(pageSegs(s)).map((p) => toPage(s, ...p.at));
+    const out = withSegs(s, moveNodePoint(pageSegs(s), { kind: 'node', seg: 2, k: 0 }, 30, 20));
+    const after = nodePoints(pageSegs(out)).map((p) => toPage(out, ...p.at));
+    for (const i of [0, 1, 3]) { expect(after[i][0]).toBeCloseTo(before[i][0], 1); expect(after[i][1]).toBeCloseTo(before[i][1], 1); }
+    expect(Math.hypot(after[2][0] - before[2][0], after[2][1] - before[2][1])).toBeGreaterThan(30);
   });
 
   it('Convert to path: a rounded rectangle and an ellipse give nodes with curve handles', () => {

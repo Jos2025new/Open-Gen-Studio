@@ -38,7 +38,11 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
           if (e.button !== 0) return;
           e.stopPropagation();
           e.currentTarget.setPointerCapture(e.pointerId);
-          drag.current = { pt: p, base: segs, from: page(e), moved: false };
+          // By proximity, nodes first (review: at small zoom a handle or another node could take the click).
+          const sc = { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top };
+          const near = (q: NodePoint) => { const c = scr(q.at); return Math.hypot(c.x - sc.x, c.y - sc.y); };
+          const nodes = pts.filter((q) => q.kind === 'node' && near(q) <= 8).sort((a, b) => near(a) - near(b));
+          drag.current = { pt: nodes[0] ?? p, base: segs, from: page(e), moved: false };
         },
         onPointerMove: move, onPointerUp: () => { drag.current = null; }, onPointerCancel: () => { drag.current = null; },
       };
