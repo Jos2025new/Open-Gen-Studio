@@ -53,7 +53,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 146 | 91 |
+| [types.ts](../src/engine/types.ts) | 148 | 92 |
 | [store.ts](../src/store/store.ts) | 98 | 88 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
@@ -82,14 +82,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 22 | 3 |
+| `src/components/designer` | 23 | 3 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 12 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 29 | 116 |
+| `src/engine` | 29 | 117 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 45 | 39 |
+| `src/engine/design` | 46 | 40 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
@@ -98,7 +98,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 113 |
 | `src/store` | 2 | 89 |
 
-96 de 231 módulos no tienen ningún test que los importe directamente.
+97 de 233 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -115,6 +115,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
+- [PathNodes.tsx](../src/components/designer/PathNodes.tsx)
 - [ShapeKnots.tsx](../src/components/designer/ShapeKnots.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)

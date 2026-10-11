@@ -22,9 +22,13 @@ Crear la forma; un clic mueve; los tiradores de la forma completa escalan y rota
 
 Girar o inclinar un rectángulo o una elipse ya no los convierte en trazado: siguen editables (doble clic, Rx/Ry, blur), con sus tiradores girados, como en Inkscape. El SVG los escribe como `<rect>`/`<ellipse>` con `transform`. Una línea girada sigue siendo línea.
 
+## Nodos y Convert to path (añadido)
+
+Doble clic en un trazado (polígono, curva, flecha, trazados del agente o convertidos) o «Edit nodes»: nodos cuadrados y manejadores redondos, como la herramienta Nodos de Inkscape. Arrastrar un nodo lleva sus manejadores; un manejador da forma a la curva; un deshacer por arrastre. En el modo edición de un rectángulo o una elipse, «Convert to path» (Objeto a trayecto de Inkscape) da el mismo contorno, giro incluido, como nodos editables; Ctrl+Z lo deshace. Sin atajo: Ctrl+Mayús+C abre el inspector de Chrome.
+
 ## Qué queda fuera
 
-«Convert to path» y la edición de nodos de trazados de formas: segunda fase. No se ofrece un botón hasta que los nodos existan (Sol: no prometerlo antes). Opacidad/fusión de capa entre lienzo y SVG: tarea aparte.
+Nodos suaves y simétricos (hoy todos se comportan como esquina), añadir o borrar nodos y segmentos. Opacidad/fusión de capa entre lienzo y SVG: tarea aparte.
 
 ## Qué no debe romperse
 

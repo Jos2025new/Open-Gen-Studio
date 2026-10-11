@@ -88,13 +88,14 @@ describe('review of 4ef6270', () => {
 });
 
 describe('shape edit mode', () => {
-  it('double-click finds the topmost rectangle or ellipse under the point; paths and lines have no edit mode', () => {
+  it('double-click finds the topmost shape under the point: rectangle, ellipse (knots) or path (nodes); lines have none', () => {
     const shapes = [{ ...rect({ type: 'path', x: 0, y: 0, w: 500, h: 500 }), id: 'c' }, { ...rect(), id: 'a' }, { ...rect({ type: 'ellipse', x: 50 }), id: 'b' }];
     expect(editableShapeAt(shapes, 60, 40)?.id).toBe('b');
     expect(editableShapeAt(shapes, 20, 40)?.id).toBe('a');
-    expect(editableShapeAt(shapes, 400, 400)).toBeNull();
+    expect(editableShapeAt(shapes, 400, 400)?.id).toBe('c');
+    expect(editableShapeAt([{ ...rect({ type: 'line', w: 100, h: 0 }), id: 'l' }], 50, 20)).toBeNull();
     // Review: a path on top hides the rectangle under it.
-    expect(editableShapeAt([{ ...rect(), id: 'a' }, { ...rect({ type: 'path' }), id: 'p' }], 20, 40)).toBeNull();
+    expect(editableShapeAt([{ ...rect(), id: 'a' }, { ...rect({ type: 'path' }), id: 'p' }], 20, 40)?.id).toBe('p');
     expect(editableShapeAt([{ ...rect({ x: 110, y: 80, w: -100, h: -60 }), id: 'n' }], 20, 30)?.id).toBe('n');
   });
 });

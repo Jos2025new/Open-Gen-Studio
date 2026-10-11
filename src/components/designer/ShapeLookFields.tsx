@@ -1,6 +1,7 @@
 import type { DesignDoc, ShapeSpec, VectorShape } from '../../engine/types';
 import { blurPercent, blurSigma, cornerRadii, MITER_DEFAULT, SHARP } from '../../engine/design/shapeLook';
 import { useObjectSelection } from '../../engine/design/objectSelection';
+import { shapeToPath } from '../../engine/design/affine';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
@@ -64,4 +65,10 @@ export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionI
     <InlineSlider label="W" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.w)))} allowManualOverflow value={Math.round(Math.abs(shape.w) * 10) / 10} onChange={(v) => set('w', v)} />
     <InlineSlider label="H" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.h)))} allowManualOverflow value={Math.round(Math.abs(shape.h) * 10) / 10} onChange={(v) => set('h', v)} />
   </>;
+}
+
+/** Inkscape's Object to Path: one undo step; the shape keeps its id, so edit mode goes on with its nodes. */
+export function convertToPath(sessionId: string, docId: string, layerId: string, shape: VectorShape): void {
+  const p = shapeToPath(shape);
+  patchShape(sessionId, docId, layerId, shape.id, { ...p, rx: undefined, ry: undefined, rot: undefined });
 }

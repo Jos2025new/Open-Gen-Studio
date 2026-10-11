@@ -232,3 +232,36 @@ test('free rotation keeps a rectangle a rectangle: still editable, knots turned 
   await page.screenshot({ path: `${SHOTS}/turned.png` });
   expect(errors).toEqual([]);
 });
+
+test('Convert to path, then edit its nodes (Inkscape Node tool): one undo per drag, double-click returns to nodes', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  const mid = { x: c.x + c.width * 0.4, y: c.y + c.height * 0.45 };
+  await page.mouse.dblclick(mid.x, mid.y);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  const s0 = await shape(page);
+  expect(s0.type).toBe('path');
+  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  // Drag the second node (top right) out: the outline follows, as one undo step.
+  const n = (await page.locator('rect.path-node').nth(1).boundingBox())!;
+  await page.mouse.move(n.x + n.width / 2, n.y + n.height / 2); await page.mouse.down();
+  for (let i = 1; i <= 5; i++) await page.mouse.move(n.x + n.width / 2 + 12 * i, n.y + n.height / 2 - 6 * i);
+  await page.mouse.up();
+  const s1 = await shape(page);
+  expect(s1.d).not.toBe(s0.d);
+  expect(s1.w).toBeGreaterThan(s0.w);
+  await page.screenshot({ path: `${SHOTS}/nodes.png` });
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(s0.d);
+  // Esc leaves; double-click on the path shows its nodes again.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('rect.path-node')).toHaveCount(0);
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  expect(errors).toEqual([]);
+});

@@ -4,6 +4,7 @@ import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, 
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { useStore } from '../../store/store';
+import { PathNodes } from './PathNodes';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
@@ -24,7 +25,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   const edit = useShapeEdit((st) => st.byDoc[doc.id]);
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<{ knot: Knot; layerId: string; shape: VectorShape; from: [number, number]; at: [number, number]; moved: boolean } | null>(null);
-  const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse');
+  const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse' || picked.shape.type === 'path');
   useEffect(() => {
     if (!editing) return;
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) setShapeEdit(doc.id, null); };
@@ -32,6 +33,8 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     return () => window.removeEventListener('keydown', key);
   }, [editing, doc.id]);
   if (!picked || !editing) return null;
+  // A path edits its nodes (Inkscape's Node tool); rectangles and ellipses their own knots.
+  if (picked.shape.type === 'path') return <PathNodes view={view} sessionId={sessionId} docId={doc.id} layerId={picked.layerId} shape={picked.shape} />;
   const s = picked.shape, rect = s.type === 'rect';
   const scr = (p: [number, number]) => documentToScreen({ x: p[0], y: p[1] }, view, { left: 0, top: 0 });
   const page = (e: { clientX: number; clientY: number }) => screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect());

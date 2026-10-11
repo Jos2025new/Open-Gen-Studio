@@ -9,7 +9,7 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineToggle } from './InlineControls';
-import { patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
+import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
 import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { useEffect } from 'react';
 
@@ -45,6 +45,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const pageRuler = ruler && ruler.docId === doc.id ? ruler : null;
   const selectedShape = tool === 'move' && !selectedText ? picked : null;
   const editing = !!selectedShape && edit?.shapeId === selectedShape.shape.id;
+  const isPath = selectedShape?.shape.type === 'path';
   return <div className="context-strip" role="toolbar" aria-label={`${TOOL_NAMES[tool]} quick settings`}>
     <span className="context-target" data-tip="What the next action changes">
       <strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}
@@ -55,14 +56,15 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
     </div> : selectedShape ? <div className="tool-settings" role="group" aria-label={editing ? 'Editing shape' : 'Selected shape'}>
       {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}
       {editing ? <>
-        <span className="context-mode" data-tip="Drag the round handles; Esc or Done to leave">Editing shape</span>
+        <span className="context-mode" data-tip={isPath ? 'Drag the square nodes and round curve handles; Esc or Done to leave' : 'Drag the round handles; Esc or Done to leave'}>{isPath ? 'Editing nodes' : 'Editing shape'}</span>
         <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
+        {!isPath && <button type="button" className="opt" data-tip="Inkscape's Object to Path: the same outline as editable nodes; the corner and size handles are gone (Ctrl+Z undoes it)" onClick={() => convertToPath(sessionId, doc.id, selectedShape.layerId, selectedShape.shape)}>Convert to path</button>}
         <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
       </> : <>
         <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
-        {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse') && <button type="button" className="opt" data-tip="Corner radius and blur handles (or double-click the shape)" onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>Edit shape</button>}
+        {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) && <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button>}
       </>}
     </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
