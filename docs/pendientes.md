@@ -45,7 +45,6 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] **Mismo campo fuera del Designer:** los deslizadores de la galería (columnas), el boceto (tamaño de brocha), el visor 3D y la tarjeta de ajustes siguen con su propio estilo. **2026-10-09**, pendiente; cambia la interfaz de otros espacios, así que hay que preguntar antes.
 - [ ] **Presión con un lápiz real:** tamaño y densidad mínimos solo se han probado con tests y con ratón (presión total). **2026-10-09**, lo prueba el usuario.
 - [ ] **Formas, siguiente pasada** ([plan](plan-edicion-formas.md)): nodos suaves y simétricos, añadir y borrar nodos; en modo edición la pista «Drag the squares to resize…» ya no corresponde; en Propiedades, Unión y Punta se parten en dos líneas. **2026-10-11**, pendiente.
-- [ ] **Opacidad y fusión de capa con formas superpuestas:** el lienzo las aplica a cada forma y el SVG al grupo; difieren desde antes de las formas (GPT, 2026-10-11: ~10 000–14 000 píxeles). Componer la capa y fusionarla una vez. **2026-10-11**, pendiente (tarea propuesta en la sesión).
 - [ ] Importar el `.zip` de datos (el exportar ya existe). **2026-10-08**, pendiente.
 - [ ] Recortar un vídeo o quitarle el audio. El servidor local ya usa ffmpeg para `join_clips`; sería la vía más ligera. **2026-10-08**, pendiente.
 - [ ] Quitar el fondo de un vídeo (`pixelcut/video-background-removal`, NanoGPT; ID verificado). **2026-10-08**, pendiente.
@@ -106,6 +105,7 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 
 ## Hecho
 
+- [x] Opacidad y fusión de capa iguales en lienzo y SVG: con más de una operación de pintado (dos formas, o relleno y trazo) la capa se compone aparte y se mezcla una vez, como un grupo SVG. **2026-10-11**, **e2e** (7 casos, 0 píxeles > 8/255; sin la corrección 8 544–32 721), **medida** (10 formas a 1500×900: mediana 1,3–1,5 → 2,3–2,4 ms, solo en esas capas).
 - [x] Formas al estilo de Inkscape: esquinas Rx/Ry con tiradores, estilo de trazo, blur, un clic transforma y doble clic edita, formas giradas editables, nodos de trazados y «Convert to path». **2026-10-11**, Claude, rama `task/designer-ux` (`523dd35` → `2949201`), **test** (1 119), **e2e** (6 de 6 en `shape-knots.spec.ts`), **fuente** (Inkscape, por línea) y **revisión** de GPT en seis rondas. Detalle: [024](history/024-2026-10-W41.md).
 - [x] Designer lento al pintar y al usarlo (el usuario, 2026-10-09: «una interfaz que vaya lenta conforme más se usa deja la app inviable»). **2026-10-09**, Claude, rama `task/rendimiento`:
   - **Caché de FX del editor:** una capa con FX «layer» reutiliza su resultado mientras no cambien la capa, la versión de contenido de sus píxeles, sus FX y la escala. Cada lienzo tiene ahora su versión, que sube también durante el trazo en vivo (lo que pidió Astra). Exportar siempre calcula. Tope 48 Mpx. **test** (`fx-render.test.ts`: reutiliza, recalcula al editar la capa, sus FX, un trazo en vivo o un commit sobre ella, no al pintar otra; los dos casos clave fallan sin la caché). En el documento del usuario el FX filtra la imagen de debajo, que no cambia al pintar.

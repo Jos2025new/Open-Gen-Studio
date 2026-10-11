@@ -327,3 +327,38 @@ test('a turned path: dragging one node leaves the others where they were on scre
   expect(Math.hypot(after[2][0] - (x + 60), after[2][1] - (y + 36)), 'dragged node under the pointer').toBeLessThan(0.5);
   expect(errors).toEqual([]);
 });
+
+test('layer opacity and blend apply to the layer as a whole, as SVG groups them (canvas = SVG)', async ({ page }) => {
+  const errors = await setup(page);
+  const out = await page.evaluate(async () => {
+    const R = await import('/src/engine/design/render.ts' as string); const E = await import('/src/engine/design/export.ts' as string);
+    const W = 440, H = 260;
+    const doc = (bg: string | null, layer: any) => ({ id: 'd', name: 'd', width: W, height: H, background: bg, activeLayerId: 'v', layers: [{ id: 'v', type: 'vector', name: 'v', visible: true, locked: false, ...layer }] });
+    const canvasOf = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c; };
+    const viaCanvas = (d: any) => { const c = canvasOf(); R.drawDoc(c.getContext('2d')!, d, { resolution: 'document' }); return c.getContext('2d')!.getImageData(0, 0, W, H).data; };
+    const viaSvg = async (d: any) => {
+      const svg = await E.docToSvg(d, { rasterHref: async () => null, layout: () => ({ lines: [], width: 0, lineHeightPx: 0 }), ascent: () => 0 });
+      const img = new Image(); img.src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })); await img.decode();
+      const c = canvasOf(); c.getContext('2d')!.drawImage(img, 0, 0, W, H); return c.getContext('2d')!.getImageData(0, 0, W, H).data;
+    };
+    const diff = (a: Uint8ClampedArray, b: Uint8ClampedArray) => { let n = 0, max = 0, ink = 0; for (let i = 0; i < a.length; i++) { const v = Math.abs(a[i] - b[i]); if (v > 8) n++; max = Math.max(max, v); if (i % 4 === 3 && a[i] > 0) ink++; } return { n, max, ink }; };
+    const sh = (o: any) => ({ id: Math.random().toString(36), radius: 0, fill: null, stroke: null, strokeWidth: 0, ...o });
+    const two = [sh({ type: 'rect', x: 100, y: 65, w: 240, h: 120, fill: '#ffdd00', blur: 0 }), sh({ type: 'ellipse', x: 200, y: 100, w: 200, h: 120, fill: '#ff3388' })];
+    const fillStroke = (order?: string) => [sh({ type: 'rect', x: 100, y: 60, w: 240, h: 140, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 24, paintOrder: order })];
+    const cases: Record<string, any> = {
+      twoNormal: doc('#303030', { opacity: 0.5, blend: 'normal', shapes: two }),
+      twoMultiply: doc('#808080', { opacity: 0.4, blend: 'multiply', shapes: two }),
+      twoScreen: doc('#303030', { opacity: 0.4, blend: 'screen', shapes: two }),
+      oneFillStroke: doc('#303030', { opacity: 0.5, blend: 'normal', shapes: fillStroke() }),
+      oneStrokeBehind: doc('#303030', { opacity: 0.5, blend: 'normal', shapes: fillStroke('stroke') }),
+      transparentBg: doc(null, { opacity: 0.5, blend: 'normal', shapes: two }),
+      withBlur: doc('#303030', { opacity: 0.5, blend: 'normal', shapes: [two[0], sh({ ...two[1], blur: 6 })] }),
+    };
+    const res: Record<string, any> = {};
+    for (const [k, d] of Object.entries(cases)) res[k] = diff(viaCanvas(d), await viaSvg(d));
+    return res;
+  });
+  console.log(JSON.stringify(out));
+  for (const [k, v] of Object.entries(out) as Array<[string, { n: number; ink: number }]>) expect(v.n, `${k}: canvas and SVG agree`).toBeLessThan(v.ink * 0.01);
+  expect(errors).toEqual([]);
+});

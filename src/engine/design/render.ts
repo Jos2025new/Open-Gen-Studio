@@ -3,7 +3,7 @@ import { drawMaskedVector, maskContains, maskBounds } from './vectorMask';
 import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
-import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
+import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
@@ -268,10 +268,49 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
     }
   } else if (l.type === 'vector') {
     const paint = (c: CanvasRenderingContext2D) => { l.shapes.forEach(s => drawShape(c, s)); l.strokes?.forEach(s => drawStroke(c, s)); };
-    if (l.pixelMask) drawMaskedVector(ctx, l, paint); else paint(ctx);
+    // Opacity and blend belong to the layer as a whole, as SVG groups them (W3C Compositing): with more than one
+    // paint operation (two shapes, or one with fill and stroke) they are composed first and blended once. One
+    // operation, full opacity and Normal stay direct. A pixel mask already composes the layer.
+    if (l.pixelMask) drawMaskedVector(ctx, l, paint);
+    else if (!plain && (l.opacity < 1 || l.blend !== 'normal') && paintOps(l) > 1) drawGrouped(ctx, l, paint);
+    else paint(ctx);
   } else {
     drawText(ctx, l);
   }
+  ctx.restore();
+}
+
+/** Paint operations of a vector layer that would overlap: fill and stroke count apart; a blurred shape is one
+    (it is composed before its blur); a Lineart stroke counts as several (its tip stamps overlap). */
+function paintOps(l: VectorLayer): number {
+  let n = 0;
+  for (const s of l.shapes) n += s.blur ? 1 : (s.fill && s.type !== 'line' ? 1 : 0) + (s.stroke && s.strokeWidth > 0 ? 1 : 0);
+  return n + (l.strokes?.length ?? 0) * 2;
+}
+
+/** A vector layer composed apart and laid on the target once, with the target's opacity and blend. The piece covers
+    only what the layer paints (with its strokes and blur margins), cut to the target; its canvas is reused. */
+let groupScratch: HTMLCanvasElement | undefined;
+function drawGrouped(ctx: CanvasRenderingContext2D, l: VectorLayer, paint: (c: CanvasRenderingContext2D) => void): void {
+  const r = unionBox([...l.shapes.map(blurRegion), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
+  if (!r) return;
+  const m = ctx.getTransform(), pad = 2;
+  const pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => [m.a * x + m.c * y + m.e, m.b * x + m.d * y + m.f]);
+  const x0 = Math.floor(Math.max(0, Math.min(...pts.map((q) => q[0])) - pad)), y0 = Math.floor(Math.max(0, Math.min(...pts.map((q) => q[1])) - pad));
+  const x1 = Math.ceil(Math.min(ctx.canvas.width, Math.max(...pts.map((q) => q[0])) + pad)), y1 = Math.ceil(Math.min(ctx.canvas.height, Math.max(...pts.map((q) => q[1])) + pad));
+  const w = x1 - x0, h = y1 - y0;
+  if (w <= 0 || h <= 0) return;
+  const off = (groupScratch ??= createCanvas(1, 1)), o = ctx2d(off);
+  if (off.width < w || off.height < h) { off.width = Math.max(off.width, w); off.height = Math.max(off.height, h); }
+  else { o.setTransform(1, 0, 0, 1, 0, 0); o.clearRect(0, 0, w, h); }
+  o.save();
+  o.beginPath(); o.rect(0, 0, w, h); o.clip();
+  o.setTransform(m.a, m.b, m.c, m.d, m.e - x0, m.f - y0);
+  paint(o);
+  o.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(off, 0, 0, w, h, x0, y0, w, h);
   ctx.restore();
 }
 
