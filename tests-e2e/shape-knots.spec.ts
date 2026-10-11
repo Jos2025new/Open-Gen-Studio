@@ -321,7 +321,9 @@ test('a turned path: dragging one node leaves the others where they were on scre
   for (let i = 1; i <= 12; i++) await page.mouse.move(x + 5 * i, y + 3 * i);
   await page.mouse.up();
   const after = await centres();
-  for (const i of [0, 1, 3]) expect(Math.hypot(after[i][0] - before[i][0], after[i][1] - before[i][1]), `node ${i}`).toBeLessThan(0.75);
+  for (const i of [0, 1, 3]) expect(Math.hypot(after[i][0] - before[i][0], after[i][1] - before[i][1]), `node ${i}`).toBeLessThan(0.1);
   expect(Math.hypot(after[2][0] - before[2][0], after[2][1] - before[2][1])).toBeGreaterThan(50);
+  // The dragged node ends under the pointer (review: converting the pointer with the current shape left it ~3.6 px off).
+  expect(Math.hypot(after[2][0] - (x + 60), after[2][1] - (y + 36)), 'dragged node under the pointer').toBeLessThan(0.5);
   expect(errors).toEqual([]);
 });

@@ -18,7 +18,9 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
   const segs = pageSegs(shape);
   const scr = (p: [number, number]) => { const [x, y] = toPage(shape, p[0], p[1]); return documentToScreen({ x, y }, view, { left: 0, top: 0 }); };
-  const page = (e: { clientX: number; clientY: number }) => { const q = screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect()); const [x, y] = toLocal(shape, q.x, q.y); return { x, y }; };
+  // Pointer → own coordinates of `sh`: during a drag always the shape at its start (review: mixing it with the
+  // current one drifted the other nodes).
+  const page = (e: { clientX: number; clientY: number }, sh: VectorShape = shape) => { const q = screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect()); const [x, y] = toLocal(sh, q.x, q.y); return { x, y }; };
   // Handles under nodes, and none that sit on their node (Inkscape hides zero-length handles): a node is always
   // what a click on it picks.
   const all = nodePoints(segs).filter((p) => p.kind === 'node' || (() => { const a = scr(p.at), b = scr(p.from!); return Math.hypot(a.x - b.x, a.y - b.y) >= 6; })());
@@ -26,7 +28,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
-    const q = page(e);
+    const q = page(e, d.shape);
     // Each frame from the segments at the start of the drag: no drift; the first change records the undo step.
     // From the shape at the start of the drag (review of 480cfc3: the current one compounded the turn correction).
     const next = withSegs(d.shape, moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y));
@@ -45,7 +47,8 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
           const sc = { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top };
           const near = (q: NodePoint) => { const c = scr(q.at); return Math.hypot(c.x - sc.x, c.y - sc.y); };
           const nodes = pts.filter((q) => q.kind === 'node' && near(q) <= 8).sort((a, b) => near(a) - near(b));
-          const same = nodes.filter((q) => near(q) - near(nodes[0]) < 1);
+          // Only nodes on the very same spot cycle (not ones merely as far from the pointer).
+          const at0 = nodes[0] && scr(nodes[0].at), same = nodes.filter((q) => { const c = scr(q.at); return Math.hypot(c.x - at0.x, c.y - at0.y) < 0.5; });
           const key = same.map((q) => q.seg).join(',');
           turn.current = { at: key, i: turn.current.at === key ? (turn.current.i + 1) % Math.max(1, same.length) : 0 };
           drag.current = { pt: same[turn.current.i] ?? p, base: segs, shape, from: page(e), moved: false };
