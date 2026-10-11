@@ -40,10 +40,10 @@ import { uid } from '../../lib/id';
 type Drag =
   | { kind: 'pixelMove'; move: PixelMove }
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string }
-  | { kind: 'xform'; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
+  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; solo?: string }
+  | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
-  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string }
+  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
   | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
@@ -689,8 +689,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const hHit = [...handles].reverse().find((h) => Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol);
       if (hHit && tBox && pivotAt) {
         const ts = xformTargets(current);
-        record(current);
-        drag.current = { kind: 'xform', op: hHit.op, h: hHit, startX: p.x, startY: p.y, cx: pivotAt.x, cy: pivotAt.y, box: tBox, bases: ts.map((t) => ({ ...t, buffers: gestureBuffers(t.layer) })) };
+        drag.current = { kind: 'xform', pre: current, op: hHit.op, h: hHit, startX: p.x, startY: p.y, cx: pivotAt.x, cy: pivotAt.y, box: tBox, bases: ts.map((t) => ({ ...t, buffers: gestureBuffers(t.layer) })) };
         return;
       }
       // Point editing of a picked Lineart curve comes first, in either mode.
@@ -705,16 +704,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       }
       setSelectedCurve(null);
 
-      // Objects mode (Shift held: the layer, just for this drag). The objects inside a layer are picked and moved;
-      // the layer itself never moves or scales here. A layer with no parts (an image, a text) is its own object.
+      // Objects mode: parts of one layer; Shift (below) selects layers.
       if (!editLayers && !e.shiftKey) {
         const ctrl = e.ctrlKey || e.metaKey;
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
-        // The topmost layer under the pointer decides: its object if it has one there, else (below) the layer's whole
-        // content. A stroke in a lower layer never wins over an image on top of it. Ctrl keeps to the active layer.
+        // The top layer wins. Ctrl picks parts of one layer, or whole layers for a group.
         const top = hitTestPixel(current, p.x, p.y);
         let layer: Layer | null = null;
-        if (ctrl) layer = owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
+        if (ctrl) layer = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)).length === 1 && owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
         else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
         else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
@@ -727,32 +724,31 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
             const had = cur?.layerId === layer.id && cur.ids.includes(id);
             if (!had) pickObject(doc.id, layer.id, id, true);
             const ids = objectPick(doc.id)?.ids ?? [id];
-            record(current);
-            drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, ctrlToggle: had ? id : undefined };
+            drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, ctrlToggle: had ? id : undefined, pre: current };
             return;
           }
           setActiveLayer(sessionId, doc.id, layer.id);
-          // A plain click on an object: layers picked before (Ctrl/Shift in the panel) are let go.
+          // Pressing one of several picked layers drags them all; a click keeps just it (Inkscape).
+          const grp = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+          if (grp.length > 1 && grp.includes(layer.id)) return void (drag.current = { kind: 'move', layerId: layer.id, startX: p.x, startY: p.y, base: layer, others: otherPickedLayers(current, layer.id), pre: current, solo: layer.id });
           pickLayer(doc.id, layer.id, false, []);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
           const again = cur?.layerId === layer.id && cur.ids.includes(id);
           const ids = again ? cur!.ids : [id];
           setObjectPick(doc.id, { layerId: layer.id, ids });
-          record(current);
-          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, again };
+          drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, again, pre: current };
           return;
         }
         if (ctrl) {
-          // Whole layers (images, text): Ctrl-press adds the layer under the pointer and a drag moves all picked;
-          // a Ctrl-click on a picked one takes it out.
+          // Ctrl adds layers; releasing without dragging toggles a picked layer.
           const hit = hitTestPixel(current, p.x, p.y);
-          if (!hit || hit.locked || layerObjects(hit).length || hit.type === 'vector') return;
+          if (!hit || hit.locked) return;
+          setObjectPick(doc.id, null);
           const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
           const had = ids.length > 1 && ids.includes(hit.id);
           if (!had) pickLayer(doc.id, hit.id, true, ids);
           setActiveLayer(sessionId, doc.id, hit.id);
-          record(current);
-          drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
+          drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
           return;
         }
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
@@ -765,9 +761,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           const again = current.activeLayerId === whole.id;
           setActiveLayer(sessionId, doc.id, whole.id);
           if (!whole.locked) {
-            record(current);
             // One of several picked layers: they all move together (as in Inkscape).
-            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, others: otherPickedLayers(current, whole.id), again };
+            drag.current = { kind: 'move', layerId: whole.id, startX: p.x, startY: p.y, base: whole, others: otherPickedLayers(current, whole.id), again, pre: current };
           }
         }
         return;
@@ -775,18 +770,15 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
 
       // Layer mode: Ctrl/Cmd-click adds the layer under the pointer to the selection (or takes it out).
       setObjectPick(doc.id, null);
-      if (e.ctrlKey || e.metaKey) {
-        // Ctrl-press adds the layer; a drag moves all picked; Ctrl-click on a picked one removes it.
+      if (e.ctrlKey || e.metaKey || e.shiftKey) {
+        // Ctrl- or Shift-press adds the layer; a drag moves all picked; a click on a picked one removes it.
         const hit = hitTestPixel(current, p.x, p.y);
         if (hit) {
           const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
           const had = ids.length > 1 && ids.includes(hit.id);
           if (!had) pickLayer(doc.id, hit.id, true, ids);
           setActiveLayer(sessionId, doc.id, hit.id);
-          if (!hit.locked) {
-            record(current);
-            drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined };
-          }
+          if (!hit.locked) drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
         }
         return;
       }
@@ -806,8 +798,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
             return;
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
-            record(current);
-            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: true };
+            drag.current = { kind: 'move', layerId: act.id, startX: p.x, startY: p.y, base: act, others: otherPickedLayers(current, act.id), again: true, pre: current };
             return;
           }
         }
@@ -818,8 +809,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (!hit || !sel.includes(hit.id)) pickLayer(doc.id, hit?.id ?? '', false, sel);
       setActiveLayer(sessionId, doc.id, hit?.id ?? null);
       if (hit && !hit.locked) {
-        record(current);
-        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id) };
+        drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(current, hit.id), pre: current, again: sel.includes(hit.id) };
       }
       return;
     }
@@ -1000,6 +990,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     } else if (d.kind === 'xform' && d.op === 'pivot') {
       setPivot({ x: p.x, y: p.y });
     } else if (d.kind === 'xform') {
+      if (!started(d, p)) return;
       // Scale handles snap too: the dragged side or corner meets page edges, guides and other layers (Alt: free).
       let q = p;
       const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
@@ -1015,7 +1006,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       xformAt.current = { d, m: xformMatrix(d, q, e.shiftKey || e.ctrlKey || e.metaKey) };
       xformRaf.current ??= requestAnimationFrame(() => applyXform(false));
     } else if (d.kind === 'objMove') {
-      if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
+      if (!started(d, p)) return;
       // Pointer events can come faster than frames: keep the latest position and compose the layer at most once a
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
@@ -1031,7 +1022,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       rasterMoveAt.current = { d, x: ox, y: oy };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
     } else if (d.kind === 'move') {
-      if (Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) d.moved = true;
+      if (!started(d, p)) return;
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
@@ -1129,6 +1120,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     }
   };
 
+  /** A move starts past 3 screen px; only then is its undo step recorded. */
+  const started = (d: { moved?: boolean; pre?: DesignDoc; startX: number; startY: number }, p: { x: number; y: number }) => {
+    if (!d.moved && Math.hypot(p.x - d.startX, p.y - d.startY) * view.zoom > 3) { d.moved = true; if (d.pre) record(d.pre); }
+    return d.moved;
+  };
+
   const onPointerUp = (e?: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
@@ -1140,7 +1137,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     // Clicking the selection again (no drag) switches between scale and rotate/skew handles, as in Inkscape.
     if ((d.kind === 'objMove' || d.kind === 'move') && d.again && !d.moved) setHandleMode((m) => (m === 'scale' ? 'rotate' : 'scale'));
     if (d.kind === 'xform') {
-      if (d.op === 'pivot') return;
+      if (d.op === 'pivot' || !d.moved) return;
       applyXform(true);
       for (const b of d.bases) if (b.layer.type === 'raster') commitEdit(b.layer.id);
       return;
@@ -1149,10 +1146,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     // A Ctrl-click (no drag) on something already picked takes it out of the pick.
     if (d.kind === 'objMove' && d.ctrlToggle && !d.moved) pickObject(doc.id, d.layerId, d.ctrlToggle, true);
-    if (d.kind === 'move' && d.ctrlToggle && !d.moved) { const cur = getDoc(sessionId, doc.id) ?? doc; pickLayer(doc.id, d.ctrlToggle, true, layerSelection(doc.id, cur.activeLayerId, cur.layers.map((l) => l.id))); }
+    if (d.kind === 'move' && d.solo && !d.moved) pickLayer(doc.id, d.solo, false, []);
+    if (d.kind === 'move' && d.ctrlToggle && !d.moved) { const cur = getDoc(sessionId, doc.id) ?? doc; const ids = pickLayer(doc.id, d.ctrlToggle, true, layerSelection(doc.id, cur.activeLayerId, cur.layers.map((l) => l.id))); setActiveLayer(sessionId, doc.id, ids.at(-1) ?? null); }
     if (d.kind === 'objMove') {
       applyRasterMove();
-      if (d.base.type !== 'raster') return;
+      // A click without moving changes nothing.
+      if (d.base.type !== 'raster' || !d.moved) return;
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }
@@ -1371,7 +1370,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       {tool === 'move' && getSelection(doc.id) ? <StageHint id="move-region">Drag inside the pixel selection to extract and move it · vectors stay editable</StageHint> : tool === 'move' && selectedCurve ? <StageHint id="curve-points">Drag points to edit · Click away to move again</StageHint> : tool === 'lineart' && lineartMode === 'edit' ? <StageHint id="lineart-edit">Select a stroke · Drag its points · Influence controls the bend</StageHint> : null}
       {tool === 'move' && shapeEditing ? <StageHint id={shapeEditHint(doc).id} subtle>{shapeEditHint(doc).text}</StageHint>
         : tool === 'move' && !getSelection(doc.id) && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? (handleMode === 'scale' ? <StageHint id="handles-scale" subtle>Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate</StageHint> : <StageHint id="handles-rotate" subtle>Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize</StageHint>)
-        : tool === 'move' && !getSelection(doc.id) && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · Ctrl-click for more · Shift-drag moves the whole layer</StageHint> : null}
+        : tool === 'move' && !getSelection(doc.id) && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · Shift- or Ctrl-click adds more · drag moves all picked</StageHint> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
