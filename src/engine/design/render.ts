@@ -177,6 +177,8 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
   if (s.type === 'path') {
     if (!s.d) return;
     const t = pathTransform(s);
+    // A converted shape keeps its turn (shapeTransform.ts), outside the path's own placement.
+    if (s.rot) { const m = shapeMatrix(s); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); }
     ctx.setTransform(ctx.getTransform().multiply(new DOMMatrix([t.sx, 0, 0, t.sy, t.tx, t.ty])));
     p = new Path2D(s.d);
     sw = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));

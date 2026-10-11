@@ -154,7 +154,7 @@ export interface Box {
 }
 
 export function shapeBox(s: ShapeSpec): Box {
-  if (s.rot && s.type !== 'path' && s.type !== 'line') return pageBox(s);
+  if (s.rot && s.type !== 'line') return pageBox(s);
   const x = Math.min(s.x, s.x + s.w);
   const y = Math.min(s.y, s.y + s.h);
   const pad = s.type === 'line' ? Math.max(4, s.strokeWidth / 2) : 0;

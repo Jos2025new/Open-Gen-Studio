@@ -3,7 +3,7 @@ import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../type
 import { createCanvas, ctx2d } from '../../lib/media';
 import { mapPathShape } from './path';
 import { cornerRadii, roundRectPath, scaleLook } from './shapeLook';
-import { composeShape, toPage } from './shapeTransform';
+import { composeShape } from './shapeTransform';
 import { apply, invert, isAxisAligned, lengthScale, multiply, type Mat } from './matrix';
 import { getBuffer, setBuffer, composeRaster } from './raster';
 
@@ -28,11 +28,12 @@ export function shapeToPath<T extends ShapeSpec>(s: T): T {
   } else {
     // Rounded corners keep their look (elliptical when Rx ≠ Ry).
     const r = cornerRadii(s);
-    d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry);
+    // Dashed: from mid top edge, as the rectangle is painted, so the dashes stay where they were.
+    d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry, !!s.dash?.length && !!s.stroke && s.strokeWidth > 0);
   }
   const box = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) || 1, h: Math.abs(y1 - y0) || 1 };
-  const p = { ...s, type: 'path' as const, d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined, rot: undefined };
-  return (s.rot ? mapPathShape(p, (x, y) => toPage(s, x, y)) : p) as T;
+  // A turn or skew stays as rot (Inkscape keeps the transform): outline, stroke, dashes and blur are unchanged.
+  return { ...s, type: 'path' as const, d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined } as T;
 }
 
 export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
@@ -42,7 +43,7 @@ export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
     return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, ...scaleLook(s, m[0], m[3]) };
   }
   // A rectangle or ellipse stays one when turned or skewed, as in Inkscape (shapeTransform.ts); a line stays a line.
-  if (s.type === 'rect' || s.type === 'ellipse') return composeShape(s, m);
+  if (s.type === 'rect' || s.type === 'ellipse' || s.rot) return composeShape(s, m);
   if (s.type === 'line') { const [x0, y0] = apply(m, s.x, s.y), [x1, y1] = apply(m, s.x + s.w, s.y + s.h); return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) }; }
   return { ...mapPathShape(s, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
 }

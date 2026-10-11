@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import type { VectorShape } from '../../engine/types';
 import { moveNodePoint, nodePoints, pageSegs, withSegs, type NodePoint, type Seg } from '../../engine/design/pathNodes';
+import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape } from './ShapeLookFields';
 
@@ -12,9 +13,14 @@ import { patchShape } from './ShapeLookFields';
 export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: View; sessionId: string; docId: string; layerId: string; shape: VectorShape }) {
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<{ pt: NodePoint; base: Seg[]; from: { x: number; y: number }; moved: boolean } | null>(null);
-  const segs = pageSegs(shape), pts = nodePoints(segs);
-  const scr = (p: [number, number]) => documentToScreen({ x: p[0], y: p[1] }, view, { left: 0, top: 0 });
-  const page = (e: { clientX: number; clientY: number }) => screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect());
+  // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
+  const segs = pageSegs(shape);
+  const scr = (p: [number, number]) => { const [x, y] = toPage(shape, p[0], p[1]); return documentToScreen({ x, y }, view, { left: 0, top: 0 }); };
+  const page = (e: { clientX: number; clientY: number }) => { const q = screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect()); const [x, y] = toLocal(shape, q.x, q.y); return { x, y }; };
+  // Handles under nodes, and none that sit on their node (Inkscape hides zero-length handles): a node is always
+  // what a click on it picks.
+  const all = nodePoints(segs).filter((p) => p.kind === 'node' || (() => { const a = scr(p.at), b = scr(p.from!); return Math.hypot(a.x - b.x, a.y - b.y) >= 6; })());
+  const pts = [...all.filter((p) => p.kind === 'handle'), ...all.filter((p) => p.kind === 'node')];
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;

@@ -265,3 +265,35 @@ test('Convert to path, then edit its nodes (Inkscape Node tool): one undo per dr
   await expect(page.locator('rect.path-node')).toHaveCount(4);
   expect(errors).toEqual([]);
 });
+
+test('Convert to path changes no pixel, even turned, skewed, dashed and blurred; every node is what a click picks', async ({ page }) => {
+  const errors = await setup(page);
+  const out = await page.evaluate(async () => {
+    const R = await import('/src/engine/design/render.ts' as string); const A = await import('/src/engine/design/affine.ts' as string); const M = await import('/src/engine/design/matrix.ts' as string);
+    const W = 900, H = 660;
+    const draw = (shape: any) => { const c = document.createElement('canvas'); c.width = W; c.height = H; R.drawDoc(c.getContext('2d')!, { id: 'd', name: 'd', width: W, height: H, background: '#202020', activeLayerId: 'v', layers: [{ id: 'v', type: 'vector', name: 'v', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [shape] }] } as any, { resolution: 'document' }); return c.getContext('2d')!.getImageData(0, 0, W, H).data; };
+    const base = { id: 's', type: 'rect', x: 280, y: 220, w: 340, h: 200, fill: '#ffdd00', stroke: '#2244ff', strokeWidth: 14, radius: 0, rx: 60, ry: 25, blur: 6, dash: [4, 2], dashOffset: 1 };
+    const turned = A.transformShape(A.transformShape(base, M.rotateAbout(0.5, 450, 320)), M.scaleAbout(1.6, 0.5, 450, 320));
+    const res: Record<string, { n: number; max: number }> = {};
+    for (const [k, s] of Object.entries({ plain: base, turnedSkewed: turned })) {
+      const a = draw(s), b = draw(A.shapeToPath(s)); let n = 0, max = 0;
+      for (let i = 0; i < a.length; i++) { const d = Math.abs(a[i] - b[i]); if (d > 8) n++; if (d > max) max = d; }
+      res[k] = { n, max };
+    }
+    return res;
+  });
+  console.log(JSON.stringify(out));
+  for (const k of Object.keys(out)) expect(out[k].n, `${k}: pixels off by more than 8/255 after Convert to path`).toBe(0);
+  // Nodes over handles: the element under each node's centre is that node.
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('o');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.36, c.y + c.height * 0.36, { steps: 4 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.33, c.y + c.height * 0.33);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  const hits = await page.locator('rect.path-node').evaluateAll((ns) => ns.map((n) => { const r = n.getBoundingClientRect(); return document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === n; }));
+  expect(hits.length).toBe(4);
+  expect(hits.every(Boolean)).toBe(true);
+  expect(errors).toEqual([]);
+});

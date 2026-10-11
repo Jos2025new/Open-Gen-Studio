@@ -70,5 +70,5 @@ export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionI
 /** Inkscape's Object to Path: one undo step; the shape keeps its id, so edit mode goes on with its nodes. */
 export function convertToPath(sessionId: string, docId: string, layerId: string, shape: VectorShape): void {
   const p = shapeToPath(shape);
-  patchShape(sessionId, docId, layerId, shape.id, { ...p, rx: undefined, ry: undefined, rot: undefined });
+  patchShape(sessionId, docId, layerId, shape.id, { ...p, rx: undefined, ry: undefined });
 }

@@ -50,14 +50,15 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
       : turn === 'flip-v' ? [x, 2 * cy - y]
         : turn === 'rotate-180' ? [2 * cx - x, 2 * cy - y]
           : turn === 'rotate-cw' ? [cx - (y - cy), cy + (x - cx)] : [cx + (y - cy), cy - (x - cx)];
-  const withPaths = (l: VectorLayer): VectorLayer => ({ ...l, shapes: l.shapes.map((s, i) => (layer.shapes[i]?.type === 'path' ? mapPathShape(layer.shapes[i], pointFn) : s)) });
+  const withPaths = (l: VectorLayer): VectorLayer => ({ ...l, shapes: l.shapes.map((s, i) => (layer.shapes[i]?.type === 'path' && !layer.shapes[i].rot ? mapPathShape(layer.shapes[i], pointFn) : s)) });
   if (turn === 'flip-h') return withPaths(D.scaleLayer(layer, -1, 1, cx, cy) as VectorLayer);
   if (turn === 'flip-v') return withPaths(D.scaleLayer(layer, 1, -1, cx, cy) as VectorLayer);
   if (turn === 'rotate-180') return withPaths(D.scaleLayer(layer, -1, -1, cx, cy) as VectorLayer);
   const cw = turn === 'rotate-cw';
   const rot = (x: number, y: number): [number, number] => (cw ? [cx - (y - cy), cy + (x - cx)] : [cx + (y - cy), cy - (x - cx)]);
   const shapes = layer.shapes.map((s): VectorShape => {
-    if (s.type === 'path') return mapPathShape(s, pointFn);
+    if (s.type === 'path' && !s.rot) return mapPathShape(s, pointFn);
+    if (s.type === 'path') return composeShape(s, rotateAbout(cw ? Math.PI / 2 : -Math.PI / 2, cx, cy));
     if (s.type === 'line') {
       const [x1, y1] = rot(s.x, s.y);
       const [x2, y2] = rot(s.x + s.w, s.y + s.h);

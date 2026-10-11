@@ -194,15 +194,19 @@ describe('scaling keeps the look', () => {
     expect(editableShapeAt([{ ...e, id: 'e' }], 10, 50)).toBeNull();
   });
 
-  it('a line turns as a line; Convert to path keeps the turned outline', () => {
+  it('a line turns as a line; Convert to path keeps the turn and the dash start', () => {
     const c = Math.cos(0.5), sn = Math.sin(0.5);
     expect(transformShape(rect({ type: 'line', w: 100, h: 0 }), [c, sn, -sn, c, 0, 0]).type).toBe('line');
     const t = transformShape(rect(), rotateAbout(Math.PI / 4, 60, 50));
     const p = shapeToPath(t);
     expect(p.type).toBe('path');
-    expect(p.rot).toBeUndefined();
-    const b = pageBox(t);
-    expect([p.x, p.y, p.w, p.h]).toEqual([b.x, b.y, b.w, b.h].map((v) => expect.closeTo(v, 1))); // paths keep 2 decimals
+    // Review of 6235ad7: the turn stays (Inkscape keeps the transform), so a skewed stroke is not flattened.
+    expect(p.rot).toEqual(t.rot);
+    const b = pageBox(t), pb = pageBox(p);
+    expect([pb.x, pb.y, pb.w, pb.h]).toEqual([b.x, b.y, b.w, b.h].map((v) => expect.closeTo(v, 1)));
+    // A dashed rectangle converts from mid top edge, as it is painted: the dashes do not move.
+    const dashed = shapeToPath(rect({ dash: [4, 2] }));
+    expect(dashed.d!.startsWith('M 60 20 ')).toBe(true);
   });
 
   it('SVG keeps a turned rectangle as <rect> with transform, like Inkscape; a quarter turn of a turned shape composes', () => {

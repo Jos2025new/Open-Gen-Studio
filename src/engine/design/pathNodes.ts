@@ -3,14 +3,14 @@ import { mapPathShape, parsePath } from './path';
 
 /*
  * Node editing of a path shape (Inkscape's Node tool, N): every segment end is a node; a cubic's two control points
- * are the handles of the nodes on each side, a quadratic's one control point is shared. Dragging a node carries its
+ * are the handles of the nodes on each side (quadratics are read as the same cubic). Dragging a node carries its
  * handles; dragging a handle moves only it (a cusp node). The path is edited in page coordinates and written back
  * as a plain path whose own box is where it sits (path.ts mapPathShape), so it moves, scales and exports as before.
  */
 
 type Pt = [number, number];
-/** One absolute command; S and T are made explicit (C, Q) so every control point can be dragged. */
-export interface Seg { c: 'M' | 'L' | 'C' | 'Q' | 'Z'; p: Pt[] }
+/** One absolute command; S, Q and T become C (Inkscape edits every curve as a cubic), so every control point drags. */
+export interface Seg { c: 'M' | 'L' | 'C' | 'Z'; p: Pt[] }
 /** A draggable point: a node (segment end) or a handle (control point `k` of segment `seg`). */
 export interface NodePoint { kind: 'node' | 'handle'; seg: number; k: number; at: Pt; /** handle: the node it hangs from */ from?: Pt }
 
@@ -32,9 +32,14 @@ export function parseSegs(d: string): Seg[] {
     else if (cmd === 'L') { out.push({ c: 'L', p: pts }); prevCtrl = null; }
     else if (cmd === 'C') { out.push({ c: 'C', p: pts }); prevCtrl = pts[1]; }
     else if (cmd === 'S') { const c1 = refl(prevKind === 'C' ? prevCtrl : null); out.push({ c: 'C', p: [c1, ...pts] }); prevCtrl = pts[0]; cmd = 'S'; }
-    else if (cmd === 'Q') { out.push({ c: 'Q', p: pts }); prevCtrl = pts[0]; }
-    else if (cmd === 'T') { const c1 = refl(prevKind === 'Q' ? prevCtrl : null); out.push({ c: 'Q', p: [c1, pts[0]] }); prevCtrl = c1; }
-    prevKind = out[out.length - 1].c;
+    else if (cmd === 'Q' || cmd === 'T') {
+      // Quadratics become the same cubic (exact degree elevation), as Inkscape edits every curve: each end gets
+      // its own handle, so moving a node carries its handle like any other.
+      const q: Pt = cmd === 'Q' ? pts[0] : refl(prevKind === 'Q' ? prevCtrl : null), end = pts[pts.length - 1];
+      out.push({ c: 'C', p: [[cur[0] + (2 / 3) * (q[0] - cur[0]), cur[1] + (2 / 3) * (q[1] - cur[1])], [end[0] + (2 / 3) * (q[0] - end[0]), end[1] + (2 / 3) * (q[1] - end[1])], end] });
+      prevCtrl = q;
+    }
+    prevKind = cmd === 'Q' || cmd === 'T' ? 'Q' : out[out.length - 1].c;
     cur = pts[pts.length - 1];
   }
   return out;
@@ -60,7 +65,7 @@ export function nodePoints(segs: Seg[]): NodePoint[] {
     if (s.c === 'C') {
       if (prevEnd) out.push({ kind: 'handle', seg: i, k: 0, at: s.p[0], from: prevEnd });
       out.push({ kind: 'handle', seg: i, k: 1, at: s.p[1], from: end });
-    } else if (s.c === 'Q') out.push({ kind: 'handle', seg: i, k: 0, at: s.p[0], from: end });
+    }
     // A closing segment that lands on its subpath's start is the same node: drawn once (the M).
     if (!(closesOnStart(segs, i))) out.push({ kind: 'node', seg: i, k: s.p.length - 1, at: end });
     prevEnd = end;

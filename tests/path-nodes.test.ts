@@ -4,13 +4,18 @@ import { moveNodePoint, nodePoints, pageSegs, parseSegs, serializeSegs, withSegs
 import { shapeToPath } from '../src/engine/design/affine';
 
 /* Inkscape's Node tool on path shapes (pathNodes.ts). */
-const path = (d: string, o: Partial<ShapeSpec> = {}): ShapeSpec => ({ type: 'path', d, x: 0, y: 0, w: 0, h: 0, fill: '#000', stroke: null, strokeWidth: 0, radius: 0, ...withBox(d), ...o });
+const path = (d: string, o: Partial<ShapeSpec> = {}): ShapeSpec => ({ type: 'path', d, fill: '#000', stroke: null, strokeWidth: 0, radius: 0, ...withBox(d), ...o });
 function withBox(d: string) { const s = withSegs({ type: 'path', x: 0, y: 0, w: 1, h: 1, fill: null, stroke: null, strokeWidth: 0, radius: 0 } as ShapeSpec, parseSegs(d)); return { box0: s.box0, x: s.x, y: s.y, w: s.w, h: s.h }; }
 
 describe('path nodes', () => {
-  it('S and T become explicit C and Q (every control point can be dragged); the path draws the same', () => {
+  it('S, Q and T become the same cubics (Inkscape edits every curve as cubic): each end gets its own handle', () => {
     expect(serializeSegs(parseSegs('M 0 0 C 0 10 10 10 10 0 S 20 -10 20 0'))).toBe('M 0 0 C 0 10 10 10 10 0 C 10 -10 20 -10 20 0');
-    expect(serializeSegs(parseSegs('M 0 0 Q 5 10 10 0 T 20 0'))).toBe('M 0 0 Q 5 10 10 0 Q 15 -10 20 0');
+    expect(serializeSegs(parseSegs('M 0 0 Q 6 9 12 0 T 24 0'))).toBe('M 0 0 C 4 6 8 6 12 0 C 16 -6 20 -6 24 0');
+  });
+
+  it('review: moving the end node of a Curve (quadratic) carries its handle', () => {
+    const segs = parseSegs('M 0 0 Q 6 9 12 0');
+    expect(serializeSegs(moveNodePoint(segs, { kind: 'node', seg: 1, k: 2 }, 3, -3))).toBe('M 0 0 C 4 6 11 3 15 -3');
   });
 
   it('nodes at segment ends, handles hanging from their node; a closing twin of the start is one node', () => {

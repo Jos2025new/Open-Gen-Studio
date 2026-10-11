@@ -24,7 +24,7 @@ Girar o inclinar un rectángulo o una elipse ya no los convierte en trazado: sig
 
 ## Nodos y Convert to path (añadido)
 
-Doble clic en un trazado (polígono, curva, flecha, trazados del agente o convertidos) o «Edit nodes»: nodos cuadrados y manejadores redondos, como la herramienta Nodos de Inkscape. Arrastrar un nodo lleva sus manejadores; un manejador da forma a la curva; un deshacer por arrastre. En el modo edición de un rectángulo o una elipse, «Convert to path» (Objeto a trayecto de Inkscape) da el mismo contorno, giro incluido, como nodos editables; Ctrl+Z lo deshace. Sin atajo: Ctrl+Mayús+C abre el inspector de Chrome.
+Doble clic en un trazado (polígono, curva, flecha, trazados del agente o convertidos) o «Edit nodes»: nodos cuadrados y manejadores redondos, como la herramienta Nodos de Inkscape. Arrastrar un nodo lleva sus manejadores; un manejador da forma a la curva; un deshacer por arrastre. En el modo edición de un rectángulo o una elipse, «Convert to path» (Objeto a trayecto de Inkscape) da el mismo contorno, giro incluido, como nodos editables; Ctrl+Z lo deshace. Sin atajo: Ctrl+Mayús+C abre el inspector de Chrome. La conversión conserva el giro o la inclinación (como Inkscape cuando preserva la transformación) y empieza un rectángulo con guiones en el centro del borde superior: el lienzo no cambia ni un píxel (e2e). Las curvas cuadráticas se editan como la cúbica equivalente, como en Inkscape, así que cada nodo arrastra su manejador; los nodos se dibujan sobre los manejadores y se ocultan los manejadores de longitud casi cero.
 
 ## Qué queda fuera
 
