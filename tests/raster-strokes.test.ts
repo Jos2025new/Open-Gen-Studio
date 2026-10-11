@@ -111,3 +111,31 @@ it('does not discard existing pixels if the stored foundation is unavailable', a
   expect(raster.composeRaster(l)).toBe(false);
   expect(ops(l.id)).toEqual(['keep existing pixels']);
 });
+
+
+it('reuses immutable segment bounds while applying the current offset and layer scale', () => {
+  const l = layer(), s = l.paintStrokes![0];
+  let iterations = 0;
+  const seg = s.segments[0];
+  Object.defineProperty(seg, Symbol.iterator, { value: function* () { iterations++; for (let i = 0; i < 5; i++) yield seg[i]; } });
+  const first = rasterStrokeBox(l, s)!;
+  const moved = { ...s, x: 20, y: 30 };
+  expect(rasterStrokeBox(l, moved)).toEqual({ ...first, x: first.x + 20, y: first.y + 30 });
+  const scaled = { ...l, width: l.width * 2, height: l.height * 2 };
+  const box = rasterStrokeBox(scaled, moved)!;
+  expect(box.w).toBeCloseTo(first.w * 2, 10);
+  expect(box.h).toBeCloseTo(first.h * 2, 10);
+  expect(iterations).toBe(1);
+  const changed = { ...s, segments: [[10, 10, 90, 20, 6]] as RasterStroke['segments'] };
+  expect(rasterStrokeBox(l, changed)!.w).toBeGreaterThan(first.w);
+});
+
+it('stroke bounds cache: a stroke that grows in place (painting) gets its new bounds, not the cached ones', () => {
+  const layer = { x: 0, y: 0, width: 100, height: 100, pxWidth: 100, pxHeight: 100 } as unknown as RasterLayer;
+  const stroke = { x: 0, y: 0, segments: [[0, 0, 10, 0, 2]] } as unknown as RasterStroke;
+  const a = rasterStrokeBox(layer, stroke)!;
+  (stroke.segments as unknown as number[][]).push([10, 0, 60, 40, 2]);
+  const b = rasterStrokeBox(layer, stroke)!;
+  expect(b.w).toBeGreaterThan(a.w);
+  expect(b.h).toBeGreaterThan(a.h);
+});
