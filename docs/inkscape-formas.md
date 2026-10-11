@@ -25,6 +25,8 @@ Investigación del 2026-10-11 para tiradores de esquina, estilo de trazo y desen
 - Un tirador con radio 0 se dibuja 10 px de pantalla al lado de la esquina para no tapar el tirador de escala. El arrastre es relativo, así que el valor no salta.
 - Tiradores de blur: solo aparecen con blur > 0, y siempre a 20 px de pantalla o más del borde, para no tapar los tiradores de escala de los lados. El arrastre es relativo.
 - Sin Ctrl, arrastrar un tirador mueve solo ese radio: el otro conserva el valor que muestra (en Inkscape, un radio sin definir copia al otro y se mueve con él). Excepción: sin redondeo previo, el primer arrastre redondea los dos, porque Rx con Ry 0 dibuja esquinas rectas. Pedido por el usuario. «Lock radii» en la barra hace lo mismo que Ctrl.
+- Un rectángulo con guiones empieza y cierra su trazado en el centro del borde superior, nunca en una esquina: ahí Chromium e Inkscape unían distinto el último guion (revisión de 4ef6270: 223/255 → 60/255, solo antialiasing de las puntas). Sin guiones se sigue exportando como `<rect>`.
+- Rx o Ry a 0 escritos en la barra no impiden que el primer arrastre redondee: el radio no arrastrado queda sin definir.
 - «Rotate 90°» intercambia Rx y Ry junto con el ancho y el alto.
 - Los tiradores Rx/Ry se apartan del rectángulo (Rx hacia arriba, Ry a la derecha) hasta quedar a 18 px de pantalla de cualquier tirador de escala o giro: en formas pequeñas no los tapan.
 - Un rectángulo de ancho o alto 0 se exporta como trazado (SVG no dibuja `<rect>` vacíos; el lienzo sí traza la línea).

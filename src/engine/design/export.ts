@@ -62,6 +62,8 @@ function shapeBody(s: VectorShape): string {
     // A rectangle with no width or height: SVG skips <rect> then, the canvas strokes it as a line; draw that line.
     if (!w || !h) return `<path d="${roundRectPath({ x, y, w, h }, 0, 0)}" ${paint(s, s.strokeWidth, null)}/>`;
     const r = cornerRadii(s);
+    // Dashed: a path from mid top edge, the same the canvas traces (shapeLook.traceRoundRect).
+    if (s.dash?.length && s.stroke && s.strokeWidth > 0) return `<path d="${roundRectPath({ x, y, w, h }, r.rx, r.ry, true)}" ${paint(s, s.strokeWidth)}/>`;
     return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${r.rx > 0 && r.ry > 0 ? ` rx="${n(r.rx)}"${r.ry !== r.rx ? ` ry="${n(r.ry)}"` : ''}` : ''} ${paint(s, s.strokeWidth)}/>`;
   }
   if (s.type === 'ellipse') {

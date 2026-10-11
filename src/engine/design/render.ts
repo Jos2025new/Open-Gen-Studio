@@ -184,8 +184,9 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     if (s.type === 'rect') {
       const r = cornerRadii(s), b = rectBox(s);
       // A shape from before Rx/Ry keeps the native round rect it was always drawn with, pixel for pixel.
-      if (s.rx == null && s.ry == null) ctx.roundRect(b.x, b.y, b.w, b.h, r.rx);
-      else traceRoundRect(ctx, b, r.rx, r.ry);
+      const dashed = !!s.dash?.length && !!s.stroke && s.strokeWidth > 0;
+      if (s.rx == null && s.ry == null && !dashed) ctx.roundRect(b.x, b.y, b.w, b.h, r.rx);
+      else traceRoundRect(ctx, b, r.rx, r.ry, dashed);
     } else if (s.type === 'ellipse') ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
     else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }

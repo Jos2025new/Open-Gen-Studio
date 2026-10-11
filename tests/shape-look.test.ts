@@ -49,7 +49,7 @@ describe('corner radii', () => {
     // User's rule: without Ctrl only the dragged radius moves; the other keeps what it shows (Rx was copying 8).
     expect(dragRx(rect({ rx: 10 }), 70, false)).toEqual({ rx: 40, ry: 10 });
     expect(dragRy(rect({ rx: 10 }), 45, false)).toEqual({ rx: 10, ry: 25 });
-    expect(dragRy(rect({ rx: 0, ry: 3 }), 999, false)).toEqual({ rx: 0, ry: 30 });
+    expect(dragRy(rect({ rx: 0, ry: 3 }), 999, false)).toEqual({ rx: undefined, ry: 30 }); // review of 4ef6270: 0 must not keep corners sharp
     // A legacy radius becomes Rx and Ry moves alone.
     expect(dragRy(rect({ radius: 6 }), 45, false)).toEqual({ rx: 6, ry: 25 });
   });
@@ -69,6 +69,19 @@ describe('corner radii', () => {
     const d = roundRectPath({ x: 0, y: 0, w: 100, h: 60 }, 20, 10);
     expect(d.startsWith('M 20 0 L 80 0 C')).toBe(true);
     expect(d).toContain('100 10 L 100 50');
+  });
+});
+
+describe('review of 4ef6270', () => {
+  it('explicit zero radii: dragging one rounds the corners (the other is unset, so it copies)', () => {
+    const s = rect({ rx: 0, ry: 0 });
+    expect(cornerRadii({ ...s, ...dragRx(s, 90, false) })).toEqual({ rx: 20, ry: 20 });
+    expect(cornerRadii({ ...s, ...dragRy(s, 45, false) })).toEqual({ rx: 25, ry: 25 });
+  });
+  it('a dashed rectangle starts and closes mid top edge, never at a corner', () => {
+    expect(roundRectPath({ x: 0, y: 0, w: 10, h: 6 }, 0, 0, true)).toBe('M 5 0 L 10 0 L 10 6 L 0 6 L 0 0 L 5 0 Z');
+    expect(shapeSvg({ ...rect({ dash: [4, 2], join: 'miter' }), id: 'd' })).toMatch(/^<path d="M 60 20 /);
+    expect(shapeSvg({ ...rect(), id: 'p' })).toMatch(/^<rect /);
   });
 });
 

@@ -31,8 +31,21 @@ export function cornerRadii(s: Pick<ShapeSpec, 'w' | 'h' | 'radius' | 'rx' | 'ry
 type PathSink = { moveTo(x: number, y: number): void; lineTo(x: number, y: number): void; bezierCurveTo(a: number, b: number, c: number, d: number, x: number, y: number): void; closePath(): void };
 
 /** Trace a rectangle with elliptical corners (cubic Béziers) on a canvas or path; the one geometry for all uses. */
-export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number): void {
+export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number, fromMid = false): void {
   const x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
+  // Dashed: start and close in the middle of the top edge, never at a corner, where engines differ in how the
+  // dash meets the closing join (review: Inkscape squared a corner Chromium rounded).
+  if (fromMid) {
+    const xm = (x0 + x1) / 2, r = rx > 0 && ry > 0;
+    const kx = rx * K, ky = ry * K;
+    p.moveTo(xm, y0);
+    if (!r) { p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); p.lineTo(x0, y0); p.lineTo(xm, y0); p.closePath(); return; }
+    p.lineTo(x1 - rx, y0); p.bezierCurveTo(x1 - rx + kx, y0, x1, y0 + ry - ky, x1, y0 + ry);
+    p.lineTo(x1, y1 - ry); p.bezierCurveTo(x1, y1 - ry + ky, x1 - rx + kx, y1, x1 - rx, y1);
+    p.lineTo(x0 + rx, y1); p.bezierCurveTo(x0 + rx - kx, y1, x0, y1 - ry + ky, x0, y1 - ry);
+    p.lineTo(x0, y0 + ry); p.bezierCurveTo(x0, y0 + ry - ky, x0 + rx - kx, y0, x0 + rx, y0);
+    p.lineTo(xm, y0); p.closePath(); return;
+  }
   if (rx <= 0 || ry <= 0) { p.moveTo(x0, y0); p.lineTo(x1, y0); p.lineTo(x1, y1); p.lineTo(x0, y1); p.closePath(); return; }
   const kx = rx * K, ky = ry * K;
   p.moveTo(x0 + rx, y0);
@@ -44,9 +57,9 @@ export function traceRoundRect(p: PathSink, b: Box, rx: number, ry: number): voi
 }
 
 /** The same rectangle as SVG path data (so it also survives rotation and skew). */
-export function roundRectPath(b: Box, rx: number, ry: number): string {
+export function roundRectPath(b: Box, rx: number, ry: number, fromMid = false): string {
   const d: string[] = [];
-  traceRoundRect({ moveTo: (x, y) => d.push(`M ${x} ${y}`), lineTo: (x, y) => d.push(`L ${x} ${y}`), bezierCurveTo: (...c) => d.push(`C ${c.join(' ')}`), closePath: () => d.push('Z') }, b, rx, ry);
+  traceRoundRect({ moveTo: (x, y) => d.push(`M ${x} ${y}`), lineTo: (x, y) => d.push(`L ${x} ${y}`), bezierCurveTo: (...c) => d.push(`C ${c.join(' ')}`), closePath: () => d.push('Z') }, b, rx, ry, fromMid);
   return d.join(' ');
 }
 
@@ -63,7 +76,8 @@ export function dragRx(s: ShapeSpec, px: number, lock: boolean): Pick<ShapeSpec,
   // Without Ctrl (or the lock) only Rx moves: Ry keeps the radius it shows now. With no rounding yet (Ry 0), Ry stays
   // unset and copies Rx, so the first drag rounds the corners at all (an Rx with Ry 0 draws sharp corners).
   const cur = cornerRadii(s);
-  return { rx: clamp(b.x + b.w - px, 0, b.w / 2), ry: cur.ry > 0 ? cur.ry : s.ry };
+  // Review: an explicit Ry 0 (typed in the bar) must not keep the corners sharp either: unset it.
+  return { rx: clamp(b.x + b.w - px, 0, b.w / 2), ry: cur.ry > 0 ? cur.ry : undefined };
 }
 
 /** Dragging the Ry knot to page y (Inkscape's RectKnotHolderEntityRY::knot_set). */
@@ -73,7 +87,7 @@ export function dragRy(s: ShapeSpec, py: number, lock: boolean): Pick<ShapeSpec,
   // Without Ctrl (or the lock) only Ry moves: Rx keeps the radius it shows now (unset at 0, as above). With Rx unset or
   // 0, Inkscape caps Ry by the shorter side.
   const free = s.rx == null || s.rx === 0;
-  return { rx: cur.rx > 0 ? cur.rx : s.rx, ry: clamp(py - b.y, 0, free ? Math.min(b.w, b.h) / 2 : b.h / 2) };
+  return { rx: cur.rx > 0 ? cur.rx : undefined, ry: clamp(py - b.y, 0, free ? Math.min(b.w, b.h) / 2 : b.h / 2) };
 }
 
 /** Click on a knot: Shift makes the corners sharp; Ctrl copies this knot's radius to the other. */
