@@ -213,3 +213,124 @@ export function setNodeType(segs: Seg[], n: number, type: NodeType): Seg[] {
   b[0] = at[0] + dx * (len || lb); b[1] = at[1] + dy * (len || lb);
   return out;
 }
+
+/*
+ * Adding and deleting nodes (Inkscape: double-click a segment adds one; Delete removes the picked one). Each subpath
+ * is read as its nodes and the edges between them (a closed one's last edge comes back to its first node), edited,
+ * and written back; node types move with their nodes.
+ */
+interface Edge { c: 'L' | 'C'; c1?: Pt; c2?: Pt }
+interface Sub { nodes: Pt[]; edges: Edge[]; closed: boolean }
+
+function toSubs(segs: Seg[]): Sub[] {
+  const subs: Sub[] = [];
+  let cur: Sub | null = null;
+  for (const g of segs) {
+    if (g.c === 'M') { cur = { nodes: [g.p[0]], edges: [], closed: false }; subs.push(cur); continue; }
+    if (!cur) continue;
+    if (g.c === 'Z') {
+      const last = cur.nodes[cur.nodes.length - 1], first = cur.nodes[0];
+      // The closing twin (an edge that already landed on the start) is that edge back, not a new node.
+      if (cur.nodes.length > 1 && Math.abs(last[0] - first[0]) < 1e-6 && Math.abs(last[1] - first[1]) < 1e-6) cur.nodes.pop();
+      else cur.edges.push({ c: 'L' });
+      cur.closed = true;
+      continue;
+    }
+    cur.edges.push(g.c === 'C' ? { c: 'C', c1: g.p[0], c2: g.p[1] } : { c: 'L' });
+    cur.nodes.push(g.p[g.p.length - 1]);
+  }
+  return subs;
+}
+
+function fromSubs(subs: Sub[]): Seg[] {
+  const out: Seg[] = [];
+  for (const s of subs) {
+    out.push({ c: 'M', p: [s.nodes[0]] });
+    s.edges.forEach((e, k) => {
+      const to = s.nodes[(k + 1) % s.nodes.length];
+      out.push(e.c === 'C' ? { c: 'C', p: [e.c1!, e.c2!, to] } : { c: 'L', p: [to] });
+    });
+    if (s.closed) out.push({ c: 'Z', p: [] });
+  }
+  return out;
+}
+
+const lerp = (a: Pt, b: Pt, t: number): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+function edgePoint(a: Pt, e: Edge, b: Pt, t: number): Pt {
+  if (e.c === 'L') return lerp(a, b, t);
+  const p = lerp(lerp(lerp(a, e.c1!, t), lerp(e.c1!, e.c2!, t), t), lerp(lerp(e.c1!, e.c2!, t), lerp(e.c2!, b, t), t), t);
+  return p;
+}
+
+/** The nearest point of the outline to `p`: which edge, where on it (t) and how far. */
+export function nearestOnPath(segs: Seg[], p: Pt): { sub: number; edge: number; t: number; dist: number } | null {
+  let best: { sub: number; edge: number; t: number; dist: number } | null = null;
+  toSubs(segs).forEach((s, si) => s.edges.forEach((e, k) => {
+    const a = s.nodes[k], b = s.nodes[(k + 1) % s.nodes.length];
+    let bt = 0, bd = Infinity;
+    for (let i = 0; i <= 64; i++) { const q = edgePoint(a, e, b, i / 64), d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; bt = i / 64; } }
+    // Refine around the best sample.
+    for (let step = 1 / 128; step > 1e-5; step /= 2) for (const t of [bt - step, bt + step]) { if (t < 0 || t > 1) continue; const q = edgePoint(a, e, b, t), d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; bt = t; } }
+    if (!best || bd < best.dist) best = { sub: si, edge: k, t: bt, dist: bd };
+  }));
+  return best;
+}
+
+/** Global node index of node `j` of subpath `si`. */
+function globalIndex(subs: Sub[], si: number, j: number): number {
+  return subs.slice(0, si).reduce((n, s) => n + s.nodes.length, 0) + j;
+}
+
+/** Add a node on edge `edge` of subpath `sub` at `t`: the outline stays the same (De Casteljau for curves). */
+export function insertNode(segs: Seg[], types: NodeType[], at: { sub: number; edge: number; t: number }): { segs: Seg[]; types: NodeType[]; node: number } {
+  const subs = toSubs(segs), s = subs[at.sub], k = at.edge, e = s.edges[k], a = s.nodes[k], b = s.nodes[(k + 1) % s.nodes.length], t = at.t;
+  let mid: Pt, left: Edge, right: Edge;
+  if (e.c === 'L') { mid = lerp(a, b, t); left = { c: 'L' }; right = { c: 'L' }; }
+  else {
+    const p01 = lerp(a, e.c1!, t), p12 = lerp(e.c1!, e.c2!, t), p23 = lerp(e.c2!, b, t), p012 = lerp(p01, p12, t), p123 = lerp(p12, p23, t);
+    mid = lerp(p012, p123, t); left = { c: 'C', c1: p01, c2: p012 }; right = { c: 'C', c1: p123, c2: p23 };
+  }
+  s.nodes.splice(k + 1, 0, mid);
+  s.edges.splice(k, 1, left, right);
+  const node = globalIndex(subs, at.sub, k + 1), out = [...types];
+  // A node added on a curve keeps it smooth there; on a straight line it is a cusp.
+  out.splice(node, 0, e.c === 'C' ? 's' : 'c');
+  return { segs: fromSubs(subs), types: out, node };
+}
+
+/** Delete node `n`: its neighbours are joined by one edge keeping their outer handles. Null when it would leave the
+    path without a drawable subpath (the last node of the last subpath). */
+export function deleteNode(segs: Seg[], types: NodeType[], n: number): { segs: Seg[]; types: NodeType[] } | null {
+  const subs = toSubs(segs);
+  let si = 0, j = n;
+  while (si < subs.length && j >= subs[si].nodes.length) { j -= subs[si].nodes.length; si++; }
+  const s = subs[si];
+  if (!s) return null;
+  const m = s.nodes.length, outTypes = [...types];
+  outTypes.splice(n, 1);
+  if (m <= 2) {
+    // A subpath of two nodes loses its last edge: it goes, unless it is the only one.
+    if (subs.length === 1) return null;
+    subs.splice(si, 1);
+    outTypes.splice(globalIndex(subs.concat(), si, 0), m - 1);
+    return { segs: fromSubs(subs), types: outTypes };
+  }
+  const merge = (ein: Edge, eout: Edge): Edge => (ein.c === 'L' && eout.c === 'L' ? { c: 'L' } : { c: 'C', c1: ein.c === 'C' ? ein.c1 : undefined, c2: eout.c === 'C' ? eout.c2 : undefined });
+  if (s.closed) {
+    const kin = (j - 1 + m) % m, merged = merge(s.edges[kin], s.edges[j]);
+    // Missing handles sit on their node (a straight start or end of the new curve).
+    if (merged.c === 'C') { merged.c1 ??= s.nodes[kin]; merged.c2 ??= s.nodes[(j + 1) % m]; }
+    s.edges[kin] = merged;
+    s.edges.splice(j, 1);
+    s.nodes.splice(j, 1);
+    // Edge k still runs from node k to node k + 1 (the merged one closes back to the new first node when j is 0).
+  } else if (j === 0) { s.nodes.shift(); s.edges.shift(); }
+  else if (j === m - 1) { s.nodes.pop(); s.edges.pop(); }
+  else {
+    const merged = merge(s.edges[j - 1], s.edges[j]);
+    if (merged.c === 'C') { merged.c1 ??= s.nodes[j - 1]; merged.c2 ??= s.nodes[j + 1]; }
+    s.edges.splice(j - 1, 2, merged);
+    s.nodes.splice(j, 1);
+  }
+  return { segs: fromSubs(subs), types: outTypes };
+}

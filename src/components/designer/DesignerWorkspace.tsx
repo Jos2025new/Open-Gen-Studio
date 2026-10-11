@@ -14,6 +14,7 @@ import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, 
 import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
+import { deletePickedNode } from './PathNodes';
 import { deleteLayers, exportDocFile, mergeDown, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, record, subscribeHistory } from '../../engine/design/history';
@@ -168,6 +169,9 @@ export function DesignerWorkspace() {
         else if (k === 'd') setSelection(doc.id, null);
         else if (k === 'i') invertSelection(doc);
         else { const err = selectionToLayer(session.id, doc); if (err) toast(err, 'error'); }
+      } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && deletePickedNode(session.id, doc.id)) {
+        // Editing a path with a node picked: Delete removes that node, never the layer (PathNodes.tsx).
+        e.preventDefault();
       } else if (!e.altKey && ((!mod && (e.key === 'Delete' || e.key === 'Backspace')) || (mod && k === 'x')) && getSelection(doc.id)) {
         // With a selection, Delete (or Ctrl+X, handled by cut) erases its pixels instead of deleting the layer.
         if (mod) return;

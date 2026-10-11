@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { moveNodePoint, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { deleteNode, insertNode, moveNodePoint, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -98,5 +98,41 @@ describe('path nodes', () => {
   it('SVG export writes sodipodi:nodetypes so Inkscape opens the nodes with their type', () => {
     const p = { ...path('M 0 0 L 10 0 L 10 10 Z'), nodeTypes: 'cscc', id: 'p' };
     expect(shapeSvg(p)).toContain('sodipodi:nodetypes="cscc"');
+  });
+});
+
+describe('adding and deleting nodes', () => {
+  const box = (segs: ReturnType<typeof parseSegs>) => { const s = withSegs(path('M 0 0 L 1 1'), segs); return [s.x, s.y, s.w, s.h]; };
+  it('adding a node keeps the outline (line and curve, De Casteljau), types move with nodes', () => {
+    const segs = parseSegs('M 0 0 C 0 10 10 10 10 0 L 20 0');
+    const near = nearestOnPath(segs, [5, 7.5])!;
+    expect(near.edge).toBe(0); expect(near.t).toBeCloseTo(0.5, 3); expect(near.dist).toBeLessThan(1e-3);
+    const r = insertNode(segs, ['c', 'z', 'c'], near);
+    expect(serializeSegs(r.segs)).toBe('M 0 0 C 0 5 2.5 7.5 5 7.5 C 7.5 7.5 10 5 10 0 L 20 0');
+    expect(r.types).toEqual(['c', 's', 'z', 'c']);
+    expect(r.node).toBe(1);
+    const line = insertNode(segs, ['c', 'c', 'c'], { sub: 0, edge: 1, t: 0.25 });
+    expect(serializeSegs(line.segs)).toBe('M 0 0 C 0 10 10 10 10 0 L 12.5 0 L 20 0');
+    expect(box(line.segs)).toEqual(box(segs));
+  });
+  it('adding on the closing edge of a closed path, and deleting its first node, keep it closed', () => {
+    const sq = parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 Z');
+    const add = insertNode(sq, ['c', 'c', 'c', 'c'], { sub: 0, edge: 3, t: 0.5 });
+    expect(serializeSegs(add.segs)).toBe('M 0 0 L 10 0 L 10 10 L 0 10 L 0 5 L 0 0 Z');
+    expect(add.types).toHaveLength(5);
+    const del = deleteNode(sq, ['s', 'c', 'c', 'c'], 0)!;
+    expect(serializeSegs(del.segs)).toBe('M 10 0 L 10 10 L 0 10 L 10 0 Z');
+    expect(del.types).toEqual(['c', 'c', 'c']);
+  });
+  it('deleting joins the neighbours keeping their outer handles; ends of an open path just go; the last node stays', () => {
+    const segs = parseSegs('M 0 0 C 0 5 3 8 5 8 C 7 8 10 5 10 0 L 20 0');
+    expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 1)!.segs)).toBe('M 0 0 C 0 5 10 5 10 0 L 20 0');
+    expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 0)!.segs)).toBe('M 5 8 C 7 8 10 5 10 0 L 20 0');
+    expect(serializeSegs(deleteNode(segs, ['c', 's', 'c', 'c'], 3)!.segs)).toBe('M 0 0 C 0 5 3 8 5 8 C 7 8 10 5 10 0');
+    expect(deleteNode(parseSegs('M 0 0 L 10 0'), ['c', 'c'], 0)).toBeNull();
+    // Two subpaths: a two-node one goes whole, the other stays.
+    const two = deleteNode(parseSegs('M 0 0 L 10 0 M 20 0 L 30 0 L 30 10'), ['c', 'c', 'a' as never, 'c', 'c'].map((t) => (t === ('a' as never) ? 'c' : t)) as never, 1)!;
+    expect(serializeSegs(two.segs)).toBe('M 20 0 L 30 0 L 30 10');
+    expect(two.types).toHaveLength(3);
   });
 });

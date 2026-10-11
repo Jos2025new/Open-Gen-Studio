@@ -406,3 +406,39 @@ test('node types: pick a node, make it smooth or symmetric (bar or Shift+S / Shi
   expect((await shape(page)).nodeTypes?.[0]).toBe('c');
   expect(errors).toEqual([]);
 });
+
+test('add a node by double-clicking the outline, delete it with Delete (never the layer); outline unchanged on add', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.4, c.y + c.height * 0.45);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  const s0 = await shape(page);
+  // Double-click the middle of the top edge (between the first two nodes).
+  const [a, b] = [(await page.locator('rect.path-node').nth(0).boundingBox())!, (await page.locator('rect.path-node').nth(1).boundingBox())!];
+  await page.mouse.dblclick((a.x + b.x) / 2 + a.width / 2, (a.y + b.y) / 2 + a.height / 2);
+  await expect(page.locator('rect.path-node')).toHaveCount(5);
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
+  const s1 = await shape(page);
+  // Paths keep 2 decimals when written back.
+  const same = (p: any, q: any) => [p.x, p.y, p.w, p.h].forEach((v: number, i: number) => expect(Math.abs(v - [q.x, q.y, q.w, q.h][i])).toBeLessThan(0.01));
+  same(s1, s0);
+  // Delete removes that node only; the layer and the shape stay.
+  await page.keyboard.press('Delete');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  const s2 = await shape(page);
+  expect(s2).toBeTruthy();
+  same(s2, s0);
+  // Pick a corner and delete it from the bar: three nodes left; Ctrl+Z brings it back in one step.
+  const n = (await page.locator('rect.path-node').nth(2).boundingBox())!;
+  await page.mouse.click(n.x + n.width / 2, n.y + n.height / 2);
+  await strip(page).getByRole('button', { name: 'Delete node' }).click();
+  await expect(page.locator('rect.path-node')).toHaveCount(3);
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  expect(errors).toEqual([]);
+});
