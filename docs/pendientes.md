@@ -44,7 +44,6 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 - [ ] **Brocha, lo que falta de SAI** ([ADR 0013](decisions/0013-campos-y-brocha.md)): mezcla húmeda (Blending, Dilution, Persistence), calidad y multiplicador de tamaño. Medir antes el coste por movimiento de la punta con el [protocolo](depuracion.md#protocolo). **2026-10-09**, pendiente.
 - [ ] **Mismo campo fuera del Designer:** los deslizadores de la galería (columnas), el boceto (tamaño de brocha), el visor 3D y la tarjeta de ajustes siguen con su propio estilo. **2026-10-09**, pendiente; cambia la interfaz de otros espacios, así que hay que preguntar antes.
 - [ ] **Presión con un lápiz real:** tamaño y densidad mínimos solo se han probado con tests y con ratón (presión total). **2026-10-09**, lo prueba el usuario.
-- [ ] **Formas, siguiente pasada** ([plan](plan-edicion-formas.md)): nodos suaves y simétricos, añadir y borrar nodos; en modo edición la pista «Drag the squares to resize…» ya no corresponde; en Propiedades, Unión y Punta se parten en dos líneas. **2026-10-11**, pendiente.
 - [ ] Importar el `.zip` de datos (el exportar ya existe). **2026-10-08**, pendiente.
 - [ ] Recortar un vídeo o quitarle el audio. El servidor local ya usa ffmpeg para `join_clips`; sería la vía más ligera. **2026-10-08**, pendiente.
 - [ ] Quitar el fondo de un vídeo (`pixelcut/video-background-removal`, NanoGPT; ID verificado). **2026-10-08**, pendiente.
@@ -105,6 +104,7 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 
 ## Hecho
 
+- [x] Formas, siguiente pasada: nodos esquina/suave/simétrico (barra y Shift+C/S/Y, guardados como `sodipodi:nodetypes`), añadir nodo con doble clic en el contorno y borrar el elegido (Supr o botón, nunca la capa), pista según el modo e iconos en Unión/Punta. **2026-10-11**, commits `21e99ea`, `5dce5ee`, `846888e` y el de la pista; **test** (1 126), **e2e** (10 de 10 en `shape-knots.spec.ts` y `path-nodes.spec.ts`; los de tipos y Supr fallan sin su corrección). Sin hacer: borrar ajustando la curva (Inkscape lo aproxima; aquí se unen los vecinos).
 - [x] Opacidad y fusión de capa iguales en lienzo y SVG: con más de una operación de pintado (dos formas, o relleno y trazo) la capa se compone aparte y se mezcla una vez, como un grupo SVG. **2026-10-11**, **e2e** (7 casos, 0 píxeles > 8/255; sin la corrección 8 544–32 721), **medida** (10 formas a 1500×900: mediana 1,3–1,5 → 2,3–2,4 ms, solo en esas capas).
 - [x] Formas al estilo de Inkscape: esquinas Rx/Ry con tiradores, estilo de trazo, blur, un clic transforma y doble clic edita, formas giradas editables, nodos de trazados y «Convert to path». **2026-10-11**, Claude, rama `task/designer-ux` (`523dd35` → `2949201`), **test** (1 119), **e2e** (6 de 6 en `shape-knots.spec.ts`), **fuente** (Inkscape, por línea) y **revisión** de GPT en seis rondas. Detalle: [024](history/024-2026-10-W41.md).
 - [x] Designer lento al pintar y al usarlo (el usuario, 2026-10-09: «una interfaz que vaya lenta conforme más se usa deja la app inviable»). **2026-10-09**, Claude, rama `task/rendimiento`:

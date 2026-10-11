@@ -31,9 +31,9 @@ export function ShapeLookFields({ value, onChange, corners, stroke = true, blur,
     </>}
     {blur && <span data-tip="Inkscape's blur: σ = (blur/100)² · (width + height) / 4"><InlineSlider label="Blur" unit="%" min={0} max={100} step={0.1} value={Math.round(blurPercent(value.blur ?? 0, w, h) * 10) / 10} onChange={(p) => onChange({ blur: blurSigma(p, w, h) })} /></span>}
     {stroke && !compact && <>
-      <InlineChoice label="Join" value={join} options={[{ value: 'miter' as const, label: 'Miter join' }, { value: 'round' as const, label: 'Round join' }, { value: 'bevel' as const, label: 'Bevel join' }]} onChange={(j) => onChange({ join: j })} />
+      <InlineChoice label="Join" value={join} options={[{ value: 'miter' as const, label: 'Miter join', render: <JoinIcon j="miter" /> }, { value: 'round' as const, label: 'Round join', render: <JoinIcon j="round" /> }, { value: 'bevel' as const, label: 'Bevel join', render: <JoinIcon j="bevel" /> }]} onChange={(j) => onChange({ join: j })} />
       {join === 'miter' && <InlineSlider label="Miter limit" min={1} max={20} step={0.5} value={value.miter ?? MITER_DEFAULT} onChange={(miter) => onChange({ miter })} />}
-      <InlineChoice label="Cap" value={value.cap ?? 'round'} options={[{ value: 'butt' as const, label: 'Butt cap' }, { value: 'round' as const, label: 'Round cap' }, { value: 'square' as const, label: 'Square cap' }]} onChange={(cap) => onChange({ cap })} />
+      <InlineChoice label="Cap" value={value.cap ?? 'round'} options={[{ value: 'butt' as const, label: 'Butt cap', render: <CapIcon c="butt" /> }, { value: 'round' as const, label: 'Round cap', render: <CapIcon c="round" /> }, { value: 'square' as const, label: 'Square cap', render: <CapIcon c="square" /> }]} onChange={(cap) => onChange({ cap })} />
       <InlineSelect label="Dashes" value={DASHES.some((d) => d.value === dash) ? dash : ''} options={DASHES} onChange={(v) => onChange({ dash: v ? v.split(' ').map(Number) : undefined })} />
       {dash && <InlineSlider label="Dash offset" min={0} max={20} step={0.5} value={value.dashOffset ?? 0} onChange={(dashOffset) => onChange({ dashOffset })} />}
       <InlineToggle label="Stroke behind fill" tip="Paint order: the stroke is painted first, so the fill covers its inner half" checked={value.paintOrder === 'stroke'} onChange={(on) => onChange({ paintOrder: on ? 'stroke' : undefined })} />
@@ -71,4 +71,13 @@ export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionI
 export function convertToPath(sessionId: string, docId: string, layerId: string, shape: VectorShape): void {
   const p = shapeToPath(shape);
   patchShape(sessionId, docId, layerId, shape.id, { ...p, rx: undefined, ry: undefined });
+}
+
+/* Join and cap drawn as what they do (Inkscape's Stroke style icons), so the choices fit one row; the name stays
+   as the button's accessible label and tooltip. */
+function JoinIcon({ j }: { j: 'miter' | 'round' | 'bevel' }) {
+  return <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M3 13 V5 H15" fill="none" stroke="currentColor" strokeWidth="5" strokeLinejoin={j} strokeLinecap="butt" /></svg>;
+}
+function CapIcon({ c }: { c: 'butt' | 'round' | 'square' }) {
+  return <svg width="18" height="14" viewBox="0 0 18 14" aria-hidden="true"><path d="M2 7 H11" fill="none" stroke="currentColor" strokeWidth="7" strokeLinecap={c} /><path d="M2 7 H11" stroke="var(--bg, #000)" strokeWidth="1" /></svg>;
 }

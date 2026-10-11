@@ -96,3 +96,12 @@ function focusField(label: string): void {
   input?.focus();
   input?.select();
 }
+
+/** The tip for the mode in use (review: in edit mode the transform tip no longer applied). */
+export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
+  const e = useShapeEdit.getState().byDoc[doc.id], l = doc.layers.find((x) => x.id === e?.layerId);
+  const s = l?.type === 'vector' ? l.shapes.find((x) => x.id === e?.shapeId) : undefined;
+  return s?.type === 'path'
+    ? { id: 'edit-nodes', text: 'Drag nodes and curve handles · double-click the outline to add a node · Delete removes the picked one · Shift+C/S/Y: cusp, smooth, symmetric · Esc to finish' }
+    : { id: 'edit-shape', text: 'Drag the round handles: corners (Ctrl: both) and blur · double-click a handle for its value · Esc or Done to finish' };
+}

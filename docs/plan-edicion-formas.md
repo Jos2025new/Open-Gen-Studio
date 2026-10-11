@@ -28,7 +28,7 @@ Doble clic en un trazado (polígono, curva, flecha, trazados del agente o conver
 
 ## Qué queda fuera
 
-Nodos suaves y simétricos (hoy todos se comportan como esquina), añadir o borrar nodos y segmentos. Opacidad/fusión de capa entre lienzo y SVG: tarea aparte.
+Hecho después (2026-10-11): tipos de nodo esquina/suave/simétrico (barra, Shift+C/S/Y, `sodipodi:nodetypes`), añadir nodo con doble clic en el contorno y borrar el elegido con Supr; la opacidad y fusión de capa se componen como un grupo SVG. Queda: borrar un nodo ajustando la curva (Inkscape la aproxima; aquí se unen los vecinos con sus manejadores exteriores).
 
 ## Qué no debe romperse
 

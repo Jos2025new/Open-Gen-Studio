@@ -237,3 +237,30 @@ test('layer opacity and blend apply to the layer as a whole, as SVG groups them 
   for (const [k, v] of Object.entries(out) as Array<[string, { n: number; ink: number }]>) expect(v.n, `${k}: canvas and SVG agree`).toBeLessThan(v.ink * 0.01);
   expect(errors).toEqual([]);
 });
+
+test('the tip follows the mode; Join and Cap fit one row in Properties', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  const mid = { x: c.x + c.width * 0.4, y: c.y + c.height * 0.45 };
+  await page.mouse.click(mid.x, mid.y);
+  await expect(page.locator('.stage-hint').filter({ hasText: 'Drag the squares to resize' })).toHaveCount(1);
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(page.locator('.stage-hint').filter({ hasText: 'Drag the squares to resize' })).toHaveCount(0);
+  await expect(page.locator('.stage-hint').filter({ hasText: 'Drag the round handles' })).toHaveCount(1);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  await expect(page.locator('.stage-hint').filter({ hasText: 'Drag nodes and curve handles' })).toHaveCount(1);
+  // Properties: each choice row is one line (icons with their names as labels).
+  const panel = page.getByRole('complementary', { name: 'Layers', exact: true });
+  for (const name of ['Join', 'Cap']) {
+    const g = panel.getByRole('radiogroup', { name, exact: true });
+    await expect(g).toBeVisible();
+    expect((await g.boundingBox())!.height, name).toBeLessThan(40);
+    await expect(g.getByRole('radio')).toHaveCount(3);
+  }
+  await panel.screenshot({ path: `${SHOTS}/properties.png` });
+  expect(errors).toEqual([]);
+});
