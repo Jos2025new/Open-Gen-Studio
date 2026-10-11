@@ -247,3 +247,35 @@ test('Shift+U / Shift+L turn segments between selected nodes into curves / lines
   expect((await shape(page)).d).toContain('C');
   expect(errors).toEqual([]);
 });
+
+test('Shift+J closes an open path at its ends\' midpoint; Alt+J closes it with a segment; one undo each', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  // Replace it with an open path (a U) through the app's own functions.
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string); const P = await import('/src/engine/design/pathNodes.ts' as string);
+    const sid = st.useStore.getState().activeSessionId, d = A.activeDoc(sid), l = d.layers.find((x: any) => x.type === 'vector'), s = l.shapes[0];
+    const segs = P.parseSegs(`M ${s.x} ${s.y} L ${s.x} ${s.y + s.h} L ${s.x + s.w} ${s.y + s.h} L ${s.x + s.w} ${s.y}`);
+    A.patchLayer(sid, d.id, l.id, { shapes: [P.withSegs({ ...s, type: 'path', fill: null, stroke: '#ffffff', strokeWidth: 6, rx: undefined, ry: undefined }, segs)] });
+  });
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.3 + 2, c.y + c.height * 0.45);
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  const s0 = await shape(page);
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Shift+J');
+  await expect(page.locator('rect.path-node')).toHaveCount(3);
+  const s1 = await shape(page);
+  expect(s1.d).toContain('Z');
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(s0.d);
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Alt+j');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  expect((await shape(page)).d).toContain('Z');
+  expect(errors).toEqual([]);
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, segmentsTo, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -199,5 +200,29 @@ describe('segments to line or curve (Shift+L / Shift+U)', () => {
   it('the closing edge of a closed path counts (last and first node selected)', () => {
     const sq = parseSegs('M 0 0 L 9 0 L 9 9 L 0 9 Z');
     expect(serializeSegs(segmentsTo(sq, ['c', 'c', 'c', 'c'], [3, 0], 'curve')!.segs)).toBe('M 0 0 L 9 0 L 9 9 L 0 9 C 0 6 0 3 0 0 Z');
+  });
+});
+
+describe('joining ends (Shift+J / Alt+J)', () => {
+  it('the two ends of one open subpath: Shift+J closes it at their midpoint, handles carried; Alt+J closes it straight', () => {
+    const open = parseSegs('M 0 0 C 0 -5 10 -5 10 0 L 10 10 L 2 10');
+    const j = joinEnds(open, ['s', 'c', 'c', 'c'], [0, 3], 'merge')!;
+    expect(serializeSegs(j.segs)).toBe('M 1 5 C 1 0 10 -5 10 0 L 10 10 L 1 5 Z');
+    expect(j.types).toEqual(['c', 'c', 'c']);
+    expect(j.nodes).toEqual([0]);
+    const s = joinEnds(open, ['s', 'c', 'c', 'c'], [0, 3], 'segment')!;
+    expect(serializeSegs(s.segs)).toBe('M 0 0 C 0 -5 10 -5 10 0 L 10 10 L 2 10 L 0 0 Z');
+  });
+  it('ends of two subpaths become one, reversing as needed; the nearest ends pair up', () => {
+    const two = parseSegs('M 0 0 L 10 0 M 30 0 L 12 0');
+    // End of the first (10,0) and end of the second (12,0): the second is reversed.
+    const j = joinEnds(two, ['c', 'c', 'c', 'c'], [1, 3], 'merge')!;
+    expect(serializeSegs(j.segs)).toBe('M 0 0 L 11 0 L 30 0');
+    expect(j.nodes).toEqual([1]);
+    const s = joinEnds(two, ['c', 'c', 'c', 'c'], [1, 3], 'segment')!;
+    expect(serializeSegs(s.segs)).toBe('M 0 0 L 10 0 L 12 0 L 30 0');
+    // Interior nodes and closed subpaths are not ends; one end alone joins nothing.
+    expect(joinEnds(parseSegs('M 0 0 L 1 0 L 2 0'), ['c', 'c', 'c'], [1, 2], 'merge')).toBeNull();
+    expect(joinEnds(parseSegs('M 0 0 L 9 0 L 9 9 Z'), ['c', 'c', 'c'], [0, 2], 'merge')).toBeNull();
   });
 });

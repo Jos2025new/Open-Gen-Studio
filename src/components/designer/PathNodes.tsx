@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { VectorShape } from '../../engine/types';
-import { segmentsTo, deleteSelectedNodes, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
+import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
+import { joinEnds, segmentsTo, deleteSelectedNodes, insertNode, nearestOnPath } from '../../engine/design/pathNodeOps';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
@@ -51,7 +52,10 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
         patchNodeGroup(sessionId, docId, layerId, shape, selected, b[0] - a[0], b[1] - a[1], types);
         return;
       }
+      // Alt+J: join selected ends with a segment; Shift+J (below): merge them (Inkscape).
+      if (e.altKey && !e.shiftKey && !mod && e.key.toLowerCase() === 'j') { stop(); setJoinEnds(sessionId, docId, layerId, shape, selected, 'segment'); return; }
       if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.toLowerCase() === 'j') { stop(); setJoinEnds(sessionId, docId, layerId, shape, selected, 'merge'); return; }
       // Shift+L / Shift+U: segments to line / curve; taken here so the L and U tool keys never fire.
       const seg = ({ l: 'line', u: 'curve' } as Record<string, 'line' | 'curve'>)[e.key.toLowerCase()];
       if (seg) { stop(); setSegmentsTo(sessionId, docId, layerId, shape, selected, seg); return; }
@@ -194,4 +198,14 @@ export function setSegmentsTo(sessionId: string, docId: string, layerId: string,
   if (!r) return;
   const next = withSegs(shape, r.segs);
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
+}
+
+/** Join selected ends (Shift+J merge, Alt+J segment), one undo step; the joined nodes stay selected. */
+export function setJoinEnds(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], how: 'merge' | 'segment'): void {
+  const segs = pageSegs(shape), r = joinEnds(segs, readTypes(segs, shape.nodeTypes), selected, how);
+  if (!r) return;
+  const next = withSegs(shape, r.segs);
+  patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
+  const edit = useShapeEdit.getState().byDoc[docId];
+  if (edit) setShapeEdit(docId, { ...edit, node: r.nodes[0], nodes: r.nodes });
 }
