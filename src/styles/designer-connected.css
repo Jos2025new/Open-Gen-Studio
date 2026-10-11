@@ -179,6 +179,7 @@
 
 /* Designer: the toolbox lives in the prompt dock (the "+" menu switches it to the prompt box). */
 .composer-tools-bar { flex-wrap: nowrap; align-items: center; min-width: 0; }
+.composer:has(.composer-tools-bar) { width: max-content; max-width: 100%; }
 .composer-tools-bar .designer-palette.is-docked { position: static; flex: 1 1 auto; min-width: 0; max-width: none; }
 .composer-tools-bar .designer-palette.is-docked .tool-rail { width: auto; max-width: 100%; background: transparent; border: 0; box-shadow: none; padding: 0; overflow: visible; }
 .composer-tools-bar .designer-palette.is-docked .icon-btn.is-active::after { top: auto; bottom: -5px; }
@@ -260,13 +261,15 @@
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
 .stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }
 /* Context strip (ContextStrip.tsx): the active tool's essentials above the tool box; lines wrap, nothing scrolls. */
-.composer-tools-bar .designer-palette.is-docked { position: relative; top: auto; left: auto; }
+.composer-tools-bar .designer-palette.is-docked { position: static; top: auto; left: auto; }
+.composer-tools-bar .context-strip { left: 64px; max-width: calc(100% - 84px); }
 /* Not docked, the palette floats at the top of the page: the strip opens below it. */
 .designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }
 .context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
 .context-strip .tool-settings { display: contents; }
 .context-strip .opt { height: var(--control-h); }
-.context-strip .opt.opt-slider { flex: 0 0 auto; width: 150px; }
+.context-strip .opt.opt-slider { flex: 0 0 auto; width: 120px; }
+.context-strip .opt.opt-toggle, .context-strip .opt.opt-choice { flex: 0 0 auto; }
 .context-strip .opt-hint { display: none; }
 .context-target { display: inline-flex; gap: 4px; align-items: baseline; padding: 0 6px 0 2px; font-size: 11px; color: var(--text-2); white-space: nowrap; border-right: 1px solid var(--border-strong); margin-right: 2px; }
 .context-target strong { color: var(--text); font-weight: 600; }
@@ -294,5 +297,5 @@
 .tool-help-close { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--text-3, var(--text-2)); }
 .tool-help-close:hover { color: var(--text); background: var(--surface-3); }
 /* Narrow windows put Conversation above the dock, on the left: the strip aligns right so it never covers it. */
-@media (max-width: 1400px) { .composer-tools-bar .context-strip { left: auto; right: 0; max-width: calc(100% - 230px); } }
+@media (max-width: 1400px) { .composer-tools-bar .context-strip { left: auto; right: 18px; max-width: calc(100% - 314px); } }
 .layer-appearance-title { padding: 0 2px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, var(--text-2)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

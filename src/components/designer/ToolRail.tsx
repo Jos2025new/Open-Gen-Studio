@@ -1,5 +1,5 @@
 import { DraftingCompass, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -52,14 +52,14 @@ export function railTools(): DesignTool[] {
   return RAIL.flatMap((f) => f.items).flatMap((i) => (i === 'group:shapes' ? SHAPES_GROUP.tools.map((t) => t.id) : i === 'group:fill' ? FILL_GROUP.tools.map((t) => t.id) : [i]));
 }
 
-function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: { id: string; icon: LucideIcon; label: string; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }; tool: DesignTool }) {
+function ToolGroup({ group, tool, doc, onSelect }: { doc: DesignDoc; group: { id: string; icon: LucideIcon; label: string; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }; tool: DesignTool; onSelect: (tool: DesignTool) => void }) {
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>
     <IconButton ref={pop.ref} icon={current?.icon ?? group.icon} label={current ? `${group.label} · ${current.label}` : group.label} active={Boolean(current)} aria-pressed={Boolean(current)} aria-haspopup="menu" aria-expanded={pop.open} className="tool-group-btn" onClick={(e) => { if (e.detail < 2) pop.toggle(); }} />
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={190} label={group.label}>
       <div className="menu" role="menu">
-        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label.split(' · ')[0]} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} disabled={!!toolBlockReason(t.id, activeLayer(doc))} tip={toolBlockReason(t.id, activeLayer(doc)) ?? t.label} onClick={() => { setUi({ tool: t.id }); pop.close(); }} />)}
+        {group.tools.map((t) => <MenuItem key={t.id} icon={t.icon} label={t.label.split(' · ')[0]} right={t.key ? <span className="kbd">{t.key}</span> : undefined} active={t.id === tool} disabled={!!toolBlockReason(t.id, activeLayer(doc))} tip={toolBlockReason(t.id, activeLayer(doc)) ?? t.label} onClick={() => { onSelect(t.id); pop.close(); }} />)}
       </div>
     </Popover>
   </>;
@@ -68,13 +68,27 @@ function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: { id: string; 
 export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc; children?: ReactNode }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
+  const rail = useRef<HTMLDivElement>(null);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { setHidden(false); }, [tool, doc.id]);
+  useEffect(() => {
+    // Auxiliary menus replace the strip; its own fields and drawing on the canvas keep it open.
+    const onClick = (e: MouseEvent) => {
+      const target = e.target instanceof Element ? e.target : null;
+      const palette = rail.current?.closest('.composer-tools-bar') ?? rail.current?.closest('.designer-palette');
+      if (target?.closest('button') && palette?.contains(target) && !target.closest('.context-strip, [data-design-tool]')) setHidden(true);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, []);
+  const select = (id: DesignTool) => { setHidden(false); setUi({ tool: id }); };
   const button = (id: DesignTool) => {
     const t = TOOLS.find((t) => t.id === id)!;
     const reason = toolBlockReason(id, activeLayer(doc));
-    return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} disabled={!!reason} data-tip={reason ?? t.label} onClick={() => setUi({ tool: id })} />;
+    return <IconButton key={id} icon={t.icon} label={t.label} active={tool === id} aria-pressed={tool === id} aria-expanded={tool === id && id !== 'hand' && !hidden} disabled={!!reason} data-design-tool={id} data-tip={reason ?? t.label} onClick={() => { if (tool === id) setHidden((v) => !v); else select(id); }} />;
   };
-  const item = (i: RailItem) => (i === 'group:shapes' ? <ToolGroup key={i} doc={doc} group={SHAPES_GROUP} tool={tool} /> : i === 'group:fill' ? <ToolGroup key={i} doc={doc} group={FILL_GROUP} tool={tool} /> : button(i));
-  return <><ContextStrip sessionId={sessionId} doc={doc} /><div className="tool-rail" role="toolbar" aria-label="Design tools">
+  const item = (i: RailItem) => (i === 'group:shapes' ? <ToolGroup key={i} doc={doc} group={SHAPES_GROUP} tool={tool} onSelect={select} /> : i === 'group:fill' ? <ToolGroup key={i} doc={doc} group={FILL_GROUP} tool={tool} onSelect={select} /> : button(i));
+  return <>{!hidden && <ContextStrip sessionId={sessionId} doc={doc} />}<div ref={rail} className="tool-rail" role="toolbar" aria-label="Design tools">
     <div className="palette-fixed">
       {RAIL.map((f) => <div key={f.family} className="tool-family" role="group" aria-label={f.family}>
         {f.items.map(item)}
