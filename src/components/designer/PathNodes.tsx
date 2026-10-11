@@ -47,8 +47,9 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
           const sc = { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top };
           const near = (q: NodePoint) => { const c = scr(q.at); return Math.hypot(c.x - sc.x, c.y - sc.y); };
           const nodes = pts.filter((q) => q.kind === 'node' && near(q) <= 8).sort((a, b) => near(a) - near(b));
-          // Only nodes on the very same spot cycle (not ones merely as far from the pointer).
-          const at0 = nodes[0] && scr(nodes[0].at), same = nodes.filter((q) => { const c = scr(q.at); return Math.hypot(c.x - at0.x, c.y - at0.y) < 0.5; });
+          // Same spot in the path's own geometry (paths keep 2 decimals), not on screen: at low zoom distinct nodes
+          // can share a screen pixel and must not cycle (review of f8d15c2).
+          const at0 = nodes[0]?.at, same = nodes.filter((q) => at0 && Math.hypot(q.at[0] - at0[0], q.at[1] - at0[1]) < 0.01);
           const key = same.map((q) => q.seg).join(',');
           turn.current = { at: key, i: turn.current.at === key ? (turn.current.i + 1) % Math.max(1, same.length) : 0 };
           drag.current = { pt: same[turn.current.i] ?? p, base: segs, shape, from: page(e), moved: false };
