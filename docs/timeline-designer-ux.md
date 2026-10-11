@@ -37,3 +37,9 @@ Registro breve que iremos ampliando en este chat. Worktree `ogs-ux`, rama `task/
 - **Usuario:** pidió hacer commit de todo y dividirlo en cambios por propósito.
 - **Resultado:** `7c750fb` guarda los menús y la barra del Designer con sus tests; `7fc400b` guarda la conexión de proveedores, sus menús compactos, tests y contrato compartido. Cada commit incluye su mapa de código. Este timeline y su enlace en el índice quedan en un tercer commit documental.
 - **Verificación:** misma implementación ya comprobada: 1089 tests aprobados, 5 omitidos, typecheck y salvaguardas correctos. Sin ramas nuevas, fusión ni publicación remota. El enlace local de dependencias `node_modules` queda fuera de los commits.
+
+## 2026-10-11 — Formas al estilo de Inkscape
+
+- **Usuario:** tiradores de esquina, ajustes de forma y de trazo y blur «como en Inkscape»; luego «solucionar todo» como software profesional, sin reinventar.
+- **Cambio:** esquinas Rx/Ry con tiradores, estilo de trazo, blur; un clic transforma y doble clic edita; formas giradas que siguen siendo formas; nodos de trazados y «Convert to path». Fórmulas leídas del código de Inkscape.
+- **Evidencia:** 16 commits (`523dd35` → `2949201`), cada corrección de GPT con su e2e; 1 119 tests y 6 e2e de formas aprobados. Detalle, por commit: [historial 024](history/024-2026-10-W41.md).
