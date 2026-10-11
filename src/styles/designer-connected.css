@@ -305,4 +305,6 @@
 .shape-knot-lines line { stroke: var(--accent); stroke-width: 1; }
 .context-mode { font-weight: 600; color: var(--accent); padding: 0 6px; }
 .path-node.is-picked { fill: var(--accent); }
-.path-outline { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; }
+.path-nodes .node-marquee-hit { fill: transparent; pointer-events: all; }
+.path-nodes .node-marquee { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.path-outline { fill: none; stroke: transparent; stroke-width: 12; pointer-events: none; }

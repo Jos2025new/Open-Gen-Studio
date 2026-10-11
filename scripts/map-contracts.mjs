@@ -160,6 +160,7 @@ export default [
     sides: [
       ['src/engine/shortcuts.ts', 'export function shortcutGroups'],
       ['src/components/designer/DesignerWorkspace.tsx', 'DESIGN_TOOL_KEYS[e.key.toLowerCase()]'],
+      ['src/components/designer/PathNodes.tsx', 'marqueeNodeSelection'],
       ['src/components/shell/SettingsPanel.tsx', 'shortcutGroups()'],
       ['README.md', '<!-- shortcuts:start -->'],
     ],

@@ -58,7 +58,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
     </div> : selectedShape ? <div className="tool-settings" role="group" aria-label={editing ? 'Editing shape' : 'Selected shape'}>
       {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}
       {editing ? <>
-        <span className="context-mode" data-tip={isPath ? 'Drag the square nodes and round curve handles; Esc or Done to leave' : 'Drag the round handles; Esc or Done to leave'}>{isPath ? 'Editing nodes' : 'Editing shape'}</span>
+        <span className="context-mode" data-tip={isPath ? 'Shift-click to toggle nodes, drag a selected node to move the group; Esc clears selection, then exits' : 'Drag the round handles; Esc or Done to leave'}>{isPath ? 'Editing nodes' : 'Editing shape'}</span>
         <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}

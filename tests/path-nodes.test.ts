@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { deleteNode, fitCubic, insertNode, moveNodePoint, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -10,6 +10,34 @@ const path = (d: string, o: Partial<ShapeSpec> = {}): ShapeSpec => ({ type: 'pat
 function withBox(d: string) { const s = withSegs({ type: 'path', x: 0, y: 0, w: 1, h: 1, fill: null, stroke: null, strokeWidth: 0, radius: 0 } as ShapeSpec, parseSegs(d)); return { box0: s.box0, x: s.x, y: s.y, w: s.w, h: s.h }; }
 
 describe('path nodes', () => {
+  it('selects nodes by toggle and applies add, outside-select and inside-remove marquee modes', () => {
+    expect(toggleNodeSelection([0, 2], 1)).toEqual([0, 1, 2]);
+    expect(toggleNodeSelection([0, 1, 2], 1)).toEqual([0, 2]);
+    const pts: [number, number][] = [[0, 0], [10, 0], [20, 0], [30, 0]];
+    const box = { left: 5, top: -1, right: 25, bottom: 1 };
+    expect(marqueeNodeSelection([], pts, box, { shift: false, ctrl: false })).toEqual([1, 2]);
+    expect(marqueeNodeSelection([0], pts, box, { shift: true, ctrl: false })).toEqual([0, 1, 2]);
+    expect(marqueeNodeSelection([], pts, box, { shift: false, ctrl: true })).toEqual([0, 3]);
+    expect(marqueeNodeSelection([0, 1, 2, 3], pts, box, { shift: true, ctrl: true })).toEqual([0, 3]);
+  });
+
+  it('moves the selected group from its original geometry and writes one translated set of nodes', () => {
+    const segs = parseSegs('M 0 0 C 0 10 10 10 10 0 L 20 0');
+    const moved = moveSelectedNodes(segs, [0, 1, 2], 3, -2, ['c', 'c', 'c']);
+    expect(serializeSegs(moved)).toBe('M 3 -2 C 3 8 13 8 13 -2 L 23 -2');
+    expect(serializeSegs(segs)).toBe('M 0 0 C 0 10 10 10 10 0 L 20 0');
+  });
+
+  it('deletes selected nodes in index-safe order and returns the remapped node types once', () => {
+    const segs = parseSegs('M 0 0 L 10 0 L 20 0 L 30 0');
+    const result = deleteSelectedNodes(segs, ['c', 's', 'z', 'c'], [1, 3]);
+    expect(result).not.toBeNull();
+    expect(serializeSegs(result!.segs)).toBe('M 0 0 L 20 0');
+    expect(result!.types).toEqual(['c', 'z']);
+    expect(deleteSelectedNodes(segs, ['c', 'c', 'c', 'c'], [])).toBeNull();
+    const siblings = parseSegs('M 0 0 L 10 0 M 20 0 L 30 0 M 40 0 L 50 0');
+    expect(serializeSegs(deleteSelectedNodes(siblings, ['c', 'c', 'c', 'c', 'c', 'c'], [2, 3])!.segs)).toBe('M 0 0 L 10 0 M 40 0 L 50 0');
+  });
   it('S, Q and T become the same cubics (Inkscape edits every curve as cubic): each end gets its own handle', () => {
     expect(serializeSegs(parseSegs('M 0 0 C 0 10 10 10 10 0 S 20 -10 20 0'))).toBe('M 0 0 C 0 10 10 10 10 0 C 10 -10 20 -10 20 0');
     expect(serializeSegs(parseSegs('M 0 0 Q 6 9 12 0 T 24 0'))).toBe('M 0 0 C 4 6 8 6 12 0 C 16 -6 20 -6 24 0');

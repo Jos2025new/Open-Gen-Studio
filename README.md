@@ -197,9 +197,13 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Alt (while moving) | Move without snapping |
 | Alt + drag (Lineart) | Bend a stroke |
 | Double-click (Edit) | Edit a shape's handles or a path's nodes; Esc to finish |
+| Shift-click / Shift-drag (nodes) | Toggle a node / add nodes with a marquee; Ctrl-drag selects outside; Ctrl+Shift-drag removes inside |
+| Mod+A (nodes) | Select every path node |
+| Arrow keys (nodes) | Move selected nodes 2 document px; Shift: 20 px; Alt: 1 screen px |
+| Esc (nodes) | Clear selected nodes; Esc again finishes editing |
 | Ctrl + drag a corner handle | Both corner radii together |
 | Shift+C / Shift+S / Shift+Y (nodes) | Cusp, smooth or symmetric node |
-| Delete / Ctrl+Delete (nodes) | Delete the picked node keeping the shape / joining straight |
+| Delete / Ctrl+Delete (nodes) | Delete selected nodes keeping the shape / joining straight |
 
 **Sketch**
 

@@ -33,7 +33,9 @@ test('Convert to path, then edit its nodes (Inkscape Node tool): one undo per dr
   await page.screenshot({ path: `${SHOTS}/nodes.png` });
   await page.keyboard.press('Control+z');
   expect((await shape(page)).d).toBe(s0.d);
-  // Esc leaves; double-click on the path shows its nodes again.
+  // Esc clears the node selection, then exits; double-click on the path shows its nodes again.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
   await page.keyboard.press('Escape');
   await expect(page.locator('rect.path-node')).toHaveCount(0);
   await page.mouse.dblclick(mid.x, mid.y);

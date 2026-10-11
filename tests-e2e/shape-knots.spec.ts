@@ -252,7 +252,7 @@ test('the tip follows the mode; Join and Cap fit one row in Properties', async (
   await expect(page.locator('.stage-hint').filter({ hasText: 'Drag the squares to resize' })).toHaveCount(0);
   await expect(page.locator('.stage-hint').filter({ hasText: 'Drag the round handles' })).toHaveCount(1);
   await strip(page).getByRole('button', { name: 'Convert to path' }).click();
-  await expect(page.locator('.stage-hint').filter({ hasText: 'Drag nodes and curve handles' })).toHaveCount(1);
+  await expect(page.locator('.stage-hint').filter({ hasText: 'Shift-click adds nodes' })).toHaveCount(1);
   // Properties: each choice row is one line (icons with their names as labels).
   const panel = page.getByRole('complementary', { name: 'Layers', exact: true });
   for (const name of ['Join', 'Cap']) {

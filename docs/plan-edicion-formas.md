@@ -44,8 +44,8 @@ Fuente: código de Inkscape en el commit [21f4270](https://gitlab.com/inkscape/i
 
 | Función | Inkscape | Aquí | Fuente |
 | --- | --- | --- | --- |
-| Selección múltiple | Clic elige; Shift+clic alterna; arrastre en vacío = rectángulo (Ctrl añade); Ctrl+A todos; Esc vacía la selección y, si ya está vacía, sale | `node` pasa a `nodes: number[]`; mismos gestos. El rectángulo, solo dentro del modo edición | keys.xml 2757–2793 (doc); node-tool.cpp 516–531, 821–825 |
-| Mover varios | Arrastrar uno mueve todos los elegidos; flechas: 2 px, Shift ×10, Alt 1 px de pantalla | Igual, un deshacer por gesto | keys.xml 2971 (doc); control-point-selection.cpp 533–546 |
+| Selección múltiple | Clic elige; Shift+clic alterna; arrastre en vacío = rectángulo (Shift añade, Ctrl elige fuera, Ctrl+Shift resta dentro); Ctrl+A todos; Esc vacía la selección y, si ya está vacía, sale | `nodes: number[]`; los gestos de rectángulo solo viven dentro del modo de edición | keys.xml 2757–2793 (doc); node-tool.cpp 516–531, 734–765, 821–825 |
+| Mover varios | Arrastrar uno mueve todos los elegidos; flechas: 2 px, Shift 20 px, Alt 1 px de pantalla | Una operación de geometría por tecla; un deshacer por arrastre | keys.xml 2971 (doc); control-point-selection.cpp 533–546 |
 | Unir nodos (Shift+J) | Solo extremos, emparejados por cercanía; nodo en el punto medio; conserva el manejador de entrada de uno y el de salida del otro; queda de esquina; mismo subtrazado → se cierra; dos → se unen | Igual. Sin parejas: no hace nada (Inkscape suelda nodos contiguos; queda fuera) | multi-path-manipulator.cpp 57–79, 386–426 |
 | Unir con segmento (Alt+J) | Mismas parejas; recta entre ellos, que quedan de esquina | Igual | 457–475 |
 | Romper (Shift+B) | Cada nodo interior elegido se parte en dos extremos coincidentes; uno se lleva el manejador de entrada; los dos de esquina; en un subtrazado cerrado, lo abre por ahí | Igual | path-manipulator.cpp 646–676 |
@@ -116,3 +116,7 @@ GPT 6.1 contrastó cada fila con Inkscape en `21f4270`, y GPT 6 Luna revisó el 
 - **Índices:** insertar, borrar, unir y romper rehacen los índices elegidos junto con la geometría y los tipos. No hacen falta identificadores persistentes por nodo.
 
 **Orden:** se mantiene, pero el commit 1 resuelve por completo selección, prioridad de eventos, rehacer los índices y deshacer, antes que las operaciones que cambian la estructura del trazado.
+
+### Commit 1 implementado: selección y atajos
+
+Clic y Shift+clic, rectángulo con sus modificadores, arrastre del grupo desde la geometría inicial, Ctrl+A, flechas y Esc en dos pasos. Supr se consume aun sin nodos elegidos; los campos conservan sus teclas. Las flechas respetan el giro de la forma. Deshacer/rehacer conserva la selección en movimientos; si cambia el número de nodos, limpia los índices para evitar elegir otro nodo por accidente, también desde los botones de la barra. La selección es temporal, sin cambios al formato del documento. Pruebas: `tests/path-nodes.test.ts` y `tests-e2e/node-selection.spec.ts`. Recta/curva, unir y romper siguen pendientes.

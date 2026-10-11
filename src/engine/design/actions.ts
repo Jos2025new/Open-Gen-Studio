@@ -6,8 +6,9 @@ import { addAssets, patchSession, setDoc, setUi, toast, useStore } from '../../s
 import * as D from './doc';
 import { record, undo, redo, dropHistory } from './history';
 import { useLayerSelection } from './selection';
-import { objectPick, setObjectPick } from './objectSelection';
+import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from './objectSelection';
 import { layerObjects } from './objectOps';
+import { nodeSegs, pageSegs } from './pathNodes';
 import { composeRaster, rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer } from './raster';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { drawDoc, exportDoc, layoutText, textAscent } from './render';
@@ -325,14 +326,26 @@ export function undoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const prev = undo(doc);
-  if (prev) (setDoc(sessionId, docId, () => prev), prunePicks(prev));
+  if (prev) (setDoc(sessionId, docId, () => prev), prunePicks(prev), pruneNodePick(doc, prev));
 }
 
 export function redoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const next = redo(doc);
-  if (next) (setDoc(sessionId, docId, () => next), prunePicks(next));
+  if (next) (setDoc(sessionId, docId, () => next), prunePicks(next), pruneNodePick(doc, next));
+}
+
+/** Geometry-only undo keeps node identity; topology changes clear indices that may name a different node. */
+function pruneNodePick(before: DesignDoc, after: DesignDoc): void {
+  const edit = useShapeEdit.getState().byDoc[after.id];
+  if (!edit) return;
+  const count = (d: DesignDoc) => {
+    const l = d.layers.find((x) => x.id === edit.layerId);
+    const shape = l?.type === 'vector' ? l.shapes.find((x) => x.id === edit.shapeId) : undefined;
+    return shape?.type === 'path' ? nodeSegs(pageSegs(shape)).seg.length : null;
+  };
+  if (count(before) !== count(after)) setShapeEdit(after.id, { ...edit, node: undefined, nodes: [] });
 }
 
 /** After undo/redo the picks keep only what the restored document still has (a stale pick moved or deleted ghosts). */

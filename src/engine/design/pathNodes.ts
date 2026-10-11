@@ -14,6 +14,48 @@ export interface Seg { c: 'M' | 'L' | 'C' | 'Z'; p: Pt[] }
 /** A draggable point: a node (segment end) or a handle (control point `k` of segment `seg`). */
 export interface NodePoint { kind: 'node' | 'handle'; seg: number; k: number; at: Pt; /** handle: the node it hangs from */ from?: Pt }
 
+/** Toggle a node in the current selection, keeping a stable drawing order. */
+export function toggleNodeSelection(selected: number[], node: number): number[] {
+  return selected.includes(node) ? selected.filter((n) => n !== node) : [...selected, node].sort((a, b) => a - b);
+}
+
+/** Apply a node-tool marquee. Ctrl selects outside; Shift adds; Ctrl+Shift removes. */
+export function marqueeNodeSelection(selected: number[], nodes: Pt[], bounds: { left: number; top: number; right: number; bottom: number }, mods: { shift: boolean; ctrl: boolean }): number[] {
+  const inside = nodes.flatMap(([x, y], i) => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom ? [i] : []);
+  if (mods.ctrl && mods.shift) return selected.filter((n) => !inside.includes(n));
+  const hits = mods.ctrl ? nodes.map((_, i) => i).filter((i) => !inside.includes(i)) : inside;
+  if (mods.shift) return [...new Set([...selected, ...hits])].sort((a, b) => a - b);
+  return hits;
+}
+
+/** Move a group from its original geometry; callers write the resulting shape once per pointer frame. */
+export function moveSelectedNodes(segs: Seg[], selected: number[], dx: number, dy: number, types?: NodeType[]): Seg[] {
+  const indices = nodeSegs(segs).seg;
+  return [...new Set(selected)].sort((a, b) => a - b).reduce((out, n) => {
+    const seg = indices[n];
+    return seg == null ? out : moveNodePoint(out, { kind: 'node', seg, k: segs[seg]?.c === 'M' ? 0 : segs[seg]?.p.length - 1 }, dx, dy, types);
+  }, segs);
+}
+
+/** Delete the picked nodes as one geometry change; a path's final node and its type are preserved by deleteNode. */
+export function deleteSelectedNodes(segs: Seg[], types: NodeType[], selected: number[], mode: 'auto' | 'line' = 'auto'): { segs: Seg[]; types: NodeType[] } | null {
+  let out = segs, nextTypes = types, origins = nodeSegs(segs).seg.map((_, i) => i);
+  for (const original of [...new Set(selected)].sort((a, b) => b - a)) {
+    const n = origins.indexOf(original);
+    if (n < 0) continue;
+    const subpath = nodeSegs(out).subpaths.find((sp) => n >= sp.from && n < sp.to);
+    const changed = deleteNode(out, nextTypes, n, mode);
+    if (changed) {
+      const removed = subpath && subpath.to - subpath.from <= 2
+        ? new Set(origins.slice(subpath.from, subpath.to))
+        : new Set([original]);
+      origins = origins.filter((id) => !removed.has(id));
+      out = changed.segs; nextTypes = changed.types;
+    }
+  }
+  return out === segs ? null : { segs: out, types: nextTypes };
+}
+
 const ARGS: Record<string, number> = { M: 2, L: 2, T: 2, C: 6, S: 4, Q: 4, Z: 0 };
 
 export function parseSegs(d: string): Seg[] {

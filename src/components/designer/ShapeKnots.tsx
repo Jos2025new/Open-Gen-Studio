@@ -27,11 +27,11 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   const drag = useRef<{ knot: Knot; layerId: string; shape: VectorShape; from: [number, number]; at: [number, number]; moved: boolean } | null>(null);
   const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse' || picked.shape.type === 'path');
   useEffect(() => {
-    if (!editing) return;
+    if (!editing || picked?.shape.type === 'path') return;
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) setShapeEdit(doc.id, null); };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [editing, doc.id]);
+  }, [editing, doc.id, picked?.shape.type]);
   if (!picked || !editing) return null;
   // A path edits its nodes (Inkscape's Node tool); rectangles and ellipses their own knots.
   if (picked.shape.type === 'path') return <PathNodes view={view} sessionId={sessionId} docId={doc.id} layerId={picked.layerId} shape={picked.shape} />;
@@ -102,6 +102,6 @@ export function shapeEditHint(doc: DesignDoc): { id: string; text: string } {
   const e = useShapeEdit.getState().byDoc[doc.id], l = doc.layers.find((x) => x.id === e?.layerId);
   const s = l?.type === 'vector' ? l.shapes.find((x) => x.id === e?.shapeId) : undefined;
   return s?.type === 'path'
-    ? { id: 'edit-nodes', text: 'Drag nodes and curve handles · double-click the outline to add a node · Delete removes the picked one keeping the shape (Ctrl+Delete: straight) · Shift+C/S/Y: cusp, smooth, symmetric · Esc to finish' }
+    ? { id: 'edit-nodes', text: 'Shift-click adds nodes · drag in empty space to select · drag a selected node to move the group · arrows move 2 px (Shift 20, Alt 1 screen px) · Delete removes selected nodes · Esc clears, then exits' }
     : { id: 'edit-shape', text: 'Drag the round handles: corners (Ctrl: both) and blur · double-click a handle for its value · Esc or Done to finish' };
 }
