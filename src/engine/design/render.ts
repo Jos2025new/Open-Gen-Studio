@@ -264,7 +264,9 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
       const m = ctx.getTransform(), px = Math.hypot(m.a, m.b) * (l.width / Math.max(1, buf.width));
       ctx.imageSmoothingEnabled = px < PIXEL_VIEW_FROM;
       ctx.imageSmoothingQuality = 'high';
+      const end = span('raster', 'draw', { pixels: buf.width * buf.height });
       ctx.drawImage(buf, l.x, l.y, l.width, l.height);
+      end();
     }
   } else if (l.type === 'vector') {
     const paint = (c: CanvasRenderingContext2D) => { l.shapes.forEach(s => drawShape(c, s)); l.strokes?.forEach(s => drawStroke(c, s)); };

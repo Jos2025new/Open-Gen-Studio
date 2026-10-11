@@ -1,3 +1,4 @@
+import { span } from '../../lib/trace';
 import { logged } from '../../lib/log';
 import { blobDb } from '../../lib/idb';
 import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
@@ -69,17 +70,21 @@ export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = 
 }
 
 export function restoreBuffers(map: Map<string, HTMLCanvasElement>): void {
+  const end = span('raster', 'restore', { buffers: map.size, copiedPixels: 0 });
   for (const [id, c] of map) {
     buffers.set(id, c);
     touchBuffer(c);
     schedulePersist(id);
   }
   notify();
+  end();
 }
 
 export function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
+  const end = span('raster', 'clone', { pixels: src.width * src.height });
   const c = createCanvas(src.width, src.height);
   ctx2d(c).drawImage(src, 0, 0);
+  end();
   return c;
 }
 
@@ -204,6 +209,8 @@ export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity:
 
 export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
   touchBuffer(buf);
+  const end = span('raster', 'live');
+  try {
   // A segment starts at the previous width: its box covers the wider of the two.
   const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
   if (live.tip) {
@@ -242,6 +249,7 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
   ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
   ctx.restore();
   layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
+  } finally { end(); }
 }
 
 /**
@@ -280,10 +288,12 @@ export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: r
 export function composeRaster(layer: RasterLayer, persist = true): boolean {
   const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
   if (!base) return false;
+  const end = span('raster', 'compose', { strokes: layer.paintStrokes?.length ?? 0, pixels: base.width * base.height });
   const canvas = cloneCanvas(base);
   const ctx = ctx2d(canvas);
   for (const stroke of layer.paintStrokes ?? []) drawRasterStroke(ctx, stroke);
   setBuffer(layer.id, canvas, persist);
+  end();
   return true;
 }
 

@@ -1,3 +1,4 @@
+import { span } from '../../lib/trace';
 import type { DesignDoc } from '../types';
 import { rasterBufferIds, restoreBuffers, snapshotBuffers } from './raster';
 import { getSelection, setSelection, type PixelSelection } from './pixelSelection';
@@ -41,8 +42,11 @@ function restorePicks(docId: string, snap: Snapshot): void {
 }
 
 function capture(doc: DesignDoc): Snapshot {
+  const end = span('history', 'capture', { layers: doc.layers.length });
   const rasterIds = rasterBufferIds(doc.layers);
-  return { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
+  const snap = { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
+  end({ buffers: snap.buffers.size, copiedPixels: 0 });
+  return snap;
 }
 
 /** Record the state *before* a change. */
