@@ -305,11 +305,12 @@ export default [
     what: 'ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment).',
     sides: [
       ['src/engine/design/brushEngine.ts', 'export function stampSegment'],
+      ['src/engine/design/rasterStrokeMask.ts', 'stampSegment(img'],
       ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last)'],
-      ['src/engine/design/raster.ts', 'stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ?'],
+      ['src/engine/design/raster.ts', 'rasterStrokeMask(stroke, tip)'],
       ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ??'],
     ],
-    tests: ['tests/brush-engine.test.ts'],
+    tests: ['tests/brush-engine.test.ts', 'tests/raster-stroke-mask.test.ts'],
   },
   {
     id: 'fx-editor-cache',

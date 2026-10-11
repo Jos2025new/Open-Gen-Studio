@@ -1,3 +1,4 @@
+import { rasterStrokeMask } from './rasterStrokeMask';
 import { span } from '../../lib/trace';
 import { logged } from '../../lib/log';
 import { blobDb } from '../../lib/idb';
@@ -129,12 +130,7 @@ export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterSt
 /** A stroke with a brush tip (brushEngine.ts): its mask built the same way as while it was painted, laid once. */
 function drawTipStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke, tip: BrushTip): void {
   if (!stroke.segments.length) return;
-  const boxes = stroke.segments.map(segmentBox);
-  const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
-  const w = Math.max(...boxes.map((b) => b.x + b.w)) - x, h = Math.max(...boxes.map((b) => b.y + b.h)) - y;
-  const mask = createCanvas(w, h), m = ctx2d(mask), img = m.createImageData(mask.width, mask.height), rgb = hexRgb(stroke.color);
-  stroke.segments.forEach((seg, i) => stampSegment(img, x, y, seg, tip.densities?.[i] ?? 1, tip, rgb, i ? { width: stroke.segments[i - 1][4], density: tip.densities?.[i - 1] ?? 1 } : undefined));
-  m.putImageData(img, 0, 0);
+  const { canvas: mask, x, y } = rasterStrokeMask(stroke, tip);
   layMask(ctx, mask, 0, 0, x + stroke.x, y + stroke.y, mask.width, mask.height, tip, stroke.opacity, stroke.erase);
 }
 

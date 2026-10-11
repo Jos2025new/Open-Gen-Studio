@@ -104,3 +104,41 @@ test('raster workload: group move, undo/redo pixels, long painting and 4K single
   expect(errors).toEqual([]);
   console.log(JSON.stringify({ traceId, cases: cases.length, pixelProof: 'all undo/redo channels exact' }));
 });
+
+test('warm raster replay creates no canvas per saved stroke; cached coverage equals a fresh replay', async ({ page }) => {
+  await setup(page);
+  const result = await page.evaluate(async () => {
+    const R = await import('/src/engine/design/raster.ts' as string), D = await import('/src/engine/design/doc.ts' as string), B = await import('/src/engine/design/brushStroke.ts' as string);
+    const l = D.newRasterLayer('coverage', { x: 0, y: 0, width: 512, height: 384 }, { width: 512, height: 384 });
+    l.paintBaseId = `${l.id}-base`;
+    const base = document.createElement('canvas'); base.width = 512; base.height = 384;
+    const ctx = base.getContext('2d')!; ctx.fillStyle = '#336699'; ctx.fillRect(0, 0, 300, 384);
+    R.setBuffer(l.paintBaseId, base, false);
+    l.paintStrokes = Array.from({ length: 50 }, (_, i) => {
+      const s = B.newBrushStroke({ color: i % 2 ? '#ff8040' : '#80ccff', opacity: .6, size: 18, hardness: .4, texture: i % 3 ? 'none' : 'paper', textureStrength: .7, pressureDensity: true, keepOpacity: i % 4 === 0, blend: i % 5 === 0 ? 'multiply' : 'normal' }, i % 7 === 0);
+      for (let j = 0; j < 12; j++) { s.segments.push([30 + j * 30, 30 + i * 5, 60 + j * 30, 30 + i * 5 + Math.sin(j) * 8, 18]); s.tip!.densities!.push(.3 + (j % 4) / 4); }
+      return s;
+    });
+    R.composeRaster(l, false);
+    const moved = { ...l, paintStrokes: l.paintStrokes.map((s: any) => ({ ...s, x: 13.25, y: -7.5 })) };
+    let canvases = 0;
+    const original = document.createElement;
+    document.createElement = function(tag: string, opts?: any) { if (tag === 'canvas') canvases++; return original.call(document, tag, opts); } as any;
+    try { R.composeRaster(moved, false); } finally { document.createElement = original; }
+    // Compare all channels, with translations, pressure density, texture, brush blend, Keep Opacity and erasers.
+    const cached = R.getBuffer(l.id)!.getContext('2d')!.getImageData(0, 0, 512, 384).data;
+    const fresh = { ...moved, paintStrokes: moved.paintStrokes.map((s: any) => ({ ...s, segments: s.segments.map((seg: any) => [...seg]) })) };
+    R.composeRaster(fresh, false);
+    const expected = R.getBuffer(l.id)!.getContext('2d')!.getImageData(0, 0, 512, 384).data;
+    let differences = 0; for (let i = 0; i < expected.length; i++) if (cached[i] !== expected[i]) differences++;
+    await R.flushRaster();
+    const DB = await import('/src/lib/idb.ts' as string); R.commitEdit(l.id); await R.flushRaster();
+    const blob = await DB.blobDb.get(`raster:${l.id}`);
+    return { canvases, differences, saved: !!blob?.size };
+  });
+  // Replay may allocate destination/Keep Opacity surfaces, but never regenerate fifty coverage masks.
+  expect(result.canvases).toBeLessThan(50);
+  expect(result.differences).toBe(0);
+  expect(result.saved).toBe(true);
+  console.log(JSON.stringify({ cacheRegression: result }));
+});

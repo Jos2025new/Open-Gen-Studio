@@ -43,7 +43,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **render-attribution** — Cada paso FX lleva el renderId y origen de su compositor; el porcentaje del editor excluye todos los renders fuera de pantalla. | [renderTrace.ts](../src/lib/renderTrace.ts), [render.ts](../src/engine/design/render.ts), [canvas.ts](../src/engine/fx/canvas.ts), [op.ts](../src/engine/fx/op.ts), [fill.ts](../src/engine/design/fill.ts), [swatches.ts](../src/engine/design/swatches.ts), [pixelSelection.ts](../src/engine/design/pixelSelection.ts), [canvasView.ts](../src/engine/agent/canvasView.ts), [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx), [trace-report.mjs](../scripts/trace-report.mjs), [depuracion.md](../docs/depuracion.md) | [fx-render.test.ts](../tests/fx-render.test.ts), [trace.test.ts](../tests/trace.test.ts) |
 | **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
 | **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
-| **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts) |
+| **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts) |
 | **fx-editor-cache** — 2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan. | [render.ts](../src/engine/design/render.ts), [raster.ts](../src/engine/design/raster.ts) | [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts) | [persist-json.test.ts](../tests/persist-json.test.ts) |
 
@@ -53,10 +53,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 148 | 92 |
+| [types.ts](../src/engine/types.ts) | 149 | 93 |
 | [store.ts](../src/store/store.ts) | 98 | 88 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
-| [media.ts](../src/lib/media.ts) | 34 | 24 |
+| [media.ts](../src/lib/media.ts) | 35 | 25 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [actions.ts](../src/engine/design/actions.ts) | 28 | 11 |
@@ -87,18 +87,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 12 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 118 |
+| `src/engine` | 30 | 119 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 47 | 40 |
+| `src/engine/design` | 48 | 41 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 17 | 114 |
+| `src/lib` | 17 | 115 |
 | `src/store` | 2 | 89 |
 
-97 de 235 módulos no tienen ningún test que los importe directamente.
+97 de 236 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
