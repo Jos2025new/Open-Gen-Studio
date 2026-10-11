@@ -14,7 +14,7 @@ import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPress
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots } from './ShapeKnots';
-import { cornerRadii, traceRoundRect } from '../../engine/design/shapeLook';
+import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
@@ -27,7 +27,7 @@ import { pathBox, toolPath } from '../../engine/design/shapeTools';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
 import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/design/matrix';
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
-import { objectPick, pickObject, setObjectPick, useObjectSelection } from '../../engine/design/objectSelection';
+import { editShape, objectPick, pickObject, setObjectPick, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { layerObjects, objectAt, objectsBox, translateObjects } from '../../engine/design/objectOps';
 import { combineSelection, getSelection, selectionClipFor, rectPoints, selectionPath, setSelection, useSelectionVersion, wandSelection, type SelectCombine } from '../../engine/design/pixelSelection';
 import { startPixelMove, type PixelMove } from '../../engine/design/pixelMove';
@@ -215,6 +215,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   // Picked strokes of one raster layer (Ctrl-click adds more of the same layer in Objects mode).
   // Objects picked inside a layer (Edit, Objects mode): shared, so Align and Transform in the bar act on them.
   const objPick = useObjectSelection((st) => st.byDoc[doc.id]);
+  // Shape edit mode (ShapeKnots): the shape's own knots instead of the transform handles.
+  const shapeEditing = !!useShapeEdit((st) => st.byDoc[doc.id]);
   const selectMode = useStore((s) => s.ui.selectMode ?? 'objects');
   /** Edit acts on whole layers (Layer mode) instead of the objects inside them. */
   const editLayers = selectMode === 'layers';
@@ -273,9 +275,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const tBox = targets.length ? targetsBox(targets) : null;
   const targetSig = targets.map((t) => `${t.layer.id}:${t.ids?.join(',') ?? '*'}`).join('|');
   // A new selection starts with the scale handles and its own center.
-  useEffect(() => { setHandleMode('scale'); setPivot(null); }, [targetSig]);
+  useEffect(() => { setHandleMode('scale'); setPivot(null); }, [targetSig, shapeEditing]);
   const pivotAt = tBox ? pivot ?? { x: tBox.x + tBox.w / 2, y: tBox.y + tBox.h / 2 } : null;
-  const handles = tBox && pivotAt ? boxHandles(tBox, handleMode, pivotAt) : [];
+  const handles = tBox && pivotAt && !shapeEditing ? boxHandles(tBox, handleMode, pivotAt) : [];
 
   // Load pixels of raster layers after a reload.
   useEffect(() => {
@@ -1295,6 +1297,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       return;
     }
     const hit = hitTest(doc, p.x, p.y);
+    // A rectangle or ellipse: its edit mode (docs/plan-edicion-formas.md); Edit → Layer moves whole layers only.
+    const sh = hit?.type === 'vector' && !hit.locked && !editLayers ? editableShapeAt(hit.shapes, p.x, p.y) : null;
+    if (sh) { setActiveLayer(sessionId, doc.id, hit!.id); editShape(doc.id, hit!.id, sh.id); return; }
     if (hit?.type === 'text' && !hit.locked) {
       setActiveLayer(sessionId, doc.id, hit.id);
       setEditingText(hit.id);

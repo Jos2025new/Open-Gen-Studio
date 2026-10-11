@@ -1,51 +1,50 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { DesignDoc, VectorShape } from '../../engine/types';
-import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, rectBox, stepClear, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
+import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
 import { getDoc } from '../../engine/design/actions';
+import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
 
 /*
- * Inkscape's shape knots on the one picked shape (Edit → Objects): two round corner knots on a rectangle (Rx on the
- * top edge, Ry on the right edge; Ctrl: equal, Ctrl-click: copy, Shift-click: sharp) and, on a blurred shape, two
- * blur knots out from the top and right edges. One undo step per drag. Formulas: engine/design/shapeLook.ts.
+ * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
+ * knots and the transform handles hide (Stage). Rectangle: Rx on the top edge, Ry on the right edge (Ctrl: equal,
+ * Ctrl-click: copy, Shift-click: sharp, double-click: its exact value in the bar). Rectangle and ellipse: two blur
+ * knots out from the top and right edges, also at 0 so blur can start on the canvas. One undo step per drag.
+ * Esc leaves the mode. Formulas: engine/design/shapeLook.ts.
  */
 type Knot = 'rx' | 'ry' | 'top' | 'right';
-const NUDGE = 10; // screen px: a zero-radius knot sits beside the corner, so the corner's scale handle stays reachable
-const CLEAR = 18; // screen px between a corner knot and any scale/rotate handle
-const BLUR_GAP = 20; // screen px from the edge: clear of the side scale handle and its pick tolerance
+const NUDGE = 10; // screen px: a zero radius knot sits beside the corner, so Rx and Ry never share one spot
+const BLUR_GAP = 20; // screen px from the edge, so the blur knots stay apart from the corner knots
 
 export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
+  const edit = useShapeEdit((st) => st.byDoc[doc.id]);
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<{ knot: Knot; layerId: string; shape: VectorShape; from: [number, number]; at: [number, number]; moved: boolean } | null>(null);
-  if (!picked) return null;
+  const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse');
+  useEffect(() => {
+    if (!editing) return;
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) setShapeEdit(doc.id, null); };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [editing, doc.id]);
+  if (!picked || !editing) return null;
   const s = picked.shape, rect = s.type === 'rect';
   const scr = (p: [number, number]) => documentToScreen({ x: p[0], y: p[1] }, view, { left: 0, top: 0 });
   const page = (e: { clientX: number; clientY: number }) => screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect());
-  const ck = rect ? cornerKnots(s) : null, bk = s.blur ? blurKnots(s) : null;
+  const ck = rect ? cornerKnots(s) : null, bk = blurKnots(s);
   const knots: Array<{ knot: Knot; p: [number, number]; dx?: number; dy?: number; tip: string }> = [];
   if (ck) {
     const r = cornerRadii(s), near = (v: number) => v * view.zoom < NUDGE;
-    knots.push({ knot: 'rx', p: ck.rx, dx: near(r.rx) ? -NUDGE : 0, tip: 'Horizontal corner radius · Ctrl: both equal · Ctrl-click: copy to the other · Shift-click: sharp corners' });
-    knots.push({ knot: 'ry', p: ck.ry, dy: near(r.ry) ? NUDGE : 0, tip: 'Vertical corner radius · Ctrl: both equal · Ctrl-click: copy to the other · Shift-click: sharp corners' });
+    const tip = ' corner radius · Ctrl: both equal · Ctrl-click: copy to the other · Shift-click: sharp corners · double-click: exact value';
+    knots.push({ knot: 'rx', p: ck.rx, dx: near(r.rx) ? -NUDGE : 0, tip: `Horizontal${tip}` });
+    knots.push({ knot: 'ry', p: ck.ry, dy: near(r.ry) ? NUDGE : 0, tip: `Vertical${tip}` });
   }
-  if (bk) {
-    // Never on top of the side scale handles: at least BLUR_GAP screen px out (the drag stays relative).
-    const out = Math.max(0, BLUR_GAP - BLUR_MARGIN * s.blur! * view.zoom);
-    knots.push({ knot: 'top', p: bk.top, dy: -out, tip: 'Blur · drag out for more' });
-    knots.push({ knot: 'right', p: bk.right, dx: out, tip: 'Blur · drag out for more' });
-  }
-  // A corner knot never sits on a scale or rotate handle (small shapes on screen): it steps out of the box,
-  // Rx up and Ry right, until clear. Only where it is drawn changes; the drag stays relative.
-  if (ck) {
-    const b = rectBox(s), hs = [0, 0.5, 1].flatMap((fx) => [0, 0.5, 1].map((fy) => scr([b.x + b.w * fx, b.y + b.h * fy])));
-    for (const k of knots) {
-      if (k.knot !== 'rx' && k.knot !== 'ry') continue;
-      const c = scr(k.p), [dx, dy] = stepClear({ x: c.x + (k.dx ?? 0), y: c.y + (k.dy ?? 0) }, hs, k.knot === 'rx' ? [0, -1] : [1, 0], CLEAR);
-      k.dx = (k.dx ?? 0) + dx; k.dy = (k.dy ?? 0) + dy;
-    }
-  }
+  // At least BLUR_GAP screen px out (the drag stays relative, so the value never jumps).
+  const out = Math.max(0, BLUR_GAP - BLUR_MARGIN * (s.blur ?? 0) * view.zoom);
+  knots.push({ knot: 'top', p: bk.top, dy: -out, tip: 'Blur · drag out for more, in for less' });
+  knots.push({ knot: 'right', p: bk.right, dx: out, tip: 'Blur · drag out for more, in for less' });
   const move = (e: React.PointerEvent) => {
     const d = drag.current;
     if (!d) return;
@@ -63,7 +62,7 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     if (patch) patchShape(sessionId, doc.id, d.layerId, d.shape.id, patch);
   };
   return <svg ref={ref} className="stroke-ruler shape-knots" aria-label="Shape handles">
-    {bk && <g className="shape-knot-lines">
+    {<g className="shape-knot-lines">
       {knots.filter((k) => k.knot === 'top' || k.knot === 'right').map((k) => { const A = scr(k.knot === 'top' ? bk.edgeTop : bk.edgeRight), B = scr(k.p); return <line key={k.knot} x1={A.x} y1={A.y} x2={B.x + (k.dx ?? 0)} y2={B.y + (k.dy ?? 0)} />; })}
     </g>}
     {knots.map((k) => { const c = scr(k.p); return <circle key={k.knot} className="stroke-ruler-handle shape-knot" data-knot={k.knot} data-tip={k.tip} cx={c.x + (k.dx ?? 0)} cy={c.y + (k.dy ?? 0)} r={5}
@@ -77,6 +76,14 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
         const q = page(e);
         drag.current = { knot: k.knot, layerId: picked.layerId, shape, from: [q.x, q.y], at: k.p, moved: false };
       }}
-      onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; }} />; })}
+      onPointerMove={move} onPointerUp={up} onPointerCancel={() => { drag.current = null; }}
+      onDoubleClick={(e) => { e.stopPropagation(); focusField(k.knot === 'rx' ? 'Rx' : k.knot === 'ry' ? 'Ry' : 'Blur'); }} />; })}
   </svg>;
+}
+
+/** The bar's exact-value field for a knot, focused and selected (Illustrator: double-click a widget for its value). */
+function focusField(label: string): void {
+  const input = document.querySelector<HTMLInputElement>(`.context-strip input[aria-label="${label} value"]`);
+  input?.focus();
+  input?.select();
 }

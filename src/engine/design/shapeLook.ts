@@ -84,11 +84,13 @@ export function clickKnot(s: ShapeSpec, knot: 'rx' | 'ry', mods: { shift: boolea
   return { rx: r, ry: r };
 }
 
-/** How far (screen px) to step a knot drawn at `at` along `dir` so it is `clear` px from every handle (≤ 4 steps). */
-export function stepClear(at: { x: number; y: number }, handles: Array<{ x: number; y: number }>, dir: [number, number], clear: number): [number, number] {
-  let dx = 0, dy = 0;
-  for (let i = 0; i < 4 && handles.some((h) => Math.hypot(h.x - at.x - dx, h.y - at.y - dy) < clear); i++) { dx += (dir[0] * clear) / 2; dy += (dir[1] * clear) / 2; }
-  return [dx, dy];
+/** The topmost rectangle or ellipse of a vector layer under a page point (the shapes that have an edit mode). */
+export function editableShapeAt<T extends ShapeSpec>(shapes: T[], x: number, y: number): T | null {
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    const s = shapes[i], b = rectBox(s);
+    if ((s.type === 'rect' || s.type === 'ellipse') && x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return s;
+  }
+  return null;
 }
 
 /** Blur % (Inkscape's slider) to σ in px, and back. */

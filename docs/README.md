@@ -9,6 +9,7 @@
 - [Depurar y medir](depuracion.md): registro de rendimiento (Ctrl+Alt+P), marcadores, informe, sondas y pruebas de una sola pieza.
 - [Fusión de task/agent-forcing](fusion-agent-forcing.md): comparación con modelo-general y decisiones que no deben revertirse.
 - [Catálogo de voz y efectos](catalogo-voz-y-efectos.md): modelos de texto a voz y efectos de Atlas y NanoGPT, precios por 1000 caracteres y propuesta (2026-10-08).
+- [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
 - [Formas al estilo de Inkscape](inkscape-formas.md): fórmulas de esquinas, trazo y desenfoque, con la línea exacta del código de Inkscape y las diferencias deliberadas.
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
 - Cada ficha de feature enlaza comportamiento, código y test; «sin test» marca falta de cobertura directa.

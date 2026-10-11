@@ -9,7 +9,9 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineToggle } from './InlineControls';
-import { patchShape, ShapeLookFields, usePickedShape } from './ShapeLookFields';
+import { patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
+import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
+import { useEffect } from 'react';
 
 /*
  * The contextual strip above the tool box (docs/plan-designer-ux.md, step 1): the active tool's essential controls,
@@ -32,12 +34,16 @@ export function editTarget(doc: DesignDoc, tool: string): string | null {
 export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const tool = useStore((s) => s.ui.tool);
   const ruler = useStore((s) => s.ui.strokeRuler);
+  const picked = usePickedShape(doc), edit = useShapeEdit((st) => st.byDoc[doc.id]);
+  // Another tool leaves shape edit mode (docs/plan-edicion-formas.md).
+  useEffect(() => { if (tool !== 'move') setShapeEdit(doc.id, null); }, [tool, doc.id]);
   if (tool === 'hand') return null;
   const target = editTarget(doc, tool);
   const active = activeLayer(doc);
   const selectedText = tool === 'text' && active?.type === 'text' ? active : null;
   const pageRuler = ruler && ruler.docId === doc.id ? ruler : null;
-  const picked = usePickedShape(doc), selectedShape = tool === 'move' && !selectedText ? picked : null;
+  const selectedShape = tool === 'move' && !selectedText ? picked : null;
+  const editing = !!selectedShape && edit?.shapeId === selectedShape.shape.id;
   return <div className="context-strip" role="toolbar" aria-label={`${TOOL_NAMES[tool]} quick settings`}>
     <span className="context-target" data-tip="What the next action changes">
       <strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}
@@ -45,8 +51,17 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
     {/* With a text layer selected, the fields change that text, not the settings for the next one. */}
     {selectedText ? <div className="tool-settings" role="group" aria-label="Selected text">
       <TextStyleFields value={selectedText} compact onChange={(p) => { if (!selectedText.locked) patchLayer(sessionId, doc.id, selectedText.id, p as Partial<Layer>); }} />
-    </div> : selectedShape ? <div className="tool-settings" role="group" aria-label="Selected shape">
-      <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
+    </div> : selectedShape ? <div className="tool-settings" role="group" aria-label={editing ? 'Editing shape' : 'Selected shape'}>
+      {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}
+      {editing ? <>
+        <span className="context-mode" data-tip="Drag the round handles; Esc or Done to leave">Editing shape</span>
+        <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
+        <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
+        <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
+      </> : <>
+        <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
+        {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse') && <button type="button" className="opt" data-tip="Corner radius and blur handles (or double-click the shape)" onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>Edit shape</button>}
+      </>}
     </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
     <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>

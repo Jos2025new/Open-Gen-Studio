@@ -41,16 +41,23 @@ async function dragKnot(page: Page, k: string, dx: number, dy: number, mod?: 'Co
   if (mod) await page.keyboard.up(mod);
 }
 
-test('rectangle: corner knots, sharp corners, blur from the strip and its knots, one undo per drag', async ({ page }) => {
+test('rectangle: one click transforms, double-click edits (corner and blur knots), one undo per drag, Done and Esc leave', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
   await page.keyboard.press('r');
   await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
   await page.mouse.move(c.x + c.width * 0.6, c.y + c.height * 0.7, { steps: 6 }); await page.mouse.up();
   await page.keyboard.press('v');
-  await page.mouse.click(c.x + c.width * 0.45, c.y + c.height * 0.5);
-  await expect(knot(page, 'rx')).toBeVisible();
-  await expect(knot(page, 'ry')).toBeVisible();
+  const mid = { x: c.x + c.width * 0.45, y: c.y + c.height * 0.5 };
+  // One click: the shape is picked for moving and transforming; no corner or blur knots (docs/plan-edicion-formas.md).
+  await page.mouse.click(mid.x, mid.y);
+  await expect(strip(page).getByRole('button', { name: 'Edit shape' })).toBeVisible();
+  await expect(knot(page, 'rx')).toHaveCount(0);
+  // Double-click: edit mode, with its own knots (blur knots too, at 0) and its label.
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(strip(page)).toContainText('Editing shape');
+  for (const k of ['rx', 'ry', 'top', 'right']) await expect(knot(page, k)).toBeVisible();
+  await expect(strip(page).getByRole('slider', { name: 'W', exact: true })).toBeVisible();
   const s0 = await shape(page);
 
   // Rx: dragging left along the top edge rounds the corners; Ry, unset, follows it (Inkscape).
@@ -89,10 +96,38 @@ test('rectangle: corner knots, sharp corners, blur from the strip and its knots,
   expect((await shape(page)).blur).toBeGreaterThan(s4.blur);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${SHOTS}/blur.png` });
-  // A small blur keeps its knots clear of the side scale handles (at least 20 screen px out from the edge).
-  await strip(page).getByRole('slider', { name: 'Blur', exact: true }).fill('3');
-  const len = await page.locator('.shape-knot-lines line').evaluateAll((ls) => ls.map((l: any) => Math.hypot(l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)));
-  expect(Math.min(...len)).toBeGreaterThanOrEqual(19.5);
+  // Double-click a corner knot: its exact value is ready to type in the bar.
+  await knot(page, 'rx').dblclick();
+  await expect(strip(page).getByRole('spinbutton', { name: 'Rx value' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  // Done leaves edit mode; double-click again and Esc leaves too. The shape stays picked, the knots go.
+  await strip(page).getByRole('button', { name: 'Done' }).click();
+  await expect(knot(page, 'rx')).toHaveCount(0);
+  await expect(strip(page).getByRole('button', { name: 'Edit shape' })).toBeVisible();
+  await strip(page).getByRole('button', { name: 'Edit shape' }).click();
+  await expect(knot(page, 'rx')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(knot(page, 'rx')).toHaveCount(0);
+  // A click on empty canvas leaves it too.
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(knot(page, 'rx')).toBeVisible();
+  await page.mouse.click(c.x + c.width * 0.9, c.y + c.height * 0.2);
+  await expect(knot(page, 'rx')).toHaveCount(0);
+  await page.mouse.dblclick(mid.x, mid.y);
+  await expect(knot(page, 'rx')).toBeVisible();
+  // A tiny shape on screen: Rx and Ry never share a spot, and the blur knots stay 20 px out.
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string);
+    const sid = st.useStore.getState().activeSessionId, d = A.activeDoc(sid), l = d.layers.find((x: any) => x.type === 'vector');
+    A.patchLayer(sid, d.id, l.id, { shapes: l.shapes.map((x: any) => ({ ...x, w: 6, h: 4, rx: 0, ry: 0, blur: 0 })) });
+  });
+  const at = async (k: string) => { const b = (await knot(page, k).boundingBox())!; return [b.x + b.width / 2, b.y + b.height / 2]; };
+  const [rx, ry] = [await at('rx'), await at('ry')];
+  expect(Math.hypot(rx[0] - ry[0], rx[1] - ry[1])).toBeGreaterThanOrEqual(10);
+  const tiny = await page.locator('.shape-knot-lines line').evaluateAll((ls) => ls.map((l: any) => Math.hypot(l.x2.baseVal.value - l.x1.baseVal.value, l.y2.baseVal.value - l.y1.baseVal.value)));
+  expect(Math.min(...tiny)).toBeGreaterThanOrEqual(19.5);
+  await page.screenshot({ path: `${SHOTS}/tiny.png` });
+  await page.keyboard.press('Escape');
   expect(errors).toEqual([]);
 });
 

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
-import type { DesignDoc, Layer, OpId } from '../../engine/types';
+import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayers, duplicateLayer, mergeDown, moveLayer, rasterizeLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
@@ -274,7 +274,16 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
             <StrokeStyleFields value={targets[targets.length - 1]} onChange={(p) => patch({ strokes: layer.strokes!.map((st) => (ids.has(st.id) ? { ...st, ...p } : st)) })} />
           </>;
         })() : null}
-        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill } : x) })} /></Field><Field label="Stroke"><InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field><ShapeLookFields value={s} corners={s.type === 'rect'} blur onChange={(p) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, ...p } : x) })} /></div>)}</>}
+        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && (() => {
+          // A shape picked with Edit: only its section, so its fields fit without scrolling (docs/plan-edicion-formas.md).
+          const pickedShapes = objPick?.layerId === layer.id ? layer.shapes.filter((s) => objPick.ids.includes(s.id)) : [];
+          const set = (id: string, p: Partial<VectorShape>) => patch({ shapes: layer.shapes.map((x) => (x.id === id ? { ...x, ...p } : x)) });
+          return <><p className="muted">{pickedShapes.length ? `Picked shape ${pickedShapes.length === 1 ? '' : `(${pickedShapes.length}) `}of ${layer.shapes.length}.` : `${layer.shapes.length} shapes · draw on the canvas to add more.`}</p>{(pickedShapes.length ? pickedShapes : layer.shapes).map((s) => <div className="shape-properties" key={s.id}><strong>{s.type} {layer.shapes.indexOf(s) + 1}</strong>
+            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} />
+            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => set(s.id, { stroke })} />
+            <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
+            <ShapeLookFields value={s} corners={s.type === 'rect'} blur onChange={(p) => set(s.id, p)} /></div>)}</>;
+        })()}
       </fieldset>
       </details>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>

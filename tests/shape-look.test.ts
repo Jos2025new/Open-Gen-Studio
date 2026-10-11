@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { stepClear, blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
+import { editableShapeAt, blurFilterSvg, blurRegion, strokeReach, SHARP, blurKnots, blurPercent, blurSigma, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy, roundRectPath, scaleLook, strokeLookSvg } from '../src/engine/design/shapeLook';
 import { scaleLayer } from '../src/engine/design/doc';
 import { transformShape } from '../src/engine/design/affine';
 import { shapeSvg } from '../src/engine/design/export';
@@ -69,14 +69,13 @@ describe('corner radii', () => {
   });
 });
 
-describe('knots stay clear of the scale handles', () => {
-  it('a knot on a handle steps out along its direction until 18 px clear; a clear one stays', () => {
-    const hs = [{ x: 100, y: 50 }, { x: 60, y: 50 }];
-    expect(stepClear({ x: 95, y: 50 }, hs, [0, -1], 18)).toEqual([0, -18]);
-    expect(stepClear({ x: 100, y: 50 }, hs, [1, 0], 18)).toEqual([18, 0]);
-    expect(stepClear({ x: 80, y: 20 }, hs, [0, -1], 18)).toEqual([0, 0]);
-    // A tiny shape: all handles within a few px; at most four steps out (36 px), never further.
-    expect(stepClear({ x: 0, y: 0 }, [{ x: 0, y: 0 }, { x: 0, y: -9 }, { x: 0, y: -18 }, { x: 0, y: -27 }, { x: 0, y: -36 }], [0, -1], 18)).toEqual([0, -36]);
+describe('shape edit mode', () => {
+  it('double-click finds the topmost rectangle or ellipse under the point; paths and lines have no edit mode', () => {
+    const shapes = [{ ...rect(), id: 'a' }, { ...rect({ type: 'ellipse', x: 50 }), id: 'b' }, { ...rect({ type: 'path', x: 0, y: 0, w: 500, h: 500 }), id: 'c' }];
+    expect(editableShapeAt(shapes, 60, 40)?.id).toBe('b');
+    expect(editableShapeAt(shapes, 20, 40)?.id).toBe('a');
+    expect(editableShapeAt(shapes, 400, 400)).toBeNull();
+    expect(editableShapeAt([{ ...rect({ x: 110, y: 80, w: -100, h: -60 }), id: 'n' }], 20, 30)?.id).toBe('n');
   });
 });
 

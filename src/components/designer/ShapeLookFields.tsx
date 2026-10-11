@@ -56,3 +56,12 @@ export function patchShape(sessionId: string, docId: string, layerId: string, sh
   if (!l || l.type !== 'vector') return;
   patchLayer(sessionId, docId, layerId, { shapes: l.shapes.map((s) => (s.id === shapeId ? { ...s, ...patch } : s)) }, opts);
 }
+
+/** Width and height of a shape in edit mode (Inkscape's W/H next to Rx/Ry); the top-left corner stays put. */
+export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionId: string; docId: string; layerId: string; shape: VectorShape }) {
+  const set = (key: 'w' | 'h', v: number) => patchShape(sessionId, docId, layerId, shape.id, { [key]: (shape[key] < 0 ? -1 : 1) * Math.max(1, v) });
+  return <>
+    <InlineSlider label="W" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.w)))} allowManualOverflow value={Math.round(Math.abs(shape.w) * 10) / 10} onChange={(v) => set('w', v)} />
+    <InlineSlider label="H" unit="px" min={1} max={Math.max(4000, Math.ceil(Math.abs(shape.h)))} allowManualOverflow value={Math.round(Math.abs(shape.h) * 10) / 10} onChange={(v) => set('h', v)} />
+  </>;
+}
