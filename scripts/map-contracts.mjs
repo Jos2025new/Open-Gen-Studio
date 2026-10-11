@@ -6,6 +6,16 @@
  */
 export default [
   {
+    id: 'provider-key-ui',
+    what: 'Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores.',
+    sides: [
+      ['src/components/shell/SettingsPanel.tsx', 'export function ProviderRow'],
+      ['src/components/shell/SettingsPanel.tsx', '<ProviderRow key={p} id={p} />'],
+      ['src/components/shell/ConnectedProviders.tsx', '<ProviderRow key={p} id={p} autoFocus />'],
+    ],
+    tests: ['tests/connected-providers.test.ts'],
+  },
+  {
     id: 'guided-asks',
     what: 'Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas.',
     sides: [

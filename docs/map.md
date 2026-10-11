@@ -14,6 +14,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **provider-key-ui** — Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores. | [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [ConnectedProviders.tsx](../src/components/shell/ConnectedProviders.tsx) | [connected-providers.test.ts](../tests/connected-providers.test.ts) |
 | **guided-asks** — Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas. | [context.ts](../src/engine/agent/context.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-mode.test.ts](../tests/agent-mode.test.ts) |
 | **direct-guides** — Direct no tiene tarjeta de ajustes: las guías de los modelos del compositor llegan con la petición. | [context.ts](../src/engine/agent/context.ts), [requestGuides.ts](../src/engine/agent/requestGuides.ts) | [agent-direct-model.test.ts](../tests/agent-direct-model.test.ts) |
 | **settings-policy** — Qué pasos necesitan la tarjeta de ajustes: el texto para el agente y la puerta del runtime. | [procedure.ts](../src/engine/procedure.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [general-model-gate.test.ts](../tests/general-model-gate.test.ts), [agent-force.test.ts](../tests/agent-force.test.ts) |
@@ -52,22 +53,22 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 140 | 90 |
-| [store.ts](../src/store/store.ts) | 97 | 87 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 43 | 0 |
+| [types.ts](../src/engine/types.ts) | 142 | 90 |
+| [store.ts](../src/store/store.ts) | 97 | 88 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [actions.ts](../src/engine/design/actions.ts) | 25 | 11 |
 | [doc.ts](../src/engine/design/doc.ts) | 25 | 19 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
-| [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |
+| [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [raster.ts](../src/engine/design/raster.ts) | 22 | 5 |
-| [types.ts](../src/engine/providers/types.ts) | 21 | 5 |
+| [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 105 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 106 |
 | [render.ts](../src/engine/design/render.ts) | 16 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
@@ -84,20 +85,20 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 20 | 3 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
-| `src/components/shell` | 11 | 0 |
+| `src/components/shell` | 12 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 28 | 114 |
+| `src/engine` | 28 | 115 |
 | `src/engine/agent` | 19 | 54 |
 | `src/engine/design` | 43 | 38 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/providers` | 13 | 36 |
+| `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 17 | 112 |
-| `src/store` | 2 | 88 |
+| `src/lib` | 17 | 113 |
+| `src/store` | 2 | 89 |
 
-93 de 225 módulos no tienen ningún test que los importe directamente.
+93 de 226 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -122,11 +123,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [NodeWorkspace.tsx](../src/components/node/NodeWorkspace.tsx)
 - [Operations.tsx](../src/components/node/Operations.tsx)
 - [nodes.tsx](../src/components/node/nodes.tsx)
-- [DataSummary.tsx](../src/components/shell/DataSummary.tsx)
 - [GenerationsPanel.tsx](../src/components/shell/GenerationsPanel.tsx)
 - [ProviderPool.tsx](../src/components/shell/ProviderPool.tsx)
 - [SessionsPanel.tsx](../src/components/shell/SessionsPanel.tsx)
-- [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx)
 - [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
 - [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)

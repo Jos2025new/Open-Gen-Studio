@@ -17,7 +17,7 @@ import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
 import { shortcutGroups } from '../../engine/shortcuts';
 
-function ProviderRow({ id }: { id: RemoteProviderId }) {
+export function ProviderRow({ id, autoFocus = false }: { id: RemoteProviderId; autoFocus?: boolean }) {
   const saved = useStore((s) => s.settings.keys[id]);
   const status = useStore((s) => s.catalog.status[id]);
   const error = useStore((s) => s.catalog.errors[id]);
@@ -58,6 +58,7 @@ function ProviderRow({ id }: { id: RemoteProviderId }) {
           placeholder="API key"
           spellCheck={false}
           autoComplete="off"
+          autoFocus={autoFocus}
           onChange={(e) => setValue(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => e.key === 'Enter' && commit()}

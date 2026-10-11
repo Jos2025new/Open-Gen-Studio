@@ -8,7 +8,8 @@ import { useSessionMatcher } from './SessionsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { GenerationsPanel } from './GenerationsPanel';
 import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
-import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { ConnectedProviders } from './ConnectedProviders';
+import type { RemoteProviderId } from '../../engine/types';
 import { IconButton } from '../ui/primitives';
 import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
 
@@ -37,8 +38,10 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const settingsRef = useRef<HTMLButtonElement>(null);
   const workspacePop = usePopover();
   const connectedPop = usePopover();
+  const [addedProviders, setAddedProviders] = useState<RemoteProviderId[]>([]);
   const generationsPop = usePopover();
   const connected = REMOTE_PROVIDERS.filter((p) => keys[p]?.trim());
+  const shownProviders = [...new Set([...addedProviders, ...connected])];
 
   useEffect(() => {
     if (!editing) setDraft(title);
@@ -92,11 +95,8 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         <button type="button" ref={generationsPop.ref} className={`topbar-menu ${generationsPop.open ? 'is-open' : ''}`} aria-expanded={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }}>Generations</button>
         <IconButton ref={settingsRef} icon={Settings} label="Settings" active={settingsOpen} aria-expanded={settingsOpen} onClick={() => { connectedPop.close(); generationsPop.close(); setUi((u) => ({ settingsOpen: !u.settingsOpen })); }} />
       </div>
-      <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={220} label="Connected providers">
-        <div className="pool-details">
-          {connected.map((p) => <div key={p} className="pool-row">{PROVIDER_LABELS[p]}</div>)}
-          {!connected.length ? <div className="pool-row faint">No providers connected</div> : null}
-        </div>
+      <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={shownProviders.length ? 340 : 180} label="Connected providers" className="provider-connections-popover">
+        <ConnectedProviders providers={shownProviders} onAdd={(p) => setAddedProviders((prev) => prev.includes(p) ? prev : [...prev, p])} />
       </Popover>
       <Popover open={generationsPop.open} anchor={generationsPop.ref} onClose={generationsPop.close} width={680} label="Generations" className="generations-popover">
         <GenerationsPanel onClose={generationsPop.close} />
