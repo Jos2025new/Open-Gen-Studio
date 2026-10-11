@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
 import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
-import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
+import { breakNodes, deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -224,5 +224,22 @@ describe('joining ends (Shift+J / Alt+J)', () => {
     // Interior nodes and closed subpaths are not ends; one end alone joins nothing.
     expect(joinEnds(parseSegs('M 0 0 L 1 0 L 2 0'), ['c', 'c', 'c'], [1, 2], 'merge')).toBeNull();
     expect(joinEnds(parseSegs('M 0 0 L 9 0 L 9 9 Z'), ['c', 'c', 'c'], [0, 2], 'merge')).toBeNull();
+  });
+});
+
+describe('breaking nodes (Shift+B)', () => {
+  it('an interior node splits an open path into two at coincident nodes, both cusp; ends stay', () => {
+    const r = breakNodes(parseSegs('M 0 0 C 0 5 5 5 5 0 L 10 0'), ['c', 's', 'c'], [1])!;
+    expect(serializeSegs(r.segs)).toBe('M 0 0 C 0 5 5 5 5 0 M 5 0 L 10 0');
+    expect(r.types).toEqual(['c', 'c', 'c', 'c']);
+    expect(r.nodes).toEqual([2]);
+    expect(breakNodes(parseSegs('M 0 0 L 10 0'), ['c', 'c'], [0, 1])).toBeNull();
+  });
+  it('a closed path opens at the selected node; a second selected node splits it further', () => {
+    const sq = parseSegs('M 0 0 L 9 0 L 9 9 L 0 9 Z');
+    expect(serializeSegs(breakNodes(sq, ['c', 'c', 'c', 'c'], [2])!.segs)).toBe('M 9 9 L 0 9 L 0 0 L 9 0 L 9 9');
+    const two = breakNodes(sq, ['c', 'c', 'c', 'c'], [2, 0])!;
+    expect(serializeSegs(two.segs)).toBe('M 0 0 L 9 0 L 9 9 M 9 9 L 0 9 L 0 0');
+    expect(two.types).toHaveLength(6);
   });
 });

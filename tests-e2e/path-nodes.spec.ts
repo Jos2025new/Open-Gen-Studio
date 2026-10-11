@@ -279,3 +279,33 @@ test('Shift+J closes an open path at its ends\' midpoint; Alt+J closes it with a
   expect((await shape(page)).d).toContain('Z');
   expect(errors).toEqual([]);
 });
+
+test('Shift+B opens a closed path at the selected node (two coincident ends); Shift+J joins them back; the B tool key does not fire', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.4, c.y + c.height * 0.45);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  const s0 = await shape(page);
+  const n = (await page.locator('rect.path-node').nth(2).boundingBox())!;
+  await page.mouse.click(n.x + n.width / 2, n.y + n.height / 2);
+  await page.keyboard.press('Shift+B');
+  const s1 = await shape(page);
+  expect(s1.d).not.toContain('Z');
+  await expect(page.locator('rect.path-node')).toHaveCount(5);
+  await expect(strip(page)).toContainText('Editing nodes');
+  // Select both ends again and join: closed, four nodes, same outline box.
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Shift+J');
+  await expect(page.locator('rect.path-node')).toHaveCount(4);
+  const s2 = await shape(page);
+  expect(s2.d).toContain('Z');
+  for (const k of ['x', 'y', 'w', 'h'] as const) expect(Math.abs(s2[k] - s0[k]), k).toBeLessThan(0.01);
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(s0.d);
+  expect(errors).toEqual([]);
+});

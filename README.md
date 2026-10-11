@@ -205,6 +205,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Shift+C / Shift+S / Shift+Y (nodes) | Cusp, smooth or symmetric node |
 | Shift+L / Shift+U (nodes) | Segments between selected nodes to line / curve |
 | Shift+J / Alt+J (nodes) | Join selected end nodes / join them with a segment |
+| Shift+B (nodes) | Break the path at the selected nodes |
 | Delete / Ctrl+Delete (nodes) | Delete selected nodes keeping the shape / joining straight |
 
 **Sketch**

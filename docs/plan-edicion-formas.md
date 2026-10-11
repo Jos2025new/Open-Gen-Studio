@@ -92,6 +92,8 @@ Fuente: código de [SVG-Edit](https://github.com/SVG-Edit/svgedit) en el commit 
 - Que SVG-Edit no tenga Ctrl+A de nodos, flechas para nodos, unir ni romper se dedujo de lo que Haiku leyó; esas citas no bastan para afirmarlo.
 - Lo confirmado en los dos editores: clic, Shift+clic, rectángulo, arrastre múltiple, controles a un tercio y subdivisión con De Casteljau.
 
+**Hecho (2026-10-11):** selección y atajos (`383e7be`), recta y curva (`46886fb`), unir (`4768d07`) y romper; detalle en el [historial 024](history/024-2026-10-W41.md). Pendiente: borrar segmento como botón y soldar nodos contiguos con Shift+J.
+
 **Orden de los commits** (sustituye al anterior):
 1. Selección y atajos.
 2. Recta y curva.

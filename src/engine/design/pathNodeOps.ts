@@ -344,3 +344,44 @@ function shiftNode(s: Sub, j: number, to: Pt): void {
   if (kout >= 0 && s.edges[kout].c === 'C') s.edges[kout] = { ...s.edges[kout], c1: [s.edges[kout].c1![0] + dx, s.edges[kout].c1![1] + dy] };
   s.nodes[j] = to;
 }
+
+/**
+ * Break the path at the selected nodes (Inkscape Shift+B, path-manipulator.cpp L646–676): an interior node of an open
+ * subpath splits it into two, ending and starting at two coincident nodes (one keeps the curve in, the other the
+ * curve out), both cusp; on a closed subpath the first selected node opens it there. Ends of open subpaths stay as
+ * they are. Returns the new geometry and, selected, the starting node of each new piece. Null if nothing breaks.
+ */
+export function breakNodes(segs: Seg[], types: NodeType[], selected: number[]): { segs: Seg[]; types: NodeType[]; nodes: number[] } | null {
+  const plain = toSubs(segs), sel = new Set(selected);
+  const out: TSub[] = [], starts: TSub[] = [];
+  let changed = false;
+  plain.forEach((s0, si) => {
+    const base = globalIndex(plain, si, 0);
+    let s: TSub = { ...s0, nodes: [...s0.nodes], edges: [...s0.edges], types: types.slice(base, base + s0.nodes.length) };
+    let picks = s.nodes.map((_, j) => j).filter((j) => sel.has(base + j));
+    if (s.closed && picks.length && s.nodes.length >= 2) {
+      // Open it at the first selected node: that node starts and (as a coincident copy) ends the subpath.
+      const j0 = picks[0], m = s.nodes.length;
+      const order = s.nodes.map((_, k) => (j0 + k) % m);
+      s = { nodes: [...order.map((k) => s.nodes[k]), s.nodes[j0]], edges: order.map((k) => s.edges[k]), closed: false, types: [...order.map((k) => s.types[k]), 'c'] };
+      s.types[0] = 'c';
+      picks = picks.slice(1).map((j) => (j - j0 + m) % m);
+      changed = true;
+      starts.push(s);
+    }
+    // Interior picks split it, from the last one back so earlier indices hold.
+    const pieces: TSub[] = [];
+    let rest = s;
+    for (const j of picks.filter((j) => j > 0 && j < rest.nodes.length - 1).sort((a, b) => b - a)) {
+      const tail: TSub = { nodes: rest.nodes.slice(j), edges: rest.edges.slice(j), closed: false, types: ['c', ...rest.types.slice(j + 1)] };
+      rest = { nodes: rest.nodes.slice(0, j + 1), edges: rest.edges.slice(0, j), closed: false, types: [...rest.types.slice(0, j), 'c'] };
+      pieces.unshift(tail);
+      starts.push(tail);
+      changed = true;
+    }
+    out.push(rest, ...pieces);
+  });
+  if (!changed) return null;
+  const nodes = starts.map((t) => globalIndex(out, out.indexOf(t), 0)).filter((i) => i >= 0).sort((a, b) => a - b);
+  return { segs: fromSubs(out), types: out.flatMap((t) => t.types), nodes };
+}

@@ -9,7 +9,7 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineChoice, InlineToggle } from './InlineControls';
-import { deletePickedNode, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
+import { deletePickedNode, setBreakNodes, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
 import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
@@ -63,6 +63,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
         {isPath && edit?.node != null && (() => { const t = readTypes(pageSegs(selectedShape.shape), selectedShape.shape.nodeTypes)[edit.node] ?? 'c'; return <InlineChoice label="Node" value={t} options={[{ value: 'c' as const, label: 'Cusp node (Shift+C): handles move apart' }, { value: 's' as const, label: 'Smooth node (Shift+S): handles stay in line' }, { value: 'z' as const, label: 'Symmetric node (Shift+Y): in line and the same length' }].map((o) => ({ ...o, render: { c: 'Cusp', s: 'Smooth', z: 'Sym' }[o.value] }))} onChange={(v) => setPathNodeType(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit.node!, v)} />; })()}
+        {isPath && (edit?.nodes?.length ?? 0) >= 1 && <button type="button" className="opt" data-tip="Break the path at the selected nodes into separate ends (Shift+B)" onClick={() => setBreakNodes(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!)}>Break</button>}
         {isPath && (edit?.nodes?.length ?? 0) >= 2 && <>
           <button type="button" className="opt" data-tip="Merge the selected end nodes into one (Shift+J); the same subpath closes" onClick={() => setJoinEnds(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'merge')}>Join</button>
           <button type="button" className="opt" data-tip="Join the selected end nodes with a straight segment (Alt+J)" onClick={() => setJoinEnds(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'segment')}>Join with segment</button>
