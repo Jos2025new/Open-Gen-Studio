@@ -111,11 +111,12 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
   let hit = painted.get(buf);
   // While painting the version changes every segment: rescan at most every 150 ms.
   if (!hit || (hit.version !== rasterVersion() && performance.now() - hit.at > 150)) {
-    const data = buf.getContext('2d')!.getImageData(0, 0, buf.width, buf.height).data;
-    let x0 = buf.width, y0 = buf.height, x1 = -1, y1 = -1;
-    for (let y = 0; y < buf.height; y++) {
-      for (let x = 0; x < buf.width; x++) {
-        if (data[(y * buf.width + x) * 4 + 3] > 8) {
+    const width = buf.width, height = buf.height;
+    const data = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
+    let x0 = width, y0 = height, x1 = -1, y1 = -1;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (data[(y * width + x) * 4 + 3] > 8) {
           if (x < x0) x0 = x;
           if (x > x1) x1 = x;
           if (y < y0) y0 = y;

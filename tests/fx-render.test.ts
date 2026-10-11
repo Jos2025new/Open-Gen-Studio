@@ -39,7 +39,7 @@ function recordingCanvas(width: number, height: number, editor = false) {
 vi.mock('../src/lib/media', () => ({ createCanvas: (w: number, h: number) => recordingCanvas(Math.round(w), Math.round(h)), ctx2d: (c: { getContext: () => unknown }) => c.getContext(), canvasToBlob: async () => { encoded++; return new Blob(); } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
 
-import { drawDoc, exportDoc } from '../src/engine/design/render';
+import { drawDoc, exportDoc, layerBox } from '../src/engine/design/render';
 import { applyFx, cssFilter, glowPasses, mixFx } from '../src/engine/fx/canvas';
 import { newFxLayer, newFxOp } from '../src/engine/fx/commands';
 import { createDoc, newVectorLayer } from '../src/engine/design/doc';
@@ -335,4 +335,20 @@ describe('levels and curves (one tone table for the view and the SVG export)', (
     for (let i = 1; i < t.length; i++) expect(t[i]).toBeGreaterThanOrEqual(t[i - 1]);
     expect(opPrimitives(newFxOp('curves', {}), 'SourceGraphic', 'o')).toMatch(/feComponentTransfer.*type="table" tableValues="0 /);
   });
+});
+
+
+it('painted bounds stay exact without reading native canvas dimensions per pixel', () => {
+  const l = newRasterLayer('bounds', { x: 10, y: 15, width: 200, height: 100 }, { width: 200, height: 100 });
+  const c = recordingCanvas(200, 100);
+  let widthReads = 0, heightReads = 0;
+  Object.defineProperty(c, 'width', { get: () => { widthReads++; return 200; } });
+  Object.defineProperty(c, 'height', { get: () => { heightReads++; return 100; } });
+  const data = new Uint8ClampedArray(200 * 100 * 4);
+  data[(27 * 200 + 13) * 4 + 3] = 9;
+  readPixel = (() => ({ data })) as never;
+  setBuffer(l.id, c as never, false);
+  expect(layerBox(l)).toEqual({ x: 23, y: 42, w: 1, h: 1 });
+  expect(widthReads).toBeLessThan(20);
+  expect(heightReads).toBeLessThan(20);
 });
