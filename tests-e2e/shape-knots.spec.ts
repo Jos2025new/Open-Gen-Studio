@@ -297,3 +297,31 @@ test('Convert to path changes no pixel, even turned, skewed, dashed and blurred;
   expect(hits.every(Boolean)).toBe(true);
   expect(errors).toEqual([]);
 });
+
+test('a turned path: dragging one node leaves the others where they were on screen (review of 480cfc3)', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  // Turn it 0.5 rad and make it a path, through the app's own functions.
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string);
+    const F = await import('/src/engine/design/affine.ts' as string); const M = await import('/src/engine/design/matrix.ts' as string);
+    const sid = st.useStore.getState().activeSessionId, d = A.activeDoc(sid), l = d.layers.find((x: any) => x.type === 'vector');
+    A.patchLayer(sid, d.id, l.id, { shapes: l.shapes.map((x: any) => F.shapeToPath(F.transformShape(x, M.rotateAbout(0.5, x.x + x.w / 2, x.y + x.h / 2)))) });
+  });
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.4, c.y + c.height * 0.45);
+  const centres = () => page.locator('rect.path-node').evaluateAll((ns) => ns.map((n) => { const r = n.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; }));
+  const before = await centres();
+  expect(before).toHaveLength(4);
+  const [x, y] = before[2];
+  await page.mouse.move(x, y); await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(x + 5 * i, y + 3 * i);
+  await page.mouse.up();
+  const after = await centres();
+  for (const i of [0, 1, 3]) expect(Math.hypot(after[i][0] - before[i][0], after[i][1] - before[i][1]), `node ${i}`).toBeLessThan(0.75);
+  expect(Math.hypot(after[2][0] - before[2][0], after[2][1] - before[2][1])).toBeGreaterThan(50);
+  expect(errors).toEqual([]);
+});

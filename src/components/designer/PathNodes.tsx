@@ -12,7 +12,9 @@ import { patchShape } from './ShapeLookFields';
  */
 export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: View; sessionId: string; docId: string; layerId: string; shape: VectorShape }) {
   const ref = useRef<SVGSVGElement>(null);
-  const drag = useRef<{ pt: NodePoint; base: Seg[]; from: { x: number; y: number }; moved: boolean } | null>(null);
+  const drag = useRef<{ pt: NodePoint; base: Seg[]; shape: VectorShape; from: { x: number; y: number }; moved: boolean } | null>(null);
+  // Nodes on the same spot (an arrow's tip): each press there picks the next one, as Inkscape cycles with Alt.
+  const turn = useRef<{ at: string; i: number }>({ at: '', i: 0 });
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
   const segs = pageSegs(shape);
   const scr = (p: [number, number]) => { const [x, y] = toPage(shape, p[0], p[1]); return documentToScreen({ x, y }, view, { left: 0, top: 0 }); };
@@ -26,7 +28,8 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     if (!d) return;
     const q = page(e);
     // Each frame from the segments at the start of the drag: no drift; the first change records the undo step.
-    const next = withSegs(shape, moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y));
+    // From the shape at the start of the drag (review of 480cfc3: the current one compounded the turn correction).
+    const next = withSegs(d.shape, moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y));
     patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !d.moved });
     d.moved = true;
   };
@@ -42,7 +45,10 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
           const sc = { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top };
           const near = (q: NodePoint) => { const c = scr(q.at); return Math.hypot(c.x - sc.x, c.y - sc.y); };
           const nodes = pts.filter((q) => q.kind === 'node' && near(q) <= 8).sort((a, b) => near(a) - near(b));
-          drag.current = { pt: nodes[0] ?? p, base: segs, from: page(e), moved: false };
+          const same = nodes.filter((q) => near(q) - near(nodes[0]) < 1);
+          const key = same.map((q) => q.seg).join(',');
+          turn.current = { at: key, i: turn.current.at === key ? (turn.current.i + 1) % Math.max(1, same.length) : 0 };
+          drag.current = { pt: same[turn.current.i] ?? p, base: segs, shape, from: page(e), moved: false };
         },
         onPointerMove: move, onPointerUp: () => { drag.current = null; }, onPointerCancel: () => { drag.current = null; },
       };

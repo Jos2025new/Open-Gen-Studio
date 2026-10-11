@@ -48,6 +48,11 @@ describe('path nodes', () => {
     const after = nodePoints(pageSegs(out)).map((p) => toPage(out, ...p.at));
     for (const i of [0, 1, 3]) { expect(after[i][0]).toBeCloseTo(before[i][0], 1); expect(after[i][1]).toBeCloseTo(before[i][1], 1); }
     expect(Math.hypot(after[2][0] - before[2][0], after[2][1] - before[2][1])).toBeGreaterThan(30);
+    // A whole drag: every frame from the start shape (as PathNodes does) leaves the others put after many frames.
+    let cur = s;
+    for (let f = 1; f <= 10; f++) cur = withSegs(s, moveNodePoint(pageSegs(s), { kind: 'node', seg: 2, k: 0 }, 3 * f, 2 * f));
+    const end = nodePoints(pageSegs(cur)).map((p) => toPage(cur, ...p.at));
+    for (const i of [0, 1, 3]) { expect(end[i][0]).toBeCloseTo(before[i][0], 1); expect(end[i][1]).toBeCloseTo(before[i][1], 1); }
   });
 
   it('Convert to path: a rounded rectangle and an ellipse give nodes with curve handles', () => {
