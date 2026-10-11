@@ -70,6 +70,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Esc (nodes)', action: 'Clear selected nodes; Esc again finishes editing' },
         { keys: 'Ctrl + drag a corner handle', action: 'Both corner radii together' },
         { keys: 'Shift+C / Shift+S / Shift+Y (nodes)', action: 'Cusp, smooth or symmetric node' },
+        { keys: 'Shift+L / Shift+U (nodes)', action: 'Segments between selected nodes to line / curve' },
         { keys: 'Delete / Ctrl+Delete (nodes)', action: 'Delete selected nodes keeping the shape / joining straight' },
       ],
     },

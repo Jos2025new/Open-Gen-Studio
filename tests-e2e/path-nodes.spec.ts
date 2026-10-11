@@ -217,3 +217,33 @@ test('Delete keeps the shape of a smooth node (Inkscape); Ctrl+Delete joins stra
   expect((await shape(page)).d).toContain(' L ');
   expect(errors).toEqual([]);
 });
+
+test('Shift+U / Shift+L turn segments between selected nodes into curves / lines; the tool does not change; one undo', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.4, c.y + c.height * 0.45);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  const s0 = await shape(page);
+  await page.keyboard.press('Control+a');
+  await page.keyboard.press('Shift+U');
+  const s1 = await shape(page);
+  expect((s1.d.match(/C/g) ?? []).length).toBe(4);
+  // The U tool key (gradient) did not fire: still editing nodes with Edit.
+  await expect(strip(page)).toContainText('Editing nodes');
+  await expect(page.locator('circle.path-handle')).toHaveCount(8);
+  await page.keyboard.press('Shift+L');
+  expect((await shape(page)).d).not.toContain('C');
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(s1.d);
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(s0.d);
+  // The bar's buttons do the same with two or more nodes selected.
+  await page.keyboard.press('Control+a');
+  await strip(page).getByRole('button', { name: 'Make curve' }).click();
+  expect((await shape(page)).d).toContain('C');
+  expect(errors).toEqual([]);
+});

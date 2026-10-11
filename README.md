@@ -203,6 +203,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Esc (nodes) | Clear selected nodes; Esc again finishes editing |
 | Ctrl + drag a corner handle | Both corner radii together |
 | Shift+C / Shift+S / Shift+Y (nodes) | Cusp, smooth or symmetric node |
+| Shift+L / Shift+U (nodes) | Segments between selected nodes to line / curve |
 | Delete / Ctrl+Delete (nodes) | Delete selected nodes keeping the shape / joining straight |
 
 **Sketch**

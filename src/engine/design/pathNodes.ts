@@ -451,3 +451,32 @@ export function fitCubic(pts: Pt[], h1: Pt, h2: Pt, u0?: number[]): [Pt, Pt] | n
   }
   return c;
 }
+
+/**
+ * Make the segments between selected neighbouring nodes straight or curved (Inkscape Shift+L / Shift+U,
+ * path-manipulator.cpp L1015–1038): a line gets its handles onto its nodes; a curve is made only from a line, its
+ * handles at a third of the segment from each end. A node that loses a handle to a line cannot stay smooth or
+ * symmetric (node.cpp L203–239 changes the type when a handle retracts): here it becomes a cusp. Null if no segment
+ * has both ends selected.
+ */
+export function segmentsTo(segs: Seg[], types: NodeType[], selected: number[], to: 'line' | 'curve'): { segs: Seg[]; types: NodeType[] } | null {
+  const subs = toSubs(segs), sel = new Set(selected), out = [...types];
+  let changed = false;
+  subs.forEach((s, si) => {
+    const base = globalIndex(subs, si, 0), m = s.nodes.length;
+    s.edges.forEach((e, k) => {
+      const a = base + k, b = base + ((k + 1) % m);
+      if (!sel.has(a) || !sel.has(b)) return;
+      if (to === 'line' && e.c === 'C') {
+        s.edges[k] = { c: 'L' };
+        for (const n of [a, b]) if (out[n] !== 'c') out[n] = 'c';
+        changed = true;
+      } else if (to === 'curve' && e.c === 'L') {
+        const p = s.nodes[k], q = s.nodes[(k + 1) % m], dx = (q[0] - p[0]) / 3, dy = (q[1] - p[1]) / 3;
+        s.edges[k] = { c: 'C', c1: [p[0] + dx, p[1] + dy], c2: [q[0] - dx, q[1] - dy] };
+        changed = true;
+      }
+    });
+  });
+  return changed ? { segs: fromSubs(subs), types: out } : null;
+}

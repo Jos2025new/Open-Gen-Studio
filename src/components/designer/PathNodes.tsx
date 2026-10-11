@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { VectorShape } from '../../engine/types';
-import { deleteSelectedNodes, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
+import { segmentsTo, deleteSelectedNodes, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
@@ -52,6 +52,9 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
         return;
       }
       if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      // Shift+L / Shift+U: segments to line / curve; taken here so the L and U tool keys never fire.
+      const seg = ({ l: 'line', u: 'curve' } as Record<string, 'line' | 'curve'>)[e.key.toLowerCase()];
+      if (seg) { stop(); setSegmentsTo(sessionId, docId, layerId, shape, selected, seg); return; }
       const t = ({ c: 'c', s: 's', y: 'z' } as Record<string, NodeType>)[e.key.toLowerCase()];
       if (t && picked != null) { stop(); setPathNodeType(sessionId, docId, layerId, shape, picked, t); }
     };
@@ -183,4 +186,12 @@ function deletePathNodes(sessionId: string, docId: string, layerId: string, shap
 function patchNodeGroup(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], dx: number, dy: number, types: NodeType[]): void {
   const next = withSegs(shape, moveSelectedNodes(pageSegs(shape), selected, dx, dy, types));
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h });
+}
+
+/** Segments between selected neighbouring nodes to line or curve (Shift+L / Shift+U), one undo step. */
+export function setSegmentsTo(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], to: 'line' | 'curve'): void {
+  const segs = pageSegs(shape), r = segmentsTo(segs, readTypes(segs, shape.nodeTypes), selected, to);
+  if (!r) return;
+  const next = withSegs(shape, r.segs);
+  patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
-import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
+import { deleteNode, deleteSelectedNodes, fitCubic, insertNode, marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nearestOnPath, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, segmentsTo, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -181,5 +181,23 @@ describe('adding and deleting nodes', () => {
     const two = deleteNode(parseSegs('M 0 0 L 10 0 M 20 0 L 30 0 L 30 10'), ['c', 'c', 'a' as never, 'c', 'c'].map((t) => (t === ('a' as never) ? 'c' : t)) as never, 1)!;
     expect(serializeSegs(two.segs)).toBe('M 20 0 L 30 0 L 30 10');
     expect(two.types).toHaveLength(3);
+  });
+});
+
+describe('segments to line or curve (Shift+L / Shift+U)', () => {
+  it('a curve between two selected nodes becomes a line, its smooth ends cusps; back to a curve at thirds', () => {
+    const segs = parseSegs('M 0 0 C 0 10 30 10 30 0 L 60 0');
+    const line = segmentsTo(segs, ['c', 's', 'c'], [0, 1], 'line')!;
+    expect(serializeSegs(line.segs)).toBe('M 0 0 L 30 0 L 60 0');
+    expect(line.types).toEqual(['c', 'c', 'c']);
+    const curve = segmentsTo(line.segs, line.types, [1, 2], 'curve')!;
+    expect(serializeSegs(curve.segs)).toBe('M 0 0 L 30 0 C 40 0 50 0 60 0');
+    // Only segments with both ends selected; a curve stays a curve on Shift+U.
+    expect(segmentsTo(segs, ['c', 'c', 'c'], [0, 2], 'line')).toBeNull();
+    expect(segmentsTo(segs, ['c', 'c', 'c'], [0, 1], 'curve')).toBeNull();
+  });
+  it('the closing edge of a closed path counts (last and first node selected)', () => {
+    const sq = parseSegs('M 0 0 L 9 0 L 9 9 L 0 9 Z');
+    expect(serializeSegs(segmentsTo(sq, ['c', 'c', 'c', 'c'], [3, 0], 'curve')!.segs)).toBe('M 0 0 L 9 0 L 9 9 L 0 9 C 0 6 0 3 0 0 Z');
   });
 });

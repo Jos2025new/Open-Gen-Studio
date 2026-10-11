@@ -9,7 +9,7 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineChoice, InlineToggle } from './InlineControls';
-import { deletePickedNode, setPathNodeType } from './PathNodes';
+import { deletePickedNode, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
 import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
@@ -63,6 +63,10 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
         {isPath && edit?.node != null && (() => { const t = readTypes(pageSegs(selectedShape.shape), selectedShape.shape.nodeTypes)[edit.node] ?? 'c'; return <InlineChoice label="Node" value={t} options={[{ value: 'c' as const, label: 'Cusp node (Shift+C): handles move apart' }, { value: 's' as const, label: 'Smooth node (Shift+S): handles stay in line' }, { value: 'z' as const, label: 'Symmetric node (Shift+Y): in line and the same length' }].map((o) => ({ ...o, render: { c: 'Cusp', s: 'Smooth', z: 'Sym' }[o.value] }))} onChange={(v) => setPathNodeType(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit.node!, v)} />; })()}
+        {isPath && (edit?.nodes?.length ?? 0) >= 2 && <>
+          <button type="button" className="opt" data-tip="Segments between the selected nodes become straight (Shift+L)" onClick={() => setSegmentsTo(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'line')}>Make line</button>
+          <button type="button" className="opt" data-tip="Straight segments between the selected nodes become curves (Shift+U)" onClick={() => setSegmentsTo(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'curve')}>Make curve</button>
+        </>}
         {isPath && edit?.node != null && <button type="button" className="opt" data-tip="Remove the picked node keeping the shape (Delete; Ctrl+Delete joins its neighbours straight)" onClick={() => deletePickedNode(sessionId, doc.id)}>Delete node</button>}
         {!isPath && <button type="button" className="opt" data-tip="Inkscape's Object to Path: the same outline as editable nodes; the corner and size handles are gone (Ctrl+Z undoes it)" onClick={() => convertToPath(sessionId, doc.id, selectedShape.layerId, selectedShape.shape)}>Convert to path</button>}
         <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
