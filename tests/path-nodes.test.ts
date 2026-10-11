@@ -243,3 +243,19 @@ describe('breaking nodes (Shift+B)', () => {
     expect(two.types).toHaveLength(6);
   });
 });
+
+describe('review of 581afe0 (GPT)', () => {
+  it('joining several pairs: three subpaths and four selected ends become one subpath', () => {
+    const three = parseSegs('M 0 0 L 10 0 M 12 0 L 20 0 M 22 0 L 30 0');
+    const r = joinEnds(three, ['c', 'c', 'c', 'c', 'c', 'c'], [1, 2, 3, 4], 'merge')!;
+    expect(serializeSegs(r.segs)).toBe('M 0 0 L 11 0 L 21 0 L 30 0');
+    expect(r.nodes).toEqual([1, 2]);
+    const seg = joinEnds(three, ['c', 'c', 'c', 'c', 'c', 'c'], [1, 2, 3, 4], 'segment')!;
+    expect(serializeSegs(seg.segs)).toBe('M 0 0 L 10 0 L 12 0 L 20 0 L 22 0 L 30 0');
+  });
+  it('breaking a closed square at [0, 2] selects the first node of each piece: [0, 3]', () => {
+    const r = breakNodes(parseSegs('M 0 0 L 9 0 L 9 9 L 0 9 Z'), ['c', 'c', 'c', 'c'], [0, 2])!;
+    expect(serializeSegs(r.segs)).toBe('M 0 0 L 9 0 L 9 9 M 9 9 L 0 9 L 0 0');
+    expect(r.nodes).toEqual([0, 3]);
+  });
+});

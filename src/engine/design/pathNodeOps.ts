@@ -292,8 +292,19 @@ export function joinEnds(segs: Seg[], types: NodeType[], selected: number[], how
   if (!pairs.length) return null;
   const marks: Pt[] = [];
   for (const [a0, b0] of pairs) {
-    let a = a0.sub, b = b0.sub;
-    if (!subs.includes(a) || !subs.includes(b)) continue;
+    // Find each end again in the current subpaths (review: an earlier join replaced the subpath objects, so later
+    // pairs were skipped). Node points keep their identity through joins and reversals.
+    const find = (pt: Pt): End | null => {
+      for (const t of subs) {
+        if (t.closed) continue;
+        if (t.nodes[0] === pt) return { sub: t, at: 'start' };
+        if (t.nodes[t.nodes.length - 1] === pt) return { sub: t, at: 'end' };
+      }
+      return null;
+    };
+    const ea = find(pos(a0)), eb = find(pos(b0));
+    if (!ea || !eb) continue;
+    let a = ea.sub, b = eb.sub;
     if (a === b) {
       // One subpath: close it.
       if (how === 'segment') { a.edges.push({ c: 'L' }); a.types[0] = 'c'; a.types[a.types.length - 1] = 'c'; }
@@ -307,8 +318,8 @@ export function joinEnds(segs: Seg[], types: NodeType[], selected: number[], how
       continue;
     }
     // Two subpaths: a ends where b starts.
-    if (a0.at === 'start') { const r = reverseSub(a); subs = subs.map((s) => (s === a ? r : s)); a = r; }
-    if (b0.at === 'end') { const r = reverseSub(b); subs = subs.map((s) => (s === b ? r : s)); b = r; }
+    if (ea.at === 'start') { const r = reverseSub(a); subs = subs.map((s) => (s === a ? r : s)); a = r; }
+    if (eb.at === 'end') { const r = reverseSub(b); subs = subs.map((s) => (s === b ? r : s)); b = r; }
     const merged: TSub = { nodes: [...a.nodes], edges: [...a.edges], closed: false, types: [...a.types] };
     if (how === 'segment') {
       merged.edges.push({ c: 'L' }, ...b.edges);
@@ -382,6 +393,8 @@ export function breakNodes(segs: Seg[], types: NodeType[], selected: number[]): 
     out.push(rest, ...pieces);
   });
   if (!changed) return null;
-  const nodes = starts.map((t) => globalIndex(out, out.indexOf(t), 0)).filter((i) => i >= 0).sort((a, b) => a - b);
+  // The first node of each new piece, found in the final pieces (review: a piece split again was a discarded object).
+  const firsts = new Set(starts.map((t) => t.nodes[0]));
+  const nodes = out.flatMap((t, i) => (firsts.has(t.nodes[0]) ? [globalIndex(out, i, 0)] : []));
   return { segs: fromSubs(out), types: out.flatMap((t) => t.types), nodes };
 }
