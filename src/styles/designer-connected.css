@@ -260,7 +260,7 @@
 .stroke-ruler-handle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; cursor: grab; pointer-events: auto; }
 .stroke-ruler-guide line.ray { stroke-width: 1; stroke-dasharray: none; opacity: .18; filter: none; }
 /* Context strip (ContextStrip.tsx): the active tool's essentials above the tool box; lines wrap, nothing scrolls. */
-.composer-tools-bar .designer-palette.is-docked { position: relative; }
+.composer-tools-bar .designer-palette.is-docked { position: relative; top: auto; left: auto; }
 /* Not docked, the palette floats at the top of the page: the strip opens below it. */
 .designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }
 .context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
@@ -293,3 +293,5 @@
 .tool-help span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-help-close { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: var(--text-3, var(--text-2)); }
 .tool-help-close:hover { color: var(--text); background: var(--surface-3); }
+/* Narrow windows put Conversation above the dock, on the left: the strip aligns right so it never covers it. */
+@media (max-width: 1400px) { .composer-tools-bar .context-strip { left: auto; right: 0; } }

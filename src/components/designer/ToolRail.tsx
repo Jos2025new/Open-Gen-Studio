@@ -6,7 +6,6 @@ import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
-import { InlineColor } from './InlineControls';
 import { EditOps, SnapControl } from './ToolSettings';
 import { ContextStrip } from './ContextStrip';
 
@@ -69,10 +68,6 @@ function ToolGroup({ group, tool, doc }: { doc: DesignDoc; group: { id: string; 
 export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc; children?: ReactNode }) {
   const ui = useStore((s) => s.ui);
   const tool = ui.tool;
-  const shapeTool = ['rect', 'ellipse', 'polygon', 'line', 'curve', 'arrow'].includes(tool);
-  const strokeTool = ['line', 'curve', 'arrow'].includes(tool);
-  const color = tool === 'text' ? ui.text.color : tool === 'lineart' ? ui.lineart.color : shapeTool ? (strokeTool ? ui.shape.stroke ?? '#ffffff' : ui.shape.fill ?? '#d4f25a') : ui.brush.color;
-  const setColor = (color: string) => setUi(tool === 'text' ? { text: { ...ui.text, color } } : tool === 'lineart' ? { lineart: { ...ui.lineart, color } } : shapeTool ? { shape: { ...ui.shape, [strokeTool ? 'stroke' : 'fill']: color } } : { brush: { ...ui.brush, color } });
   const button = (id: DesignTool) => {
     const t = TOOLS.find((t) => t.id === id)!;
     const reason = toolBlockReason(id, activeLayer(doc));
@@ -82,7 +77,6 @@ export function ToolRail({ sessionId, doc }: { sessionId: string; doc: DesignDoc
   return <><ContextStrip sessionId={sessionId} doc={doc} /><div className="tool-rail" role="toolbar" aria-label="Design tools">
     <div className="palette-fixed">
       {RAIL.map((f) => <div key={f.family} className="tool-family" role="group" aria-label={f.family}>
-        {f.family === 'Paint' && <InlineColor label="Active color" value={color} onChange={setColor} />}
         {f.items.map(item)}
         {f.family === 'Edit' && <><span className="palette-snap"><SnapControl /></span><span className="palette-snap"><EditOps sessionId={sessionId} doc={doc} alignOnly /></span></>}
       </div>)}

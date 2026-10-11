@@ -59,7 +59,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 31 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
-| [actions.ts](../src/engine/design/actions.ts) | 24 | 11 |
+| [actions.ts](../src/engine/design/actions.ts) | 25 | 11 |
 | [doc.ts](../src/engine/design/doc.ts) | 24 | 18 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 9 |

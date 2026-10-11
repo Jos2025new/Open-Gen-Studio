@@ -30,6 +30,8 @@ async function setup(page: Page) {
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
   await page.keyboard.press('b');
+  // Changing tools no longer opens the panel's Tool tab (plan-designer-ux, Astra's review): open it as a person would.
+  await panel(page).getByRole('tab', { name: 'All the settings of the active tool' }).click();
   await mkdir(SHOTS, { recursive: true });
   return errors;
 }

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -87,9 +87,11 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const [width, setWidth] = usePref('ogs:layers-width', 260);
   // The layer list's height under the inspector (dragged on the split); double-click or Restore layout resets it.
   const [listH, setListH] = usePref('ogs:layers-list-h', 240);
+  const morePop = usePopover();
   const split = useRef<{ y: number; h: number } | null>(null);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
-  const [tab, setTab] = usePref<'layers' | 'props'>('ogs:layers-tab', 'props');
+  // Three destinations: Properties (what is selected), Tool (the active tool's full settings), Layers (the list alone).
+  const [tab, setTab] = usePref<'layers' | 'props' | 'tool'>('ogs:layers-tab', 'props');
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const collapsedRef = useRef(collapsed);
   collapsedRef.current = collapsed;
@@ -98,13 +100,10 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     window.addEventListener('ogs:layers-toggle', toggle);
     return () => window.removeEventListener('ogs:layers-toggle', toggle);
   }, [setCollapsed]);
-  const previousTool = useRef(tool);
-  useEffect(() => {
-    if (previousTool.current !== tool) { setTab('props'); setCollapsed(false); previousTool.current = tool; }
-  }, [tool, setTab, setCollapsed]);
+  // Changing tools keeps the panel as the user left it (closed, or on Layers); only Settings… opens the Tool tab.
   // "Settings…" in the context strip opens this panel on the tool's full settings.
   useEffect(() => {
-    const open = (e: Event) => { setTab((e as CustomEvent<'layers' | 'props'>).detail); setCollapsed(false); };
+    const open = (e: Event) => { setTab((e as CustomEvent<'layers' | 'props' | 'tool'>).detail); setCollapsed(false); };
     window.addEventListener('ogs:designer-panel', open);
     return () => window.removeEventListener('ogs:designer-panel', open);
   }, [setTab, setCollapsed]);
@@ -157,19 +156,19 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }}
       onDoubleClick={() => setWidth(260)} />
     <div className="panel-tabs" role="tablist" aria-label="Layers panel">
-      {([['layers', LayersIcon, 'Layers'], ['props', SlidersHorizontal, 'Tool settings and layer properties']] as const).map(([id, Icon, label]) => (
+      {([['props', SlidersHorizontal, 'Properties', 'Properties of the selected layer'], ['tool', Wrench, 'Tool', 'All the settings of the active tool'], ['layers', LayersIcon, 'Layers', `Layers only · page ${doc.width} × ${doc.height}`]] as const).map(([id, Icon, name, label]) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
-          <Icon size={14} /><span>{id === 'layers' ? 'Layers' : 'Tool settings'}</span>
+          {/* Only the active tab spells its name: three tabs fit the panel; the others say it on hover. */}
+          <Icon size={14} />{tab === id && <span>{name}</span>}
         </button>
       ))}
       <span className="panel-tabs-gap" />
-      {tab === 'props' && <IconButton icon={RotateCcw} label="Restore panel layout" size="sm" data-tip="Restore panel layout · width, layer list height and tab" onClick={() => { setWidth(260); setListH(240); setTab('props'); }} />}
-      {tab === 'layers' ? <div className="panel-head-actions">{picked.length > 1 ? <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span> : <span className="faint num">{doc.width} × {doc.height}</span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div> : <IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} />}
+      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
         <div className="prop-row">
-          <InlineSlider label="Opacity" unit="%" scale={100} min={0} max={1} step={0.01} value={layer.opacity} onChange={(v) => patch({ opacity: v })} />
-          <Field label="Blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
+          <InlineSlider label="Layer" unit="%" scale={100} min={0} max={1} step={0.01} value={layer.opacity} onChange={(v) => patch({ opacity: v })} />
+          <Field label="Layer blend"><select value={layer.blend} onChange={(e) => patch({ blend: e.target.value as Layer['blend'] })}>{BLENDS.map((b) => <option key={b} value={b}>{b.replace('-', ' ')}</option>)}</select></Field>
         </div>
     </fieldset>}
     <section className="layer-shelf">
@@ -199,6 +198,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           // Shift: the whole run from the active layer to this one (the active layer stays the anchor). Ctrl: add or take out one.
           if (e.shiftKey && !(e.ctrlKey || e.metaKey)) { pickLayerRange(doc.id, doc.activeLayerId, l.id, doc.layers.map((x) => x.id)); pop.close(); return; }
           pickLayer(doc.id, l.id, e.ctrlKey || e.metaKey, picked); setActiveLayer(sessionId, doc.id, l.id); pop.close();
+          if (tab === 'tool') setTab('props');
         }} title="Ctrl-click to add or remove a layer · Shift-click to select every layer up to this one">
           <span className={`layer-thumb-wrap${l.type === 'fx' ? ' is-fx' : ''}`} title={l.type === 'fx' ? 'Double-click to edit' : undefined}>{l.type === 'fx' ? <Icon size={16} /> : <LayerThumb doc={doc} layer={l} />}</span>
           {l.type === 'fx' && <span className="layer-fx-target" data-tip="What this FX layer acts on">→ {l.scope === 'layer' ? fxTarget(doc.layers, l.id)?.name ?? 'no layer under it' : 'everything below'}</span>}
@@ -222,22 +222,27 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </Popover>
       <FxMenu sessionId={sessionId} doc={doc} layer={layer} />
       {layer && <>
-        <IconButton icon={Copy} label="Duplicate layer" size="sm" onClick={() => duplicateLayer(sessionId, doc.id, layer.id)} />
         <IconButton icon={Merge} label="Merge down (Ctrl+E)" size="sm" disabled={index === 0 || layer.locked} data-tip="Merge down (Ctrl+E) · this layer and the one under it become one raster layer" onClick={() => void mergeDown(sessionId, doc.id, layer.id)} />
-        {layer.type !== 'raster' && layer.type !== 'fx' && <IconButton icon={Grid2x2} label="Rasterize layer" size="sm" disabled={layer.locked} data-tip="Rasterize · turns this layer into pixels you can paint on" onClick={() => void rasterizeLayer(sessionId, doc.id, layer.id)} />}
         {layer.type === 'raster' && <IconButton ref={pop.ref} size="sm" icon={Sparkles} label="Operations" className="layer-ops-btn" disabled={layer.locked} data-tip="Operations · relight, upscale, remove background… the result is a new layer above" onClick={() => { setOp(null); pop.toggle(); }} />}
-        <span className="layer-actions-gap" />
-        {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
-          ? <IconButton icon={FolderOutput} label="Ungroup this folder" size="sm" onClick={() => ungroup(sessionId, doc.id, layer.groupId!)} />
-          : <IconButton icon={FolderInput} label="Group layers (Ctrl+G)" size="sm" disabled={picked.length < 2} onClick={() => groupLayers(sessionId, doc.id, picked)} />}
         <IconButton icon={ArrowUp} label="Move layer up" size="sm" disabled={index === doc.layers.length - 1} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, 1); }} />
         <IconButton icon={ArrowDown} label="Move layer down" size="sm" disabled={index === 0} onClick={() => { if (layer.locked) lockedNote(layer.name); else moveLayer(sessionId, doc.id, layer.id, -1); }} />
         <IconButton icon={Trash} label={picked.length > 1 ? `Delete ${picked.length} layers` : 'Delete layer'} size="sm" tone="danger" disabled={picked.every((id) => doc.layers.find((l) => l.id === id)?.locked)} onClick={() => deleteLayers(sessionId, doc.id, picked)} />
+        <IconButton ref={morePop.ref} icon={MoreHorizontal} label="More layer actions" size="sm" aria-haspopup="menu" aria-expanded={morePop.open} data-tip="Duplicate, rasterize, group · panel layout" onClick={morePop.toggle} />
+        <Popover open={morePop.open} anchor={morePop.ref} onClose={morePop.close} placement="top-start" width={220} label="More layer actions">
+          <div className="menu" role="menu">
+            <MenuItem icon={Copy} label="Duplicate layer" onClick={() => { duplicateLayer(sessionId, doc.id, layer.id); morePop.close(); }} />
+            {layer.type !== 'raster' && layer.type !== 'fx' && <MenuItem icon={Grid2x2} label="Rasterize layer" detail="Turn it into pixels you can paint on" disabled={layer.locked} onClick={() => { void rasterizeLayer(sessionId, doc.id, layer.id); morePop.close(); }} />}
+            {layer.groupId && picked.every((id) => doc.layers.find((l) => l.id === id)?.groupId === layer.groupId)
+              ? <MenuItem icon={FolderOutput} label="Ungroup this folder" onClick={() => { ungroup(sessionId, doc.id, layer.groupId!); morePop.close(); }} />
+              : <MenuItem icon={FolderInput} label="Group layers" right={<span className="kbd">Ctrl+G</span>} disabled={picked.length < 2} onClick={() => { groupLayers(sessionId, doc.id, picked); morePop.close(); }} />}
+            <MenuItem icon={RotateCcw} label="Restore panel layout" detail={`Width, layer list and tab · page ${doc.width} × ${doc.height}`} onClick={() => { setWidth(260); setListH(240); setTab('props'); morePop.close(); }} />
+          </div>
+        </Popover>
       </>}
     </div>
     </section>
     <div className="layers-body">
-    {tab === 'props' && <section className={`sidebar-tool-settings settings-${tool}`} aria-label="Active tool settings">
+    {tab === 'tool' && <section className={`sidebar-tool-settings settings-${tool}`} aria-label="Active tool settings">
       {tool === 'hand' ? <p className="field-hint">Pan has no additional settings.</p> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} />}
     </section>}
     {tab === 'props' && !layer && <p className="empty-block">Select a layer to see its properties.</p>}

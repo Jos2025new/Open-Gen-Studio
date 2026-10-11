@@ -12,7 +12,7 @@ import { setUi, useStore } from '../../store/store';
 import { FONT_NAMES } from '../../engine/design/doc';
 import { Popover, usePopover } from '../ui/Popover';
 import { StrokeStyleFields } from './StrokeStyleFields';
-import type { DesignDoc, StrokeStyle } from '../../engine/types';
+import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { clearSelected, fillSelection, getSelection, growSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
@@ -185,6 +185,11 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
       <span data-tip="New replaces the selection; Add and Subtract change it (Shift adds, Alt subtracts with any shape)"><InlineSelect label="Mode" value={wand.mode} options={[{ value: 'replace' as const, label: 'New' }, { value: 'add' as const, label: 'Add' }, { value: 'subtract' as const, label: 'Subtract' }]} onChange={(v) => setWand({ mode: v })} /></span>
       <span data-tip="Active layer: only its own pixels and elements decide · All layers: the whole visible picture"><InlineSelect label="Sample" value={wand.sample} options={[{ value: 'layer' as const, label: 'Active layer' }, { value: 'all' as const, label: 'All layers' }]} onChange={(v) => setWand({ sample: v })} /></span>
     </> : null}
+    {/* What finishes a selection stays at hand, also in the quick strip. */}
+    {compact && <>
+    <button type="button" className="opt" disabled={!sel} onClick={() => { record(cur()); setSelection(doc.id, null); }} data-tip="Ctrl+D">Deselect</button>
+    <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
+    </>}
     {!compact && <>
     <button type="button" className="opt" onClick={() => { record(cur()); selectAll(cur()); }} data-tip="Ctrl+A">All</button>
     <button type="button" className="opt" onClick={() => { record(cur()); invertSelection(cur()); }} data-tip="Ctrl+Shift+I">{sel?.inverted ? 'Inverted' : 'Invert'}</button>
@@ -197,6 +202,24 @@ function SelectOps({ sessionId, doc, compact = false }: { sessionId: string; doc
     <button type="button" className="opt" disabled={!sel} onClick={() => run(() => selectionToLayer(sessionId, cur()))} data-tip="Ctrl+J · copies the selected pixels of the active layer to a new layer">To layer</button>
     </>}
   </div>;
+}
+
+/**
+ * Text style fields, the same for the next text (ui.text) and for a selected text layer (its own properties): the
+ * caller decides what they change. Compact keeps the essentials (font, size, weight, colour, alignment).
+ */
+export function TextStyleFields({ value, onChange, compact = false }: { value: TextStyle; onChange: (patch: Partial<TextStyle>) => void; compact?: boolean }) {
+  return <>
+    <InlineSelect label="Font" value={value.fontFamily} options={FONT_NAMES} onChange={(v) => onChange({ fontFamily: v })} />
+    <InlineSlider label="Size" unit="px" min={1} max={500} value={value.fontSize} onChange={(v) => onChange({ fontSize: v })} />
+    <InlineSelect label="Weight" value={value.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => onChange({ fontWeight: v })} />
+    <InlineColor label="Color" value={value.color} onChange={(v) => onChange({ color: v })} />
+    <InlineSelect label="Align" value={value.align} options={['left', 'center', 'right'] as const as unknown as Array<TextStyle['align']>} onChange={(v) => onChange({ align: v })} />
+    {!compact && <>
+      <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={value.lineHeight} onChange={(v) => onChange({ lineHeight: v })} />
+      <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={value.letterSpacing} onChange={(v) => onChange({ letterSpacing: v })} />
+    </>}
+  </>;
 }
 
 export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean }) {
@@ -240,13 +263,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
   if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
-          <InlineSelect label="Font" value={text.fontFamily} options={FONT_NAMES} onChange={(v) => setUi({ text: { ...text, fontFamily: v } })} />
-          <InlineSlider label="Size" unit="px" min={1} max={500} value={text.fontSize} onChange={(v) => setUi({ text: { ...text, fontSize: v } })} />
-          <InlineSelect label="Weight" value={text.fontWeight} options={[100, 200, 300, 400, 500, 600, 700, 800, 900]} onChange={(v) => setUi({ text: { ...text, fontWeight: v } })} />
-          <InlineColor label="Color" value={text.color} onChange={(v) => setUi({ text: { ...text, color: v } })} />
-          <InlineSelect label="Align" value={text.align} options={['left', 'center', 'right'] as const as unknown as Array<typeof text.align>} onChange={(v) => setUi({ text: { ...text, align: v } })} />
-          <InlineSlider label="Line" min={0.5} max={3} step={0.1} value={text.lineHeight} onChange={(v) => setUi({ text: { ...text, lineHeight: v } })} />
-          <InlineSlider label="Spacing" unit="px" min={-10} max={40} step={0.5} value={text.letterSpacing} onChange={(v) => setUi({ text: { ...text, letterSpacing: v } })} />
+          <TextStyleFields value={text} compact={compact} onChange={(p) => setUi({ text: { ...text, ...p } })} />
         </> : tool === 'ruler' ? <RulerSettings docId={doc.id} /> : tool === 'fill' ? <>
           <InlineColor label="Color" value={brush.color} onChange={(v) => setUi({ brush: { ...brush, color: v } })} />
           <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => setUi({ brush: { ...brush, opacity: v } })} />

@@ -904,7 +904,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         return;
       }
       // width 0 = auto width: the box follows the text as it is typed.
-      const id = addTextLayer(sessionId, doc.id, 'Text', { x: p.x, y: p.y, width: 0 }, { ...textStyle, fontSize: Math.max(12, Math.round(current.width / 14)) });
+      const id = addTextLayer(sessionId, doc.id, 'Text', { x: p.x, y: p.y, width: 0 }, textStyle);
       if (id) setEditingText(id);
     }
   };

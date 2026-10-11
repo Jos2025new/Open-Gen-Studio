@@ -18,7 +18,8 @@
     "trace:report": "node scripts/trace-report.mjs",
     "fx:check": "playwright test tests-e2e/fx-visual.spec.ts",
     "brush:check": "playwright test tests-e2e/brush-visual.spec.ts",
-    "tools:check": "playwright test tests-e2e/designer-tools.spec.ts"
+    "tools:check": "playwright test tests-e2e/designer-tools.spec.ts",
+    "flows:check": "playwright test tests-e2e/designer-flows.spec.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

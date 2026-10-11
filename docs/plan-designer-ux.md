@@ -64,3 +64,25 @@ Criterio: completarlas sin buscar controles, sin confundir su alcance y sin perd
 - que el usuario vea las capturas y lo pruebe antes de integrarlo en `task/agent-forcing`;
 - la validación con las tres tareas de Astra, hecha por una persona;
 - la cabecera del panel en la pestaña Layers sigue justa de ancho (las pestañas se recortan con el tamaño del documento al lado).
+
+## Segunda pasada, tras la revisión de Astra (2026-10-10)
+
+Astra revisó hasta `21e73f8`. Su veredicto: conservar la distribución y pasar de «mostrar los controles de una herramienta» a «acompañar la tarea». Claude comprobó en el código los cinco hechos que señaló, y los cinco eran ciertos. El usuario dijo «Hazlo».
+
+| # | Qué | Archivos | Comprobación |
+|---|---|---|---|
+| 1 | **Rótulos veraces.** Con un texto seleccionado, la franja edita **esa capa** (antes cambiaba los ajustes del próximo texto mientras decía «selected text»). Relleno y degradado dicen «→ new layer», porque crean una. El texto nuevo usa el tamaño elegido (antes `Stage` lo sustituía por uno calculado). Los campos de texto son un solo componente, `TextStyleFields`, para la creación y para el seleccionado | `ContextStrip.tsx`, `ToolSettings.tsx`, `Stage.tsx` | `flows:check`, recorrido «compose»: el texto se crea a 60 px; con él seleccionado, 80 px cambia la capa y no los ajustes de creación |
+| 2 | **El panel se respeta.** Cambiar de herramienta ya no lo abre ni cambia de pestaña; solo «Settings…» abre «Tool» | `LayersPanel.tsx` | «retouch»: con «Layers» elegida, cambiar de herramienta la mantiene |
+| 3 | **Franja priorizada.** Pincel: tamaño, color y opacidad (el suavizado y el estabilizado, en «Tool»). Texto compacto sin interlineado ni espaciado. Selección con «Deselect» y «To layer». Se quita el color duplicado de la caja | `BrushSettings.tsx`, `ToolSettings.tsx`, `ToolRail.tsx` | «retouch»: «To layer» crea la capa y «Deselect» funciona desde la franja |
+| 4 | **Propiedades primero.** Tres pestañas: **Properties** (lo seleccionado), **Tool** (la herramienta) y **Layers** (solo las capas). Elegir una capa estando en «Tool» lleva a sus propiedades. Solo la pestaña activa muestra su nombre | `LayersPanel.tsx` | «FX»: seleccionar el FX abre sus ajustes («Applies to») y cambiar de herramienta no lo cambia |
+| 5 | **Acabado.** Acciones de capa en una fila (duplicar, rasterizar, agrupar y restaurar la disposición, en «More»). La opacidad de capa se llama «Layer». El tamaño de página va en la pista de «Layers» y en «More». En ventanas estrechas la franja se alinea a la derecha | `LayersPanel.tsx`, `designer-connected.css` | «FX»: fila de acciones de menos de 48 px; «More» contiene duplicar y restaurar; captura a 1280×720 |
+| 6 | **Los tres recorridos completos,** como prueba permanente: `npm run flows:check` | `tests-e2e/designer-flows.spec.ts` | 3/3 en el sandbox |
+
+**Fallos encontrados al comprobar, y corregidos:**
+- «Settings…» seguía enviando la pestaña antigua («props») y no abría «Tool». Lo detectó el recorrido «FX».
+- La barra acoplada heredaba `top: 62px`: con `position: relative` (del paso 1) se desplazaba 62 px hacia abajo y, a 1280×720, la caja de herramientas quedaba medio fuera de la pantalla. Se comparó con `task/agent-forcing`, donde cabía, y se corrigió con `top: auto`.
+- Las comprobaciones antiguas (`brush:check`, `tools:check`) daban por hecho que cambiar de herramienta abría los ajustes: ahora abren la pestaña «Tool», como haría una persona.
+
+**Comprobado:** `npm test` y build; en el sandbox, `brush:check` 7/7, `tools:check` 3/3 y `flows:check` 3/3.
+
+**Sin comprobar:** que el usuario lo pruebe; ventanas aún más pequeñas que 1280×720; la ayuda superior sigue enumerando posibilidades en vez de orientar sobre el próximo gesto (propuesta de Astra, no hecha).

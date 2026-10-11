@@ -102,8 +102,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
     {!erase && <InlineColor label="Color" value={brush.color} onChange={(v) => set({ color: v })} />}
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
-    <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
-    <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
+    {/* Smoothing and Stabilize live in the Tool tab: set once, not touched every stroke. */}
   </>;
   return <>
     <BrushPreview brush={brush} erase={erase} />

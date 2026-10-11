@@ -67,6 +67,7 @@ test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints al
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const y0 = b.y + b.height * 0.4;
   await page.keyboard.press('k');
+  await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('tab', { name: 'All the settings of the active tool' }).click();
   // The kind is kept in the settings: choose it, whatever an earlier run left.
   await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('button', { name: /^Ruler/ }).click();
   await page.getByRole('button', { name: 'Straight', exact: true }).click();
@@ -100,6 +101,7 @@ test('perspective ruler: a stroke heads straight to the vanishing point it start
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
   await page.keyboard.press('k');
+  await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('tab', { name: 'All the settings of the active tool' }).click();
   await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('button', { name: /^Ruler/ }).click();
   await page.getByRole('button', { name: 'Perspective', exact: true }).click();
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
