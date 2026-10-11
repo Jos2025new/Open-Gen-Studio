@@ -53,15 +53,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 142 | 90 |
+| [types.ts](../src/engine/types.ts) | 145 | 91 |
 | [store.ts](../src/store/store.ts) | 97 | 88 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 34 | 23 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
+| [actions.ts](../src/engine/design/actions.ts) | 27 | 11 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
-| [actions.ts](../src/engine/design/actions.ts) | 25 | 11 |
-| [doc.ts](../src/engine/design/doc.ts) | 25 | 19 |
+| [doc.ts](../src/engine/design/doc.ts) | 25 | 20 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [raster.ts](../src/engine/design/raster.ts) | 22 | 5 |
@@ -82,14 +82,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 20 | 3 |
+| `src/components/designer` | 22 | 3 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 12 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 28 | 115 |
+| `src/engine` | 29 | 116 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 43 | 38 |
+| `src/engine/design` | 44 | 39 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
@@ -98,7 +98,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 17 | 113 |
 | `src/store` | 2 | 89 |
 
-93 de 226 módulos no tienen ningún test que los importe directamente.
+96 de 230 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -115,6 +115,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
+- [ShapeKnots.tsx](../src/components/designer/ShapeKnots.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)

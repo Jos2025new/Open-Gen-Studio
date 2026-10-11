@@ -1,3 +1,4 @@
+import { ShapeLookFields } from './ShapeLookFields';
 import { record } from '../../engine/design/history';
 import type { ReactNode } from 'react';
 import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Magnet, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
@@ -282,7 +283,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
           <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
           {tool === 'polygon' && <InlineSlider label="Sides" min={3} max={12} value={shape.sides ?? 5} onChange={(v) => setUi({ shape: { ...shape, sides: v } })} />}
           {tool === 'curve' && <span data-tip="How far the curve bows from the straight line; negative bows to the other side"><InlineSlider label="Bend" unit="%" min={-100} max={100} value={shape.bend ?? 30} onChange={(v) => setUi({ shape: { ...shape, bend: v } })} /></span>}
-          {tool === 'rect' && <InlineSlider label="Radius" unit="px" min={0} max={200} value={shape.radius} onChange={(v) => setUi({ shape: { ...shape, radius: v } })} />}
+          <ShapeLookFields value={shape} corners={tool === 'rect'} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
         </>}
 
   </div>;

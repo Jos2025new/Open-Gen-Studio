@@ -1,6 +1,7 @@
 import { multiply, scaleAbout, translation } from './matrix';
 import { uid } from '../../lib/id';
 import { scaleStroke, translateStroke } from './strokes';
+import { scaleLook } from './shapeLook';
 import type { DesignDoc, Layer, RasterLayer, TextLayer, TextStyle, VectorLayer, VectorShape, ShapeSpec } from '../types';
 
 /* Pure document/layer operations for the Designer. Layers are ordered bottom → top. */
@@ -181,7 +182,7 @@ export function scaleLayer(layer: Layer, sx: number, sy: number, ax: number, ay:
     return {
       ...layer,
       ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(scaleAbout(sx, sy, ax, ay), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}),
-      shapes: layer.shapes.map((s: VectorShape) => ({ ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, radius: s.radius * k })),
+      shapes: layer.shapes.map((s: VectorShape) => ({ ...s, x: fx(s.x), y: fy(s.y), w: s.w * sx, h: s.h * sy, strokeWidth: s.strokeWidth * k, ...scaleLook(s, sx, sy) })),
       ...(layer.strokes ? { strokes: layer.strokes.map((s) => scaleStroke(s, sx, sy, ax, ay)) } : {}),
     };
   }

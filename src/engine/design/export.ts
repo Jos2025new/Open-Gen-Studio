@@ -1,4 +1,5 @@
 import { pathTransform } from './path';
+import { blurFilterSvg, cornerRadii, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
 import { strokeSvg } from './brushTextures';
@@ -35,28 +36,36 @@ export function n(v: number): string {
   return String(Math.round(v * 1000) / 1000);
 }
 
-function paint(fill: string | null, stroke: string | null, strokeWidth: number): string {
-  return `fill="${fill ? xmlEscape(fill) : 'none'}"${stroke && strokeWidth > 0 ? ` stroke="${xmlEscape(stroke)}" stroke-width="${n(strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"` : ''}`;
+function paint(s: VectorShape, strokeWidth: number, fill = s.fill): string {
+  return `fill="${fill ? xmlEscape(fill) : 'none'}"${s.stroke && strokeWidth > 0 ? ` stroke="${xmlEscape(s.stroke)}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
 }
 
+/** A shape, wrapped with its own blur filter when it has one (shapeLook.ts: Inkscape's 2.4σ margin). */
 export function shapeSvg(s: VectorShape): string {
+  const body = shapeBody(s);
+  if (!s.blur || s.blur <= 0) return body;
+  const id = `blur-${xmlEscape(s.id)}`;
+  return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${body}</g>`;
+}
+
+function shapeBody(s: VectorShape): string {
   if (s.type === 'path') {
     const t = pathTransform(s);
     const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
-    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${n(t.sx)} 0 0 ${n(t.sy)} ${n(t.tx)} ${n(t.ty)})" ${paint(s.fill, s.stroke, s.strokeWidth / k)}/>`;
+    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${n(t.sx)} 0 0 ${n(t.sy)} ${n(t.tx)} ${n(t.ty)})" ${paint(s, s.strokeWidth / k)}/>`;
   }
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);
     const y = Math.min(s.y, s.y + s.h);
     const w = Math.abs(s.w);
     const h = Math.abs(s.h);
-    const r = Math.min(s.radius, w / 2, h / 2);
-    return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${r > 0 ? ` rx="${n(r)}"` : ''} ${paint(s.fill, s.stroke, s.strokeWidth)}/>`;
+    const r = cornerRadii(s);
+    return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}"${r.rx > 0 && r.ry > 0 ? ` rx="${n(r.rx)}"${r.ry !== r.rx ? ` ry="${n(r.ry)}"` : ''}` : ''} ${paint(s, s.strokeWidth)}/>`;
   }
   if (s.type === 'ellipse') {
-    return `<ellipse cx="${n(s.x + s.w / 2)}" cy="${n(s.y + s.h / 2)}" rx="${n(Math.abs(s.w / 2))}" ry="${n(Math.abs(s.h / 2))}" ${paint(s.fill, s.stroke, s.strokeWidth)}/>`;
+    return `<ellipse cx="${n(s.x + s.w / 2)}" cy="${n(s.y + s.h / 2)}" rx="${n(Math.abs(s.w / 2))}" ry="${n(Math.abs(s.h / 2))}" ${paint(s, s.strokeWidth)}/>`;
   }
-  return `<line x1="${n(s.x)}" y1="${n(s.y)}" x2="${n(s.x + s.w)}" y2="${n(s.y + s.h)}" ${paint(null, s.stroke, s.strokeWidth)}/>`;
+  return `<line x1="${n(s.x)}" y1="${n(s.y)}" x2="${n(s.x + s.w)}" y2="${n(s.y + s.h)}" ${paint(s, s.strokeWidth, null)}/>`;
 }
 
 export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineHeightPx: number }, ascent: number): string {

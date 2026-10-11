@@ -5,6 +5,7 @@ import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
+import { applyStrokeLook, blurFilter, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion, redrawSoon } from './raster';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
@@ -163,50 +164,26 @@ function untransformedBox(l: Layer): Box | null {
 }
 
 function drawShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
+  ctx.save();
+  // Blur and stroke style: shapeLook.ts (Inkscape's formulas).
+  if (s.blur) ctx.filter = blurFilter(ctx, s.blur);
+  let p: Path2D | undefined, sw = s.strokeWidth;
   if (s.type === 'path') {
-    if (!s.d) return;
+    if (!s.d) { ctx.restore(); return; }
     const t = pathTransform(s);
-    ctx.save();
     ctx.setTransform(ctx.getTransform().multiply(new DOMMatrix([t.sx, 0, 0, t.sy, t.tx, t.ty])));
-    const p = new Path2D(s.d);
-    if (s.fill) {
-      ctx.fillStyle = s.fill;
-      ctx.fill(p);
-    }
-    if (s.stroke && s.strokeWidth > 0) {
-      ctx.strokeStyle = s.stroke;
-      ctx.lineWidth = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.stroke(p);
-    }
-    ctx.restore();
-    return;
-  }
-  ctx.beginPath();
-  if (s.type === 'rect') {
-    const x = Math.min(s.x, s.x + s.w);
-    const y = Math.min(s.y, s.y + s.h);
-    const w = Math.abs(s.w);
-    const h = Math.abs(s.h);
-    ctx.roundRect(x, y, w, h, Math.min(s.radius, w / 2, h / 2));
-  } else if (s.type === 'ellipse') {
-    ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
+    p = new Path2D(s.d);
+    sw = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
   } else {
-    ctx.moveTo(s.x, s.y);
-    ctx.lineTo(s.x + s.w, s.y + s.h);
+    ctx.beginPath();
+    if (s.type === 'rect') { const r = cornerRadii(s); traceRoundRect(ctx, rectBox(s), r.rx, r.ry); }
+    else if (s.type === 'ellipse') ctx.ellipse(s.x + s.w / 2, s.y + s.h / 2, Math.abs(s.w / 2), Math.abs(s.h / 2), 0, 0, Math.PI * 2);
+    else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }
-  if (s.fill && s.type !== 'line') {
-    ctx.fillStyle = s.fill;
-    ctx.fill();
-  }
-  if (s.stroke && s.strokeWidth > 0) {
-    ctx.strokeStyle = s.stroke;
-    ctx.lineWidth = s.strokeWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-  }
+  const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; if (p) ctx.fill(p); else ctx.fill(); } };
+  const stroke = () => { if (s.stroke && s.strokeWidth > 0) { ctx.strokeStyle = s.stroke; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); } };
+  if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
+  ctx.restore();
 }
 
 function drawText(ctx: CanvasRenderingContext2D, l: TextLayer): void {

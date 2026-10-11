@@ -2,6 +2,7 @@ import { allVectorObjects } from './vectorMask';
 import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { mapPathShape } from './path';
+import { cornerRadii, roundRectPath, scaleLook } from './shapeLook';
 import { apply, invert, isAxisAligned, lengthScale, multiply, type Mat } from './matrix';
 import { getBuffer, setBuffer, composeRaster } from './raster';
 
@@ -23,24 +24,22 @@ function asPath<T extends ShapeSpec>(s: T): T {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, rx = (x1 - x0) / 2, ry = (y1 - y0) / 2;
     d = `M ${cx + rx} ${cy} C ${cx + rx} ${cy + ry * K} ${cx + rx * K} ${cy + ry} ${cx} ${cy + ry} C ${cx - rx * K} ${cy + ry} ${cx - rx} ${cy + ry * K} ${cx - rx} ${cy} C ${cx - rx} ${cy - ry * K} ${cx - rx * K} ${cy - ry} ${cx} ${cy - ry} C ${cx + rx * K} ${cy - ry} ${cx + rx} ${cy - ry * K} ${cx + rx} ${cy} Z`;
   } else {
-    // Rounded corners as quadratic curves, so a rounded rectangle keeps its look.
-    const r = Math.min(Math.abs(s.radius ?? 0), Math.abs(x1 - x0) / 2, Math.abs(y1 - y0) / 2);
-    d = r > 0
-      ? `M ${x0 + r} ${y0} L ${x1 - r} ${y0} Q ${x1} ${y0} ${x1} ${y0 + r} L ${x1} ${y1 - r} Q ${x1} ${y1} ${x1 - r} ${y1} L ${x0 + r} ${y1} Q ${x0} ${y1} ${x0} ${y1 - r} L ${x0} ${y0 + r} Q ${x0} ${y0} ${x0 + r} ${y0} Z`
-      : `M ${x0} ${y0} L ${x1} ${y0} L ${x1} ${y1} L ${x0} ${y1} Z`;
+    // Rounded corners keep their look (elliptical when Rx ≠ Ry).
+    const r = cornerRadii(s);
+    d = roundRectPath({ x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0), h: Math.abs(y1 - y0) }, r.rx, r.ry);
   }
   const box = { x: Math.min(x0, x1), y: Math.min(y0, y1), w: Math.abs(x1 - x0) || 1, h: Math.abs(y1 - y0) || 1 };
-  return { ...s, type: 'path', d, box0: box, ...box, radius: 0 };
+  return { ...s, type: 'path', d, box0: box, ...box, radius: 0, rx: undefined, ry: undefined };
 }
 
 export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
   const k = lengthScale(m);
   if (s.type !== 'path' && isAxisAligned(m)) {
     const [x0, y0] = apply(m, s.x, s.y), [x1, y1] = apply(m, s.x + s.w, s.y + s.h);
-    return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, radius: (s.radius ?? 0) * k };
+    return { ...s, x: x0, y: y0, w: x1 - x0, h: y1 - y0, strokeWidth: s.strokeWidth * k, ...scaleLook(s, m[0], m[3]) };
   }
   const p = s.type === 'path' ? s : asPath(s);
-  return { ...mapPathShape(p, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k };
+  return { ...mapPathShape(p, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
 }
 
 export function transformStroke(s: Stroke, m: Mat): Stroke {

@@ -15,6 +15,7 @@ import { usePref } from '../ui/hooks';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { ToolSettings } from './ToolSettings';
+import { ShapeLookFields } from './ShapeLookFields';
 import { InlineColor, InlineSlider } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
@@ -273,7 +274,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
             <StrokeStyleFields value={targets[targets.length - 1]} onChange={(p) => patch({ strokes: layer.strokes!.map((st) => (ids.has(st.id) ? { ...st, ...p } : st)) })} />
           </>;
         })() : null}
-        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill } : x) })} /></Field><Field label="Stroke"><InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field></div>)}</>}
+        {layer.type === 'vector' && (layer.shapes.length > 0 || !layer.strokes?.length) && <><p className="muted">{layer.shapes.length} shapes · draw on the canvas to add more.</p>{layer.shapes.map((s, i) => <div className="shape-properties" key={s.id}><strong>{s.type} {i + 1}</strong><Field label="Fill"><InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, fill } : x) })} /></Field><Field label="Stroke"><InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, stroke } : x) })} /></Field><Field label="Stroke width"><input type="number" min={0} value={s.strokeWidth} onChange={(e) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, strokeWidth: Math.max(0, +e.target.value) } : x) })} /></Field><ShapeLookFields value={s} corners={s.type === 'rect'} blur onChange={(p) => patch({ shapes: layer.shapes.map((x) => x.id === s.id ? { ...x, ...p } : x) })} /></div>)}</>}
       </fieldset>
       </details>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>

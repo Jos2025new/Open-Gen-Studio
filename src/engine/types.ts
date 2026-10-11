@@ -367,20 +367,8 @@ export interface TextStyle {
   letterSpacing: number;
 }
 
-export interface ShapeSpec {
-  type: 'rect' | 'ellipse' | 'line' | 'path';
-  /** path: SVG path data in absolute commands, in its own coordinates (`box0`), mapped onto x/y/w/h. */
-  d?: string;
-  box0?: { x: number; y: number; w: number; h: number };
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  fill: string | null;
-  stroke: string | null;
-  strokeWidth: number;
-  radius: number;
-}
+import type { ShapeSpec } from './shapeSpec';
+export type { ShapeSpec };
 
 interface StepBase {
   /** Local node identities, resolved through the existing step executor. */

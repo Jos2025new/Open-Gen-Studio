@@ -9,6 +9,7 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineToggle } from './InlineControls';
+import { patchShape, ShapeLookFields, usePickedShape } from './ShapeLookFields';
 
 /*
  * The contextual strip above the tool box (docs/plan-designer-ux.md, step 1): the active tool's essential controls,
@@ -36,6 +37,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const active = activeLayer(doc);
   const selectedText = tool === 'text' && active?.type === 'text' ? active : null;
   const pageRuler = ruler && ruler.docId === doc.id ? ruler : null;
+  const picked = usePickedShape(doc), selectedShape = tool === 'move' && !selectedText ? picked : null;
   return <div className="context-strip" role="toolbar" aria-label={`${TOOL_NAMES[tool]} quick settings`}>
     <span className="context-target" data-tip="What the next action changes">
       <strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}
@@ -43,8 +45,10 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
     {/* With a text layer selected, the fields change that text, not the settings for the next one. */}
     {selectedText ? <div className="tool-settings" role="group" aria-label="Selected text">
       <TextStyleFields value={selectedText} compact onChange={(p) => { if (!selectedText.locked) patchLayer(sessionId, doc.id, selectedText.id, p as Partial<Layer>); }} />
+    </div> : selectedShape ? <div className="tool-settings" role="group" aria-label="Selected shape">
+      <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
     </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
-    <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
+    <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
   </div>;
 }

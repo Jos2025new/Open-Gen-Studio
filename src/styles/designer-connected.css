@@ -299,3 +299,7 @@
 /* Narrow windows put Conversation above the dock, on the left: the strip aligns right so it never covers it. */
 @media (max-width: 1400px) { .composer-tools-bar .context-strip { left: auto; right: 18px; max-width: calc(100% - 314px); } }
 .layer-appearance-title { padding: 0 2px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, var(--text-2)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Shape knots (ShapeKnots.tsx): Inkscape's corner and blur handles on the picked shape. */
+.shape-knots { z-index: 4; }
+.shape-knot { cursor: pointer; }
+.shape-knot-lines line { stroke: var(--accent); stroke-width: 1; }

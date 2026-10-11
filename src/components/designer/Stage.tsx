@@ -13,6 +13,8 @@ import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
+import { ShapeKnots } from './ShapeKnots';
+import { cornerRadii, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
 import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
@@ -569,7 +571,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const path = preview.tool === 'polygon' || preview.tool === 'curve' || preview.tool === 'arrow'
         ? new Path2D(toolPath(preview.tool, preview.x0, preview.y0, preview.x1, preview.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: shapeStyle.strokeWidth }))
         : new Path2D();
-      if (preview.tool === 'rect') path.roundRect(x, y, w, h, Math.min(shapeStyle.radius, w / 2, h / 2));
+      if (preview.tool === 'rect') { const r = cornerRadii({ ...shapeStyle, w, h }); traceRoundRect(path, { x, y, w, h }, r.rx, r.ry); }
       else if (preview.tool === 'ellipse') path.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
       else if (preview.tool === 'line') { path.moveTo(preview.x0, preview.y0); path.lineTo(preview.x1, preview.y1); }
       if (!lineLike && shapeStyle.fill) {
@@ -1219,6 +1221,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const d0 = d.tool === 'polygon' || d.tool === 'curve' || d.tool === 'arrow' ? toolPath(d.tool, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
       const pbox = d0 ? pathBox(d0) : null;
       if (d0 && !pbox) return;
+      // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
+      const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder };
       const shape = pbox ? {
         id: uid('shp'),
         type: 'path' as const,
@@ -1229,6 +1233,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         stroke: lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
         strokeWidth: lineLike ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
         radius: 0,
+        ...look,
       } : {
         id: uid('shp'),
         type: d.tool as 'rect' | 'ellipse' | 'line',
@@ -1240,6 +1245,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         stroke: d.tool === 'line' ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
         strokeWidth: d.tool === 'line' ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
         radius: d.tool === 'rect' ? shapeStyle.radius : 0,
+        ...look, ...(d.tool === 'rect' ? { rx: shapeStyle.rx, ry: shapeStyle.ry } : {}),
       };
       const current = getDoc(sessionId, doc.id);
       if (!current) return;
@@ -1331,6 +1337,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
+      {tool === 'move' && !editLayers && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {

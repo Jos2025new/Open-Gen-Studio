@@ -17,7 +17,7 @@ import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
 import { DEFAULT_STROKE_STYLE } from '../engine/design/strokes';
-import type { StrokeStyle } from '../engine/types';
+import type { ShapeSpec, StrokeStyle } from '../engine/types';
 import type {
   AgentStyle,
   Asset,
@@ -138,7 +138,7 @@ export interface UiState {
   snap?: { on: boolean; page: boolean; layers: boolean };
   /** Edit tool: Ctrl-click picks more objects of the active layer (default) or more layers. */
   selectMode?: 'objects' | 'layers';
-  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number };
+  shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number } & Pick<ShapeSpec, 'rx' | 'ry' | 'join' | 'cap' | 'miter' | 'dash' | 'dashOffset' | 'paintOrder'>;
   text: TextStyle;
   threadOpen: boolean;
   settingsOpen: boolean;
