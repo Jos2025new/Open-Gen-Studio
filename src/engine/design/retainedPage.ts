@@ -1,4 +1,6 @@
-import type { FxOp } from '../fx/types';
+import type { FxOp, FxLayer } from '../fx/types';
+import type { FxStep } from '../fx/plan';
+import type { Layer } from '../types';
 
 /*
  * Retained page (Paso 3): the editor keeps the last composite and recomposes only the region a change dirties.
@@ -38,5 +40,100 @@ export function fxMargin(op: Pick<FxOp, 'kind' | 'enabled' | 'params'>, scale: n
     default:
       // glow reaches its blur radius (3 sigma) but its passes are not verified here; flare places light anywhere.
       return Infinity;
+  }
+}
+
+/** One step of the FX plan as the planner sees it: what it is made of (identities and pixel versions), its area and its reach. */
+export interface StepSig { below: boolean; key: unknown[]; box: Rect | null; margin: number }
+/** What a frame was composed from. A new frame is compared with the last composed one. */
+export interface FrameMemo { W: number; H: number; scale: number; background: string | undefined; fontEpoch: number; base: Rect | null; steps: StepSig[] }
+export type FramePlan = { kind: 'same' } | { kind: 'full'; why: string } | { kind: 'region'; rect: Rect; reach: number };
+
+/** Sum of the reach of FX ops (`Infinity` if any op is not known). */
+function marginOf(fxs: FxLayer[], scale: number): number {
+  let m = 0;
+  for (const f of fxs) for (const op of f.ops) m += fxMargin(op, scale);
+  return m;
+}
+
+/** The planner's view of a step. A layer's box grows by its own FX reach, since its FX may spread it. */
+export function stepSig(s: FxStep, scale: number, boxOf: (l: Layer) => Rect | null, versionsOf: (l: Layer) => unknown[]): StepSig {
+  if (s.t === 'below') return { below: true, key: [s.fx], box: null, margin: marginOf([s.fx], scale) };
+  if (s.t === 'draw') return { below: false, key: [s.layer, ...versionsOf(s.layer)], box: boxOf(s.layer), margin: 0 };
+  const margin = marginOf(s.fx, scale), box = boxOf(s.layer);
+  return { below: false, key: [s.layer, ...s.fx, ...versionsOf(s.layer)], box: box && grow(box, margin), margin };
+}
+
+const sameKey = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((k, i) => k === b[i]);
+/** A region bigger than this share of the page is recomposed as a whole: the bookkeeping would cost more than it saves. */
+export const MAX_REGION_SHARE = 0.5;
+
+/**
+ * Decides how to produce a frame from the last composed one. Only steps whose keys changed are looked at. A changed
+ * layer dirties its old and new area; a 'below' FX dirties everything under it (the page when there is a background)
+ * grown by its reach, and every later 'below' FX sees what the earlier changes dirtied. Anything unknown is a full frame.
+ */
+export function planFrame(prev: FrameMemo | null, cur: FrameMemo): FramePlan {
+  if (!prev) return { kind: 'full', why: 'first frame' };
+  if (prev.W !== cur.W || prev.H !== cur.H || prev.scale !== cur.scale || prev.background !== cur.background || prev.fontEpoch !== cur.fontEpoch) return { kind: 'full', why: 'page' };
+  if (prev.steps.length !== cur.steps.length || prev.steps.some((p, i) => p.below !== cur.steps[i].below)) return { kind: 'full', why: 'steps' };
+  const changed = cur.steps.map((s, i) => !sameKey(s.key, prev.steps[i].key));
+  if (!changed.some(Boolean)) return { kind: 'same' };
+  let reach = 0;
+  for (const s of cur.steps) reach += s.margin;
+  if (!Number.isFinite(reach)) return { kind: 'full', why: 'unknown FX' };
+  let dirty: Rect | null = null, beneath: Rect | null = cur.base;
+  for (let i = 0; i < cur.steps.length; i++) {
+    const s = cur.steps[i], p = prev.steps[i];
+    if (s.below) {
+      // Both reaches: a shrinking blur still changed what the wider one spread over.
+      const reach = Math.max(p.margin, s.margin);
+      if (changed[i] || dirty) {
+        const src = changed[i] ? union(beneath, dirty) : dirty;
+        if (src) dirty = union(dirty, grow(src, reach));
+      }
+      beneath = beneath && grow(beneath, reach);
+    } else {
+      const box = union(p.box, s.box);
+      if (changed[i]) dirty = union(dirty, box);
+      beneath = union(beneath, box);
+    }
+  }
+  if (!dirty) return { kind: 'full', why: 'no area' };
+  const rect = clipTo(dirty, cur.W, cur.H);
+  if (isEmpty(rect)) return { kind: 'full', why: 'outside the page' };
+  if ((rect.x1 - rect.x0) * (rect.y1 - rect.y0) > MAX_REGION_SHARE * cur.W * cur.H) return { kind: 'full', why: 'large region' };
+  return { kind: 'region', rect, reach };
+}
+
+/** The operations a page needs from its canvas type: compose a crop (null = the whole page) and copy a part of one into another. */
+export interface PageOps<C> {
+  compose(crop: Rect | null): C;
+  blit(dst: C, src: C, from: Rect, to: Rect): void;
+}
+
+/**
+ * The composed page, kept between frames. Each frame is planned against the last one; a region is recomposed on a
+ * crop that adds the FX reach around it, so the pixels inside the region match a whole-page composition.
+ */
+export class RetainedPage<C> {
+  private memo: FrameMemo | null = null;
+  private page: C | null = null;
+  /** Frames by kind since the last reset (for the bench). */
+  readonly stats = { same: 0, region: 0, full: 0 };
+  reset(): void { this.memo = null; this.page = null; }
+  frame(cur: FrameMemo, ops: PageOps<C>): C {
+    const plan = planFrame(this.memo, cur);
+    if (plan.kind === 'same' && this.page) { this.stats.same++; return this.page; }
+    if (plan.kind === 'region' && this.page) {
+      const crop = clipTo(grow(plan.rect, plan.reach), cur.W, cur.H), r = plan.rect;
+      const part = ops.compose(crop);
+      ops.blit(this.page, part, { x0: r.x0 - crop.x0, y0: r.y0 - crop.y0, x1: r.x1 - crop.x0, y1: r.y1 - crop.y0 }, r);
+      this.memo = cur; this.stats.region++;
+      return this.page;
+    }
+    this.page = ops.compose(null);
+    this.memo = cur; this.stats.full++;
+    return this.page;
   }
 }
