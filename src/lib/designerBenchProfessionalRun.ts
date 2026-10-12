@@ -23,6 +23,8 @@ const percentile = (values: number[], q: number) => [...values].sort((a, b) => a
 const round = (n: number) => Math.round(n * 100) / 100;
 
 let running = false;
+/** Moves of the drag gestures (b, c); the profiling rule caps a gesture at 5 s, so the Etapa A runs use 10. */
+let dragMoves = 60;
 const work: Array<[number, number]> = [];
 const frames: number[] = [];
 const longTasks: Array<{ start: number; duration: number }> = [];
@@ -113,8 +115,8 @@ async function moveEarlyStroke(rep: number, canvasInfo: ReturnType<typeof stage>
   const at = performance.now();
   await ctx.send('pointerdown', hit, at);
   if (!objectPick(doc.id)?.ids.includes(strokeId)) throw new Error(`Press did not pick ${strokeId}; invalid benchmark`);
-  for (let i = 1; i <= 60; i++) await ctx.send('pointermove', { x: hit.x + i, y: hit.y + i / 2 }, at + PERIOD * i);
-  await ctx.send('pointerup', { x: hit.x + 60, y: hit.y + 30 }, at + PERIOD * 61);
+  for (let i = 1; i <= dragMoves; i++) await ctx.send('pointermove', { x: hit.x + i, y: hit.y + i / 2 }, at + PERIOD * i);
+  await ctx.send('pointerup', { x: hit.x + dragMoves, y: hit.y + dragMoves / 2 }, at + PERIOD * (dragMoves + 1));
 }
 
 /** Edit (layers): drag a whole vector layer by pressing inside its box. */
@@ -127,8 +129,8 @@ async function moveWholeLayer(canvasInfo: ReturnType<typeof stage>, ctx: Ctx) {
   if (hitTestPixel(doc, p0.x, p0.y)?.id !== PROFESSIONAL_IDS.wholeLayer) throw new Error('Press point is not on the target layer; invalid benchmark');
   const at = performance.now();
   await ctx.send('pointerdown', canvasInfo.point(p0.x, p0.y), at);
-  for (let i = 1; i <= 60; i++) await ctx.send('pointermove', canvasInfo.point(p0.x - 2 * i, p0.y), at + PERIOD * i);
-  await ctx.send('pointerup', canvasInfo.point(p0.x - 120, p0.y), at + PERIOD * 61);
+  for (let i = 1; i <= dragMoves; i++) await ctx.send('pointermove', canvasInfo.point(p0.x - 2 * i, p0.y), at + PERIOD * i);
+  await ctx.send('pointerup', canvasInfo.point(p0.x - 2 * dragMoves, p0.y), at + PERIOD * (dragMoves + 1));
 }
 
 /** Layers panel: hide the folder, then show it again (the eye button of the folder). */
@@ -196,8 +198,9 @@ export function pruneProfessionalSessions(keep: string) {
 }
 
 /** Runs the five gestures, three repetitions each, on the prepared document. Returns the JSON for the baseline. */
-export async function runProfessional(only?: string[], reps = 3) {
+export async function runProfessional(only?: string[], reps = 3, moves = 60) {
   if (running) throw new Error('Benchmark already running');
+  dragMoves = moves;
   const sessionId = useStore.getState().activeSessionId;
   const doc0 = activeDoc(sessionId);
   if (!doc0 || doc0.id !== 'bench-doc-profesional') throw new Error('Prepare the professional document first');
