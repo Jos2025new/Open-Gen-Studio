@@ -7,8 +7,9 @@ import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape }
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
-import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
+import { bufferVersion, cloneCanvas, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import { bufferAlpha } from './hitAlpha';
+import { cachedBelow, keepBelow } from './belowFxCache';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
@@ -437,10 +438,17 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
     x.fillStyle = doc.background;
     x.fillRect(0, 0, doc.width, doc.height);
   }
+  // Editor frames only: what is drawn so far, for the 'below' cache (scale, page size, background, fonts, layers, pixels).
+  const below: unknown[] = editor ? [scale, W, H, doc.background, fontEpoch] : [];
   for (const s of steps) {
     const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${W}x${H}` });
-    if (s.t === 'draw') drawLayer(at(acc), s.layer);
-    else if (s.t === 'below') acc = mixFx(acc, s.fx, { scale, clip: false, trace });
+    if (s.t === 'draw') { drawLayer(at(acc), s.layer); if (editor) below.push(s.layer, ...rasterBufferIds([s.layer]).map(bufferVersion)); }
+    else if (s.t === 'below') {
+      const key = editor ? [...below, s.fx] : null, hit = key && cachedBelow(s.fx.id, key);
+      if (hit) { acc = createCanvas(W, H); ctx2d(acc).drawImage(hit, 0, 0); }
+      else { acc = mixFx(acc, s.fx, { scale, clip: false, trace }); if (key) keepBelow(s.fx.id, key, cloneCanvas(acc)); }
+      if (editor) below.push(s.fx);
+    }
     else {
       const key = editor ? contentKey(s.layer, s, scale, W, H) : null;
       let own = key && cachedFx(s.layer.id, key, rasterBufferIds([s.layer]).length);
@@ -452,6 +460,7 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
         for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region, trace });
         if (key) keepFx(s.layer.id, key, own);
       }
+      if (editor) below.push(s.layer, ...s.fx, ...rasterBufferIds([s.layer]).map(bufferVersion));
       // In canvas px: `own` is already at the composite's scale.
       const x = ctx2d(acc);
       x.setTransform(1, 0, 0, 1, 0, 0);
