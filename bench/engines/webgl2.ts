@@ -79,14 +79,15 @@ export function webgl2Engine(): Engine {
   let gl: WebGL2RenderingContext, canvas: HTMLCanvasElement;
   let quad: WebGLBuffer, progTex: Prog, progBlur: Prog, progColor: Prog, progShadow: Prog, progGlow: Prog, progPoint: Prog;
   const baseTex = new WeakMap<HTMLCanvasElement, WebGLTexture>();
-  const vecTex = new WeakMap<Layer, WebGLTexture>();
+  const vecTex = new Map<string, { layer: Layer; tex: WebGLTexture }>();
+  const allTex: WebGLTexture[] = [], allFb: WebGLFramebuffer[] = [], allBuf: WebGLBuffer[] = [];
   const dabs = new WeakMap<RasterStroke, Float32Array>();
   const layerBatches = new Map<string, { layer: RasterLayer; batches: Batch[] }>();
   const fbos: Target[] = [];
   let texBytes = 0, scene: Scene;
 
   const tex = (w: number, h: number, data?: TexImageSource) => {
-    const t = gl.createTexture()!;
+    const t = gl.createTexture()!; allTex.push(t);
     gl.bindTexture(gl.TEXTURE_2D, t);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
@@ -95,7 +96,7 @@ export function webgl2Engine(): Engine {
     return t;
   };
   const target = (w: number, h: number): Target => {
-    const t = tex(w, h), fb = gl.createFramebuffer()!;
+    const t = tex(w, h), fb = gl.createFramebuffer()!; allFb.push(fb);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
     return { fb, tex: t, w, h, busy: false };
   };
@@ -210,7 +211,7 @@ export function webgl2Engine(): Engine {
       const [hard, mult] = key.split('|');
       const total = parts.reduce((n, p) => n + p.length, 0), all = new Float32Array(total);
       let off = 0; for (const p of parts) { all.set(p, off); off += p.length; }
-      const buf = gl.createBuffer()!; gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, all, gl.STATIC_DRAW);
+      const buf = gl.createBuffer()!; allBuf.push(buf); gl.bindBuffer(gl.ARRAY_BUFFER, buf); gl.bufferData(gl.ARRAY_BUFFER, all, gl.STATIC_DRAW);
       return { buf, count: total / 9, hard: Number(hard), multiply: mult === '1' };
     });
   };
@@ -250,11 +251,12 @@ export function webgl2Engine(): Engine {
           if (t) draw(progTex, bindTexOf(t), [l.x * scale, l.y * scale, l.width * scale, l.height * scale], [W, H], () => gl.uniform1f(progTex.u.u_alpha, l.opacity), true);
           drawBatches(l, scale, W, H, l.opacity);
         } else {
-          let t = vecTex.get(l);
+          let t = vecTex.get(l.id)?.layer === l ? vecTex.get(l.id)!.tex : undefined;
           if (!t) {
+            const old = vecTex.get(l.id); if (old) gl.deleteTexture(old.tex);
             const c = document.createElement('canvas'); c.width = doc.width; c.height = doc.height;
             drawDoc(c.getContext('2d')!, { ...doc, background: null, layers: [l] }, { resolution: 'document' });
-            t = tex(0, 0, c); vecTex.set(l, t); texBytes += c.width * c.height * 4;
+            t = tex(0, 0, c); vecTex.set(l.id, { layer: l, tex: t }); texBytes += c.width * c.height * 4; c.width = 0;
           }
           gl.bindFramebuffer(gl.FRAMEBUFFER, acc.fb); gl.viewport(0, 0, W, H);
           draw(progTex, bindTexOf(t), [0, 0, W, H], [W, H], () => gl.uniform1f(progTex.u.u_alpha, l.opacity), true);
@@ -307,6 +309,13 @@ export function webgl2Engine(): Engine {
       for (const [, base] of sc.bases) { baseTex.set(base, tex(0, 0, base)); texBytes += base.width * base.height * 4; }
     },
     layerChanged(_doc, layerId) { layerBatches.delete(layerId); },
+    dispose() {
+      for (const t of allTex) gl.deleteTexture(t);
+      for (const f of allFb) gl.deleteFramebuffer(f);
+      for (const b of allBuf) gl.deleteBuffer(b);
+      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      canvas.width = 0;
+    },
     render(doc, view) {
       const scale = scaleOf(doc, view.zoom);
       const acc = pageInto(doc, scale);

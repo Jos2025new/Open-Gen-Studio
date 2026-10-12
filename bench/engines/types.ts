@@ -15,6 +15,8 @@ export interface Engine {
   sync(): void;
   /** The full-resolution page as RGBA (top row first), for pixel comparison. */
   fullPage(doc: DesignDoc): Uint8ClampedArray;
+  /** Frees every canvas, texture, buffer and CanvasKit object the engine made (between repetitions). */
+  dispose(): void;
   /** Bytes of canvases/textures the engine holds, estimated from their sizes. */
   textureBytes(): number;
 }

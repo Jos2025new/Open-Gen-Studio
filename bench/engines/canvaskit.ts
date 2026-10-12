@@ -22,13 +22,18 @@ const matrix20 = (m3: number[], off = [0, 0, 0]) => [m3[0], m3[1], m3[2], 0, off
 
 export function canvaskitEngine(): Engine {
   let CK: any, surface: any, stage: any, bytes = 0;
+  /** Objects that own memory (surfaces, snapshots, paints, images, paths): deleted after each frame or on dispose. */
+  let garbage: Array<{ delete(): void }> = [];
+  let longLived: Array<{ delete(): void }> = [];
+  const t = <T extends { delete(): void }>(x: T): T => { garbage.push(x); return x; };
+  const freeGarbage = () => { for (const g of garbage) g.delete(); garbage = []; };
   const images = new WeakMap<HTMLCanvasElement, any>();
   const paths = new WeakMap<RasterStroke, any>();
   let scene: Scene;
   const info = (w: number, h: number) => ({ width: w, height: h, colorType: CK.ColorType.RGBA_8888, alphaType: CK.AlphaType.Premul, colorSpace: CK.ColorSpace.SRGB });
   const imageOf = (c: HTMLCanvasElement) => {
     let img = images.get(c);
-    if (!img) { img = CK.MakeImageFromCanvasImageSource(c); images.set(c, img); bytes += c.width * c.height * 4; }
+    if (!img) { img = CK.MakeImageFromCanvasImageSource(c); images.set(c, img); longLived.push(img); bytes += c.width * c.height * 4; }
     return img;
   };
   const pathOf = (s: RasterStroke) => {
@@ -37,13 +42,13 @@ export function canvaskitEngine(): Engine {
       // 0.42 builds paths with PathBuilder (moveTo/lineTo) and detaches the finished Path.
       const pb = new CK.PathBuilder();
       for (const [ax, ay, bx, by] of s.segments) { pb.moveTo(ax + s.x, ay + s.y); pb.lineTo(bx + s.x, by + s.y); }
-      p = pb.detach();
-      paths.set(s, p);
+      p = pb.detach(); pb.delete();
+      paths.set(s, p); longLived.push(p);
     }
     return p;
   };
   const colorPaint = (hex: string, alpha: number, width?: number) => {
-    const paint = new CK.Paint(); const [r, g, b] = hexColor(hex);
+    const paint = t(new CK.Paint()); const [r, g, b] = hexColor(hex);
     paint.setColor(CK.Color4f(r, g, b, alpha)); paint.setAntiAlias(true);
     if (width !== undefined) { paint.setStyle(CK.PaintStyle.Stroke); paint.setStrokeWidth(width); paint.setStrokeCap(CK.StrokeCap.Round); paint.setStrokeJoin(CK.StrokeJoin.Round); }
     return paint;
@@ -52,9 +57,9 @@ export function canvaskitEngine(): Engine {
   const filterOp = (src: any, op: { kind: string; enabled: boolean; params: Record<string, number | string> }, scale: number, W: number, H: number) => {
     if (!op.enabled) return src;
     const num = (k: string, d: number) => Number(op.params[k] ?? d);
-    const dst = src.makeSurface(info(W, H)); const c = dst.getCanvas();
-    const snap = src.makeImageSnapshot();
-    const paint = new CK.Paint();
+    const dst = t(src.makeSurface(info(W, H))); const c = dst.getCanvas();
+    const snap = t(src.makeImageSnapshot());
+    const paint = t(new CK.Paint());
     if (op.kind === 'blur') {
       const s = Math.max(0.01, num('radius', 4) * scale);
       paint.setImageFilter(CK.ImageFilter.MakeBlur(s, s, CK.TileMode.Clamp, null));
@@ -73,8 +78,8 @@ export function canvaskitEngine(): Engine {
       else { const ys = num('shadows', 0.25), ym = num('midtones', 0.5), yh = num('highlights', 0.75); a = (yh - ys) / 0.5; b = ym - a * 0.5; }
       paint.setColorFilter(CK.ColorFilter.MakeMatrix(matrix20([a, 0, 0, 0, a, 0, 0, 0, a], [b, b, b])));
     } else if (op.kind === 'glow') {
-      const sg = Math.max(0.01, num('radius', 12) * scale), glow = new CK.Paint();
-      c.drawImage(snap, 0, 0, new CK.Paint());
+      const sg = Math.max(0.01, num('radius', 12) * scale), glow = t(new CK.Paint());
+      c.drawImage(snap, 0, 0, t(new CK.Paint()));
       glow.setImageFilter(CK.ImageFilter.MakeBlur(sg, sg, CK.TileMode.Clamp, null));
       glow.setAlphaf(num('strength', 0.8)); glow.setBlendMode(CK.BlendMode.Screen);
       c.drawImage(snap, 0, 0, glow);
@@ -91,7 +96,7 @@ export function canvaskitEngine(): Engine {
   const drawLayerContent = (c: any, l: RasterLayer, scale: number, opacity: number) => {
     const base = scene.bases.get(l.id);
     if (base) {
-      const paint = new CK.Paint(); paint.setAlphaf(opacity);
+      const paint = t(new CK.Paint()); paint.setAlphaf(opacity);
       c.drawImageRect(imageOf(base), CK.LTRBRect(0, 0, base.width, base.height), CK.LTRBRect(l.x * scale, l.y * scale, (l.x + l.width) * scale, (l.y + l.height) * scale), paint);
     }
     for (const s of l.paintStrokes ?? []) {
@@ -114,7 +119,7 @@ export function canvaskitEngine(): Engine {
   };
   const pageInto = (doc: DesignDoc, scale: number) => {
     const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
-    const acc = surface.makeSurface(info(W, H)); const c = acc.getCanvas();
+    const acc = t(surface.makeSurface(info(W, H))); const c = acc.getCanvas();
     c.clear(doc.background ? CK.Color4f(...hexColor(doc.background), 1) : CK.Color4f(0, 0, 0, 0));
     for (const s of fxPlan(doc.layers)) {
       if (s.t === 'draw') {
@@ -122,15 +127,15 @@ export function canvaskitEngine(): Engine {
         else drawVector(c, s.layer, scale, s.layer.opacity);
       } else if (s.t === 'below') {
         const next = chain(acc, (s.fx as FxLayer).ops, scale, W, H);
-        if (next !== acc) { c.clear(CK.Color4f(0, 0, 0, 0)); c.drawImage(next.makeImageSnapshot(), 0, 0); }
+        if (next !== acc) { c.clear(CK.Color4f(0, 0, 0, 0)); c.drawImage(t(next.makeImageSnapshot()), 0, 0); }
       } else {
-        const own = surface.makeSurface(info(W, H)); const oc = own.getCanvas();
+        const own = t(surface.makeSurface(info(W, H))); const oc = own.getCanvas();
         oc.clear(CK.Color4f(0, 0, 0, 0));
         if (s.layer.type === 'raster') drawLayerContent(oc, s.layer, scale, 1);
         let cur = own;
         for (const fx of s.fx) cur = chain(cur, fx.ops, scale, W, H);
-        const paint = new CK.Paint(); paint.setAlphaf(s.layer.opacity);
-        c.drawImage(cur.makeImageSnapshot(), 0, 0, paint);
+        const paint = t(new CK.Paint()); paint.setAlphaf(s.layer.opacity);
+        c.drawImage(t(cur.makeImageSnapshot()), 0, 0, paint);
       }
     }
     return { acc, W, H };
@@ -153,16 +158,25 @@ export function canvaskitEngine(): Engine {
       const { acc, W, H } = pageInto(doc, scale);
       const c = stage.getCanvas();
       c.clear(CK.Color4f(0, 0, 0, 0));
-      const paint = new CK.Paint();
-      c.drawImageRect(acc.makeImageSnapshot(), CK.LTRBRect(0, 0, W, H), CK.LTRBRect(view.x, view.y, view.x + doc.width * view.zoom, view.y + doc.height * view.zoom), paint);
+      const paint = t(new CK.Paint());
+      c.drawImageRect(t(acc.makeImageSnapshot()), CK.LTRBRect(0, 0, W, H), CK.LTRBRect(view.x, view.y, view.x + doc.width * view.zoom, view.y + doc.height * view.zoom), paint);
       stage.flush();
+      freeGarbage();
     },
     sync() { stage.flush(); const img = stage.makeImageSnapshot(CK.LTRBRect(0, 0, 1, 1)); img.readPixels(0, 0, info(1, 1)); img.delete(); },
     fullPage(doc) {
       const { acc, W, H } = pageInto(doc, 1);
-      const img = acc.makeImageSnapshot();
+      const img = t(acc.makeImageSnapshot());
       const px = img.readPixels(0, 0, info(W, H));
-      return new Uint8ClampedArray(px.buffer ?? px);
+      const out = new Uint8ClampedArray(px.buffer ?? px);
+      freeGarbage();
+      return out;
+    },
+    dispose() {
+      freeGarbage();
+      for (const o of longLived) o.delete();
+      longLived = [];
+      stage?.delete?.();
     },
     textureBytes: () => bytes,
   };

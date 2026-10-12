@@ -1,4 +1,4 @@
-import { buildScene, addStroke, moveEditableStroke, moveWholeLayer, setFolderVisible, setFxParam, GESTURE_IDS, type Scene } from './scene';
+import { buildScene, freeBases, addStroke, moveEditableStroke, moveWholeLayer, setFolderVisible, setFxParam, GESTURE_IDS, type Scene } from './scene';
 import type { Engine, View } from './types';
 import type { DesignDoc } from '../../src/engine/types';
 import { canvas2dEngine } from './canvas2d';
@@ -9,6 +9,8 @@ import { canvas2dEngine } from './canvas2d';
  * gesture, ten events each, each repetition from a fresh scene and a fresh engine (not timed).
  */
 
+/** Forces a collection when the browser runs with --js-flags=--expose-gc (bench browsers only), so dropped canvases go. */
+const collect = () => { (window as unknown as { gc?: () => void }).gc?.(); };
 const EVENTS = 10, REPS = 3, VIEW_W = 1500, VIEW_H = 940;
 const pct = (v: number[], q: number) => { const s = [...v].sort((a, b) => a - b); return s[Math.max(0, Math.ceil(s.length * q) - 1)] ?? 0; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -47,19 +49,29 @@ export async function runEngine(zoom: number, only?: string[]) {
   })();
   const view = (scene: Scene): View => ({ zoom, x: (VIEW_W - scene.doc.width * zoom) / 2, y: (VIEW_H - scene.doc.height * zoom) / 2, width: VIEW_W, height: VIEW_H });
   const out: Record<string, unknown> = { engine: __ENGINE__, zoom, renderer, gestures: {} as Record<string, unknown> };
-  // Reference: OGS's own full-resolution page (the export path), from the pristine scene.
-  const ref = canvas2dEngine();
+  // Reference: OGS's own full-resolution page, from the pristine scene. It is computed once (mode=ref, stored as
+  // ref.b64 beside the builds): computing it inside each engine page exceeds the 1800 MB cap.
   const pristine = buildScene();
-  const refCanvas = document.createElement('canvas'); refCanvas.width = VIEW_W; refCanvas.height = VIEW_H;
-  await ref.init(pristine, refCanvas);
-  const refPage = ref.fullPage(pristine.doc);
+  const refPage = await loadReference(pristine);
+  // A new stage canvas per engine instance: a WebGL context lost on dispose cannot be reused.
+  const stageCanvas = (): HTMLCanvasElement => {
+    document.querySelectorAll('canvas.stage-canvas').forEach((c) => c.remove());
+    const cv = document.createElement('canvas'); cv.width = VIEW_W; cv.height = VIEW_H;
+    cv.style.width = `${VIEW_W}px`; cv.style.height = `${VIEW_H}px`; cv.className = 'stage-canvas';
+    document.body.appendChild(cv);
+    return cv;
+  };
+  const release = (eng: Engine, sc: Scene, cv: HTMLCanvasElement) => {
+    eng.dispose();
+    cv.remove();
+    collect();
+  };
   const engine = await makeEngine();
   const probe = buildScene();
-  const cv = document.createElement('canvas'); cv.width = VIEW_W; cv.height = VIEW_H;
-  cv.style.width = `${VIEW_W}px`; cv.style.height = `${VIEW_H}px`; cv.className = 'stage-canvas';
-  document.body.appendChild(cv);
-  await engine.init(probe, cv);
+  const probeCanvas = stageCanvas();
+  await engine.init(probe, probeCanvas);
   const page = engine.fullPage(probe.doc);
+  release(engine, probe, probeCanvas);
   let maxD = 0, sum = 0, over2 = 0;
   for (let i = 0; i < page.length; i += 4) for (let k = 0; k < 4; k++) { const d = Math.abs(page[i + k] - refPage[i + k]); if (d > maxD) maxD = d; sum += d; if (d > 2) over2++; }
   const at = (arr: Uint8ClampedArray, x: number, y: number) => Array.from(arr.subarray((y * pristine.doc.width + x) * 4, (y * pristine.doc.width + x) * 4 + 4));
@@ -71,6 +83,7 @@ export async function runEngine(zoom: number, only?: string[]) {
     for (let rep = 0; rep < REPS; rep++) {
       const scene = buildScene();
       const eng = await makeEngine();
+      const cv = stageCanvas();
       await eng.init(scene, cv);
       let doc = scene.doc;
       const v = view(scene);
@@ -86,10 +99,12 @@ export async function runEngine(zoom: number, only?: string[]) {
         times.push(performance.now() - t0);
       }
       lt.stop();
+      release(eng, scene, cv);
       reps.push({ rep, frameMs: times.map(r2), p50: r2(pct(times, 0.5)), p95: r2(pct(times, 0.95)), max: r2(Math.max(...times)), over8ms: times.filter((t) => t > 8).length, longTasks: lt.list.length, longTaskMaxMs: r2(Math.max(0, ...lt.list)), textureBytes: eng.textureBytes() });
     }
     out.gestures = { ...(out.gestures as object), [name]: { label: g.label, reps } };
   }
+  freeBases(); collect();
   const mem = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory;
   out.memory = { jsHeapBytes: mem?.usedJSHeapSize ?? null };
   return out;
@@ -97,3 +112,37 @@ export async function runEngine(zoom: number, only?: string[]) {
 
 declare global { const __ENGINE__: string; }
 export { EVENTS, REPS };
+
+/** The OGS reference page, from ref.png (written by mode=ref, lossless), or computed when that file is missing. */
+export async function loadReference(scene: Scene): Promise<Uint8ClampedArray> {
+  const res = await fetch('./ref.png').catch(() => null);
+  if (res?.ok) {
+    const bmp = await createImageBitmap(await res.blob());
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    const x = c.getContext('2d')!; x.drawImage(bmp, 0, 0);
+    const out = x.getImageData(0, 0, c.width, c.height).data;
+    c.width = 0;
+    return new Uint8ClampedArray(out);
+  }
+  const ref = canvas2dEngine();
+  const c = document.createElement('canvas'); c.width = VIEW_W; c.height = VIEW_H;
+  await ref.init(scene, c);
+  const page = ref.fullPage(scene.doc);
+  ref.dispose(); collect();
+  return page;
+}
+
+/** mode=ref: computes the OGS reference once, encodes it as PNG (lossless) and leaves base64 in #ref (saved as ref.png). */
+export async function refExport() {
+  const pristine = buildScene();
+  const page = await loadReference(pristine);
+  const c = document.createElement('canvas'); c.width = pristine.doc.width; c.height = pristine.doc.height;
+  c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(page), c.width, c.height), 0, 0);
+  const blob = await new Promise<Blob>((ok) => c.toBlob((b) => ok(b!), 'image/png'));
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000));
+  const pre = document.createElement('pre'); pre.id = 'ref'; pre.textContent = btoa(bin); document.body.appendChild(pre);
+  freeBases();
+  return { ref: 'ok', pngBytes: buf.length };
+}

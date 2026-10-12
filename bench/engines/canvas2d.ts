@@ -1,12 +1,12 @@
 import { drawDoc } from '../../src/engine/design/render';
-import { composeRaster, setBuffer } from '../../src/engine/design/raster';
+import { composeRaster, getBuffer, setBuffer } from '../../src/engine/design/raster';
 import type { DesignDoc } from '../../src/engine/types';
 import type { Engine, View } from './types';
 import type { Scene } from './scene';
 
 /* Canvas2D: OGS's own renderer, unchanged. drawDoc is the function the Designer and the exports call. */
 export function canvas2dEngine(): Engine {
-  let canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, sceneBases: Scene['bases'], bytes = 0;
+  let canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, sceneBases: Scene['bases'], bytes = 0, layerIds: string[] = [];
   return {
     name: 'canvas2d',
     async init(scene, cv) {
@@ -14,6 +14,7 @@ export function canvas2dEngine(): Engine {
       // The Stage's class turns on OGS's editor FX cache, as in the Designer.
       cv.classList.add('stage-canvas');
       sceneBases = scene.bases;
+      layerIds = scene.doc.layers.filter((l) => l.type === 'raster').map((l) => l.id);
       for (const l of scene.doc.layers) {
         if (l.type !== 'raster') continue;
         const base = scene.bases.get(l.id)!;
@@ -38,7 +39,13 @@ export function canvas2dEngine(): Engine {
       c.width = doc.width; c.height = doc.height;
       const x = c.getContext('2d')!;
       drawDoc(x, doc, { resolution: 'document' });
-      return x.getImageData(0, 0, c.width, c.height).data;
+      const out = x.getImageData(0, 0, c.width, c.height).data;
+      c.width = 0;
+      return out;
+    },
+    dispose() {
+      for (const lid of layerIds) { const b = getBuffer(lid); if (b) b.width = 0; }
+      canvas.width = 0;
     },
     textureBytes: () => { void sceneBases; return bytes; },
   };

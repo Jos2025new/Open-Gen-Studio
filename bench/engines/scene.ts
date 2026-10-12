@@ -19,15 +19,25 @@ function blankCanvas(): HTMLCanvasElement {
   return c;
 }
 
+/* The flattened bases are inputs no engine writes to (each engine copies or uploads them): one set serves every scene. */
+let sharedBases: Map<string, HTMLCanvasElement> | null = null;
+export function freeBases(): void {
+  for (const b of sharedBases?.values() ?? []) b.width = 0;
+  sharedBases = null;
+}
+
 export function buildScene(): Scene {
   const { doc } = professionalDocument();
-  const bases = new Map<string, HTMLCanvasElement>();
+  const bases = sharedBases ?? new Map<string, HTMLCanvasElement>();
+  sharedBases = bases;
   const layers: Layer[] = doc.layers.map((l) => {
     if (l.type !== 'raster') return l;
     const { flat, editable } = splitRasterLimit(l.paintStrokes ?? []);
-    const base = blankCanvas(), ctx = base.getContext('2d')!;
-    for (const s of flat) drawRasterStroke(ctx, s);
-    bases.set(l.id, base);
+    if (!bases.has(l.id)) {
+      const base = blankCanvas(), ctx = base.getContext('2d')!;
+      for (const s of flat) drawRasterStroke(ctx, s);
+      bases.set(l.id, base);
+    }
     return { ...l, paintBaseId: `${l.id}-base`, paintStrokes: editable };
   });
   return { doc: { ...doc, layers }, bases };
