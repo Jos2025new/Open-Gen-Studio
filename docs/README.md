@@ -43,7 +43,8 @@
 - [0011 — Capas de filtros y efectos no destructivos (FX)](decisions/0011-capas-fx.md).
 - [0012 — Registro de rendimiento para sesiones de prueba](decisions/0012-registro-de-rendimiento.md).
 - [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
-- [0014 — Guardar cada sesión por separado (propuesto, pendiente de aprobación)](decisions/0014-sesiones-separadas.md).
+- [0014 — Guardar cada sesión por separado (aceptado 2026-10-12; implementación parcial 2026-10-13)](decisions/0014-sesiones-separadas.md).
+- [0015 — Píxeles en mosaicos de 256² con copia al escribir (propuesto, sin implementar)](decisions/0015-mosaicos-de-pixeles.md).
 
 ## Propuestas de interfaz
 
