@@ -105,6 +105,27 @@ Lectura:
 
 **Lo no atribuido.** La parte de React en c (86 % inclusivo) incluye el redibujo; no se separa. No hay trazas de GPU: `restore`, `getImageData` y `drawImage` pueden incluir sincronización con la GPU, que no se distingue.
 
+## Etapa A: arreglos y medidas antes/después
+
+Estado de partida: sandbox vacío (una sesión profesional de 4,3 MB; antes el estado tenía 30 MB). Medidas con 10 movimientos en los gestos de arrastre (límite de 5 s por gesto), tres repeticiones, ventana enfocada en X11, renderer Mesa Intel hardware.
+
+**Corrección a la sección «Causas».** El coste de 450 ms que el perfil atribuyó a `sessionParts` en d corresponde a la pasada completa de seguridad (`FULL_EVERY_MS`, cada 30 s), que serializa todas las sesiones. En medidas de d (una repetición por acción) la tarea larga es de 83–112 ms: el guardado normal. Medido en Node: pasada completa con 7 sesiones (30 MB) 523 ms; guardado normal con una sesión cambiada 218 ms, sin cambios 55 ms.
+
+| Arreglo | Gesto | Antes (3 rep.) | Después (3 rep.) | Commit |
+|---|---|---|---|---|
+| 1. Guardar solo la sesión que cambió (ADR 0014) | d, e | No implementado. El ADR exige un formato de disco y de IndexedDB que las versiones antiguas no leen (PUT legado rechazado), así que se detuvo antes de implementarlo. | — | — |
+| 2. Máscaras sin recálculo y acierto sin leer GPU | b (mover trazo, 10 mov.) | Trabajo p50 0,8–3,3 ms; **p95 555–559 ms**; fotogramas > 8 ms: 7–9 de 20–22; tareas > 50 ms: 9–11 (máx. 604–624 ms); cola de evento p95 3,3–4,3 s; duración 3,6–4,5 s | Trabajo p50 0,4–5,7 ms; **p95 21–79 ms**; fotogramas > 8 ms: 2–5 de 9–14; tareas > 50 ms: 5–8 (máx. 104–145 ms); cola p95 0,09–0,71 s; duración 0,44–1,1 s | 066322d |
+| 3. Caché de FX `below` | c (mover capa, 10 mov.) | Trabajo p50 0,1–0,2 ms; p95 5,7–14,3 ms; tareas > 50 ms: 3–7 (máx. 211–405 ms); cola p95 136–250 ms | Trabajo p50 0 ms; p95 14–27 ms; tareas > 50 ms: 2–5 (máx. 91–137 ms); cola p95 75–265 ms | 2427ddb |
+
+**Lectura.**
+- **Arreglo 2 mejora b de forma clara:** el trabajo por fotograma p95 baja de ~556 ms a 21–79 ms, y la cola de eventos de ~4 s a menos de 0,7 s. **No cumple** el umbral de 8 ms: el coste restante está en la composición de los trazos (`ctx.restore` en `layMask`, raster.ts:142) y en las tareas de guardado fuera de la sonda.
+- **Arreglo 3 no mejora c de forma demostrable.** El trabajo por fotograma p95 queda igual o algo mayor (14–27 frente a 6–14 ms) y las tareas largas bajan de 3–7 a 2–5 por repetición. Con tres repeticiones es ruido probable. A zoom 0,365 los FX `below` se calculan sobre lienzos de unos 750 px, así que su coste ya era pequeño en este documento. El commit se conserva por corrección, pero no justifica su coste de mantenimiento por esta medida.
+- **Arreglo 1 pendiente de decisión.** Las tareas largas de d y e (83–137 ms) son el guardado normal de la sesión profesional de 4,3 MB, más el commit de React. Un guardado solo de la sesión cambiada reduciría el JSON, pero no el texto unido de 4,3 MB ni el blob; esa parte habría que medirla con el formato 2.
+
+**Medidas de referencia del estado limpio** (sin arreglos, mismo estado que la fila «Antes»): d, tarea larga 83–95 ms por repetición, trabajo p95 0,1–0,4 ms; e, tarea larga 91–137 ms, trabajo p95 0,1–0,2 ms. c con el mismo estado: tareas largas 3–7 por repetición, a diferencia de 21–29 con los 30 MB de la pasada inicial (60 movimientos, no comparable 1:1).
+
+**Incidencias de procedimiento.** Dos medidas empezaron con memoria disponible por debajo de 2,5 GB (2,09 GB en la línea base de b; 2,29 GB en el «antes» de c). La regla exige esperar; no se esperó. Los resultados se anotan con esa reserva. Desde entonces, la espera va dentro de cada comando de medida.
+
 ## Pendiente (para decidir)
 
 1. **Sesión reutilizada.** `prepareProfessional` ya reutiliza la sesión existente (una sola) y restaura su contenido; el test del helper pasa. El guardado de la sandbox sigue reserializando todo el estado (ver arreglo 1 de la Etapa A).
