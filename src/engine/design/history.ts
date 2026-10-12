@@ -23,6 +23,11 @@ interface Stack {
 }
 
 const LIMIT = 40;
+/** Pixel bytes the undo and redo steps may hold (Paso 5). The newest undo step is always kept. */
+export const HISTORY_BYTES_DEFAULT = 512 * 1024 * 1024;
+let historyByteLimit = HISTORY_BYTES_DEFAULT;
+/** Steps dropped per document to stay under the byte limit (the Designer shows this count, discreetly). */
+const dropped = new Map<string, number>();
 const stacks = new Map<string, Stack>();
 const listeners = new Set<() => void>();
 
@@ -49,12 +54,50 @@ function capture(doc: DesignDoc): Snapshot {
   return snap;
 }
 
+/** Pixel bytes held by the given steps, each canvas counted once (buffers are shared copy-on-write). */
+export function bytesOfSnapshots(snaps: Array<{ buffers: Map<string, { width: number; height: number }> }>): number {
+  const seen = new Set<unknown>();
+  let total = 0;
+  for (const snap of snaps) {
+    for (const canvas of snap.buffers.values()) {
+      if (seen.has(canvas)) continue;
+      seen.add(canvas);
+      total += canvas.width * canvas.height * 4;
+    }
+  }
+  return total;
+}
+
+/**
+ * Drops the oldest undo steps until the steps hold at most `limit` bytes. The newest undo step is never dropped (the
+ * last change can always be undone). Returns how many steps were dropped.
+ */
+export function trimByBytes<T extends { buffers: Map<string, { width: number; height: number }> }>(past: T[], future: T[], limit: number): number {
+  let n = 0;
+  while (past.length > 1 && bytesOfSnapshots([...past, ...future]) > limit) {
+    past.shift();
+    n++;
+  }
+  return n;
+}
+
+/** Sets the byte limit of the undo history (0 keeps only the newest undo step). */
+export function setHistoryByteLimit(bytes: number): void {
+  historyByteLimit = Math.max(0, bytes);
+}
+
+function trimStack(docId: string, s: Stack): void {
+  const n = trimByBytes(s.past, s.future, historyByteLimit);
+  if (n > 0) dropped.set(docId, (dropped.get(docId) ?? 0) + n);
+}
+
 /** Record the state *before* a change. */
 export function record(doc: DesignDoc): void {
   const s = stack(doc.id);
   s.past.push(capture(doc));
   if (s.past.length > LIMIT) s.past.shift();
   s.future = [];
+  trimStack(doc.id, s);
   listeners.forEach((l) => l());
 }
 
@@ -98,6 +141,6 @@ export function dropHistory(docId: string): void {
 }
 
 /** Read-only stack sizes for the sandbox state hook. */
-export function historyDepth(docId: string): { undo: number; redo: number } {
-  return { undo: stacks.get(docId)?.past.length ?? 0, redo: stacks.get(docId)?.future.length ?? 0 };
+export function historyDepth(docId: string): { undo: number; redo: number; dropped: number } {
+  return { undo: stacks.get(docId)?.past.length ?? 0, redo: stacks.get(docId)?.future.length ?? 0, dropped: dropped.get(docId) ?? 0 };
 }
