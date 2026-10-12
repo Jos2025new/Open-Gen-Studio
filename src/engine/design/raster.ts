@@ -63,9 +63,31 @@ export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasEleme
   return out;
 }
 
-/** Replace a layer's buffer (no copy) and persist it. */
-export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = true): void {
+/** A dirty area in buffer pixels, or 'all' when the write does not say where it landed. */
+export type Dirty = { x0: number; y0: number; x1: number; y1: number } | 'all';
+/** Which layer a buffer belongs to (buffers are replaced by copies; this follows them). */
+const layerOfCanvas = new WeakMap<HTMLCanvasElement, string>();
+/** What each layer changed since the last frame that composed it (Paso 3: the retained page reads and clears it). */
+const dirtyBy = new Map<string, Dirty>();
+
+function markDirty(layerId: string, d: Dirty): void {
+  const cur = dirtyBy.get(layerId);
+  if (d === 'all' || cur === 'all') { dirtyBy.set(layerId, 'all'); return; }
+  if (!cur) { dirtyBy.set(layerId, d); return; }
+  dirtyBy.set(layerId, { x0: Math.min(cur.x0, d.x0), y0: Math.min(cur.y0, d.y0), x1: Math.max(cur.x1, d.x1), y1: Math.max(cur.y1, d.y1) });
+}
+/** The area a layer changed since the last take, or null when nothing changed. Clears it. */
+export function takeDirty(layerId: string): Dirty | null {
+  const d = dirtyBy.get(layerId) ?? null;
+  dirtyBy.delete(layerId);
+  return d;
+}
+
+/** Replace a layer's buffer (no copy) and persist it. `dirty` says where the write landed (default: everywhere). */
+export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = true, dirty: Dirty = 'all'): void {
   buffers.set(layerId, canvas);
+  layerOfCanvas.set(canvas, layerId);
+  markDirty(layerId, dirty);
   touchBuffer(canvas);
   if (persist) schedulePersist(layerId);
   notify();
@@ -206,6 +228,8 @@ export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity:
 
 export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
   touchBuffer(buf);
+  const owner = layerOfCanvas.get(buf);
+  if (owner) { const r = Math.max(width, live.tip ? live.last?.width ?? 0 : 0) / 2 + 2; markDirty(owner, { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r }); }
   const end = span('raster', 'live');
   try {
   // A segment starts at the previous width: its box covers the wider of the two.
@@ -317,9 +341,30 @@ export function composeMoving(layer: RasterLayer, ids: readonly string[]): ((mov
     ctx.drawImage(under, 0, 0);
     ctx.restore();
     for (const stroke of (moved.paintStrokes ?? []).slice(first)) drawRasterStroke(ctx, stroke);
-    setBuffer(layer.id, work, false);
+    // What changed: the moving strokes, where they were and where they are now.
+    const before = strokes.filter((x) => moving.has(x.id)).map(strokeBufferBox);
+    const after = (moved.paintStrokes ?? []).filter((x) => moving.has(x.id)).map(strokeBufferBox);
+    setBuffer(layer.id, work, false, unionOf([...before, ...after]));
     end();
   };
+}
+
+/** Bounds of a stroke in buffer pixels, its offset included, with its widest reach. */
+export function strokeBufferBox(s: RasterStroke): Dirty {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const [ax, ay, bx, by, w] of s.segments) {
+    const r = w / 2 + 2;
+    x0 = Math.min(x0, ax - r, bx - r); y0 = Math.min(y0, ay - r, by - r);
+    x1 = Math.max(x1, ax + r, bx + r); y1 = Math.max(y1, ay + r, by + r);
+  }
+  if (!Number.isFinite(x0)) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  return { x0: x0 + s.x, y0: y0 + s.y, x1: x1 + s.x, y1: y1 + s.y };
+}
+function unionOf(list: Dirty[]): Dirty {
+  if (list.some((d) => d === 'all')) return 'all';
+  const rs = list as Array<Exclude<Dirty, 'all'>>;
+  if (!rs.length) return { x0: 0, y0: 0, x1: 0, y1: 0 };
+  return { x0: Math.min(...rs.map((r) => r.x0)), y0: Math.min(...rs.map((r) => r.y0)), x1: Math.max(...rs.map((r) => r.x1)), y1: Math.max(...rs.map((r) => r.y1)) };
 }
 
 function pixelLayers(layers: Layer[]): RasterLayer[] {
@@ -336,6 +381,7 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
   const current = buffers.get(layer.id) ?? createCanvas(layer.pxWidth, layer.pxHeight);
   const copy = cloneCanvas(current);
   buffers.set(layer.id, copy);
+  layerOfCanvas.set(copy, layer.id);
   return copy;
 }
 
