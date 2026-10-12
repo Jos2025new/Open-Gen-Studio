@@ -167,3 +167,16 @@ export function professionalDocument(): { doc: DesignDoc; rasterLayers: RasterLa
   const doc: DesignDoc = { ...createDoc('Profesional sintético 2048 (Tarea 1)', PROFESSIONAL_SIZE, PROFESSIONAL_SIZE), id: 'bench-doc-profesional', groups, layers, activeLayerId: PROFESSIONAL_IDS.paintLayer };
   return { doc, rasterLayers: layers.filter((l): l is RasterLayer => l.type === 'raster') };
 }
+
+export const PROFESSIONAL_DOC_ID = 'bench-doc-profesional';
+export const PROFESSIONAL_SESSION_TITLE = 'Benchmark profesional';
+
+/**
+ * Sessions made by the bench for this document (title and doc id), in store order. prepareProfessional reuses the first
+ * one instead of adding another, so the sandbox keeps one copy of the document.
+ */
+export function professionalSessionIds(sessions: Record<string, { title: string; docs: Array<{ id: string }> }>): string[] {
+  return Object.entries(sessions)
+    .filter(([, s]) => s.title === PROFESSIONAL_SESSION_TITLE && s.docs.some((d) => d.id === PROFESSIONAL_DOC_ID))
+    .map(([id]) => id);
+}

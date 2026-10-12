@@ -68,7 +68,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
-| [actions.ts](../src/engine/actions.ts) | 18 | 9 |
+| [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 3 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 108 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |

@@ -20,7 +20,7 @@ Fecha: 2026-10-12. Rama `task/render-bench`. Medido en el sandbox (build de prod
 | Backend de ventana | X11 (`--args "--ozone-platform=x11"`). Con Wayland los fotogramas no llegaban a la página (ver «Pasadas descartadas») |
 | Ventana y DPR | 1500 × 940, DPR 1, zoom del lienzo 0,365 |
 | Build | `npm run dev:sandbox -- --production`, puerto 5183, `.sandbox/data` del worktree |
-| Carga y memoria | Antes de la pasada válida: carga 5,5; 2,9 GB disponibles. Durante la pasada la carga llegó a ~6,5: un renderer del navegador personal del usuario consumía CPU. No se tocó. |
+| Carga y memoria | Antes de la pasada válida: carga 5,5; 2,9 GB disponibles. Durante la pasada la carga llegó a ~6,5 (la misma sesión de medida, no otro proceso). |
 
 ## El documento medido
 
@@ -69,7 +69,7 @@ Lectura:
 
 1. **Wayland, primera pasada:** los fotogramas no llegaban a la página (`requestAnimationFrame` = 0 durante 2–5 s tras cada carga). Los temporizadores se retrasaron. Sin cifras válidas.
 2. **Wayland, segunda pasada:** 0 fotogramas en todas las repeticiones. Descartada.
-3. **X11, dos intentos sin resultado:** en el primero, sin foco, los fotogramas bajaron a 1–10 por segundo. En el segundo, con la ventana enfocada, la carga del equipo superó 10 por el navegador personal del usuario. Ambos se cerraron sin contabilizar. La medida válida se hizo con la ventana enfocada (`xdotool windowactivate`) y la cadencia comprobada (≈ 60 Hz) antes de medir.
+3. **X11, dos intentos sin resultado:** en el primero, sin foco, los fotogramas bajaron a 1–10 por segundo. En el segundo, con la ventana enfocada, la carga del equipo superó 10 por procesos de navegador de sesiones anteriores del propio banco. Ambos se cerraron sin contabilizar. La medida válida se hizo con la ventana enfocada (`xdotool windowactivate`) y la cadencia comprobada (≈ 60 Hz) antes de medir.
 
 ## Lo que no se midió y por qué
 
@@ -80,11 +80,36 @@ Lectura:
 - **Caso habitual** (el documento del usuario): no medido. No forma parte de la tarea 1, y el sandbox de este worktree no tiene ese documento.
 - **Medida limpia** sin las seis sesiones acumuladas: no medida. Requiere borrar las sesiones del banco en `.sandbox/data`, y AGENTS.md exige aprobación explícita para cualquier borrado.
 
+## Causas (perfil de CPU, tarea 1b)
+
+**Método.** Perfil de CPU con `agent-browser profiler` sobre el sandbox de producción con sourcemaps (`sourcemap: true`, solo en el build del sandbox). Una repetición por gesto (b, c, d, e). Cada muestra se mapea con los sourcemaps del build a archivo:línea de `src/`. Los porcentajes son **inclusivos**: una muestra cuenta en cada categoría de su pila, así que no suman 100 %. El perfilador multiplica el coste: las proporciones sirven; los milisegundos, solo de orientación. Estado: 7 sesiones y `state.json` de 30 MB (sin limpiar; ver «Pendiente»).
+
+| Gesto | Causa | Evidencia (función, archivo:línea, ms o %) | Arreglo propuesto |
+|---|---|---|---|
+| b. Mover trazo temprano (300) | **1. Recomposición de todos los trazos desde el movido** en cada evento. `composeMoving` redibuja ~260 trazos por movimiento | `drawRasterStroke` (raster.ts:105) y `drawTipStroke` (raster.ts:132): 79 % inclusivo | Recomponer solo la región de los trazos movidos y reutilizar la base y los trazos anteriores (plan, etapa 3: límite raster y grafo de invalidación) |
+| b | **2. Máscaras de trazo reconstruidas en cada cuadro.** La caché LRU tiene 128 entradas y el recorrido toca ~260 trazos: en un recorrido cíclico cada búsqueda falla | `rasterStrokeMask` (rasterStrokeMask.ts:15): 15,6 s inclusivos (43 %). Dentro, `stampSegment` (brushEngine.ts:147) 10,9 s propios y `putImageData` 3,1 s | Guardar la máscara en el propio trazo (es inmutable al terminar) o una caché por bytes sin límite de entradas; no rehacer el estampado |
+| b | **3. Composición del trazo sobre el lienzo de trabajo.** `ctx.restore()` concentra el tiempo de cada trazo al componer su máscara | `layMask` (raster.ts:142): `restore` 12,4 s propios | Componer la región con una sola operación o en GPU (WebGL, tarea 3); medir de nuevo |
+| b | **4. Lectura de GPU al pulsar.** La prueba de acierto lee píxeles de la capa | `hitTestPixel` (render.ts:499) → `getImageData` 2,0 s, desde `onPointerDown` (Stage.tsx:620) | Acierto por geometría de los trazos (no por píxeles) o máscara de acierto en caché |
+| b | **5. PNG de la capa durante el gesto.** `writeLayer` codifica la capa a PNG en el hilo principal | `writeLayer` (raster.ts:395) → `canvasToBlob` (media.ts:35): 0,49 s | No codificar durante el gesto; llevarlo a un worker (plan, etapa 2) |
+| b | Otros: GC, React, serialización | GC 0,86 s (2 %); React 13 % inclusivo; `sessionParts` (persistJson.ts:27) 0,65 s propios (3 %) | Tras los anteriores |
+| c. Mover capa entera | **1. Redibujo de toda la página en cada movimiento** (la capa movida está arriba y el resto se vuelve a dibujar) | `drawDoc` (render.ts:356) → `drawWithFx` (render.ts:428), llamado desde Stage.tsx:372: 73 % inclusivo | Caché de la página retenida y recomposición solo de la zona de la capa (plan, etapa 3 y 4) |
+| c | **2. Pasadas FX `below` sobre la página completa, en cada fotograma.** Cada pasada crea un canvas nuevo y aplica un filtro de página completa | `applyFx`/`mixFx` (canvas.ts:141/152): 31 % inclusivo. `draw` (canvas.ts:109): `drawImage` 18,2 s; `getContext` 3,4 s propios | Caché del resultado de cada FX `below` mientras su entrada no cambie (plan, etapa 4) y reutilizar canvas (pool) |
+| c | **3. Serialización del estado en cada cambio.** | `sessionParts` (persistJson.ts:27) 3,7 s propios (7 % inclusivo) | Serializar solo la sesión que cambió (ADR 0014) |
+| c | GC 1,7 s (2 %) | — | Reutilizar buffers |
+| d. Ocultar/mostrar carpeta | **1. Guardado completo del estado tras el cambio.** Cada guardado diferido serializa las 7 sesiones | `flushWhenIdle` → `writeUnlessPressed` → `flushWrite` (store.ts:287/297/311) → `persistState` (persistJson.ts:45) → `sessionParts` (persistJson.ts:27): 450 ms propios, **52 % de la tarea** | ADR 0014: guardar solo la sesión cambiada; ocultar una carpeta no debe reserializar el resto |
+| d | React 31 % inclusivo; dibujo 12 % | `drawDoc` 0,13 s inclusivos | Tras el guardado |
+| e. Parámetro de ajuste `below` | **1. Guardado completo tras el cambio** | `sessionParts` 92 ms propios; `persistState` 28 % inclusivo | Igual que d |
+| e | **2. React y dibujo** | React 39 % inclusivo (Stage.tsx:296, cierre del componente); `drawDoc` 22 %; pasadas FX 13 % | Memoizar las suscripciones de Stage y de propiedades (plan, etapa 2) |
+
+**Lectura.** En b la causa es de composición: se rehacen todos los trazos y sus máscaras en cada movimiento, con lecturas de GPU. En c la causa es el redibujo completo con FX `below`, que se recalculan en cada fotograma. En d y e la causa dominante es el guardado del estado completo tras cada cambio: el coste escala con el tamaño de todo el estado (30 MB aquí). **Estimación no medida:** con un solo documento profesional (~5 MB) el mismo guardado costaría ~75 ms, según escala lineal; hace falta la medida limpia para confirmarlo.
+
+**Lo no atribuido.** La parte de React en c (86 % inclusivo) incluye el redibujo; no se separa. No hay trazas de GPU: `restore`, `getImageData` y `drawImage` pueden incluir sincronización con la GPU, que no se distingue.
+
 ## Pendiente (para decidir)
 
-1. Aprobar la limpieza de las sesiones `Benchmark profesional` creadas por el banco en `.sandbox/data` de este worktree, y repetir la pasada para separar el coste del guardado.
-2. Atribuir las tareas largas de c, d y e con la traza (`window.__OGS_TRACE__`, dominios `designer` y `raster`), antes de optimizar. Así se confirma o descarta el guardado.
-3. Repetir en otra sesión con la ventana sin ocultar y sin procesos ajenos consumiendo CPU.
+1. **Sesión reutilizada.** `prepareProfessional` ya reutiliza la sesión existente (una sola) y restaura su contenido; el test del helper pasa. El guardado de la sandbox sigue reserializando todo el estado (ver arreglo 1 de la Etapa A).
+2. Verificar la atribución de d y e con una medida limpia (sandbox vacío, una sola sesión).
+3. Repetir en una sesión sin procesos ajenos consumiendo CPU (durante el perfil la carga llegó a ~10 por procesos de navegador del propio banco).
 
 ## Reproducción
 

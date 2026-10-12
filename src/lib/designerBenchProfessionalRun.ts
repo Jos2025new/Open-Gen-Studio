@@ -1,4 +1,5 @@
-import { newSession, patchSession, setUi, useStore } from '../store/store';
+import { newSession, patchSession, selectSession, setUi, useStore } from '../store/store';
+import { deleteSession } from '../engine/actions';
 import { activeDoc, setActiveLayer } from '../engine/design/actions';
 import { composeRaster, setBuffer } from '../engine/design/raster';
 import { hitTestPixel } from '../engine/design/render';
@@ -6,7 +7,7 @@ import { objectPick } from '../engine/design/objectSelection';
 import { runFx } from '../engine/design/fx';
 import type { DesignDoc, RasterLayer, VectorLayer } from '../engine/types';
 import { intervalWork } from './designerBenchFixtures';
-import { PROFESSIONAL_IDS, PROFESSIONAL_SIZE, longStrokes, professionalDocument } from './designerBenchProfessional';
+import { PROFESSIONAL_IDS, PROFESSIONAL_SIZE, longStrokes, professionalDocument, professionalSessionIds } from './designerBenchProfessional';
 
 /*
  * Gestures on the professional document (docs/render-baseline.md). Same probe as designerBench.ts: synthetic pointer
@@ -151,13 +152,17 @@ async function changeBelowFx(rep: number, ctx: Ctx) {
   });
 }
 
-/** Prepares the professional document in a new session of the sandbox. */
+/**
+ * Prepares the professional document. Reuses the bench session that already holds it (same id, same title) and restores
+ * its pristine content; creates a session only when none exists. Never deletes anything.
+ */
 export async function prepareProfessional() {
   if (running) throw new Error('Benchmark already running');
   const st = useStore.getState();
   if (!st.hydrated) throw new Error('Wait for hydration');
-  const id = newSession();
+  const existing = professionalSessionIds(st.sessions)[0];
   const { doc, rasterLayers } = professionalDocument();
+  const id = existing ?? newSession();
   // One shared blank base: composeRaster only reads it (clones it), so no layer paints into it.
   const blank = document.createElement('canvas'); blank.width = PROFESSIONAL_SIZE; blank.height = PROFESSIONAL_SIZE;
   for (const layer of rasterLayers as RasterLayer[]) {
@@ -165,18 +170,33 @@ export async function prepareProfessional() {
     composeRaster(layer, false);
   }
   patchSession(id, (s) => ({ ...s, title: 'Benchmark profesional', docs: [doc], activeDocId: doc.id }));
+  selectSession(id);
   setUi({ workspace: 'designer', tool: 'brush', selectMode: 'objects' });
   await delay(3000);
   window.dispatchEvent(new Event('ogs:designer-fit'));
   await delay(200);
   return {
-    sessionId: id, documentId: doc.id, layers: doc.layers.length, rasterStrokes: rasterLayers.reduce((n, l) => n + (l.paintStrokes?.length ?? 0), 0),
+    sessionId: id, reused: Boolean(existing), documentId: doc.id, layers: doc.layers.length,
+    rasterStrokes: rasterLayers.reduce((n, l) => n + (l.paintStrokes?.length ?? 0), 0),
     activeLayer: PROFESSIONAL_IDS.paintLayer, folders: doc.groups?.map((g) => g.name),
   };
 }
 
+/**
+ * Deletes every bench session of the professional document except `keep`, through the app's own deleteSession.
+ * Only sessions titled 'Benchmark profesional' that hold the bench document are touched.
+ */
+export function pruneProfessionalSessions(keep: string) {
+  if (running) throw new Error('Benchmark already running');
+  const ids = professionalSessionIds(useStore.getState().sessions);
+  if (!ids.includes(keep)) throw new Error('keep must be a bench session of the professional document');
+  const removed = ids.filter((id) => id !== keep);
+  for (const id of removed) deleteSession(id);
+  return { found: ids.length, removed: removed.length, kept: keep };
+}
+
 /** Runs the five gestures, three repetitions each, on the prepared document. Returns the JSON for the baseline. */
-export async function runProfessional() {
+export async function runProfessional(only?: string[], reps = 3) {
   if (running) throw new Error('Benchmark already running');
   const sessionId = useStore.getState().activeSessionId;
   const doc0 = activeDoc(sessionId);
@@ -223,8 +243,9 @@ export async function runProfessional() {
       }],
     ];
     for (const [name, step] of plan) {
+      if (only && !only.some((o) => name.startsWith(o))) continue;
       gestures[name] = [];
-      for (let rep = 0; rep < 3; rep++) {
+      for (let rep = 0; rep < reps; rep++) {
         // Wait out the previous repetition's tail, then set the UI up outside the measured window.
         await delay(1000);
         const doc = current(), info = stage(doc);

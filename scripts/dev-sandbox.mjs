@@ -62,7 +62,7 @@ export async function sandboxBuildDirectory(root, outDir) {
 export function sandboxOptions(production = false, outDir = 'dist') {
   return {
     define: { 'import.meta.env.VITE_OGS_SANDBOX': JSON.stringify('1') },
-    ...(production ? { build: { outDir }, preview: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false } } : {}),
+    ...(production ? { build: { outDir, sourcemap: true }, preview: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false } } : {}),
     server: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false },
   };
 }

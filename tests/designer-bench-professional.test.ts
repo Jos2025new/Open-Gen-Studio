@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fxPlan } from '../src/engine/fx/plan';
 import type { FxLayer } from '../src/engine/fx/types';
 import type { RasterLayer, VectorLayer } from '../src/engine/types';
-import { LONG_STROKE_COUNT, LONG_STROKE_SEGMENTS, PROFESSIONAL_IDS, PROFESSIONAL_SIZE, professionalDocument, seededRandom } from '../src/lib/designerBenchProfessional';
+import { LONG_STROKE_COUNT, LONG_STROKE_SEGMENTS, PROFESSIONAL_IDS, PROFESSIONAL_SIZE, professionalDocument, professionalSessionIds, seededRandom } from '../src/lib/designerBenchProfessional';
 
 describe('professional bench document (deterministic generator)', () => {
   const { doc, rasterLayers } = professionalDocument();
@@ -53,5 +53,17 @@ describe('professional bench document (deterministic generator)', () => {
     const again = professionalDocument().doc;
     expect(JSON.stringify({ layers: again.layers, groups: again.groups, id: again.id })).toBe(JSON.stringify({ layers: doc.layers, groups: doc.groups, id: doc.id }));
     expect(seededRandom(7)()).toBe(seededRandom(7)());
+  });
+});
+
+describe('prepare reuses the bench session that holds the document', () => {
+  it('returns the existing bench session only, never another session or a session with another document', () => {
+    const sessions = {
+      a: { title: 'Benchmark profesional', docs: [{ id: 'bench-doc-profesional' }] },
+      b: { title: 'Otra sesión', docs: [{ id: 'bench-doc-profesional' }] },
+      c: { title: 'Benchmark profesional', docs: [{ id: 'otro-documento' }] },
+    };
+    expect(professionalSessionIds(sessions)).toEqual(['a']);
+    expect(professionalSessionIds({})).toEqual([]);
   });
 });

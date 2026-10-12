@@ -4,7 +4,7 @@ import { composeRaster, ensureBuffers, getBuffer, setBuffer } from '../engine/de
 import { activeDoc } from '../engine/design/actions';
 import { objectPick } from '../engine/design/objectSelection';
 import { appendBenchSessions, intervalWork, longBenchStrokes, sandboxBenchAllowed } from './designerBenchFixtures';
-import { prepareProfessional, rendererInfo, runProfessional } from './designerBenchProfessionalRun';
+import { prepareProfessional, pruneProfessionalSessions, rendererInfo, runProfessional } from './designerBenchProfessionalRun';
 
 const PERIOD = 1000 / 60;
 const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
@@ -124,4 +124,4 @@ async function run() {
   } finally { tracking = false; observer.disconnect(); window.requestAnimationFrame = previousRAF; canvas.setPointerCapture = capture; canvas.releasePointerCapture = release; running = false; }
 }
 
-if (sandboxBenchAllowed(location)) Object.assign(window, { __OGS_BENCH__: { prepare, run, prepareProfessional, runProfessional, rendererInfo } });
+if (sandboxBenchAllowed(location)) Object.assign(window, { __OGS_BENCH__: { prepare, run, prepareProfessional, runProfessional, pruneProfessionalSessions, rendererInfo } });

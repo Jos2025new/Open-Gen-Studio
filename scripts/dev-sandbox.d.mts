@@ -5,7 +5,7 @@ export function sandboxOptions(production?: boolean, outDir?: string): {
   define: Record<string, string>;
   server: { host: string; port: 5183; strictPort: boolean; open: boolean };
   preview?: { host: string; port: 5183; strictPort: boolean; open: boolean };
-  build?: { outDir: string };
+  build?: { outDir: string; sourcemap: boolean };
 };
 
 export function sandboxBuildDirectory(root: string, outDir: string): Promise<string>;
