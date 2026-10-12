@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const persistence = vi.hoisted(() => ({ writes: 0 }));
 vi.mock('../../src/lib/idb', () => ({
-  stateDb: { get: async () => undefined, set: async () => { persistence.writes += 1; }, del: async () => undefined },
+  stateDb: { get: vi.fn(async () => undefined), set: async () => { persistence.writes += 1; }, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => { persistence.writes += 1; } },
   blobDb: { get: async () => undefined, set: async () => { persistence.writes += 1; }, del: async () => undefined },
   getAssetBlob: async () => undefined, putAssetBlob: async () => undefined, peekAssetUrl: () => undefined, loadAssetUrl: async () => undefined,
@@ -21,11 +21,16 @@ describe('journey module import isolation', { timeout: 60_000 }, () => {
     vi.stubGlobal('window', { setTimeout, clearTimeout, addEventListener: () => undefined });
     vi.stubGlobal('document', { addEventListener: () => undefined, visibilityState: 'visible' });
     await vi.resetModules();
+    // Resolve the mocked persistence boundary before concurrent roots enter the store through different cycles.
+    // Otherwise a real idb module can win that race and attempt hydration against IndexedDB/disk.
+    const { stateDb } = await import('../../src/lib/idb');
+    expect(vi.isMockFunction(stateDb.get)).toBe(true);
     await Promise.all([
       import('../../src/engine/agent/runtime'), import('../../src/engine/jobs'),
       import('../../src/components/composer/Composer'), import('../../src/lib/log'),
       import('../../src/lib/journeyTrace'), import('../../src/store/store'),
     ]);
+    expect(stateDb.get).toHaveBeenCalled(); // App hydration must terminate in our mock, not a second module instance.
     expect(requests).toEqual([]);
     // The fake clock starts after the imports: frozen timers during a slow import (busy machine) hung the test.
     vi.useFakeTimers();
