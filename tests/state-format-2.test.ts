@@ -86,4 +86,12 @@ describe('format 2 in the browser (ADR 0014)', () => {
     expect(await db.set('ogs-app', parts({ ses_a: { id: 'ses_a' } }) as never)).toBe('browser-only');
     expect(stores.get('ogs-store-v2')!.get('session:ses_a')).toBe('{"id":"ses_a"}');
   });
+
+  it('a dead disk server (failed write) keeps the browser copy and reports the failure, never a false save', async () => {
+    const db = await freshDb();
+    diskSetCommit.mockResolvedValueOnce('fail');
+    expect(await db.set('ogs-app', parts({ ses_a: { id: 'ses_a' } }) as never)).toBe('fail');
+    expect(stores.get('ogs-store-v2')!.get('session:ses_a')).toBe('{"id":"ses_a"}');
+    expect(stores.get('ogs-store-v2')!.get('manifest')).toEqual(expect.objectContaining({ order: ['ses_a'] }));
+  });
 });

@@ -2,9 +2,9 @@
 
 ## Estado
 
-Propuesto
+Aceptado
 
-Revisado contra el código por GPT 6 Astra el 2026-10-10; pendiente de aprobación del usuario **antes de implementar**. No autoriza migrar ni borrar datos. Complementaría [0001](0001-proteger-datos.md); no lo sustituye ni reduce sus protecciones.
+Aprobado por el usuario el 2026-10-12 («apruebo adr0014, la idea es que esto funcione de verdad»). Implementación parcial el 2026-10-13: ver la sección «Implementación (2026-10-13)». Revisado contra el código por GPT 6 Astra el 2026-10-10. No autoriza migrar ni borrar datos. Complementaría [0001](0001-proteger-datos.md); no lo sustituye ni reduce sus protecciones.
 
 ## Fecha
 
@@ -93,3 +93,34 @@ Mantener un JSON único conserva el coste observado. Dividir solo el archivo en 
 ## Consecuencias
 
 Se evita serializar y enviar el contenido de sesiones intactas en cada guardado, a cambio de versiones inmutables, más almacenamiento temporal y un protocolo de commit/reconciliación explícito. La primera fase no reduce la memoria de todas las sesiones cargadas ni garantiza latencia constante. No se implementa caché FX, carga diferida ni limpieza de datos en este encargo. Revisión Astra: los cuatro riesgos están cubiertos como requisitos verificables; el diseño queda propuesto, no aprobado ni implementado.
+
+## Implementación (2026-10-13)
+
+Qué se implementó, y dónde:
+
+- **Disco, formato 2:** `server/store-v2.js`. Carpeta `store-v2/` con `HEAD.json` (manifiesto, se publica al final), `globals.json` y `sessions/<id>.json`. Una escritura escribe solo las sesiones cambiadas. `state.json` no se escribe otra vez tras la migración.
+- **Navegador, formato 2:** `src/lib/idb.ts` (base `ogs-store-v2`, un registro por sesión; el manifiesto se escribe el último) y `src/store/formatV2.ts`. Un guardado escribe las sesiones cambiadas en local y envía un solo commit al disco con esas sesiones (`src/lib/disk.ts`, `setCommit`).
+- **Migración:** la primera carga sin formato 2 copia el texto de formato 1 completo a `ogs-app:format1-backup-<savedAt>` (en IndexedDB) y en el servidor a `backups/format1-<ts>.json`, antes de escribir nada nuevo. Las claves de formato 1 (`ogs-app`, `ogs-app:b`) no se borran ni se sobrescriben.
+- **Lectura:** el servidor devuelve el texto de formato 1 reensamblado (`GET /x/store/state`), así que la carga de la app no cambia. El PUT legado (`PUT /x/store/state`) se conserva y se convierte en commit cuando existe formato 2.
+
+Decisiones conservadoras (el ADR deja alternativas abiertas):
+
+1. **Sin base nueva por bloques de blobs.** El ADR describe un inventario de blobs y un HEAD por revisión. Aquí los blobs de medios siguen igual que antes (`blobDb`); solo cambia el estado de la aplicación.
+2. **Retirada del PUT legado: no se retira.** Lo usa el cliente al cargar (`disk.putState`) y tests existentes; se convierte en commit. Anotado como pendiente.
+3. **Papelera de sesiones:** las sesiones eliminadas no se borran del disco; pasan a `backups/removed-sessions/`.
+4. **Copias periódicas:** cada 10 minutos (máximo 20) se copia el formato 2 completo a `backups/v2-<ts>/`.
+5. **Pérdida masiva, por total y por sesión:** se rechaza y el intento queda en `backups/rejected-*.json`. Por sesión: una sesión de más de 4 KB que se reduce a menos de la mitad.
+6. **Revisión de tiempo de la pasada de seguridad (`FULL_EVERY_MS`):** se conserva, como exige el ADR.
+
+## Vuelta atrás
+
+Procedimiento para volver al formato 1 (no destructivo):
+
+1. Cerrar el servidor de datos y todas las pestañas de la app.
+2. Exportar el estado de formato 2 a `state.json`: `node -e "import('./server/store-v2.js').then(m => m.exportToFormat1('<carpeta de datos>'))"`. Antes de escribir, el `state.json` actual se copia a `backups/before-export-<ts>.json`.
+3. Mover `store-v2/` a `backups/reverted-store-v2-<ts>/` (no se borra).
+4. Arrancar la app. Sin `store-v2/`, el servidor lee `state.json` como antes. En el navegador, la base `ogs-store-v2` no se usa cuando falta su manifiesto; si se quiere forzar, borrar esa base desde las herramientas del navegador (los datos de formato 1 siguen en `ogs-app`).
+
+Los datos de formato 1 nunca se borran por este procedimiento: `state.json` original se conserva en `backups/format1-<ts>.json` y `ogs-app:format1-backup-<savedAt>`.
+
+Pruebas que cubren la vuelta atrás: `tests/store-v2.test.ts` (exportar restaura el último estado y deja copia previa).
