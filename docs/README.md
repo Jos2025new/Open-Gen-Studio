@@ -50,6 +50,7 @@
 - [La interfaz del Designer según la filosofía de ibisPaint, Photoshop, Feather 3D y SketchUp](propuesta-gui-pintura.md) (2026-10-10), sin implementar.
 
 - [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
+- [Plan: Designer fluido](plan-fluidez.md) (2026-10-12): objetivo, umbrales, etapas y autorizaciones; las revisiones lo enmiendan, no lo reabren.
 
 - [Timeline breve de esta sesión de Designer UX](timeline-designer-ux.md) (desde 2026-10-11).
 
