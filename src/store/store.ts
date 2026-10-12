@@ -193,6 +193,15 @@ export function createSession(title = 'Untitled session'): Session {
 
 const firstSession = createSession();
 
+/** The `ui` values a fresh app starts with (also what the Designer e2e specs reset to: cleanUi.ts). */
+export const DEFAULT_UI: Pick<UiState, 'tool' | 'brush' | 'lineart' | 'shape' | 'text'> = {
+  tool: 'move',
+  brush: { size: 24, color: '#ffffff', opacity: 1 },
+  lineart: { ...DEFAULT_STROKE_STYLE },
+  shape: { fill: '#d4f25a', stroke: null, strokeWidth: 4, radius: 0 },
+  text: { ...DEFAULT_TEXT_STYLE },
+};
+
 export const DEFAULT_SETTINGS: Settings = {
   keys: { openrouter: '', fal: '', nanogpt: '', atlas: '' },
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
@@ -243,11 +252,7 @@ const initial: AppState = {
     lightbox: null,
     sketch: null,
     toasts: [],
-    tool: 'move',
-    brush: { size: 24, color: '#ffffff', opacity: 1 },
-    lineart: { ...DEFAULT_STROKE_STYLE },
-    shape: { fill: '#d4f25a', stroke: null, strokeWidth: 4, radius: 0 },
-    text: { ...DEFAULT_TEXT_STYLE },
+    ...DEFAULT_UI,
     threadOpen: false,
     settingsOpen: false,
     focusComposer: 0,

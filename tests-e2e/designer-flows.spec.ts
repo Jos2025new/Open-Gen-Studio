@@ -1,4 +1,5 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
+import { resetDesignerUi } from './cleanUi';
 
 /*
  * Three designer workflows (docs/plan-designer-ux.md, step 6, proposed by Astra): compose image and text, retouch with
@@ -25,6 +26,8 @@ async function setup(page: Page) {
   if (!(await page.getByRole('button', { name: 'New document', exact: true }).isVisible())) { await page.getByRole('button', { name: 'Switch workspace', exact: true }).click(); await page.getByText('Designer', { exact: true }).click(); }
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  // The sandbox keeps `ui` between runs: every test starts from the app's own defaults.
+  await resetDesignerUi(page);
   return errors;
 }
 const docState = (page: Page) => page.evaluate(async () => {

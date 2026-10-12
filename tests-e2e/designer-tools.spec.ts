@@ -1,4 +1,5 @@
 import { chromium, expect, test } from '@playwright/test';
+import { resetDesignerUi } from './cleanUi';
 test.use({ launchOptions: { executablePath: chromium.executablePath() } });
 test('merge, rasterize, grow/shrink and mirror in the real browser', async ({ page }) => {
   test.setTimeout(120_000);
@@ -64,6 +65,8 @@ test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints al
   if (!(await page.getByRole('button', { name: 'New document', exact: true }).isVisible())) { await page.getByRole('button', { name: 'Switch workspace', exact: true }).click(); await page.getByText('Designer', { exact: true }).click(); }
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  // The sandbox keeps `ui` between runs: every test starts from the app's own defaults.
+  await resetDesignerUi(page);
   const b = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const y0 = b.y + b.height * 0.4;
   await page.keyboard.press('k');
@@ -106,6 +109,8 @@ test('perspective ruler: a stroke heads straight to the vanishing point it start
   if (!(await page.getByRole('button', { name: 'New document', exact: true }).isVisible())) { await page.getByRole('button', { name: 'Switch workspace', exact: true }).click(); await page.getByText('Designer', { exact: true }).click(); }
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  // The sandbox keeps `ui` between runs: this stroke is measured as opaque white, so the brush is theirs.
+  await resetDesignerUi(page);
   await page.keyboard.press('k');
   await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('tab', { name: 'All the settings of the active tool' }).click();
   await page.getByRole('complementary', { name: 'Layers', exact: true }).getByRole('button', { name: /^Ruler/ }).click();

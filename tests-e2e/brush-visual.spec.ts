@@ -1,5 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { resetDesignerUi } from './cleanUi';
 
 /*
  * The brush tip in the real browser (sandbox only): start `npm run dev:sandbox`, then `npm run brush:check`.
@@ -29,6 +30,8 @@ async function setup(page: Page) {
   }
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  // The sandbox keeps `ui` between runs: every test starts from the app's own defaults.
+  await resetDesignerUi(page);
   await page.keyboard.press('b');
   // Changing tools no longer opens the panel's Tool tab (plan-designer-ux, Astra's review): open it as a person would.
   await panel(page).getByRole('tab', { name: 'All the settings of the active tool' }).click();

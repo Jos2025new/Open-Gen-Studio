@@ -1,5 +1,6 @@
 import { chromium, expect, test, type Page } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+import { resetDesignerUi } from './cleanUi';
 
 /*
  * FX layers in the real browser (docs/fx-pruebas.md, ADR 0011), on the sandbox only: start `npm run dev:sandbox`,
@@ -55,6 +56,8 @@ async function setup(page: Page, trace?: string) {
   }
   await page.getByRole('button', { name: 'New document', exact: true }).click();
   await page.getByRole('button', { name: /^Landscape 16:9/ }).first().click();
+  // The sandbox keeps `ui` between runs: the lime rectangle below is the shape tool's default fill.
+  await resetDesignerUi(page);
   // Content with colour: a lime rectangle (the shape tool's default fill) and a text layer.
   await page.keyboard.press('r');
   const stage = page.locator('canvas.stage-canvas');
@@ -121,13 +124,24 @@ test.describe('each filter and effect on a layer', () => {
 test('a filter layer over everything below changes the rectangle too', async ({ page }) => {
   const errors = await setup(page);
   await mkdir(SHOTS, { recursive: true });
+  // The lime rectangle by itself: green clearly over blue and bright (the text is white, g − b = 0).
+  const lime = () => page.evaluate(() => {
+    const c = document.querySelector('canvas.stage-canvas') as HTMLCanvasElement;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i + 1] > 120 && d[i + 1] - d[i + 2] > 60) n++;
+    return n;
+  });
+  const limeBefore = await lime();
+  expect(limeBefore, 'the lime rectangle is on the page').toBeGreaterThan(500);
   await measure(page, '__fxBase');
   await applyFx(page, /^New filter layer/);
   await layers(page).getByRole('combobox', { name: 'Add filter', exact: true }).first().selectOption('grayscale');
   await page.waitForTimeout(250);
   const after = await measure(page);
   await page.locator('canvas.stage-canvas').screenshot({ path: `${SHOTS}/everything-below-grayscale.png` });
-  // The lime rectangle turns grey: many pixels change, not only the text.
+  // The lime rectangle turns grey: the pixels that were lime no longer are, and many pixels change.
+  expect(await lime(), 'no lime is left after grayscale').toBeLessThan(limeBefore * 0.05);
   expect(after.changed).toBeGreaterThan(2000);
   expect(errors).toEqual([]);
 });
