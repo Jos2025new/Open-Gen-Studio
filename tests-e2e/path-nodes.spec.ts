@@ -1,4 +1,4 @@
-import { chromium, expect, test } from '@playwright/test';
+import { chromium, expect, test, type Page } from '@playwright/test';
 import { dragKnot, knot, setup, shape, SHOTS, strip } from './shapeHelpers';
 
 /*
@@ -307,5 +307,47 @@ test('Shift+B opens a closed path at the selected node (two coincident ends); Sh
   await page.keyboard.press('Control+z');
   await page.keyboard.press('Control+z');
   expect((await shape(page)).d).toBe(s0.d);
+  expect(errors).toEqual([]);
+});
+
+
+async function convertedSquare(page: Page) {
+  const errors = await setup(page), c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  await page.keyboard.press('r');
+  await page.mouse.move(c.x + c.width * 0.3, c.y + c.height * 0.3); await page.mouse.down();
+  await page.mouse.move(c.x + c.width * 0.5, c.y + c.height * 0.6, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.press('v');
+  await page.mouse.dblclick(c.x + c.width * 0.4, c.y + c.height * 0.45);
+  await strip(page).getByRole('button', { name: 'Convert to path' }).click();
+  return { errors, before: await shape(page) };
+}
+
+async function selectNodes(page: Page, indices: number[]) {
+  for (const [i, n] of indices.entries()) {
+    const b = (await page.locator('rect.path-node').nth(n).boundingBox())!;
+    if (i) await page.keyboard.down('Shift');
+    await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+    if (i) await page.keyboard.up('Shift');
+  }
+}
+
+const pickedNodeIndices = (page: Page) => page.evaluate(async () => {
+  const st = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), E = await import('/src/engine/design/objectSelection.ts' as string);
+  return E.useShapeEdit.getState().byDoc[A.activeDoc(st.useStore.getState().activeSessionId).id]?.nodes;
+});
+
+test('Delete segment opens the closed path, removes its isolated middle node and selects both surviving ends; one undo', async ({ page }) => {
+  const { errors, before } = await convertedSquare(page);
+  await selectNodes(page, [0, 1, 2]);
+  await strip(page).getByRole('button', { name: 'Delete segment', exact: true }).click();
+  await expect(page.locator('rect.path-node')).toHaveCount(3);
+  expect((await shape(page)).d).not.toContain('Z');
+  expect(await pickedNodeIndices(page)).toEqual([0, 2]);
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(2);
+  await page.screenshot({ path: `${SHOTS}/delete-segment.png` });
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(before.d);
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).type).toBe('rect');
   expect(errors).toEqual([]);
 });

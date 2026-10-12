@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { VectorShape } from '../../engine/types';
 import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
-import { breakNodes, joinEnds, segmentsTo, deleteSelectedNodes, insertNode, nearestOnPath } from '../../engine/design/pathNodeOps';
+import { breakNodes, deleteSegments, joinEnds, segmentsTo, deleteSelectedNodes, insertNode, nearestOnPath } from '../../engine/design/pathNodeOps';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
-import { getDoc } from '../../engine/design/actions';
+import { getDoc, patchLayer } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape } from './ShapeLookFields';
@@ -216,6 +216,22 @@ export function setJoinEnds(sessionId: string, docId: string, layerId: string, s
 export function setBreakNodes(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[]): void {
   const segs = pageSegs(shape), r = breakNodes(segs, readTypes(segs, shape.nodeTypes), selected);
   if (!r) return;
+  const next = withSegs(shape, r.segs);
+  patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
+  const edit = useShapeEdit.getState().byDoc[docId];
+  if (edit) setShapeEdit(docId, { ...edit, node: r.nodes[0], nodes: r.nodes });
+}
+
+/** Delete selected segments as one undo step; retain the selected surviving endpoints by their new indices. */
+export function setDeleteSegments(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[]): void {
+  const segs = pageSegs(shape), r = deleteSegments(segs, readTypes(segs, shape.nodeTypes), selected);
+  if (!r) return;
+  if (!r.segs.length) {
+    const layer = getDoc(sessionId, docId)?.layers.find((l) => l.id === layerId);
+    if (layer?.type === 'vector') patchLayer(sessionId, docId, layerId, { shapes: layer.shapes.filter((s) => s.id !== shape.id) });
+    setShapeEdit(docId, null);
+    return;
+  }
   const next = withSegs(shape, r.segs);
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
   const edit = useShapeEdit.getState().byDoc[docId];

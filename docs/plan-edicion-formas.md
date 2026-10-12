@@ -49,7 +49,7 @@ Fuente: código de Inkscape en el commit [21f4270](https://gitlab.com/inkscape/i
 | Unir nodos (Shift+J) | Solo extremos, emparejados por cercanía; nodo en el punto medio; conserva el manejador de entrada de uno y el de salida del otro; queda de esquina; mismo subtrazado → se cierra; dos → se unen | Igual. Sin parejas: no hace nada (Inkscape suelda nodos contiguos; queda fuera) | multi-path-manipulator.cpp 57–79, 386–426 |
 | Unir con segmento (Alt+J) | Mismas parejas; recta entre ellos, que quedan de esquina | Igual | 457–475 |
 | Romper (Shift+B) | Cada nodo interior elegido se parte en dos extremos coincidentes; uno se lleva el manejador de entrada; los dos de esquina; en un subtrazado cerrado, lo abre por ahí | Igual | path-manipulator.cpp 646–676 |
-| Borrar segmento (Alt+Supr) | Entre nodos elegidos contiguos: quita los segmentos, retrae los manejadores de los extremos (esquina); en un cerrado, lo abre | Igual | path-manipulator.cpp 915–980 |
+| Borrar segmento (botón) | Entre nodos elegidos contiguos: quita los segmentos, retrae los manejadores de los extremos (esquina); en un cerrado, lo abre | Igual | path-manipulator.cpp 915–980 |
 | Segmento a recta / curva (Shift+L / Shift+U) | Entre nodos elegidos contiguos. Recta: manejadores sobre sus nodos. Curva (solo si era recta): manejadores a 1/3 del segmento. Los tipos no cambian | Igual; la curva se guarda como C | path-manipulator.cpp 1015–1038 |
 
 **Base técnica:** los subtrazados ya se editan como nodos y aristas (`toSubs`/`fromSubs` en `pathNodes.ts`), así que cada operación es una función pura sobre esa lista, que también mantiene `nodeTypes`. Cada operación es un solo paso de deshacer y pasa por `withSegs`, con la compensación del giro.
@@ -92,7 +92,7 @@ Fuente: código de [SVG-Edit](https://github.com/SVG-Edit/svgedit) en el commit 
 - Que SVG-Edit no tenga Ctrl+A de nodos, flechas para nodos, unir ni romper se dedujo de lo que Haiku leyó; esas citas no bastan para afirmarlo.
 - Lo confirmado en los dos editores: clic, Shift+clic, rectángulo, arrastre múltiple, controles a un tercio y subdivisión con De Casteljau.
 
-**Hecho (2026-10-11):** selección y atajos (`383e7be`), recta y curva (`46886fb`), unir (`4768d07`) y romper; detalle en el [historial 024](history/024-2026-10-W41.md). Pendiente: borrar segmento como botón y soldar nodos contiguos con Shift+J.
+**Hecho (2026-10-11):** selección y atajos (`383e7be`), recta y curva (`46886fb`), unir (`4768d07`) y romper; detalle en el [historial 024](history/024-2026-10-W41.md). Hecho (2026-10-12): borrar segmento como botón (abiertos, cerrados, varios subtrazados, tipos y selección recalculada); fuente: [path-manipulator.cpp 915–991](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/path-manipulator.cpp#L915-991). Pendiente: soldar nodos contiguos con Shift+J.
 
 **Orden de los commits** (sustituye al anterior):
 1. Selección y atajos.

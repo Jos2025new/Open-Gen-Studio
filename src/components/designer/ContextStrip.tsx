@@ -9,7 +9,7 @@ import { TextStyleFields, ToolSettings } from './ToolSettings';
 import { patchLayer } from '../../engine/design/actions';
 import type { Layer } from '../../engine/types';
 import { InlineChoice, InlineToggle } from './InlineControls';
-import { deletePickedNode, setBreakNodes, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
+import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
 import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
@@ -67,6 +67,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         {isPath && (edit?.nodes?.length ?? 0) >= 2 && <>
           <button type="button" className="opt" data-tip="Merge the selected end nodes into one (Shift+J); the same subpath closes" onClick={() => setJoinEnds(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'merge')}>Join</button>
           <button type="button" className="opt" data-tip="Join the selected end nodes with a straight segment (Alt+J)" onClick={() => setJoinEnds(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'segment')}>Join with segment</button>
+          <button type="button" className="opt" data-tip="Delete the segments between adjacent selected nodes; open or split the path" onClick={() => setDeleteSegments(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!)}>Delete segment</button>
           <button type="button" className="opt" data-tip="Segments between the selected nodes become straight (Shift+L)" onClick={() => setSegmentsTo(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'line')}>Make line</button>
           <button type="button" className="opt" data-tip="Straight segments between the selected nodes become curves (Shift+U)" onClick={() => setSegmentsTo(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'curve')}>Make curve</button>
         </>}

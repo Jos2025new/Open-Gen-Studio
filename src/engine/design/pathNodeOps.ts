@@ -398,3 +398,38 @@ export function breakNodes(segs: Seg[], types: NodeType[], selected: number[]): 
   const nodes = out.flatMap((t, i) => (firsts.has(t.nodes[0]) ? [globalIndex(out, i, 0)] : []));
   return { segs: fromSubs(out), types: out.flatMap((t) => t.types), nodes };
 }
+
+/** Delete edges between adjacent selected nodes (Inkscape _deleteSegments L915–991), dropping isolated remnants. */
+export function deleteSegments(segs: Seg[], types: NodeType[], selected: number[]): { segs: Seg[]; types: NodeType[]; nodes: number[] } | null {
+  const subs = toSubs(segs), sel = new Set(selected), out: TSub[] = [], nodes: number[] = [];
+  let changed = false, offset = 0;
+  subs.forEach((s, si) => {
+    const base = globalIndex(subs, si, 0), m = s.nodes.length;
+    const cut = s.edges.map((_, k) => sel.has(base + k) && sel.has(base + (k + 1) % m));
+    const emit = (order: number[], closed: boolean) => {
+      const edges = order.slice(0, closed ? order.length : -1).map((k) => s.edges[k]);
+      const nextTypes = order.map((k) => types[base + k] ?? 'c');
+      if (!closed && cut.some(Boolean)) {
+        // Only the handles on removed edges retract; surviving outer curves stay in place.
+        if (cut[(order[0] - 1 + m) % m]) nextTypes[0] = 'c';
+        if (cut[order[order.length - 1]]) nextTypes[nextTypes.length - 1] = 'c';
+      }
+      out.push({ nodes: order.map((k) => s.nodes[k]), edges, closed, types: nextTypes });
+      order.forEach((k, j) => { if (sel.has(base + k)) nodes.push(offset + j); });
+      offset += order.length;
+    };
+    if (!cut.some(Boolean)) { emit(s.nodes.map((_, k) => k), s.closed); return; }
+    changed = true;
+    const start = s.closed ? (cut.indexOf(true) + 1) % m : 0;
+    let piece: number[] = [];
+    for (let j = 0; j < m; j++) {
+      const k = (start + j) % m;
+      piece.push(k);
+      if (cut[k] || j === m - 1) {
+        if (piece.length > 1) emit(piece, false);
+        piece = [];
+      }
+    }
+  });
+  return changed ? { segs: fromSubs(out), types: out.flatMap((s) => s.types), nodes } : null;
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
 import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
-import { breakNodes, deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
+import { breakNodes, deleteSegments, deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -257,5 +257,45 @@ describe('review of 581afe0 (GPT)', () => {
     const r = breakNodes(parseSegs('M 0 0 L 9 0 L 9 9 L 0 9 Z'), ['c', 'c', 'c', 'c'], [0, 2])!;
     expect(serializeSegs(r.segs)).toBe('M 0 0 L 9 0 L 9 9 M 9 9 L 0 9 L 0 0');
     expect(r.nodes).toEqual([0, 3]);
+  });
+});
+
+
+describe('delete segments', () => {
+  it('splits an open selected run, drops inner nodes and preserves outer curve handles and types', () => {
+    const segs = parseSegs('M 0 0 C 5 0 15 10 20 0 C 25 0 35 10 40 0 C 45 0 55 10 60 0 C 65 0 75 10 80 0');
+    const r = deleteSegments(segs, ['z', 's', 'z', 's', 'z'], [1, 2, 3]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 0 0 C 5 0 15 10 20 0 M 60 0 C 65 0 75 10 80 0');
+    expect(r!.types).toEqual(['z', 'c', 'c', 'z']);
+    expect(r!.nodes).toEqual([1, 2]);
+    expect(segs).toEqual(parseSegs('M 0 0 C 5 0 15 10 20 0 C 25 0 35 10 40 0 C 45 0 55 10 60 0 C 65 0 75 10 80 0'));
+  });
+  it('opens a closed path by deleting its curved closing edge', () => {
+    const r = deleteSegments(parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 C -5 8 -5 2 0 0 Z'), ['s', 'z', 's', 'z'], [3, 0]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 0 0 L 10 0 L 10 10 L 0 10');
+    expect(r!.types).toEqual(['c', 'z', 's', 'c']);
+    expect(r!.nodes).toEqual([0, 3]);
+  });
+  it('removes fully selected subpaths and remaps surviving selections across subpaths', () => {
+    const r = deleteSegments(parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 Z M 100 0 L 110 0 L 120 0 L 130 0'), ['s', 's', 's', 's', 'z', 's', 's', 'z'], [0, 1, 2, 3, 5, 6]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 100 0 L 110 0 M 120 0 L 130 0');
+    expect(r!.types).toEqual(['z', 'c', 'c', 'z']);
+    expect(r!.nodes).toEqual([1, 2]);
+    expect(deleteSegments(parseSegs('M 0 0 L 10 0'), ['s', 'z'], [0, 1])).toEqual({ segs: [], types: [], nodes: [] });
+  });
+  it('keeps coincident endpoints distinct, trims selected ends and leaves nonadjacent selections alone', () => {
+    const r = deleteSegments(parseSegs('M 0 0 L 10 0 L 10 0 L 20 0'), ['s', 's', 'z', 'z'], [1, 2]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 0 0 L 10 0 M 10 0 L 20 0');
+    expect(r!.nodes).toEqual([1, 2]);
+    for (const selected of [[0, 1], [2, 3]]) {
+      const cut = deleteSegments(parseSegs('M 0 0 L 10 0 L 20 0 L 30 0'), ['s', 's', 's', 's'], selected)!;
+      expect(cut.segs).toHaveLength(3);
+      expect(cut.nodes).toEqual(selected[0] === 0 ? [0] : [2]);
+    }
+    expect(deleteSegments(parseSegs('M 0 0 L 10 0 L 20 0'), ['s', 's', 's'], [0, 2])).toBeNull();
   });
 });

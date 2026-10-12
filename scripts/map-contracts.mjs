@@ -6,6 +6,16 @@
  */
 export default [
   {
+    id: 'path-node-topology',
+    what: 'Borrar segmentos conserva curvas exteriores, tipos e índices elegidos; la barra aplica la operación con un solo deshacer.',
+    sides: [
+      ['src/engine/design/pathNodeOps.ts', 'export function deleteSegments'],
+      ['src/components/designer/PathNodes.tsx', 'export function setDeleteSegments'],
+      ['src/components/designer/ContextStrip.tsx', '>Delete segment</button>'],
+    ],
+    tests: ['tests/path-nodes.test.ts', 'tests-e2e/path-nodes.spec.ts'],
+  },
+  {
     id: 'provider-key-ui',
     what: 'Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores.',
     sides: [
