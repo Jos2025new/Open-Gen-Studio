@@ -352,3 +352,35 @@ it('painted bounds stay exact without reading native canvas dimensions per pixel
   expect(widthReads).toBeLessThan(20);
   expect(heightReads).toBeLessThan(20);
 });
+
+it('painted bounds rescan only their own layer, and never mid-stroke: the box catches up when the stroke is committed', () => {
+  let now = 1000;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined }); // the layer save timer
+  const a = { ...newRasterLayer('A', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'box-a' };
+  const b = { ...newRasterLayer('B', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'box-b' };
+  const ca = recordingCanvas(200, 100), cb = recordingCanvas(200, 100);
+  const data = new Uint8ClampedArray(200 * 100 * 4);
+  data[(5 * 200 + 7) * 4 + 3] = 255;
+  let reads = 0;
+  readPixel = (() => { reads++; return { data }; }) as never;
+  setBuffer(a.id, ca as never, false);
+  setBuffer(b.id, cb as never, false);
+  layerBox(a); layerBox(b);
+  expect(reads).toBe(2);
+  now += 1000;
+  setBuffer(b.id, recordingCanvas(200, 100) as never, false); // another layer changes
+  layerBox(a);
+  expect(reads).toBe(2);
+  beginLiveStroke(ca as never, '#000', 1, false);
+  setBuffer(a.id, ca as never, false); // a segment of the stroke: new content version
+  now += 1000;
+  expect(layerBox(a)).toEqual({ x: 7, y: 5, w: 1, h: 1 });
+  expect(reads).toBe(2);
+  data[(50 * 200 + 90) * 4 + 3] = 255;
+  commitEdit(a.id);
+  now += 1000;
+  expect(layerBox(a)).toEqual({ x: 7, y: 5, w: 84, h: 46 });
+  expect(reads).toBe(3);
+  vi.unstubAllGlobals();
+});

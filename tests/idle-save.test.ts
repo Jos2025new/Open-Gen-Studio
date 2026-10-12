@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 /* The state is written when the browser is idle (never mid-gesture), within a deadline; hiding the page writes at once. */
 const writes: string[] = [];
 vi.mock('../src/lib/idb', () => ({
-  stateDb: { get: async () => undefined, set: async (_k: string, v: string) => { writes.push(v); }, del: async () => undefined },
+  stateDb: { get: async () => undefined, set: async (_k: string, v: string | { text(): string }) => { writes.push(typeof v === "string" ? v : v.text()); }, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
   getAssetBlob: async () => undefined,
   putAssetBlob: async () => undefined,
@@ -41,6 +41,39 @@ describe('state save in idle time', () => {
     setUi({ brush: { ...useStore.getState().ui.brush, size: 32 } });
     window.dispatchEvent(new Event('pagehide'));
     expect(writes).toHaveLength(1);
+    vi.useRealTimers();
+  });
+  it('never starts mid-gesture: a pressed pointer delays the write to its release, 10 s at most', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    const { setUi, useStore, MAX_GESTURE_WAIT_MS } = await import('../src/store/store');
+    const press = (type: string) => window.dispatchEvent(Object.assign(new Event(type), { pointerId: 1 }));
+    const runIdle = () => idle.splice(0).forEach((fn) => fn());
+    writes.length = 0;
+    press('pointerdown');
+    setUi({ brush: { ...useStore.getState().ui.brush, size: 33 } });
+    await vi.advanceTimersByTimeAsync(400);
+    runIdle(); // idle time between the frames of a stroke
+    expect(writes).toHaveLength(0);
+    press('pointerup');
+    runIdle();
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(writes[0]).state.ui.brush.size).toBe(33);
+
+    // A pointerup that never comes: the write still happens once the cap is reached.
+    press('pointerdown');
+    setUi({ brush: { ...useStore.getState().ui.brush, size: 34 } });
+    await vi.advanceTimersByTimeAsync(400);
+    runIdle();
+    expect(writes).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(MAX_GESTURE_WAIT_MS);
+    expect(writes).toHaveLength(2);
+    expect(JSON.parse(writes[1]).state.ui.brush.size).toBe(34);
+
+    // Hiding the page mid-gesture writes at once.
+    setUi({ brush: { ...useStore.getState().ui.brush, size: 35 } });
+    window.dispatchEvent(new Event('pagehide'));
+    expect(writes).toHaveLength(3);
+    press('pointerup');
     vi.useRealTimers();
   });
 });

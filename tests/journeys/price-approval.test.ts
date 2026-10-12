@@ -10,7 +10,7 @@ vi.mock('../../src/lib/media', async (importOriginal) => {
   return { ...original, probeMedia: async () => ({ width: 1, height: 1 }) };
 });
 vi.mock('../../src/lib/idb', () => ({
-  stateDb: { get: async () => savedState.raw, set: async (_key: string, raw: string) => { savedState.raw = raw; }, del: async () => undefined },
+  stateDb: { get: async () => savedState.raw, set: async (_key: string, raw: string | { text(): string }) => { savedState.raw = typeof raw === "string" ? raw : raw.text(); }, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
   blobDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   getAssetBlob: async () => new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' }),

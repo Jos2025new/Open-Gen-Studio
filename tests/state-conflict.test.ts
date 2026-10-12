@@ -73,6 +73,22 @@ describe('two tabs saving the same state', () => {
     expect(onDisk()).toContain('more test sessions');
   });
 
+  it('a save sent as a Blob reaches the disk with its baseAt, and a stale tab is refused the same way', async () => {
+    const body = (at: number, what: string) => ({ savedAt: at, blob: (open: string) => new Blob([open, `"what":"${what}"}`]) });
+    const a = await tab();
+    await a.getState();
+    const b = await tab();
+    await b.getState();
+    a.setState(body(9000, 'blob save'));
+    await until(diskHas('blob save'));
+    expect(JSON.parse(onDisk())).toMatchObject({ savedAt: 9000, what: 'blob save' });
+    a.setState(body(9500, 'blob again')); // its baseAt moved on with the first save
+    await until(diskHas('blob again'));
+    b.setState(body(10_000, 'blob stale'));
+    await until(() => b.isStale());
+    expect(onDisk()).toContain('blob again');
+  });
+
   it('at load, a browser copy left by a stale tab loses to the disk; one built on the disk state is kept', async () => {
     const t = await tab();
     const now = JSON.parse(onDisk()).savedAt as number;

@@ -7,7 +7,7 @@ import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape }
 import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
-import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, rasterVersion, redrawSoon } from './raster';
+import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
@@ -109,8 +109,11 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
   const buf = getBuffer(l.id);
   if (!buf || !buf.width || !buf.height) return null;
   let hit = painted.get(buf);
-  // While painting the version changes every segment: rescan at most every 150 ms.
-  if (!hit || (hit.version !== rasterVersion() && performance.now() - hit.at > 150)) {
+  // Keyed on this buffer's own content version: painting or redrawing another layer does not rescan this one. A live
+  // stroke changes it every segment and reading the pixels back stalls the brush: the box catches up once the stroke
+  // ends (its commit is a new version). Otherwise rescan at most every 150 ms.
+  const version = bufferVersion(l.id);
+  if (!hit || (hit.version !== version && !paintingLive() && performance.now() - hit.at > 150)) {
     const width = buf.width, height = buf.height;
     const data = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
     let x0 = width, y0 = height, x1 = -1, y1 = -1;
@@ -124,7 +127,7 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
         }
       }
     }
-    hit = { version: rasterVersion(), at: performance.now(), box: x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 } };
+    hit = { version, at: performance.now(), box: x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 } };
     painted.set(buf, hit);
   }
   if (!hit.box) return null;

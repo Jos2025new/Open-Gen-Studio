@@ -29,7 +29,7 @@ const report = (what: string) => (err: unknown) => console.warn(`Disk copy: coul
 
 // State writes are serialized and coalesced: only the newest pending value is sent, never out of order.
 let stateChain: Promise<void> = Promise.resolve();
-let latestState: string | null = null;
+let latestState: string | StateBody | null = null;
 // The disk state this tab works from (its savedAt): each write says so, and the server refuses it when another tab
 // saved in between, instead of letting an older copy overwrite newer work.
 let baseAt = 0;
@@ -37,6 +37,8 @@ let stale = false;
 let onStale: (() => void) | null = null;
 const savedAtOf = (v: string | null) => Number(/^\{"savedAt":(\d+)/.exec(v ?? '')?.[1] ?? 0);
 /** `{"savedAt":N,…}` → `{"savedAt":N,"baseAt":B,…}` (any baseAt already there is replaced). */
+/** A stamped state sent as a Blob: `open` replaces its opening `{` (see persistJson.ts). */
+export interface StateBody { savedAt: number; blob(open: string): Blob }
 const withBase = (v: string, base: number) => v.replace(/^\{"savedAt":(\d+),("baseAt":\d+,)?/, `{"savedAt":$1,"baseAt":${base},`);
 
 export const disk = {
@@ -70,19 +72,24 @@ export const disk = {
     onStale = cb;
   },
 
-  setState(value: string): void {
+  setState(value: string | StateBody): void {
     if (stale) return;
     latestState = value;
     stateChain = stateChain.then(async () => {
       if (stale || latestState == null || !(await diskAvailable())) return;
-      const body = savedAtOf(latestState) ? withBase(latestState, baseAt) : latestState;
+      const next = latestState;
       latestState = null;
+      // A Blob body is handed over without encoding it on the page (a long string blocked it for most of a second).
+      const [body, at] = typeof next === 'string'
+        ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
+        : [next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`), next.savedAt];
+      const size = typeof body === 'string' ? body.length : body.size;
       // keepalive lets the last save survive a closing tab (browsers cap it at 64 KB).
-      const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: body.length < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(report('save state'));
+      const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: size < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(report('save state'));
       if (res?.status === 409) {
         stale = true;
         onStale?.();
-      } else if (res?.ok) baseAt = savedAtOf(body);
+      } else if (res?.ok) baseAt = at;
     });
   },
 

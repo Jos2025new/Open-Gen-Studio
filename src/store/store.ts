@@ -1,4 +1,4 @@
-import { persistJson } from './persistJson';
+import { persistState } from './persistJson';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
@@ -280,18 +280,40 @@ let idleHandle: number | undefined;
 function flushWhenIdle(): void {
   const ric = typeof window !== 'undefined' ? window.requestIdleCallback : undefined;
   if (!ric) return flushWrite();
-  if (idleHandle === undefined) idleHandle = ric(() => { idleHandle = undefined; flushWrite(); }, { timeout: IDLE_TIMEOUT_MS });
+  if (idleHandle === undefined) idleHandle = ric(() => { idleHandle = undefined; writeUnlessPressed(); }, { timeout: IDLE_TIMEOUT_MS });
+}
+
+// Idle time also comes between the frames of a stroke, and a save cannot be interrupted once it starts: while a
+// pointer is pressed the write waits for its release, MAX_GESTURE_WAIT_MS at most (a lost pointerup must not stop
+// saving). Hiding or closing the page still writes at once.
+export const MAX_GESTURE_WAIT_MS = 10_000;
+const pressed = new Set<number>();
+let pressedSince = 0;
+let gestureTimer: ReturnType<typeof setTimeout> | undefined;
+function writeUnlessPressed(): void {
+  const waited = Date.now() - pressedSince;
+  if (!pressed.size || waited >= MAX_GESTURE_WAIT_MS) return flushWrite();
+  gestureTimer ??= setTimeout(flushWrite, MAX_GESTURE_WAIT_MS - waited);
+}
+function released(e: { pointerId?: number; type: string }): void {
+  if (e.type === 'blur') pressed.clear();
+  else pressed.delete(e.pointerId ?? 0);
+  if (pressed.size || gestureTimer === undefined) return;
+  clearTimeout(gestureTimer);
+  gestureTimer = undefined;
+  flushWhenIdle();
 }
 
 function flushWrite(): void {
   clearTimeout(writeTimer);
   clearTimeout(maxWaitTimer);
+  clearTimeout(gestureTimer);
   if (idleHandle !== undefined && typeof window !== 'undefined') window.cancelIdleCallback?.(idleHandle);
-  writeTimer = maxWaitTimer = idleHandle = undefined;
+  writeTimer = maxWaitTimer = idleHandle = gestureTimer = undefined;
   if (!pendingWrite || wiping) return;
   const { name, value } = pendingWrite;
   pendingWrite = null;
-  stateDb.set(name, persistJson(value)).catch((err) => console.error('Could not save state', err));
+  stateDb.set(name, persistState(value)).catch((err) => console.error('Could not save state', err));
 }
 
 const idbStorage: PersistStorage<Persisted> = {
@@ -311,6 +333,11 @@ const idbStorage: PersistStorage<Persisted> = {
 };
 
 if (typeof window !== 'undefined') {
+  window.addEventListener('pointerdown', (e) => {
+    if (!pressed.size) pressedSince = Date.now();
+    pressed.add(e.pointerId);
+  }, true);
+  for (const type of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(type, released as EventListener, true);
   window.addEventListener('pagehide', flushWrite);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushWrite();

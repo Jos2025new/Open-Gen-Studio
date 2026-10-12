@@ -4,7 +4,7 @@ const disk = vi.hoisted(() => ({ raw: undefined as string | undefined }));
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener() {} },
   document: { addEventListener() {}, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({
-  stateDb: { get: async () => disk.raw, set: async (_k: string, raw: string) => { disk.raw = raw; }, del: async () => undefined },
+  stateDb: { get: async () => disk.raw, set: async (_k: string, raw: string | { text(): string }) => { disk.raw = typeof raw === "string" ? raw : raw.text(); }, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
   getAssetBlob: async () => new Blob(['test'], { type: 'image/png' }), putAssetBlob: async () => undefined,
 }));

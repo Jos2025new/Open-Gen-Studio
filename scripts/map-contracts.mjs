@@ -336,11 +336,13 @@ export default [
   },
   {
     id: 'persist-json-exact',
-    what: '2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio.',
+    what: '2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB sigue guardando el texto.',
     sides: [
-      ['src/store/store.ts', 'stateDb.set(name, persistJson(value))'],
-      ['src/store/persistJson.ts', 'export function persistJson('],
+      ['src/store/store.ts', 'stateDb.set(name, persistState(value))'],
+      ['src/store/persistJson.ts', 'export function persistState('],
+      ['src/lib/idb.ts', 'disk.setState({ savedAt, blob: (open) => value.blob(open) })'],
+      ['src/lib/disk.ts', 'next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`)'],
     ],
-    tests: ['tests/persist-json.test.ts'],
+    tests: ['tests/persist-json.test.ts', 'tests/state-conflict.test.ts'],
   },
 ];
