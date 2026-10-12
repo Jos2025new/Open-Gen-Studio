@@ -7,9 +7,11 @@
 export default [
   {
     id: 'path-node-topology',
-    what: 'Borrar segmentos conserva curvas exteriores, tipos e índices elegidos; la barra aplica la operación con un solo deshacer.',
+    what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [
       ['src/engine/design/pathNodeOps.ts', 'export function deleteSegments'],
+      ['src/engine/design/pathNodeOps.ts', 'export function weldNodes'],
+      ['src/components/designer/PathNodes.tsx', 'export function setJoinEnds'],
       ['src/components/designer/PathNodes.tsx', 'export function setDeleteSegments'],
       ['src/components/designer/ContextStrip.tsx', '>Delete segment</button>'],
     ],

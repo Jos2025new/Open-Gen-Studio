@@ -31,7 +31,6 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Funciones propuestas sin implementar
 
-- [ ] **Nodos, lo que falta de Inkscape:** borrar segmento entre nodos elegidos (botón) y soldar nodos contiguos con Shift+J cuando no hay extremos ([plan](plan-edicion-formas.md)). **2026-10-11**, pendiente.
 - [ ] **Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca a cada segundo siempre visible (tamaño y opacidad del pincel, deshacer, capas), herramientas con nombre y sin desbordamiento, capas con sus efectos dentro, interruptores de un toque, girar el lienzo e histograma. Segunda ronda con Feather 3D y SketchUp y correcciones del usuario: secuencia vigente de 8 pasos; el primero es el inventario de herramientas y funciones con un test de alcance, para no perder nada al reorganizar. **2026-10-10**, pedido por el usuario; sin decidir el orden.
 - [ ] **Designer, tras el 2026-10-09 (segunda parte):**
   - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
@@ -103,6 +102,8 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 - [ ] **Carga de la app:** paquete principal de 1,64 MB minificado (521 KB comprimido) y avisos de imports dinámicos que no separan módulos (dato de la auditoría, sin comprobar aquí). Medir el arranque con una sonda antes de optimizar. **2026-10-08**, propuesta.
 
 ## Hecho
+
+- [x] **Nodos, lo que falta de Inkscape:** botón Delete segment entre nodos contiguos elegidos y soldar con Shift+J cuando no hay parejas de extremos. Reutiliza subtrazados, tipos y deshacer existentes. **2026-10-12**, 9 casos puros y 2 e2e nuevos, todos fallan al desactivar sus operaciones. Fuentes, selección y diferencia deliberada del punto medio en el [plan](plan-edicion-formas.md).
 
 - [x] **e2e de presión simulada y de la regla de trazo:** fallaban por el pincel guardado en el sandbox, no por la app. La presión depende de la distancia, no del tiempo, y un «Min size» de 0,55 impedía adelgazar; la regla no fijaba ni color ni opacidad. Investigación de MiMo 2.6 Flash, corroborada por Claude en el código y en sus logs. Los tests ahora fijan el pincel que miden. **2026-10-11**, **e2e**: con el sandbox contaminado a propósito, las versiones anteriores fallan (32 320; «rows 0») y las corregidas pasan.
 - [x] **2026-10-11, rendimiento raster medido:** con 50 trazos, recomponer 1080p 235,45 → 9,1 ms y 4K 793,65 → 49,6 ms; límites/cobertura reutilizados sin cambiar historial. Las copias completas permanecen (4K ~40 ms); reconsiderarlas solo con medición y diseño seguro. [Método, exactitud y límites](raster-pruebas.md).

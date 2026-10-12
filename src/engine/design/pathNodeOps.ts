@@ -289,7 +289,7 @@ export function joinEnds(segs: Seg[], types: NodeType[], selected: number[], how
     pairs.push([left[i], left[j]]);
     left.splice(j, 1); left.splice(i, 1);
   }
-  if (!pairs.length) return null;
+  if (!pairs.length) return how === 'merge' ? weldNodes(segs, types, selected) : null;
   const marks: Pt[] = [];
   for (const [a0, b0] of pairs) {
     // Find each end again in the current subpaths (review: an earlier join replaced the subpath objects, so later
@@ -430,6 +430,44 @@ export function deleteSegments(segs: Seg[], types: NodeType[], selected: number[
         piece = [];
       }
     }
+  });
+  return changed ? { segs: fromSubs(out), types: out.flatMap((s) => s.types), nodes } : null;
+}
+
+/** Weld adjacent selected runs, only when endpoint joining has no pairs (Inkscape weldNodes L506–578). */
+export function weldNodes(segs: Seg[], types: NodeType[], selected: number[]): { segs: Seg[]; types: NodeType[]; nodes: number[] } | null {
+  const subs = toSubs(segs), sel = new Set(selected), out: TSub[] = [], nodes: number[] = [];
+  let changed = false, offset = 0;
+  subs.forEach((s, si) => {
+    const base = globalIndex(subs, si, 0), m = s.nodes.length;
+    const picks = s.nodes.map((_, k) => sel.has(base + k)), all = picks.every(Boolean);
+    // Like Inkscape, leave a fully selected subpath alone rather than collapse it to one unusable point.
+    // Rotate the traversal only for a selected run across the closing edge; keep other subpath starts intact.
+    const start = s.closed && !all && picks[0] && picks[m - 1] ? picks.indexOf(false) : 0;
+    const order = s.nodes.map((_, k) => (start + k) % m);
+    const groups: { indices: number[]; pt: Pt; type: NodeType; picked: boolean }[] = [];
+    for (let j = 0; j < m;) {
+      const first = order[j], indices = [first];
+      j++;
+      if (!all && picks[first]) while (j < m && picks[order[j]]) indices.push(order[j++]);
+      const last = indices[indices.length - 1], merged = indices.length > 1;
+      // Deliberate: midpoint of the run's endpoint nodes, not of its external handle positions.
+      const pt: Pt = merged ? lerp(s.nodes[first], s.nodes[last], 0.5) : s.nodes[first];
+      groups.push({ indices, pt, type: merged ? 'c' : types[base + first] ?? 'c', picked: picks[first] });
+      changed ||= merged;
+    }
+    const edges = groups.slice(0, s.closed ? groups.length : -1).map((a, i) => {
+      const b = groups[(i + 1) % groups.length], last = a.indices[a.indices.length - 1], first = b.indices[0];
+      const e = s.edges[last];
+      if (e.c !== 'C') return e;
+      // External nondegenerate handles stay at their original coordinates. Retracted ones follow the new node.
+      const same = (h: Pt, p: Pt) => Math.hypot(h[0] - p[0], h[1] - p[1]) < 1e-9;
+      return { ...e, c1: a.indices.length > 1 && same(e.c1!, s.nodes[last]) ? a.pt : e.c1,
+        c2: b.indices.length > 1 && same(e.c2!, s.nodes[first]) ? b.pt : e.c2 };
+    });
+    out.push({ nodes: groups.map((g) => g.pt), edges, closed: s.closed, types: groups.map((g) => g.type) });
+    groups.forEach((g, i) => { if (g.picked) nodes.push(offset + i); });
+    offset += groups.length;
   });
   return changed ? { segs: fromSubs(out), types: out.flatMap((s) => s.types), nodes } : null;
 }

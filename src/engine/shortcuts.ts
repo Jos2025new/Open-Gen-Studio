@@ -71,7 +71,7 @@ export function shortcutGroups(): ShortcutGroup[] {
         { keys: 'Ctrl + drag a corner handle', action: 'Both corner radii together' },
         { keys: 'Shift+C / Shift+S / Shift+Y (nodes)', action: 'Cusp, smooth or symmetric node' },
         { keys: 'Shift+L / Shift+U (nodes)', action: 'Segments between selected nodes to line / curve' },
-        { keys: 'Shift+J / Alt+J (nodes)', action: 'Join selected end nodes / join them with a segment' },
+        { keys: 'Shift+J / Alt+J (nodes)', action: 'Join selected ends or weld adjacent nodes / join ends with a segment' },
         { keys: 'Shift+B (nodes)', action: 'Break the path at the selected nodes' },
         { keys: 'Delete / Ctrl+Delete (nodes)', action: 'Delete selected nodes keeping the shape / joining straight' },
       ],

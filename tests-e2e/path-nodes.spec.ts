@@ -351,3 +351,29 @@ test('Delete segment opens the closed path, removes its isolated middle node and
   expect((await shape(page)).type).toBe('rect');
   expect(errors).toEqual([]);
 });
+
+
+test('Shift+J welds adjacent nodes without end pairs, selects the new cusp and keeps one undo step', async ({ page }) => {
+  const { errors, before } = await convertedSquare(page);
+  await selectNodes(page, [1, 2]);
+  await page.keyboard.press('Shift+J');
+  await expect(page.locator('rect.path-node')).toHaveCount(3);
+  expect((await shape(page)).d).toContain('Z');
+  expect(await pickedNodeIndices(page)).toEqual([1]);
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(1);
+  await expect(strip(page)).toContainText('Editing nodes');
+  const middle = await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), P = await import('/src/engine/design/pathNodes.ts' as string);
+    const d = A.activeDoc(st.useStore.getState().activeSessionId), s = d.layers.find((l: any) => l.type === 'vector').shapes[0];
+    const segs = P.pageSegs(s), ns = P.nodeSegs(segs).seg;
+    return segs[ns[1]].p.at(-1);
+  });
+  expect(middle[0]).toBeCloseTo(before.x + before.w, 2);
+  expect(middle[1]).toBeCloseTo(before.y + before.h / 2, 2);
+  await page.screenshot({ path: `${SHOTS}/weld-nodes.png` });
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).d).toBe(before.d);
+  await page.keyboard.press('Control+z');
+  expect((await shape(page)).type).toBe('rect');
+  expect(errors).toEqual([]);
+});

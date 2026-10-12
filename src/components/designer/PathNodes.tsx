@@ -202,7 +202,7 @@ export function setSegmentsTo(sessionId: string, docId: string, layerId: string,
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(r.segs, r.types) });
 }
 
-/** Join selected ends (Shift+J merge, Alt+J segment), one undo step; the joined nodes stay selected. */
+/** Join selected ends, or weld adjacent nodes if there are no end pairs (Shift+J; Alt+J only joins ends), one undo step; the joined nodes stay selected. */
 export function setJoinEnds(sessionId: string, docId: string, layerId: string, shape: VectorShape, selected: number[], how: 'merge' | 'segment'): void {
   const segs = pageSegs(shape), r = joinEnds(segs, readTypes(segs, shape.nodeTypes), selected, how);
   if (!r) return;

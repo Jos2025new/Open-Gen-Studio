@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ShapeSpec } from '../src/engine/types';
 import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodeHandles, nodePoints, pageSegs, parseSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes } from '../src/engine/design/pathNodes';
-import { breakNodes, deleteSegments, deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo } from '../src/engine/design/pathNodeOps';
+import { breakNodes, deleteSegments, deleteNode, deleteSelectedNodes, fitCubic, insertNode, joinEnds, nearestOnPath, segmentsTo, weldNodes } from '../src/engine/design/pathNodeOps';
 import { shapeSvg } from '../src/engine/design/export';
 import { shapeToPath } from '../src/engine/design/affine';
 import { toPage } from '../src/engine/design/shapeTransform';
@@ -221,9 +221,10 @@ describe('joining ends (Shift+J / Alt+J)', () => {
     expect(j.nodes).toEqual([1]);
     const s = joinEnds(two, ['c', 'c', 'c', 'c'], [1, 3], 'segment')!;
     expect(serializeSegs(s.segs)).toBe('M 0 0 L 10 0 L 12 0 L 30 0');
-    // Interior nodes and closed subpaths are not ends; one end alone joins nothing.
-    expect(joinEnds(parseSegs('M 0 0 L 1 0 L 2 0'), ['c', 'c', 'c'], [1, 2], 'merge')).toBeNull();
-    expect(joinEnds(parseSegs('M 0 0 L 9 0 L 9 9 Z'), ['c', 'c', 'c'], [0, 2], 'merge')).toBeNull();
+    // Alt+J only joins ends; Shift+J can now weld these adjacent selections. A lone end still does nothing.
+    expect(joinEnds(parseSegs('M 0 0 L 1 0 L 2 0'), ['c', 'c', 'c'], [1, 2], 'segment')).toBeNull();
+    expect(joinEnds(parseSegs('M 0 0 L 9 0 L 9 9 Z'), ['c', 'c', 'c'], [0, 2], 'segment')).toBeNull();
+    expect(joinEnds(parseSegs('M 0 0 L 1 0 L 2 0'), ['c', 'c', 'c'], [2], 'merge')).toBeNull();
   });
 });
 
@@ -297,5 +298,59 @@ describe('delete segments', () => {
       expect(cut.nodes).toEqual(selected[0] === 0 ? [0] : [2]);
     }
     expect(deleteSegments(parseSegs('M 0 0 L 10 0 L 20 0'), ['s', 's', 's'], [0, 2])).toBeNull();
+  });
+});
+
+
+describe('weld nodes', () => {
+  it('collapses an open run at its endpoint midpoint, keeps external handles fixed and preserves other types', () => {
+    const segs = parseSegs('M 0 0 C 4 0 8 5 10 0 C 12 1 18 1 20 40 C 22 1 28 1 30 0 C 32 5 36 0 40 0');
+    const r = weldNodes(segs, ['z', 's', 'z', 's', 'z'], [1, 2, 3]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 0 0 C 4 0 8 5 20 0 C 32 5 36 0 40 0');
+    expect(r!.types).toEqual(['z', 'c', 'z']);
+    expect(r!.nodes).toEqual([1]);
+    expect(segs).toHaveLength(5);
+    expect(segs[1].p[2]).toEqual([10, 0]);
+  });
+  it('welds the run across the closing edge while preserving a closed subpath', () => {
+    const r = weldNodes(parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 Z'), ['s', 'z', 's', 'z'], [3, 0]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 10 0 L 10 10 L 0 5 L 10 0 Z');
+    expect(r!.types).toEqual(['z', 's', 'c']);
+    expect(r!.nodes).toEqual([2]);
+  });
+  it('keeps coincident welds in separate subpaths selected by their own indices, with types attached', () => {
+    const r = weldNodes(parseSegs('M -10 0 L 0 0 L 0 0 L 10 0 M -10 0 L 0 0 L 0 0 L 10 0'), ['s', 'z', 's', 'z', 'z', 's', 'z', 's'], [1, 2, 5, 6]);
+    expect(r).not.toBeNull();
+    expect(r!.nodes).toEqual([1, 4]);
+    expect(r!.types).toEqual(['s', 'c', 'z', 'z', 'c', 's']);
+    expect(serializeSegs(r!.segs)).toBe('M -10 0 L 0 0 L 10 0 M -10 0 L 0 0 L 10 0');
+    expect(weldNodes(parseSegs('M 0 0 L 10 0 L 20 0'), ['s', 's', 's'], [0, 2])).toBeNull();
+    expect(weldNodes(parseSegs('M 0 0 L 10 0 L 20 0 Z'), ['s', 's', 's'], [0, 1, 2])).toBeNull();
+    // A selected singleton on an untouched closed subpath must not rotate its start (or shift its dash phase).
+    const mixed = weldNodes(parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 Z M 20 0 L 30 0 L 40 0 L 50 0'), ['s', 'z', 's', 'z', 's', 's', 's', 's'], [0, 5, 6])!;
+    expect(serializeSegs(mixed.segs)).toBe('M 0 0 L 10 0 L 10 10 L 0 10 L 0 0 Z M 20 0 L 35 0 L 50 0');
+    expect(mixed.nodes).toEqual([0, 5]);
+    const prefix = weldNodes(parseSegs('M 0 0 L 10 0 L 10 10 L 0 10 Z'), ['s', 's', 's', 's'], [0, 1])!;
+    expect(prefix.segs[0].p[0]).toEqual([5, 0]);
+  });
+  it('keeps retracted external curve handles retracted at the welded node', () => {
+    const r = weldNodes(parseSegs('M 0 0 C 3 0 10 0 10 0 L 10 10 C 10 10 3 10 0 10 Z'), ['s', 'z', 's', 'z'], [1, 2]);
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 0 0 C 3 0 10 5 10 5 C 10 5 3 10 0 10 L 0 0 Z');
+    expect(r!.nodes).toEqual([1]);
+    expect(r!.types).toEqual(['s', 'c', 'z']);
+  });
+  it('falls back from Shift+J to welding only without end pairs; Alt+J and end joining stay unchanged', () => {
+    const segs = parseSegs('M 0 0 L 10 0 L 20 0 L 30 0');
+    const r = joinEnds(segs, ['s', 's', 's', 's'], [0, 1, 2], 'merge');
+    expect(r).not.toBeNull();
+    expect(serializeSegs(r!.segs)).toBe('M 10 0 L 30 0');
+    expect(r!.nodes).toEqual([0]);
+    expect(joinEnds(segs, ['s', 's', 's', 's'], [0, 1, 2], 'segment')).toBeNull();
+    const ends = joinEnds(segs, ['s', 's', 's', 's'], [0, 1, 2, 3], 'merge')!;
+    expect(ends.segs.at(-1)?.c).toBe('Z');
+    expect(ends.types).toHaveLength(3);
   });
 });
