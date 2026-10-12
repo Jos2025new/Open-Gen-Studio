@@ -48,3 +48,87 @@ Antes de implementar cualquiera de estos cambios conviene medirlos en el banco c
 - No se ha verificado el rendimiento de PhotoCraft con ninguna medida propia. Las cifras de `perf/baseline.json` son del proyecto y no se comparan con las de OGS.
 - No se ha leído `crates/compose/src/lib.rs` de forma completa; solo los puntos citados.
 - La popularidad (53 000 estrellas en 12 días) no se ha verificado.
+
+## 6. Desarrollo y dependencias (2026-10-13)
+
+Solo lectura: clones superficiales y completos del repositorio en el scratchpad, `Cargo.toml`, `Cargo.lock`, código fuente y API de GitHub. No se compiló, instaló ni ejecutó nada. Las líneas de código se cuentan con `wc -l` (tokei no está instalado) e incluyen los tests que viven en los mismos archivos.
+
+### 6.1 Respuesta directa: ¿motor propio?
+
+**Sí, en la composición; no en la capa gráfica, la interfaz ni los formatos.**
+
+- **Propio:** la fusión de capas (34 variantes de modo en `crates/color/src/blend.rs` 11, incluidos el paso directo y dos de Paint.NET, con su versión en GPU), los filtros y ajustes, las máscaras, los efectos de capa y los mosaicos COW. El compositor de CPU tiene 12 587 líneas de Rust en `crates/compose/src`; el de GPU, 5 761 líneas de Rust más 1 297 de WGSL escritas a mano (`crates/gpu/src/compose.wgsl`).
+- **De terceros:** la API gráfica (`wgpu`, solo como capa sobre WebGPU, Vulkan o Metal), la interfaz (`egui` y `eframe`), la decodificación de imagen (`image`, `zune-jpeg`, `png`, `tiff`, `exr`), el texto (`parley`, `skrifa`), el color ICC (`moxcms`), el paralelismo (`rayon`) y el SVG importado (`resvg` con `tiny-skia`).
+- **Sin Skia, Vello ni fast_image_resize** en ningún `Cargo.toml` ni en el `Cargo.lock`. `tiny-skia` entra solo por `resvg` (`Cargo.lock`, paquete `resvg`), y se usa en `crates/io/src/svg.rs` 22–23 para rasterizar SVG importados, no para componer el documento.
+
+Conclusión: el motor de composición de PhotoCraft es propio. Lo que delega en bibliotecas es lo que no es composición.
+
+### 6.2 Dependencias por función
+
+| Función | Biblioteca | Dónde (archivo) | ¿Compone píxeles? |
+|---|---|---|---|
+| API GPU | `wgpu` | `crates/gpu/src/lib.rs` (texturas, pases, buffers) | No: solo la API; la fusión está en `compose.wgsl` |
+| Interfaz | `egui`, `eframe`, `egui_extras` | `crates/ui-egui`, `apps/*` | No |
+| Paralelismo | `rayon` | `crates/compose/src/lib.rs` 154, 435, 542 | No: reparte bandas de píxeles |
+| Decodificar JPEG/PNG/TIFF/EXR | `zune-jpeg`, `png`, `tiff`, `exr`, `image` (sin funciones por defecto) | `crates/codecs`, `crates/raw` | No |
+| Texto | `parley`, `skrifa` | `crates/text` | No: la rasterización de glifos es de la biblioteca de texto |
+| Color ICC | `moxcms` | `crates/cms` | No: transforma perfiles, no compone |
+| SVG importado | `resvg` / `tiny-skia` | `crates/io/src/svg.rs` 22–23 | Solo al importar SVG |
+| Espectros y FFT | `rustfft` | `crates/algo` | No (algoritmos de filtrado) |
+| Plugins | `wasmi`, `wat` | `crates/plugins` | Plugins de usuario en wasm |
+| Compresión | `flate2`, `ruzstd` (zstd), `blake3`, `crc32fast` | `crates/format`, `crates/io` | No |
+| Sistema | `rfd`, `arboard`, `winit`, `open`, `muda` (y APIs de plataforma) | `apps/photocraft`, `crates/tablet` | No |
+| Impresión | `craft-print` (repo `storytold/craft-libs`) | `crates/engine/src/print_cmds.rs` 392–412 | No: envía a la cola de impresión |
+| Paneles | `craft-ui` (repo `storytold/craft-libs`) | `crates/ui-egui/src/panel_docking.rs` 4–5, `tab_strip.rs` 11–16 | No: pestañas y acoplamiento de paneles |
+
+Las dependencias `craft-*` vienen de `storytold/craft-libs` (Apache-2.0, creado el 2026-10-09, un único commit), fijadas por revisión (`Cargo.toml`, `[workspace.dependencies]`). Esa biblioteca tiene `print`, `ui`, `atomic`, `quit` y `settings`, y no contiene compositor (revisado en el clon).
+
+### 6.3 Tamaño del código de composición
+
+| Archivo o crate | Líneas | Qué hace |
+|---|---|---|
+| `crates/compose/src/psblend.rs` | 479 | Fórmulas de fusión de Photoshop en CPU |
+| `crates/compose/src/effects.rs` | 3 110 | Efectos de capa (sombra, brillo, bisel, trazo) |
+| `crates/compose/src/adjust.rs` | 1 530 | Ajustes (curvas, niveles, tono…) |
+| `crates/compose/src/masks.rs` | 764 | Máscaras y desenfoque (gaussiano propio, `masks.rs` 262) |
+| `crates/compose/src` (total) | 12 587 | Compositor de CPU (referencia, «oráculo») |
+| `crates/gpu/src/plan.rs` | 1 997 | Planificador de pases de GPU |
+| `crates/gpu/src/fx.rs` | 828 | Efectos de capa en GPU |
+| `crates/gpu/src/compose.wgsl` | 1 297 | Shader de fusión (87 funciones) |
+| `crates/raster/src` | 1 385 | Superficies COW por mosaicos de 256² |
+| `crates/ui-egui/src/canvas.rs` + `gpu_canvas.rs` | 9 680 | Lienzo de la interfaz |
+| `crates/engine/src` | 102 072 | Registro de comandos y sesión |
+
+Fusión: `compose/src/lib.rs` 1693 (`blend_into`) llama a `psblend`; en GPU, `compose.wgsl` 160 (`blend_channel`), 245 (`blend_rgb`) y 261 (`composite`) implementan las mismas fórmulas en WGSL. Son dos implementaciones propias del mismo modelo, y el compositor de CPU es la referencia contra la que se comprueba la GPU.
+
+### 6.4 Cómo desarrollan (método)
+
+**Lo verificado:**
+
+- **Repositorio y ritmo.** 1 804 commits entre el 2026-09-30 y el 2026-10-13 (14 días con commits). El día de mayor actividad tiene 366 commits (2026-10-09). En los últimos 300 commits sin fusiones, la media es de 5,6 archivos por commit. Prefijos más comunes en el asunto: `fix` (234), `feat` (42), `perf` (30).
+- **Autoría.** Los autores humanos mayores son Brandon Thomas (266 commits), Valentin Klein (131) y Nigel Ihza Firdausy (103). Brandon Thomas aparece además en 439 líneas `Co-authored-by`.
+- **Coautoría con IA.** 1 143 de 1 804 commits (63 %) contienen una línea `Co-Authored-By: Claude Opus 5.5` (o sus variantes, incluida la de «1M context»). Hay además 53 líneas de `Copilot`. Son trailers declarados por el propio commit: no prueban quién escribió el código.
+- **Instrucciones para el agente.** `AGENTS.md` (18 448 bytes, en la raíz) es la guía. Define «Rust only» (sin JavaScript ni TypeScript), el reparto en capas que se comprueba con `cargo xtask layers`, reglas de no fallar nunca, sin `unsafe`, y clean-room («estudiamos los editores propietarios solo por comportamiento y aspecto»). No hay `CLAUDE.md` ni carpeta `.claude/` en PhotoCraft.
+- **Planificación.** Las horas de trabajo se estiman en «horas de agente Opus 5.5» (`ROADMAP.md` 14, `docs/gaps.md` 15). Los huecos se ordenan en `docs/gaps.md` y `docs/scorecard.md`, y el progreso se refleja en `docs/target-app-parity.md`.
+- **Validación de píxeles.** El compositor de CPU es el oráculo. `crates/gpu/tests/parity.rs` 1426 compara la GPU con la CPU sobre el documento entero, con una tolerancia, y devuelve el peor píxel si la supera. La tolerancia documentada es ~1/255 (`crates/gpu/src/lib.rs` 4). Además hay un corpus de PSD de prueba escritos en Photoshop, en otro repositorio (`storytold/photocraft-corpus`), fijado por commit y verificado por sha256 (`AGENTS.md`, sección 5).
+- **Rendimiento.** Presupuestos en `perf/budgets.toml` (con `enforce = false` cuando el código aún no los cumple), una línea base en `perf/baseline.json` (commit `f5d2bcb`, Apple M4 Pro, macOS 15.6) y `cargo xtask perf`.
+- **Trabajo en paralelo.** `AGENTS.md`, sección 6: cada agente con su propio directorio de compilación, comandos nuevos en módulos nuevos (`<área>_cmds.rs`), cambios pequeños en los archivos compartidos y escritura atómica de los `Cargo.toml`.
+- **Vínculo con ArtCraft.** El README enlaza a getartcraft.com y a `discord.gg/artcraft`. La organización `storytold` (creada en 2021) tiene como sitio web `getartcraft.com` y 59 repositorios públicos.
+
+**Lo que no pude confirmar:**
+
+- El repositorio `storytold/craftrules`, que citan `AGENTS.md` de `craft-libs` y `contributors/people.toml` como fuente de sus normas compartidas: la API devuelve 404 y el clon falla. No puedo describir esas normas.
+- Si la coautoría con Claude refleja que la IA escribió el código o solo lo revisó.
+- La popularidad del repositorio (53 000 estrellas en 12 días): no la he verificado.
+- El rendimiento de PhotoCraft frente a OGS: no lo medí, y las cifras de `perf/baseline.json` no tienen una equivalencia directa con las de OGS.
+
+### 6.5 ¿Se puede reutilizar sus crates en OGS mediante wasm?
+
+No lo he probado (sin compilar). Lo que sí se ve en el código:
+
+- **Licencia.** Los crates del workspace son `MIT OR Apache-2.0` (`Cargo.toml` 9). OGS es Apache-2.0 (`LICENSE` y `package.json`). La licencia no impide reutilizar; haría falta conservar el aviso y la atribución (`NOTICE`, `ATTRIBUTION.md`).
+- **Tamaño.** El propio proyecto informa de 24 a 29 MB de wasm de la versión web (`docs/development.md` 80), con un límite de 24 MiB. Ese tamaño es mucho mayor que el de cualquier módulo que OGS carga hoy, aunque no lo he medido.
+- **Acoplamiento.** El compositor opera sobre `photocraft_doc::Document` (capas, canales, perfil ICC, profundidad), sobre superficies de `photocraft-raster` (mosaicos de 256²) y sobre sus tipos de color. OGS guarda cada capa como un lienzo de Canvas2D y su propio modelo. Usar el compositor exige convertir ambos modelos en cada edición, y el coste de esa conversión no se conoce.
+- **Herramientas.** OGS no tiene toolchain de Rust ni build de wasm. Añadirlo es un cambio de proceso que afecta a todo el equipo.
+
+Recomendación: no reutilizar sus crates de composición. Sí es útil leer sus decisiones de diseño (mosaicos COW, región dañada, mipmaps, presupuestos en bytes) y aplicarlas en TypeScript, como se indica en la sección 3.
