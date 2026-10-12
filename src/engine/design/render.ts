@@ -11,6 +11,7 @@ import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, redrawSoon } f
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
+import { rasterStrokeBox } from './rasterStrokes';
 import { fxPlan } from '../fx/plan';
 import { mixFx } from '../fx/canvas';
 import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
@@ -102,37 +103,68 @@ export function textAscent(l: TextLayer): number {
   return m.emHeightAscent ?? m.fontBoundingBoxAscent ?? l.fontSize * 0.8;
 }
 
+/**
+ * The box of the pixels with alpha above 8. Rows are scanned from the top and the bottom until one is hit; between
+ * them each row only scans the columns outside the box found so far, so the work is the area outside the box rather
+ * than the whole canvas. Same result as checking every pixel.
+ */
+export function alphaBounds(px: Uint32Array, width: number, height: number): { x0: number; y0: number; x1: number; y1: number } | null {
+  const solid = (i: number) => (px[i] >>> 24) > 8; // RGBA bytes read little-endian: alpha is the top byte
+  let y0 = 0;
+  for (; y0 < height; y0++) { const r = y0 * width; let x = 0; while (x < width && !solid(r + x)) x++; if (x < width) break; }
+  if (y0 === height) return null;
+  let y1 = height - 1;
+  for (; y1 > y0; y1--) { const r = y1 * width; let x = 0; while (x < width && !solid(r + x)) x++; if (x < width) break; }
+  let x0 = width, x1 = -1;
+  for (let y = y0; y <= y1; y++) {
+    const r = y * width;
+    for (let x = 0; x < x0; x++) if (solid(r + x)) { x0 = x; break; }
+    for (let x = width - 1; x > x1; x--) if (solid(r + x)) { x1 = x; break; }
+  }
+  return { x0, y0, x1: x1 + 1, y1: y1 + 1 };
+}
+
 /** A painted layer (no image) is page-sized: select and move what is drawn, not the whole page. Cached per buffer version. */
 const painted = new WeakMap<HTMLCanvasElement, { version: number; at: number; box: { x0: number; y0: number; x1: number; y1: number } | null }>();
-function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
-  if (l.sourceAssetId) return null;
-  const buf = getBuffer(l.id);
-  if (!buf || !buf.width || !buf.height) return null;
+/** The drawn pixels' box of one buffer, in buffer pixels; null = nothing drawn, undefined = not read yet (see below). */
+function pixelBox(buf: HTMLCanvasElement, version: number): { x0: number; y0: number; x1: number; y1: number } | null {
   let hit = painted.get(buf);
   // Keyed on this buffer's own content version: painting or redrawing another layer does not rescan this one. A live
   // stroke changes it every segment and reading the pixels back stalls the brush: the box catches up once the stroke
   // ends (its commit is a new version). Otherwise rescan at most every 150 ms.
-  const version = bufferVersion(l.id);
   if (!hit || (hit.version !== version && !paintingLive() && performance.now() - hit.at > 150)) {
     const width = buf.width, height = buf.height;
-    const data = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
-    let x0 = width, y0 = height, x1 = -1, y1 = -1;
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        if (data[(y * width + x) * 4 + 3] > 8) {
-          if (x < x0) x0 = x;
-          if (x > x1) x1 = x;
-          if (y < y0) y0 = y;
-          if (y > y1) y1 = y;
-        }
-      }
-    }
-    hit = { version, at: performance.now(), box: x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 } };
+    const d = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
+    hit = { version, at: performance.now(), box: alphaBounds(new Uint32Array(d.buffer, d.byteOffset, width * height), width, height) };
     painted.set(buf, hit);
+  } else if (hit.version !== version && !paintingLive()) {
+    // Throttled: catch up right after, not at the next click (a stale box was rescanned on pointer down).
+    redrawSoon(160);
   }
-  if (!hit.box) return null;
-  const kx = l.width / buf.width, ky = l.height / buf.height;
-  return { x: l.x + hit.box.x0 * kx, y: l.y + hit.box.y0 * ky, w: (hit.box.x1 - hit.box.x0) * kx, h: (hit.box.y1 - hit.box.y0) * ky };
+  return hit.box;
+}
+function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
+  if (l.sourceAssetId) return null;
+  const buf = getBuffer(l.id);
+  if (!buf || !buf.width || !buf.height) return null;
+  const toPage = (b: { x0: number; y0: number; x1: number; y1: number }, c: HTMLCanvasElement): Box => {
+    const kx = l.width / c.width, ky = l.height / c.height;
+    return { x: l.x + b.x0 * kx, y: l.y + b.y0 * ky, w: (b.x1 - b.x0) * kx, h: (b.y1 - b.y0) * ky };
+  };
+  // Editable strokes over a fixed base: the base's pixels (read once, it never changes) and each stroke's own box,
+  // the boxes Objects mode picks by. No read of the layer's pixels, which changes every frame while strokes move (a
+  // first read of a new canvas took ~40 ms). Erasing strokes can shrink what shows: those layers read their pixels.
+  const base = l.paintBaseId ? getBuffer(l.paintBaseId) : undefined;
+  if (base?.width && l.paintStrokes && !l.paintStrokes.some((st) => st.erase)) {
+    const b0 = pixelBox(base, bufferVersion(l.paintBaseId!));
+    const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
+    if (!all) return null;
+    // Only what lands on the layer's canvas shows.
+    const x0 = Math.max(all.x, l.x), y0 = Math.max(all.y, l.y), x1 = Math.min(all.x + all.w, l.x + l.width), y1 = Math.min(all.y + all.h, l.y + l.height);
+    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+  }
+  const box = pixelBox(buf, bufferVersion(l.id));
+  return box ? toPage(box, buf) : null;
 }
 
 export function layerBox(l: Layer): Box | null {

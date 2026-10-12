@@ -384,3 +384,42 @@ it('painted bounds rescan only their own layer, and never mid-stroke: the box ca
   expect(reads).toBe(3);
   vi.unstubAllGlobals();
 });
+
+it('alphaBounds finds the same box as checking every pixel', async () => {
+  const { alphaBounds } = await import('../src/engine/design/render');
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  for (let n = 0; n < 200; n++) {
+    const w = 1 + Math.floor(rnd() * 40), h = 1 + Math.floor(rnd() * 30);
+    const bytes = new Uint8ClampedArray(w * h * 4);
+    const dots = Math.floor(rnd() * 6);
+    for (let k = 0; k < dots; k++) bytes[Math.floor(rnd() * w * h) * 4 + 3] = rnd() < 0.3 ? 8 : 9 + Math.floor(rnd() * 240);
+    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (bytes[(y * w + x) * 4 + 3] > 8) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    const want = x1 < 0 ? null : { x0, y0, x1: x1 + 1, y1: y1 + 1 };
+    expect(alphaBounds(new Uint32Array(bytes.buffer), w, h)).toEqual(want);
+  }
+});
+
+it('a layer of editable strokes is boxed by its base and its strokes, without reading the moving canvas', async () => {
+  const { withPaintBase } = await import('../src/engine/design/raster');
+  const { rasterStrokeBox } = await import('../src/engine/design/rasterStrokes');
+  vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined });
+  const data = new Uint8ClampedArray(200 * 100 * 4);
+  data[(5 * 200 + 7) * 4 + 3] = 255; // one pixel in the base
+  let reads = 0;
+  readPixel = (() => { reads++; return { data }; }) as never;
+  const plain = { ...newRasterLayer('S', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'strokes-box' };
+  setBuffer(plain.id, recordingCanvas(200, 100) as never, false);
+  const stroke = { id: 's1', x: 0, y: 0, color: '#fff', opacity: 1, erase: false, segments: [[100, 60, 150, 80, 10]] as [number, number, number, number, number][] };
+  const l = { ...withPaintBase(plain), paintStrokes: [stroke] };
+  const want = { x: 7, y: 5, w: rasterStrokeBox(l, stroke)!.x + rasterStrokeBox(l, stroke)!.w - 7, h: rasterStrokeBox(l, stroke)!.y + rasterStrokeBox(l, stroke)!.h - 5 };
+  expect(layerBox(l)).toEqual(want);
+  setBuffer(l.id, recordingCanvas(200, 100) as never, false); // a frame of a drag: a new canvas
+  expect(layerBox(l)).toEqual(want);
+  expect(reads).toBe(1); // the base, once
+  const erasing = { ...l, paintStrokes: [stroke, { ...stroke, id: 'e', erase: true }] };
+  layerBox(erasing);
+  expect(reads).toBe(2); // erasing can shrink what shows: the pixels are read
+  vi.unstubAllGlobals();
+});

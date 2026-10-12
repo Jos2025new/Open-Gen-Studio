@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
+import type { DesignDoc, Layer, RasterLayer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
@@ -16,7 +16,7 @@ import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
-import { composeRaster, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
+import { composeMoving, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -43,7 +43,7 @@ type Drag =
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; solo?: string }
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
-  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
+  | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
   | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
@@ -920,8 +920,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (!at) return;
     const { d } = at;
     const moved = translateObjects(d.base, d.ids, at.x - d.startX, at.y - d.startY);
-    // A painted layer is recomposed from its base and strokes (once a frame).
-    if (moved.type === 'raster' && !composeRaster(moved, false)) return;
+    // A painted layer is recomposed once a frame, from the first moving stroke up.
+    if (moved.type === 'raster' && d.base.type === 'raster') {
+      if (!(d.compose ??= composeMoving(d.base, d.ids) ?? undefined)) return;
+      d.compose(moved);
+    }
     setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === d.layerId ? moved : l) }));
   };
 

@@ -293,6 +293,34 @@ export function composeRaster(layer: RasterLayer, persist = true): boolean {
   return true;
 }
 
+/**
+ * Moving some strokes of a painted layer: composeRaster for every frame of the drag, without its cost. What lies under
+ * the first moving stroke (the base and the strokes before it) is drawn once; each frame copies it into one reused
+ * canvas and draws only the strokes from there on, in the same order, so the pixels are the same. The layer's buffer
+ * before the drag is never written (undo keeps it). Null while the base is not loaded.
+ */
+export function composeMoving(layer: RasterLayer, ids: readonly string[]): ((moved: RasterLayer) => void) | null {
+  const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
+  if (!base) return null;
+  const moving = new Set(ids);
+  const strokes = layer.paintStrokes ?? [];
+  const first = Math.max(0, strokes.findIndex((s) => moving.has(s.id)));
+  const under = cloneCanvas(base);
+  for (const stroke of strokes.slice(0, first)) drawRasterStroke(ctx2d(under), stroke);
+  const work = createCanvas(base.width, base.height);
+  return (moved) => {
+    const end = span('raster', 'compose', { strokes: (moved.paintStrokes?.length ?? 0) - first, pixels: base.width * base.height });
+    const ctx = ctx2d(work);
+    ctx.save();
+    ctx.globalCompositeOperation = 'copy';
+    ctx.drawImage(under, 0, 0);
+    ctx.restore();
+    for (const stroke of (moved.paintStrokes ?? []).slice(first)) drawRasterStroke(ctx, stroke);
+    setBuffer(layer.id, work, false);
+    end();
+  };
+}
+
 function pixelLayers(layers: Layer[]): RasterLayer[] {
   return layers.flatMap(l => l.type === 'raster' ? [l] : l.type === 'vector' && l.pixelMask ? [l.pixelMask] : []);
 }
@@ -319,8 +347,14 @@ export function commitEdit(layerId: string): void {
 
 /** Redraw the views once, `ms` from now, without changing any pixels' version (the FX cache catching up). */
 let redrawTimer: ReturnType<typeof setTimeout> | undefined;
+let redrawDue = Infinity;
 export function redrawSoon(ms: number): void {
-  redrawTimer ??= setTimeout(() => { redrawTimer = undefined; notify(); }, Math.max(0, ms));
+  // Several callers may ask: the earliest one wins (one redraw serves them all).
+  const due = Date.now() + Math.max(0, ms);
+  if (redrawTimer !== undefined && redrawDue <= due) return;
+  clearTimeout(redrawTimer);
+  redrawDue = due;
+  redrawTimer = setTimeout(() => { redrawTimer = undefined; redrawDue = Infinity; notify(); }, Math.max(0, ms));
 }
 
 export function touchRaster(): void {

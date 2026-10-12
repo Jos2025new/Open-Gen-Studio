@@ -20,7 +20,7 @@ vi.mock('../src/lib/media', () => {
     let a: number[], b: number[];
     const ctx = {
       globalCompositeOperation: 'source-over', globalAlpha: 1, strokeStyle: '', lineWidth: 1,
-      drawImage: (src: typeof c) => { c.ops.push(...src.ops); },
+      drawImage: (src: typeof c) => { if (ctx.globalCompositeOperation === 'copy') c.ops.length = 0; c.ops.push(...src.ops); },
       save() {}, restore() {}, beginPath() {},
       moveTo: (x: number, y: number) => { a = [x, y]; },
       lineTo: (x: number, y: number) => { b = [x, y]; },
@@ -139,3 +139,28 @@ it('stroke bounds cache: a stroke that grows in place (painting) gets its new bo
   expect(b.w).toBeGreaterThan(a.w);
   expect(b.h).toBeGreaterThan(a.h);
 });
+
+it('moving strokes recomposes from the first moving one on a reused canvas: same pixels, the old buffer untouched', () => {
+  let l: RasterLayer = { ...layer(), paintStrokes: [stroke('a', 10), stroke('b', 80), stroke('c', 120)] };
+  const bitmap = createCanvas(200, 100);
+  (bitmap as unknown as { ops: unknown[] }).ops.push('existing image');
+  raster.setBuffer(l.id, bitmap);
+  l = { ...raster.withPaintBase(l), paintStrokes: l.paintStrokes };
+  raster.composeRaster(l);
+  const original = raster.getBuffer(l.id)!, before = [...ops(l.id)];
+  const frame = raster.composeMoving(l, ['b'])!;
+  let work: unknown;
+  for (const dx of [5, 12, 30]) {
+    const moved = moveRasterStroke(l, 'b', dx, 3);
+    frame(moved);
+    const fast = [...ops(l.id)];
+    work ??= raster.getBuffer(l.id);
+    expect(raster.getBuffer(l.id)).toBe(work); // one canvas for the whole drag
+    raster.composeRaster(moved, false);
+    expect(fast).toEqual(ops(l.id));
+    raster.setBuffer(l.id, work as never, false);
+  }
+  expect(work).not.toBe(original);
+  expect((original as unknown as { ops: unknown[] }).ops).toEqual(before);
+});
+
