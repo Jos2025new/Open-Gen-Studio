@@ -6,6 +6,7 @@ import { chmod, mkdir, readdir, readFile, rename, rm, stat, writeFile, appendFil
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { createStoreV2 } from './store-v2.js';
 
 const run = promisify(execFile);
 /** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
@@ -108,6 +109,8 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
   const dir = resolve(root, dataDir);
   const stateFile = join(dir, 'state.json');
   const sandbox = dir === resolve(root, '.sandbox/data');
+  // Format 2 (ADR 0014): once store-v2/HEAD.json exists, reads are assembled from it and state writes become commits.
+  const v2 = createStoreV2(dir);
 
   // State writes run one at a time, check and write together: two tabs can never both pass the baseAt check
   // before either writes. A failed write does not stop the queue.
@@ -183,8 +186,24 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       }
     }
 
+    // Format 2 commit: the app sends the global record and only the sessions that changed (ADR 0014).
+    if (path === '/v2/commit' && req.method === 'PUT') {
+      let payload;
+      try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
+      const r = await serialState(() => v2.commit(payload));
+      if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
+      return send(r.status);
+    }
+
     if (path === '/state') {
+      if (req.method === 'GET' && (await v2.readHead())) return send(200, await v2.read(), 'application/json');
       if (req.method === 'GET') return send(200, await readFile(stateFile).catch(() => ''), 'application/json');
+      if (req.method === 'PUT' && (await v2.readHead())) {
+        const text = (await body(req)).toString('utf8');
+        const r = await serialState(() => v2.commitLegacy(text));
+        if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
+        return send(r.status === 204 ? 204 : r.status);
+      }
       if (req.method === 'PUT') {
         // A tab says which saved state it worked from (baseAt). If the file has moved on since (another tab saved),
         // the write is refused instead of overwriting newer work with an older copy.
