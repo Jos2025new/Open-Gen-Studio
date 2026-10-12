@@ -19,3 +19,6 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 );
+
+// Diagnostic bank is opt-in and checks sandbox origin before exposing any actions.
+if (import.meta.env.VITE_OGS_SANDBOX === '1' && location.port === '5183' && new URLSearchParams(location.search).has('bench')) void import('./lib/designerBench');

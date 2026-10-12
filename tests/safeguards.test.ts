@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, readFileSyn
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { prepareSandbox, sandboxDirectory, SANDBOX_PORT } from '../scripts/dev-sandbox.mjs';
+import { prepareSandbox, sandboxDirectory, SANDBOX_PORT, sandboxOptions, sandboxBuildDirectory } from '../scripts/dev-sandbox.mjs';
 import { checkDocs, checkSafeguards } from '../scripts/check-safeguards.mjs';
 import { checkSizes, MAX_BYTES, sizeViolations } from '../scripts/check-sizes.mjs';
 
@@ -71,4 +71,24 @@ it('holds files over 30 KB at their baseline, rejects new ones and exempts gener
   expect(sizeViolations([{ path: 'src/new.ts', bytes: over }, { path: 'docs/x.md', bytes: over }], baseline)).toHaveLength(2);
   expect(sizeViolations([{ path: 'src/new.ts', bytes: MAX_BYTES }], baseline)).toEqual([]);
   expect(sizeViolations(['package-lock.json', 'tests/fixtures/live/fal.json', 'bench/run.json'].map((path) => ({ path, bytes: over })), baseline)).toEqual([]);
+});
+
+it('production preview retains sandbox port, strict binding and chosen build directory', () => {
+  const opts = sandboxOptions(true, '/tmp/ogs-baseline-dist');
+  expect(opts.preview).toEqual({ host: '127.0.0.1', port: 5183, strictPort: true, open: false });
+  expect(opts.build!.outDir).toBe('/tmp/ogs-baseline-dist');
+  expect(sandboxOptions(false).preview).toBeUndefined();
+});
+
+
+it('refuses production output in protected data, the project root or symlinked directories', async () => {
+  const root = fixture();
+  for (const path of ['data', 'data.bak-2026', '.sandbox/data', '.', '..']) {
+    await expect(sandboxBuildDirectory(root, path)).rejects.toThrow('protected data');
+  }
+  symlinkSync(join(root, 'data'), join(root, 'linked-build'));
+  await expect(sandboxBuildDirectory(root, 'linked-build')).rejects.toThrow('symbolic link');
+  await expect(sandboxBuildDirectory(root, 'dist')).resolves.toBe(join(root, 'dist'));
+  await expect(sandboxBuildDirectory(root, '/tmp/ogs-fluidity-baseline')).resolves.toBe('/tmp/ogs-fluidity-baseline');
+  expect(readFileSync(join(root, 'data/state.json'), 'utf8')).toBe('{"original":true}');
 });

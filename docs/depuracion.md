@@ -124,3 +124,24 @@ Pedido del usuario: el Designer iba lento al pintar «o hacer cualquier cosa», 
 - **Probado por el usuario (2026-10-09, sandbox, Brave):** con la caché de FX (`585919a`), el guardado ligero y en momento libre (`7cf101f`) y el FX que sigue al trazo (`926aea4`), dijo: «el pincel no anda tan lento… buen trabajo». No probó los ajustes de la brocha ni otras herramientas, así que esa prueba cubre solo la velocidad al pintar. Precedente: cuando el usuario prueba un cambio concreto, se anota con fecha qué cambio probó y qué no, con sus palabras.
 - **Integrado después, todavía sin probar por el usuario (2026-10-09):** brocha sin lectura del canvas, zoom a 3200 % y filtros que se abren por separado (`7efeb42`). El usuario no lo había visto: el máximo seguía en 800 % porque esta rama no estaba integrada. Falta también `npm run brush:check`.
 - **Revisión de Astra (2026-10-10, solo código) y validación de Claude (mismo día):** dos fallos, ambos corregidos: fusionar cambiaba la opacidad visible, y el FX podía quedarse atrasado con el puntero quieto. Lo demás, sin fallos: la caché se invalida bien y el guardado conserva las protecciones. Matiz: la pasada completa de 30 s ocurre en el primer guardado tras ese plazo, no por sí sola. En el navegador (sandbox), Claude comprobó: `npm run brush:check` 7/7 (la brocha sin lectura del canvas reconstruye igual) y `npm run tools:check` (fusionar, rasterizar, Grow/Shrink y espejo).
+
+## Banco de fluidez en producción (etapa 0)
+
+`npm run dev:sandbox -- --production` construye y sirve producción **en 5183**, con el mismo `.sandbox/data`, los proxies y las protecciones del almacén. No abrir otra pestaña ni iniciar otro servidor. `--no-build` sirve una build existente; `SANDBOX_BUILD_DIR=/ruta/dist` permite comparar la build anterior sin cambiar código ni datos. No usar `npm run preview` para este banco: no fija ese aislamiento.
+
+Las builds ordinarias no incluyen la sonda: el script sandbox activa `VITE_OGS_SANDBOX=1` al compilar. La sonda optativa `?bench=1` expone `window.__OGS_BENCH__` solo en localhost:5183. No graba mientras no se llama. No se han añadido eventos al trace: los resultados son un objeto JSON del banco, separado de los dominios anteriores.
+
+1. Comprobar carga y memoria antes; una sola pestaña. Abrir el documento habitual en Designer y añadir `?bench=1` a la URL.
+2. `await __OGS_BENCH__.prepare('habitual')` clona el documento en una sesión diagnóstica; conserva el original. Esperar a que termine. Guardar los metadatos devueltos.
+3. `await __OGS_BENCH__.run()` pinta a 60 Hz, pulsa el trazo pintado en Edit/Objects, lo arrastra y suelta, incluyendo un segundo posterior a cada gesto. Si no selecciona un objeto, aborta: la ejecución no vale. Copiar el JSON completo. Repetir tres veces.
+4. Comparar habitual antes/después **antes** de añadir el estado exigente. Entonces `await __OGS_BENCH__.prepare('exigente')`: agrega 1 000 sesiones sintéticas sin borrar ni reemplazar ninguna existente, y crea una capa con 300 trazos de 120 segmentos (1920×1080). Los IDs sintéticos son estables: repetir no añade otras 1 000 sesiones. Ejecutar ambas builds sobre esa misma sesión exigente, sin volver a preparar entre ellas. Estas sesiones permanecen en el sandbox; no existe limpieza que borre datos.
+5. Parar el servidor al terminar. La validación visible requiere gestos reales y capturas del otro agente: no la sustituye este banco sintético.
+
+| Sonda del banco | Alcance y límite |
+| --- | --- |
+| `frameWorkP95Ms` / `work` | Unión de intervalos síncronos de dispatch y callbacks RAF por fotograma; evita doble conteo. Es un **mínimo medido**, no todo el trabajo del hilo: tareas no instrumentadas, GPU y composición quedan fuera. No certifica por sí solo el umbral de 8 ms. |
+| `events` | Plazo de emisión a 60 Hz, entrega, demora de cola, duración síncrona y siguiente RAF, por evento. No ralentiza deliberadamente los plazos si el hilo se atasca. |
+| `longTasks` | PerformanceObserver: todas las tareas de más de 50 ms durante el banco y sus ventanas de un segundo. |
+| `eventNextRafP95Ms` | Proxy de programación; **no probado** puntero → píxel visible. |
+
+El JSON contiene navegador, núcleos, DPR, documento, zoom y muestras. La preparación y reconstrucción de fixtures queda fuera de las medidas. El banco hace cambios reales solo en documentos diagnósticos del sandbox: deben persistir con las mismas protecciones; no desactiva guardado, proveedores ni comprobaciones para mejorar cifras.

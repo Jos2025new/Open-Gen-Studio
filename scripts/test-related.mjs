@@ -16,5 +16,5 @@ if (!files.length) {
   process.exit(0);
 }
 console.log(`test:related: ${files.length} changed file(s)\n  ${files.join('\n  ')}`);
-const run = spawnSync('npx', ['vitest', 'related', '--run', ...files], { stdio: 'inherit' });
+const run = spawnSync('npx', ['vitest', 'related', '--run', '--maxWorkers=2', ...files], { stdio: 'inherit' });
 process.exit(run.status ?? 1);

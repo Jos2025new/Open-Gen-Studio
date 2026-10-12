@@ -31,7 +31,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **ops-in-prompt** — Las operaciones que conoce el agente salen del registro OPS, no de una segunda lista. | [ops.ts](../src/engine/ops.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts) | [agent-procedure.test.ts](../tests/agent-procedure.test.ts) |
 | **audio-defaults** — Voz y efectos (2026-10-08): por defecto Gemini 3.8 Flash TTS para voz y ElevenLabs Sound Effects v2 para efectos, salvo que el usuario nombre o elija otro; el agente lo lee en el contrato del paso de audio. | [nanogptAudio.ts](../src/engine/providers/nanogptAudio.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts), [catalogo-voz-y-efectos.md](../docs/catalogo-voz-y-efectos.md) | [nanogpt-speech.test.ts](../tests/nanogpt-speech.test.ts) |
 | **shortcuts** — Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista. | [shortcuts.ts](../src/engine/shortcuts.ts), [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [README.md](../README.md) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
-| **sandbox** — El sandbox usa .sandbox/data y el puerto 5183; las salvaguardas comprueban ese aislamiento. | [dev-sandbox.mjs](../scripts/dev-sandbox.mjs), [check-safeguards.mjs](../scripts/check-safeguards.mjs) | [safeguards.test.ts](../tests/safeguards.test.ts) |
+| **sandbox** — El sandbox dev y producción usan .sandbox/data y el puerto 5183; preview conserva strictPort y las protecciones locales. | [dev-sandbox.mjs](../scripts/dev-sandbox.mjs), [dev-sandbox.d.mts](../scripts/dev-sandbox.d.mts), [main.tsx](../src/main.tsx), [designerBenchFixtures.ts](../src/lib/designerBenchFixtures.ts), [depuracion.md](../docs/depuracion.md), [check-safeguards.mjs](../scripts/check-safeguards.mjs) | [safeguards.test.ts](../tests/safeguards.test.ts), [designer-bench.test.ts](../tests/designer-bench.test.ts) |
 | **store-local-only** — El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba. | [local-store.js](../server/local-store.js), [seguridad.md](../docs/seguridad.md), [README.md](../README.md) | [store-server.test.ts](../tests/store-server.test.ts) |
 | **automated-writes** — El servidor rechaza escrituras automatizadas (cabecera X-OGS-Automated) fuera del sandbox. | [local-store.js](../server/local-store.js) | [automated-write.test.ts](../tests/automated-write.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 | **fx-plan** — ADR 0011: el lienzo y la exportación SVG aplican las capas FX con el mismo plan (qué filtra cada capa y en qué orden). | [plan.ts](../src/engine/fx/plan.ts), [render.ts](../src/engine/design/render.ts), [export.ts](../src/engine/design/export.ts) | [fx-render.test.ts](../tests/fx-render.test.ts), [fx-svg.test.ts](../tests/fx-svg.test.ts) |
@@ -54,26 +54,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 149 | 93 |
-| [store.ts](../src/store/store.ts) | 98 | 88 |
+| [types.ts](../src/engine/types.ts) | 150 | 93 |
+| [store.ts](../src/store/store.ts) | 99 | 89 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 35 | 25 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
-| [actions.ts](../src/engine/design/actions.ts) | 28 | 11 |
+| [actions.ts](../src/engine/design/actions.ts) | 29 | 11 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
-| [doc.ts](../src/engine/design/doc.ts) | 25 | 20 |
+| [doc.ts](../src/engine/design/doc.ts) | 26 | 20 |
+| [raster.ts](../src/engine/design/raster.ts) | 23 | 5 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
-| [raster.ts](../src/engine/design/raster.ts) | 22 | 5 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 106 |
 | [render.ts](../src/engine/design/render.ts) | 16 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 13 | 1 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
-| [history.ts](../src/engine/design/history.ts) | 12 | 5 |
 
 ## Por área
 
@@ -96,10 +96,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 17 | 115 |
-| `src/store` | 2 | 89 |
+| `src/lib` | 19 | 116 |
+| `src/store` | 2 | 90 |
 
-97 de 236 módulos no tienen ningún test que los importe directamente.
+98 de 238 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -140,4 +140,5 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
 - [gradient.ts](../src/engine/design/gradient.ts)
 - [useCursorPreview.ts](../src/engine/design/useCursorPreview.ts)
+- [designerBench.ts](../src/lib/designerBench.ts)
 - [main.tsx](../src/main.tsx)

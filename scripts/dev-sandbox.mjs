@@ -1,7 +1,7 @@
 import { cp, lstat, mkdir, realpath } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer } from 'vite';
+import { createServer, build, preview } from 'vite';
 
 export const SANDBOX_PORT = 5183;
 export function sandboxDirectory(root, dataDir) {
@@ -44,17 +44,44 @@ export async function prepareSandbox(root, dataDir) {
   return destination;
 }
 
+/** Build/preview output must never erase or expose the protected data directories. */
+export async function sandboxBuildDirectory(root, outDir) {
+  const target = resolve(root, outDir);
+  const project = resolve(root);
+  if (target === project || project.startsWith(target + sep) || /(?:^|\/)(?:data(?:\.bak-[^/]+)?|\.sandbox)(?:\/|$)/.test(target)) {
+    throw new Error('Sandbox build directory cannot contain protected data');
+  }
+  for (let path = target; ; path = dirname(path)) {
+    const info = await lstat(path).catch((error) => { if (error.code !== 'ENOENT') throw error; });
+    if (info?.isSymbolicLink()) throw new Error('Sandbox build directory contains a symbolic link');
+    if (dirname(path) === path) break;
+  }
+  return target;
+}
+
+export function sandboxOptions(production = false, outDir = 'dist') {
+  return {
+    define: { 'import.meta.env.VITE_OGS_SANDBOX': JSON.stringify('1') },
+    ...(production ? { build: { outDir }, preview: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false } } : {}),
+    server: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false },
+  };
+}
+
 async function main() {
   const root = process.cwd();
   const destination = await prepareSandbox(root, process.env.DATA_DIR);
   console.log(`Sandbox DATA_DIR=${destination}`);
-  const server = await createServer({
-    server: { host: '127.0.0.1', port: SANDBOX_PORT, strictPort: true, open: false },
-  });
+  const production = process.argv.includes('--production');
+  const outDir = production ? await sandboxBuildDirectory(root, process.env.SANDBOX_BUILD_DIR || 'dist') : 'dist';
+  const options = sandboxOptions(production, outDir);
+  if (production && !process.argv.includes('--no-build')) await build(options);
+  const server = production ? await preview(options) : await createServer(options);
   for (const signal of ['SIGINT', 'SIGTERM']) {
-    process.once(signal, async () => { await server.close(); process.exit(0); });
+    process.once(signal, async () => { if (production) await new Promise((done) => server.httpServer.close(done));
+      else await server.close();
+      process.exit(0); });
   }
-  await server.listen();
+  if (!production) await server.listen();
   server.printUrls();
 }
 

@@ -180,12 +180,18 @@ export default [
   },
   {
     id: 'sandbox',
-    what: 'El sandbox usa .sandbox/data y el puerto 5183; las salvaguardas comprueban ese aislamiento.',
+    what: 'El sandbox dev y producción usan .sandbox/data y el puerto 5183; preview conserva strictPort y las protecciones locales.',
     sides: [
       ['scripts/dev-sandbox.mjs', 'export const SANDBOX_PORT = 5183'],
+      ['scripts/dev-sandbox.mjs', 'export function sandboxOptions('],
+      ['scripts/dev-sandbox.mjs', 'export async function sandboxBuildDirectory('],
+      ['scripts/dev-sandbox.d.mts', 'export function sandboxOptions('],
+      ['src/main.tsx', "import.meta.env.VITE_OGS_SANDBOX === '1'"],
+      ['src/lib/designerBenchFixtures.ts', 'export function sandboxBenchAllowed('],
+      ['docs/depuracion.md', '## Banco de fluidez en producción'],
       ['scripts/check-safeguards.mjs', 'node scripts\\/dev-sandbox\\.mjs'],
     ],
-    tests: ['tests/safeguards.test.ts'],
+    tests: ['tests/safeguards.test.ts', 'tests/designer-bench.test.ts'],
   },
   {
     id: 'store-local-only',
