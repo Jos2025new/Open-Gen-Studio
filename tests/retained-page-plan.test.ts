@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RetainedPage, planFrame, type FrameMemo, type PageOps, type Rect, type StepSig } from '../src/engine/design/retainedPage';
+import { RetainedPage, planFrame, type FrameMemo, type PageOps, type StepSig } from '../src/engine/design/retainedPage';
 
 /*
  * Retained page (Paso 3): the planner and the page are checked against a one-dimensional model of the composite.
@@ -37,7 +37,7 @@ const ops: PageOps<Page> = {
 };
 let current: Step[] | null = null;
 
-function sigOf(s: Step, prevStep?: Step): StepSig {
+function sigOf(s: Step): StepSig {
   if (s.kind === 'blur') return { below: true, key: [s], box: null, margin: s.r };
   return { below: false, key: [s], box: { x0: s.a, y0: 0, x1: s.b, y1: 1 }, margin: 0 };
 }

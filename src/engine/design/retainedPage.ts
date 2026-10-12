@@ -46,7 +46,7 @@ export function fxMargin(op: Pick<FxOp, 'kind' | 'enabled' | 'params'>, scale: n
 /** One step of the FX plan as the planner sees it: what it is made of (identities and pixel versions), its area and its reach. */
 export interface StepSig { below: boolean; key: unknown[]; box: Rect | null; margin: number }
 /** What a frame was composed from. A new frame is compared with the last composed one. */
-export interface FrameMemo { W: number; H: number; scale: number; background: string | undefined; fontEpoch: number; base: Rect | null; steps: StepSig[] }
+export interface FrameMemo { W: number; H: number; scale: number; background: string | null | undefined; fontEpoch: number; base: Rect | null; steps: StepSig[] }
 export type FramePlan = { kind: 'same' } | { kind: 'full'; why: string } | { kind: 'region'; rect: Rect; reach: number };
 
 /** Sum of the reach of FX ops (`Infinity` if any op is not known). */

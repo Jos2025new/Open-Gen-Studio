@@ -4,7 +4,7 @@ import { apply, invert, mapBox } from './matrix';
 import { pathTransform } from './path';
 import { canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
 import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape } from '../types';
-import { fontStack, shapeBox, unionBox, type Box } from './doc';
+import { shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { bufferVersion, cloneCanvas, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
@@ -15,6 +15,7 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { rasterStrokeBox } from './rasterStrokes';
 import { fxPlan } from '../fx/plan';
+import { RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
 import { mixFx } from '../fx/canvas';
 import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
 
@@ -47,63 +48,8 @@ export const BLEND_MODES = Object.keys(GCO) as BlendMode[];
 /** Screen pixels per layer pixel from which raster layers are drawn without smoothing. */
 export const PIXEL_VIEW_FROM = 4;
 
-let measureCtx: CanvasRenderingContext2D | null = null;
-
-function measurer(): CanvasRenderingContext2D {
-  if (!measureCtx) measureCtx = ctx2d(createCanvas(8, 8));
-  return measureCtx;
-}
-
-function fontFor(l: Pick<TextLayer, 'fontWeight' | 'fontSize' | 'fontFamily'>): string {
-  return `${l.fontWeight} ${l.fontSize}px ${fontStack(l.fontFamily)}`;
-}
-
-function applyLetterSpacing(ctx: CanvasRenderingContext2D, px: number): void {
-  const c = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
-  if ('letterSpacing' in c) c.letterSpacing = `${px}px`;
-}
-
-export interface TextLayout {
-  lines: string[];
-  width: number;
-  height: number;
-  lineHeightPx: number;
-}
-
-/** Word-wrap a text layer to its box width. */
-export function layoutText(l: TextLayer): TextLayout {
-  const ctx = measurer();
-  ctx.font = fontFor(l);
-  applyLetterSpacing(ctx, l.letterSpacing);
-  const maxW = l.width > 0 ? l.width : Infinity;
-  const lines: string[] = [];
-  for (const para of l.text.split('\n')) {
-    const words = para.split(/(\s+)/);
-    let line = '';
-    for (const w of words) {
-      const test = line + w;
-      if (line && ctx.measureText(test.trimEnd()).width > maxW && w.trim()) {
-        lines.push(line.trimEnd());
-        line = w.trimStart();
-      } else {
-        line = test;
-      }
-    }
-    lines.push(line.trimEnd());
-  }
-  const lineHeightPx = l.fontSize * l.lineHeight;
-  const width = l.width > 0 ? l.width : Math.max(1, ...lines.map((s) => ctx.measureText(s).width));
-  return { lines, width, height: Math.max(lineHeightPx, lines.length * lineHeightPx), lineHeightPx };
-}
-
-/** Top of the em box to the alphabetic baseline: where SVG places the baseline for the canvas 'top' layout. */
-export function textAscent(l: TextLayer): number {
-  const ctx = measurer();
-  ctx.font = fontFor(l);
-  ctx.textBaseline = 'alphabetic';
-  const m = ctx.measureText('Mg') as TextMetrics & { emHeightAscent?: number };
-  return m.emHeightAscent ?? m.fontBoundingBoxAscent ?? l.fontSize * 0.8;
-}
+export { layoutText, textAscent, type TextLayout } from './textLayout';
+import { applyLetterSpacing, fontFor, layoutText } from './textLayout';
 
 /**
  * The box of the pixels with alpha above 8. Rows are scanned from the top and the bottom until one is hit; between
@@ -387,15 +333,17 @@ import { editorCacheBudget } from './cacheBudget';
 const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
 if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
-function contentKey(l: Layer, s: { fx: FxLayer[] }, scale: number, W: number, H: number): unknown[] {
+function contentKey(l: Layer, s: { fx: FxLayer[] }, geom: unknown[]): unknown[] {
   // The pixels' versions go last: while a stroke is painted only they change (see cachedFx).
-  return [l, ...s.fx, scale, W, H, fontEpoch, ...rasterBufferIds([l]).map(bufferVersion)];
+  return [l, ...s.fx, ...geom, fontEpoch, ...rasterBufferIds([l]).map(bufferVersion)];
 }
 /*
  * Mid-stroke on the filtered layer itself, the result may be up to FX_LIVE_MS old instead of filtering on every
  * move (as Krita and GIMP let filters trail the brush); the stroke's commit brings it up to date.
  */
 const FX_LIVE_MS = 120;
+/** Set when a frame used a trailing (not yet caught up) FX result: the retained page is then not kept. */
+let servedStale = false;
 function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasElement | undefined {
   const hit = fxCache.get(id);
   if (!hit || hit.key.length !== key.length) return undefined;
@@ -404,7 +352,7 @@ function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasEleme
   if (!fresh && !trailing) return undefined;
   editorCacheBudget.touch(`fx:${id}`);
   // A held, unmoving pointer sends no new frame: one is asked for when the trailing result runs out.
-  if (trailing) redrawSoon(FX_LIVE_MS - (performance.now() - hit.at));
+  if (trailing) { redrawSoon(FX_LIVE_MS - (performance.now() - hit.at)); servedStale = true; }
   fxCache.delete(id);
   fxCache.set(id, hit);
   return hit.canvas;
@@ -419,58 +367,113 @@ function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
 const FX_MAX_PX = 16_000_000;
 
-/**
+/*
  * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
  * FX see everything under them, background included. Delivery uses scale 1 with this same plan. Lengths in FX params are document px.
  */
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false): void {
-  const m = ctx.getTransform();
-  const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
-  const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
-  let acc = createCanvas(W, H);
-  const at = (c: HTMLCanvasElement) => { const x = ctx2d(c); x.setTransform(scale, 0, 0, scale, 0, 0); return x; };
+const retained = new RetainedPage<HTMLCanvasElement>();
+const fullRect = (W: number, H: number): Rect => ({ x0: 0, y0: 0, x1: W, y1: H });
+const boxRect = (l: Layer, scale: number): Rect | null => {
+  const b = layerBox(l);
+  return b && { x0: b.x * scale, y0: b.y * scale, x1: (b.x + b.w) * scale, y1: (b.y + b.h) * scale };
+};
+const versionsOf = (l: Layer): unknown[] => rasterBufferIds([l]).map(bufferVersion);
+
+/** The plan's steps composed into a canvas of `crop` (canvas px of the W×H page at `scale`; the page itself when it is the whole page). */
+function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: number, W: number, H: number, crop: Rect, editor: boolean, trace?: RenderTrace): HTMLCanvasElement {
+  const ox = crop.x0, oy = crop.y0, cw = crop.x1 - ox, ch = crop.y1 - oy;
+  let acc = createCanvas(cw, ch);
+  const at = (c: HTMLCanvasElement) => { const x = ctx2d(c); x.setTransform(scale, 0, 0, scale, -ox, -oy); return x; };
   if (doc.background) {
     const x = at(acc);
     x.fillStyle = doc.background;
     x.fillRect(0, 0, doc.width, doc.height);
   }
-  // Editor frames only: what is drawn so far, for the 'below' cache (scale, page size, background, fonts, layers, pixels).
-  const below: unknown[] = editor ? [scale, W, H, doc.background, fontEpoch] : [];
+  // Editor frames only: for the 'below' cache (scale, page, crop, background, fonts, layers, pixels).
+  const below: unknown[] = editor ? [scale, W, H, ox, oy, cw, ch, doc.background, fontEpoch] : [];
   for (const s of steps) {
-    const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${W}x${H}` });
-    if (s.t === 'draw') { drawLayer(at(acc), s.layer); if (editor) below.push(s.layer, ...rasterBufferIds([s.layer]).map(bufferVersion)); }
+    const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${cw}x${ch}` });
+    if (s.t === 'draw') { drawLayer(at(acc), s.layer); if (editor) below.push(s.layer, ...versionsOf(s.layer)); }
     else if (s.t === 'below') {
       const key = editor ? [...below, s.fx] : null, hit = key && cachedBelow(s.fx.id, key);
-      if (hit) { acc = createCanvas(W, H); ctx2d(acc).drawImage(hit, 0, 0); }
+      if (hit) { acc = createCanvas(cw, ch); ctx2d(acc).drawImage(hit, 0, 0); }
       else { acc = mixFx(acc, s.fx, { scale, clip: false, trace }); if (key) keepBelow(s.fx.id, key, cloneCanvas(acc)); }
       if (editor) below.push(s.fx);
     }
     else {
-      const key = editor ? contentKey(s.layer, s, scale, W, H) : null;
-      let own = key && cachedFx(s.layer.id, key, rasterBufferIds([s.layer]).length);
-      if (!own) {
-        own = createCanvas(W, H);
-        drawLayer(at(own), s.layer, true);
-        const box = layerBox(s.layer);
-        const region = box ? { x: box.x * scale, y: box.y * scale, w: box.w * scale, h: box.h * scale } : undefined;
+      // A layer's FX run on its own box, on whole pixels: the result does not depend on the crop.
+      const box = layerBox(s.layer);
+      const ix = box ? Math.floor(box.x * scale) : 0, iy = box ? Math.floor(box.y * scale) : 0;
+      const iw = box ? Math.max(1, Math.ceil((box.x + box.w) * scale) - ix) : 1, ih = box ? Math.max(1, Math.ceil((box.y + box.h) * scale) - iy) : 1;
+      const inCrop = !!box && ix < ox + cw && iy < oy + ch && ix + iw > ox && iy + ih > oy;
+      const key = editor && inCrop ? contentKey(s.layer, s, [scale, ix, iy, iw, ih]) : null;
+      let own = key && cachedFx(s.layer.id, key, versionsOf(s.layer).length);
+      if (box && inCrop && !own) {
+        own = createCanvas(iw, ih);
+        const x = ctx2d(own);
+        x.setTransform(scale, 0, 0, scale, -ix, -iy);
+        drawLayer(x, s.layer, true);
+        const region = { x: box.x * scale - ix, y: box.y * scale - iy, w: box.w * scale, h: box.h * scale };
         for (const fx of s.fx) own = mixFx(own, fx, { scale, clip: true, region, trace });
         if (key) keepFx(s.layer.id, key, own);
       }
-      if (editor) below.push(s.layer, ...s.fx, ...rasterBufferIds([s.layer]).map(bufferVersion));
-      // In canvas px: `own` is already at the composite's scale.
-      const x = ctx2d(acc);
-      x.setTransform(1, 0, 0, 1, 0, 0);
-      x.globalAlpha = s.layer.opacity;
-      x.globalCompositeOperation = GCO[s.layer.blend] ?? 'source-over';
-      x.drawImage(own, 0, 0);
-      x.globalAlpha = 1;
-      x.globalCompositeOperation = 'source-over';
+      if (editor) below.push(s.layer, ...s.fx, ...versionsOf(s.layer));
+      if (own) {
+        const x = ctx2d(acc);
+        x.setTransform(1, 0, 0, 1, 0, 0);
+        x.globalAlpha = s.layer.opacity;
+        x.globalCompositeOperation = GCO[s.layer.blend] ?? 'source-over';
+        x.drawImage(own, ix - ox, iy - oy);
+        x.globalAlpha = 1;
+        x.globalCompositeOperation = 'source-over';
+      }
     }
     end?.();
   }
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(acc, 0, 0, doc.width, doc.height);
+  return acc;
 }
+
+/** Editor frame through the retained page (only changed areas are composed again). */
+function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: number, W: number, H: number, trace?: RenderTrace): HTMLCanvasElement {
+  const cur: FrameMemo = {
+    W, H, scale, background: doc.background, fontEpoch,
+    base: doc.background ? fullRect(W, H) : null,
+    steps: steps.map((s) => stepSig(s, scale, (l) => boxRect(l, scale), versionsOf)),
+  };
+  servedStale = false;
+  const page = retained.frame(cur, {
+    compose: (crop) => composeFx(doc, steps, scale, W, H, crop ?? fullRect(W, H), true, trace),
+    blit: (dst, src, from, to) => {
+      const w = to.x1 - to.x0, h = to.y1 - to.y0, x = ctx2d(dst);
+      x.save();
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      x.globalCompositeOperation = 'copy';
+      x.drawImage(src, from.x0, from.y0, w, h, to.x0, to.y0, w, h);
+      x.restore();
+    },
+  });
+  // A stale result must not stay as the page: the next frame composes again.
+  if (servedStale) retained.reset();
+  return page;
+}
+
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false): void {
+  const m = ctx.getTransform();
+  const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
+  const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
+  const page = editor && !fullResolution ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(page, 0, 0, doc.width, doc.height);
+}
+
+/** Bench (parity): the page at `scale` through the retained path, or the whole composition with no caches. */
+export function composeFrame(doc: DesignDoc, scale: number, retainedPath: boolean): HTMLCanvasElement {
+  const steps = fxPlan(doc.layers);
+  const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
+  return retainedPath ? retainedFrame(doc, steps, scale, W, H) : composeFx(doc, steps, scale, W, H, fullRect(W, H), false);
+}
+export const resetRetainedPage = (): void => retained.reset();
+export const retainedStats = () => retained.stats;
 
 export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {
   checkExportSize(doc.width, doc.height, fxPlan(doc.layers).some((step) => step.t !== 'draw'));
