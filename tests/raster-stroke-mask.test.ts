@@ -28,10 +28,11 @@ it('evicts older coverage when pixel storage would exceed 16 million pixels', as
   expect(made.count).toBe(2);
   rasterStrokeMask(a, a.tip!); expect(made.count).toBe(3);
 });
-it('also bounds the number of tiny masks, retaining the recently used ones', async () => {
+it('keeps every mask of a 300-stroke layer, so a cyclic walk does not rebuild them each frame', async () => {
   const { rasterStrokeMask } = await import('../src/engine/design/rasterStrokeMask');
-  const ss = Array.from({ length: 129 }, () => stroke());
+  const ss = Array.from({ length: 300 }, () => stroke());
   for (const s of ss) rasterStrokeMask(s, s.tip!);
-  rasterStrokeMask(ss[128], ss[128].tip!); expect(made.count).toBe(129);
-  rasterStrokeMask(ss[0], ss[0].tip!); expect(made.count).toBe(130);
+  expect(made.count).toBe(300);
+  for (const s of ss) rasterStrokeMask({ ...s, x: 5 }, s.tip!);
+  expect(made.count).toBe(300);
 });

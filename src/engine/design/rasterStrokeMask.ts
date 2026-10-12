@@ -3,9 +3,8 @@ import { createCanvas, ctx2d } from '../../lib/media';
 import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
 
 // Saved segments/tips are immutable after a stroke ends (history depends on that too). Translation only changes
-// stroke.x/y, so its coverage can be reused. Keep a bounded LRU, rather than retaining every stroke ever seen.
+// stroke.x/y, so its coverage can be reused. Keep an LRU bounded by pixels, rather than retaining every stroke ever seen.
 const MAX_PIXELS = 16_000_000;
-const MAX_ENTRIES = 128;
 type Mask = { canvas: HTMLCanvasElement; x: number; y: number };
 type Entry = Mask & { tip: BrushTip; color: string; pixels: number };
 const masks = new Map<RasterStroke['segments'], Entry>();
@@ -27,7 +26,9 @@ export function rasterStrokeMask(stroke: RasterStroke, tip: BrushTip): Mask {
   m.putImageData(img, 0, 0);
   const size = canvas.width * canvas.height;
   if (size <= MAX_PIXELS) {
-    while (masks.size && (pixels + size > MAX_PIXELS || masks.size >= MAX_ENTRIES)) {
+    // Budget in pixels only: a layer of hundreds of strokes keeps every mask it moves through (a count limit below
+    // that number makes each frame rebuild them all: a cyclic walk never hits an LRU).
+    while (masks.size && pixels + size > MAX_PIXELS) {
       const key = masks.keys().next().value!;
       pixels -= masks.get(key)!.pixels; masks.delete(key);
     }

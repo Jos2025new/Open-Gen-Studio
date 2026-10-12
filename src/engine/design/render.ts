@@ -8,6 +8,7 @@ import { fontStack, shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { bufferVersion, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
+import { bufferAlpha } from './hitAlpha';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
@@ -518,8 +519,8 @@ export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null
     // A small neighbourhood, so thin strokes can be picked.
     const r = Math.max(1, Math.round(buf.width / Math.max(1, l.width) * 3));
     const x0 = Math.max(0, px - r), y0 = Math.max(0, py - r);
-    const data = buf.getContext('2d')?.getImageData(x0, y0, Math.min(buf.width - x0, r * 2 + 1), Math.min(buf.height - y0, r * 2 + 1)).data;
-    if (data) for (let k = 3; k < data.length; k += 4) if (data[k] > 16) return l;
+    const alpha = bufferAlpha(l.id, buf), x1 = Math.min(buf.width, x0 + r * 2 + 1), y1 = Math.min(buf.height, y0 + r * 2 + 1);
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) if (alpha[yy * buf.width + xx] > 16) return l;
   }
   return null;
 }
