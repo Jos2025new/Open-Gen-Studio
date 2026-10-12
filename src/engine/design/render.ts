@@ -383,7 +383,7 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
  * another layer does not run the filters again every frame. Editor frames only (exports always compute), at most
  * FX_CACHE_PX pixels in all; the oldest entry goes first.
  */
-const FX_CACHE_PX = 48_000_000;
+import { editorCacheBudget } from './cacheBudget';
 const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
 if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
@@ -402,6 +402,7 @@ function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasEleme
   const same = (n: number) => key.slice(0, n).every((k, i) => k === hit.key[i]);
   const fresh = same(key.length), trailing = !fresh && paintingLive() && same(key.length - versions) && performance.now() - hit.at < FX_LIVE_MS;
   if (!fresh && !trailing) return undefined;
+  editorCacheBudget.touch(`fx:${id}`);
   // A held, unmoving pointer sends no new frame: one is asked for when the trailing result runs out.
   if (trailing) redrawSoon(FX_LIVE_MS - (performance.now() - hit.at));
   fxCache.delete(id);
@@ -411,13 +412,8 @@ function cachedFx(id: string, key: unknown[], versions: number): HTMLCanvasEleme
 function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
   fxCache.delete(id);
   fxCache.set(id, { key, canvas, at: performance.now() });
-  let px = 0;
-  for (const e of fxCache.values()) px += e.canvas.width * e.canvas.height;
-  for (const [k, e] of fxCache) {
-    if (px <= FX_CACHE_PX || fxCache.size <= 1) break;
-    px -= e.canvas.width * e.canvas.height;
-    fxCache.delete(k);
-  }
+  // One byte budget shared with the 'below' results and the stroke masks (Paso 4): the oldest entries go first.
+  editorCacheBudget.put(`fx:${id}`, canvas.width * canvas.height * 4, () => fxCache.delete(id));
 }
 
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */

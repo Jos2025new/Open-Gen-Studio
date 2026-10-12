@@ -369,4 +369,15 @@ export default [
     ],
     tests: ['tests/store-v2.test.ts', 'tests/state-format-2.test.ts', 'tests/state-copies.test.ts', 'tests/store-server.test.ts'],
   },
+  {
+    id: 'cache-budget',
+    what: 'Paso 4 (2026-10-13): las cachés del editor (FX de capa, FX below y máscaras de trazo) comparten un presupuesto en bytes; descarta primero lo menos usado y nunca el dibujo del usuario, que no es una entrada.',
+    sides: [
+      ['src/engine/design/cacheBudget.ts', 'export const editorCacheBudget'],
+      ['src/engine/design/render.ts', 'editorCacheBudget.put(`fx:${id}`'],
+      ['src/engine/design/belowFxCache.ts', 'editorCacheBudget.put(`below:${id}`'],
+      ['src/engine/design/rasterStrokeMask.ts', 'editorCacheBudget.put(id, bytes'],
+    ],
+    tests: ['tests/cache-budget.test.ts', 'tests/raster-stroke-mask.test.ts', 'tests/fx-render.test.ts'],
+  },
 ];

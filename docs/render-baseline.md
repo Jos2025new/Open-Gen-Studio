@@ -153,3 +153,10 @@ El JSON completo de la pasada válida (todas las repeticiones y metadatos) queda
 - **Etapa C (ADR 0014), en curso.** Hecho: formato 2 en disco (`server/store-v2.js`, con 10 pruebas que incluyen migración con copia previa, escritura de una sola sesión, recarga idéntica, 409, pérdida masiva total y por sesión, PUT legado convertido y vuelta atrás) y en navegador (`ogs-store-v2`, con 4 pruebas: migración, commit de una sola sesión, recarga y disco caído). Pendiente: medidas de d y e antes y después (el «antes» en el worktree `ogs-render-bench-before`: el run de d con tres repeticiones aún no terminó; el navegador con el documento profesional y sus cachés supera el tope de 1800 MB si se encadenan preparación y gestos sin liberar), pruebas de la lista que falten, la vuelta atrás escrita en el ADR 0014, y `npm test` completo.
 - **Etapa B en pausa**, a la espera de que el usuario decida entre composición retenida sobre Canvas2D o terminar la comparación de motores.
 - El worktree `ogs-render-bench-before` (HEAD separado en `4e238f8`) sigue existiendo para la medida «antes»; se eliminará con `git worktree remove` al terminarla.
+
+## Plan de rendimiento (2026-10-13): filas por paso
+
+| Paso | Qué cambia | Antes | Después | Medida |
+|---|---|---|---|---|
+| 2. Oráculo de paridad | Compara la vía de exportación (`drawDoc`, sin cachés) con la del editor (cachés activas) sobre documentos sintéticos | No existía | Diferencia 0 de 921 600 canales (navegador, Canvas2D) | `bench/engines/parity.ts`, `tests/parity-oracle.test.ts` |
+| 4. Presupuesto en bytes | `fxCache`, `belowFxCache` y máscaras de trazo comparten un presupuesto de 256 MB en bytes | Tres cachés con límites propios: 48 M px, 48 M px y 16 M px | Un único presupuesto en bytes; descarta lo menos usado | Sin medida de gesto todavía (sandbox ocupado; ver «Pendiente») |

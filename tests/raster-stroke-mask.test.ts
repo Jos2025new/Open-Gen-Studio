@@ -21,12 +21,16 @@ it('reuses translated coverage but rebuilds for color, tip or geometry changes',
   rasterStrokeMask({ ...a, segments: a.segments.map((s) => [...s]) }, a.tip!);
   expect(made.count).toBe(4);
 });
-it('evicts older coverage when pixel storage would exceed 16 million pixels', async () => {
+it('evicts older coverage when the shared byte budget would be exceeded', async () => {
   const { rasterStrokeMask } = await import('../src/engine/design/rasterStrokeMask');
+  const { editorCacheBudget } = await import('../src/engine/design/cacheBudget');
   const a = stroke(3000), b = stroke(3000);
+  // Each mask is 3000 x 3000 pixels (4 bytes each); the budget fits exactly one of them.
+  editorCacheBudget.setLimit(3000 * 3000 * 4 + 8);
   rasterStrokeMask(a, a.tip!); rasterStrokeMask(b, b.tip!); rasterStrokeMask(b, b.tip!);
   expect(made.count).toBe(2);
   rasterStrokeMask(a, a.tip!); expect(made.count).toBe(3);
+  editorCacheBudget.setLimit(256 * 1024 * 1024);
 });
 it('keeps every mask of a 300-stroke layer, so a cyclic walk does not rebuild them each frame', async () => {
   const { rasterStrokeMask } = await import('../src/engine/design/rasterStrokeMask');

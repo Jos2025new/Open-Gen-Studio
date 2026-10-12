@@ -1,5 +1,5 @@
 import { beforeEach, expect, it } from 'vitest';
-import { BELOW_CACHE_PX, cachedBelow, clearBelowCache, keepBelow } from '../src/engine/design/belowFxCache';
+import { cachedBelow, clearBelowCache, keepBelow } from '../src/engine/design/belowFxCache';
 
 const canvas = (w: number, h: number) => ({ width: w, height: h }) as unknown as HTMLCanvasElement;
 beforeEach(() => clearBelowCache());
@@ -14,10 +14,13 @@ it('returns the kept result only for the same composite inputs, in the same orde
   expect(cachedBelow('fx', [layer, 1, fx, 'extra'])).toBeUndefined();
 });
 
-it('drops the oldest results first once they exceed the pixel budget', () => {
-  const side = Math.floor(Math.sqrt(BELOW_CACHE_PX / 2)) + 1; // two of these do not fit
+it('drops the oldest results first once they exceed the shared byte budget', async () => {
+  const { editorCacheBudget } = await import('../src/engine/design/cacheBudget');
+  const side = 100; // 100 x 100 px = 40 000 bytes each
+  editorCacheBudget.setLimit(side * side * 4 * 1.5); // one fits, two do not
   keepBelow('old', ['k'], canvas(side, side));
   keepBelow('new', ['k'], canvas(side, side));
   expect(cachedBelow('old', ['k'])).toBeUndefined();
   expect(cachedBelow('new', ['k'])).toBeDefined();
+  editorCacheBudget.setLimit(256 * 1024 * 1024);
 });
