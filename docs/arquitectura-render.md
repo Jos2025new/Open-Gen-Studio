@@ -41,6 +41,8 @@ Lo que ya está bien y se conserva: fusión según W3C Compositing, plan de FX (
 
 Los contratos no cambian: trazos editables hasta el límite, orden, borrador, Keep Opacity, fusión, deshacer, guardado, exportación idéntica.
 
+**Investigación de un editor Rust+wasm (solo lectura):** [investigacion-photocraft.md](investigacion-photocraft.md). Los cambios sin wasm ni GPU que propone (historial en bytes, proxies de zoom, página retenida por región) son independientes de la prueba de motor.
+
 ## 4. Motor: decisión antes de construir
 
 La composición incremental (puntos 1–3) depende del motor; por eso el motor se decide **primero**.
