@@ -63,7 +63,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [doc.ts](../src/engine/design/doc.ts) | 27 | 20 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
-| [raster.ts](../src/engine/design/raster.ts) | 24 | 6 |
+| [raster.ts](../src/engine/design/raster.ts) | 25 | 7 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
@@ -90,7 +90,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 120 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 48 | 42 |
+| `src/engine/design` | 49 | 43 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 5 |
 | `src/engine/guides` | 1 | 1 |
@@ -99,7 +99,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 21 | 120 |
 | `src/store` | 3 | 92 |
 
-100 de 242 módulos no tienen ningún test que los importe directamente.
+100 de 243 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
