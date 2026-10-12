@@ -1,4 +1,4 @@
-import { newSession, patchSession, selectSession, setUi, useStore } from '../store/store';
+import { createSession, newSession, patchSession, selectSession, setUi, useStore } from '../store/store';
 import { deleteSession } from '../engine/actions';
 import { activeDoc, setActiveLayer } from '../engine/design/actions';
 import { composeRaster, setBuffer } from '../engine/design/raster';
@@ -295,4 +295,16 @@ export function rendererInfo() {
   const renderer = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
   const vendor = String(ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR));
   return { available: true, renderer, vendor, version: String(gl.getParameter(gl.VERSION)), software: /swiftshader|llvmpipe|software/i.test(renderer) };
+}
+
+/** Adds `count` small synthetic sessions (the many-sessions case of ADR 0014). Bench sandbox only. */
+export function addSyntheticSessions(count: number) {
+  const st = useStore.getState();
+  const sessions = { ...st.sessions };
+  for (let i = 0; i < count; i++) {
+    const id = `bench-many-${i}`;
+    if (!sessions[id]) sessions[id] = { ...createSession(`Synthetic ${i}`), id };
+  }
+  useStore.setState({ sessions });
+  return { sessions: Object.keys(sessions).length };
 }

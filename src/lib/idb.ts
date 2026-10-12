@@ -1,4 +1,5 @@
-import { createStore, del, get, set, delMany, keys } from 'idb-keyval';
+import { createStore, del, get, getMany, set, setMany, delMany, keys } from 'idb-keyval';
+import { assembleText, splitText, type V2Parts } from '../store/formatV2';
 import { disk, diskAvailable, type DiskWriteResult } from './disk';
 import type { StateJson } from '../store/persistJson';
 
@@ -14,46 +15,102 @@ const blobStore = createStore('ogs-blobs', 'kv');
 const cacheStore = createStore('ogs-cache', 'kv');
 
 // The saved state is one JSON document; a leading `savedAt` stamp tells which copy (browser or disk) is newer.
-const stamp = (value: string) => `{"savedAt":${Date.now()},${value.slice(1)}`;
 const savedAt = (value: string | null | undefined) => Number(/^\{"savedAt":(\d+)/.exec(value ?? '')?.[1] ?? 0);
 
+// Format 2 (ADR 0014): one record per session in its own database. The format-1 keys (`ogs-app` and `ogs-app:b`) are
+// never written or deleted; the first load that finds only format 1 copies it whole to `ogs-app:format1-backup-<savedAt>`.
+const v2Store = createStore('ogs-store-v2', 'kv');
+// The session texts this tab last committed to v2Store: a commit writes only the ones that differ.
+const committed = new Map<string, string>();
+
+async function readV2(): Promise<V2Parts | null> {
+  const manifest = await get<{ savedAt: number; version: number; order: string[] }>('manifest', v2Store);
+  if (!manifest) return null;
+  const globals = (await get<string>('globals', v2Store)) ?? '{}';
+  const texts = await getMany(manifest.order.map((id) => `session:${id}`), v2Store);
+  const sessions = new Map<string, string>();
+  manifest.order.forEach((id, i) => {
+    if (typeof texts[i] === 'string') sessions.set(id, texts[i] as string);
+  });
+  if (sessions.size !== manifest.order.length) return null; // a missing session: the manifest is not complete
+  return { savedAt: manifest.savedAt, version: manifest.version, globals, order: manifest.order, sessions };
+}
+
+/** Publishes a format-2 state: changed and removed sessions first, the manifest last. */
+async function commitV2(p: V2Parts): Promise<void> {
+  const changed: Array<[string, string]> = [];
+  for (const [id, text] of p.sessions) if (committed.get(id) !== text) changed.push([`session:${id}`, text]);
+  const removed = [...committed.keys()].filter((id) => !p.sessions.has(id)).map((id) => `session:${id}`);
+  if (changed.length) await setMany(changed, v2Store);
+  if (removed.length) await delMany(removed, v2Store);
+  await setMany([['globals', p.globals], ['manifest', { savedAt: p.savedAt, version: p.version, order: p.order }]], v2Store);
+  committed.clear();
+  for (const [id, text] of p.sessions) committed.set(id, text);
+}
+
+/** Format 1 as the browser had it: the text of `ogs-app` or its newer copy `ogs-app:b`, and the disk copy. */
+async function readLegacy(key: string): Promise<string | undefined> {
+  const [legacy, current] = await Promise.all([get<string>(key, stateStore), get<Blob | string>(`${key}:b`, stateStore)]);
+  const text = current instanceof Blob ? await current.text() : current;
+  return savedAt(text) >= savedAt(legacy) ? text ?? legacy : legacy;
+}
+
+/** Copies format 1 whole before its first format-2 write (once; the original keys stay as they are). */
+async function backupLegacy(key: string, legacy: string | undefined): Promise<void> {
+  if (!legacy) return;
+  const backupKey = `${key}:format1-backup-${savedAt(legacy)}`;
+  if (!(await get(backupKey, stateStore))) await set(backupKey, legacy, stateStore);
+}
+
 export const stateDb = {
-  /** Read legacy text, Blob and disk; legacy bytes are never overwritten or deleted. */
+  /**
+   * The state text: format 2 when it exists, else format 1, which is migrated on this load. A disk copy that is newer
+   * is adopted (it becomes format 2 too); a newer local copy is pushed to the disk.
+   */
   async get(key: string): Promise<string | undefined> {
-    const [legacy, current, onDisk] = await Promise.all([
-      get<string>(key, stateStore), get<Blob | string>(`${key}:b`, stateStore), disk.getState(),
-    ]);
-    const text = current instanceof Blob ? await current.text() : current;
-    const local = savedAt(text) >= savedAt(legacy) ? text ?? legacy : legacy;
+    const v2 = await readV2();
+    const legacy = v2 ? undefined : await readLegacy(key);
+    const onDisk = await disk.getState();
+    if (v2) for (const [id, text] of v2.sessions) committed.set(id, text);
+    const local = v2 ? assembleText(v2) : legacy;
     if (onDisk && savedAt(onDisk) > savedAt(local)) {
-      await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
+      await backupLegacy(key, legacy);
+      await commitV2(splitText(onDisk));
       return onDisk;
     }
     if (local && onDisk && savedAt(local) > savedAt(onDisk)) {
       if ((await disk.putState(local, savedAt(onDisk))) === 'conflict') {
         await set(`${key}:conflict-${Date.now()}`, local, stateStore);
-        await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
+        await backupLegacy(key, legacy);
+        await commitV2(splitText(onDisk));
         return onDisk;
       }
     } else if (local && !onDisk) await disk.setState(local);
+    if (legacy) {
+      await backupLegacy(key, legacy);
+      await commitV2(splitText(legacy));
+    }
     return local ?? undefined;
   },
+  /** Saves a state: format 2 locally first, then the disk commit. A disk conflict keeps this copy and adopts the disk's. */
   async set(key: string, value: string | StateJson): Promise<DiskWriteResult> {
     if (disk.isStale()) return 'conflict';
     const at = Date.now();
-    const stamped = typeof value === 'string' ? (value.startsWith('{') ? stamp(value) : value) : null;
-    const blob = typeof value === 'string'
-      ? new Blob([stamped!], { type: 'application/json' })
-      : value.blob(`{"savedAt":${at},`);
-    // The same encoded body is reused; adding baseAt builds only the small prefix for disk.
-    const receipt = disk.setState(typeof value === 'string' ? stamped! : { savedAt: at, blob: (open) => value.blob(open) });
-    await set(`${key}:b`, blob, stateStore);
-    const result = await receipt;
+    const parts: V2Parts = typeof value === 'string'
+      ? { ...splitText(value), savedAt: at }
+      : value.v2
+        ? { savedAt: at, version: value.v2.version, globals: value.v2.globals, order: value.v2.order, sessions: value.v2.sessions }
+        : { ...splitText(value.text()), savedAt: at };
+    const before = new Map(committed);
+    await commitV2(parts);
+    const changed = parts.order
+      .filter((id) => before.get(id) !== parts.sessions.get(id))
+      .map((id) => [id, parts.sessions.get(id)!] as [string, string]);
+    const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed });
     if (result === 'conflict') {
-      await set(`${key}:conflict-${at}`, blob, stateStore);
-      // Never offer this refused write as a recovery candidate on the next load.
+      await set(`${key}:conflict-${at}`, assembleText(parts), stateStore);
       const onDisk = await disk.getState();
-      if (onDisk) await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
+      if (onDisk) await commitV2(splitText(onDisk));
     }
     return result;
   },

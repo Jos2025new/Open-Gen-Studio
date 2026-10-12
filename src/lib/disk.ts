@@ -32,6 +32,7 @@ const report = (what: string) => (err: unknown) => console.warn(`Disk copy: coul
 
 // State writes are serialized and coalesced: only the newest pending value is sent, never out of order.
 let stateChain: Promise<void> = Promise.resolve();
+let commitChain: Promise<void> = Promise.resolve();
 let latestState: string | StateBody | null = null;
 let receipts: Array<(result: DiskWriteResult) => void> = [];
 // The disk state this tab works from (its savedAt): each write says so, and the server refuses it when another tab
@@ -74,6 +75,30 @@ export const disk = {
   /** Called once when the disk refuses this tab's state because another tab saved after it loaded. */
   onStateConflict(cb: () => void): void {
     onStale = cb;
+  },
+
+  /**
+   * Format-2 commit (ADR 0014): the global record, the session order and only the sessions that changed. The server
+   * writes those files and publishes the new manifest; a stale baseAt is refused (409) like a whole-state write.
+   */
+  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]> }): Promise<DiskWriteResult> {
+    if (stale) return Promise.resolve('conflict');
+    const receipt = new Promise<DiskWriteResult>((resolve) => { commitChain = commitChain.then(async () => {
+      let result: DiskWriteResult = 'fail';
+      try {
+        if (stale) result = 'conflict';
+        else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        else {
+          const sessions = c.changed.map(([id, text]) => `${JSON.stringify(id)}:${text}`).join(',');
+          const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${c.globals},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}}`;
+          const res = await fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: body.length < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+          if (res.status === 409) { stale = true; onStale?.(); result = 'conflict'; }
+          else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
+        }
+      } catch (err) { report('save state')(err); }
+      resolve(result);
+    }); });
+    return receipt;
   },
 
   setState(value: string | StateBody): Promise<DiskWriteResult> {

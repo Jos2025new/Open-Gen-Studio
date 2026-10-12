@@ -349,11 +349,24 @@ export default [
     sides: [
       ['src/store/store.ts', 'stateDb.set(next.name, persistState(next.value))'],
       ['src/store/persistJson.ts', 'export function persistState('],
-      ['src/lib/idb.ts', 'get<Blob | string>(`${key}:b`, stateStore)'],
+      ['src/lib/idb.ts', 'async function readLegacy(key: string)'],
       ['src/store/saveStatus.ts', 'export function confirmStateSave('],
       ['src/components/shell/SaveIndicator.tsx', 'export function SaveIndicator('],
       ['src/lib/disk.ts', 'next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`)'],
     ],
-    tests: ['tests/persist-json.test.ts', 'tests/state-conflict.test.ts', 'tests/state-copies.test.ts', 'tests/save-status.test.ts', 'tests/disk-receipts.test.ts', 'tests/save-now.test.ts', 'tests/raster-persist.test.ts'],
+    tests: ['tests/persist-json.test.ts', 'tests/state-conflict.test.ts', 'tests/state-copies.test.ts', 'tests/save-status.test.ts', 'tests/disk-receipts.test.ts', 'tests/save-now.test.ts', 'tests/raster-persist.test.ts', 'tests/state-format-2.test.ts'],
+  },
+  {
+    id: 'state-format-2',
+    what: 'ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2.',
+    sides: [
+      ['server/store-v2.js', 'export function createStoreV2('],
+      ['server/store-v2.d.ts', 'export function createStoreV2('],
+      ['server/local-store.js', "import { createStoreV2 } from './store-v2.js';"],
+      ['src/store/formatV2.ts', 'export function assembleText('],
+      ['src/lib/idb.ts', "const v2Store = createStore('ogs-store-v2', 'kv');"],
+      ['src/lib/disk.ts', 'setCommit(c: {'],
+    ],
+    tests: ['tests/store-v2.test.ts', 'tests/state-format-2.test.ts', 'tests/state-copies.test.ts', 'tests/store-server.test.ts'],
   },
 ];

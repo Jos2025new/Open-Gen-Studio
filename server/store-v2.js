@@ -95,6 +95,10 @@ export function createStoreV2(dir) {
     for (const [id, text] of Object.entries(sessions)) {
       if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}') || !order.includes(id)) return { status: 400 };
     }
+    // An id in the order that the commit does not send must already be on disk (it is unchanged), or the state is broken.
+    for (const id of order) {
+      if (!(id in sessions) && !(await stat(join(sessionsDir, `${id}.json`)).catch(() => null))) return { status: 400 };
+    }
     const head = await readHead();
     const legacy = head ? null : await readFile(stateFile, 'utf8').catch(() => null);
     const current = head ? head.savedAt : Number(/^\{"savedAt":(\d+)/.exec(legacy ?? '')?.[1] ?? 0);

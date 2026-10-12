@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { stores, diskState, diskSetState, diskSetBlob, diskPutState } = vi.hoisted(() => ({
+const { stores, diskState, diskSetState, diskSetBlob, diskPutState, diskSetCommit } = vi.hoisted(() => ({
   stores: new Map<string, Map<string, unknown>>(),
   diskState: { value: null as string | null },
   diskSetState: vi.fn(async (_value: string | { savedAt: number; blob: (open?: string) => Blob }) => 'ok'),
   diskSetBlob: vi.fn(async (_key: string, _value: Blob) => 'ok'),
   diskPutState: vi.fn(async (_value: string, _baseAt: number) => 'ok'),
+  diskSetCommit: vi.fn(async (_c: unknown) => 'ok'),
 }));
 
 vi.mock('idb-keyval', () => ({
@@ -18,6 +19,12 @@ vi.mock('idb-keyval', () => ({
   },
   del: async (key: string, store: { name: string }) => { stores.get(store.name)?.delete(key); },
   delMany: async (keys: string[], store: { name: string }) => keys.forEach((key) => stores.get(store.name)?.delete(key)),
+  getMany: async (keys: string[], store: { name: string }) => keys.map((key) => stores.get(store.name)?.get(key)),
+  setMany: async (entries: Array<[string, unknown]>, store: { name: string }) => {
+    let map = stores.get(store.name);
+    if (!map) stores.set(store.name, map = new Map());
+    for (const [key, value] of entries) map.set(key, value);
+  },
   keys: async (store: { name: string }) => [...(stores.get(store.name)?.keys() ?? [])],
 }));
 
@@ -26,6 +33,7 @@ vi.mock('../src/lib/disk', () => ({
     getState: async () => diskState.value,
     putState: diskPutState,
     setState: diskSetState,
+    setCommit: diskSetCommit,
     setBlob: diskSetBlob,
     getBlob: async () => undefined,
     listBlobs: async () => [],
@@ -53,6 +61,7 @@ beforeEach(() => {
   diskSetState.mockClear();
   diskSetBlob.mockClear();
   diskPutState.mockClear();
+  diskSetCommit.mockClear();
 });
 
 describe('state copy recovery', () => {
@@ -136,29 +145,33 @@ describe('state copy recovery', () => {
   it('keeps a refused write separately and restores the confirmed disk copy', async () => {
     const db = await freshDb();
     diskState.value = json(80, 'newer disk work');
-    diskSetState.mockResolvedValueOnce('conflict');
-    expect(await db.set('ogs-app', '{"state":{}}')).toBe('conflict');
+    diskSetCommit.mockResolvedValueOnce('conflict');
+    const refused = JSON.stringify({ savedAt: 90, state: { settings: {}, sessions: { ses_mine: { id: 'ses_mine' } } }, version: 1 });
+    expect(await db.set('ogs-app', { text: () => refused, blob: () => new Blob([refused]), v2: { version: 1, globals: '{"settings":{}}', order: ['ses_mine'], sessions: new Map([['ses_mine', '{"id":"ses_mine"}']]) } } as never)).toBe('conflict');
     const kept = [...stateStore()].filter(([key]) => String(key).startsWith('ogs-app:conflict-'));
     expect(kept).toHaveLength(1);
-    expect(await (kept[0][1] as Blob).text()).toContain('"state":{}');
-    expect(await (stateStore().get('ogs-app:b') as Blob).text()).toBe(diskState.value);
+    expect(String(kept[0][1])).toContain('ses_mine');
+    // The disk's state is adopted in the format-2 store; the format-1 keys are left alone.
+    const v2 = stores.get('ogs-store-v2')!;
+    expect(v2.get('manifest')).toEqual(expect.objectContaining({ savedAt: 80 }));
     expect(stateStore().has('ogs-app')).toBe(false);
   });
 
   it('writes a Blob copy without reading its text or writing the legacy key', async () => {
     const db = await freshDb();
-    const blob = new Blob(['large state bytes'], { type: 'application/json' });
     const value = {
       text: vi.fn(() => 'large state bytes'),
-      blob: vi.fn(() => blob),
+      blob: vi.fn(() => new Blob(['large state bytes'])),
+      v2: { version: 1, globals: '{"settings":{}}', order: ['ses_a'], sessions: new Map([['ses_a', '{"id":"ses_a"}']]) },
     };
 
     expect(await db.set('ogs-app', value as never)).toBe('ok');
 
+    // Format 2: the session records are written and the disk gets a commit; no whole-state text is built.
     expect(value.text).not.toHaveBeenCalled();
-    expect(value.blob).toHaveBeenCalled();
+    expect(value.blob).not.toHaveBeenCalled();
     expect(stateStore().has('ogs-app')).toBe(false);
-    expect(stateStore().get('ogs-app:b')).toBe(blob);
-    expect(diskSetState).toHaveBeenCalled();
+    expect(stores.get('ogs-store-v2')!.get('session:ses_a')).toBe('{"id":"ses_a"}');
+    expect(diskSetCommit).toHaveBeenCalledWith(expect.objectContaining({ order: ['ses_a'], changed: [['ses_a', '{"id":"ses_a"}']] }));
   });
 });

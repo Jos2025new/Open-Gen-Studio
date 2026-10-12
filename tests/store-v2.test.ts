@@ -13,7 +13,7 @@ function setup(text?: string) {
   if (text !== undefined) writeFileSync(join(dir, 'state.json'), text);
   return { dir, v2: createStoreV2(dir) };
 }
-const commitOf = (text: string, baseAt: number, changed?: Record<string, unknown>) => {
+const commitOf = (text: string, baseAt: number, changed?: Record<string, string>) => {
   const p = splitText(text);
   return { savedAt: p.savedAt + 1, baseAt, version: p.version, globals: p.globals, order: p.order, sessions: changed ?? p.sessions };
 };

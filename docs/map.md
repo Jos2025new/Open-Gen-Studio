@@ -46,7 +46,8 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
 | **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts) |
 | **fx-editor-cache** — 2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan. | [render.ts](../src/engine/design/render.ts), [raster.ts](../src/engine/design/raster.ts) | [fx-render.test.ts](../tests/fx-render.test.ts) |
-| **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [saveStatus.ts](../src/store/saveStatus.ts), [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [save-status.test.ts](../tests/save-status.test.ts), [disk-receipts.test.ts](../tests/disk-receipts.test.ts), [save-now.test.ts](../tests/save-now.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts) |
+| **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [saveStatus.ts](../src/store/saveStatus.ts), [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [save-status.test.ts](../tests/save-status.test.ts), [disk-receipts.test.ts](../tests/disk-receipts.test.ts), [save-now.test.ts](../tests/save-now.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts) |
+| **state-format-2** — ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2. | [store-v2.js](../server/store-v2.js), [store-v2.d.ts](../server/store-v2.d.ts), [local-store.js](../server/local-store.js), [formatV2.ts](../src/store/formatV2.ts), [idb.ts](../src/lib/idb.ts), [disk.ts](../src/lib/disk.ts) | [store-v2.test.ts](../tests/store-v2.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 
 ## Módulos centrales
 
@@ -70,7 +71,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 108 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 109 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 14 | 1 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
@@ -96,10 +97,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 21 | 120 |
-| `src/store` | 3 | 92 |
+| `src/lib` | 21 | 121 |
+| `src/store` | 4 | 92 |
 
-100 de 244 módulos no tienen ningún test que los importe directamente.
+101 de 245 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

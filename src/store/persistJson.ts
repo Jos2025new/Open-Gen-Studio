@@ -13,6 +13,7 @@
  */
 
 interface Kept { text: string; blob?: Blob }
+export type { Kept };
 const kept = new WeakMap<object, Kept>();
 const MARK = '\u0000ogs-sessions\u0000';
 export const FULL_EVERY_MS = 30_000;
@@ -22,10 +23,12 @@ let lastFull = Number.NEGATIVE_INFINITY;
 export interface StateJson {
   text(open?: string): string;
   blob(open?: string): Blob;
+  /** Format 2 parts (ADR 0014) when the state has sessions: the global record and each session's text. */
+  v2?: { version: number; globals: string; order: string[]; sessions: Map<string, string> };
 }
 
-function sessionParts(sessions: Record<string, unknown>, fresh: boolean): Array<{ key: string; rec: Kept }> {
-  const parts: Array<{ key: string; rec: Kept }> = [];
+function sessionParts(sessions: Record<string, unknown>, fresh: boolean): Array<{ id: string; key: string; rec: Kept }> {
+  const parts: Array<{ id: string; key: string; rec: Kept }> = [];
   for (const [id, s] of Object.entries(sessions)) {
     if (s === undefined || typeof s === 'function' || typeof s === 'symbol') continue;
     const cacheable = !!s && typeof s === 'object';
@@ -37,7 +40,7 @@ function sessionParts(sessions: Record<string, unknown>, fresh: boolean): Array<
       rec = old?.text === text ? old : { text };
       if (cacheable) kept.set(s as object, rec);
     }
-    parts.push({ key: `${JSON.stringify(id)}:`, rec });
+    parts.push({ id, key: `${JSON.stringify(id)}:`, rec });
   }
   return parts;
 }
@@ -57,7 +60,9 @@ export function persistState(value: { state?: unknown; version?: number }, now =
   const at = head.indexOf(JSON.stringify(MARK));
   const pre = head.slice(1, at), post = head.slice(at + JSON.stringify(MARK).length);
   const parts = sessionParts(sessions as Record<string, unknown>, fresh);
+  const { sessions: _sessions, ...globals } = state as Record<string, unknown>;
   return {
+    v2: { version: value.version ?? 1, globals: JSON.stringify(globals), order: parts.map((p) => p.id), sessions: new Map(parts.map((p) => [p.id, p.rec.text])) },
     text: (open = '{') => `${open}${pre}{${parts.map((p) => p.key + p.rec.text).join(',')}}${post}`,
     blob: (open = '{') => {
       const bits: BlobPart[] = [open + pre, '{'];
