@@ -43,3 +43,9 @@ Registro breve que iremos ampliando en este chat. Worktree `ogs-ux`, rama `task/
 - **Usuario:** tiradores de esquina, ajustes de forma y de trazo y blur «como en Inkscape»; luego «solucionar todo» como software profesional, sin reinventar.
 - **Cambio:** esquinas Rx/Ry con tiradores, estilo de trazo, blur; un clic transforma y doble clic edita; formas giradas que siguen siendo formas; nodos de trazados y «Convert to path». Fórmulas leídas del código de Inkscape.
 - **Evidencia:** 16 commits (`523dd35` → `2949201`), cada corrección de GPT con su e2e; 1 119 tests y 6 e2e de formas aprobados. Detalle, por commit: [historial 024](history/024-2026-10-W41.md).
+
+## 2026-10-11 (tarde y noche) — Nodos, selección múltiple, rendimiento raster y pruebas e2e
+
+- **Cambio:** herramientas de nodos de Inkscape (seleccionar, tipos, añadir/borrar conservando la forma, recta/curva, unir, romper); Shift+clic para elegir varias formas y arrastrar el grupo; deshacer sin pasos vacíos; recomponer trazos raster ~25× más rápido; e2e que fijan su propio estado.
+- **Quién:** Claude, GPT 6.1 (con Luna) y MiMo 2.6 Flash; cada parte revisada por otro agente.
+- **Detalle y evidencia:** [historial 024](history/024-2026-10-W41.md), partes segunda a cuarta y registros posteriores; medidas en [raster-pruebas.md](raster-pruebas.md).
