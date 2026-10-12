@@ -170,6 +170,9 @@ export default [
     id: 'shortcuts',
     what: 'Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista.',
     sides: [
+      ['src/engine/shortcuts.ts', "{ keys: 'Mod + S'"],
+      ['src/components/designer/DesignerWorkspace.tsx', 'void saveNow(); return;'],
+      ['src/components/shell/SettingsPanel.tsx', 'Save (Mod+S) also works while typing'],
       ['src/engine/shortcuts.ts', 'export function shortcutGroups'],
       ['src/components/designer/DesignerWorkspace.tsx', 'DESIGN_TOOL_KEYS[e.key.toLowerCase()]'],
       ['src/components/designer/PathNodes.tsx', 'marqueeNodeSelection'],
@@ -342,13 +345,15 @@ export default [
   },
   {
     id: 'persist-json-exact',
-    what: '2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB sigue guardando el texto.',
+    what: '2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses.',
     sides: [
-      ['src/store/store.ts', 'stateDb.set(name, persistState(value))'],
+      ['src/store/store.ts', 'stateDb.set(next.name, persistState(next.value))'],
       ['src/store/persistJson.ts', 'export function persistState('],
-      ['src/lib/idb.ts', 'disk.setState({ savedAt, blob: (open) => value.blob(open) })'],
+      ['src/lib/idb.ts', 'get<Blob | string>(`${key}:b`, stateStore)'],
+      ['src/store/saveStatus.ts', 'export function confirmStateSave('],
+      ['src/components/shell/SaveIndicator.tsx', 'export function SaveIndicator('],
       ['src/lib/disk.ts', 'next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`)'],
     ],
-    tests: ['tests/persist-json.test.ts', 'tests/state-conflict.test.ts'],
+    tests: ['tests/persist-json.test.ts', 'tests/state-conflict.test.ts', 'tests/state-copies.test.ts', 'tests/save-status.test.ts', 'tests/disk-receipts.test.ts', 'tests/save-now.test.ts', 'tests/raster-persist.test.ts'],
   },
 ];

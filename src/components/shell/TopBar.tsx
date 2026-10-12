@@ -1,3 +1,4 @@
+import { SaveIndicator } from './SaveIndicator';
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Pin, Plus, Search, Settings } from 'lucide-react';
@@ -89,6 +90,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
       </div>
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
+        {workspace === 'designer' && <SaveIndicator />}
         <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
           <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
         </button>

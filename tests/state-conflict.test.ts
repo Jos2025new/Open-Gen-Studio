@@ -49,6 +49,25 @@ async function until(done: () => boolean, ms = 15_000): Promise<void> {
 const diskHas = (what: string) => () => { try { return onDisk().includes(what); } catch { return false; } };
 
 describe('two tabs saving the same state', () => {
+  it('a tab that loaded valid legacy text cannot overwrite a newer tab write', async () => {
+    const seed = await tab();
+    await seed.getState();
+    const at = Date.now();
+    expect(await seed.setState(state(at, 'legacy old text'))).toBe('ok');
+    expect(onDisk()).toContain('legacy old text');
+
+    const legacy = await tab();
+    expect(await legacy.getState()).toContain('legacy old text');
+    const newer = await tab();
+    expect(await newer.getState()).toContain('legacy old text');
+
+    expect(await newer.setState(state(at + 1, 'new tab work'))).toBe('ok');
+    expect(await legacy.setState(state(at + 2, 'legacy stale write'))).toBe('conflict');
+    expect(legacy.isStale()).toBe(true);
+    expect(onDisk()).toContain('new tab work');
+    expect(onDisk()).not.toContain('legacy stale write');
+  });
+
   it('a tab that loaded before another one saved cannot overwrite the newer work', async () => {
     const old = await tab();
     await old.getState(); // empty disk: both tabs start from nothing

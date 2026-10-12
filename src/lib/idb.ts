@@ -1,5 +1,5 @@
 import { createStore, del, get, set, delMany, keys } from 'idb-keyval';
-import { disk, diskAvailable } from './disk';
+import { disk, diskAvailable, type DiskWriteResult } from './disk';
 import type { StateJson } from '../store/persistJson';
 
 /**
@@ -18,40 +18,46 @@ const stamp = (value: string) => `{"savedAt":${Date.now()},${value.slice(1)}`;
 const savedAt = (value: string | null | undefined) => Number(/^\{"savedAt":(\d+)/.exec(value ?? '')?.[1] ?? 0);
 
 export const stateDb = {
-  /** The newest of the browser and disk copies; the other one is brought up to date. */
+  /** Read legacy text, Blob and disk; legacy bytes are never overwritten or deleted. */
   async get(key: string): Promise<string | undefined> {
-    const [local, onDisk] = await Promise.all([get<string>(key, stateStore), disk.getState()]);
+    const [legacy, current, onDisk] = await Promise.all([
+      get<string>(key, stateStore), get<Blob | string>(`${key}:b`, stateStore), disk.getState(),
+    ]);
+    const text = current instanceof Blob ? await current.text() : current;
+    const local = savedAt(text) >= savedAt(legacy) ? text ?? legacy : legacy;
     if (onDisk && savedAt(onDisk) > savedAt(local)) {
-      await set(key, onDisk, stateStore);
+      await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
       return onDisk;
     }
     if (local && onDisk && savedAt(local) > savedAt(onDisk)) {
-      // The browser copy is newer: it goes to disk only if it was built on the disk's current state. A copy another
-      // tab left behind after newer work reached the disk is refused, and the disk's copy is used.
       if ((await disk.putState(local, savedAt(onDisk))) === 'conflict') {
-        // The refused browser copy is kept under its own key, never thrown away (AGENTS.md, critical rule).
         await set(`${key}:conflict-${Date.now()}`, local, stateStore);
-        await set(key, onDisk, stateStore);
+        await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
         return onDisk;
       }
-    } else if (local && !onDisk) disk.setState(local);
+    } else if (local && !onDisk) await disk.setState(local);
     return local ?? undefined;
   },
-  async set(key: string, value: string | StateJson): Promise<void> {
-    // Another tab saved newer work: this one keeps neither copy, so a reload shows the newer work.
-    if (disk.isStale()) return;
-    if (typeof value !== 'string') {
-      // Stamped as it is built (no extra copies of the whole text); the disk gets the same bytes as a Blob.
-      const savedAt = Date.now();
-      disk.setState({ savedAt, blob: (open) => value.blob(open) });
-      await set(key, value.text(`{"savedAt":${savedAt},`), stateStore);
-      return;
+  async set(key: string, value: string | StateJson): Promise<DiskWriteResult> {
+    if (disk.isStale()) return 'conflict';
+    const at = Date.now();
+    const stamped = typeof value === 'string' ? (value.startsWith('{') ? stamp(value) : value) : null;
+    const blob = typeof value === 'string'
+      ? new Blob([stamped!], { type: 'application/json' })
+      : value.blob(`{"savedAt":${at},`);
+    // The same encoded body is reused; adding baseAt builds only the small prefix for disk.
+    const receipt = disk.setState(typeof value === 'string' ? stamped! : { savedAt: at, blob: (open) => value.blob(open) });
+    await set(`${key}:b`, blob, stateStore);
+    const result = await receipt;
+    if (result === 'conflict') {
+      await set(`${key}:conflict-${at}`, blob, stateStore);
+      // Never offer this refused write as a recovery candidate on the next load.
+      const onDisk = await disk.getState();
+      if (onDisk) await set(`${key}:b`, new Blob([onDisk], { type: 'application/json' }), stateStore);
     }
-    const stamped = value.startsWith('{') ? stamp(value) : value;
-    disk.setState(stamped);
-    await set(key, stamped, stateStore);
+    return result;
   },
-  del: (key: string) => del(key, stateStore),
+  del: (key: string) => del(`${key}:b`, stateStore),
 };
 
 export const blobDb = {
@@ -64,8 +70,10 @@ export const blobDb = {
     return onDisk;
   },
   async set(key: string, value: Blob): Promise<void> {
-    void disk.setBlob(key, value);
+    const receipt = disk.setBlob(key, value);
     await set(key, value, blobStore);
+    const result = await receipt;
+    if (result === 'fail' || result === 'conflict') throw new Error(result === 'conflict' ? 'Another tab saved newer work' : 'Disk copy pending');
   },
   async del(key: string): Promise<void> {
     disk.delBlobs([key]);

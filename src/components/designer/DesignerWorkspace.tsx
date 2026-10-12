@@ -12,7 +12,7 @@ import { groupLayers } from '../../engine/design/groups';
 import { layerSelection } from '../../engine/design/selection';
 import { clearSelected, getSelection, invertSelection, selectAll, selectedCrop, selectionToLayer, setSelection } from '../../engine/design/pixelSelection';
 import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
-import { toast, setUi, useStore } from '../../store/store';
+import { saveNow, toast, setUi, useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
 import { deletePickedNode } from './PathNodes';
 import { deleteLayers, exportDocFile, mergeDown, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
@@ -140,6 +140,7 @@ export function DesignerWorkspace() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); void saveNow(); return; }
       if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover:not(.designer-context), .lightbox')) return;
       const layer = activeLayer(doc);
       const k = e.key.toLowerCase();

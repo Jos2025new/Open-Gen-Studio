@@ -4,6 +4,8 @@
  */
 
 let available: Promise<boolean> | null = null;
+let unavailable = false;
+export type DiskWriteResult = 'ok' | 'conflict' | 'fail' | 'browser-only';
 
 /** True when the local store answers. A static host's SPA fallback returns HTML, not "ok", so it counts as absent. */
 /**
@@ -20,8 +22,9 @@ export const LOCAL_WRITE = {
 
 export function diskAvailable(): Promise<boolean> {
   available ??= fetch('/x/store/ping', { cache: 'no-store' })
-    .then(async (r) => r.ok && (await r.text()) === 'ok')
-    .catch(() => false);
+    .then(async (r) => { unavailable = !r.ok && r.status !== 404; return r.ok && (await r.text()) === 'ok'; })
+    .catch(() => { unavailable = true; return false; })
+    .then((ok) => { if (unavailable) available = null; return ok; });
   return available;
 }
 
@@ -30,6 +33,7 @@ const report = (what: string) => (err: unknown) => console.warn(`Disk copy: coul
 // State writes are serialized and coalesced: only the newest pending value is sent, never out of order.
 let stateChain: Promise<void> = Promise.resolve();
 let latestState: string | StateBody | null = null;
+let receipts: Array<(result: DiskWriteResult) => void> = [];
 // The disk state this tab works from (its savedAt): each write says so, and the server refuses it when another tab
 // saved in between, instead of letting an older copy overwrite newer work.
 let baseAt = 0;
@@ -72,25 +76,35 @@ export const disk = {
     onStale = cb;
   },
 
-  setState(value: string | StateBody): void {
-    if (stale) return;
+  setState(value: string | StateBody): Promise<DiskWriteResult> {
+    if (stale) return Promise.resolve('conflict');
     latestState = value;
+    const receipt = new Promise<DiskWriteResult>((resolve) => receipts.push(resolve));
     stateChain = stateChain.then(async () => {
-      if (stale || latestState == null || !(await diskAvailable())) return;
-      const next = latestState;
+      if (latestState == null) return;
+      const next = latestState, waiters = receipts;
       latestState = null;
-      // A Blob body is handed over without encoding it on the page (a long string blocked it for most of a second).
-      const [body, at] = typeof next === 'string'
-        ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
-        : [next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`), next.savedAt];
-      const size = typeof body === 'string' ? body.length : body.size;
-      // keepalive lets the last save survive a closing tab (browsers cap it at 64 KB).
-      const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: size < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(report('save state'));
-      if (res?.status === 409) {
-        stale = true;
-        onStale?.();
-      } else if (res?.ok) baseAt = at;
+      receipts = [];
+      let result: DiskWriteResult = 'fail';
+      try {
+        if (stale) result = 'conflict';
+        else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        else {
+          const [body, at] = typeof next === 'string'
+            ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
+            : [next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`), next.savedAt];
+          const size = typeof body === 'string' ? body.length : body.size;
+          const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: size < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+          if (res.status === 409) {
+            stale = true;
+            onStale?.();
+            result = 'conflict';
+          } else if (res.ok) { baseAt = at; result = 'ok'; }
+        }
+      } catch (err) { report('save state')(err); }
+      waiters.forEach((resolve) => resolve(result));
     });
+    return receipt;
   },
 
   async getBlob(key: string): Promise<Blob | undefined> {
@@ -100,11 +114,14 @@ export const disk = {
   },
 
   /** Resolves when written (callers that do not need to wait use `void`). */
-  async setBlob(key: string, blob: Blob): Promise<void> {
-    if (!(await diskAvailable())) return;
-    await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream', ...LOCAL_WRITE } })
-      .then(() => undefined)
-      .catch(report(`save ${key}`));
+  async setBlob(key: string, blob: Blob): Promise<DiskWriteResult> {
+    if (stale) return 'conflict';
+    if (!(await diskAvailable())) return unavailable ? 'fail' : 'browser-only';
+    try {
+      const res = await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream', ...LOCAL_WRITE } });
+      if (res.status === 409) { stale = true; onStale?.(); return 'conflict'; }
+      return res.ok ? 'ok' : 'fail';
+    } catch (err) { report(`save ${key}`)(err); return 'fail'; }
   },
 
   delBlobs(keys: string[]): void {

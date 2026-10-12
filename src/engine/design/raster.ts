@@ -1,3 +1,4 @@
+import { rasterPending, rasterSaved, failSave } from '../../store/saveStatus';
 import { rasterStrokeMask } from './rasterStrokeMask';
 import { span } from '../../lib/trace';
 import { logged } from '../../lib/log';
@@ -378,6 +379,7 @@ let failureReported = false;
 
 function schedulePersist(layerId: string): void {
   pending.add(layerId);
+  rasterPending(layerId);
   const t = timers.get(layerId);
   if (t) window.clearTimeout(t);
   timers.set(
@@ -394,14 +396,16 @@ function writeLayer(layerId: string): Promise<void> {
     const c = buffers.get(layerId);
     if (!c) {
       pending.delete(layerId);
+      rasterSaved(layerId);
       return;
     }
     try {
       await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'));
       // A change made while writing (new buffer or a new timer) keeps the layer pending.
-      if (buffers.get(layerId) === c && !timers.has(layerId)) pending.delete(layerId);
+      if (buffers.get(layerId) === c && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
-    } catch {
+    } catch (err) {
+      failSave('Layer pixels pending', err instanceof Error && err.message.includes('Another tab'));
       if (!failureReported) {
         failureReported = true;
         toast('Could not save layer pixels to storage. They are kept in memory and saving will be retried; do not close this tab yet.', 'error');
@@ -424,12 +428,6 @@ export function pendingRaster(): string[] {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => void flushRaster());
-  window.addEventListener('beforeunload', (e) => {
-    if (!pending.size) return;
-    void flushRaster();
-    e.preventDefault();
-    e.returnValue = '';
-  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') void flushRaster();
   });
@@ -462,6 +460,7 @@ export async function deleteBuffers(layerIds: string[]): Promise<void> {
     if (t) window.clearTimeout(t);
     timers.delete(id);
     pending.delete(id);
+    rasterSaved(id);
   }
   // Let writes already running finish first, so they cannot bring a deleted layer's pixels back.
   await Promise.all(layerIds.map((id) => chains.get(id)));

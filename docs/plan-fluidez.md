@@ -100,4 +100,6 @@ Dibujar, seleccionar y mover se sienten inmediatos. Tests verdes o un guardado m
 - 2026-10-12, GPT: banco sintético ≠ latencia visible; umbral completo al cierre, no por etapa; etiquetas de estado corregidas (incorporado arriba).
 - 2026-10-12, GPT (etapa 0): la sonda sintética informa la unión de handlers y callbacks RAF como mínimo observado, no CPU total; el siguiente RAF no es píxel visible. Certificar esos umbrales necesita además el perfil nativo y los gestos reales del agente verificador. Por la memoria disponible, `test:related` limita Vitest a dos workers; no se ejecutan suites en paralelo.
 
+- 2026-10-12, usuario: GPT prepara el banco e instrucciones; no ejecuta agent-browser ni arrastres reales. Comparación antes/después reservada al agente verificador ([instrucciones](fluidez-pruebas.md)); las cifras permanecen pendientes, sin sustituirlas por medidas de desarrollo.
+
 - 2026-10-12, GPT: el directorio opcional de build se valida antes de compilar/servir; no puede ser el proyecto, un ancestro, `data/`, sus copias, `.sandbox/` ni un enlace simbólico. Esto protege los datos también al comparar una build externa.

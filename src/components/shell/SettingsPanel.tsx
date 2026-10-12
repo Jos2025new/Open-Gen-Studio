@@ -475,7 +475,7 @@ export function SettingsPanel() {
             </dl>
           </div>
         ))}
-        <p className="set-note">Mod is Ctrl, or ⌘ on a Mac. Shortcuts don't fire while you type in a field.</p>
+        <p className="set-note">Mod is Ctrl, or ⌘ on a Mac. Save (Mod+S) also works while typing; other shortcuts pause in fields.</p>
       </section> : null}
 
       {tab === 'data' ? <section className="set-section">

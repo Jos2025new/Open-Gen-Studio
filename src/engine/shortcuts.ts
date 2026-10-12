@@ -48,6 +48,7 @@ export function shortcutGroups(): ShortcutGroup[] {
     {
       title: 'Designer',
       items: [
+        { keys: 'Mod + S', action: 'Save state and pending layer pixels now' },
         ...Object.entries(DESIGN_TOOL_KEYS).map(([key, tool]) => ({ keys: key.toUpperCase(), action: TOOL_NAMES[tool] })),
         { keys: 'Space (hold)', action: 'Pan' },
         { keys: 'Alt-click (Brush, Fill)', action: 'Pick a color from the canvas' },

@@ -38,6 +38,7 @@ vi.mock('../src/lib/media', () => ({
 
 import { commitEdit, deleteBuffers, flushRaster, pendingRaster, setBuffer } from '../src/engine/design/raster';
 import { useStore } from '../src/store/store';
+import { hasPendingSave, resetSaveStatus } from '../src/store/saveStatus';
 
 const canvas = (tag: string) => ({ width: 4, height: 4, tag }) as unknown as HTMLCanvasElement;
 const fire = (type: string, e: unknown = {}) => (events.handlers[type] ?? []).forEach((fn) => fn(e));
@@ -55,6 +56,13 @@ afterEach(async () => {
 });
 
 describe('raster saving (D1–D3)', () => {
+  it('keeps the unified close warning pending until the raster receipt finishes', async () => {
+    resetSaveStatus();
+    setBuffer('unified', canvas('pixels'));
+    expect(hasPendingSave()).toBe(true);
+    await flushRaster();
+    expect(hasPendingSave()).toBe(false);
+  });
   it('writes 700 ms after the last change, only the latest pixels, and then nothing is pending', async () => {
     setBuffer('a', canvas('v1'));
     await vi.advanceTimersByTimeAsync(300);

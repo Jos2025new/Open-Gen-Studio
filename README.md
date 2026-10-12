@@ -168,6 +168,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 
 | Teclas | Acción |
 | --- | --- |
+| Mod + S | Save state and pending layer pixels now |
 | V | Edit |
 | H | Pan |
 | M | Select pixels |

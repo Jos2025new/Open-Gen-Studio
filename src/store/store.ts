@@ -1,3 +1,4 @@
+import { markStateDirty, beginStateSave, confirmStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
 import { persistState } from './persistJson';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
@@ -270,7 +271,10 @@ const MAX_WRITE_WAIT_MS = 2000;
 // The latest state to save. Held as the (immutable) object and turned into JSON only when the debounced write runs:
 // stringifying the whole state on every change cost a full serialization per store update, which grows with the
 // history and piled up where many updates come together (the end of an agent turn, when its card appears).
-let pendingWrite: { name: string; value: StorageValue<Persisted> } | null = null;
+type PendingWrite = { name: string; value: StorageValue<Persisted>; version: number };
+let pendingWrite: PendingWrite | null = null;
+let lastWrite: PendingWrite | null = null;
+let writesRunning: Promise<void> = Promise.resolve();
 let wiping = false;
 
 // The write runs when the browser is idle (not mid-stroke or mid-drag), within IDLE_TIMEOUT_MS at the latest, so
@@ -279,7 +283,7 @@ const IDLE_TIMEOUT_MS = 1000;
 let idleHandle: number | undefined;
 function flushWhenIdle(): void {
   const ric = typeof window !== 'undefined' ? window.requestIdleCallback : undefined;
-  if (!ric) return flushWrite();
+  if (!ric) { void flushWrite(); return; }
   if (idleHandle === undefined) idleHandle = ric(() => { idleHandle = undefined; writeUnlessPressed(); }, { timeout: IDLE_TIMEOUT_MS });
 }
 
@@ -292,7 +296,7 @@ let pressedSince = 0;
 let gestureTimer: ReturnType<typeof setTimeout> | undefined;
 function writeUnlessPressed(): void {
   const waited = Date.now() - pressedSince;
-  if (!pressed.size || waited >= MAX_GESTURE_WAIT_MS) return flushWrite();
+  if (!pressed.size || waited >= MAX_GESTURE_WAIT_MS) { void flushWrite(); return; }
   gestureTimer ??= setTimeout(flushWrite, MAX_GESTURE_WAIT_MS - waited);
 }
 function released(e: { pointerId?: number; type: string }): void {
@@ -304,16 +308,40 @@ function released(e: { pointerId?: number; type: string }): void {
   flushWhenIdle();
 }
 
-function flushWrite(): void {
+function flushWrite(): Promise<void> {
   clearTimeout(writeTimer);
   clearTimeout(maxWaitTimer);
   clearTimeout(gestureTimer);
   if (idleHandle !== undefined && typeof window !== 'undefined') window.cancelIdleCallback?.(idleHandle);
   writeTimer = maxWaitTimer = idleHandle = gestureTimer = undefined;
-  if (!pendingWrite || wiping) return;
-  const { name, value } = pendingWrite;
+  if (!pendingWrite || wiping || saveStatus.getState().conflict) return writesRunning;
+  const next = pendingWrite;
   pendingWrite = null;
-  stateDb.set(name, persistState(value)).catch((err) => console.error('Could not save state', err));
+  lastWrite = next;
+  beginStateSave(next.version);
+  // Serialize the latest snapshots in the same order as their acknowledgements.
+  const operation = (async () => {
+    try {
+      const result = await stateDb.set(next.name, persistState(next.value));
+      if (result === 'conflict' || result === 'fail') {
+        failSave(result === 'conflict' ? 'Another tab saved changes · reload' : 'Disk copy pending', result === 'conflict', next.version);
+      } else confirmStateSave(next.version, result === 'browser-only');
+    } catch (err) {
+      console.error('Could not save state', err);
+      failSave('Could not save to browser storage', false, next.version);
+    }
+  })();
+  writesRunning = Promise.all([writesRunning, operation]).then(() => undefined);
+  return writesRunning;
+}
+
+/** Explicit save: the latest state and every pending raster write must both finish. */
+export async function saveNow(): Promise<void> {
+  if (saveStatus.getState().conflict) return;
+  if (!pendingWrite && lastWrite && saveStatus.getState().phase === 'error') pendingWrite = lastWrite;
+  const state = flushWrite();
+  const { flushRaster } = await import('../engine/design/raster');
+  await Promise.all([state, flushRaster()]);
 }
 
 const idbStorage: PersistStorage<Persisted> = {
@@ -323,7 +351,7 @@ const idbStorage: PersistStorage<Persisted> = {
   },
   setItem: (name, value) => {
     if (wiping) return;
-    pendingWrite = { name, value };
+    pendingWrite = { name, value, version: markStateDirty() };
     // The global timers, not window's: tests (Node) write state too.
     clearTimeout(writeTimer);
     writeTimer = setTimeout(flushWhenIdle, 350);
@@ -338,7 +366,13 @@ if (typeof window !== 'undefined') {
     pressed.add(e.pointerId);
   }, true);
   for (const type of ['pointerup', 'pointercancel', 'blur']) window.addEventListener(type, released as EventListener, true);
-  window.addEventListener('pagehide', flushWrite);
+  window.addEventListener('pagehide', () => void flushWrite());
+  window.addEventListener('beforeunload', (e) => {
+    if (!hasPendingSave()) return;
+    void saveNow();
+    e.preventDefault();
+    e.returnValue = '';
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushWrite();
   });

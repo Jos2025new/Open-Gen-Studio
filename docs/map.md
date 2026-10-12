@@ -30,7 +30,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **keyword-route** — Las palabras clave señalan una operación y su encaje; la señal va antes del mensaje del usuario. | [triggers.ts](../src/engine/agent/triggers.ts), [force.ts](../src/engine/agent/force.ts), [fit.ts](../src/engine/agent/fit.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-force.test.ts](../tests/agent-force.test.ts), [agent-fit.test.ts](../tests/agent-fit.test.ts) |
 | **ops-in-prompt** — Las operaciones que conoce el agente salen del registro OPS, no de una segunda lista. | [ops.ts](../src/engine/ops.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts) | [agent-procedure.test.ts](../tests/agent-procedure.test.ts) |
 | **audio-defaults** — Voz y efectos (2026-10-08): por defecto Gemini 3.8 Flash TTS para voz y ElevenLabs Sound Effects v2 para efectos, salvo que el usuario nombre o elija otro; el agente lo lee en el contrato del paso de audio. | [nanogptAudio.ts](../src/engine/providers/nanogptAudio.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts), [catalogo-voz-y-efectos.md](../docs/catalogo-voz-y-efectos.md) | [nanogpt-speech.test.ts](../tests/nanogpt-speech.test.ts) |
-| **shortcuts** — Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista. | [shortcuts.ts](../src/engine/shortcuts.ts), [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [README.md](../README.md) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
+| **shortcuts** — Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista. | [shortcuts.ts](../src/engine/shortcuts.ts), [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [README.md](../README.md) | [readme-shortcuts.test.ts](../tests/readme-shortcuts.test.ts) |
 | **sandbox** — El sandbox dev y producción usan .sandbox/data y el puerto 5183; preview conserva strictPort y las protecciones locales. | [dev-sandbox.mjs](../scripts/dev-sandbox.mjs), [dev-sandbox.d.mts](../scripts/dev-sandbox.d.mts), [main.tsx](../src/main.tsx), [designerBenchFixtures.ts](../src/lib/designerBenchFixtures.ts), [depuracion.md](../docs/depuracion.md), [check-safeguards.mjs](../scripts/check-safeguards.mjs) | [safeguards.test.ts](../tests/safeguards.test.ts), [designer-bench.test.ts](../tests/designer-bench.test.ts) |
 | **store-local-only** — El almacén /x/store solo responde al propio ordenador (también con --host); docs/seguridad.md lo afirma con su prueba. | [local-store.js](../server/local-store.js), [seguridad.md](../docs/seguridad.md), [README.md](../README.md) | [store-server.test.ts](../tests/store-server.test.ts) |
 | **automated-writes** — El servidor rechaza escrituras automatizadas (cabecera X-OGS-Automated) fuera del sandbox. | [local-store.js](../server/local-store.js) | [automated-write.test.ts](../tests/automated-write.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
@@ -46,7 +46,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
 | **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts) |
 | **fx-editor-cache** — 2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan. | [render.ts](../src/engine/design/render.ts), [raster.ts](../src/engine/design/raster.ts) | [fx-render.test.ts](../tests/fx-render.test.ts) |
-| **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB sigue guardando el texto. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts) |
+| **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [saveStatus.ts](../src/store/saveStatus.ts), [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [save-status.test.ts](../tests/save-status.test.ts), [disk-receipts.test.ts](../tests/disk-receipts.test.ts), [save-now.test.ts](../tests/save-now.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts) |
 
 ## Módulos centrales
 
@@ -55,7 +55,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 150 | 93 |
-| [store.ts](../src/store/store.ts) | 99 | 89 |
+| [store.ts](../src/store/store.ts) | 100 | 90 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 35 | 25 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
@@ -63,13 +63,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/design/actions.ts) | 29 | 11 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [doc.ts](../src/engine/design/doc.ts) | 26 | 20 |
-| [raster.ts](../src/engine/design/raster.ts) | 23 | 5 |
+| [raster.ts](../src/engine/design/raster.ts) | 23 | 6 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 18 | 9 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 106 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 108 |
 | [render.ts](../src/engine/design/render.ts) | 16 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 13 | 1 |
@@ -86,20 +86,20 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 23 | 3 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
-| `src/components/shell` | 12 | 1 |
+| `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 119 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 48 | 41 |
+| `src/engine/design` | 48 | 42 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 4 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 19 | 116 |
-| `src/store` | 2 | 90 |
+| `src/lib` | 19 | 119 |
+| `src/store` | 3 | 92 |
 
-98 de 238 módulos no tienen ningún test que los importe directamente.
+99 de 240 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -127,6 +127,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [nodes.tsx](../src/components/node/nodes.tsx)
 - [GenerationsPanel.tsx](../src/components/shell/GenerationsPanel.tsx)
 - [ProviderPool.tsx](../src/components/shell/ProviderPool.tsx)
+- [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx)
 - [SessionsPanel.tsx](../src/components/shell/SessionsPanel.tsx)
 - [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
