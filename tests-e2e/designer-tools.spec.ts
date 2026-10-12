@@ -73,6 +73,12 @@ test('stroke ruler (SAI 2): placed with the Ruler tool, the brush then paints al
   await page.getByRole('button', { name: 'Straight', exact: true }).click();
   await page.mouse.move(b.x + b.width * 0.2, y0); await page.mouse.down(); await page.mouse.move(b.x + b.width * 0.7, y0, { steps: 5 }); await page.mouse.up();
   await page.keyboard.press('b');
+  // The brush this test measures (white, opaque, plain), whatever earlier runs left in the sandbox: with a translucent,
+  // pressure-thinned brush the stroke followed the ruler but never reached the white it looks for (MiMo, 2026-10-11).
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string);
+    st.setUi({ brush: { size: 24, color: '#ffffff', opacity: 1 } });
+  });
   // A diagonal drag: with the ruler on, it lands as a horizontal line through its start.
   const ys = y0 + 80;
   await page.mouse.move(b.x + b.width * 0.3, ys); await page.mouse.down(); await page.mouse.move(b.x + b.width * 0.6, ys + 150, { steps: 25 }); await page.mouse.up();

@@ -74,6 +74,12 @@ async function reset(page: Page) {
   await page.getByRole('button', { name: 'None', exact: true }).click();
   await panel(page).getByRole('checkbox', { name: 'Simulate pressure' }).setChecked(false);
   for (const name of ['Taper start', 'Taper end']) await panel(page).getByRole('slider', { name, exact: true }).fill('0');
+  // Pressure limits back to their defaults: the sandbox keeps the brush of earlier runs, and a Min size of 0.55 left
+  // by one of them stopped a fast stroke from thinning enough (investigation by MiMo, 2026-10-11).
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string);
+    st.setUi((u: any) => ({ brush: { ...u.brush, minSize: undefined, minDensity: undefined } }));
+  });
 }
 
 test('the brush settings, and a stroke for each tip', async ({ page }) => {
