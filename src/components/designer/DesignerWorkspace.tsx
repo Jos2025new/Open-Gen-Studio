@@ -3,7 +3,7 @@ import { ToolHelpLine, ViewToggles } from './ToolHelp';
 import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
 import { objectPick, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
-import { nudgeLayers } from '../../engine/design/nudge';
+import { nudgeObjects } from '../../engine/design/nudge';
 import { prepareImportFile } from '../../lib/imports';
 
 const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -192,13 +192,15 @@ export function DesignerWorkspace() {
         const pk = objectPick(doc.id)!;
         deletePickedObjects(session.id, doc.id, pk.layerId, pk.ids);
         setObjectPick(doc.id, null);
-      } else if (!mod && !e.altKey && ARROW_STEP[e.key] && !useShapeEdit.getState().byDoc[doc.id] && !pickedHere(doc) && layer) {
-        // Arrow keys nudge the picked layers (1 px, Shift 10 px); path-node editing keeps its own arrows (PathNodes.tsx).
+      } else if (!mod && !e.altKey && ARROW_STEP[e.key] && !useShapeEdit.getState().byDoc[doc.id] && layer) {
+        // Arrow keys move the picked objects (strokes, shapes; 1 px, Shift 10 px). Nothing picked: they pan the view.
+        // Path-node editing keeps its own arrows (PathNodes.tsx).
         e.preventDefault();
         const [ux, uy] = ARROW_STEP[e.key];
         const k = e.shiftKey ? 10 : 1;
-        const r = nudgeLayers(session.id, doc.id, layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id)), ux * k, uy * k);
-        if (r.locked && !r.moved) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info');
+        const pk = objectPick(doc.id);
+        if (pk && pickedHere(doc)) { if (!nudgeObjects(session.id, doc.id, pk.layerId, pk.ids, ux * k, uy * k)) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info'); }
+        else window.dispatchEvent(new CustomEvent('ogs:pan', { detail: { ux, uy, shift: e.shiftKey } }));
         if ((e.key === 'Delete' || e.key === 'Backspace') && layer) {
           // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
           e.preventDefault();

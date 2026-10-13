@@ -37,6 +37,7 @@ import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
 import { clickCandidate } from '../../engine/design/autoSelect';
+import { panOffset } from '../../engine/design/nudge';
 import { commitStagePaintGesture, drawingChoiceFirst, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
@@ -197,6 +198,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
   const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  // Arrow keys with nothing picked pan the view (DesignerWorkspace dispatches ogs:pan).
+  useEffect(() => {
+    const onPan = (e: Event) => { const d = (e as CustomEvent<{ ux: number; uy: number; shift: boolean }>).detail; setView((v) => ({ ...v, ...panOffset(v, d.ux, d.uy, d.shift) })); };
+    window.addEventListener('ogs:pan', onPan);
+    return () => window.removeEventListener('ogs:pan', onPan);
+  }, []);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
 
