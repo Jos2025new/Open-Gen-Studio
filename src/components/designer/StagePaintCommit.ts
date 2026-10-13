@@ -1,6 +1,6 @@
 import type { DesignDoc, Layer, RasterLayer, RasterStroke } from '../../engine/types';
 import type { LiveStroke } from '../../engine/design/raster';
-import { commitEdit, getBuffer } from '../../engine/design/raster';
+import { commitEdit, getRasterSurface } from '../../engine/design/raster';
 import { activeLayer } from '../../engine/design/doc';
 import { isProtectedImage } from '../../engine/design/rules';
 import { endBrushStroke } from '../../engine/design/brushStroke';
@@ -16,7 +16,7 @@ export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {
   const paintable = (item: Layer | null | undefined): item is RasterLayer => !!item && item.type === 'raster' && !item.locked && item.visible && !isProtectedImage(item);
   const above = selected ? doc.layers[doc.layers.indexOf(selected) + 1] : undefined;
   const candidate = erase ? selected?.type === 'raster' ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
-  if (candidate && (!getBuffer(candidate.id) || (!candidate.paintFlattened && candidate.paintBaseId && !getBuffer(candidate.paintBaseId)))) {
+  if (candidate && (!getRasterSurface(candidate.id) || (!candidate.paintFlattened && candidate.paintBaseId && !getRasterSurface(candidate.paintBaseId)))) {
     toast('Layer pixels are still loading. Try again in a moment.', 'error');
     return false;
   }
@@ -50,7 +50,7 @@ export function commitStagePaintGesture(args: {
   const { sessionId, docId, gesture, brush } = args;
   const doc = getDoc(sessionId, docId);
   const layer = doc?.layers.find((item): item is RasterLayer => item.id === gesture.layerId && item.type === 'raster');
-  const pixels = getBuffer(gesture.layerId);
+  const pixels = getRasterSurface(gesture.layerId)?.canvas;
   if (!doc || !layer) return;
 
   if (pixels) endBrushStroke(gesture.stroke, gesture.live, pixels, layer, brush);

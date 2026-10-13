@@ -14,6 +14,8 @@ export interface RasterHistorySnapshot {
   height: number;
   tileSize: number;
   tiles: ReadonlyMap<string, RasterHistoryTile>;
+  /** Where the grid sits in the full buffer (rasterSurface.ts); absent = a full buffer at (0, 0). */
+  geometry?: { x0: number; y0: number; fw: number; fh: number };
 }
 
 let copiedPixels = 0;
@@ -48,12 +50,12 @@ function copyTile(source: HTMLCanvasElement, tx: number, ty: number, tileSize: n
   return { canvas, width, height };
 }
 
-export function snapshotRasterTiles(source: HTMLCanvasElement, tileSize = RASTER_HISTORY_TILE_SIZE): RasterHistorySnapshot {
+export function snapshotRasterTiles(source: HTMLCanvasElement, tileSize = RASTER_HISTORY_TILE_SIZE, geometry?: RasterHistorySnapshot['geometry']): RasterHistorySnapshot {
   const tiles = new Map<string, RasterHistoryTile>();
   for (let y = 0; y < source.height; y += tileSize) {
     for (let x = 0; x < source.width; x += tileSize) tiles.set(tileKey(x / tileSize, y / tileSize), copyTile(source, x / tileSize, y / tileSize, tileSize));
   }
-  return { width: source.width, height: source.height, tileSize, tiles };
+  return { width: source.width, height: source.height, tileSize, tiles, geometry };
 }
 
 export function updateRasterTiles(snapshot: RasterHistorySnapshot, source: HTMLCanvasElement, changedKeys: Iterable<string>): RasterHistorySnapshot {
@@ -65,7 +67,7 @@ export function updateRasterTiles(snapshot: RasterHistorySnapshot, source: HTMLC
     if (x >= source.width || y >= source.height) continue;
     tiles.set(key, copyTile(source, tx, ty, snapshot.tileSize));
   }
-  return { width: source.width, height: source.height, tileSize: snapshot.tileSize, tiles };
+  return { width: source.width, height: source.height, tileSize: snapshot.tileSize, tiles, geometry: snapshot.geometry };
 }
 
 export function restoreRasterTiles(snapshot: RasterHistorySnapshot): HTMLCanvasElement {

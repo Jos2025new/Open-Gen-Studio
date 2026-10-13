@@ -5,7 +5,7 @@ import { setDoc, toast } from '../../store/store';
 import { insertLayer, newRasterLayer, translateLayer } from './doc';
 import { getDoc } from './actions';
 import { editableRaster, getSelection, selectionClipFor, selectionMask, setSelection } from './pixelSelection';
-import { getBuffer, setBuffer } from './raster';
+import { getBuffer, getRasterSurface, setBuffer } from './raster';
 import { pickLayer } from './selection';
 import { setObjectPick } from './objectSelection';
 import { record } from './history';
@@ -19,7 +19,7 @@ export function startPixelMove(sessionId: string, doc: DesignDoc, start: Point, 
   if (!sel || start.x < 0 || start.y < 0 || start.x >= doc.width || start.y >= doc.height) return null;
   if (!ctx2d(selectionMask(doc, sel)).getImageData(Math.floor(start.x), Math.floor(start.y), 1, 1).data[3]) return null;
   const active = doc.layers.find(l => l.id === doc.activeLayerId);
-  const source = active?.type === 'vector' ? active.locked ? `"${active.name}" is locked.` : !active.visible ? 'The active layer is hidden.' : active.pixelMask && !getBuffer(active.pixelMask.id) ? 'Layer pixels are still loading.' : active : editableRaster(doc);
+  const source = active?.type === 'vector' ? active.locked ? `"${active.name}" is locked.` : !active.visible ? 'The active layer is hidden.' : active.pixelMask && !getRasterSurface(active.pixelMask.id) ? 'Layer pixels are still loading.' : active : editableRaster(doc);
   if (typeof source === 'string') { toast(source, 'error'); return true; }
   let lifted: Layer | null = null;
   return { update(point) {

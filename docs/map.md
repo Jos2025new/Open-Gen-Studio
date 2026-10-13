@@ -44,7 +44,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **render-attribution** — Cada paso FX lleva el renderId y origen de su compositor; el porcentaje del editor excluye todos los renders fuera de pantalla. | [renderTrace.ts](../src/lib/renderTrace.ts), [render.ts](../src/engine/design/render.ts), [canvas.ts](../src/engine/fx/canvas.ts), [op.ts](../src/engine/fx/op.ts), [fill.ts](../src/engine/design/fill.ts), [swatches.ts](../src/engine/design/swatches.ts), [pixelSelection.ts](../src/engine/design/pixelSelection.ts), [canvasView.ts](../src/engine/agent/canvasView.ts), [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx), [trace-report.mjs](../scripts/trace-report.mjs), [depuracion.md](../docs/depuracion.md) | [fx-render.test.ts](../tests/fx-render.test.ts), [trace.test.ts](../tests/trace.test.ts) |
 | **trace-probes** — El protocolo de medida (docs/depuracion.md#protocolo) solo cubre lo que tiene sondas: cada span, note o awaitFrame del código está en la tabla «Qué se mide hoy», y cada evento de la tabla tiene su sonda. | [depuracion.md](../docs/depuracion.md), [trace.ts](../src/lib/trace.ts), [AGENTS.md](../AGENTS.md) | [trace-domains.test.ts](../tests/trace-domains.test.ts) |
 | **single-controls** — ADR 0013: los ajustes del Designer usan un solo tipo de campo (InlineControls); ningún otro componente dibuja su propio deslizador o input de color. | [InlineControls.tsx](../src/components/designer/InlineControls.tsx), [designer-connected.css](../src/styles/designer-connected.css) | [ui-single-slider.test.ts](../tests/ui-single-slider.test.ts) |
-| **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts), [raster.ts](../src/engine/design/raster.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts) |
+| **brush-one-engine** — ADR 0013: el trazo en vivo, el trazo reconstruido y la vista previa de la brocha se dibujan con el mismo motor de punta (stampSegment). | [brushEngine.ts](../src/engine/design/brushEngine.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts), [raster.ts](../src/engine/design/raster.ts), [rasterDraw.ts](../src/engine/design/rasterDraw.ts), [BrushSettings.tsx](../src/components/designer/BrushSettings.tsx) | [brush-engine.test.ts](../tests/brush-engine.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts) |
 | **raster-png-worker** — La ruta worker PNG está disponible como experimento de paridad; el guardado de capas mantiene activo el encoder Canvas legado hasta demostrar paridad de píxeles. Cada escritura solo confirma la misma versión de píxeles que codificó, también cuando un trazo en vivo muta el lienzo en el sitio. | [raster.ts](../src/engine/design/raster.ts), [canvasPngWorker.ts](../src/lib/canvasPngWorker.ts), [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts), [png-parity.ts](../bench/engines/png-parity.ts), [main.ts](../bench/engines/main.ts) | [canvas-png-worker.test.ts](../tests/canvas-png-worker.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts) |
 | **fx-editor-cache** — 2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan. | [render.ts](../src/engine/design/render.ts), [raster.ts](../src/engine/design/raster.ts) | [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [saveStatus.ts](../src/store/saveStatus.ts), [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [save-status.test.ts](../tests/save-status.test.ts), [disk-receipts.test.ts](../tests/disk-receipts.test.ts), [save-now.test.ts](../tests/save-now.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts) |
@@ -61,15 +61,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 160 | 98 |
+| [types.ts](../src/engine/types.ts) | 161 | 98 |
 | [store.ts](../src/store/store.ts) | 102 | 91 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 45 | 0 |
-| [media.ts](../src/lib/media.ts) | 39 | 29 |
+| [media.ts](../src/lib/media.ts) | 41 | 30 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 33 | 1 |
 | [actions.ts](../src/engine/design/actions.ts) | 32 | 12 |
-| [doc.ts](../src/engine/design/doc.ts) | 31 | 22 |
+| [doc.ts](../src/engine/design/doc.ts) | 31 | 23 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
-| [raster.ts](../src/engine/design/raster.ts) | 28 | 10 |
+| [raster.ts](../src/engine/design/raster.ts) | 28 | 11 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
@@ -77,7 +77,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 4 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 111 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 112 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 1 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [types.ts](../src/engine/fx/types.ts) | 13 | 6 |
@@ -97,16 +97,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 124 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 58 | 53 |
+| `src/engine/design` | 60 | 54 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 23 | 125 |
+| `src/lib` | 23 | 126 |
 | `src/store` | 4 | 93 |
 
-104 de 257 módulos no tienen ningún test que los importe directamente.
+105 de 259 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

@@ -3,7 +3,7 @@ import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc } from '../../store/store';
 import { insertLayer, newRasterLayer } from './doc';
 import { drawDoc } from './render';
-import { getBuffer, setBuffer } from './raster';
+import { getRasterSurface, setBuffer } from './raster';
 import { record } from './history';
 import { getSelection, selectionMask } from './pixelSelection';
 
@@ -15,7 +15,7 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
   const w = Math.round(doc.width), h = Math.round(doc.height);
   x = Math.floor(x); y = Math.floor(y);
   if (x < 0 || y < 0 || x >= w || y >= h) return;
-  if (doc.layers.some((l) => l.visible && l.type === 'raster' && !getBuffer(l.id))) throw new Error('Layer pixels are still loading. Try again in a moment.');
+  if (doc.layers.some((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id))) throw new Error('Layer pixels are still loading. Try again in a moment.');
   const canvas = createCanvas(w, h);
   const ctx = ctx2d(canvas);
   drawDoc(ctx, doc, { origin: 'fill' });

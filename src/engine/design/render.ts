@@ -7,7 +7,7 @@ import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape }
 import { shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
-import { bufferVersion, cloneCanvas, getBuffer, paintingLive, rasterBufferIds, redrawSoon } from './raster';
+import { bufferVersion, cloneCanvas, getBuffer, getRasterSurface, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import { bufferAlpha } from './hitAlpha';
 import { cachedBelow, keepBelow } from './belowFxCache';
 import type { FxLayer } from '../fx/types';
@@ -182,14 +182,16 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
   ctx.globalCompositeOperation = plain ? 'source-over' : GCO[l.blend] ?? 'source-over';
   if (l.transform && l.type !== 'vector') ctx.transform(...l.transform);
   if (l.type === 'raster') {
-    const buf = getBuffer(l.id);
-    if (buf) {
+    // The stored box is drawn where it sits in the layer's full buffer (fw × fh pixels, scaled to the layer's size).
+    const surface = getRasterSurface(l.id);
+    if (surface && surface.canvas.width && surface.canvas.height) {
+      const buf = surface.canvas, kx = l.width / surface.fw, ky = l.height / surface.fh;
       // Close up (each pixel 4 screen px or more), pixels show as squares, as in Photoshop, Krita or SAI.
-      const m = ctx.getTransform(), px = Math.hypot(m.a, m.b) * (l.width / Math.max(1, buf.width));
+      const m = ctx.getTransform(), px = Math.hypot(m.a, m.b) * kx;
       ctx.imageSmoothingEnabled = px < PIXEL_VIEW_FROM;
       ctx.imageSmoothingQuality = 'high';
       const end = span('raster', 'draw', { pixels: buf.width * buf.height });
-      ctx.drawImage(buf, l.x, l.y, l.width, l.height);
+      ctx.drawImage(buf, l.x + surface.x0 * kx, l.y + surface.y0 * ky, buf.width * kx, buf.height * ky);
       end();
     }
   } else if (l.type === 'vector') {
@@ -479,14 +481,16 @@ export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null
       continue;
     }
     if (l.type !== 'raster') return l;
-    const buf = getBuffer(l.id);
-    if (!buf) continue;
+    const surface = getRasterSurface(l.id);
+    if (!surface) continue;
     const [lx, ly] = toLayerSpace(l, x, y);
-    const px = Math.floor(((lx - l.x) / l.width) * buf.width), py = Math.floor(((ly - l.y) / l.height) * buf.height);
-    if (px < 0 || py < 0 || px >= buf.width || py >= buf.height) continue;
+    // Full-buffer pixel, then the same neighbourhood in the stored box (pixels outside the box are empty).
+    const px = Math.floor(((lx - l.x) / l.width) * surface.fw), py = Math.floor(((ly - l.y) / l.height) * surface.fh);
+    if (px < 0 || py < 0 || px >= surface.fw || py >= surface.fh) continue;
+    const buf = surface.canvas, bx = px - surface.x0, by = py - surface.y0;
     // A small neighbourhood, so thin strokes can be picked.
-    const r = Math.max(1, Math.round(buf.width / Math.max(1, l.width) * 3));
-    const x0 = Math.max(0, px - r), y0 = Math.max(0, py - r);
+    const r = Math.max(1, Math.round(surface.fw / Math.max(1, l.width) * 3));
+    const x0 = Math.max(0, bx - r), y0 = Math.max(0, by - r);
     const alpha = bufferAlpha(l.id, buf), x1 = Math.min(buf.width, x0 + r * 2 + 1), y1 = Math.min(buf.height, y0 + r * 2 + 1);
     for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) if (alpha[yy * buf.width + xx] > 16) return l;
   }

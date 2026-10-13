@@ -5,7 +5,7 @@ import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc, toast } from '../../store/store';
 import { activeLayer, insertLayer, newRasterLayer } from './doc';
 import { isProtectedImage } from './rules';
-import { getBuffer, setBuffer } from './raster';
+import { getBuffer, setBuffer, getRasterSurface } from './raster';
 import { drawDoc, drawLayer } from './render';
 import { floodMask } from './fill';
 import { invert } from './matrix';
@@ -176,7 +176,7 @@ export function wandSelection(doc: DesignDoc, x: number, y: number, o: WandOptio
   const only = o.sample === 'layer' ? activeLayer(doc) : null;
   if (o.sample === 'layer' && !only) return 'Select a layer first, or sample all layers.';
   const layers = only ? [only] : doc.layers;
-  if (layers.some((l) => l.visible && l.type === 'raster' && !getBuffer(l.id))) return 'Layer pixels are still loading. Try again in a moment.';
+  if (layers.some((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id))) return 'Layer pixels are still loading. Try again in a moment.';
   const sample = createCanvas(w, h);
   const sc = ctx2d(sample);
   if (only) drawLayer(sc, { ...only, visible: true }); else drawDoc(sc, doc, { origin: 'selection' });
@@ -228,7 +228,7 @@ export function editableRaster(doc: DesignDoc): RasterLayer | string {
   if (l.locked) return `"${l.name}" is locked.`;
   if (!l.visible) return `"${l.name}" is hidden.`;
   if (isProtectedImage(l)) return `"${l.name}" is a placed image. Turn on "Allow painting" in Properties to change its pixels.`;
-  if (!getBuffer(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
   return l;
 }
 
@@ -292,7 +292,7 @@ export function selectionToLayer(sessionId: string, doc: DesignDoc): string | nu
     return null;
   }
   if (!l || l.type !== 'raster') return 'Select a raster layer.';
-  if (!getBuffer(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
   addPixelLayer(sessionId, doc, `${l.name} · selection`, selectedPixels(doc, l, sel));
   return null;
 }
@@ -317,7 +317,7 @@ export function selectedCrop(doc: DesignDoc): HTMLCanvasElement | string {
   if (!sel) return 'Nothing is selected.';
   const l = activeLayer(doc);
   if (!l || l.type !== 'raster') return 'Select a raster layer.';
-  if (!getBuffer(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
   const box = selectionBox(doc, sel);
   if (!box) return 'The selection is outside the page.';
   const page = selectedPixels(doc, l, sel);

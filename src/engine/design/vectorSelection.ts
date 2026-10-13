@@ -3,7 +3,7 @@ import { createCanvas, ctx2d } from '../../lib/media';
 import { cloneLayer, newRasterLayer, unionBox } from './doc';
 import { layerBox } from './render';
 import { getSelection, selectionMask } from './pixelSelection';
-import { getBuffer, setBuffer } from './raster';
+import { getBuffer, setBuffer, getRasterSurface } from './raster';
 import { maskFrame } from './vectorMask';
 
 /** Split coverage rather than geometry: shapes and editable strokes survive on both sides. */
@@ -11,7 +11,7 @@ export function splitVectorSelection(doc: DesignDoc, source: VectorLayer, cutSou
   const sel = getSelection(doc.id);
   if (!sel) return null;
   const old = source.pixelMask;
-  if (old && !getBuffer(old.id)) return null;
+  if (old && !getRasterSurface(old.id)) return null;
   const content = layerBox(source);
   const b = unionBox([{ x: 0, y: 0, w: doc.width, h: doc.height }, ...(content ? [content] : [])])!;
   const x = Math.floor(b.x), y = Math.floor(b.y), width = Math.ceil(b.x + b.w) - x, height = Math.ceil(b.y + b.h) - y;

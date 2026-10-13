@@ -25,6 +25,10 @@ import { redo, record, undo, dropHistory } from '../src/engine/design/history';
 import { beginEdit, beginLiveStroke, commitEdit, composeRaster, flushRaster, getBuffer, paintLive, setBuffer, snapshotHistoryBuffers, withPaintBase } from '../src/engine/design/raster';
 import { restoreRasterTiles, snapshotRasterTiles, takeRasterHistoryCopiedPixels, updateRasterTiles } from '../src/engine/design/rasterHistoryTiles';
 import { alphaAt, pixelCanvas } from './helpers/pixelCanvas';
+import { place } from '../src/engine/design/rasterSurface';
+/** A canvas injected as a full buffer (placed over its whole size): stored as it is, as before boxes existed. */
+const fullPlaced = <T extends { width: number; height: number }>(c: T): HTMLCanvasElement => place(c as unknown as HTMLCanvasElement, { x0: 0, y0: 0, fw: c.width, fh: c.height });
+
 
 function pixels(canvas: HTMLCanvasElement): number[] {
   return Array.from(canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data);
@@ -34,14 +38,14 @@ afterEach(async () => { await flushRaster(); });
 
 describe('raster history tile snapshots', () => {
   it('shares untouched 64px tiles, copies touched tiles, and preserves exact edge dimensions and pixels', () => {
-    const source = pixelCanvas(130, 70) as unknown as HTMLCanvasElement;
+    const source = fullPlaced(pixelCanvas(130, 70) as unknown as HTMLCanvasElement);
     const ctx = source.getContext('2d')!;
     ctx.fillRect(1, 1, 4, 4);
     ctx.fillRect(64, 1, 2, 4);
     const first = snapshotRasterTiles(source);
     expect([...first.tiles.values()].map((tile) => [tile.width, tile.height])).toEqual([[64, 64], [64, 64], [2, 64], [64, 6], [64, 6], [2, 6]]);
 
-    const edited = pixelCanvas(130, 70) as unknown as HTMLCanvasElement;
+    const edited = fullPlaced(pixelCanvas(130, 70) as unknown as HTMLCanvasElement);
     edited.getContext('2d')!.drawImage(source, 0, 0);
     edited.getContext('2d')!.fillRect(64, 1, 4, 4);
     const second = updateRasterTiles(first, edited, ['1:0']);
@@ -147,7 +151,7 @@ describe('raster history tile snapshots', () => {
 
   it('preserves local setBuffer tile sharing and clamps huge or off-canvas dirty regions', () => {
     const layer = newRasterLayer('Move', { x: 0, y: 0, width: 130, height: 70 }, { width: 130, height: 70 });
-    const base = pixelCanvas(130, 70) as unknown as HTMLCanvasElement;
+    const base = fullPlaced(pixelCanvas(130, 70) as unknown as HTMLCanvasElement);
     setBuffer(layer.id, base, false);
     const first = snapshotHistoryBuffers([layer.id]).get(layer.id)!;
     expect(takeRasterHistoryCopiedPixels()).toBe(130 * 70);
@@ -157,7 +161,7 @@ describe('raster history tile snapshots', () => {
     expect([...first.tiles.keys()].every((key) => first.tiles.get(key) === outside.tiles.get(key))).toBe(true);
     expect(takeRasterHistoryCopiedPixels()).toBe(0);
 
-    const moved = pixelCanvas(130, 70) as unknown as HTMLCanvasElement;
+    const moved = fullPlaced(pixelCanvas(130, 70) as unknown as HTMLCanvasElement);
     moved.getContext('2d')!.drawImage(base, 0, 0);
     moved.getContext('2d')!.fillRect(65, 2, 3, 3);
     setBuffer(layer.id, moved, false, { x0: 65, y0: 2, x1: 68, y1: 5 });
@@ -166,7 +170,7 @@ describe('raster history tile snapshots', () => {
     expect(pixels(restoreRasterTiles(local))).toEqual(pixels(moved));
     expect(takeRasterHistoryCopiedPixels()).toBe(64 * 64);
 
-    const broadlyDirty = pixelCanvas(130, 70) as unknown as HTMLCanvasElement;
+    const broadlyDirty = fullPlaced(pixelCanvas(130, 70) as unknown as HTMLCanvasElement);
     broadlyDirty.getContext('2d')!.drawImage(moved, 0, 0);
     broadlyDirty.getContext('2d')!.fillRect(4, 60, 2, 2);
     setBuffer(layer.id, broadlyDirty, false, { x0: -1_000_000, y0: -1_000_000, x1: 1_000_000, y1: 1_000_000 });

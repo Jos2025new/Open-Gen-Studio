@@ -327,8 +327,8 @@ export default [
     sides: [
       ['src/engine/design/brushEngine.ts', 'export function stampSegment'],
       ['src/engine/design/rasterStrokeMask.ts', 'stampSegment(img'],
-      ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last)'],
-      ['src/engine/design/raster.ts', 'rasterStrokeMask(stroke, tip)'],
+      ['src/engine/design/raster.ts', 'stampSegment(img, x, y, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last)'],
+      ['src/engine/design/rasterDraw.ts', 'rasterStrokeMask(stroke, tip)'],
       ['src/components/designer/BrushSettings.tsx', 'stampSegment(img, 0, 0, [ax, ay, bx, by, width], density, tip, rgb, last ??'],
     ],
     tests: ['tests/brush-engine.test.ts', 'tests/raster-stroke-mask.test.ts'],
@@ -337,7 +337,7 @@ export default [
     id: 'raster-png-worker',
     what: 'La ruta worker PNG está disponible como experimento de paridad; el guardado de capas mantiene activo el encoder Canvas legado hasta demostrar paridad de píxeles. Cada escritura solo confirma la misma versión de píxeles que codificó, también cuando un trazo en vivo muta el lienzo en el sitio.',
     sides: [
-      ['src/engine/design/raster.ts', "await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'))"],
+      ['src/engine/design/raster.ts', "await blobDb.set(keyFor(layerId), await canvasToBlob(assembleFull(c), 'image/png'))"],
       ['src/engine/design/raster.ts', 'bufferVersion(layerId) === revision'],
       ['src/lib/canvasPngWorker.ts', 'export async function canvasToPngBlob'],
       ['src/lib/canvasPng.worker.ts', 'canvas.convertToBlob({ type: \'image/png\' })'],
@@ -352,7 +352,7 @@ export default [
     sides: [
       ['src/engine/design/render.ts', 'function contentKey('],
       ['src/engine/design/raster.ts', 'export function bufferVersion('],
-      ['src/engine/design/raster.ts', 'export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {\n  touchBuffer(buf);'],
+      ['src/engine/design/raster.ts', 'export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): HTMLCanvasElement {\n  touchBuffer(buf0);'],
     ],
     tests: ['tests/fx-render.test.ts'],
   },

@@ -225,6 +225,10 @@ describe('passes', () => {
 });
 
 import { beginLiveStroke, commitEdit, getBuffer, paintLive, setBuffer, subscribeRaster } from '../src/engine/design/raster';
+import { place } from '../src/engine/design/rasterSurface';
+/** A test canvas injected as a full buffer: placed at (0, 0) over its whole size, so it is stored as it is. */
+const setFull = (id: string, c: { width: number; height: number }, persist?: boolean, dirty?: Parameters<typeof setBuffer>[3]) => setBuffer(id, place(c as HTMLCanvasElement, { x0: 0, y0: 0, fw: c.width, fh: c.height }), persist, dirty);
+
 import { newRasterLayer } from '../src/engine/design/doc';
 
 describe('editor FX cache (filters run again only when what they read changes)', () => {
@@ -255,8 +259,8 @@ describe('editor FX cache (filters run again only when what they read changes)',
     readPixel = (() => ({ data: new Uint8ClampedArray(200 * 100 * 4) })) as never;
     // commitEdit schedules the layer's save on window timers; nothing is written here.
     vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined });
-    setBuffer('img', recordingCanvas(200, 100) as never, false);
-    setBuffer('paint', recordingCanvas(200, 100) as never, false);
+    setFull('img', recordingCanvas(200, 100) as never, false);
+    setFull('paint', recordingCanvas(200, 100) as never, false);
     const doc = { ...createDoc('p', 200, 100), layers: [img, fxOn(), paint] } as DesignDoc;
     drawDoc(stage(), doc);
     const n = blurs();
@@ -306,7 +310,7 @@ describe('raster layers close up', () => {
   it('from 4 screen px per pixel they are drawn without smoothing (pixels as squares); below, smoothed', async () => {
     const { drawLayer, PIXEL_VIEW_FROM } = await import('../src/engine/design/render');
     const layer = { ...newRasterLayer('R', { x: 0, y: 0, width: 100, height: 100 }, { width: 100, height: 100 }), id: 'px' };
-    setBuffer('px', recordingCanvas(100, 100) as never, false);
+    setFull('px', recordingCanvas(100, 100) as never, false);
     const smoothingAt = (zoom: number) => {
       let seen: boolean | undefined;
       const ctx = { save() {}, restore() {}, transform() {}, getTransform: () => ({ a: zoom, b: 0 }), drawImage() { seen = ctx.imageSmoothingEnabled; }, imageSmoothingEnabled: true, imageSmoothingQuality: 'low', globalAlpha: 1, globalCompositeOperation: 'source-over' };
@@ -347,7 +351,7 @@ it('painted bounds stay exact without reading native canvas dimensions per pixel
   const data = new Uint8ClampedArray(200 * 100 * 4);
   data[(27 * 200 + 13) * 4 + 3] = 9;
   readPixel = (() => ({ data })) as never;
-  setBuffer(l.id, c as never, false);
+  setFull(l.id, c as never, false);
   expect(layerBox(l)).toEqual({ x: 23, y: 42, w: 1, h: 1 });
   expect(widthReads).toBeLessThan(20);
   expect(heightReads).toBeLessThan(20);
@@ -364,16 +368,16 @@ it('painted bounds rescan only their own layer, and never mid-stroke: the box ca
   data[(5 * 200 + 7) * 4 + 3] = 255;
   let reads = 0;
   readPixel = (() => { reads++; return { data }; }) as never;
-  setBuffer(a.id, ca as never, false);
-  setBuffer(b.id, cb as never, false);
+  setFull(a.id, ca as never, false);
+  setFull(b.id, cb as never, false);
   layerBox(a); layerBox(b);
   expect(reads).toBe(2);
   now += 1000;
-  setBuffer(b.id, recordingCanvas(200, 100) as never, false); // another layer changes
+  setFull(b.id, recordingCanvas(200, 100) as never, false); // another layer changes
   layerBox(a);
   expect(reads).toBe(2);
   beginLiveStroke(ca as never, '#000', 1, false);
-  setBuffer(a.id, ca as never, false); // a segment of the stroke: new content version
+  setFull(a.id, ca as never, false); // a segment of the stroke: new content version
   now += 1000;
   expect(layerBox(a)).toEqual({ x: 7, y: 5, w: 1, h: 1 });
   expect(reads).toBe(2);
@@ -410,12 +414,12 @@ it('a layer of editable strokes is boxed by its base and its strokes, without re
   let reads = 0;
   readPixel = (() => { reads++; return { data }; }) as never;
   const plain = { ...newRasterLayer('S', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'strokes-box' };
-  setBuffer(plain.id, recordingCanvas(200, 100) as never, false);
+  setFull(plain.id, recordingCanvas(200, 100) as never, false);
   const stroke = { id: 's1', x: 0, y: 0, color: '#fff', opacity: 1, erase: false, segments: [[100, 60, 150, 80, 10]] as [number, number, number, number, number][] };
   const l = { ...withPaintBase(plain), paintStrokes: [stroke] };
   const want = { x: 7, y: 5, w: rasterStrokeBox(l, stroke)!.x + rasterStrokeBox(l, stroke)!.w - 7, h: rasterStrokeBox(l, stroke)!.y + rasterStrokeBox(l, stroke)!.h - 5 };
   expect(layerBox(l)).toEqual(want);
-  setBuffer(l.id, recordingCanvas(200, 100) as never, false); // a frame of a drag: a new canvas
+  setFull(l.id, recordingCanvas(200, 100) as never, false); // a frame of a drag: a new canvas
   expect(layerBox(l)).toEqual(want);
   expect(reads).toBe(1); // the base, once
   const erasing = { ...l, paintStrokes: [stroke, { ...stroke, id: 'e', erase: true }] };

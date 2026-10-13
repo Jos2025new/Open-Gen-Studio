@@ -7,12 +7,16 @@ import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media
 import { uid } from '../../lib/id';
 import type { Layer, RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
-import { compositeOp, hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { drawRasterStroke, layMask, strokeSegment } from './rasterDraw';
+export { drawRasterStroke, strokeSegment } from './rasterDraw';
 import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
+import { allocBox, assembleFull, cropToContent, emptyBox, geometryOf, growTo, isPlaced, place, regionOf, regrid, sameBox, unionRegion, type Region, type RasterSurface } from './rasterSurface';
 
 /*
- * Pixel buffers of raster layers. Buffers are treated as immutable snapshots:
- * any edit clones the current canvas first (copy-on-write), which keeps undo cheap.
+ * Pixel buffers of raster layers. Buffers are treated as immutable snapshots: any edit clones the current canvas
+ * first (copy-on-write), which keeps undo cheap. A buffer is stored as a box around its pixels (rasterSurface.ts):
+ * getRasterSurface gives the box and its place; getBuffer gives the full buffer (assembled when the box is smaller).
  */
 
 const buffers = new Map<string, HTMLCanvasElement>();
@@ -51,8 +55,16 @@ export function rasterVersion(): number {
   return version;
 }
 
+/** The stored box of a layer's pixels and its place in the full buffer (undefined = not loaded yet). */
+export function getRasterSurface(layerId: string): RasterSurface | undefined {
+  const canvas = buffers.get(layerId);
+  return canvas && { canvas, ...geometryOf(canvas) };
+}
+
+/** The full buffer: the stored canvas when it is full, else a copy assembled for this call (cold paths only). */
 export function getBuffer(layerId: string): HTMLCanvasElement | undefined {
-  return buffers.get(layerId);
+  const canvas = buffers.get(layerId);
+  return canvas && assembleFull(canvas);
 }
 
 export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasElement> {
@@ -64,7 +76,7 @@ export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasEleme
   return out;
 }
 
-/** A dirty area in buffer pixels, or 'all' when the write does not say where it landed. */
+/** A dirty area in full-buffer pixels, or 'all' when the write does not say where it landed. */
 export type Dirty = { x0: number; y0: number; x1: number; y1: number } | 'all';
 /** Which layer a buffer belongs to (buffers are replaced by copies; this follows them). */
 const layerOfCanvas = new WeakMap<HTMLCanvasElement, string>();
@@ -87,17 +99,25 @@ export function takeDirty(layerId: string): Dirty | null {
   return d;
 }
 
-/** Replace a layer's buffer (no copy) and persist it. `dirty` says where the write landed (default: everywhere). */
+/**
+ * Replace a layer's buffer and persist it. A canvas from getRasterSurface or cloneCanvas is stored as it is; a full
+ * buffer is cropped to its pixels. `dirty` says where the write landed, in full-buffer pixels (default: everywhere).
+ */
 export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = true, dirty: Dirty = 'all'): void {
+  storeCanvas(layerId, isPlaced(canvas) ? canvas : cropToContent(canvas), persist, dirty);
+}
+
+function storeCanvas(layerId: string, canvas: HTMLCanvasElement, persist: boolean, dirty: Dirty): void {
   const previous = buffers.get(layerId);
-  const previousTiles = previous && previous.width === canvas.width && previous.height === canvas.height ? historyTiles.get(previous) : undefined;
+  const same = previous !== undefined && sameBox(previous, canvas);
+  const previousTiles = same && previous !== canvas ? historyTiles.get(previous) : undefined;
   buffers.set(layerId, canvas);
   layerOfCanvas.set(canvas, layerId);
-  if (dirty === 'all' || (previous && (previous.width !== canvas.width || previous.height !== canvas.height))) {
+  if (dirty === 'all' || !same) {
     historyTiles.delete(canvas);
     historyDirty.delete(canvas);
   } else {
-    if (previous !== canvas && previousTiles) historyTiles.set(canvas, previousTiles);
+    if (previousTiles) historyTiles.set(canvas, previousTiles);
     markHistoryDirty(canvas, dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0);
   }
   markDirty(layerId, dirty);
@@ -129,7 +149,7 @@ export function snapshotHistoryBuffers(layerIds: string[]): Map<string, RasterHi
     flushHistoryTiles(canvas);
     let snapshot = historyTiles.get(canvas);
     if (!snapshot) {
-      snapshot = snapshotRasterTiles(canvas);
+      snapshot = snapshotRasterTiles(canvas, RASTER_HISTORY_TILE_SIZE, geometryOf(canvas));
       historyTiles.set(canvas, snapshot);
     }
     out.set(id, snapshot);
@@ -139,18 +159,24 @@ export function snapshotHistoryBuffers(layerIds: string[]): Map<string, RasterHi
 
 export function restoreHistoryBuffers(map: Map<string, RasterHistorySnapshot>): void {
   const canvases = new Map<string, HTMLCanvasElement>();
-  for (const [id, snapshot] of map) canvases.set(id, restoreRasterTiles(snapshot));
+  for (const [id, snapshot] of map) {
+    const canvas = restoreRasterTiles(snapshot);
+    if (snapshot.geometry) place(canvas, snapshot.geometry);
+    canvases.set(id, canvas);
+  }
   restoreBuffers(canvases);
   for (const [id, canvas] of canvases) historyTiles.set(canvas, map.get(id)!);
 }
 
+/** A rectangle in full-buffer pixels, marked in the canvas's own tile grid. */
 function markHistoryDirty(canvas: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
-  const x0 = Math.max(0, x), y0 = Math.max(0, y);
-  const x1 = Math.min(canvas.width, x + width), y1 = Math.min(canvas.height, y + height);
-  if (x1 <= x0 || y1 <= y0) return;
+  const g = geometryOf(canvas);
+  const bx = Math.max(0, x - g.x0), by = Math.max(0, y - g.y0);
+  const x1 = Math.min(canvas.width, x + width - g.x0), y1 = Math.min(canvas.height, y + height - g.y0);
+  if (x1 <= bx || y1 <= by) return;
   let keys = historyDirty.get(canvas);
   if (!keys) { keys = new Set(); historyDirty.set(canvas, keys); }
-  for (const key of tileKeysForRect(x0, y0, x1 - x0, y1 - y0, RASTER_HISTORY_TILE_SIZE)) keys.add(key);
+  for (const key of tileKeysForRect(bx, by, x1 - bx, y1 - by, RASTER_HISTORY_TILE_SIZE)) keys.add(key);
 }
 
 function flushHistoryTiles(canvas: HTMLCanvasElement): void {
@@ -161,10 +187,12 @@ function flushHistoryTiles(canvas: HTMLCanvasElement): void {
   changed.clear();
 }
 
+/** A copy of a canvas, placed where the original sits. */
 export function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   const end = span('raster', 'clone', { pixels: src.width * src.height });
   const c = createCanvas(src.width, src.height);
-  ctx2d(c).drawImage(src, 0, 0);
+  if (src.width && src.height) ctx2d(c).drawImage(src, 0, 0);
+  place(c, geometryOf(src));
   end();
   return c;
 }
@@ -173,80 +201,15 @@ export function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
 export function withPaintBase(layer: RasterLayer): RasterLayer {
   if (layer.paintBaseId) return layer;
   const paintBaseId = uid('rbase');
-  setBuffer(paintBaseId, cloneCanvas(getBuffer(layer.id) ?? createCanvas(layer.pxWidth, layer.pxHeight)));
+  setBuffer(paintBaseId, cloneCanvas(buffers.get(layer.id) ?? emptyBox(layer.pxWidth, layer.pxHeight)));
   return { ...layer, paintBaseId, paintStrokes: [] };
-}
-
-/**
- * Replay a saved stroke. Contiguous segments of the same width are one path, stroked once: with an opacity below
- * 100 % the overlapping round ends of separate segments would add up into beads along the line.
- */
-export function drawRasterStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke): void {
-  if (stroke.tip) return drawTipStroke(ctx, stroke, stroke.tip);
-  const segs = stroke.segments;
-  let i = 0;
-  while (i < segs.length) {
-    const width = segs[i][4];
-    ctx.save();
-    ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
-    ctx.globalAlpha = stroke.opacity;
-    ctx.strokeStyle = stroke.color;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = width;
-    ctx.beginPath();
-    ctx.moveTo(segs[i][0] + stroke.x, segs[i][1] + stroke.y);
-    let j = i;
-    for (; j < segs.length && segs[j][4] === width && (j === i || (segs[j][0] === segs[j - 1][2] && segs[j][1] === segs[j - 1][3])); j++) {
-      // A tiny offset so a click without movement still leaves a dot.
-      ctx.lineTo(segs[j][2] + stroke.x + (j === i ? 0.01 : 0), segs[j][3] + stroke.y);
-    }
-    ctx.stroke();
-    ctx.restore();
-    i = j;
-  }
-}
-
-/** A stroke with a brush tip (brushEngine.ts): its mask built the same way as while it was painted, laid once. */
-function drawTipStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke, tip: BrushTip): void {
-  if (!stroke.segments.length) return;
-  const { canvas: mask, x, y } = rasterStrokeMask(stroke, tip);
-  layMask(ctx, mask, 0, 0, x + stroke.x, y + stroke.y, mask.width, mask.height, tip, stroke.opacity, stroke.erase);
-}
-
-/**
- * The mask laid on the layer region (dx, dy, w, h) from (sx, sy) in the mask: at the stroke's opacity, with its blend;
- * Keep Opacity then keeps the layer's alpha as it was before the stroke.
- */
-function layMask(ctx: CanvasRenderingContext2D, mask: HTMLCanvasElement, sx: number, sy: number, dx: number, dy: number, w: number, h: number, tip: BrushTip | undefined, opacity: number, erase: boolean, before?: HTMLCanvasElement): void {
-  const keep = tip?.keepOpacity && !erase;
-  // The pixels under the stroke before it lands, for Keep Opacity (the live stroke passes its base).
-  let base = before, bx = dx, by = dy;
-  if (keep && !base) {
-    base = createCanvas(w, h);
-    ctx2d(base).drawImage(ctx.canvas, dx, dy, w, h, 0, 0, w, h);
-    bx = 0; by = 0;
-  }
-  ctx.save();
-  ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = compositeOp(tip, erase);
-  ctx.drawImage(mask, sx, sy, w, h, dx, dy, w, h);
-  if (keep && base) {
-    // destination-in clears outside what it draws: kept to the stroke's region.
-    ctx.beginPath();
-    ctx.rect(dx, dy, w, h);
-    ctx.clip();
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.drawImage(base, bx, by, w, h, dx, dy, w, h);
-  }
-  ctx.restore();
 }
 
 /**
  * A stroke being painted, as SAI does it: segments go into a mask at full strength (overlaps cannot add up), and
  * the layer is the pixels it had before the stroke with the mask laid over at the brush opacity. Only the area
- * the new segment touches is recomposed, so a long stroke costs the same per move as a short one.
+ * the new segment touches is recomposed, so a long stroke costs the same per move as a short one. base, mask and
+ * the working canvas share one place; a stroke that leaves its box grows them together (paintLive).
  */
 export interface LiveStroke {
   base: HTMLCanvasElement;
@@ -254,7 +217,7 @@ export interface LiveStroke {
   color: string;
   opacity: number;
   erase: boolean;
-  /** The pixel selection in this layer's pixels: paint and erase land only inside it (as GIMP and Krita do). */
+  /** The pixel selection, in full-buffer pixels: paint and erase land only inside it (as GIMP and Krita do). */
   clip?: HTMLCanvasElement | null;
   /** The brush tip (brushEngine.ts); absent = canvas lines, as strokes were painted before the engine. */
   tip?: BrushTip;
@@ -280,54 +243,97 @@ export const paintingLive = () => liveStroke;
 
 export function beginLiveStroke(base: HTMLCanvasElement, color: string, opacity: number, erase: boolean, clip?: HTMLCanvasElement | null, tip?: BrushTip): LiveStroke {
   liveStroke = true;
-  return { base, mask: createCanvas(base.width, base.height), color, opacity, erase, clip, tip };
+  return { base, mask: place(createCanvas(base.width, base.height), geometryOf(base)), color, opacity, erase, clip, tip };
 }
 
-export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): void {
-  touchBuffer(buf);
+/**
+ * Make the working canvas, its base and the mask cover `need` (full-buffer pixels), growing them together when the
+ * stroke leaves the box. Returns the working canvas (the store follows it).
+ */
+function fitLive(buf: HTMLCanvasElement, live: LiveStroke, need: Region): HTMLCanvasElement {
+  const next = growTo(buf, need);
+  if (next === buf) return buf;
+  const box = regionOf(next)!;
+  const oldMask = live.mask, oldPixels = live.pixels;
+  live.base = regrid(live.base, box);
+  live.mask = regrid(oldMask, box);
+  if (oldPixels) {
+    const pixels = new ImageData(live.mask.width, live.mask.height);
+    const g = geometryOf(oldMask), dx = g.x0 - box.x0, dy = g.y0 - box.y0;
+    for (let row = 0; row < oldMask.height; row++) pixels.data.set(oldPixels.data.subarray(row * oldMask.width * 4, (row + 1) * oldMask.width * 4), ((row + dy) * pixels.width + dx) * 4);
+    live.pixels = pixels;
+  }
   const owner = layerOfCanvas.get(buf);
-  if (owner) { const r = Math.max(width, live.tip ? live.last?.width ?? 0 : 0) / 2 + 2; markDirty(owner, { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r }); }
-  const end = span('raster', 'live');
-  try {
+  if (owner !== undefined && buffers.get(owner) === buf) {
+    buffers.set(owner, next);
+    layerOfCanvas.set(next, owner);
+    touchBuffer(next);
+  }
+  return next;
+}
+
+/** The full-buffer area a segment with `reach` touches: its tip box and the padded box, inside the page. */
+function segmentRegion(a: { x: number; y: number }, b: { x: number; y: number }, reach: number, fw: number, fh: number): Region | null {
+  const pad = reach / 2 + 2;
+  const sb = segmentBox([a.x, a.y, b.x, b.y, reach]);
+  const x0 = Math.min(Math.floor(Math.min(a.x, b.x) - pad), sb.x), y0 = Math.min(Math.floor(Math.min(a.y, b.y) - pad), sb.y);
+  const x1 = Math.max(Math.ceil(Math.max(a.x, b.x) + pad), sb.x + sb.w), y1 = Math.max(Math.ceil(Math.max(a.y, b.y) + pad), sb.y + sb.h);
+  const r = { x0: Math.max(0, x0), y0: Math.max(0, y0), x1: Math.min(fw, x1), y1: Math.min(fh, y1) };
+  return r.x1 > r.x0 && r.y1 > r.y0 ? r : null;
+}
+
+export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): HTMLCanvasElement {
+  touchBuffer(buf0);
+  const owner = layerOfCanvas.get(buf0);
   // A segment starts at the previous width: its box covers the wider of the two.
   const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
-  if (live.tip) {
-    // The tip engine: the segment's coverage goes into the mask where it is stronger than what is there.
-    const box = segmentBox([a.x, a.y, b.x, b.y, reach]);
-    const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
-    if (w > 0 && h > 0) {
-      const m = ctx2d(live.mask), all = livePixels(live);
-      if (all) {
-        stampSegment(all, 0, 0, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
-        m.putImageData(all, 0, 0, x, y, w, h);
-      } else {
-        const img = m.getImageData(x, y, w, h);
-        stampSegment(img, x, y, [a.x, a.y, b.x, b.y, width], density, live.tip, hexRgb(live.color), live.last);
-        m.putImageData(img, x, y);
+  if (owner) { const r = reach / 2 + 2; markDirty(owner, { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r }); }
+  const end = span('raster', 'live');
+  try {
+    const g0 = geometryOf(buf0);
+    const region = segmentRegion(a, b, reach, g0.fw, g0.fh);
+    if (!region) return buf0;
+    const buf = fitLive(buf0, live, region);
+    const g = geometryOf(buf);
+    const A = { x: a.x - g.x0, y: a.y - g.y0 }, B = { x: b.x - g.x0, y: b.y - g.y0 };
+    if (live.tip) {
+      // The tip engine: the segment's coverage goes into the mask where it is stronger than what is there.
+      const box = segmentBox([A.x, A.y, B.x, B.y, reach]);
+      const x = Math.max(0, box.x), y = Math.max(0, box.y), w = Math.min(buf.width, box.x + box.w) - x, h = Math.min(buf.height, box.y + box.h) - y;
+      if (w > 0 && h > 0) {
+        const m = ctx2d(live.mask), all = livePixels(live);
+        if (all) {
+          stampSegment(all, 0, 0, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last);
+          m.putImageData(all, 0, 0, x, y, w, h);
+        } else {
+          const img = m.getImageData(x, y, w, h);
+          stampSegment(img, x, y, [A.x, A.y, B.x, B.y, width], density, live.tip, hexRgb(live.color), live.last);
+          m.putImageData(img, x, y);
+        }
+        live.last = { width, density };
       }
-      live.last = { width, density };
+    } else strokeSegment(ctx2d(live.mask), A, B, { width, color: live.color, opacity: 1, erase: false });
+    const pad = reach / 2 + 2;
+    const x = Math.max(0, Math.floor(Math.min(A.x, B.x) - pad)), y = Math.max(0, Math.floor(Math.min(A.y, B.y) - pad));
+    const x1 = Math.min(buf.width, Math.ceil(Math.max(A.x, B.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(A.y, B.y) + pad));
+    const w = x1 - x, h = y1 - y;
+    if (w <= 0 || h <= 0) return buf;
+    markHistoryDirty(buf, x + g.x0, y + g.y0, w, h);
+    if (live.clip) {
+      // Keep the stroke only where the selection is (soft edges stay soft).
+      const m = ctx2d(live.mask);
+      m.save();
+      m.globalCompositeOperation = 'destination-in';
+      m.drawImage(live.clip, x + g.x0, y + g.y0, w, h, x, y, w, h);
+      m.restore();
     }
-  } else strokeSegment(ctx2d(live.mask), a, b, { width, color: live.color, opacity: 1, erase: false });
-  const pad = reach / 2 + 2;
-  const x = Math.max(0, Math.floor(Math.min(a.x, b.x) - pad)), y = Math.max(0, Math.floor(Math.min(a.y, b.y) - pad));
-  const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
-  const w = x1 - x, h = y1 - y;
-  if (w <= 0 || h <= 0) return;
-  markHistoryDirty(buf, x, y, w, h);
-  if (live.clip) {
-    // Keep the stroke only where the selection is (soft edges stay soft).
-    const m = ctx2d(live.mask);
-    m.save();
-    m.globalCompositeOperation = 'destination-in';
-    m.drawImage(live.clip, x, y, w, h, x, y, w, h);
-    m.restore();
-  }
-  const ctx = ctx2d(buf);
-  ctx.save();
-  ctx.clearRect(x, y, w, h);
-  ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
-  ctx.restore();
-  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
+    const ctx = ctx2d(buf), bg = geometryOf(live.base);
+    ctx.save();
+    ctx.clearRect(x, y, w, h);
+    ctx.drawImage(live.base, x + g.x0 - bg.x0, y + g.y0 - bg.y0, w, h, x, y, w, h);
+    ctx.restore();
+    layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base, bg.x0 - g.x0, bg.y0 - g.y0);
+    return buf;
   } finally { end(); }
 }
 
@@ -335,18 +341,23 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
  * Paint again the part of the live stroke that `changed` covered (their old extent), from all of `segments`: what
  * the end taper needs, since a mask that keeps the strongest coverage cannot shrink in place.
  */
-export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): void {
-  if (!live.tip || !changed.length) return;
-  touchBuffer(buf);
+export function repaintLive(buf0: HTMLCanvasElement, live: LiveStroke, changed: readonly (readonly number[])[], segments: readonly (readonly number[])[], densities?: readonly number[]): HTMLCanvasElement {
+  if (!live.tip || !changed.length) return buf0;
+  touchBuffer(buf0);
   const boxes = changed.map(segmentBox);
-  const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
-  const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
-  if (w <= 0 || h <= 0) return;
-  markHistoryDirty(buf, x, y, w, h);
+  const g0 = geometryOf(buf0);
+  const rx0 = Math.max(0, Math.min(...boxes.map((b) => b.x))), ry0 = Math.max(0, Math.min(...boxes.map((b) => b.y)));
+  const rx1 = Math.min(g0.fw, Math.max(...boxes.map((b) => b.x + b.w))), ry1 = Math.min(g0.fh, Math.max(...boxes.map((b) => b.y + b.h)));
+  if (rx1 <= rx0 || ry1 <= ry0) return buf0;
+  const buf = fitLive(buf0, live, { x0: rx0, y0: ry0, x1: rx1, y1: ry1 });
+  const g = geometryOf(buf), bg = geometryOf(live.base);
+  const x = rx0 - g.x0, y = ry0 - g.y0, w = rx1 - rx0, h = ry1 - ry0;
+  markHistoryDirty(buf, rx0, ry0, w, h);
   const m = ctx2d(live.mask), rgb = hexRgb(live.color), img = m.createImageData(w, h);
+  const local = (seg: readonly number[]) => [seg[0] - g.x0, seg[1] - g.y0, seg[2] - g.x0, seg[3] - g.y0, seg[4]];
   segments.forEach((seg, i) => {
-    const b = segmentBox(seg);
-    if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, seg, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
+    const s = local(seg), b = segmentBox(s);
+    if (b.x < x + w && b.x + b.w > x && b.y < y + h && b.y + b.h > y) stampSegment(img, x, y, s, densities?.[i] ?? 1, live.tip!, rgb, i ? { width: segments[i - 1][4], density: densities?.[i - 1] ?? 1 } : undefined);
   });
   m.putImageData(img, x, y);
   // The in-memory copy follows, so a later segment never writes back the tail as it was before the taper.
@@ -355,23 +366,41 @@ export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: r
   if (live.clip) {
     m.save();
     m.globalCompositeOperation = 'destination-in';
-    m.drawImage(live.clip, x, y, w, h, x, y, w, h);
+    m.drawImage(live.clip, rx0, ry0, w, h, x, y, w, h);
     m.restore();
   }
   const ctx = ctx2d(buf);
   ctx.clearRect(x, y, w, h);
-  ctx.drawImage(live.base, x, y, w, h, x, y, w, h);
-  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base);
+  ctx.drawImage(live.base, x + g.x0 - bg.x0, y + g.y0 - bg.y0, w, h, x, y, w, h);
+  layMask(ctx, live.mask, x, y, x, y, w, h, live.tip, live.opacity, live.erase, live.base, bg.x0 - g.x0, bg.y0 - g.y0);
+  return buf;
+}
+
+/** The area one stroke can paint, in full-buffer pixels. */
+function strokeRegion(s: RasterStroke): Region | null {
+  if (!s.segments.length) return null;
+  if (s.tip) { const m = rasterStrokeMask(s, s.tip); return { x0: m.x + s.x, y0: m.y + s.y, x1: m.x + s.x + m.canvas.width, y1: m.y + s.y + m.canvas.height }; }
+  const d = strokeBufferBox(s);
+  return d === 'all' ? null : { x0: d.x0 - 2, y0: d.y0 - 2, x1: d.x1 + 2, y1: d.y1 + 2 };
+}
+
+/** Draw a stored box into a canvas placed at (ox, oy) of the full buffer. */
+function drawBox(ctx: CanvasRenderingContext2D, s: HTMLCanvasElement, ox: number, oy: number): void {
+  if (!s.width || !s.height) return;
+  const g = geometryOf(s);
+  ctx.drawImage(s, g.x0 - ox, g.y0 - oy);
 }
 
 /** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */
 export function composeRaster(layer: RasterLayer, persist = true, dirty: Dirty = 'all'): boolean {
-  const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
+  const base = layer.paintBaseId && getRasterSurface(layer.paintBaseId);
   if (!base) return false;
-  const end = span('raster', 'compose', { strokes: layer.paintStrokes?.length ?? 0, pixels: base.width * base.height });
-  const canvas = cloneCanvas(base);
-  const ctx = ctx2d(canvas);
-  for (const stroke of layer.paintStrokes ?? []) drawRasterStroke(ctx, stroke);
+  const strokes = layer.paintStrokes ?? [];
+  const end = span('raster', 'compose', { strokes: strokes.length, pixels: base.canvas.width * base.canvas.height });
+  const canvas = allocBox(unionRegion([regionOf(base.canvas), ...strokes.map(strokeRegion)], base.fw, base.fh), base.fw, base.fh);
+  const ctx = ctx2d(canvas), g = geometryOf(canvas);
+  drawBox(ctx, base.canvas, g.x0, g.y0);
+  for (const stroke of strokes) drawRasterStroke(ctx, stroke, g.x0, g.y0);
   setBuffer(layer.id, canvas, persist, dirty);
   end();
   return true;
@@ -384,26 +413,35 @@ export function composeRaster(layer: RasterLayer, persist = true, dirty: Dirty =
  * before the drag is never written (undo keeps it). Null while the base is not loaded.
  */
 export function composeMoving(layer: RasterLayer, ids: readonly string[]): ((moved: RasterLayer) => void) | null {
-  const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
+  const base = layer.paintBaseId && getRasterSurface(layer.paintBaseId);
   if (!base) return null;
   const moving = new Set(ids);
   const strokes = layer.paintStrokes ?? [];
   const first = Math.max(0, strokes.findIndex((s) => moving.has(s.id)));
-  const under = cloneCanvas(base);
-  for (const stroke of strokes.slice(0, first)) drawRasterStroke(ctx2d(under), stroke);
-  const work = createCanvas(base.width, base.height);
+  const fw = base.fw, fh = base.fh;
+  const underRegion = unionRegion([regionOf(base.canvas), ...strokes.slice(0, first).map(strokeRegion)], fw, fh);
+  const under = allocBox(underRegion, fw, fh), ug = geometryOf(under);
+  const uctx = ctx2d(under);
+  drawBox(uctx, base.canvas, ug.x0, ug.y0);
+  for (const stroke of strokes.slice(0, first)) drawRasterStroke(uctx, stroke, ug.x0, ug.y0);
+  let work: HTMLCanvasElement | undefined;
   return (moved) => {
-    const end = span('raster', 'compose', { strokes: (moved.paintStrokes?.length ?? 0) - first, pixels: base.width * base.height });
-    const ctx = ctx2d(work);
+    const end = span('raster', 'compose', { strokes: (moved.paintStrokes?.length ?? 0) - first, pixels: base.canvas.width * base.canvas.height });
+    const after = (moved.paintStrokes ?? []).slice(first);
+    // The work canvas keeps its place while the drag stays inside it: one canvas for the whole drag.
+    const need = unionRegion([regionOf(under), ...after.map(strokeRegion)], fw, fh);
+    work = need ? (work ? growTo(work, need) : allocBox(need, fw, fh)) : (work ?? allocBox(null, fw, fh));
+    const wg = geometryOf(work), ctx = ctx2d(work);
+    // 'copy' clears everything outside the drawn box, as the work canvas must start empty each frame.
     ctx.save();
     ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(under, 0, 0);
+    drawBox(ctx, under, wg.x0, wg.y0);
     ctx.restore();
-    for (const stroke of (moved.paintStrokes ?? []).slice(first)) drawRasterStroke(ctx, stroke);
+    for (const stroke of after) drawRasterStroke(ctx, stroke, wg.x0, wg.y0);
     // What changed: the moving strokes, where they were and where they are now.
     const before = strokes.filter((x) => moving.has(x.id)).map(strokeBufferBox);
-    const after = (moved.paintStrokes ?? []).filter((x) => moving.has(x.id)).map(strokeBufferBox);
-    setBuffer(layer.id, work, false, unionOf([...before, ...after]));
+    const now = (moved.paintStrokes ?? []).filter((x) => moving.has(x.id)).map(strokeBufferBox);
+    setBuffer(layer.id, work, false, unionOf([...before, ...now]));
     end();
   };
 }
@@ -437,7 +475,7 @@ export function rasterBufferIds(layers: Layer[]): string[] {
 
 /** Start an edit: clone the current buffer so earlier snapshots stay intact. */
 export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
-  const current = buffers.get(layer.id) ?? createCanvas(layer.pxWidth, layer.pxHeight);
+  const current = buffers.get(layer.id) ?? emptyBox(layer.pxWidth, layer.pxHeight);
   flushHistoryTiles(current);
   const copy = cloneCanvas(current);
   buffers.set(layer.id, copy);
@@ -480,6 +518,7 @@ export function touchRaster(): void {
  * a newer one. Hiding or closing the tab writes everything pending at once, and closing with unsaved pixels asks
  * first. A failed write stays pending, is retried with the next change or flush, and is reported once.
  * Limit: a process killed before a write finishes can still lose the last stroke.
+ * The file is the full buffer, assembled from the box, so its bytes do not depend on the box.
  */
 const PERSIST_DELAY_MS = 700;
 const timers = new Map<string, number>();
@@ -511,7 +550,7 @@ function writeLayer(layerId: string): Promise<void> {
     }
     const revision = bufferVersion(layerId);
     try {
-      await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'));
+      await blobDb.set(keyFor(layerId), await canvasToBlob(assembleFull(c), 'image/png'));
       // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
       if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
@@ -544,7 +583,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** Load buffers for layers that are not in memory yet (after reload). */
+/** Load buffers for layers that are not in memory yet (after reload). A stored full buffer is cropped to its box. */
 export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
   const layers = pixelLayers(allLayers);
   let changed = false;
@@ -553,11 +592,11 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
     layers.flatMap((l) => l.paintBaseId ? [l, { ...l, id: l.paintBaseId, paintBaseId: undefined }] : [l]).map(async (l) => {
       if (buffers.has(l.id)) return;
       const blob = await blobDb.get(keyFor(l.id)).catch(logged('read layer pixels'));
-      const canvas = blob ? await blobToCanvas(blob).catch((e) => (logged('decode layer pixels')(e), null)) : null;
+      const full = blob ? await blobToCanvas(blob).catch((e) => (logged('decode layer pixels')(e), null)) : null;
       // A missing foundation must never be replaced by blank pixels when objects are moved.
-      if (!canvas && baseIds.has(l.id)) return;
+      if (!full && baseIds.has(l.id)) return;
       if (buffers.has(l.id)) return;
-      buffers.set(l.id, canvas ?? createCanvas(l.pxWidth, l.pxHeight));
+      buffers.set(l.id, full ? cropToContent(full) : emptyBox(l.pxWidth, l.pxHeight));
       changed = true;
     }),
   );
@@ -585,26 +624,4 @@ export function copyBuffer(fromId: string, toId: string): void {
   const src = buffers.get(fromId);
   if (!src) return;
   setBuffer(toId, cloneCanvas(src));
-}
-
-/** One brush or eraser segment in canvas pixels (shared by the Designer and the sketch editor). */
-export function strokeSegment(
-  ctx: CanvasRenderingContext2D,
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-  opts: { width: number; color: string; opacity: number; erase: boolean },
-): void {
-  ctx.save();
-  ctx.globalCompositeOperation = opts.erase ? 'destination-out' : 'source-over';
-  ctx.globalAlpha = opts.opacity;
-  ctx.strokeStyle = opts.color;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = opts.width;
-  ctx.beginPath();
-  ctx.moveTo(a.x, a.y);
-  // A tiny offset so a click without movement still leaves a dot.
-  ctx.lineTo(b.x + 0.01, b.y);
-  ctx.stroke();
-  ctx.restore();
 }

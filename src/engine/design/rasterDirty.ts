@@ -1,6 +1,6 @@
 import type { Layer } from '../types';
 import { mapBox } from './matrix';
-import { bufferVersion, getBuffer, rasterBufferIds, takeDirty, type Dirty } from './raster';
+import { bufferVersion, getRasterSurface, rasterBufferIds, takeDirty, type Dirty } from './raster';
 import type { Rect } from './retainedPage';
 import { extendRasterBounds } from './rasterBounds';
 
@@ -13,13 +13,15 @@ export function rasterDirtyRect(layer: Layer, scale: number): Rect | null {
     // A paint base is only source material for a rebuild. The displayed pixels live in layer.id, whose rebuild marks
     // its own dirty area; invalidating the page for the base clone alone needlessly turns entering Edit into a repaint.
     if (id !== layer.id || !dirty) continue;
-    const buf = getBuffer(id);
-    if (buf) extendRasterBounds(id, bufferVersion(id), buf.width, buf.height, dirty);
-    const local = dirty === 'all' || !buf?.width || !buf.height ? { x: layer.x, y: layer.y, w: layer.width, h: layer.height } : {
-      x: layer.x + dirty.x0 * layer.width / buf.width,
-      y: layer.y + dirty.y0 * layer.height / buf.height,
-      w: (dirty.x1 - dirty.x0) * layer.width / buf.width,
-      h: (dirty.y1 - dirty.y0) * layer.height / buf.height,
+    // Dirty areas are in full-buffer pixels: the layer's size in them, not the size of the box.
+    const surface = getRasterSurface(id);
+    if (surface) extendRasterBounds(id, bufferVersion(id), surface.fw, surface.fh, dirty);
+    const fw = surface?.fw ?? 0, fh = surface?.fh ?? 0;
+    const local = dirty === 'all' || !fw || !fh ? { x: layer.x, y: layer.y, w: layer.width, h: layer.height } : {
+      x: layer.x + dirty.x0 * layer.width / fw,
+      y: layer.y + dirty.y0 * layer.height / fh,
+      w: (dirty.x1 - dirty.x0) * layer.width / fw,
+      h: (dirty.y1 - dirty.y0) * layer.height / fh,
     };
     const page = layer.transform ? mapBox(layer.transform, local) : local;
     const rect = { x0: page.x * scale, y0: page.y * scale, x1: (page.x + page.w) * scale, y1: (page.y + page.h) * scale };

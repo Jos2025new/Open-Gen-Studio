@@ -16,7 +16,7 @@ import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
-import { composeMoving, withPaintBase, beginEdit, commitEdit, ensureBuffers, getBuffer, rasterVersion, subscribeRaster } from '../../engine/design/raster';
+import { composeMoving, withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface } from '../../engine/design/raster';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -716,7 +716,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
-          if (layer.type === 'raster' && layer.paintBaseId && !getBuffer(layer.paintBaseId)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
+          if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
           const cur = objectPick(doc.id);
           if (ctrl) {
             // Ctrl held: press and drag moves everything picked (adding this one first if needed); a Ctrl-click
@@ -825,14 +825,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // Brush never touches protected images: it paints on its own layer.
       const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
       if (!target || target.type !== 'raster') return;
-      if (!getBuffer(target.id) || (!target.paintFlattened && target.paintBaseId && !getBuffer(target.paintBaseId))) {
+      if (!getRasterSurface(target.id) || (!target.paintFlattened && target.paintBaseId && !getRasterSurface(target.paintBaseId))) {
         toast('Layer pixels are still loading. Try again in a moment.', 'error');
         return;
       }
       const prepared = target.paintFlattened ? target : withPaintBase(target);
       if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
       // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
-      const before = getBuffer(target.id)!;
+      const before = getRasterSurface(target.id)!.canvas;
       beginEdit(prepared);
       const stroke = newBrushStroke(brush, erase);
       // With a pixel selection, the stroke lands only inside it.
@@ -1383,9 +1383,9 @@ function isTyping(e: KeyboardEvent): boolean {
   return Boolean(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable));
 }
 
-// The paint stroke edits the buffer cloned at pointer-down; fetch it lazily.
+// The stroke's working canvas (its box), read per segment.
 function beginEditCurrent(layerId: string): HTMLCanvasElement | undefined {
-  return getBuffer(layerId);
+  return getRasterSurface(layerId)?.canvas;
 }
 
 export type { DesignTool };

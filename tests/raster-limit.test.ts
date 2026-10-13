@@ -27,6 +27,10 @@ import type { BrushOptions } from '../src/engine/design/brushEngine';
 import type { LiveStroke } from '../src/engine/design/raster';
 import { useStore } from '../src/store/store';
 import { pixelCanvas } from './helpers/pixelCanvas';
+import { place } from '../src/engine/design/rasterSurface';
+/** A canvas injected as a full buffer (placed over its whole size): stored as it is, as before boxes existed. */
+const fullPlaced = <T extends { width: number; height: number }>(c: T): HTMLCanvasElement => place(c as unknown as HTMLCanvasElement, { x0: 0, y0: 0, fw: c.width, fh: c.height });
+
 
 const stroke = (id: string, segments = 1): RasterStroke => ({
   id, x: 0, y: 0, color: '#ffffff', opacity: 1, erase: false,
@@ -78,7 +82,7 @@ describe('provisional editable raster quota', () => {
     const sid = useStore.getState().activeSessionId;
     const old = layerWith(Array.from({ length: 64 }, (_, i) => stroke(String(i))));
     const doc = { ...createDoc('old full', 8, 8), layers: [old], activeLayerId: old.id };
-    setBuffer(old.id, pixelCanvas(8, 8) as unknown as HTMLCanvasElement);
+    setBuffer(old.id, fullPlaced(pixelCanvas(8, 8)));
     addDoc(sid, doc);
     const before = getDoc(sid, doc.id)!;
     expect(prepareStagePaint(before, false)).toBe(false);
@@ -105,13 +109,13 @@ describe('provisional editable raster quota', () => {
     const painted = pixelCanvas(8, 8); painted.getContext().fillRect(3, 4, 2, 1);
     const editable = layerWith([stroke('a'), stroke('b')], { paintBaseId: 'paint-base', opacity: 0.6, blend: 'multiply' });
     const doc = { ...createDoc('quota', 8, 8), layers: [editable], activeLayerId: editable.id };
-    setBuffer('paint-base', base as unknown as HTMLCanvasElement);
-    setBuffer(editable.id, prior as unknown as HTMLCanvasElement);
+    setBuffer('paint-base', fullPlaced(base));
+    setBuffer(editable.id, fullPlaced(prior));
     addDoc(sid, doc);
     const current = getDoc(sid, doc.id)!;
     record(current);
     // This is the Stage live buffer after its final segment; flattening must use this exact object.
-    setBuffer(editable.id, painted as unknown as HTMLCanvasElement);
+    setBuffer(editable.id, fullPlaced(painted));
     const added = stroke('c');
     commitStagePaintGesture({
       sessionId: sid,
@@ -146,12 +150,12 @@ describe('provisional editable raster quota', () => {
     const doc = { ...createDoc('quota follow-up', 8, 8), layers: [editable], activeLayerId: editable.id };
     const prior = pixelCanvas(8, 8);
     addDoc(sid, doc);
-    setBuffer(editable.id, prior as unknown as HTMLCanvasElement);
+    setBuffer(editable.id, fullPlaced(prior));
     const paint = (id: string, limits: { strokes: number; segments: number }) => {
       const before = getDoc(sid, doc.id)!;
       record(before);
       const nextPixels = pixelCanvas(8, 8); nextPixels.getContext().fillRect(id === 'flatten' ? 2 : 5, 3, 1, 1);
-      setBuffer(editable.id, nextPixels as unknown as HTMLCanvasElement);
+      setBuffer(editable.id, fullPlaced(nextPixels));
       commitStagePaintGesture({
         sessionId: sid, docId: doc.id,
         gesture: { kind: 'paint', live: {} as LiveStroke, stroke: { ...stroke(id), erase: id === 'erase' }, layerId: editable.id, last: { x: 2, y: 2 }, control: { x: 2, y: 2 }, time: 0, erase: id === 'erase' },
@@ -174,7 +178,7 @@ describe('provisional editable raster quota', () => {
     expect(requiresRasterPaintApproval(optedOut, { strokes: 2, segments: 100 })).toBe(false);
     const optDoc = { ...createDoc('opted-out', 8, 8), layers: [optedOut], activeLayerId: optedOut.id };
     addDoc(sid, optDoc);
-    setBuffer(optedOut.id, pixelCanvas(8, 8) as unknown as HTMLCanvasElement);
+    setBuffer(optedOut.id, fullPlaced(pixelCanvas(8, 8)));
     record(getDoc(sid, optDoc.id)!);
     commitStagePaintGesture({
       sessionId: sid, docId: optDoc.id,

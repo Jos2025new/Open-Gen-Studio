@@ -1,6 +1,7 @@
 import type { Layer } from '../types';
 import { unionBox, type Box } from './doc';
-import { bufferVersion, getBuffer, paintingLive } from './raster';
+import { bufferVersion, getRasterSurface, paintingLive } from './raster';
+import type { RasterSurface } from './rasterSurface';
 import { rasterStrokeBox } from './rasterStrokes';
 
 /** The box of pixels with alpha above 8, found from the outside in. */
@@ -73,21 +74,23 @@ function layerPixelBox(id: string, buf: HTMLCanvasElement, version: number, read
 /** Bounds of visible raster pixels before a layer transform; source assets fall back to their placement. */
 export function rasterPaintedBox(l: Extract<Layer, { type: 'raster' }>, readPixels = true, includeComposite = false): Box | null | undefined {
   if (l.sourceAssetId) return undefined;
-  const buf = getBuffer(l.id);
-  if (!buf || !buf.width || !buf.height) return undefined;
-  const toPage = (b: NonNullable<ReturnType<typeof alphaBounds>>, c: HTMLCanvasElement): Box => {
-    const kx = l.width / c.width, ky = l.height / c.height;
-    return { x: l.x + b.x0 * kx, y: l.y + b.y0 * ky, w: (b.x1 - b.x0) * kx, h: (b.y1 - b.y0) * ky };
+  const surface = getRasterSurface(l.id);
+  if (!surface || !surface.canvas.width || !surface.canvas.height) return undefined;
+  const buf = surface.canvas;
+  // Boxes are measured in their own canvas and placed back in the full buffer (fw × fh pixels, as the layer's size).
+  const toPage = (b: NonNullable<ReturnType<typeof alphaBounds>>, s: RasterSurface): Box => {
+    const kx = l.width / s.fw, ky = l.height / s.fh;
+    return { x: l.x + (s.x0 + b.x0) * kx, y: l.y + (s.y0 + b.y0) * ky, w: (b.x1 - b.x0) * kx, h: (b.y1 - b.y0) * ky };
   };
-  const base = l.paintBaseId ? getBuffer(l.paintBaseId) : undefined;
-  if (base?.width && l.paintStrokes) {
-    const b0 = layerPixelBox(l.paintBaseId!, base, bufferVersion(l.paintBaseId!), readPixels);
+  const base = l.paintBaseId ? getRasterSurface(l.paintBaseId) : undefined;
+  if (base?.canvas.width && l.paintStrokes) {
+    const b0 = layerPixelBox(l.paintBaseId!, base.canvas, bufferVersion(l.paintBaseId!), readPixels);
     const composed = includeComposite ? layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels) : undefined;
-    const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...(composed ? [toPage(composed, buf)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
+    const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...(composed ? [toPage(composed, surface)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
     if (!all) return null;
     const x0 = Math.max(all.x, l.x), y0 = Math.max(all.y, l.y), x1 = Math.min(all.x + all.w, l.x + l.width), y1 = Math.min(all.y + all.h, l.y + l.height);
     return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
   }
   const box = layerPixelBox(l.id, buf, bufferVersion(l.id), readPixels);
-  return box ? toPage(box, buf) : null;
+  return box ? toPage(box, surface) : null;
 }
