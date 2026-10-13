@@ -418,7 +418,7 @@ export default [
   },
   {
     id: 'raster-editable-stroke-limit',
-    what: 'Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar.',
+    what: 'Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar. El bench limit compara RGB y alfa del aplanado, undo/redo y pintura posterior en modo píxel.',
     sides: [
       ['src/engine/types.ts', 'paintFlattened?: boolean;'],
       ['src/engine/design/rasterLimit.ts', 'export const DEFAULT_PAINT_STROKE_LIMIT = 64;'],
@@ -426,6 +426,8 @@ export default [
       ['src/components/designer/StagePaintCommit.ts', 'shouldFlattenRasterPaint({ ...layer, paintStrokes: nextStrokes }'],
       ['src/components/designer/LayersPanel.tsx', '<RasterLimitControls sessionId={sessionId}'],
       ['docs/raster-limit.md', '64 trazos o 8192 segmentos.'],
+      ['bench/engines/raster-limit-parity.ts', 'export async function runRasterLimitParity'],
+      ['bench/engines/main.ts', "mode === 'limit' ? runRasterLimitParity()"],
     ],
     tests: ['tests/raster-limit.test.ts'],
   },

@@ -74,7 +74,59 @@ export interface SequenceResult {
   operationFrames: Record<string, { same: number; region: number; full: number; fullWhy: Record<string, number> }>;
   cacheVsUncached: { differingOps: number; maxChannelDiff: number };
   drift: { afterEditorFrame: number; afterFlush: number };
-  firstFailure: { op: number; kind: string; diff: number } | null;
+  firstFailure: {
+    op: number; kind: string; diff: number; differingChannels: number; differingPixels: number;
+    diffBox: { x0: number; y0: number; x1: number; y1: number } | null;
+    worstChannel: { x: number; y: number; channel: number; expected: number; actual: number } | null;
+    changedLayer: { id: string; type: string; before: unknown; after: unknown; movedStrokes: Array<{ id: string; before: [number, number]; after: [number, number] }> } | null;
+    plan: ReturnType<typeof retainedStats>['lastPlan'];
+  } | null;
+}
+
+function changedLayerDetails(before: DesignDoc, after: DesignDoc): NonNullable<SequenceResult['firstFailure']>['changedLayer'] {
+  const index = after.layers.findIndex((layer, i) => layer !== before.layers[i]);
+  if (index < 0) return null;
+  const prev = before.layers[index], next = after.layers[index];
+  if (!prev || !next) return null;
+  const fields = (layer: Layer) => ({
+    visible: layer.visible, opacity: layer.opacity, blend: layer.blend,
+    x: 'x' in layer ? layer.x : undefined, y: 'y' in layer ? layer.y : undefined,
+    width: 'width' in layer ? layer.width : undefined, height: 'height' in layer ? layer.height : undefined,
+  });
+  const oldStrokes = prev.type === 'raster' ? prev.paintStrokes ?? [] : [];
+  const newStrokes = next.type === 'raster' ? next.paintStrokes ?? [] : [];
+  const oldById = new Map(oldStrokes.map((stroke) => [stroke.id, stroke]));
+  const movedStrokes = newStrokes.flatMap((stroke) => {
+    const old = oldById.get(stroke.id);
+    return old && (old.x !== stroke.x || old.y !== stroke.y) ? [{ id: stroke.id, before: [old.x, old.y] as [number, number], after: [stroke.x, stroke.y] as [number, number] }] : [];
+  });
+  return { id: next.id, type: next.type, before: fields(prev), after: fields(next), movedStrokes };
+}
+
+function diffDetails(expected: Uint8ClampedArray, actual: Uint8ClampedArray, width: number): Pick<NonNullable<SequenceResult['firstFailure']>, 'differingChannels' | 'differingPixels' | 'diffBox' | 'worstChannel'> {
+  let differingChannels = 0, differingPixels = 0, x0 = width, y0 = Infinity, x1 = -1, y1 = -1, max = 0;
+  let worstChannel: NonNullable<SequenceResult['firstFailure']>['worstChannel'] = null;
+  for (let i = 0; i < expected.length; i += 4) {
+    const x = (i / 4) % width, y = Math.floor(i / 4 / width);
+    let pixelDiffers = false;
+    for (let c = 0; c < 4; c++) {
+      const delta = Math.abs(expected[i + c] - actual[i + c]);
+      if (delta) { differingChannels++; pixelDiffers = true; }
+      if (delta > max) {
+        max = delta;
+        worstChannel = { x, y, channel: c, expected: expected[i + c], actual: actual[i + c] };
+      }
+    }
+    if (pixelDiffers) {
+      differingPixels++;
+      x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+    }
+  }
+  return {
+    differingChannels, differingPixels,
+    diffBox: x1 < 0 ? null : { x0, y0, x1, y1 },
+    worstChannel,
+  };
 }
 
 function rng(seed: number): (n: number) => number {
@@ -178,6 +230,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
   for (let k = 0; k < count; k++) {
     const m = mutate(doc, rnd, raster, tone);
     kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
+    const beforeDoc = doc;
     doc = m.next;
     const u0 = uncached(doc);
     const before = { ...retainedStats() };
@@ -194,7 +247,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
     if (cmp.maxChannelDiff > 1) {
       fallbacks++;
       failKinds[m.kind] = (failKinds[m.kind] ?? 0) + 1;
-      if (!firstFailure) firstFailure = { op: k, kind: m.kind, diff: cmp.maxChannelDiff };
+      if (!firstFailure) firstFailure = { op: k, kind: m.kind, diff: cmp.maxChannelDiff, ...diffDetails(ref, got, doc.width), changedLayer: changedLayerDetails(beforeDoc, doc), plan: after.lastPlan };
     }
     const cu = compareArrays(ref, u0);
     if (cu.maxChannelDiff > 1) cacheDiffOps++;
