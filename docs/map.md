@@ -65,12 +65,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 167 | 103 |
-| [store.ts](../src/store/store.ts) | 106 | 94 |
+| [store.ts](../src/store/store.ts) | 105 | 94 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 47 | 0 |
 | [media.ts](../src/lib/media.ts) | 43 | 33 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 34 | 1 |
 | [actions.ts](../src/engine/design/actions.ts) | 34 | 15 |
-| [doc.ts](../src/engine/design/doc.ts) | 33 | 25 |
+| [doc.ts](../src/engine/design/doc.ts) | 32 | 25 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [raster.ts](../src/engine/design/raster.ts) | 29 | 15 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
@@ -83,7 +83,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [idb.ts](../src/lib/idb.ts) | 17 | 114 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 2 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [history.ts](../src/engine/design/history.ts) | 14 | 10 |
+| [history.ts](../src/engine/design/history.ts) | 13 | 10 |
 
 ## Por área
 
@@ -93,7 +93,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 27 | 5 |
+| `src/components/designer` | 28 | 5 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
@@ -106,10 +106,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 131 |
+| `src/lib` | 24 | 132 |
 | `src/store` | 4 | 96 |
 
-107 de 267 módulos no tienen ningún test que los importe directamente.
+108 de 268 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -132,6 +132,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
+- [usePanRequest.ts](../src/components/designer/usePanRequest.ts)
 - [GalleryPanel.tsx](../src/components/gallery/GalleryPanel.tsx)
 - [CanvasNavigation.tsx](../src/components/node/CanvasNavigation.tsx)
 - [NodeWorkspace.tsx](../src/components/node/NodeWorkspace.tsx)
