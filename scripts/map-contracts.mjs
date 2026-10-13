@@ -417,4 +417,14 @@ export default [
     ],
     tests: ['tests/raster-limit.test.ts'],
   },
+  {
+    id: 'retained-region-planner',
+    what: 'El memo retenido mantiene pasos estables para capas ocultas y FX inactivos; la composición y exportación siguen usando fxPlan.',
+    sides: [
+      ['src/engine/design/retainedPlanner.ts', 'export function retainedPlannerSteps('],
+      ['src/engine/fx/plan.ts', 'export function fxPlan('],
+      ['src/engine/design/render.ts', 'function retainedFrame('],
+    ],
+    tests: ['tests/retained-page-planner.test.ts', 'tests/fx-svg.test.ts'],
+  },
 ];

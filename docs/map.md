@@ -52,6 +52,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **cache-budget** — Paso 4 (2026-10-13): las cachés del editor (FX de capa, FX below y máscaras de trazo) comparten un presupuesto en bytes; descarta primero lo menos usado y nunca el dibujo del usuario, que no es una entrada. | [cacheBudget.ts](../src/engine/design/cacheBudget.ts), [render.ts](../src/engine/design/render.ts), [belowFxCache.ts](../src/engine/design/belowFxCache.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts) | [cache-budget.test.ts](../tests/cache-budget.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts), [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **raster-dirty-retained** — Una escritura raster localizada invalida su área efectiva y el margen de FX; cambios de geometría o FX usan cajas totales y el redibujado seguro. | [raster.ts](../src/engine/design/raster.ts), [rasterDirty.ts](../src/engine/design/rasterDirty.ts), [rasterBounds.ts](../src/engine/design/rasterBounds.ts), [retainedPage.ts](../src/engine/design/retainedPage.ts), [render.ts](../src/engine/design/render.ts) | [retained-page-plan.test.ts](../tests/retained-page-plan.test.ts), [raster-pixel-box.test.ts](../tests/raster-pixel-box.test.ts), [raster-strokes.test.ts](../tests/raster-strokes.test.ts) |
 | **raster-editable-stroke-limit** — Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar. | [types.ts](../src/engine/types.ts), [rasterLimit.ts](../src/engine/design/rasterLimit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx), [raster-limit.md](../docs/raster-limit.md) | [raster-limit.test.ts](../tests/raster-limit.test.ts) |
+| **retained-region-planner** — El memo retenido mantiene pasos estables para capas ocultas y FX inactivos; la composición y exportación siguen usando fxPlan. | [retainedPlanner.ts](../src/engine/design/retainedPlanner.ts), [plan.ts](../src/engine/fx/plan.ts), [render.ts](../src/engine/design/render.ts) | [retained-page-planner.test.ts](../tests/retained-page-planner.test.ts), [fx-svg.test.ts](../tests/fx-svg.test.ts) |
 
 ## Módulos centrales
 
@@ -59,7 +60,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 159 | 97 |
+| [types.ts](../src/engine/types.ts) | 160 | 98 |
 | [store.ts](../src/store/store.ts) | 102 | 91 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 45 | 0 |
 | [media.ts](../src/lib/media.ts) | 38 | 28 |
@@ -78,7 +79,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [idb.ts](../src/lib/idb.ts) | 17 | 110 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 1 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
+| [types.ts](../src/engine/fx/types.ts) | 13 | 6 |
 
 ## Por área
 
@@ -93,18 +94,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 123 |
+| `src/engine` | 30 | 124 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 56 | 51 |
+| `src/engine/design` | 57 | 52 |
 | `src/engine/flow` | 10 | 11 |
-| `src/engine/fx` | 7 | 7 |
+| `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 23 | 124 |
 | `src/store` | 4 | 93 |
 
-104 de 255 módulos no tienen ningún test que los importe directamente.
+104 de 256 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

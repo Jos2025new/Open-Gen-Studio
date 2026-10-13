@@ -15,8 +15,9 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { rasterPaintedBox } from './rasterBounds';
 import { fxPlan } from '../fx/plan';
-import { paintArea, RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
+import { paintArea, RetainedPage, type FrameMemo, type Rect } from './retainedPage';
 import { rasterDirtyRect } from './rasterDirty';
+import { retainedPlannerSteps } from './retainedPlanner';
 import { mixFx } from '../fx/canvas';
 import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
 
@@ -386,7 +387,7 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   const cur: FrameMemo = {
     W, H, scale, background: doc.background, fontEpoch,
     base: doc.background ? fullRect(W, H) : null,
-    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, (target) => retainedLayerBox(target, dirtyByLayer.get(target))), versionsOf, dirtyOf)),
+    steps: retainedPlannerSteps(doc.layers, steps, scale, (l) => paintArea(l, scale, (target) => retainedLayerBox(target, dirtyByLayer.get(target))), versionsOf, dirtyOf),
   };
   servedStale = false;
   const page = retained.frame(cur, {

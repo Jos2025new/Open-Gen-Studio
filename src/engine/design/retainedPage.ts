@@ -46,6 +46,8 @@ export function fxMargin(op: Pick<FxOp, 'kind' | 'enabled' | 'params'>, scale: n
 
 /** One step of the FX plan as the planner sees it: what it is made of (identities and pixel versions), its area and its reach. */
 export interface StepSig {
+  /** Stable planner identity, kept even while the corresponding composition step is inactive. */
+  id?: string;
   below: boolean;
   key: unknown[];
   box: Rect | null;
@@ -68,16 +70,16 @@ function marginOf(fxs: FxLayer[], scale: number): number {
 }
 
 const transformKey = (l: Layer): unknown[] => l.transform ? [...l.transform] : [];
-const fxKey = (fxs: FxLayer[]): unknown[] => fxs.flatMap((fx) => [
+export const fxLayerKey = (fxs: FxLayer[]): unknown[] => fxs.flatMap((fx) => [
   fx.id, fx.scope, fx.visible, fx.opacity,
   ...fx.ops.flatMap((op) => [op.id, op.kind, op.enabled, ...Object.keys(op.params).sort().flatMap((key) => [key, op.params[key]])]),
 ]);
 
 /** Properties that change the raster's placement or how its pixels composite, without walking editable content. */
 function renderKeyOf(layer: Layer, fxs: FxLayer[]): unknown[] {
-  if (layer.type !== 'raster') return [layer, ...fxKey(fxs)];
+  if (layer.type !== 'raster') return [layer, ...fxLayerKey(fxs)];
   return [layer.id, layer.type, layer.x, layer.y, layer.width, layer.height, layer.pxWidth, layer.pxHeight,
-    layer.visible, layer.opacity, layer.blend, ...transformKey(layer), layer.paintBaseId ?? null, ...fxKey(fxs)];
+    layer.visible, layer.opacity, layer.blend, ...transformKey(layer), layer.paintBaseId ?? null, ...fxLayerKey(fxs)];
 }
 
 /** The planner's view of a step. A layer's box grows by its own FX reach, since its FX may spread it. */
