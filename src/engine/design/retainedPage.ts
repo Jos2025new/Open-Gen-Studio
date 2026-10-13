@@ -46,7 +46,16 @@ export function fxMargin(op: Pick<FxOp, 'kind' | 'enabled' | 'params'>, scale: n
 }
 
 /** One step of the FX plan as the planner sees it: what it is made of (identities and pixel versions), its area and its reach. */
-export interface StepSig { below: boolean; key: unknown[]; box: Rect | null; margin: number }
+export interface StepSig {
+  below: boolean;
+  key: unknown[];
+  box: Rect | null;
+  margin: number;
+  /** Stable layer/FX identity and pixel versions let a localized buffer write invalidate only its dirty area. */
+  source?: unknown[];
+  versions?: unknown[];
+  dirty?: Rect | null;
+}
 /** What a frame was composed from. A new frame is compared with the last composed one. */
 export interface FrameMemo { W: number; H: number; scale: number; background: string | null | undefined; fontEpoch: number; base: Rect | null; steps: StepSig[] }
 export type FramePlan = { kind: 'same' } | { kind: 'full'; why: string } | { kind: 'region'; rect: Rect; reach: number };
@@ -59,15 +68,27 @@ function marginOf(fxs: FxLayer[], scale: number): number {
 }
 
 /** The planner's view of a step. A layer's box grows by its own FX reach, since its FX may spread it. */
-export function stepSig(s: FxStep, scale: number, boxOf: (l: Layer) => Rect | null, versionsOf: (l: Layer) => unknown[]): StepSig {
+export function stepSig(
+  s: FxStep,
+  scale: number,
+  boxOf: (l: Layer) => Rect | null,
+  versionsOf: (l: Layer) => unknown[],
+  dirtyOf: (l: Layer) => Rect | null = () => null,
+): StepSig {
   if (s.t === 'below') return { below: true, key: [s.fx], box: null, margin: marginOf([s.fx], scale) };
-  if (s.t === 'draw') return { below: false, key: [s.layer, ...versionsOf(s.layer)], box: boxOf(s.layer), margin: 0 };
-  const margin = marginOf(s.fx, scale), box = boxOf(s.layer);
-  return { below: false, key: [s.layer, ...s.fx, ...versionsOf(s.layer)], box: box && grow(box, margin), margin };
+  const versions = versionsOf(s.layer), dirty = dirtyOf(s.layer);
+  if (s.t === 'draw') return { below: false, key: [s.layer, ...versions], source: [s.layer], versions, box: boxOf(s.layer), margin: 0, dirty };
+  const margin = marginOf(s.fx, scale), box = boxOf(s.layer), source = [s.layer, ...s.fx];
+  return { below: false, key: [...source, ...versions], source, versions, box: box && grow(box, margin), margin, dirty: dirty && grow(dirty, margin) };
 }
 
 const sameKey = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((k, i) => k === b[i]);
 const sameRect = (a: Rect | null, b: Rect | null) => a === b || (!!a && !!b && a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1);
+function changedArea(prev: StepSig, cur: StepSig): Rect | null {
+  const pixelsOnly = !!prev.source && !!cur.source && !!prev.versions && !!cur.versions
+    && sameKey(prev.source, cur.source) && !sameKey(prev.versions, cur.versions);
+  return pixelsOnly && cur.dirty && !isEmpty(cur.dirty) ? cur.dirty : union(prev.box, cur.box);
+}
 /** A region bigger than this share of the page is recomposed as a whole: the bookkeeping would cost more than it saves. */
 export const MAX_REGION_SHARE = 0.5;
 
@@ -80,7 +101,7 @@ export function planFrame(prev: FrameMemo | null, cur: FrameMemo): FramePlan {
   if (!prev) return { kind: 'full', why: 'first frame' };
   if (prev.W !== cur.W || prev.H !== cur.H || prev.scale !== cur.scale || prev.background !== cur.background || prev.fontEpoch !== cur.fontEpoch) return { kind: 'full', why: 'page' };
   if (prev.steps.length !== cur.steps.length || prev.steps.some((p, i) => p.below !== cur.steps[i].below)) return { kind: 'full', why: 'steps' };
-  // A box can change without the key changing (the pixel box is read back at most every 150 ms): that is a change too.
+  // A box can change without the key changing: that is a change too.
   const changed = cur.steps.map((s, i) => !sameKey(s.key, prev.steps[i].key) || !sameRect(s.box, prev.steps[i].box));
   if (!changed.some(Boolean)) return { kind: 'same' };
   let reach = 0;
@@ -99,7 +120,7 @@ export function planFrame(prev: FrameMemo | null, cur: FrameMemo): FramePlan {
       beneath = beneath && grow(beneath, reach);
     } else {
       const box = union(p.box, s.box);
-      if (changed[i]) dirty = union(dirty, box);
+      if (changed[i]) dirty = union(dirty, changedArea(p, s));
       beneath = union(beneath, box);
     }
   }

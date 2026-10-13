@@ -164,3 +164,11 @@ it('moving strokes recomposes from the first moving one on a reused canvas: same
   expect((original as unknown as { ops: unknown[] }).ops).toEqual(before);
 });
 
+
+it('accumulates localized raster dirt until the retained page takes it once', () => {
+  const l = layer(), bitmap = createCanvas(200, 100);
+  raster.setBuffer(l.id, bitmap, false, { x0: 2, y0: 3, x1: 8, y1: 9 });
+  raster.setBuffer(l.id, bitmap, false, { x0: 6, y0: 1, x1: 12, y1: 5 });
+  expect(raster.takeDirty(l.id)).toEqual({ x0: 2, y0: 1, x1: 12, y1: 9 });
+  expect(raster.takeDirty(l.id)).toBeNull();
+});

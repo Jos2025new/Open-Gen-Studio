@@ -306,14 +306,14 @@ export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: r
 }
 
 /** Rebuild only after moving an object; ordinary painting keeps its incremental renderer. */
-export function composeRaster(layer: RasterLayer, persist = true): boolean {
+export function composeRaster(layer: RasterLayer, persist = true, dirty: Dirty = 'all'): boolean {
   const base = layer.paintBaseId && getBuffer(layer.paintBaseId);
   if (!base) return false;
   const end = span('raster', 'compose', { strokes: layer.paintStrokes?.length ?? 0, pixels: base.width * base.height });
   const canvas = cloneCanvas(base);
   const ctx = ctx2d(canvas);
   for (const stroke of layer.paintStrokes ?? []) drawRasterStroke(ctx, stroke);
-  setBuffer(layer.id, canvas, persist);
+  setBuffer(layer.id, canvas, persist, dirty);
   end();
   return true;
 }

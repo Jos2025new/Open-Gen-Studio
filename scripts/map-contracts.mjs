@@ -380,4 +380,14 @@ export default [
     ],
     tests: ['tests/cache-budget.test.ts', 'tests/raster-stroke-mask.test.ts', 'tests/fx-render.test.ts'],
   },
+  {
+    id: 'raster-dirty-retained',
+    what: 'Una escritura raster localizada invalida en la página retenida su área mapeada y el margen de sus FX; cambios de capa o escrituras sin región conservan el redibujo geométrico seguro.',
+    sides: [
+      ['src/engine/design/raster.ts', 'export function takeDirty('],
+      ['src/engine/design/rasterDirty.ts', 'function rasterDirtyRect('],
+      ['src/engine/design/retainedPage.ts', 'function changedArea('],
+    ],
+    tests: ['tests/retained-page-plan.test.ts', 'tests/raster-strokes.test.ts'],
+  },
 ];

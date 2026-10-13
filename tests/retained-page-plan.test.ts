@@ -66,6 +66,20 @@ describe('retained page: planner', () => {
     const cur = { ...memo([a, b]), steps: [prev.steps[0], { ...prev.steps[1], box: { x0: 20, y0: 0, x1: 34, y1: 1 } }] };
     expect(planFrame(prev, cur)).toEqual({ kind: 'region', rect: { x0: 20, y0: 0, x1: 34, y1: 1 }, reach: 0 });
   });
+  it('uses a raster buffer dirty area when only its pixel version changed', () => {
+    const prev = memo([a]), old = prev.steps[0];
+    const dirty = { x0: 4, y0: 0, x1: 7, y1: 1 };
+    const cur: FrameMemo = { ...prev, steps: [{ ...old, key: ['layer', 2], source: ['layer'], versions: [2], dirty }] };
+    const base: FrameMemo = { ...prev, steps: [{ ...old, key: ['layer', 1], source: ['layer'], versions: [1] }] };
+    expect(planFrame(base, cur)).toEqual({ kind: 'region', rect: dirty, reach: 0 });
+  });
+  it('uses old and new geometry when the layer itself changed, even if pixels are dirty', () => {
+    const prev = memo([a]), old = prev.steps[0];
+    const nextBox = { x0: 12, y0: 0, x1: 16, y1: 1 }, dirty = { x0: 14, y0: 0, x1: 15, y1: 1 };
+    const base: FrameMemo = { ...prev, steps: [{ ...old, source: ['old-layer'], versions: [1] }] };
+    const cur: FrameMemo = { ...prev, steps: [{ ...old, key: ['new-layer', 1], source: ['new-layer'], versions: [1], box: nextBox, dirty }] };
+    expect(planFrame(base, cur)).toEqual({ kind: 'region', rect: { x0: 2, y0: 0, x1: 16, y1: 1 }, reach: 0 });
+  });
   it('propagates a change through a later below step by its reach', () => {
     const blur: Step = { kind: 'blur', r: 3 };
     const plan = planFrame(memo([a, blur]), memo([{ kind: 'draw', a: 2, b: 9, v: 1 }, blur]));

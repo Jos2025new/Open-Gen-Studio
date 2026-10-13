@@ -16,6 +16,7 @@ import { strokeBox } from './strokes';
 import { rasterStrokeBox } from './rasterStrokes';
 import { fxPlan } from '../fx/plan';
 import { paintArea, RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
+import { rasterDirtyRect } from './rasterDirty';
 import { mixFx } from '../fx/canvas';
 import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
 
