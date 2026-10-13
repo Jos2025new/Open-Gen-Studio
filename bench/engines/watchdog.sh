@@ -5,10 +5,10 @@
 # agent-browser daemon), writes the reason to the log, and exits. Also exits when no such process is left.
 # usage: watchdog.sh [log]   Start it before opening the browser; it waits up to 120 s for one, and never starts a browser.
 LOG="${1:-/tmp/claude-1000/watchdog.log}"
-PROFILE_RE='agent-browser-chrome-'
+PROFILE_RE="${OGS_BENCH_PROFILE_RE:-agent-browser-chrome-}"
 mkdir -p "$(dirname "$LOG")"
 pids() { ps -eo pid=,args= | awk -v re="$PROFILE_RE" 'index($0, re) && /user-data-dir/ {print $1}'; }
-daemons() { pgrep -f "agent-browser/bin/agent-browser-linux[-]x64" || true; }
+daemons() { [ -n "${OGS_BENCH_DAEMON_PID:-}" ] && printf '%s\n' "$OGS_BENCH_DAEMON_PID"; }
 rss_mb() { local t=0 p; for p in $(pids); do r=$(awk '/VmRSS/{print $2}' /proc/$p/status 2>/dev/null); t=$((t + ${r:-0})); done; echo $((t / 1024)); }
 avail_mb() { awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo; }
 echo "$(date +%T) watchdog start" >> "$LOG"
