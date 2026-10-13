@@ -143,6 +143,8 @@ export interface UiState {
   selectMode?: 'objects' | 'layers';
   /** Drawing on a layer with editable strokes: the choice the user saved (ADR 0016); 'ask' shows the prompt. */
   drawingChoice?: 'ask' | 'flatten' | 'design' | 'newLayer';
+  /** Clicks act on the topmost layer under the pointer (Photoshop Auto-select); off by default. */
+  autoSelect?: boolean;
   shape: { fill: string | null; stroke: string | null; strokeWidth: number; radius: number; sides?: number; bend?: number } & Pick<ShapeSpec, 'rx' | 'ry' | 'join' | 'cap' | 'miter' | 'dash' | 'dashOffset' | 'paintOrder'>;
   text: TextStyle;
   threadOpen: boolean;
@@ -382,7 +384,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind' | 'toolHelp' | 'drawingChoice'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind' | 'toolHelp' | 'drawingChoice' | 'autoSelect'>;
 };
 
 export const useStore = create<AppState>()(
@@ -400,7 +402,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind, toolHelp: s.ui.toolHelp, drawingChoice: s.ui.drawingChoice },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind, toolHelp: s.ui.toolHelp, drawingChoice: s.ui.drawingChoice, autoSelect: s.ui.autoSelect },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;

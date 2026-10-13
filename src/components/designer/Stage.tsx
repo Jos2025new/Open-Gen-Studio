@@ -36,6 +36,7 @@ import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoo
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
+import { clickCandidate } from '../../engine/design/autoSelect';
 import { commitStagePaintGesture, drawingChoiceFirst, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
@@ -711,7 +712,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const ctrl = e.ctrlKey || e.metaKey;
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
         // The top layer wins. Ctrl picks parts of one layer, or whole layers for a group.
-        const top = hitTestPixel(current, p.x, p.y);
+        const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => Boolean(objectAt(l, p.x, p.y))); 
         let layer: Layer | null = null;
         if (ctrl) layer = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)).length === 1 && owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
         else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
