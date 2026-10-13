@@ -25,6 +25,7 @@ function setup(locked = false) {
   const doc = { ...createDoc('selection', 12, 12), layers: [layer], activeLayerId: layer.id };
   addDoc(sid, doc); return { sid, doc, layer, canvas };
 }
+const pixels = (canvas: HTMLCanvasElement) => Array.from(canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data);
 const point = { x: 3, y: 3 };
 afterEach(() => flushRaster());
 
@@ -55,7 +56,7 @@ describe('dragging selected pixels', () => {
     expect(getSelection(doc.id)).toBeNull();
     undoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)).toEqual(doc);
-    expect(getBuffer(layer.id)).toBe(canvas);
+    expect(pixels(getBuffer(layer.id)!)).toEqual(pixels(canvas as unknown as HTMLCanvasElement));
     expect(getSelection(doc.id)).not.toBeNull();
     redoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)).toEqual(after);
@@ -123,7 +124,7 @@ describe('moving a vector region without rasterizing its geometry', () => {
     expect(getSelection(doc.id)).not.toBeNull();
     redoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)).toEqual(after);
-    expect(getBuffer(lifted.pixelMask!.id)).toBe(buffer);
+    expect(pixels(getBuffer(lifted.pixelMask!.id)!)).toEqual(pixels(buffer!));
     expect((translateLayer(lifted, 3, 4) as typeof lifted).pixelMask).toMatchObject({ x: 9, y: 9 });
     expect((scaleLayer(lifted, 2, 2, 0, 0) as typeof lifted).pixelMask!.transform).toEqual([2, 0, 0, 2, 0, 0]);
   });

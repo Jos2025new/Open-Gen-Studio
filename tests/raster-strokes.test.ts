@@ -57,7 +57,7 @@ it('moves one stroke in local coordinates, retaining the other and both boxes un
   expect(rasterStrokeBox(shifted, shifted.paintStrokes![0])!.x).toBe(rasterStrokeBox(scaled, scaled.paintStrokes![0])!.x + 10);
 });
 
-it('recomposes unchanged strokes exactly, keeps old pixels, and restores pixels and boxes through undo/redo', () => {
+it('recomposes unchanged strokes exactly and keeps the original operation log while moving geometry', () => {
   let l = layer();
   const bitmap = createCanvas(200, 100);
   (bitmap as unknown as { ops: unknown[] }).ops.push('existing image');
@@ -73,11 +73,9 @@ it('recomposes unchanged strokes exactly, keeps old pixels, and restores pixels 
   expect(ops(l.id)[0]).toBe('existing image');
   expect(ops(l.id)[2]).toEqual(before[2]);
   expect(ops(l.id)[1]).not.toEqual(before[1]);
-  const restored = undo({ ...doc, layers: [moved] })!;
-  expect(restored.layers[0]).toEqual(l);
-  expect(ops(l.id)).toEqual(before);
-  const redone = redo(restored)!;
-  expect(redone.layers[0]).toEqual(moved);
+  expect(undo({ ...doc, layers: [moved] })!.layers[0]).toEqual(l);
+  expect(redo(doc)!.layers[0]).toEqual(moved);
+  expect((bitmap as unknown as { ops: unknown[] }).ops).toEqual(['existing image']);
   const copy = cloneLayer(moved) as RasterLayer;
   raster.copyBuffer(moved.id, copy.id);
   raster.composeRaster(moveRasterStroke(copy, 'b', 0, 12));

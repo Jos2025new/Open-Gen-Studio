@@ -28,6 +28,7 @@ function setup() {
 }
 const layerAt = (sid: string, id: string) => getDoc(sid, id)!.layers[0] as RasterLayer;
 const pageAlpha = (layer: RasterLayer, x: number, y: number) => alphaAt(getBuffer(layer.id)!, x - layer.x, y - layer.y);
+const pixels = (canvas: HTMLCanvasElement) => Array.from(canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data);
 afterEach(() => flushRaster());
 
 describe('painted layer canvas resize', () => {
@@ -53,8 +54,8 @@ describe('painted layer canvas resize', () => {
     undoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)!.width).toBe(12);
     expect(layerAt(sid, doc.id)).toEqual(layer);
-    expect(getBuffer(layer.id)).toBe(old);
-    expect(getBuffer(layer.paintBaseId!)).toBe(oldBase);
+    expect(pixels(getBuffer(layer.id)!)).toEqual(pixels(old!));
+    expect(pixels(getBuffer(layer.paintBaseId!)!)).toEqual(pixels(oldBase!));
     redoDoc(sid, doc.id);
     expect(pageAlpha(layerAt(sid, doc.id), x, y)).toBe(255);
   });
@@ -84,7 +85,7 @@ describe('full-page solid fill stays visible after resizing', () => {
     expect(pageAlpha(grown, 1, 1)).toBe(255);
     expect(pageAlpha(grown, 22, 22)).toBe(255);
     undoDoc(sid, doc.id);
-    expect(getBuffer(fill.id)).toBe(pixels);
+    expect(Array.from(getBuffer(fill.id)!.getContext('2d')!.getImageData(0, 0, 12, 12).data)).toEqual(Array.from(pixels.getContext().getImageData(0, 0, 12, 12).data));
     redoDoc(sid, doc.id);
     expect(pageAlpha(layerAt(sid, doc.id), 22, 22)).toBe(255);
   });

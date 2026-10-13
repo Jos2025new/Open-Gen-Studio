@@ -1,6 +1,7 @@
 import { span } from '../../lib/trace';
 import type { DesignDoc } from '../types';
-import { rasterBufferIds, restoreBuffers, snapshotBuffers } from './raster';
+import { rasterBufferIds, restoreHistoryBuffers, snapshotHistoryBuffers } from './raster';
+import { takeRasterHistoryCopiedPixels, type RasterHistorySnapshot } from './rasterHistoryTiles';
 import { getSelection, setSelection, type PixelSelection } from './pixelSelection';
 import { useLayerSelection } from './selection';
 import { objectPick, setObjectPick, type ObjectPick } from './objectSelection';
@@ -9,7 +10,7 @@ import { objectPick, setObjectPick, type ObjectPick } from './objectSelection';
 
 interface Snapshot {
   doc: DesignDoc;
-  buffers: Map<string, HTMLCanvasElement>;
+  buffers: Map<string, RasterHistorySnapshot>;
   /** The pixel selection then: undo and redo bring it back, as in GIMP and Krita. */
   sel: PixelSelection | null;
   /** The picked layers and objects then: redo brings back what the change had selected (a duplicate stays picked). */
@@ -48,21 +49,31 @@ function restorePicks(docId: string, snap: Snapshot): void {
 
 function capture(doc: DesignDoc): Snapshot {
   const end = span('history', 'capture', { layers: doc.layers.length });
+  // Tile copies committed by the preceding edit belong to that edit, not to this capture span.
+  takeRasterHistoryCopiedPixels();
   const rasterIds = rasterBufferIds(doc.layers);
-  const snap = { doc, buffers: snapshotBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
-  end({ buffers: snap.buffers.size, copiedPixels: 0 });
+  const snap = { doc, buffers: snapshotHistoryBuffers(rasterIds), sel: getSelection(doc.id), layers: useLayerSelection.getState().byDoc[doc.id], objects: objectPick(doc.id) };
+  end({ buffers: snap.buffers.size, tiles: [...snap.buffers.values()].reduce((n, grid) => n + grid.tiles.size, 0), copiedPixels: takeRasterHistoryCopiedPixels() });
   return snap;
 }
 
-/** Pixel bytes held by the given steps, each canvas counted once (buffers are shared copy-on-write). */
-export function bytesOfSnapshots(snaps: Array<{ buffers: Map<string, { width: number; height: number }> }>): number {
+type ByteItem = { width: number; height: number };
+type ByteBuffer = ByteItem & { tiles?: ReadonlyMap<unknown, ByteItem> };
+type ByteSnapshot = { buffers: ReadonlyMap<string, unknown> };
+
+/** Pixel bytes held by the given steps, counting shared canvases or tile refs once. */
+export function bytesOfSnapshots(snaps: ReadonlyArray<ByteSnapshot>): number {
   const seen = new Set<unknown>();
   let total = 0;
   for (const snap of snaps) {
-    for (const canvas of snap.buffers.values()) {
-      if (seen.has(canvas)) continue;
-      seen.add(canvas);
-      total += canvas.width * canvas.height * 4;
+    for (const raw of snap.buffers.values()) {
+      const buffer = raw as ByteBuffer;
+      const items = buffer.tiles ? [...buffer.tiles.values()] : [buffer];
+      for (const item of items) {
+        if (seen.has(item)) continue;
+        seen.add(item);
+        total += item.width * item.height * 4;
+      }
     }
   }
   return total;
@@ -72,7 +83,7 @@ export function bytesOfSnapshots(snaps: Array<{ buffers: Map<string, { width: nu
  * Drops the oldest undo steps until the steps hold at most `limit` bytes. The newest undo step is never dropped (the
  * last change can always be undone). Returns how many steps were dropped.
  */
-export function trimByBytes<T extends { buffers: Map<string, { width: number; height: number }> }>(past: T[], future: T[], limit: number): number {
+export function trimByBytes<T extends { buffers: ReadonlyMap<string, unknown> }>(past: T[], future: T[], limit: number): number {
   let n = 0;
   while (past.length > 1 && bytesOfSnapshots([...past, ...future]) > limit) {
     past.shift();
@@ -106,7 +117,7 @@ export function undo(current: DesignDoc): DesignDoc | null {
   const prev = s.past.pop();
   if (!prev) return null;
   s.future.push(capture(current));
-  restoreBuffers(prev.buffers);
+  restoreHistoryBuffers(prev.buffers);
   restorePicks(current.id, prev);
   listeners.forEach((l) => l());
   return prev.doc;
@@ -117,7 +128,7 @@ export function redo(current: DesignDoc): DesignDoc | null {
   const next = s.future.pop();
   if (!next) return null;
   s.past.push(capture(current));
-  restoreBuffers(next.buffers);
+  restoreHistoryBuffers(next.buffers);
   restorePicks(current.id, next);
   listeners.forEach((l) => l());
   return next.doc;

@@ -405,6 +405,18 @@ export default [
     tests: ['tests/retained-page-plan.test.ts', 'tests/raster-pixel-box.test.ts', 'tests/raster-strokes.test.ts'],
   },
   {
+    id: 'raster-history-tiles',
+    what: 'El historial raster comparte mosaicos inmutables de 64×64 entre pasos y copia solo los mosaicos tocados al confirmar un trazo o una escritura local; undo y redo reconstruyen los mismos píxeles, y el presupuesto cuenta mosaicos únicos por sus dimensiones reales. beginEdit conserva su lienzo temporal completo para la base inmutable del trazo. El modo bench tiles compara RGB y alfa exactos en navegador.',
+    sides: [
+      ['src/engine/design/history.ts', 'export function bytesOfSnapshots'],
+      ['src/engine/design/raster.ts', 'export function snapshotHistoryBuffers'],
+      ['src/engine/design/rasterHistoryTiles.ts', 'export const RASTER_HISTORY_TILE_SIZE = 64;'],
+      ['bench/engines/raster-history-tiles.ts', 'export async function runRasterHistoryTiles'],
+      ['bench/engines/main.ts', "mode === 'tiles' ? runRasterHistoryTiles()"],
+    ],
+    tests: ['tests/history-bytes.test.ts', 'tests/raster-history-tiles.test.ts', 'tests/raster-limit.test.ts'],
+  },
+  {
     id: 'raster-editable-stroke-limit',
     what: 'Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar.',
     sides: [
