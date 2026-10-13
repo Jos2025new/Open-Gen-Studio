@@ -78,6 +78,17 @@ export function AutoSelectToggle() {
   return <label className="tool-setting" title="Click acts on the topmost layer under the pointer. Off: only the selected layer, and a click elsewhere keeps the selection"><input type="checkbox" checked={on} onChange={(e) => setUi({ autoSelect: e.target.checked })} /><span>Auto-select</span></label>;
 }
 
+/** Edit options: a popover with the same Auto-select checkbox as the bar (one setting, two places). */
+export function EditOptionsControl() {
+  const pop = usePopover();
+  return <>
+    <button type="button" ref={pop.ref} className="tool-setting" aria-expanded={pop.open} onClick={pop.toggle} data-tip="Edit options" aria-label="Edit options"><ChevronDown size={12} /></button>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Edit options">
+      <div className="snap-pop"><AutoSelectToggle /></div>
+    </Popover>
+  </>;
+}
+
 export function SnapControl() {
   const pop = usePopover();
   const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
@@ -271,7 +282,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} /><AutoSelectToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} /><AutoSelectToggle /><EditOptionsControl />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
