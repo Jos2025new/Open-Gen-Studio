@@ -51,3 +51,9 @@ Ningún commit ni documento del track cita a Claude Opus ni a GPT/Luna en un tra
 ## Verificación del cierre
 
 Según el informe de cierre de `ab01a02`: `npx tsc --noEmit` sin errores; `npm run test:related` con 849 pasados (4 omitidos); `npm test` con 189 archivos y 1 313 tests pasados (5 omitidos). La nota de esta auditoría es solo documentación: no se volvieron a ejecutar tests de código.
+
+## Cajas de píxeles en memoria (2026-10-13)
+
+- Cada capa raster guarda solo la caja alineada a 64 px de sus píxeles (`rasterSurface.ts`); `getRasterSurface` la da con su desplazamiento, `getBuffer` ensambla el lienzo completo para las operaciones que no lo necesitan.
+- El guardado ensambla el lienzo a tamaño de página (mismo PNG); la carga lo recorta; los trazos en vivo y la composición usan la caja. Una capa vacía guarda un lienzo de 1 × 1 (`createCanvas` no admite 0 × 0).
+- Prueba: `tests/raster-surface.test.ts` (crecimiento, capa vacía, guardar y cargar, trazo pequeño en 2048² por debajo del 5 %).
