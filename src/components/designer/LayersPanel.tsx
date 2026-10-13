@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -21,6 +21,8 @@ import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
 import { fxTarget } from '../../engine/fx/plan';
+import { pendingRasterPaintLayer, subscribeRasterPaintGate } from '../../engine/design/rasterLimit';
+import { RasterLimitApproval, RasterLimitControls } from './RasterLimitControls';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -78,6 +80,8 @@ function GroupRow({ sessionId, doc, group, onSelect }: { sessionId: string; doc:
 
 export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null }) {
   const layer = activeLayer(doc);
+  const pendingPaintId = useSyncExternalStore(subscribeRasterPaintGate, pendingRasterPaintLayer);
+  const pendingPaintLayer = doc.layers.find((item): item is Extract<Layer, { type: 'raster' }> => item.id === pendingPaintId && item.type === 'raster');
   const tool = useStore((s) => s.ui.tool);
   const pop = usePopover();
   const addPop = usePopover();
@@ -143,6 +147,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
 
   if (collapsed) return <aside className="layers-panel is-collapsed" aria-label="Layers">
     <IconButton icon={PanelRightOpen} label="Show layers panel" size="sm" onClick={() => setCollapsed(false)} />
+    {pendingPaintLayer && <IconButton icon={AlertTriangle} label="Open layers panel to confirm painting" size="sm" onClick={() => setCollapsed(false)} />}
   </aside>;
 
   return <aside className={`layers-panel${tab === 'layers' ? ' is-layers-only' : ''}`} aria-label="Layers">
@@ -164,7 +169,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
       ))}
       <span className="panel-tabs-gap" />
-      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
+      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
         <legend className="layer-appearance-title">Layer · {layer.name}</legend>
@@ -211,7 +216,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         <span className="layer-kind" data-tip={l.type === 'fx' ? `${l.group} layer · ${l.scope === 'layer' ? 'layer below' : 'everything below'}` : `${l.type} layer`} aria-label={l.type === 'fx' ? `${l.group} layer` : `${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
-      </div></Fragment>; })}
+      </div>{l.type === 'raster' && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     <div className="layer-actions">
