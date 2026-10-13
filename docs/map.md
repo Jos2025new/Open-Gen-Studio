@@ -107,7 +107,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 137 |
+| `src/lib` | 24 | 138 |
 | `src/store` | 4 | 96 |
 
 110 de 278 módulos no tienen ningún test que los importe directamente.
