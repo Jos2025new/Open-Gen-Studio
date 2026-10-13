@@ -130,12 +130,12 @@ describe('provisional editable raster quota', () => {
 
     undoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)!.layers[0]).toEqual(editable);
-    expect(getBuffer(editable.id)).toBe(prior);
+    expect(Array.from(getBuffer(editable.id)!.getContext('2d')!.getImageData(0, 0, 8, 8).data)).toEqual(Array.from(prior.getContext().getImageData(0, 0, 8, 8).data));
     expect(historyDepth(doc.id).undo).toBe(0);
 
     redoDoc(sid, doc.id);
     expect(getDoc(sid, doc.id)!.layers[0]).toEqual(flattened);
-    expect(getBuffer(editable.id)).toBe(painted);
+    expect(Array.from(getBuffer(editable.id)!.getContext('2d')!.getImageData(0, 0, 8, 8).data)).toEqual(Array.from(painted.getContext().getImageData(0, 0, 8, 8).data));
     expect(getDoc(sid, doc.id)!.layers[0]).not.toBe(current.layers[0]);
     dropHistory(doc.id);
   });

@@ -9,6 +9,7 @@ import { uid } from '../../lib/id';
 import type { Layer, RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
 import { compositeOp, hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
+import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
 
 /*
  * Pixel buffers of raster layers. Buffers are treated as immutable snapshots:
@@ -68,6 +69,9 @@ export function snapshotBuffers(layerIds: string[]): Map<string, HTMLCanvasEleme
 export type Dirty = { x0: number; y0: number; x1: number; y1: number } | 'all';
 /** Which layer a buffer belongs to (buffers are replaced by copies; this follows them). */
 const layerOfCanvas = new WeakMap<HTMLCanvasElement, string>();
+/** History-only tile grids. Rendering has its own dirtyBy lifecycle below. */
+const historyTiles = new WeakMap<HTMLCanvasElement, RasterHistorySnapshot>();
+const historyDirty = new WeakMap<HTMLCanvasElement, Set<string>>();
 /** What each layer changed since the last frame that composed it (Paso 3: the retained page reads and clears it). */
 const dirtyBy = new Map<string, Dirty>();
 
@@ -86,8 +90,17 @@ export function takeDirty(layerId: string): Dirty | null {
 
 /** Replace a layer's buffer (no copy) and persist it. `dirty` says where the write landed (default: everywhere). */
 export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = true, dirty: Dirty = 'all'): void {
+  const previous = buffers.get(layerId);
+  const previousTiles = previous && previous.width === canvas.width && previous.height === canvas.height ? historyTiles.get(previous) : undefined;
   buffers.set(layerId, canvas);
   layerOfCanvas.set(canvas, layerId);
+  if (dirty === 'all' || (previous && (previous.width !== canvas.width || previous.height !== canvas.height))) {
+    historyTiles.delete(canvas);
+    historyDirty.delete(canvas);
+  } else {
+    if (previous !== canvas && previousTiles) historyTiles.set(canvas, previousTiles);
+    markHistoryDirty(canvas, dirty.x0, dirty.y0, dirty.x1 - dirty.x0, dirty.y1 - dirty.y0);
+  }
   markDirty(layerId, dirty);
   touchBuffer(canvas);
   if (persist) schedulePersist(layerId);
@@ -98,11 +111,55 @@ export function restoreBuffers(map: Map<string, HTMLCanvasElement>): void {
   const end = span('raster', 'restore', { buffers: map.size, copiedPixels: 0 });
   for (const [id, c] of map) {
     buffers.set(id, c);
+    layerOfCanvas.set(c, id);
+    historyTiles.delete(c);
+    historyDirty.delete(c);
     touchBuffer(c);
     schedulePersist(id);
   }
   notify();
   end();
+}
+
+/** History-only snapshots; the legacy snapshotBuffers API continues to return the original canvas refs. */
+export function snapshotHistoryBuffers(layerIds: string[]): Map<string, RasterHistorySnapshot> {
+  const out = new Map<string, RasterHistorySnapshot>();
+  for (const id of layerIds) {
+    const canvas = buffers.get(id);
+    if (!canvas) continue;
+    flushHistoryTiles(canvas);
+    let snapshot = historyTiles.get(canvas);
+    if (!snapshot) {
+      snapshot = snapshotRasterTiles(canvas);
+      historyTiles.set(canvas, snapshot);
+    }
+    out.set(id, snapshot);
+  }
+  return out;
+}
+
+export function restoreHistoryBuffers(map: Map<string, RasterHistorySnapshot>): void {
+  const canvases = new Map<string, HTMLCanvasElement>();
+  for (const [id, snapshot] of map) canvases.set(id, restoreRasterTiles(snapshot));
+  restoreBuffers(canvases);
+  for (const [id, canvas] of canvases) historyTiles.set(canvas, map.get(id)!);
+}
+
+function markHistoryDirty(canvas: HTMLCanvasElement, x: number, y: number, width: number, height: number): void {
+  const x0 = Math.max(0, x), y0 = Math.max(0, y);
+  const x1 = Math.min(canvas.width, x + width), y1 = Math.min(canvas.height, y + height);
+  if (x1 <= x0 || y1 <= y0) return;
+  let keys = historyDirty.get(canvas);
+  if (!keys) { keys = new Set(); historyDirty.set(canvas, keys); }
+  for (const key of tileKeysForRect(x0, y0, x1 - x0, y1 - y0, RASTER_HISTORY_TILE_SIZE)) keys.add(key);
+}
+
+function flushHistoryTiles(canvas: HTMLCanvasElement): void {
+  const changed = historyDirty.get(canvas);
+  if (!changed?.size) return;
+  const previous = historyTiles.get(canvas);
+  if (previous) historyTiles.set(canvas, updateRasterTiles(previous, canvas, changed));
+  changed.clear();
 }
 
 export function cloneCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
@@ -257,6 +314,7 @@ export function paintLive(buf: HTMLCanvasElement, live: LiveStroke, a: { x: numb
   const x1 = Math.min(buf.width, Math.ceil(Math.max(a.x, b.x) + pad)), y1 = Math.min(buf.height, Math.ceil(Math.max(a.y, b.y) + pad));
   const w = x1 - x, h = y1 - y;
   if (w <= 0 || h <= 0) return;
+  markHistoryDirty(buf, x, y, w, h);
   if (live.clip) {
     // Keep the stroke only where the selection is (soft edges stay soft).
     const m = ctx2d(live.mask);
@@ -285,6 +343,7 @@ export function repaintLive(buf: HTMLCanvasElement, live: LiveStroke, changed: r
   const x = Math.max(0, Math.min(...boxes.map((b) => b.x))), y = Math.max(0, Math.min(...boxes.map((b) => b.y)));
   const w = Math.min(buf.width, Math.max(...boxes.map((b) => b.x + b.w))) - x, h = Math.min(buf.height, Math.max(...boxes.map((b) => b.y + b.h))) - y;
   if (w <= 0 || h <= 0) return;
+  markHistoryDirty(buf, x, y, w, h);
   const m = ctx2d(live.mask), rgb = hexRgb(live.color), img = m.createImageData(w, h);
   segments.forEach((seg, i) => {
     const b = segmentBox(seg);
@@ -380,15 +439,20 @@ export function rasterBufferIds(layers: Layer[]): string[] {
 /** Start an edit: clone the current buffer so earlier snapshots stay intact. */
 export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
   const current = buffers.get(layer.id) ?? createCanvas(layer.pxWidth, layer.pxHeight);
+  flushHistoryTiles(current);
   const copy = cloneCanvas(current);
   buffers.set(layer.id, copy);
   layerOfCanvas.set(copy, layer.id);
+  const shared = historyTiles.get(current);
+  if (shared) historyTiles.set(copy, shared);
   return copy;
 }
 
 export function commitEdit(layerId: string): void {
   liveStroke = false;
-  touchBuffer(buffers.get(layerId));
+  const current = buffers.get(layerId);
+  if (current) flushHistoryTiles(current);
+  touchBuffer(current);
   schedulePersist(layerId);
   notify();
 }

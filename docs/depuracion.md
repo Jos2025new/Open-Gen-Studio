@@ -57,7 +57,7 @@ Sin argumentos lee la última sesión del sandbox. Para otra, pasa su ruta. `--j
 | `memory` | `heap`, cada segundo |
 | `browser` | `longtask` (más de 50 ms) |
 | `mark` | tus marcadores |
-| `history` | `capture`: captura del documento y referencias de buffers; cuenta buffers y píxeles copiados |
+| `history` | `capture`: captura del documento y referencias de buffers y mosaicos; cuenta buffers, mosaicos y píxeles copiados a los mosaicos |
 | `raster` | `restore`: restaurar referencias y programar guardado; `clone`: copia de un lienzo; `compose`: reconstruir base y trazos; `live`: pintar un segmento; `draw`: dibujar el buffer raster |
 
 La latencia de `fx` o `designer` se registra aunque no se active el dominio `render`: el dibujo del lienzo del editor resuelve la acción pendiente de forma independiente de grabar su duración. Un dibujo fuera de pantalla no la resuelve.

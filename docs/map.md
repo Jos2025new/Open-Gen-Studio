@@ -51,6 +51,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **state-format-2** — ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2. | [store-v2.js](../server/store-v2.js), [store-v2.d.ts](../server/store-v2.d.ts), [local-store.js](../server/local-store.js), [formatV2.ts](../src/store/formatV2.ts), [idb.ts](../src/lib/idb.ts), [disk.ts](../src/lib/disk.ts) | [store-v2.test.ts](../tests/store-v2.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 | **cache-budget** — Paso 4 (2026-10-13): las cachés del editor (FX de capa, FX below y máscaras de trazo) comparten un presupuesto en bytes; descarta primero lo menos usado y nunca el dibujo del usuario, que no es una entrada. | [cacheBudget.ts](../src/engine/design/cacheBudget.ts), [render.ts](../src/engine/design/render.ts), [belowFxCache.ts](../src/engine/design/belowFxCache.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts) | [cache-budget.test.ts](../tests/cache-budget.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts), [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **raster-dirty-retained** — Una escritura raster localizada invalida en la página retenida su área mapeada y el margen de sus FX; cambios de capa o escrituras sin región conservan el redibujo geométrico seguro. | [raster.ts](../src/engine/design/raster.ts), [rasterDirty.ts](../src/engine/design/rasterDirty.ts), [retainedPage.ts](../src/engine/design/retainedPage.ts) | [retained-page-plan.test.ts](../tests/retained-page-plan.test.ts), [raster-strokes.test.ts](../tests/raster-strokes.test.ts) |
+| **raster-history-tiles** — El historial raster comparte mosaicos inmutables de 64×64 entre pasos y copia solo los mosaicos tocados al confirmar un trazo o una escritura local; undo y redo reconstruyen los mismos píxeles, y el presupuesto cuenta mosaicos únicos por sus dimensiones reales. beginEdit conserva su lienzo temporal completo para la base inmutable del trazo. El modo bench tiles compara RGB y alfa exactos en navegador. | [history.ts](../src/engine/design/history.ts), [raster.ts](../src/engine/design/raster.ts), [rasterHistoryTiles.ts](../src/engine/design/rasterHistoryTiles.ts), [raster-history-tiles.ts](../bench/engines/raster-history-tiles.ts), [main.ts](../bench/engines/main.ts) | [history-bytes.test.ts](../tests/history-bytes.test.ts), [raster-history-tiles.test.ts](../tests/raster-history-tiles.test.ts), [raster-limit.test.ts](../tests/raster-limit.test.ts) |
 | **raster-editable-stroke-limit** — Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar. | [types.ts](../src/engine/types.ts), [rasterLimit.ts](../src/engine/design/rasterLimit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx), [raster-limit.md](../docs/raster-limit.md) | [raster-limit.test.ts](../tests/raster-limit.test.ts) |
 
 ## Módulos centrales
@@ -62,12 +63,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/types.ts) | 158 | 95 |
 | [store.ts](../src/store/store.ts) | 102 | 91 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 45 | 0 |
-| [media.ts](../src/lib/media.ts) | 38 | 28 |
+| [media.ts](../src/lib/media.ts) | 39 | 29 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 33 | 1 |
 | [actions.ts](../src/engine/design/actions.ts) | 32 | 12 |
-| [doc.ts](../src/engine/design/doc.ts) | 30 | 21 |
+| [doc.ts](../src/engine/design/doc.ts) | 30 | 22 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
-| [raster.ts](../src/engine/design/raster.ts) | 27 | 8 |
+| [raster.ts](../src/engine/design/raster.ts) | 27 | 9 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
@@ -75,7 +76,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 21 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 4 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 110 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 111 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 1 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
@@ -95,16 +96,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 121 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 55 | 50 |
+| `src/engine/design` | 56 | 51 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 6 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 23 | 124 |
+| `src/lib` | 23 | 125 |
 | `src/store` | 4 | 93 |
 
-105 de 254 módulos no tienen ningún test que los importe directamente.
+105 de 255 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
