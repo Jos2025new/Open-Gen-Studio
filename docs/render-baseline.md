@@ -150,6 +150,33 @@ El JSON completo de la pasada válida (todas las repeticiones y metadatos) queda
 
 ## Pendiente
 
+### Estado para retomar (cierre del día)
+
+Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. Commits clave: `4e25877`, `6acc817`, `d4c0814`, `fc61510`, `c34b91a`, `9800f7e`, `af54852`, `384a39c`, `0ee9f2f` (revertido después), `08f1748`, `de7b477`, `65b91da`.
+
+| Paso | Estado |
+|---|---|
+| 1. Márgenes FX y rectángulos | Hecho (`4e25877`, tests) |
+| 2. Zonas sucias por capa | Hecho (`6acc817`); sin consumidor, la región usa la caja de la capa |
+| 3. Página retenida con redibujo por región | Hecho en el editor (`d4c0814`, `fc61510`, `c34b91a`); parte grande por región no ejercitada (2 de 200 cambios) |
+| 4. Presupuesto en bytes | Hecho (`b76835c`, anterior) |
+| 5. Historial en bytes | Hecho (`29c9fc9`, anterior) |
+| 6. Escenario sin FX con página retenida | Hecho con guarda: solo con traslación entera de la vista (`08f1748`); oráculo sin FX 0/255 |
+| 7. ADR 0015 | Propuesto, sin implementar (decisión del usuario) |
+| 8. Medidas antes/después | **Pendiente** (ver abajo) |
+| 9. Aviso de historial recortado | Hecho (`384a39c`, nota «History trimmed» junto a Deshacer) |
+
+**Reversión a GPU con oráculo en CPU: hecha** (`65b91da`). `ctx2d` y el Stage usan GPU por defecto; `setCpuCanvases` solo para el oráculo y el banco. Con CPU, la paridad es 200/200 en 0/255. Máximo medido con GPU: 63/255 (ver «Rasterizado GPU y determinismo»).
+
+**A/B a 1024² pendiente.** Variantes: (i) `7e56f53`, (ii) HEAD con GPU, (iii) HEAD con `?cpu=1`. El parámetro `?size=` del banco ya existe. La cadena se lanzó y se cortó al cerrar el día: no hay ninguna tabla. Medir pintar, b, c, d, e con el vigilante de 1800 MB. Con CPU el documento de 2048² llegó a 2057 MB: a 2048² la variante GPU tampoco se ha medido.
+
+**Riesgos abiertos**
+- Memoria: el documento profesional de 2048² con CPU supera el tope de 1800 MB del banco.
+- Rendimiento: la CPU puede ser más lenta al dibujar; no está medido.
+- Retenida por región: poco ejercitada (2 de 200); la mayoría de frames son completos.
+- Cajas de FX: las sombras y desenfoques de capas raster usan la caja de píxeles, que depende del tiempo (150 ms). Con CPU no alteró la paridad, pero no se ha eliminado.
+- Rasterizado GPU no determinista: el editor y la exportación pueden diferir en píxeles (hasta 63/255).
+
 - **Etapa C (ADR 0014), en curso.** Hecho: formato 2 en disco (`server/store-v2.js`, con 10 pruebas que incluyen migración con copia previa, escritura de una sola sesión, recarga idéntica, 409, pérdida masiva total y por sesión, PUT legado convertido y vuelta atrás) y en navegador (`ogs-store-v2`, con 4 pruebas: migración, commit de una sola sesión, recarga y disco caído). Pendiente: medidas de d y e antes y después (el «antes» en el worktree `ogs-render-bench-before`: el run de d con tres repeticiones aún no terminó; el navegador con el documento profesional y sus cachés supera el tope de 1800 MB si se encadenan preparación y gestos sin liberar), pruebas de la lista que falten, la vuelta atrás escrita en el ADR 0014, y `npm test` completo.
 - **Etapa B en pausa**, a la espera de que el usuario decida entre composición retenida sobre Canvas2D o terminar la comparación de motores.
 - El worktree `ogs-render-bench-before` (HEAD separado en `4e238f8`) sigue existiendo para la medida «antes»; se eliminará con `git worktree remove` al terminarla.
