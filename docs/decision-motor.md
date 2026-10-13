@@ -1,6 +1,6 @@
 # Decisión del motor de render (Tarea 2): estado y bloqueos
 
-Fecha: 2026-10-12. Estado: **sin decisión final**. La comparación está a medias y no cumple su criterio de aceptación (equivalencia de píxeles y medida bajo el tope de 1800 MB). Este documento registra lo medido, lo que falta y por qué. Enlazado desde [arquitectura-render.md](arquitectura-render.md), sección 4.
+Fecha: 2026-10-12. Estado: **sin decisión final; aplazada por decisión del usuario** (Canvas2D con composición retenida primero, motor después; ver [render-estado.md](render-estado.md), cronología). La comparación está a medias y no cumple su criterio de aceptación (equivalencia de píxeles y medida bajo el tope de 1800 MB). Este documento registra lo medido, lo que falta y por qué. Enlazado desde [arquitectura-render.md](arquitectura-render.md), sección 4.
 
 ## Qué se construyó (en `bench/engines/`, solo banco)
 
@@ -41,4 +41,4 @@ Para cerrar la decisión hacen falta, en este orden: (a) aprobación para una re
 
 ## Etapa C (ADR 0014)
 
-No iniciada en esta ejecución: depende de cerrar la Etapa B y el ADR sigue en espera de la implementación del formato 2 (pendiente de las dos partes de la aprobación: formato y migración sobre datos reales, que requieren ejecución separada).
+Actualizado el 2026-10-13. La Etapa C sí se inició después de esta nota: formato 2 en disco y en navegador (`19a81ce`, `8662a87`), con la vuelta atrás escrita en el ADR. El ADR 0014 está aceptado con implementación parcial. La migración sobre datos reales requiere una aprobación separada del usuario.

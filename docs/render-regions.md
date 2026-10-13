@@ -1,5 +1,7 @@
 # Regiones retenidas del Designer
 
+Estado (2026-10-13): la regla de los 200 cambios no se cumple según la entrada 5 del [historial 025](history/025-2026-10-W42.md) (11 de 200 superan la tolerancia), y `render-baseline.md` registra 0/255 para la misma secuencia. La contradicción está abierta en [render-estado.md](render-estado.md), que es la fuente única de pendientes.
+
 La página retenida compara el último cuadro visible con el siguiente. Una escritura raster localizada puede recomponer el área de píxeles tocada, transformada desde el buffer a la página y ampliada por el alcance de sus FX. El rectángulo dirty describe el cambio pendiente; la caja total de la capa conserva el área necesaria para moverla, ocultarla o cambiar sus filtros.
 
 El camino de pintura regional solo se usa cuando fuente, geometría, opacidad, mezcla y propiedades FX coinciden y cambian las versiones de píxeles. Si también cambió alguna propiedad de render, el plan une la caja anterior, la nueva y el dirty actual/anterior. Las escrituras desconocidas usan el área completa; una región que cubre más de la mitad de la página vuelve a cuadro completo.

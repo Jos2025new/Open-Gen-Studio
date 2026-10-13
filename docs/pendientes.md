@@ -52,6 +52,8 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Plan del Designer (orden de ejecución)
 
+Rendimiento y guardado del Designer (render-bench): lo pendiente está solo en [render-estado.md](render-estado.md), sección «Pendiente (fuente única)». No se duplica aquí.
+
 Afinar por partes, sin reescribir el motor. Este es el plan del Designer; las propuestas de producción de vídeo de la auditoría siguen aparte y no condicionan este recorrido.
 
 - [x] **1. Sondas y exportación (esta tarea).** Cronometrar la lectura sincronizada; resolver latencia aun sin dominio render; atribuir pasos FX por render y origen; separar resolución de vista y entrega. **2026-10-09**, Astra, **test**: regresiones que fallan al retirar temporalmente cada arreglo; 1029 tests aprobados y build correcto. **sandbox**: aviso al exportar 8192×8192, latencia solo FX, tres orígenes y PNG real 256×128 con FX; 8K se comprobó con canvas doble. Commits de código: `eb2c7f4`, `c19fdf3`, `4e53d5d`, `722564a`.
@@ -84,7 +86,7 @@ Estas son decisiones de diseño propuestas y criterios de cierre; no describen f
 - [ ] 11 tests de 7 archivos fallaron una vez con la carga en 47–52 (`agent-contract-journey`, `agent-direct-model`, `composer-choice`, `join-clips`, `settings-phase`, `journeys/composer-variant`, `journeys/import-safety`); pasaron por separado (51 de 51) y en la ejecución completa siguiente. La auditoría externa vio fallar `import-safety` igual. Misma causa probable que el caso anterior; tampoco se capturó el error. **2026-10-08**.
 - [ ] El renderizador de líneas de los trazos raster anteriores al motor de punta no reconstruye fiel a lo pintado: 132 píxeles con más de 4 niveles de alfa de diferencia, máximo 72 (medido en `npm run brush:check`, 2026-10-09). Solo afecta a trazos antiguos al reconstruirse (al mover objetos). Los nuevos usan el motor y coinciden. **2026-10-09**.
 - [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
-- [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**.
+- [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**. Parcial (2026-10-13): el historial de píxeles ya guarda mosaicos de 64² en memoria (`79bf595`); la medida del gesto sigue en [render-estado.md](render-estado.md).
 - [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.
 
 ## Auditoría externa (GPT 6 Astra, 2026-10-08)

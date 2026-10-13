@@ -1,6 +1,10 @@
-# Arquitectura de render profesional para el Designer (2026-10-12)
+# Arquitectura de render profesional para el Designer (2026-10-12; estado al 2026-10-13)
 
-Investigación de cómo resuelven el problema los editores profesionales y qué significa para OGS. Fuentes primarias enlazadas; el estado de OGS se leyó en el código de `9c061f8`. Es una propuesta: nada de esto está implementado ni medido en OGS.
+Investigación de cómo resuelven el problema los editores profesionales y qué significa para OGS. Fuentes primarias enlazadas; el estado de OGS en las secciones 2 a 5 se leyó en el código de `9c061f8` el 2026-10-12. Las secciones 3 a 5 son la propuesta original. **El estado actual de cada tarea está en la sección 6.**
+
+**Nota de cambio de rumbo.**
+- **2026-10-12:** el usuario aprobó los cinco puntos en TypeScript sobre Canvas2D (no sobre un motor nuevo). La composición retenida se hace primero sobre Canvas2D y el motor se decide después. Los cinco puntos no constan en este documento; el usuario los comunicó en la sesión.
+- **2026-10-13:** el usuario autorizó el plan único de 6 entregas ([plan-fluidez.md](plan-fluidez.md)). Sustituye la secuencia de tareas de la sección 5 para la ejecución; la tabla de la sección 6 recoge el resultado.
 
 **Requisito de producto:** varias carpetas, ~1 capa por personaje y por localización, muchas capas de ajuste y filtro, raster y vector combinados, lienzos de 1K–2K, cientos o miles de trazos. Diseñar sin esperas.
 
@@ -75,3 +79,18 @@ La composición incremental (puntos 1–3) depende del motor; por eso el motor s
 **Resultado de la tarea 1:** [cifras de partida](render-baseline.md) (2026-10-12). Ningún gesto cumple los umbrales en el documento profesional; mover un trazo temprano de la capa de 300 es el peor (unos 550 ms por fotograma). Las cifras incluyen un guardado grande del sandbox, pendiente de separar con una medida limpia.
 
 Cada tarea requiere aprobación antes de implementarse (AGENTS.md); la 5 además la autorización propia de la etapa 3. Esta dirección enmienda la regla de plan-fluidez «arquitectura solo si la medida muestra cálculo pesado»: la evidencia externa (Photopea) y el código (todo se recompone cada fotograma) ya la justifican, y la tarea 1 la confirma en OGS.
+
+## 6. Estado de las 8 tareas (2026-10-13)
+
+Estado a fecha del cierre del track; los pendientes completos están en [render-estado.md](render-estado.md). Commits de la rama `task/render-bench`; la atribución de cada commit está en esa misma nota.
+
+| # | Tarea | Estado | Commits clave |
+|---|---|---|---|
+| 1 | Documento profesional sintético y cifras de partida con Canvas2D | **Parcial.** Medido el 2026-10-12, con el guardado grande del sandbox sin separar; A/B a 1024² pendiente. | `42a09b8`, `e2fa658`, `e68e83f` |
+| 2 | Prueba de motor | **Aplazada por decisión del usuario** (Canvas2D con página retenida primero). Sin recomendación en [decision-motor.md](decision-motor.md). | `26c7dc6`, `4e238f8` |
+| 3 | Núcleo de composición en GPU y página retenida | **Parcial.** Hay página retenida con regiones sobre Canvas2D (no el núcleo GPU). Paridad en navegador pendiente. | `4e25877`, `6acc817`, `d4c0814`, `fc61510`, `c34b91a`, `08f1748`, `a423862`, `4503594` |
+| 4 | Grafo de invalidación, márgenes de FX y caché de FX `below` | **Parcial.** Márgenes de FX y caché de `below` hechos; el grafo completo no. Paridad en navegador pendiente. | `4e25877`, `2427ddb`, `7a9e88c`, `7da0a51`, `ae0aa2e` |
+| 5 | Límite raster y pinceles en GPU | **Parcial.** Límite provisional (64 trazos / 8192 segmentos) y prueba de píxeles en Canvas real. Pinceles en GPU no hechos; comprobación visual pendiente. | `4bd93cd`, `2f44d74`, `2039485`, `ae0aa2e` |
+| 6 | Mosaicos con copia al escribir y presupuesto de memoria | **Parcial.** Presupuesto en bytes y historial en mosaicos 64² en memoria. Guardado por mosaicos y ADR 0015 pendientes. | `b76835c`, `29c9fc9`, `79bf595` |
+| 7 | PNG, exportar e integrar en workers | **Parcial / descartado en parte.** Encoder en worker existe pero desactivado; las tres rutas no dieron paridad. | `5ae9851`, `95e6634`, `7ad9c17`, `89bb605` |
+| 8 | Verificación con gestos reales y prueba del usuario | **Pendiente.** | — |

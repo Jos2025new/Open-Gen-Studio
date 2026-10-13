@@ -1,6 +1,6 @@
 # Plan: Designer fluido (2026-10-12)
 
-Plan único acordado por el usuario con revisiones de Claude y GPT. **Las revisiones futuras lo enmiendan en la sección «Enmiendas»; no se reabre desde cero.** Contexto y medidas: [historial 025](history/025-2026-10-W42.md), entradas 1 y 2.
+Plan único acordado por el usuario con revisiones de Claude y GPT. **Las revisiones futuras lo enmiendan en la sección «Enmiendas»; no se reabre desde cero.** Contexto y medidas: [historial 025](history/025-2026-10-W42.md), entradas 1 y 2. Estado de cada entrega y pendientes: [render-estado.md](render-estado.md), fuente única.
 
 ## Objetivo y aceptación
 
@@ -35,7 +35,7 @@ Dibujar, seleccionar y mover se sienten inmediatos. Tests verdes o un guardado m
 | Guardado: texto para IndexedDB (41 ms) + `put` (64 ms) | Medido en el sandbox (dev) → etapa 1 |
 | Recuadro raster al pulsar o arrastrar | Corregido según las pruebas anteriores (61,6 → ~3 ms, `26a97f0`); pendiente de validar en el banco final |
 | Bloqueo de 40–56 ms tras cada pulsación en Edit | Medido en desarrollo; atribución a React pendiente → etapa 2 |
-| PNG de la capa 700 ms tras cada trazo (`canvasToBlob`, `raster.ts` `writeLayer`) | Sin medir; sospechoso de leer la GPU en el hilo principal → etapa 2 |
+| PNG de la capa 700 ms tras cada trazo (`canvasToBlob`, `raster.ts` `writeLayer`) | Sospechoso de leer la GPU en el hilo principal → etapa 2. Medido el 2026-10-13: ninguna ruta en worker da paridad exacta; el guardado sigue con el encoder legado ([historial 025](history/025-2026-10-W42.md), entrada 4) |
 | 12 MB por guardado: todas las sesiones en un documento | Estructural → etapa 3 (ADR 0014) |
 | `paintStrokes` sin límite (1,2 MB en una capa) | Estructural → etapa 3 (límite raster) |
 
@@ -84,7 +84,7 @@ Dibujar, seleccionar y mover se sienten inmediatos. Tests verdes o un guardado m
   - una opción para quitar el límite, con advertencia;
   - umbral por trazos y segmentos, fijado midiendo;
   - las capas antiguas por encima del límite no se aplanan sin confirmación dentro de la app.
-- **ADR 0014:** guardar solo la sesión que cambió (pendiente de aprobación).
+- **ADR 0014:** guardar solo la sesión que cambió. Aceptado el 2026-10-12; implementación parcial el 2026-10-13 ([render-estado.md](render-estado.md)).
 
 ## Lo que no se toca
 - `baseAt`, el rechazo 409, las copias, el rechazo de pérdida masiva, `X-OGS-Automated` y el acceso solo local.

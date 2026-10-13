@@ -126,12 +126,6 @@ Estado de partida: sandbox vacío (una sesión profesional de 4,3 MB; antes el e
 
 **Incidencias de procedimiento.** Dos medidas empezaron con memoria disponible por debajo de 2,5 GB (2,09 GB en la línea base de b; 2,29 GB en el «antes» de c). La regla exige esperar; no se esperó. Los resultados se anotan con esa reserva. Desde entonces, la espera va dentro de cada comando de medida.
 
-## Pendiente (para decidir)
-
-1. **Sesión reutilizada.** `prepareProfessional` ya reutiliza la sesión existente (una sola) y restaura su contenido; el test del helper pasa. El guardado de la sandbox sigue reserializando todo el estado (ver arreglo 1 de la Etapa A).
-2. Verificar la atribución de d y e con una medida limpia (sandbox vacío, una sola sesión).
-3. Repetir en una sesión sin procesos ajenos consumiendo CPU (durante el perfil la carga llegó a ~10 por procesos de navegador del propio banco).
-
 ## Reproducción
 
 ```bash
@@ -150,36 +144,15 @@ El JSON completo de la pasada válida (todas las repeticiones y metadatos) queda
 
 ## Pendiente
 
-### Estado para retomar (cierre del día)
+Los pendientes están en un único lugar: [render-estado.md](render-estado.md), sección «Pendiente (fuente única)». Aquí solo quedan las notas de estado que cambiaron después de esta medida (2026-10-12 y 2026-10-13):
 
-Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. Commits clave: `4e25877`, `6acc817`, `d4c0814`, `fc61510`, `c34b91a`, `9800f7e`, `af54852`, `384a39c`, `0ee9f2f` (revertido después), `08f1748`, `de7b477`, `65b91da`.
-
-| Paso | Estado |
-|---|---|
-| 1. Márgenes FX y rectángulos | Hecho (`4e25877`, tests) |
-| 2. Zonas sucias por capa | Hecho (`6acc817`); el cambio local de 2026-10-13 conecta `takeDirty` con la página retenida; paridad browser pendiente |
-| 3. Página retenida con redibujo por región | Hecho en el editor (`d4c0814`, `fc61510`, `c34b91a`); parte grande por región no ejercitada (2 de 200 cambios) |
-| 4. Presupuesto en bytes | Hecho (`b76835c`, anterior) |
-| 5. Historial en bytes | Hecho (`29c9fc9`, anterior) |
-| 6. Escenario sin FX con página retenida | Hecho con guarda: solo con traslación entera de la vista (`08f1748`); oráculo sin FX 0/255 |
-| 7. ADR 0015 | Propuesto, sin implementar (decisión del usuario) |
-| 8. Medidas antes/después | **Pendiente** (ver abajo) |
-| 9. Aviso de historial recortado | Hecho (`384a39c`, nota «History trimmed» junto a Deshacer) |
-
-**Reversión a GPU con oráculo en CPU: hecha** (`65b91da`). `ctx2d` y el Stage usan GPU por defecto; `setCpuCanvases` solo para el oráculo y el banco. Con CPU, la paridad es 200/200 en 0/255. Máximo medido con GPU: 63/255 (ver «Rasterizado GPU y determinismo»).
-
-**A/B a 1024² pendiente.** Variantes: (i) `7e56f53`, (ii) HEAD con GPU, (iii) HEAD con `?cpu=1`. En el intento del 2026-10-13 solo se preparó la fixture 1024²; no se ejecutaron gestos porque la memoria disponible quedó entre 1 672 y 2 118 MB, por debajo del mínimo de 2 500 MB exigido antes de medir. El watchdog no actuó; el navegador llegó a 1 539 MB RSS, bajo el límite de 1 800 MB. Se cerraron navegador, servidor y watchdog propios; el puerto 5183 quedó libre y el SHA-256 de `.sandbox/data/state.json` siguió igual (`b739d941fdc2d5bca9e788403b8d5d0b6758f58d777a932f98d231fcfe6e21fc`). No hay tabla A/B ni decisión CPU/GPU basada en estos gestos. Con CPU el documento de 2048² llegó a 2 057 MB; HEAD GPU a 2048² tampoco se midió.
-
-**Riesgos abiertos**
-- Memoria: el documento profesional de 2048² con CPU supera el tope de 1800 MB del banco.
-- Rendimiento: la CPU puede ser más lenta al dibujar; no está medido.
-- Retenida por región: histórico 2 de 200 cambios; el consumidor local ahora mapea `takeDirty` a la página y expande el rectángulo por el margen FX. La paridad del oráculo 200/200/255 y el conteo nuevo de regiones aún no se ejecutaron en navegador.
-- Cajas de FX: se eliminó el reloj de 150 ms; la caja combina el alfa de la base cacheado por versión y la geometría conservadora de trazos editables, con margen FX aplicado por el plan. La prueba simula el reloj en t=0 y t=149 ms; paridad browser pendiente.
-- Rasterizado GPU no determinista: el editor y la exportación pueden diferir en píxeles (hasta 63/255).
-
-- **Etapa C (ADR 0014), en curso.** Hecho: formato 2 en disco (`server/store-v2.js`, con 10 pruebas que incluyen migración con copia previa, escritura de una sola sesión, recarga idéntica, 409, pérdida masiva total y por sesión, PUT legado convertido y vuelta atrás) y en navegador (`ogs-store-v2`, con 4 pruebas: migración, commit de una sola sesión, recarga y disco caído). Pendiente: medidas de d y e antes y después (el «antes» en el worktree `ogs-render-bench-before`: el run de d con tres repeticiones aún no terminó; el navegador con el documento profesional y sus cachés supera el tope de 1800 MB si se encadenan preparación y gestos sin liberar), pruebas de la lista que falten, la vuelta atrás escrita en el ADR 0014, y `npm test` completo.
-- **Etapa B en pausa**, a la espera de que el usuario decida entre composición retenida sobre Canvas2D o terminar la comparación de motores.
-- El worktree `ogs-render-bench-before` (HEAD separado en `4e238f8`) sigue existiendo para la medida «antes»; se eliminará con `git worktree remove` al terminarla.
+- **Reversión a GPU con oráculo en CPU:** hecha (`65b91da`). `ctx2d` y el Stage usan GPU por defecto; `setCpuCanvases` solo para el oráculo y el banco. Con CPU, la paridad de la secuencia corta fue 200/200 en 0/255 (ver la contradicción abierta en render-estado).
+- **Sesión reutilizada** en `prepareProfessional`: hecha.
+- **Aviso «History trimmed»** (`384a39c`): hecho.
+- **Vuelta atrás del ADR 0014:** escrita en el ADR (sección «Vuelta atrás»).
+- **Etapa B:** decisión del usuario, composición retenida sobre Canvas2D primero y motor después (cronología en render-estado). Ya no está en pausa.
+- **ADR 0015:** propuesto; el historial en mosaicos está en memoria (`79bf595`). El estado lo decide el usuario.
+- **Medidas de d y e antes y después, y A/B a 1024²:** pendientes. El worktree `ogs-render-bench-before` (HEAD `4e238f8`) se eliminará con `git worktree remove` al terminar la medida.
 
 ## Plan de rendimiento (2026-10-13): filas por paso
 
@@ -187,9 +160,9 @@ Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. C
 |---|---|---|---|---|
 | 2. Oráculo de paridad | Compara la vía de exportación (`drawDoc`, sin cachés) con la del editor (cachés activas) sobre documentos sintéticos | No existía | Diferencia 0 de 921 600 canales (navegador, Canvas2D) | `bench/engines/parity.ts`, `tests/parity-oracle.test.ts` |
 | 4. Presupuesto en bytes | `fxCache`, `belowFxCache` y máscaras de trazo comparten un presupuesto de 256 MB en bytes | Tres cachés con límites propios: 48 M px, 48 M px y 16 M px | Un único presupuesto en bytes; descarta lo menos usado | Sin medida de gesto todavía (sandbox ocupado; ver «Pendiente») |
-| 5. Historial en bytes | El deshacer del Designer tiene un tope en bytes (512 MB) sobre los lienzos que conserva; descarta primero el más antiguo y nunca el último | Tope por número de pasos (40), sin límite en bytes | Tope en bytes con conteo de lienzos compartidos una vez; contador de pasos descartados en `historyDepth` | Pendiente: el aviso discreto en la interfaz y la medida del gesto |
+| 5. Historial en bytes | El deshacer del Designer tiene un tope en bytes (512 MB) sobre los lienzos que conserva; descarta primero el más antiguo y nunca el último | Tope por número de pasos (40), sin límite en bytes | Tope en bytes con conteo de lienzos compartidos una vez; contador de pasos descartados en `historyDepth` | Aviso «History trimmed» hecho (`384a39c`); pendiente la medida del gesto |
 
-## Rasterizado GPU y determinismo (Paso 3, parte 5)
+## Rasterizado GPU y determinismo (Paso 3, parte 5; 2026-10-12)
 
 - **Hallazgo.** El rasterizado GPU de Chromium no es bit a bit determinista: el mismo documento compuesto dos veces
   puede dar píxeles distintos, con diferencias de hasta **63/255** por canal (200 cambios aleatorios, semilla fija,

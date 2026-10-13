@@ -45,7 +45,7 @@
 - [0012 — Registro de rendimiento para sesiones de prueba](decisions/0012-registro-de-rendimiento.md).
 - [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
 - [0014 — Guardar cada sesión por separado (aceptado 2026-10-12; implementación parcial 2026-10-13)](decisions/0014-sesiones-separadas.md).
-- [0015 — Píxeles en mosaicos de 256² con copia al escribir (propuesto, sin implementar)](decisions/0015-mosaicos-de-pixeles.md).
+- [0015 — Píxeles en mosaicos de 256² con copia al escribir (propuesto; el historial en mosaicos de 64² ya está en memoria, sin guardado por mosaicos)](decisions/0015-mosaicos-de-pixeles.md).
 
 ## Propuestas de interfaz
 
@@ -53,11 +53,11 @@
 
 - [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
 - [Plan: Designer fluido](plan-fluidez.md) (2026-10-12): objetivo, umbrales, etapas y autorizaciones; las revisiones lo enmiendan, no lo reabren.
-- [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, motor a decidir y tareas.
+- [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
-- [Estado del cierre de render-bench](render-estado.md) (2026-10-13): commits de guardado raster, regiones y banco; verificación, revertido y pendiente.
+- [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
 - [Investigación: cómo resuelve memoria y rendimiento PhotoCraft (Rust+wasm) y qué aplicar en OGS](investigacion-photocraft.md) (2026-10-13), solo lectura del código.
-- [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final](decision-motor.md) (2026-10-12).
+- [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final; aplazada por decisión del usuario](decision-motor.md) (2026-10-12).
 - [Banco de fluidez: instrucciones al agente de pruebas](fluidez-pruebas.md): producción aislada, casos habitual/exigente y límites de las medidas.
 - [Regiones retenidas del Designer](render-regions.md): dirty raster, cajas totales, FX y evidencia de paridad.
 
@@ -90,7 +90,7 @@
 - [022-2026-10-W41: Brocha de SAI, revisión de Astra, integración y purga (2026-10-09)](history/022-2026-10-W41.md) — 16469 bytes.
 - [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](history/023-2026-10-W41.md) — 4623 bytes.
 - [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 29926 bytes.
-- [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12)](history/025-2026-10-W42.md) — 12674 bytes.
+- [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12)](history/025-2026-10-W42.md) — 14493 bytes.
 
 ## Trazabilidad
 
