@@ -2,7 +2,10 @@ import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
 import { ToolHelpLine, ViewToggles } from './ToolHelp';
 import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
-import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
+import { objectPick, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
+import { nudgeLayers } from '../../engine/design/nudge';
+
+const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
@@ -188,7 +191,13 @@ export function DesignerWorkspace() {
         const pk = objectPick(doc.id)!;
         deletePickedObjects(session.id, doc.id, pk.layerId, pk.ids);
         setObjectPick(doc.id, null);
-      } else if (!mod && !e.altKey) {
+      } else if (!mod && !e.altKey && ARROW_STEP[e.key] && !useShapeEdit.getState().byDoc[doc.id] && !pickedHere(doc) && layer) {
+        // Arrow keys nudge the picked layers (1 px, Shift 10 px); path-node editing keeps its own arrows (PathNodes.tsx).
+        e.preventDefault();
+        const [ux, uy] = ARROW_STEP[e.key];
+        const k = e.shiftKey ? 10 : 1;
+        const r = nudgeLayers(session.id, doc.id, layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id)), ux * k, uy * k);
+        if (r.locked && !r.moved) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info');
         if ((e.key === 'Delete' || e.key === 'Backspace') && layer) {
           // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
           e.preventDefault();
