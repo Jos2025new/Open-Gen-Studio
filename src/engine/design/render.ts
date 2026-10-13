@@ -311,7 +311,9 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
   const stage = traceStatus() !== null && (ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas');
   const { context, end } = beginRender(opts.origin ?? (stage ? 'editor' : 'offscreen'), { layers: doc.layers.length, fx: steps.reduce((k, s) => k + (s.t === 'clip' ? s.fx.length : s.t === 'below' ? 1 : 0), 0), page: `${doc.width}x${doc.height}` });
   if (stage) takeCanvasCount();
-  if (steps.every((s) => s.t === 'draw')) {
+  // Stage without FX: retained page at whole-pixel views (Paso 6).
+  const m = ctx.getTransform();
+  if (steps.every((s) => s.t === 'draw') && !(stage && Number.isInteger(m.e) && Number.isInteger(m.f))) {
     if (doc.background) {
       ctx.fillStyle = doc.background;
       ctx.fillRect(0, 0, doc.width, doc.height);
@@ -368,8 +370,8 @@ function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
 const FX_MAX_PX = 16_000_000;
 
 /*
- * With FX the page is composed off screen, at the resolution it is shown (the view transform's scale), so 'below'
- * FX see everything under them, background included. Delivery uses scale 1 with this same plan. Lengths in FX params are document px.
+ * With FX the page is composed off screen at the view's scale, so 'below' FX see everything under them.
+ * Delivery uses scale 1 with the same plan. FX lengths are document px.
  */
 const retained = new RetainedPage<HTMLCanvasElement>();
 const fullRect = (W: number, H: number): Rect => ({ x0: 0, y0: 0, x1: W, y1: H });
@@ -385,7 +387,7 @@ function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: numb
     x.fillStyle = doc.background;
     x.fillRect(0, 0, doc.width, doc.height);
   }
-  // Editor frames: keys for the 'below' cache (page, crop, background, fonts, layers, pixels).
+  // Editor frames: 'below' cache keys (page, crop, background, fonts, pixels).
   const below: unknown[] = editor ? [scale, W, H, ox, oy, cw, ch, doc.background, fontEpoch] : [];
   for (const s of steps) {
     const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${cw}x${ch}` });

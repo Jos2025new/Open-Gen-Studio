@@ -24,12 +24,13 @@ function maxDiff(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
 type Mut = { kind: string; next: DesignDoc };
 const withLayer = (doc: DesignDoc, id: string, f: (l: Layer) => Layer): DesignDoc => ({ ...doc, layers: doc.layers.map((l) => (l.id === id ? f(l) : l)) });
 
-function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone = true): Mut {
+function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone = true, nofx = false): Mut {
   const pick = <T,>(xs: T[]): T => xs[rnd(xs.length)];
   const rasters = doc.layers.filter((l): l is RasterLayer => l.type === 'raster');
   const fxs = doc.layers.filter((l) => l.type === 'fx');
   let pickCase = rnd(8);
   if (!raster && (pickCase === 6 || pickCase === 7)) pickCase = 3;
+  if (nofx && pickCase === 5) pickCase = 3;
   switch (pickCase) {
     case 0: {
       const l = pick(rasters), dx = rnd(41) - 20, dy = rnd(41) - 20;
@@ -85,9 +86,10 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
   }
 }
 
-export async function runCacheOracle(count = 200, seed = 20260412, raster = true, tone = true): Promise<CacheOracleResult> {
+export async function runCacheOracle(count = 200, seed = 20260412, raster = true, tone = true, nofx = false): Promise<CacheOracleResult> {
   const rnd = rng(seed);
   let { doc } = parityDocument();
+  if (nofx) doc = { ...doc, layers: doc.layers.filter((l) => l.type !== 'fx') };
   if (!tone) doc = { ...doc, layers: doc.layers.filter((l) => l.id !== 'par-fx-curves') };
   for (const l of doc.layers) if (l.type === 'raster' && l.paintBaseId) { setBuffer(l.paintBaseId, blank(), false); composeRaster(l, false); }
   const stage = document.createElement('canvas'); stage.width = doc.width; stage.height = doc.height; stage.className = 'stage-canvas';
@@ -101,7 +103,7 @@ export async function runCacheOracle(count = 200, seed = 20260412, raster = true
   let differing = 0, maxAll = 0, firstDiff: CacheOracleResult['firstDiff'] = null;
   const kinds: Record<string, number> = {};
   for (let k = 0; k < count; k++) {
-    const m = mutate(doc, rnd, raster, tone);
+    const m = mutate(doc, rnd, raster, tone, nofx);
     kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
     doc = m.next;
     await new Promise((r) => setTimeout(r, 170));
