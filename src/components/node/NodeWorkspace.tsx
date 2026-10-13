@@ -16,6 +16,7 @@ import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
+import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
 import type { GraphNodeData } from '../../engine/types';
 import { TopbarActions } from '../shell/TopBar';
@@ -311,7 +312,13 @@ function Canvas() {
   const fileInput = useRef<HTMLInputElement>(null);
   const importPosition = useRef<{ x: number; y: number } | undefined>(undefined);
   const importImages = useCallback(async (files: File[], position?: { x: number; y: number }) => {
-    const images = files.filter(f => f.type.startsWith('image/'));
+    // EPS and HEIC/HEIF become PNG first (the same conversion as the Designer); unreadable files say why.
+    const ready: File[] = [];
+    for (const f of files) {
+      const r = await prepareImportFile(f);
+      if (typeof r === 'string') toast(r, 'error'); else ready.push(r);
+    }
+    const images = ready.filter(f => f.type.startsWith('image/'));
     if (!images.length) return;
     const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
     const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
@@ -396,7 +403,7 @@ function Canvas() {
         addAssetAsNode(sessionId, assetId, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
       }}
     >
-      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={e => {
+      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={e => {
         const files = [...(e.currentTarget.files ?? [])];
         e.currentTarget.value = '';
         void importImages(files, importPosition.current);
