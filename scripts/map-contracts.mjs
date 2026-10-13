@@ -32,6 +32,16 @@ export default [
     tests: ['tests/drawing-choice.test.ts'],
   },
   {
+    id: 'eps-import',
+    what: 'EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación.',
+    sides: [
+      ['server/eps.js', "'-dSAFER', '-dBATCH'"],
+      ['server/local-store.js', "path === '/eps' && req.method === 'POST'"],
+      ['src/lib/imports.ts', 'export const EPS_NEEDS_GHOSTSCRIPT'],
+    ],
+    tests: ['tests/eps-server.test.ts', 'tests/imports-eps-heic.test.ts'],
+  },
+  {
     id: 'path-node-topology',
     what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [

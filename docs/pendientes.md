@@ -127,10 +127,6 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 - [x] 3D y Designer (`PLAN_3D_DESIGNER.md`, P1–P9): cuatro modelos 3D, visor, exportación PDF/SVG, lineart editable y pinceles con textura. **2026-10-08**, **código** y **test** ([3d-contracts](../tests/3d-contracts.test.ts), [model3d](../tests/model3d.test.ts), [design-export](../tests/design-export.test.ts), [brush-control](../tests/brush-control.test.ts): 22 aprobados). **usuario**: el visor se probó y se amplió después.
 - [x] Banco del agente, antes y después (R0d/R8). **usuario**: lo ejecutó en otras sesiones, con GPT y con Claude, con Grok y MiMo y con gasto real. En el repositorio: [comparación NanoGPT](nanogpt-price-comparison.md), [expansión 2](nanogpt-price-expansion-2.md) y `bench/2026-10-01-3273c0a.json`. No se volvió a ejecutar el 2026-10-08.
 
-## Importar EPS (pendiente, 2026-10-13)
+## Importar SVG (pendiente, 2026-10-13)
 
-No se implementa. Un EPS necesita Ghostscript: o una versión en wasm que corra en el navegador (pesada y de licencia AGPL, a revisar), o una conversión en el servidor local (el almacén no debe ser el único punto de conversión). Mientras tanto, el selector de Designer no ofrece `.eps`.
-
-## Importar SVG y HEIC (pendiente, 2026-10-13)
-
-Sin hacer. SVG: vectorial si usa solo rect, ellipse, path, line con relleno y trazo; si no, rasterizado; con saneado (sin script, foreignObject ni href externos). HEIC: `heic2any` (MIT, empaqueta libheif bajo LGPL: revisar antes de añadirlo) cargado de forma diferida. Ninguno está probado con archivos reales.
+Sin hacer. SVG: vectorial si usa solo rect, ellipse, path, line con relleno y trazo; si no, rasterizado; con saneado (sin script, foreignObject ni href externos). Sin hacer: no se añade `image/svg+xml` a los accept hasta que exista el importador.

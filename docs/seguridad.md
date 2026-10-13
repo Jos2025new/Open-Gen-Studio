@@ -26,3 +26,12 @@ Esta página dice qué está protegido y qué no, con la prueba de cada punto. *
 - **Con `--host`, la app se puede abrir desde otro dispositivo, pero sin tus datos:** no guarda ni carga nada. Es intencionado.
 - **El relay `/x/media` no está limitado al propio ordenador.** Solo descarga medios de los dominios de proveedores de una lista fija y los sirve aislados. No da acceso a `data/`.
 - **No hay contraseña ni usuarios.** La app está pensada para una sola persona en su ordenador. Publicarla como servicio necesitaría autenticación, que no existe.
+
+## Importar EPS con Ghostscript local (2026-10-13)
+
+`POST /x/store/eps` (solo desde este ordenador, con cabecera de app) convierte el EPS con el `gs` del sistema: `-dSAFER`, 30 s como máximo, entrada de 25 MB como máximo, carpeta temporal propia que se borra también si falla. El nombre que envía el navegador no se usa. Ghostscript no va en la app ni en el repositorio (es AGPL). Sin `gs` la app dice cómo instalarlo; con vista previa TIFF lo dice sin mostrarla.
+
+## Licencias de importación (2026-10-13)
+
+heic2any 0.0.4: MIT, pero su bundle (1,4 MB, carga diferida) incluye libheif, que es LGPL. No es AGPL ni GPL; si el repositorio se publica, hay que mantener el aviso de LGPL de libheif.
+

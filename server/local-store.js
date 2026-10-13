@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createStoreV2 } from './store-v2.js';
+import { EPS_MAX_BYTES, handleEps } from './eps.js';
 
 const run = promisify(execFile);
 /** data/logs/app.log rotates here: the previous file is kept as app.log.1 and then overwritten. */
@@ -193,6 +194,13 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       const r = await serialState(() => v2.commit(payload));
       if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
       return send(r.status);
+    }
+
+    // EPS to PNG through the system Ghostscript (eps.js). Behind the write checks above: only the app sends it.
+    if (path === '/eps' && req.method === 'POST') {
+      if (Number(req.headers['content-length'] ?? 0) > EPS_MAX_BYTES) return send(413, 'EPS file too large');
+      const r = await handleEps(await body(req));
+      return send(r.status, r.body, r.type);
     }
 
     if (path === '/state') {

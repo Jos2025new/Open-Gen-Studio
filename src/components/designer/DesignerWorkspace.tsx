@@ -4,6 +4,7 @@ import type { DesignDoc } from '../../engine/types';
 import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps';
 import { objectPick, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
 import { nudgeLayers } from '../../engine/design/nudge';
+import { prepareImportFile } from '../../lib/imports';
 
 const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -225,7 +226,13 @@ export function DesignerWorkspace() {
   const importRef = useRef<HTMLInputElement>(null);
   const importFiles = async (files: File[]) => {
     if (!doc) return;
-    const ids = await uploadFiles(files.filter((f) => f.type.startsWith('image/')));
+    // EPS (local Ghostscript) and HEIC (browser decoder) become PNG first; anything that cannot be read says why.
+    const ready: File[] = [];
+    for (const f of files) {
+      const r = await prepareImportFile(f);
+      if (typeof r === 'string') toast(r, 'error'); else ready.push(r);
+    }
+    const ids = await uploadFiles(ready.filter((f) => f.type.startsWith('image/')));
     await placeImportedImages(session.id, doc.id, ids);
   };
   useEffect(() => {
@@ -235,7 +242,7 @@ export function DesignerWorkspace() {
   }, []);
 
   return <div className="designer">
-    <input ref={importRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
+    <input ref={importRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
     <TopbarActions>
       <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">

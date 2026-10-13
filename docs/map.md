@@ -16,6 +16,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | --- | --- | --- |
 | **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
 | **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts) |
+| **eps-import** — EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación. | [eps.js](../server/eps.js), [local-store.js](../server/local-store.js), [imports.ts](../src/lib/imports.ts) | [eps-server.test.ts](../tests/eps-server.test.ts), [imports-eps-heic.test.ts](../tests/imports-eps-heic.test.ts) |
 | **path-node-topology** — Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer. | [pathNodeOps.ts](../src/engine/design/pathNodeOps.ts), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx) | [path-nodes.test.ts](../tests/path-nodes.test.ts), [path-nodes.spec.ts](../tests-e2e/path-nodes.spec.ts) |
 | **provider-key-ui** — Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores. | [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [ConnectedProviders.tsx](../src/components/shell/ConnectedProviders.tsx) | [connected-providers.test.ts](../tests/connected-providers.test.ts) |
 | **guided-asks** — Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas. | [context.ts](../src/engine/agent/context.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-mode.test.ts](../tests/agent-mode.test.ts) |
@@ -105,10 +106,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 23 | 130 |
+| `src/lib` | 24 | 131 |
 | `src/store` | 4 | 96 |
 
-107 de 266 módulos no tienen ningún test que los importe directamente.
+107 de 267 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
