@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'rea
 import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
+import { paintOpacity, paintOpacityPatch } from '../../engine/design/shapeLook';
 import { StrokeStyleFields } from './StrokeStyleFields';
 import { addEmptyLayer, deleteLayers, duplicateLayer, mergeDown, moveLayer, rasterizeLayer, patchLayer, reorderLayer, setActiveLayer } from '../../engine/design/actions';
 import { OPS } from '../../engine/ops';
@@ -286,8 +287,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
           const pickedShapes = objPick?.layerId === layer.id ? layer.shapes.filter((s) => objPick.ids.includes(s.id)) : [];
           const set = (id: string, p: Partial<VectorShape>) => patch({ shapes: layer.shapes.map((x) => (x.id === id ? { ...x, ...p } : x)) });
           return <><p className="muted">{pickedShapes.length ? `Picked shape ${pickedShapes.length === 1 ? '' : `(${pickedShapes.length}) `}of ${layer.shapes.length}.` : `${layer.shapes.length} shapes · draw on the canvas to add more.`}</p>{(pickedShapes.length ? pickedShapes : layer.shapes).map((s) => <div className="shape-properties" key={s.id}><strong>{s.type} {layer.shapes.indexOf(s) + 1}</strong>
-            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} />
-            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => set(s.id, { stroke })} />
+            <InlineColor label="Fill" value={s.fill ?? '#d4f25a'} showValue onChange={(fill) => set(s.id, { fill })} alpha={{ value: paintOpacity(s, 'fill'), onChange: (o) => set(s.id, paintOpacityPatch('fill', o)) }} />
+            <InlineColor label="Stroke" value={s.stroke ?? '#ffffff'} showValue onChange={(stroke) => set(s.id, { stroke })} alpha={{ value: paintOpacity(s, 'stroke'), onChange: (o) => set(s.id, paintOpacityPatch('stroke', o)) }} />
             <InlineSlider label="Stroke width" unit="px" min={0} max={40} allowManualOverflow value={s.strokeWidth} onChange={(strokeWidth) => set(s.id, { strokeWidth })} />
             <ShapeLookFields value={s} corners={s.type === 'rect'} blur onChange={(p) => set(s.id, p)} /></div>)}</>;
         })()}

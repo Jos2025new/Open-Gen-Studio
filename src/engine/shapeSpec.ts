@@ -11,6 +11,9 @@ export interface ShapeSpec {
   fill: string | null;
   stroke: string | null;
   strokeWidth: number;
+  /** fill-opacity / stroke-opacity (0–1) as in SVG; absent = 1, so older documents are unchanged. */
+  fillOpacity?: number;
+  strokeOpacity?: number;
   /** Legacy single corner radius; `rx`/`ry` win when set (one set copies to the other, as in SVG). */
   radius: number;
   rx?: number;

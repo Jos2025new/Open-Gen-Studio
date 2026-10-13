@@ -181,5 +181,14 @@ export function blurFilterSvg(id: string, s: ShapeSpec): string {
   return `<filter id="${id}" filterUnits="userSpaceOnUse" x="${r3(r.x)}" y="${r3(r.y)}" width="${r3(r.w)}" height="${r3(r.h)}" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="${r3(s.blur ?? 0)}"/></filter>`;
 }
 
+/** The picker's A for a shape's fill or stroke is that paint's opacity (one value, absent = 1). */
+export function paintOpacity(s: ShapeSpec, which: 'fill' | 'stroke'): number {
+  return (which === 'fill' ? s.fillOpacity : s.strokeOpacity) ?? 1;
+}
+export function paintOpacityPatch(which: 'fill' | 'stroke', opacity: number): Partial<ShapeSpec> {
+  const v = clamp(opacity, 0, 1);
+  return which === 'fill' ? { fillOpacity: v } : { strokeOpacity: v };
+}
+
 function clamp(v: number, lo: number, hi: number): number { return Math.min(hi, Math.max(lo, v)); }
 function r3(v: number): number { return Math.round(v * 1000) / 1000; }

@@ -39,7 +39,9 @@ export function n(v: number): string {
 }
 
 function paint(s: VectorShape, strokeWidth: number, fill = s.fill): string {
-  return `fill="${fill ? xmlEscape(fill) : 'none'}"${s.stroke && strokeWidth > 0 ? ` stroke="${xmlEscape(s.stroke)}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
+  const fo = fill && s.fillOpacity != null && s.fillOpacity < 1 ? ` fill-opacity="${n(Math.max(0, s.fillOpacity))}"` : '';
+  const so = s.stroke && strokeWidth > 0 && s.strokeOpacity != null && s.strokeOpacity < 1 ? ` stroke-opacity="${n(Math.max(0, s.strokeOpacity))}"` : '';
+  return `fill="${fill ? xmlEscape(fill) : 'none'}"${fo}${so}${s.stroke && strokeWidth > 0 ? ` stroke="${xmlEscape(s.stroke)}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
 }
 
 /** A shape, wrapped with its own blur filter when it has one (shapeLook.ts: Inkscape's 2.4σ margin). */
