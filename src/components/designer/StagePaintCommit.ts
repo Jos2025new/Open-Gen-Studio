@@ -10,7 +10,7 @@ import type { RasterPaintLimits } from '../../engine/design/rasterLimit';
 import { setObjectPick } from '../../engine/design/objectSelection';
 import type { BrushOptions } from '../../engine/design/brushEngine';
 import { setDoc, toast } from '../../store/store';
-import { applyDrawingChoice, drawingPreference, requestDrawingChoice } from '../../engine/design/drawingChoice';
+import { applyDrawingChoice, drawingPreference, justClosedChoice, requestDrawingChoice } from '../../engine/design/drawingChoice';
 import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 
 /** The raster layer a brush stroke would land on (the active one, or the one above it), or null. */
@@ -99,11 +99,12 @@ export function commitStagePaintGesture(args: {
  * Drawing on a layer with editable strokes (ADR 0016): the stroke is refused before anything is recorded. Asks, or applies
  * the saved choice. True when the stroke was handled here (refused), so the caller stops.
  */
-export function drawingChoiceFirst(sessionId: string, docId: string, doc: DesignDoc, erase: boolean): boolean {
+export function drawingChoiceFirst(sessionId: string, docId: string, doc: DesignDoc, erase: boolean, at?: { x: number; y: number }): boolean {
   const candidate = paintCandidate(doc, erase);
   if (!candidate || paintModeOf(doc) !== 'drawing' || !hasEditableStrokes(candidate)) return false;
+  if (justClosedChoice()) return true;
   const pref = drawingPreference();
-  if (pref === 'ask') requestDrawingChoice(candidate.id);
+  if (pref === 'ask') requestDrawingChoice(candidate.id, at);
   else { const message = applyDrawingChoice(sessionId, docId, candidate.id, pref); if (message) toast(message, 'info'); }
   return true;
 }

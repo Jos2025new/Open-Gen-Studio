@@ -825,7 +825,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         toast(blocked ?? 'Select a raster layer to erase.', 'error');
         return;
       }
-      if (drawingChoiceFirst(sessionId, doc.id, current, erase)) return;
+      if (drawingChoiceFirst(sessionId, doc.id, current, erase, { x: e.clientX, y: e.clientY })) return;
       if (!prepareStagePaint(current, erase)) return;
       record(current);
       // Brush never touches protected images: it paints on its own layer.

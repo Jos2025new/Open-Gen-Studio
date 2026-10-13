@@ -5,6 +5,7 @@ import { deletePickedObjects, layerObjects } from '../../engine/design/objectOps
 import { objectPick, setObjectPick, useShapeEdit } from '../../engine/design/objectSelection';
 import { nudgeObjects } from '../../engine/design/nudge';
 import { isSvg, prepareImportFile } from '../../lib/imports';
+import { DrawingChoicePrompt } from './DrawingChoice';
 import { importSvgFile } from '../../engine/design/svgImport/apply';
 
 const ARROW_STEP: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -314,6 +315,7 @@ export function DesignerWorkspace() {
         </>} />
       <ToolHelpLine />
       <Stage key={doc.id} sessionId={session.id} doc={doc} selectedCurve={selectedCurve} setSelectedCurve={setSelectedCurve} />
+      <DrawingChoicePrompt sessionId={session.id} doc={doc} />
       <LayersPanel sessionId={session.id} doc={doc} selectedCurve={selectedCurve} />
     </> :
       <div className="designer-empty"><h1>Start a design</h1><p className="muted">Choose a canvas, or open an image from the gallery.</p><div className="preset-grid">{DOC_PRESETS.map((p) => <button className="preset" key={p.id} onClick={() => newBlankDoc(session.id, p)}><span className="preset-glyph"><AspectGlyph value={`${p.width}:${p.height}`} size={30} /></span><span className="preset-text"><strong>{p.label}</strong><span className="muted num">{p.width} × {p.height}</span></span></button>)}</div></div>}

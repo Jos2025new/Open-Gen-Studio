@@ -24,7 +24,6 @@ import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
 import { fxTarget } from '../../engine/fx/plan';
 import { pendingRasterPaintLayer, subscribeRasterPaintGate } from '../../engine/design/rasterLimit';
 import { RasterLimitApproval, RasterLimitControls } from './RasterLimitControls';
-import { DrawingChoiceApproval } from './DrawingChoice';
 import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 
 const MIN_W = 200;
@@ -172,7 +171,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
       ))}
       <span className="panel-tabs-gap" />
-      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><DrawingChoiceApproval sessionId={sessionId} doc={doc} /><IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
+      <div className="panel-head-actions">{picked.length > 1 && <span className="layers-picked num"><span className="layers-picked-n">{picked.length} selected</span><button type="button" onClick={() => pickLayer(doc.id, doc.activeLayerId ?? picked[picked.length - 1], false, picked)}>clear</button></span>}<RasterLimitApproval layer={pendingPaintLayer} /><IconButton icon={PanelRightClose} label="Collapse layers panel" size="sm" onClick={() => setCollapsed(true)} /></div>
     </div>
     {layer && <fieldset className="layer-appearance" disabled={layer.locked} aria-label="Selected layer appearance">
         <legend className="layer-appearance-title">Layer · {layer.name}</legend>

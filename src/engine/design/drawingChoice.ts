@@ -62,15 +62,37 @@ export function subscribeDrawingChoice(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 export const pendingDrawingChoiceLayer = (): string | null => pendingLayer;
-export function requestDrawingChoice(layerId: string): void {
+let pendingPoint: { x: number; y: number } | null = null;
+let closedAt = 0;
+/** `at`: the pointer position (screen px) where the stroke was pressed; the prompt opens beside it. */
+export function requestDrawingChoice(layerId: string, at?: { x: number; y: number }): void {
   pendingLayer = layerId;
+  pendingPoint = at ?? null;
   notifyChoice();
 }
-/** Closing the prompt without a choice: nothing changes and the stroke is not painted. */
+export const pendingChoicePoint = (): { x: number; y: number } | null => pendingPoint;
+/** Closing the prompt without a choice (Escape, a click outside): nothing changes and nothing is painted. */
 export function cancelDrawingChoice(): void {
   if (pendingLayer === null) return;
   pendingLayer = null;
+  pendingPoint = null;
+  closedAt = Date.now();
   notifyChoice();
+}
+/** The press that closed the prompt is the same click: it must not open the prompt again. */
+export function justClosedChoice(): boolean {
+  return Date.now() - closedAt < 400;
+}
+/**
+ * Where the prompt's anchor goes: 12 px from the press, toward the bottom-right, and flipped or clamped so a box of
+ * `box` size stays inside the view `view`.
+ */
+export function promptAnchor(p: { x: number; y: number }, view: { w: number; h: number }, box: { w: number; h: number }): { x: number; y: number } {
+  const off = 12;
+  let x = p.x + off, y = p.y + off;
+  if (x + box.w > view.w) x = p.x - off - box.w;
+  if (y + box.h > view.h) y = p.y - off - box.h;
+  return { x: Math.min(Math.max(0, x), Math.max(0, view.w - box.w)), y: Math.min(Math.max(0, y), Math.max(0, view.h - box.h)) };
 }
 
 /** The layer (in this document) that the prompt is about, if it still needs one. */
