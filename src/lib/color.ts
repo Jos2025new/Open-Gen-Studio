@@ -16,3 +16,16 @@ export function hslHex([h, s, l]: number[]): string {
   const rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
   return rgbHex(rgb.map((v) => (v + m) * 255));
 }
+/** A typed #RRGGBB (the # optional, any case) as #rrggbb, or null when it is not a 6-digit hex color. */
+export function parseHexInput(text: string): string | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(text.trim());
+  return m ? '#' + m[1].toLowerCase() : null;
+}
+/** One channel (0–255) replaced in a hex color; null when the value is not a whole number in range. */
+export function setRgbChannel(hex: string, index: 0 | 1 | 2, text: string): string | null {
+  const v = Number(text.trim());
+  if (!/^\d{1,3}$/.test(text.trim()) || !Number.isInteger(v) || v < 0 || v > 255) return null;
+  const rgb = colorRgb(hex);
+  rgb[index] = v;
+  return rgbHex(rgb);
+}
