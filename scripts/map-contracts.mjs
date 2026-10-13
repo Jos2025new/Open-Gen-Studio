@@ -335,9 +335,10 @@ export default [
   },
   {
     id: 'raster-png-worker',
-    what: 'La ruta worker PNG está disponible como experimento de paridad; el guardado de capas mantiene activo el encoder Canvas legado hasta demostrar paridad de píxeles.',
+    what: 'La ruta worker PNG está disponible como experimento de paridad; el guardado de capas mantiene activo el encoder Canvas legado hasta demostrar paridad de píxeles. Cada escritura solo confirma la misma versión de píxeles que codificó, también cuando un trazo en vivo muta el lienzo en el sitio.',
     sides: [
       ['src/engine/design/raster.ts', "await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'))"],
+      ['src/engine/design/raster.ts', 'bufferVersion(layerId) === revision'],
       ['src/lib/canvasPngWorker.ts', 'export async function canvasToPngBlob'],
       ['src/lib/canvasPng.worker.ts', 'canvas.convertToBlob({ type: \'image/png\' })'],
       ['bench/engines/png-parity.ts', 'export async function runPngParity'],

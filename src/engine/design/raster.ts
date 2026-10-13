@@ -509,10 +509,11 @@ function writeLayer(layerId: string): Promise<void> {
       rasterSaved(layerId);
       return;
     }
+    const revision = bufferVersion(layerId);
     try {
       await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'));
-      // A change made while writing (new buffer or a new timer) keeps the layer pending.
-      if (buffers.get(layerId) === c && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
+      // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
+      if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
     } catch (err) {
       failSave('Layer pixels pending', err instanceof Error && err.message.includes('Another tab'));

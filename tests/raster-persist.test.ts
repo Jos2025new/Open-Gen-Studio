@@ -8,6 +8,11 @@ const events = vi.hoisted(() => {
   Object.assign(globalThis, { window: globalThis, location: { port: '5173' }, document: doc, addEventListener: on });
   return { handlers, doc };
 });
+const encoding = vi.hoisted(() => ({
+  deferNext: false,
+  started: undefined as (() => void) | undefined,
+  resolve: undefined as (() => void) | undefined,
+}));
 
 const stored = new Map<string, string>();
 const writes: string[] = [];
@@ -32,11 +37,21 @@ vi.mock('../src/lib/idb', () => ({
 vi.mock('../src/lib/media', () => ({
   createCanvas: (w: number, h: number) => ({ width: w, height: h, tag: 'blank' }),
   ctx2d: () => ({ drawImage: () => undefined }),
-  canvasToBlob: async (c: { tag: string }) => Object.assign(new Blob(['x']), { tag: c.tag }),
+  canvasToBlob: async (c: { tag: string }) => {
+    const tag = c.tag;
+    if (encoding.deferNext) {
+      encoding.deferNext = false;
+      return new Promise<Blob>((resolve) => {
+        encoding.resolve = () => resolve(Object.assign(new Blob(['x']), { tag }));
+        encoding.started?.();
+      });
+    }
+    return Object.assign(new Blob(['x']), { tag: c.tag });
+  },
   blobToCanvas: async () => ({ width: 1, height: 1 }),
 }));
 
-import { commitEdit, deleteBuffers, flushRaster, pendingRaster, setBuffer } from '../src/engine/design/raster';
+import { commitEdit, deleteBuffers, flushRaster, pendingRaster, setBuffer, touchRaster } from '../src/engine/design/raster';
 import { useStore } from '../src/store/store';
 import { hasPendingSave, resetSaveStatus } from '../src/store/saveStatus';
 
@@ -52,6 +67,9 @@ beforeEach(() => {
 });
 afterEach(async () => {
   await deleteBuffers(pendingRaster());
+  encoding.deferNext = false;
+  encoding.started = undefined;
+  encoding.resolve = undefined;
   vi.useRealTimers();
 });
 
@@ -84,6 +102,33 @@ describe('raster saving (D1–D3)', () => {
     expect(writes.at(-1)).toBe('raster:b=new');
     expect(stored.get('raster:b')).toBe('new');
     expect(pendingRaster()).toEqual([]);
+  });
+
+  it('does not acknowledge an in-place raster change made while the same canvas is encoding', async () => {
+    resetSaveStatus();
+    const pixels = canvas('before');
+    setBuffer('in-place', pixels);
+    encoding.deferNext = true;
+    const started = new Promise<void>((resolve) => { encoding.started = resolve; });
+    const first = flushRaster();
+    await started;
+
+    // Model a live-stroke pixel change and its content-version bump without scheduling a save per segment.
+    (pixels as unknown as { tag: string }).tag = 'during-live-stroke';
+    touchRaster();
+    encoding.resolve!();
+    await first;
+
+    expect(pendingRaster()).toEqual(['in-place']);
+    expect(hasPendingSave()).toBe(true);
+    expect(stored.get('raster:in-place')).toBe('before');
+
+    // Pointer-up commits the final pixels and retains the normal debounced save cadence.
+    commitEdit('in-place');
+    await flushRaster();
+    expect(stored.get('raster:in-place')).toBe('during-live-stroke');
+    expect(pendingRaster()).toEqual([]);
+    expect(hasPendingSave()).toBe(false);
   });
 
   it('hiding the tab writes at once; closing with unsaved pixels asks the browser to confirm', async () => {
