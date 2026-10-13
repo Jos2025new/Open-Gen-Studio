@@ -40,6 +40,8 @@ let receipts: Array<(result: DiskWriteResult) => void> = [];
 let baseAt = 0;
 let stale = false;
 let onStale: (() => void) | null = null;
+/** Bytes on the wire: the browser's keepalive limit (64 KiB) counts bytes, not string length. */
+const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 const savedAtOf = (v: string | null) => Number(/^\{"savedAt":(\d+)/.exec(v ?? '')?.[1] ?? 0);
 /** `{"savedAt":N,…}` → `{"savedAt":N,"baseAt":B,…}` (any baseAt already there is replaced). */
 /** A stamped state sent as a Blob: `open` replaces its opening `{` (see persistJson.ts). */
@@ -91,7 +93,7 @@ export const disk = {
         else {
           const sessions = c.changed.map(([id, text]) => `${JSON.stringify(id)}:${text}`).join(',');
           const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${c.globals},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}}`;
-          const res = await fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: body.length < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+          const res = await fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
           if (res.status === 409) { stale = true; onStale?.(); result = 'conflict'; }
           else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
         }
@@ -118,7 +120,7 @@ export const disk = {
           const [body, at] = typeof next === 'string'
             ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
             : [next.blob(`{"savedAt":${next.savedAt},"baseAt":${baseAt},`), next.savedAt];
-          const size = typeof body === 'string' ? body.length : body.size;
+          const size = typeof body === 'string' ? byteLength(body) : body.size;
           const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: size < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
           if (res.status === 409) {
             stale = true;
