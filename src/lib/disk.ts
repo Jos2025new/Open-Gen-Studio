@@ -83,17 +83,23 @@ export const disk = {
    * Format-2 commit (ADR 0014): the global record, the session order and only the sessions that changed. The server
    * writes those files and publishes the new manifest; a stale baseAt is refused (409) like a whole-state write.
    */
-  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]> }): Promise<DiskWriteResult> {
+  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]> }): Promise<DiskWriteResult> {
     if (stale) return Promise.resolve('conflict');
+    // The body carries JSON TEXT as strings: globals and each session are strings the server stores as they are.
+    const send = async (list: Array<[string, string]>): Promise<Response> => {
+      const sessions = list.map(([id, text]) => `${JSON.stringify(id)}:${JSON.stringify(text)}`).join(',');
+      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${JSON.stringify(c.globals)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}}`;
+      return fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+    };
     const receipt = new Promise<DiskWriteResult>((resolve) => { commitChain = commitChain.then(async () => {
       let result: DiskWriteResult = 'fail';
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
         else {
-          const sessions = c.changed.map(([id, text]) => `${JSON.stringify(id)}:${text}`).join(',');
-          const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${c.globals},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}}`;
-          const res = await fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
+          let res = await send(c.changed);
+          // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session.
+          if (res.status === 400 && c.all && (await res.clone().text()).startsWith('missing session')) res = await send(c.all);
           if (res.status === 409) { stale = true; onStale?.(); result = 'conflict'; }
           else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
         }

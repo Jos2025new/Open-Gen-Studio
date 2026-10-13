@@ -106,7 +106,8 @@ export const stateDb = {
     const changed = parts.order
       .filter((id) => before.get(id) !== parts.sessions.get(id))
       .map((id) => [id, parts.sessions.get(id)!] as [string, string]);
-    const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed });
+    const all = parts.order.map((id) => [id, parts.sessions.get(id)!] as [string, string]);
+    const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed, all });
     if (result === 'conflict') {
       await set(`${key}:conflict-${at}`, assembleText(parts), stateStore);
       const onDisk = await disk.getState();

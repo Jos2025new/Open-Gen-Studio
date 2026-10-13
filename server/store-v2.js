@@ -90,14 +90,17 @@ export function createStoreV2(dir) {
    */
   async function commit(body) {
     const { savedAt, baseAt, version, globals, order, sessions = {} } = body;
-    if (!Number.isFinite(savedAt) || !Array.isArray(order) || typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400 };
-    if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400 };
+    // Every 400 says why (the body), so a refused save is never a silent 400.
+    if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
+    if (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
+    if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
     for (const [id, text] of Object.entries(sessions)) {
-      if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}') || !order.includes(id)) return { status: 400 };
+      if (!SAFE_ID.test(id) || typeof text !== 'string' || !text.startsWith('{') || !text.endsWith('}')) return { status: 400, reason: `session ${id} must be a JSON text (a string)` };
+      if (!order.includes(id)) return { status: 400, reason: `session ${id} is not in the order` };
     }
     // An id in the order that the commit does not send must already be on disk (it is unchanged), or the state is broken.
     for (const id of order) {
-      if (!(id in sessions) && !(await stat(join(sessionsDir, `${id}.json`)).catch(() => null))) return { status: 400 };
+      if (!(id in sessions) && !(await stat(join(sessionsDir, `${id}.json`)).catch(() => null))) return { status: 400, reason: `missing session ${id}: send every session (no format-2 copy of it on disk yet)` };
     }
     const head = await readHead();
     const legacy = head ? null : await readFile(stateFile, 'utf8').catch(() => null);

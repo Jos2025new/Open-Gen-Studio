@@ -193,7 +193,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
       const r = await serialState(() => v2.commit(payload));
       if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
-      return send(r.status);
+      return send(r.status, r.reason ?? '');
     }
 
     // EPS to PNG through the system Ghostscript (eps.js). Behind the write checks above: only the app sends it.
