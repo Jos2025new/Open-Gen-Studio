@@ -45,3 +45,15 @@ export function parseAlphaText(text: string): number | null {
   const v = Number(t);
   return v <= 100 ? v : null;
 }
+/** A whole number 0..max typed in a field; null when it is not one. */
+export function parseIntRange(text: string, max: number): number | null {
+  const t = text.trim();
+  if (!/^\d{1,3}$/.test(t)) return null;
+  const v = Number(t);
+  return v <= max ? v : null;
+}
+/** The hex to show: #RRGGBBAA when the opacity is below 100 %, else #RRGGBB (the stored color is always #RRGGBB). */
+export function hexShown(color: string, opacity: number | undefined): string {
+  if (opacity === undefined || opacity >= 1) return color;
+  return color + Math.round(Math.min(1, Math.max(0, opacity)) * 255).toString(16).padStart(2, '0');
+}

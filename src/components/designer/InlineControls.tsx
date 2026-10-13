@@ -4,7 +4,7 @@ import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { useStore } from '../../store/store';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
-import { alphaFromOpacity, colorHsl, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
+import { alphaFromOpacity, colorHsl, hexShown, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
 import { ColorPlane } from './ColorPlane';
 import { ColorChannels } from './ColorChannels';
 
@@ -51,17 +51,17 @@ export function InlineChoice<T extends string | number>({ label, value, options,
 export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children }: { label: string; value: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
-  const [hex, setHex] = useState(value);
+  const [hex, setHex] = useState(() => hexShown(value, alpha?.value));
   const [hue, setHue] = useState(() => colorHsl(value)[0]);
   useEffect(() => { const [h, s] = colorHsl(value); if (s > 0) setHue(h); }, [value]);
   const close = () => { rememberColor(value); pop.close(); };
-  const pick = (c: string) => { onChange(c); setHex(c); };
+  const pick = (c: string) => { onChange(c); setHex(hexShown(c, alpha?.value)); };
   const chip = (c: string, saved: boolean) => (
     <button key={`${saved}${c}`} type="button" className={`swatch${c === value.toLowerCase() ? ' is-on' : ''}`} style={{ background: c }} aria-label={c} data-tip={saved ? `${c} · right-click to remove` : c}
       onClick={() => pick(c)} onContextMenu={saved ? (e) => { e.preventDefault(); removeSwatch(c); } : undefined} />
   );
   return <>
-    <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(value); pop.toggle(); }}>
+    <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(hexShown(value, alpha?.value)); pop.toggle(); }}>
       {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
