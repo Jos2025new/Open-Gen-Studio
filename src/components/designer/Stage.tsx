@@ -142,7 +142,6 @@ function drawArrowHandle(ctx: CanvasRenderingContext2D, h: { op: string; fx: num
   const path = () => {
     ctx.beginPath();
     if (h.op === 'rotate') {
-      // A quarter arc centred just outside the corner, facing away from the box.
       const out = Math.atan2(h.fy, h.fx);
       const cx = x + Math.cos(out) * 4, cy = y + Math.sin(out) * 4, r = 9;
       const a0 = out - Math.PI / 2.6, a1 = out + Math.PI / 2.6;
