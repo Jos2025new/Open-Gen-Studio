@@ -108,7 +108,7 @@ function changedArea(prev: StepSig, cur: StepSig): Rect | null {
     && !!prev.render && !!cur.render && sameKey(prev.source, cur.source) && sameKey(prev.render, cur.render)
     && !sameKey(prev.versions, cur.versions);
   if (pixelsOnly && cur.dirty && !isEmpty(cur.dirty)) return cur.dirty;
-  return union(union(prev.box, cur.box), union(prev.dirty, cur.dirty));
+  return union(union(prev.box, cur.box), union(prev.dirty ?? null, cur.dirty ?? null));
 }
 /** A region bigger than this share of the page is recomposed as a whole: the bookkeeping would cost more than it saves. */
 export const MAX_REGION_SHARE = 0.5;

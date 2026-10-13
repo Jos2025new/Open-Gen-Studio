@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { RetainedPage, planFrame, stepSig, type FrameMemo, type PageOps, type StepSig } from '../src/engine/design/retainedPage';
 import type { FxLayer } from '../src/engine/fx/types';
-import type { Layer } from '../src/engine/types';
+import type { VectorLayer } from '../src/engine/types';
 
 /*
  * Retained page (Paso 3): the planner and the page are checked against a one-dimensional model of the composite.
@@ -107,12 +107,12 @@ describe('retained page: planner', () => {
     expect(planFrame(base, cur)).toEqual({ kind: 'region', rect: { x0: 2, y0: 0, x1: 8, y1: 1 }, reach: 0 });
   });
   it('keys layer FX values for vector layers too', () => {
-    const layer = { id: 'vector', name: 'Vector', type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [] } as Layer;
+    const layer: VectorLayer = { id: 'vector', name: 'Vector', type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [] };
     const fx = (radius: number): FxLayer => ({
       id: 'fx', name: 'Blur', type: 'fx', visible: true, locked: false, opacity: 1, blend: 'normal',
       group: 'effect', scope: 'layer', ops: [{ id: 'blur', kind: 'blur', enabled: true, params: { radius } }],
     });
-    const sig = (radius: number) => stepSig({ t: 'clip', layer, fx: [fx(radius)] }, 1, () => ({ x: 2, y: 2, w: 5, h: 5 }), () => [], () => null);
+    const sig = (radius: number) => stepSig({ t: 'clip', layer, fx: [fx(radius)] }, 1, () => ({ x0: 2, y0: 2, x1: 7, y1: 7 }), () => [], () => null);
     expect(sig(2).key).not.toEqual(sig(8).key);
   });
   it('propagates a change through a later below step by its reach', () => {
