@@ -1,5 +1,7 @@
 import { BLEND_MODES, composeFrame, drawDoc, resetRetainedPage, retainedStats } from '../../src/engine/design/render';
 import { cloneCanvas, composeRaster, getBuffer, setBuffer } from '../../src/engine/design/raster';
+import { clearBelowCache } from '../../src/engine/design/belowFxCache';
+import { editorCacheBudget } from '../../src/engine/design/cacheBudget';
 import { moveRasterStroke } from '../../src/engine/design/rasterStrokes';
 import type { DesignDoc, Layer, RasterLayer } from '../../src/engine/types';
 import { PARITY_SIZE, parityDocument } from './parity-docs';
@@ -69,6 +71,7 @@ export interface SequenceResult {
   pass: boolean; seed: number; ops: number; maxRetainedDiff: number; fallbacks: number;
   frames: { same: number; region: number; full: number }; kinds: Record<string, number>; failKinds: Record<string, number>;
   cacheVsUncached: { differingOps: number; maxChannelDiff: number };
+  drift: { afterEditorFrame: number; afterFlush: number };
   firstFailure: { op: number; kind: string; diff: number } | null;
 }
 
@@ -144,6 +147,8 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
 export async function runSequence(count = 200, seed = 20260412, raster = true, tone = true): Promise<SequenceResult> {
   const rnd = rng(seed);
   let { doc } = parityDocument();
+  // tone=0: no levels/curves (their SVG filters are the only url() filters on canvas): the doc has no curves layer at all.
+  if (!tone) doc = { ...doc, layers: doc.layers.filter((l) => l.id !== 'par-fx-curves') };
   composeAll(doc, parityDocument().rasters);
   const ed = document.createElement('canvas'); ed.width = doc.width; ed.height = doc.height; ed.className = 'stage-canvas';
   const edCtx = ed.getContext('2d')!;
@@ -156,7 +161,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
   const uncached = (d: DesignDoc): Uint8ClampedArray => composeFrame(d, 1, false).getContext('2d')!.getImageData(0, 0, d.width, d.height).data;
   resetRetainedPage();
   frame(doc);
-  let maxRetainedDiff = 0, fallbacks = 0, cacheDiffOps = 0, maxCacheDiff = 0;
+  let maxRetainedDiff = 0, fallbacks = 0, cacheDiffOps = 0, maxCacheDiff = 0, driftEditor = 0, driftFlush = 0;
   const frames = { same: 0, region: 0, full: 0 };
   const kinds: Record<string, number> = {}, failKinds: Record<string, number> = {};
   let firstFailure: SequenceResult['firstFailure'] = null;
@@ -166,6 +171,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
     doc = m.next;
     // The pixel box is read back at most every 150 ms (render.ts): wait so both frames read the same, current box.
     await new Promise((r) => setTimeout(r, 170));
+    const u0 = uncached(doc);
     const before = { ...retainedStats() };
     const got = frame(doc);
     const after = retainedStats();
@@ -179,13 +185,18 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
       failKinds[m.kind] = (failKinds[m.kind] ?? 0) + 1;
       if (!firstFailure) firstFailure = { op: k, kind: m.kind, diff: cmp.maxChannelDiff };
     }
-    const cu = compareArrays(ref, uncached(doc));
-    (globalThis as { gc?: () => void }).gc?.();
+    const cu = compareArrays(ref, u0);
     if (cu.maxChannelDiff > 1) cacheDiffOps++;
     maxCacheDiff = Math.max(maxCacheDiff, cu.maxChannelDiff);
+    const u1 = uncached(doc);
+    if (compareArrays(u0, u1).maxChannelDiff > 1) driftEditor++;
+    editorCacheBudget.setLimit(0); clearBelowCache(); resetRetainedPage(); frame(doc);
+    editorCacheBudget.setLimit(256 * 1024 * 1024);
+    if (compareArrays(u0, uncached(doc)).maxChannelDiff > 1) driftFlush++;
+    (globalThis as { gc?: () => void }).gc?.();
   }
   return {
     pass: maxRetainedDiff <= 1, seed, ops: count, maxRetainedDiff, fallbacks, frames, kinds, failKinds,
-    cacheVsUncached: { differingOps: cacheDiffOps, maxChannelDiff: maxCacheDiff }, firstFailure,
+    cacheVsUncached: { differingOps: cacheDiffOps, maxChannelDiff: maxCacheDiff }, drift: { afterEditorFrame: driftEditor, afterFlush: driftFlush }, firstFailure,
   };
 }

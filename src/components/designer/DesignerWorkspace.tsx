@@ -17,7 +17,7 @@ import type { ExportFormat } from '../../engine/design/export';
 import { deletePickedNode } from './PathNodes';
 import { deleteLayers, exportDocFile, mergeDown, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
 import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
-import { canRedo, canUndo, record, subscribeHistory } from '../../engine/design/history';
+import { canRedo, canUndo, historyDepth, record, subscribeHistory } from '../../engine/design/history';
 import { toolBlockReason } from '../../engine/design/rules';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
@@ -72,6 +72,8 @@ export function DesignerWorkspace() {
   );
   const undoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canUndo(doc.id));
   const redoReady = useSyncExternalStore(subscribeHistory, () => !!doc && canRedo(doc.id));
+  // Steps the byte limit dropped (Paso 9): a small note next to undo, only when there are some.
+  const trimmed = useSyncExternalStore(subscribeHistory, () => (doc ? historyDepth(doc.id).dropped : 0));
 
   useEffect(() => {
     const inField = (e: Event) => e.target instanceof Element && !!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
@@ -234,6 +236,7 @@ export function DesignerWorkspace() {
         <span className="topbar-sep" aria-hidden />
         <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
         <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
+        {trimmed > 0 && <span className="muted" title="Older undo steps were dropped to keep the history within its memory limit" style={{ fontSize: 11, alignSelf: 'center' }}>History trimmed</span>}
         <span className="topbar-sep" aria-hidden />
         <IconButton icon={ImagePlus} label="Import image" size="sm" onClick={() => importRef.current?.click()} />
         <EditOps sessionId={session.id} doc={doc} turnOnly />
