@@ -23,11 +23,34 @@ export function alphaBounds(px: Uint32Array, width: number, height: number, thre
 
 const painted = new WeakMap<HTMLCanvasElement, Map<number, { version: number; box: ReturnType<typeof alphaBounds> }>>();
 // Last measured bounds per layer ID survive immutable canvas replacement. A pending dirty rect is unioned into them.
-const byLayer = new Map<string, { version: number; box: ReturnType<typeof alphaBounds>; exact: boolean }>();
-function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>, exact: boolean): void {
+const byLayer = new Map<string, { version: number; box: ReturnType<typeof alphaBounds>; exact: boolean; ref?: HTMLCanvasElement }>();
+/** `version` of a box carried to a stroke's working canvas: no content version matches it, so reads never trust it alone. */
+const CARRIED = -2;
+function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>, exact: boolean, ref?: HTMLCanvasElement): void {
   byLayer.delete(id);
-  byLayer.set(id, { version, box, exact });
+  byLayer.set(id, { version, box, exact, ref });
   if (byLayer.size > 512) byLayer.delete(byLayer.keys().next().value!);
+}
+/**
+ * A stroke starts on a copy of the layer's canvas (same pixels, same place): the exact box of the layer moves to the
+ * copy, marked as carried, so the stroke's commit can extend it instead of scanning the whole canvas.
+ */
+export function carryLayerBox(id: string, from: HTMLCanvasElement, to: HTMLCanvasElement): void {
+  const e = byLayer.get(id);
+  if (e?.exact && e.ref === from) rememberLayerBox(id, CARRIED, e.box, true, to);
+}
+/**
+ * A stroke commit: the layer's exact box becomes the carried box united with the stroke's region (full-buffer pixels),
+ * stamped with the version the commit left. Without a carried box, the next read measures the canvas as before.
+ */
+export function extendLayerBox(id: string, canvas: HTMLCanvasElement, region: { x0: number; y0: number; x1: number; y1: number }, version: number, origin: { x0: number; y0: number }): void {
+  const e = byLayer.get(id);
+  if (!e || !e.exact || e.ref !== canvas || e.version !== CARRIED) return;
+  const local = { x0: Math.max(0, region.x0 - origin.x0), y0: Math.max(0, region.y0 - origin.y0), x1: Math.min(canvas.width, region.x1 - origin.x0), y1: Math.min(canvas.height, region.y1 - origin.y0) };
+  const hasLocal = local.x1 > local.x0 && local.y1 > local.y0;
+  const prev = e.box;
+  const box = !hasLocal ? prev : !prev ? local : { x0: Math.min(prev.x0, local.x0), y0: Math.min(prev.y0, local.y0), x1: Math.max(prev.x1, local.x1), y1: Math.max(prev.y1, local.y1) };
+  rememberLayerBox(id, version, box, true, canvas);
 }
 /** Keep total layer bounds conservative after a write without reading the changed canvas back. */
 export function extendRasterBounds(id: string, version: number, width: number, height: number, dirty: { x0: number; y0: number; x1: number; y1: number } | 'all'): void {
@@ -59,15 +82,15 @@ export function pixelBox(buf: HTMLCanvasElement, version: number, readPixels = t
 function layerPixelBox(id: string, buf: HTMLCanvasElement, version: number, readPixels: boolean): ReturnType<typeof alphaBounds> | undefined {
   const previous = byLayer.get(id);
   if (!readPixels) {
-    if (previous) { rememberLayerBox(id, previous.version, previous.box, previous.exact); return previous.box; }
+    if (previous) { rememberLayerBox(id, previous.version, previous.box, previous.exact, previous.ref); return previous.box; }
     return pixelBox(buf, version, false, 0);
   }
-  if (previous?.version === version && previous.exact) { rememberLayerBox(id, version, previous.box, true); return previous.box; }
+  if (previous?.version === version && previous.exact && previous.ref === buf) { rememberLayerBox(id, version, previous.box, true, buf); return previous.box; }
   // A live stroke may mutate its canvas before the next version is committed; keep its dirty bound conservative and
   // defer the alpha scan until the stroke is idle instead of promoting a stale pixelBox hit to an exact new version.
   if (paintingLive()) return previous?.box ?? pixelBox(buf, version, false, 0);
   const box = pixelBox(buf, version, true, 0);
-  if (box !== undefined) rememberLayerBox(id, version, box, true);
+  if (box !== undefined) rememberLayerBox(id, version, box, true, buf);
   return box;
 }
 

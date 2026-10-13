@@ -11,6 +11,7 @@ import { hexRgb, segmentBox, stampSegment, type BrushTip } from './brushEngine';
 import { drawRasterStroke, layMask, strokeSegment } from './rasterDraw';
 export { drawRasterStroke, strokeSegment } from './rasterDraw';
 import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
+import { carryLayerBox, extendLayerBox } from './rasterBounds';
 import { allocBox, assembleFull, cropToContent, emptyBox, geometryOf, growTo, isPlaced, place, regionOf, regrid, sameBox, unionRegion, type Region, type RasterSurface } from './rasterSurface';
 
 /*
@@ -20,6 +21,8 @@ import { allocBox, assembleFull, cropToContent, emptyBox, geometryOf, growTo, is
  */
 
 const buffers = new Map<string, HTMLCanvasElement>();
+/** Full-buffer region the current stroke has touched, per layer: its commit extends the layer's box with it. */
+const strokeSpan = new Map<string, Region>();
 const listeners = new Set<() => void>();
 let version = 0;
 
@@ -287,7 +290,14 @@ export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: num
   const owner = layerOfCanvas.get(buf0);
   // A segment starts at the previous width: its box covers the wider of the two.
   const reach = Math.max(width, live.tip ? live.last?.width ?? 0 : 0);
-  if (owner) { const r = reach / 2 + 2; markDirty(owner, { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r }); }
+  if (owner) {
+    const r = reach / 2 + 2;
+    const d = { x0: Math.min(a.x, b.x) - r, y0: Math.min(a.y, b.y) - r, x1: Math.max(a.x, b.x) + r, y1: Math.max(a.y, b.y) + r };
+    markDirty(owner, d);
+    const cur = strokeSpan.get(owner);
+    const reg = { x0: Math.floor(d.x0), y0: Math.floor(d.y0), x1: Math.ceil(d.x1), y1: Math.ceil(d.y1) };
+    strokeSpan.set(owner, cur ? { x0: Math.min(cur.x0, reg.x0), y0: Math.min(cur.y0, reg.y0), x1: Math.max(cur.x1, reg.x1), y1: Math.max(cur.y1, reg.y1) } : reg);
+  }
   const end = span('raster', 'live');
   try {
     const g0 = geometryOf(buf0);
@@ -480,6 +490,8 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
   const copy = cloneCanvas(current);
   buffers.set(layer.id, copy);
   layerOfCanvas.set(copy, layer.id);
+  strokeSpan.delete(layer.id);
+  carryLayerBox(layer.id, current, copy);
   const shared = historyTiles.get(current);
   if (shared) historyTiles.set(copy, shared);
   return copy;
@@ -488,8 +500,12 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
 export function commitEdit(layerId: string): void {
   liveStroke = false;
   const current = buffers.get(layerId);
+  const span = strokeSpan.get(layerId);
+  strokeSpan.delete(layerId);
   if (current) flushHistoryTiles(current);
   touchBuffer(current);
+  // The layer's box is known without reading the canvas back: the box before the stroke plus the stroke's region.
+  if (current && span) extendLayerBox(layerId, current, span, bufferVersion(layerId), geometryOf(current));
   schedulePersist(layerId);
   notify();
 }
