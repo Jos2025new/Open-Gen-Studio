@@ -36,8 +36,8 @@ import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoo
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
-import { commitStagePaintGesture, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
-import { hasEditableStrokes, paintModeOf, paintsPixelsDirectly } from '../../engine/design/paintMode';
+import { commitStagePaintGesture, drawingChoiceFirst, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
+import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
 
 type Drag =
@@ -822,6 +822,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         toast(blocked ?? 'Select a raster layer to erase.', 'error');
         return;
       }
+      if (drawingChoiceFirst(sessionId, doc.id, current, erase)) return;
       if (!prepareStagePaint(current, erase)) return;
       record(current);
       // Brush never touches protected images: it paints on its own layer.
@@ -829,11 +830,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (!target || target.type !== 'raster') return;
       if (!getRasterSurface(target.id) || (!target.paintFlattened && target.paintBaseId && !getRasterSurface(target.paintBaseId))) {
         toast('Layer pixels are still loading. Try again in a moment.', 'error');
-        return;
-      }
-      // Drawing (ADR 0016): the pixels are the layer itself, so a layer with editable strokes cannot take new ones.
-      if (paintModeOf(current) === 'drawing' && hasEditableStrokes(target)) {
-        toast('This layer keeps editable strokes from Design mode. Switch to Design to paint on it, or flatten it first.', 'info');
         return;
       }
       const direct = paintsPixelsDirectly(current, target);

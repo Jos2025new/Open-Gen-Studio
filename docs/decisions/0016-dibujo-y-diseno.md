@@ -19,7 +19,7 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 3. **Diseño es el comportamiento actual**: los trazos son editables hasta el límite, con contador, aviso y aplanado.
 4. **Documentos existentes sin ajuste guardado** no se reescriben: se leen en Diseño si alguna capa raster tiene trazos editables, y en Dibujo si no (`paintModeOf`).
 5. **Cambiar de Diseño a Dibujo no aplana nada.** Los trazos ya editables se quedan. Cambiar de Dibujo a Diseño solo afecta a los trazos nuevos.
-6. **Una capa con trazos editables no recibe trazos de Dibujo** mientras los conserve: pintar sobre ella necesitaría aplanarla, y el aplanado la quita de la edición. El aviso lo dice. Esta regla es una decisión pendiente del usuario (ver «Consecuencias»).
+6. **Pintar en Dibujo sobre una capa con trazos editables** (decisión del usuario, 2026-10-13, opción a). El trazo se rechaza y aparece un aviso con tres acciones, sin `confirm()`: «Flatten and paint» aplana los trazos de la capa en un solo paso de deshacer; «Paint in Design» cambia el documento a Diseño; «New layer» crea una capa raster encima, la selecciona y pinta en ella. Cerrar el aviso no hace nada. El trazo que disparó el aviso no se pinta: lo pinta el siguiente, como con el límite de cupo. «Don't show again» guarda la acción como preferencia (`ui.drawingChoice`, con los ajustes persistidos) y la aplica sin aviso, con un toast que dice qué se hizo. Ajustes → «Ask every time» la borra.
 7. **Seleccionar y mover trazos sueltos** solo se ofrece en Diseño, o en capas raster que ya tienen trazos editables.
 
 ## Alternativas
@@ -30,6 +30,5 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 
 ## Consecuencias
 
-- Módulo nuevo `src/engine/design/paintMode.ts` (la lógica) y `src/components/designer/PaintModeToggle.tsx` (el interruptor). `raster.ts` y `Stage.tsx` solo enrutan.
+- Módulo nuevo `src/engine/design/paintMode.ts` (la lógica) y `src/components/designer/PaintModeToggle.tsx` (el interruptor). `raster.ts` y `Stage.tsx` solo enrutan. El aviso y sus acciones están en `drawingChoice.ts` y `DrawingChoice.tsx`.
 - El píxel de un trazo de Dibujo sale del mismo camino de pintura (`beginEdit`, `paintLive`, `endBrushStroke`, `commitEdit`) que el de un trazo de Diseño aplanado. Los tests comprueban ese camino, no el píxel: el entorno de pruebas no tiene canvas real.
-- Pendiente del usuario: qué hacer con pintar en una capa que aún tiene trazos editables en Dibujo. Hoy se avisa y no se pinta. Las alternativas son aplanar esa capa (con deshacer) o pintar encima sin tocar sus trazos, y cada una cambia la regla 6.

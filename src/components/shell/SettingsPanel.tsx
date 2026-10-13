@@ -11,6 +11,7 @@ import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine
 import type { OpEngine } from '../../engine/ops';
 import { formatUsd } from '../../lib/format';
 import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Settings } from '../../store/store';
+import { setDrawingPreference } from '../../engine/design/drawingChoice';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
@@ -265,6 +266,17 @@ function OpsModelRow({ label, tip, slot, kind, engine, filter }: { label: string
   );
 }
 
+/** Painting in Drawing on a layer with editable strokes: the saved choice, and the way back to asking (ADR 0016). */
+function DrawingChoiceSetting() {
+  const pref = useStore((s) => s.ui.drawingChoice ?? 'ask');
+  const labels = { ask: 'Ask every time', flatten: 'Flatten and paint', design: 'Paint in Design', newLayer: 'New layer' } as const;
+  return <div className="set-row">
+    <span className="set-label">Painting on layers with editable strokes</span>
+    <span className="faint">{labels[pref]}</span>
+    <Button size="sm" variant="ghost" disabled={pref === 'ask'} onClick={() => setDrawingPreference('ask')}>Ask every time</Button>
+  </div>;
+}
+
 export function SettingsPanel() {
   const settings = useStore((s) => s.settings);
   const spent = useStore((s) => s.spentUsd);
@@ -480,6 +492,7 @@ export function SettingsPanel() {
 
       {tab === 'data' ? <section className="set-section">
         <DataSummary />
+        <DrawingChoiceSetting />
         <div className="set-row">
           <span className="set-label">Local data</span>
           <Button ref={confirmRef} size="sm" variant="danger" icon={Trash} onClick={() => setConfirmOpen(true)}>

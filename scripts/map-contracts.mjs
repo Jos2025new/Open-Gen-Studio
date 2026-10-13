@@ -20,6 +20,18 @@ export default [
     tests: ['tests/paint-mode.test.ts'],
   },
   {
+    id: 'drawing-choice',
+    what: 'ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia.',
+    sides: [
+      ['src/engine/design/drawingChoice.ts', 'export function applyDrawingChoice'],
+      ['src/components/designer/StagePaintCommit.ts', 'export function drawingChoiceFirst'],
+      ['src/components/designer/Stage.tsx', 'if (drawingChoiceFirst(sessionId, doc.id, current, erase)) return;'],
+      ['src/components/designer/DrawingChoice.tsx', "Don&apos;t show again"],
+      ['src/components/shell/SettingsPanel.tsx', 'Ask every time'],
+    ],
+    tests: ['tests/drawing-choice.test.ts'],
+  },
+  {
     id: 'path-node-topology',
     what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [

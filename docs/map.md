@@ -15,6 +15,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
 | **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
+| **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts) |
 | **path-node-topology** — Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer. | [pathNodeOps.ts](../src/engine/design/pathNodeOps.ts), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx) | [path-nodes.test.ts](../tests/path-nodes.test.ts), [path-nodes.spec.ts](../tests-e2e/path-nodes.spec.ts) |
 | **provider-key-ui** — Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores. | [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [ConnectedProviders.tsx](../src/components/shell/ConnectedProviders.tsx) | [connected-providers.test.ts](../tests/connected-providers.test.ts) |
 | **guided-asks** — Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas. | [context.ts](../src/engine/agent/context.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-mode.test.ts](../tests/agent-mode.test.ts) |
@@ -62,15 +63,15 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 164 | 100 |
-| [store.ts](../src/store/store.ts) | 103 | 92 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
-| [media.ts](../src/lib/media.ts) | 42 | 32 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 33 | 1 |
-| [actions.ts](../src/engine/design/actions.ts) | 32 | 13 |
-| [doc.ts](../src/engine/design/doc.ts) | 31 | 24 |
+| [types.ts](../src/engine/types.ts) | 166 | 101 |
+| [store.ts](../src/store/store.ts) | 105 | 93 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 47 | 0 |
+| [media.ts](../src/lib/media.ts) | 43 | 33 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 34 | 1 |
+| [actions.ts](../src/engine/design/actions.ts) | 33 | 14 |
+| [doc.ts](../src/engine/design/doc.ts) | 32 | 25 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
-| [raster.ts](../src/engine/design/raster.ts) | 28 | 14 |
+| [raster.ts](../src/engine/design/raster.ts) | 29 | 15 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
@@ -81,7 +82,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [idb.ts](../src/lib/idb.ts) | 17 | 114 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 2 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [types.ts](../src/engine/fx/types.ts) | 13 | 6 |
+| [history.ts](../src/engine/design/history.ts) | 13 | 9 |
 
 ## Por área
 
@@ -91,23 +92,23 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 26 | 5 |
+| `src/components/designer` | 27 | 5 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 126 |
+| `src/engine` | 30 | 127 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 62 | 57 |
+| `src/engine/design` | 63 | 58 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 23 | 128 |
-| `src/store` | 4 | 94 |
+| `src/lib` | 23 | 129 |
+| `src/store` | 4 | 95 |
 
-106 de 262 módulos no tienen ningún test que los importe directamente.
+107 de 264 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -121,6 +122,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [CanvasSize.tsx](../src/components/designer/CanvasSize.tsx)
 - [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
 - [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx)
+- [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)

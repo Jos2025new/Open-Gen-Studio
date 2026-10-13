@@ -10,12 +10,19 @@ import type { RasterPaintLimits } from '../../engine/design/rasterLimit';
 import { setObjectPick } from '../../engine/design/objectSelection';
 import type { BrushOptions } from '../../engine/design/brushEngine';
 import { setDoc, toast } from '../../store/store';
+import { applyDrawingChoice, drawingPreference, requestDrawingChoice } from '../../engine/design/drawingChoice';
+import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 
-export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {
+/** The raster layer a brush stroke would land on (the active one, or the one above it), or null. */
+export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | null {
   const selected = activeLayer(doc);
   const paintable = (item: Layer | null | undefined): item is RasterLayer => !!item && item.type === 'raster' && !item.locked && item.visible && !isProtectedImage(item);
   const above = selected ? doc.layers[doc.layers.indexOf(selected) + 1] : undefined;
-  const candidate = erase ? selected?.type === 'raster' ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
+  return erase ? selected?.type === 'raster' ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
+}
+
+export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {
+  const candidate = paintCandidate(doc, erase);
   if (candidate && (!getRasterSurface(candidate.id) || (!candidate.paintFlattened && candidate.paintBaseId && !getRasterSurface(candidate.paintBaseId)))) {
     toast('Layer pixels are still loading. Try again in a moment.', 'error');
     return false;
@@ -86,4 +93,17 @@ export function commitStagePaintGesture(args: {
     }),
   }));
   if (flattenNow) toast('Strokes flattened to pixels. Undo restores editable strokes.', 'info');
+}
+
+/**
+ * Drawing on a layer with editable strokes (ADR 0016): the stroke is refused before anything is recorded. Asks, or applies
+ * the saved choice. True when the stroke was handled here (refused), so the caller stops.
+ */
+export function drawingChoiceFirst(sessionId: string, docId: string, doc: DesignDoc, erase: boolean): boolean {
+  const candidate = paintCandidate(doc, erase);
+  if (!candidate || paintModeOf(doc) !== 'drawing' || !hasEditableStrokes(candidate)) return false;
+  const pref = drawingPreference();
+  if (pref === 'ask') requestDrawingChoice(candidate.id);
+  else { const message = applyDrawingChoice(sessionId, docId, candidate.id, pref); if (message) toast(message, 'info'); }
+  return true;
 }
