@@ -402,6 +402,7 @@ export default [
       ['src/engine/design/rasterBounds.ts', 'export function rasterPaintedBox('],
       ['src/engine/design/retainedPage.ts', 'function changedArea('],
       ['src/engine/design/render.ts', 'function retainedLayerBox('],
+      ['bench/engines/parity.ts', 'export function appendParityPaintStroke('],
     ],
     tests: ['tests/retained-page-plan.test.ts', 'tests/raster-pixel-box.test.ts', 'tests/raster-strokes.test.ts'],
   },

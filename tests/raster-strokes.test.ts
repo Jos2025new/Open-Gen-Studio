@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { RasterLayer, RasterStroke, DesignDoc } from '../src/engine/types';
 import { moveRasterStroke, rasterStrokeBox } from '../src/engine/design/rasterStrokes';
 import { newRasterLayer, translateLayer, scaleLayer, createDoc, cloneLayer } from '../src/engine/design/doc';
+import { appendParityPaintStroke } from '../bench/engines/parity';
 
 const fixture = vi.hoisted(() => {
   Object.assign(globalThis, { window: globalThis, document: { addEventListener() {} }, addEventListener() {} });
@@ -169,4 +170,20 @@ it('accumulates localized raster dirt until the retained page takes it once', ()
   raster.setBuffer(l.id, bitmap, false, { x0: 6, y0: 1, x1: 12, y1: 5 });
   expect(raster.takeDirty(l.id)).toEqual({ x0: 2, y0: 1, x1: 12, y1: 9 });
   expect(raster.takeDirty(l.id)).toBeNull();
+});
+
+it('records the parity paint mutation as an editable stroke that survives later recomposition', () => {
+  let l = layer();
+  raster.setBuffer(l.id, createCanvas(l.pxWidth, l.pxHeight), false);
+  l = { ...raster.withPaintBase(l), paintStrokes: l.paintStrokes };
+  raster.composeRaster(l, false);
+  const before = [...ops(l.id)];
+
+  const painted = appendParityPaintStroke(l, 'parity-paint-test', 24, 26, 12, 8, '#123456');
+  const afterPaint = [...ops(l.id)];
+  expect(painted.paintStrokes?.at(-1)).toMatchObject({ id: 'parity-paint-test', color: '#123456', opacity: 0.8 });
+  expect(afterPaint).not.toEqual(before);
+
+  raster.composeRaster(painted, false);
+  expect(ops(l.id)).toEqual(afterPaint);
 });

@@ -1,10 +1,10 @@
 import { BLEND_MODES, composeFrame, drawDoc, resetRetainedPage, retainedStats } from '../../src/engine/design/render';
-import { setCpuCanvases } from '../../src/lib/media';
-import { cloneCanvas, composeRaster, getBuffer, setBuffer, strokeBufferBox, type Dirty } from '../../src/engine/design/raster';
+import { ctx2d, setCpuCanvases } from '../../src/lib/media';
+import { cloneCanvas, composeRaster, drawRasterStroke, getBuffer, setBuffer, strokeBufferBox, type Dirty } from '../../src/engine/design/raster';
 import { clearBelowCache } from '../../src/engine/design/belowFxCache';
 import { editorCacheBudget } from '../../src/engine/design/cacheBudget';
 import { moveRasterStroke } from '../../src/engine/design/rasterStrokes';
-import type { DesignDoc, Layer, RasterLayer } from '../../src/engine/types';
+import type { DesignDoc, Layer, RasterLayer, RasterStroke } from '../../src/engine/types';
 import { PARITY_SIZE, parityDocument } from './parity-docs';
 
 /*
@@ -142,7 +142,23 @@ function joinDirty(a: Dirty, b: Dirty): Dirty {
   return { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) };
 }
 
-function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone = true): Mut {
+/** A localized brush-paint mutation recorded in the same editable model the renderer later recomposes. */
+export function appendParityPaintStroke(layer: RasterLayer, id: string, left: number, top: number, width: number, height: number, color: string): RasterLayer {
+  const stroke: RasterStroke = {
+    id, x: 0, y: 0, color, opacity: 0.8, erase: false,
+    segments: [[left, top + height / 2, left + width, top + height / 2, Math.max(2, Math.min(width, height))]],
+  };
+  const painted = { ...layer, paintStrokes: [...(layer.paintStrokes ?? []), stroke] };
+  const current = getBuffer(layer.id);
+  if (current) {
+    const nextPixels = cloneCanvas(current);
+    drawRasterStroke(ctx2d(nextPixels), stroke);
+    setBuffer(layer.id, nextPixels, false, strokeBufferBox(stroke));
+  }
+  return painted;
+}
+
+function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone = true, op = 0): Mut {
   const pick = <T,>(xs: T[]): T => xs[rnd(xs.length)];
   const rasters = doc.layers.filter((l): l is RasterLayer => l.type === 'raster');
   const fxs = doc.layers.filter((l) => l.type === 'fx');
@@ -184,14 +200,14 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
       }) };
     }
     case 6: {
-      const l = pick(rasters), c = getBuffer(l.id);
-      if (!c) return { kind: 'paint (skipped)', next: doc };
-      const copy = cloneCanvas(c), x = copy.getContext('2d')!;
-      x.fillStyle = `rgba(${rnd(256)},${rnd(256)},${rnd(256)},0.8)`;
-      const left = rnd(copy.width - 20), top = rnd(copy.height - 20), width = 4 + rnd(16), height = 4 + rnd(16);
-      x.fillRect(left, top, width, height);
-      setBuffer(l.id, copy, false, { x0: left, y0: top, x1: left + width, y1: top + height });
-      return { kind: 'paint', next: { ...doc, layers: doc.layers.slice() } };
+      const l = pick(rasters), base = l.paintBaseId && getBuffer(l.paintBaseId);
+      if (!base) return { kind: 'paint (skipped)', next: doc };
+      const left = rnd(base.width - 20), top = rnd(base.height - 20), width = 4 + rnd(16), height = 4 + rnd(16);
+      const color = `#${[rnd(256), rnd(256), rnd(256)].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+      // The benchmark's paint operation must be part of the editable layer model. Writing only to its composed
+      // buffer creates pixels that composeRaster cannot reproduce later, which is not a valid editor mutation.
+      const painted = appendParityPaintStroke(l, `parity-paint-${op}`, left, top, width, height, color);
+      return { kind: 'paint', next: withLayer(doc, l.id, () => painted) };
     }
     default: {
       const withStrokes = rasters.filter((l) => (l.paintStrokes?.length ?? 0) > 0);
@@ -228,7 +244,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
   const kinds: Record<string, number> = {}, failKinds: Record<string, number> = {}, operationFrames: SequenceResult['operationFrames'] = {};
   let firstFailure: SequenceResult['firstFailure'] = null;
   for (let k = 0; k < count; k++) {
-    const m = mutate(doc, rnd, raster, tone);
+    const m = mutate(doc, rnd, raster, tone, k);
     kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
     const beforeDoc = doc;
     doc = m.next;
