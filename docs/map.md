@@ -82,7 +82,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 6 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 116 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 2 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 14 | 2 |
 
@@ -101,7 +101,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 131 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 75 | 64 |
+| `src/engine/design` | 75 | 65 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
