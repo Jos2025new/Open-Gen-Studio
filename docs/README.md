@@ -89,7 +89,7 @@
 - [022-2026-10-W41: Brocha de SAI, revisión de Astra, integración y purga (2026-10-09)](history/022-2026-10-W41.md) — 16469 bytes.
 - [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](history/023-2026-10-W41.md) — 4623 bytes.
 - [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 29926 bytes.
-- [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12)](history/025-2026-10-W42.md) — 8522 bytes.
+- [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12)](history/025-2026-10-W42.md) — 12674 bytes.
 
 ## Trazabilidad
 
