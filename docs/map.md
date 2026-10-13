@@ -49,7 +49,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **persist-json-exact** — 2026-10-09: el guardado del estado reutiliza el texto de las sesiones que no cambiaron (las sesiones se reemplazan, nunca se mutan) y produce el mismo JSON byte a byte; cada 30 s una pasada completa detecta y corrige una sesión mutada en el sitio. 2026-10-12: el disco recibe esos mismos bytes como un Blob de partes por sesión (un texto de 12 MB en fetch bloqueaba ~0,9 s), con su baseAt; IndexedDB guarda Blob bajo una clave nueva sin modificar el texto legado; el indicador confirma la versión y los píxeles solo tras los acuses. | [store.ts](../src/store/store.ts), [persistJson.ts](../src/store/persistJson.ts), [idb.ts](../src/lib/idb.ts), [saveStatus.ts](../src/store/saveStatus.ts), [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx), [disk.ts](../src/lib/disk.ts) | [persist-json.test.ts](../tests/persist-json.test.ts), [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [save-status.test.ts](../tests/save-status.test.ts), [disk-receipts.test.ts](../tests/disk-receipts.test.ts), [save-now.test.ts](../tests/save-now.test.ts), [raster-persist.test.ts](../tests/raster-persist.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts) |
 | **state-format-2** — ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2. | [store-v2.js](../server/store-v2.js), [store-v2.d.ts](../server/store-v2.d.ts), [local-store.js](../server/local-store.js), [formatV2.ts](../src/store/formatV2.ts), [idb.ts](../src/lib/idb.ts), [disk.ts](../src/lib/disk.ts) | [store-v2.test.ts](../tests/store-v2.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 | **cache-budget** — Paso 4 (2026-10-13): las cachés del editor (FX de capa, FX below y máscaras de trazo) comparten un presupuesto en bytes; descarta primero lo menos usado y nunca el dibujo del usuario, que no es una entrada. | [cacheBudget.ts](../src/engine/design/cacheBudget.ts), [render.ts](../src/engine/design/render.ts), [belowFxCache.ts](../src/engine/design/belowFxCache.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts) | [cache-budget.test.ts](../tests/cache-budget.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts), [fx-render.test.ts](../tests/fx-render.test.ts) |
-| **raster-dirty-retained** — Una escritura raster localizada invalida en la página retenida su área mapeada y el margen de sus FX; cambios de capa o escrituras sin región conservan el redibujo geométrico seguro. | [raster.ts](../src/engine/design/raster.ts), [rasterDirty.ts](../src/engine/design/rasterDirty.ts), [retainedPage.ts](../src/engine/design/retainedPage.ts) | [retained-page-plan.test.ts](../tests/retained-page-plan.test.ts), [raster-strokes.test.ts](../tests/raster-strokes.test.ts) |
+| **raster-dirty-retained** — Una escritura raster localizada invalida su área efectiva y el margen de FX; cambios de geometría o FX usan cajas totales y el redibujado seguro. | [raster.ts](../src/engine/design/raster.ts), [rasterDirty.ts](../src/engine/design/rasterDirty.ts), [rasterBounds.ts](../src/engine/design/rasterBounds.ts), [retainedPage.ts](../src/engine/design/retainedPage.ts), [render.ts](../src/engine/design/render.ts) | [retained-page-plan.test.ts](../tests/retained-page-plan.test.ts), [raster-pixel-box.test.ts](../tests/raster-pixel-box.test.ts), [raster-strokes.test.ts](../tests/raster-strokes.test.ts) |
 
 ## Módulos centrales
 
@@ -57,16 +57,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 155 | 94 |
+| [types.ts](../src/engine/types.ts) | 156 | 96 |
 | [store.ts](../src/store/store.ts) | 101 | 90 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 37 | 26 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 32 | 1 |
 | [actions.ts](../src/engine/design/actions.ts) | 30 | 11 |
+| [doc.ts](../src/engine/design/doc.ts) | 30 | 20 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
-| [doc.ts](../src/engine/design/doc.ts) | 29 | 20 |
+| [raster.ts](../src/engine/design/raster.ts) | 27 | 8 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
-| [raster.ts](../src/engine/design/raster.ts) | 26 | 7 |
 | [format.ts](../src/lib/format.ts) | 23 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 22 | 10 |
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
@@ -91,18 +91,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 120 |
+| `src/engine` | 30 | 122 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 54 | 49 |
+| `src/engine/design` | 55 | 50 |
 | `src/engine/flow` | 10 | 11 |
-| `src/engine/fx` | 7 | 6 |
+| `src/engine/fx` | 7 | 7 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 21 | 122 |
 | `src/store` | 4 | 92 |
 
-103 de 249 módulos no tienen ningún test que los importe directamente.
+102 de 250 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

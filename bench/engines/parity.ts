@@ -71,6 +71,7 @@ export async function runParity(): Promise<ParityResult> {
 export interface SequenceResult {
   pass: boolean; seed: number; ops: number; maxRetainedDiff: number; fallbacks: number;
   frames: { same: number; region: number; full: number }; kinds: Record<string, number>; failKinds: Record<string, number>;
+  operationFrames: Record<string, { same: number; region: number; full: number; fullWhy: Record<string, number> }>;
   cacheVsUncached: { differingOps: number; maxChannelDiff: number };
   drift: { afterEditorFrame: number; afterFlush: number };
   firstFailure: { op: number; kind: string; diff: number } | null;
@@ -172,7 +173,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
   frame(doc);
   let maxRetainedDiff = 0, fallbacks = 0, cacheDiffOps = 0, maxCacheDiff = 0, driftEditor = 0, driftFlush = 0;
   const frames = { same: 0, region: 0, full: 0 };
-  const kinds: Record<string, number> = {}, failKinds: Record<string, number> = {};
+  const kinds: Record<string, number> = {}, failKinds: Record<string, number> = {}, operationFrames: SequenceResult['operationFrames'] = {};
   let firstFailure: SequenceResult['firstFailure'] = null;
   for (let k = 0; k < count; k++) {
     const m = mutate(doc, rnd, raster, tone);
@@ -183,6 +184,9 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
     const got = frame(doc);
     const after = retainedStats();
     if (after.same > before.same) frames.same++; else if (after.region > before.region) frames.region++; else frames.full++;
+    const operation = (operationFrames[m.kind] ??= { same: 0, region: 0, full: 0, fullWhy: {} });
+    operation[after.lastPlan?.kind ?? 'full']++;
+    if (after.lastPlan?.kind === 'full') operation.fullWhy[after.lastPlan.why] = (operation.fullWhy[after.lastPlan.why] ?? 0) + 1;
     resetRetainedPage();
     const ref = frame(doc);
     const cmp = compareArrays(ref, got);
@@ -203,7 +207,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
     (globalThis as { gc?: () => void }).gc?.();
   }
   return {
-    pass: maxRetainedDiff <= 1, seed, ops: count, maxRetainedDiff, fallbacks, frames, kinds, failKinds,
+    pass: maxRetainedDiff === 0, seed, ops: count, maxRetainedDiff, fallbacks, frames, kinds, failKinds, operationFrames,
     cacheVsUncached: { differingOps: cacheDiffOps, maxChannelDiff: maxCacheDiff }, drift: { afterEditorFrame: driftEditor, afterFlush: driftFlush }, firstFailure,
   };
 }

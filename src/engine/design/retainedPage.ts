@@ -1,8 +1,7 @@
 import type { FxOp, FxLayer } from '../fx/types';
 import type { FxStep } from '../fx/plan';
 import type { Layer } from '../types';
-import { unionBox, type Box } from './doc';
-import { mapBox } from './matrix';
+import type { Box } from './doc';
 
 /*
  * Retained page (Paso 3): the editor keeps the last composite and recomposes only the region a change dirties.
@@ -51,8 +50,9 @@ export interface StepSig {
   key: unknown[];
   box: Rect | null;
   margin: number;
-  /** Stable layer/FX identity and pixel versions let a localized buffer write invalidate only its dirty area. */
+  /** Stable pixel-source identity, render properties and pixel versions distinguish paint from geometry/FX edits. */
   source?: unknown[];
+  render?: unknown[];
   versions?: unknown[];
   dirty?: Rect | null;
 }
@@ -67,6 +67,19 @@ function marginOf(fxs: FxLayer[], scale: number): number {
   return m;
 }
 
+const transformKey = (l: Layer): unknown[] => l.transform ? [...l.transform] : [];
+const fxKey = (fxs: FxLayer[]): unknown[] => fxs.flatMap((fx) => [
+  fx.id, fx.scope, fx.visible, fx.opacity,
+  ...fx.ops.flatMap((op) => [op.id, op.kind, op.enabled, ...Object.keys(op.params).sort().flatMap((key) => [key, op.params[key]])]),
+]);
+
+/** Properties that change the raster's placement or how its pixels composite, without walking editable content. */
+function renderKeyOf(layer: Layer, fxs: FxLayer[]): unknown[] {
+  if (layer.type !== 'raster') return [layer, ...fxKey(fxs)];
+  return [layer.id, layer.type, layer.x, layer.y, layer.width, layer.height, layer.pxWidth, layer.pxHeight,
+    layer.visible, layer.opacity, layer.blend, ...transformKey(layer), layer.paintBaseId ?? null, ...fxKey(fxs)];
+}
+
 /** The planner's view of a step. A layer's box grows by its own FX reach, since its FX may spread it. */
 export function stepSig(
   s: FxStep,
@@ -77,17 +90,23 @@ export function stepSig(
 ): StepSig {
   if (s.t === 'below') return { below: true, key: [s.fx], box: null, margin: marginOf([s.fx], scale) };
   const versions = versionsOf(s.layer), dirty = dirtyOf(s.layer);
-  if (s.t === 'draw') return { below: false, key: [s.layer, ...versions], source: [s.layer], versions, box: boxOf(s.layer), margin: 0, dirty };
-  const margin = marginOf(s.fx, scale), box = boxOf(s.layer), source = [s.layer, ...s.fx];
-  return { below: false, key: [...source, ...versions], source, versions, box: box && grow(box, margin), margin, dirty: dirty && grow(dirty, margin) };
+  const fx = s.t === 'clip' ? s.fx : [];
+  const render = renderKeyOf(s.layer, fx), source = s.layer.type === 'raster' ? [s.layer.id, s.layer.paintBaseId ?? null] : [s.layer];
+  if (s.t === 'draw') return { below: false, key: [...render, ...versions], source, render, versions, box: boxOf(s.layer), margin: 0, dirty };
+  const margin = marginOf(s.fx, scale), box = boxOf(s.layer);
+  const localBox = Number.isFinite(margin) ? box && grow(box, margin) : box;
+  const localDirty = dirty && (Number.isFinite(margin) ? grow(dirty, margin) : localBox);
+  return { below: false, key: [...render, ...versions], source: s.layer.type === 'raster' ? [s.layer.id, s.layer.paintBaseId ?? null] : source, render, versions, box: localBox, margin, dirty: localDirty };
 }
 
 const sameKey = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((k, i) => k === b[i]);
 const sameRect = (a: Rect | null, b: Rect | null) => a === b || (!!a && !!b && a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1);
 function changedArea(prev: StepSig, cur: StepSig): Rect | null {
   const pixelsOnly = !!prev.source && !!cur.source && !!prev.versions && !!cur.versions
-    && sameKey(prev.source, cur.source) && !sameKey(prev.versions, cur.versions);
-  return pixelsOnly && cur.dirty && !isEmpty(cur.dirty) ? cur.dirty : union(prev.box, cur.box);
+    && !!prev.render && !!cur.render && sameKey(prev.source, cur.source) && sameKey(prev.render, cur.render)
+    && !sameKey(prev.versions, cur.versions);
+  if (pixelsOnly && cur.dirty && !isEmpty(cur.dirty)) return cur.dirty;
+  return union(union(prev.box, cur.box), union(prev.dirty, cur.dirty));
 }
 /** A region bigger than this share of the page is recomposed as a whole: the bookkeeping would cost more than it saves. */
 export const MAX_REGION_SHARE = 0.5;
@@ -105,7 +124,7 @@ export function planFrame(prev: FrameMemo | null, cur: FrameMemo): FramePlan {
   const changed = cur.steps.map((s, i) => !sameKey(s.key, prev.steps[i].key) || !sameRect(s.box, prev.steps[i].box));
   if (!changed.some(Boolean)) return { kind: 'same' };
   let reach = 0;
-  for (const s of cur.steps) reach += s.margin;
+  for (const s of cur.steps) if (s.below) reach += s.margin;
   if (!Number.isFinite(reach)) return { kind: 'full', why: 'unknown FX' };
   let dirty: Rect | null = null, beneath: Rect | null = cur.base;
   for (let i = 0; i < cur.steps.length; i++) {
@@ -145,10 +164,12 @@ export class RetainedPage<C> {
   private memo: FrameMemo | null = null;
   private page: C | null = null;
   /** Frames by kind since the last reset (for the bench). */
-  readonly stats = { same: 0, region: 0, full: 0 };
+  readonly stats: { same: number; region: number; full: number; fullWhy: Record<string, number> } = { same: 0, region: 0, full: 0, fullWhy: {} };
+  lastPlan: FramePlan | null = null;
   reset(): void { this.memo = null; this.page = null; }
   frame(cur: FrameMemo, ops: PageOps<C>): C {
     const plan = planFrame(this.memo, cur);
+    this.lastPlan = plan;
     if (plan.kind === 'same' && this.page) { this.stats.same++; return this.page; }
     if (plan.kind === 'region' && this.page) {
       const crop = clipTo(grow(plan.rect, plan.reach), cur.W, cur.H), r = plan.rect;
@@ -159,17 +180,13 @@ export class RetainedPage<C> {
     }
     this.page = ops.compose(null);
     this.memo = cur; this.stats.full++;
+    if (plan.kind === 'full') this.stats.fullWhy[plan.why] = (this.stats.fullWhy[plan.why] ?? 0) + 1;
     return this.page;
   }
 }
 
-/**
- * The area a layer can paint, in canvas px: its own box, and for a raster layer its whole placement. The buffer can
- * change anywhere on the placement (an edit need not come with strokes), so the placement is always part of it.
- */
+/** The effective painted area in canvas px. Callers use the layer placement only when pixel bounds are unavailable. */
 export function paintArea(l: Layer, scale: number, boxOf: (l: Layer) => Box | null): Rect | null {
-  const place: Box | null = l.type === 'raster' ? { x: l.x, y: l.y, w: l.width, h: l.height } : null;
-  const shown = place && l.transform ? mapBox(l.transform, place) : place;
-  const u = unionBox([boxOf(l), shown].filter((b): b is Box => !!b));
-  return u && { x0: u.x * scale, y0: u.y * scale, x1: (u.x + u.w) * scale, y1: (u.y + u.h) * scale };
+  const box = boxOf(l);
+  return box && { x0: box.x * scale, y0: box.y * scale, x1: (box.x + box.w) * scale, y1: (box.y + box.h) * scale };
 }
