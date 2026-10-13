@@ -15,7 +15,7 @@ import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
 import { rasterStrokeBox } from './rasterStrokes';
 import { fxPlan } from '../fx/plan';
-import { RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
+import { paintArea, RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
 import { mixFx } from '../fx/canvas';
 import { frameShown, span, takeCanvasCount, traceStatus } from '../../lib/trace';
 
@@ -373,10 +373,6 @@ const FX_MAX_PX = 16_000_000;
  */
 const retained = new RetainedPage<HTMLCanvasElement>();
 const fullRect = (W: number, H: number): Rect => ({ x0: 0, y0: 0, x1: W, y1: H });
-const boxRect = (l: Layer, scale: number): Rect | null => {
-  const b = layerBox(l);
-  return b && { x0: b.x * scale, y0: b.y * scale, x1: (b.x + b.w) * scale, y1: (b.y + b.h) * scale };
-};
 const versionsOf = (l: Layer): unknown[] => rasterBufferIds([l]).map(bufferVersion);
 
 /** The plan's steps composed into a canvas of `crop` (canvas px of the W×H page at `scale`; the page itself when it is the whole page). */
@@ -389,7 +385,7 @@ function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: numb
     x.fillStyle = doc.background;
     x.fillRect(0, 0, doc.width, doc.height);
   }
-  // Editor frames only: for the 'below' cache (scale, page, crop, background, fonts, layers, pixels).
+  // Editor frames: keys for the 'below' cache (page, crop, background, fonts, layers, pixels).
   const below: unknown[] = editor ? [scale, W, H, ox, oy, cw, ch, doc.background, fontEpoch] : [];
   for (const s of steps) {
     const end = s.t === 'draw' ? null : span('fx', 'layer', { ...trace, scope: s.t === 'below' ? 'below' : 'layer', fx: s.t === 'below' ? 1 : s.fx.length, size: `${cw}x${ch}` });
@@ -438,16 +434,17 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   const cur: FrameMemo = {
     W, H, scale, background: doc.background, fontEpoch,
     base: doc.background ? fullRect(W, H) : null,
-    steps: steps.map((s) => stepSig(s, scale, (l) => boxRect(l, scale), versionsOf)),
+    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, layerBox), versionsOf)),
   };
   servedStale = false;
   const page = retained.frame(cur, {
     compose: (crop) => composeFx(doc, steps, scale, W, H, crop ?? fullRect(W, H), true, trace),
     blit: (dst, src, from, to) => {
       const w = to.x1 - to.x0, h = to.y1 - to.y0, x = ctx2d(dst);
+      // 'copy' clears all outside the drawn part: clear the region, then copy.
       x.save();
       x.setTransform(1, 0, 0, 1, 0, 0);
-      x.globalCompositeOperation = 'copy';
+      x.clearRect(to.x0, to.y0, w, h);
       x.drawImage(src, from.x0, from.y0, w, h, to.x0, to.y0, w, h);
       x.restore();
     },

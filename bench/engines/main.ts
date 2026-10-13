@@ -1,5 +1,5 @@
 import { runEngine, refExport } from './harness';
-import { runParity } from './parity';
+import { runParity, runSequence } from './parity';
 
 /* One build per engine (BENCH_ENGINE). The page runs the gestures at ?zoom= and writes the JSON into #result. */
 const params = new URLSearchParams(location.search);
@@ -7,7 +7,7 @@ const zoom = Number(params.get('zoom') ?? 0.365);
 const only = params.get('only')?.split(',');
 const mode = params.get('mode') ?? 'run';
 const w = window as unknown as Record<string, unknown>;
-(mode === 'ref' ? refExport() : mode === 'parity' ? runParity() : runEngine(zoom, only)).then((result) => {
+(mode === 'ref' ? refExport() : mode === 'parity' ? runParity() : mode === 'sequence' ? runSequence(Number(params.get('ops') ?? 200), Number(params.get('seed') ?? 20260412), params.get('raster') !== '0', params.get('tone') !== '0') : runEngine(zoom, only)).then((result) => {
   w.__RESULT__ = result;
   const pre = document.createElement('pre');
   pre.id = 'result';

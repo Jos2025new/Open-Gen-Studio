@@ -61,6 +61,11 @@ describe('retained page: planner', () => {
     const plan = planFrame(memo([a, b]), memo([moved, b]));
     expect(plan).toEqual({ kind: 'region', rect: { x0: 2, y0: 0, x1: 16, y1: 1 }, reach: 0 });
   });
+  it('treats a box that changes without a key change as a change', () => {
+    const prev = memo([a, b]);
+    const cur = { ...memo([a, b]), steps: [prev.steps[0], { ...prev.steps[1], box: { x0: 20, y0: 0, x1: 34, y1: 1 } }] };
+    expect(planFrame(prev, cur)).toEqual({ kind: 'region', rect: { x0: 20, y0: 0, x1: 34, y1: 1 }, reach: 0 });
+  });
   it('propagates a change through a later below step by its reach', () => {
     const blur: Step = { kind: 'blur', r: 3 };
     const plan = planFrame(memo([a, blur]), memo([{ kind: 'draw', a: 2, b: 9, v: 1 }, blur]));

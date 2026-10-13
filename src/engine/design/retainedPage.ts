@@ -1,6 +1,8 @@
 import type { FxOp, FxLayer } from '../fx/types';
 import type { FxStep } from '../fx/plan';
 import type { Layer } from '../types';
+import { unionBox, type Box } from './doc';
+import { mapBox } from './matrix';
 
 /*
  * Retained page (Paso 3): the editor keeps the last composite and recomposes only the region a change dirties.
@@ -65,6 +67,7 @@ export function stepSig(s: FxStep, scale: number, boxOf: (l: Layer) => Rect | nu
 }
 
 const sameKey = (a: unknown[], b: unknown[]) => a.length === b.length && a.every((k, i) => k === b[i]);
+const sameRect = (a: Rect | null, b: Rect | null) => a === b || (!!a && !!b && a.x0 === b.x0 && a.y0 === b.y0 && a.x1 === b.x1 && a.y1 === b.y1);
 /** A region bigger than this share of the page is recomposed as a whole: the bookkeeping would cost more than it saves. */
 export const MAX_REGION_SHARE = 0.5;
 
@@ -77,7 +80,8 @@ export function planFrame(prev: FrameMemo | null, cur: FrameMemo): FramePlan {
   if (!prev) return { kind: 'full', why: 'first frame' };
   if (prev.W !== cur.W || prev.H !== cur.H || prev.scale !== cur.scale || prev.background !== cur.background || prev.fontEpoch !== cur.fontEpoch) return { kind: 'full', why: 'page' };
   if (prev.steps.length !== cur.steps.length || prev.steps.some((p, i) => p.below !== cur.steps[i].below)) return { kind: 'full', why: 'steps' };
-  const changed = cur.steps.map((s, i) => !sameKey(s.key, prev.steps[i].key));
+  // A box can change without the key changing (the pixel box is read back at most every 150 ms): that is a change too.
+  const changed = cur.steps.map((s, i) => !sameKey(s.key, prev.steps[i].key) || !sameRect(s.box, prev.steps[i].box));
   if (!changed.some(Boolean)) return { kind: 'same' };
   let reach = 0;
   for (const s of cur.steps) reach += s.margin;
@@ -136,4 +140,15 @@ export class RetainedPage<C> {
     this.memo = cur; this.stats.full++;
     return this.page;
   }
+}
+
+/**
+ * The area a layer can paint, in canvas px: its own box, and for a raster layer its whole placement. The buffer can
+ * change anywhere on the placement (an edit need not come with strokes), so the placement is always part of it.
+ */
+export function paintArea(l: Layer, scale: number, boxOf: (l: Layer) => Box | null): Rect | null {
+  const place: Box | null = l.type === 'raster' ? { x: l.x, y: l.y, w: l.width, h: l.height } : null;
+  const shown = place && l.transform ? mapBox(l.transform, place) : place;
+  const u = unionBox([boxOf(l), shown].filter((b): b is Box => !!b));
+  return u && { x0: u.x * scale, y0: u.y * scale, x1: (u.x + u.w) * scale, y1: (u.y + u.h) * scale };
 }
