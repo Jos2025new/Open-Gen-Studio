@@ -114,3 +114,4 @@ Dibujar, seleccionar y mover se sienten inmediatos. Tests verdes o un guardado m
 - 2026-10-12, usuario: GPT prepara el banco e instrucciones; no ejecuta agent-browser ni arrastres reales. Comparación antes/después reservada al agente verificador ([instrucciones](fluidez-pruebas.md)); las cifras permanecen pendientes, sin sustituirlas por medidas de desarrollo.
 
 - 2026-10-12, GPT: el directorio opcional de build se valida antes de compilar/servir; no puede ser el proyecto, un ancestro, `data/`, sus copias, `.sandbox/` ni un enlace simbólico. Esto protege los datos también al comparar una build externa.
+- 2026-10-13, usuario: aprobó implementar la cuota raster de la etapa 3 en rama aislada. Los topes 64 trazos / 8192 segmentos son provisionales; la comprobación visual del plan sigue pendiente.

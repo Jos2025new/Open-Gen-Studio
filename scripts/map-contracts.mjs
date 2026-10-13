@@ -402,4 +402,17 @@ export default [
     ],
     tests: ['tests/retained-page-plan.test.ts', 'tests/raster-strokes.test.ts'],
   },
+  {
+    id: 'raster-editable-stroke-limit',
+    what: 'Una capa raster editable se aplana en el mismo paso de deshacer al llegar al límite provisional de 64 trazos o 8192 segmentos; el buffer exacto que pintó Stage pasa a píxeles persistentes, y una capa antigua que ya alcanzó o superó la cuota pide confirmación antes de pintar.',
+    sides: [
+      ['src/engine/types.ts', 'paintFlattened?: boolean;'],
+      ['src/engine/design/rasterLimit.ts', 'export const DEFAULT_PAINT_STROKE_LIMIT = 64;'],
+      ['src/components/designer/Stage.tsx', 'prepareStagePaint(current, erase)'],
+      ['src/components/designer/StagePaintCommit.ts', 'shouldFlattenRasterPaint({ ...layer, paintStrokes: nextStrokes }'],
+      ['src/components/designer/LayersPanel.tsx', '<RasterLimitControls sessionId={sessionId}'],
+      ['docs/raster-limit.md', '64 trazos o 8192 segmentos.'],
+    ],
+    tests: ['tests/raster-limit.test.ts'],
+  },
 ];

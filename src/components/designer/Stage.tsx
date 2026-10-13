@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import type { DesignDoc, Layer, RasterLayer, RasterStroke, Stroke, TextLayer } from '../../engine/types';
+import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
@@ -9,8 +9,8 @@ import { drawDoc, layerBox, hitTest, hitTestPixel } from '../../engine/design/re
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
-import { beginLiveStroke, type LiveStroke } from '../../engine/design/raster';
-import { addBrushSegment, brushSegment, endBrushStroke, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
+import { beginLiveStroke } from '../../engine/design/raster';
+import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
@@ -35,6 +35,7 @@ import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoo
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
+import { commitStagePaintGesture, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 
 
 type Drag =
@@ -44,7 +45,7 @@ type Drag =
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
-  | { kind: 'paint'; live: LiveStroke; stroke: RasterStroke; layerId: string; last: { x: number; y: number }; control: { x: number; y: number }; time: number; erase: boolean }
+  | StagePaintGesture
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
   | { kind: 'select'; lasso: boolean; points: Array<[number, number]>; combine: SelectCombine }
@@ -819,15 +820,16 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         toast(blocked ?? 'Select a raster layer to erase.', 'error');
         return;
       }
+      if (!prepareStagePaint(current, erase)) return;
       record(current);
       // Brush never touches protected images: it paints on its own layer.
       const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
       if (!target || target.type !== 'raster') return;
-      if (!getBuffer(target.id) || (target.paintBaseId && !getBuffer(target.paintBaseId))) {
+      if (!getBuffer(target.id) || (!target.paintFlattened && target.paintBaseId && !getBuffer(target.paintBaseId))) {
         toast('Layer pixels are still loading. Try again in a moment.', 'error');
         return;
       }
-      const prepared = withPaintBase(target);
+      const prepared = target.paintFlattened ? target : withPaintBase(target);
       if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
       // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
       const before = getBuffer(target.id)!;
@@ -1157,19 +1159,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       commitEdit(d.layerId);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1 } : l) }));
     }
-    if (d.kind === 'paint') {
-      const pl = getDoc(sessionId, doc.id)?.layers.find((l) => l.id === d.layerId), pb = getBuffer(d.layerId);
-      if (pl?.type === 'raster' && pb) endBrushStroke(d.stroke, d.live, pb, pl, brush);
-      flushPaintFrame();
-      commitEdit(d.layerId);
-      if (d.live.clip) {
-        // A stroke cut by a selection cannot be replayed as a free stroke: the layer keeps it as pixels.
-        setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintBaseId: undefined, paintStrokes: undefined } : l)) }));
-      } else {
-        if (!d.erase) setObjectPick(doc.id, { layerId: d.layerId, ids: [d.stroke.id] });
-        setDoc(sessionId, doc.id, (dd) => ({ ...dd, updatedAt: Date.now(), layers: dd.layers.map((l) => (l.id === d.layerId && l.type === 'raster' ? { ...l, rev: l.rev + 1, paintStrokes: [...(l.paintStrokes ?? []), d.stroke] } : l)) }));
-      }
-    }
+    if (d.kind === 'paint') commitStagePaintGesture({ sessionId, docId: doc.id, gesture: d, brush, clipped: !!d.live.clip, flushFrame: flushPaintFrame });
     if (d.kind === 'stroke') {
       if (liveRaf.current != null) cancelAnimationFrame(liveRaf.current);
       liveRaf.current = null;

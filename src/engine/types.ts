@@ -793,6 +793,10 @@ export interface RasterLayer extends LayerBase {
   pageFill?: { color: string; rev: number };
   paintBaseId?: string;
   paintStrokes?: RasterStroke[];
+  /** The editable-stroke quota was reached; later brush/eraser gestures edit pixels directly. */
+  paintFlattened?: boolean;
+  /** Per-layer opt-out for future editable-stroke quotas. */
+  paintLimitDisabled?: boolean;
   x: number;
   y: number;
   width: number;
