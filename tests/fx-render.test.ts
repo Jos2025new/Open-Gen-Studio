@@ -420,6 +420,6 @@ it('a layer of editable strokes is boxed by its base and its strokes, without re
   expect(reads).toBe(1); // the base, once
   const erasing = { ...l, paintStrokes: [stroke, { ...stroke, id: 'e', erase: true }] };
   layerBox(erasing);
-  expect(reads).toBe(2); // erasing can shrink what shows: the pixels are read
+  expect(reads).toBe(1); // stroke geometry is a safe bound even when an eraser shrinks the visible pixels
   vi.unstubAllGlobals();
 });

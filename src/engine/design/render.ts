@@ -74,21 +74,17 @@ export function alphaBounds(px: Uint32Array, width: number, height: number): { x
 }
 
 /** A painted layer (no image) is page-sized: select and move what is drawn, not the whole page. Cached per buffer version. */
-const painted = new WeakMap<HTMLCanvasElement, { version: number; at: number; box: { x0: number; y0: number; x1: number; y1: number } | null }>();
-/** The drawn pixels' box of one buffer, in buffer pixels; null = nothing drawn, undefined = not read yet (see below). */
-function pixelBox(buf: HTMLCanvasElement, version: number): { x0: number; y0: number; x1: number; y1: number } | null {
+const painted = new WeakMap<HTMLCanvasElement, { version: number; box: { x0: number; y0: number; x1: number; y1: number } | null }>();
+/** The drawn pixels' box of one buffer, in buffer pixels; null = nothing drawn, undefined = not read yet. */
+export function pixelBox(buf: HTMLCanvasElement, version: number): { x0: number; y0: number; x1: number; y1: number } | null {
   let hit = painted.get(buf);
   // Keyed on this buffer's own content version: painting or redrawing another layer does not rescan this one. A live
-  // stroke changes it every segment and reading the pixels back stalls the brush: the box catches up once the stroke
-  // ends (its commit is a new version). Otherwise rescan at most every 150 ms.
-  if (!hit || (hit.version !== version && !paintingLive() && performance.now() - hit.at > 150)) {
+  // stroke changes it every segment and reading pixels back stalls the brush; its bounds catch up when the stroke ends.
+  if (!hit || (hit.version !== version && !paintingLive())) {
     const width = buf.width, height = buf.height;
     const d = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
-    hit = { version, at: performance.now(), box: alphaBounds(new Uint32Array(d.buffer, d.byteOffset, width * height), width, height) };
+    hit = { version, box: alphaBounds(new Uint32Array(d.buffer, d.byteOffset, width * height), width, height) };
     painted.set(buf, hit);
-  } else if (hit.version !== version && !paintingLive()) {
-    // Throttled: catch up right after, not at the next click (a stale box was rescanned on pointer down).
-    redrawSoon(160);
   }
   return hit.box;
 }
@@ -100,11 +96,10 @@ function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
     const kx = l.width / c.width, ky = l.height / c.height;
     return { x: l.x + b.x0 * kx, y: l.y + b.y0 * ky, w: (b.x1 - b.x0) * kx, h: (b.y1 - b.y0) * ky };
   };
-  // Editable strokes over a fixed base: the base's pixels (read once, it never changes) and each stroke's own box,
-  // the boxes Objects mode picks by. No read of the layer's pixels, which changes every frame while strokes move (a
-  // first read of a new canvas took ~40 ms). Erasing strokes can shrink what shows: those layers read their pixels.
+  // Editable strokes over a fixed base: the base's pixels (cached by version) and each stroke's own box. Stroke
+  // geometry is conservative for erasing too, and stays current while the layer buffer is being rebuilt.
   const base = l.paintBaseId ? getBuffer(l.paintBaseId) : undefined;
-  if (base?.width && l.paintStrokes && !l.paintStrokes.some((st) => st.erase)) {
+  if (base?.width && l.paintStrokes) {
     const b0 = pixelBox(base, bufferVersion(l.paintBaseId!));
     const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
     if (!all) return null;
@@ -434,10 +429,15 @@ function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: numb
 
 /** Editor frame through the retained page (only changed areas are composed again). */
 function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: number, W: number, H: number, trace?: RenderTrace): HTMLCanvasElement {
+  const dirtyByLayer = new Map<Layer, Rect | null>();
+  const dirtyOf = (layer: Layer) => {
+    if (!dirtyByLayer.has(layer)) dirtyByLayer.set(layer, rasterDirtyRect(layer, scale));
+    return dirtyByLayer.get(layer) ?? null;
+  };
   const cur: FrameMemo = {
     W, H, scale, background: doc.background, fontEpoch,
     base: doc.background ? fullRect(W, H) : null,
-    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, layerBox), versionsOf)),
+    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, layerBox), versionsOf, dirtyOf)),
   };
   servedStale = false;
   const page = retained.frame(cur, {

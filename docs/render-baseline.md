@@ -157,7 +157,7 @@ Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. C
 | Paso | Estado |
 |---|---|
 | 1. Márgenes FX y rectángulos | Hecho (`4e25877`, tests) |
-| 2. Zonas sucias por capa | Hecho (`6acc817`); sin consumidor, la región usa la caja de la capa |
+| 2. Zonas sucias por capa | Hecho (`6acc817`); el cambio local de 2026-10-13 conecta `takeDirty` con la página retenida; paridad browser pendiente |
 | 3. Página retenida con redibujo por región | Hecho en el editor (`d4c0814`, `fc61510`, `c34b91a`); parte grande por región no ejercitada (2 de 200 cambios) |
 | 4. Presupuesto en bytes | Hecho (`b76835c`, anterior) |
 | 5. Historial en bytes | Hecho (`29c9fc9`, anterior) |
@@ -168,13 +168,13 @@ Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. C
 
 **Reversión a GPU con oráculo en CPU: hecha** (`65b91da`). `ctx2d` y el Stage usan GPU por defecto; `setCpuCanvases` solo para el oráculo y el banco. Con CPU, la paridad es 200/200 en 0/255. Máximo medido con GPU: 63/255 (ver «Rasterizado GPU y determinismo»).
 
-**A/B a 1024² pendiente.** Variantes: (i) `7e56f53`, (ii) HEAD con GPU, (iii) HEAD con `?cpu=1`. El parámetro `?size=` del banco ya existe. La cadena se lanzó y se cortó al cerrar el día: no hay ninguna tabla. Medir pintar, b, c, d, e con el vigilante de 1800 MB. Con CPU el documento de 2048² llegó a 2057 MB: a 2048² la variante GPU tampoco se ha medido.
+**A/B a 1024² pendiente.** Variantes: (i) `7e56f53`, (ii) HEAD con GPU, (iii) HEAD con `?cpu=1`. En el intento del 2026-10-13 solo se preparó la fixture 1024²; no se ejecutaron gestos porque la memoria disponible quedó entre 1 672 y 2 118 MB, por debajo del mínimo de 2 500 MB exigido antes de medir. El watchdog no actuó; el navegador llegó a 1 539 MB RSS, bajo el límite de 1 800 MB. Se cerraron navegador, servidor y watchdog propios; el puerto 5183 quedó libre y el SHA-256 de `.sandbox/data/state.json` siguió igual (`b739d941fdc2d5bca9e788403b8d5d0b6758f58d777a932f98d231fcfe6e21fc`). No hay tabla A/B ni decisión CPU/GPU basada en estos gestos. Con CPU el documento de 2048² llegó a 2 057 MB; HEAD GPU a 2048² tampoco se midió.
 
 **Riesgos abiertos**
 - Memoria: el documento profesional de 2048² con CPU supera el tope de 1800 MB del banco.
 - Rendimiento: la CPU puede ser más lenta al dibujar; no está medido.
-- Retenida por región: poco ejercitada (2 de 200); la mayoría de frames son completos.
-- Cajas de FX: las sombras y desenfoques de capas raster usan la caja de píxeles, que depende del tiempo (150 ms). Con CPU no alteró la paridad, pero no se ha eliminado.
+- Retenida por región: histórico 2 de 200 cambios; el consumidor local ahora mapea `takeDirty` a la página y expande el rectángulo por el margen FX. La paridad del oráculo 200/200/255 y el conteo nuevo de regiones aún no se ejecutaron en navegador.
+- Cajas de FX: se eliminó el reloj de 150 ms; la caja combina el alfa de la base cacheado por versión y la geometría conservadora de trazos editables, con margen FX aplicado por el plan. La prueba simula el reloj en t=0 y t=149 ms; paridad browser pendiente.
 - Rasterizado GPU no determinista: el editor y la exportación pueden diferir en píxeles (hasta 63/255).
 
 - **Etapa C (ADR 0014), en curso.** Hecho: formato 2 en disco (`server/store-v2.js`, con 10 pruebas que incluyen migración con copia previa, escritura de una sola sesión, recarga idéntica, 409, pérdida masiva total y por sesión, PUT legado convertido y vuelta atrás) y en navegador (`ogs-store-v2`, con 4 pruebas: migración, commit de una sola sesión, recarga y disco caído). Pendiente: medidas de d y e antes y después (el «antes» en el worktree `ogs-render-bench-before`: el run de d con tres repeticiones aún no terminó; el navegador con el documento profesional y sus cachés supera el tope de 1800 MB si se encadenan preparación y gestos sin liberar), pruebas de la lista que falten, la vuelta atrás escrita en el ADR 0014, y `npm test` completo.
@@ -203,3 +203,10 @@ Rama `task/render-bench` (worktree `ogs-render-bench`), sin fusionar ni subir. C
   tras vaciar cachés 0/255. Escenario sin FX frente a dibujo plano directo: 0/255 en 200 de 200.
 - **Memoria.** Con contextos de CPU, el documento profesional de 2048² llegó a **2057 MB** de RSS en el navegador del
   banco (el tope del vigilante es 1800 MB). Es otro motivo para no usar CPU en el editor.
+
+
+### Intento de A/B y cambios locales (2026-10-13)
+
+No se obtuvieron medidas de gesto: la preparación de la fixture 1024² usó el único navegador permitido y la memoria disponible no alcanzó el umbral de 2 500 MB. Se cerró la sesión sin iniciar una repetición; el renderer detectado era Intel ANGLE por hardware. Los valores de p50/p95, longtasks, comparación CPU/GPU y medida GPU 2048² siguen pendientes. El watchdog y el servidor del sandbox se detuvieron, 5183 quedó libre y el hash de `state.json` no cambió.
+
+Cambios locales para verificar en la próxima pasada: la página retenida consume una vez las regiones sucias raster, las transforma a coordenadas de página y añade el margen de los FX; la geometría anterior y nueva sigue siendo la alternativa segura ante cambios de capa o escrituras sin región. `pixelBox` actualiza de inmediato al cambiar la versión fuera de un trazo vivo y deja de depender de un reloj. El test de paridad conserva la comparación CPU sobre 200/2 000 pasos y el límite 255, pero no se ejecutó en navegador en este intento.

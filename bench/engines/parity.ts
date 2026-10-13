@@ -1,6 +1,6 @@
 import { BLEND_MODES, composeFrame, drawDoc, resetRetainedPage, retainedStats } from '../../src/engine/design/render';
 import { setCpuCanvases } from '../../src/lib/media';
-import { cloneCanvas, composeRaster, getBuffer, setBuffer } from '../../src/engine/design/raster';
+import { cloneCanvas, composeRaster, getBuffer, setBuffer, strokeBufferBox, type Dirty } from '../../src/engine/design/raster';
 import { clearBelowCache } from '../../src/engine/design/belowFxCache';
 import { editorCacheBudget } from '../../src/engine/design/cacheBudget';
 import { moveRasterStroke } from '../../src/engine/design/rasterStrokes';
@@ -84,6 +84,11 @@ function rng(seed: number): (n: number) => number {
 type Mut = { kind: string; next: DesignDoc };
 const withLayer = (doc: DesignDoc, id: string, f: (l: Layer) => Layer): DesignDoc => ({ ...doc, layers: doc.layers.map((l) => (l.id === id ? f(l) : l)) });
 
+function joinDirty(a: Dirty, b: Dirty): Dirty {
+  if (a === 'all' || b === 'all') return 'all';
+  return { x0: Math.min(a.x0, b.x0), y0: Math.min(a.y0, b.y0), x1: Math.max(a.x1, b.x1), y1: Math.max(a.y1, b.y1) };
+}
+
 function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone = true): Mut {
   const pick = <T,>(xs: T[]): T => xs[rnd(xs.length)];
   const rasters = doc.layers.filter((l): l is RasterLayer => l.type === 'raster');
@@ -130,8 +135,9 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
       if (!c) return { kind: 'paint (skipped)', next: doc };
       const copy = cloneCanvas(c), x = copy.getContext('2d')!;
       x.fillStyle = `rgba(${rnd(256)},${rnd(256)},${rnd(256)},0.8)`;
-      x.fillRect(rnd(copy.width - 20), rnd(copy.height - 20), 4 + rnd(16), 4 + rnd(16));
-      setBuffer(l.id, copy, false);
+      const left = rnd(copy.width - 20), top = rnd(copy.height - 20), width = 4 + rnd(16), height = 4 + rnd(16);
+      x.fillRect(left, top, width, height);
+      setBuffer(l.id, copy, false, { x0: left, y0: top, x1: left + width, y1: top + height });
       return { kind: 'paint', next: { ...doc, layers: doc.layers.slice() } };
     }
     default: {
@@ -139,7 +145,8 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
       if (!withStrokes.length) return { kind: 'move stroke (skipped)', next: doc };
       const l = pick(withStrokes), st = pick(l.paintStrokes!);
       const moved = moveRasterStroke(l, st.id, rnd(31) - 15, rnd(31) - 15);
-      composeRaster(moved, false);
+      const after = moved.paintStrokes!.find((x) => x.id === st.id)!;
+      composeRaster(moved, false, joinDirty(strokeBufferBox(st), strokeBufferBox(after)));
       return { kind: 'move stroke', next: withLayer(doc, l.id, () => moved) };
     }
   }
@@ -171,8 +178,6 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
     const m = mutate(doc, rnd, raster, tone);
     kinds[m.kind] = (kinds[m.kind] ?? 0) + 1;
     doc = m.next;
-    // The pixel box is read back at most every 150 ms (render.ts): wait so both frames read the same, current box.
-    await new Promise((r) => setTimeout(r, 170));
     const u0 = uncached(doc);
     const before = { ...retainedStats() };
     const got = frame(doc);
