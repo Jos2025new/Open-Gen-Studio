@@ -6,8 +6,13 @@ type Channels = { differentPixels: number; differentChannels: number; maxChannel
 function paintProbe(canvas: HTMLCanvasElement): void {
   const ctx = ctx2d(canvas);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#16324f';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // A transparent strip containing every nonzero alpha value, plus transparent pixels below it.
+  for (let alpha = 1; alpha <= 255; alpha++) {
+    const x = (alpha - 1) * canvas.width / 255;
+    const nextX = alpha * canvas.width / 255;
+    ctx.fillStyle = `rgba(240,80,150,${alpha / 255})`;
+    ctx.fillRect(x, 0, nextX - x + 0.01, 32);
+  }
   ctx.globalAlpha = 0.43;
   ctx.fillStyle = '#f28e2b';
   ctx.fillRect(13.25, 19.5, 420.75, 240.25);
@@ -49,27 +54,44 @@ async function readPixels(blob: Blob, width: number, height: number): Promise<Ui
   }
 }
 
+function startLongTasks(): { observer?: PerformanceObserver; durations: number[] } {
+  const durations: number[] = [];
+  try {
+    const observer = new PerformanceObserver((list) => durations.push(...list.getEntries().map((e) => e.duration)));
+    observer.observe({ type: 'longtask', buffered: false });
+    return { observer, durations };
+  } catch { return { durations }; }
+}
+
+async function finishLongTasks(probe: { observer?: PerformanceObserver; durations: number[] }): Promise<{ count: number; maxMs: number }> {
+  if (probe.observer) {
+    // Let the observer deliver its queued entries, then drain any that are still waiting before disconnecting.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    probe.durations.push(...probe.observer.takeRecords().map((e) => e.duration));
+    probe.observer.disconnect();
+  }
+  return { count: probe.durations.length, maxMs: Math.max(0, ...probe.durations) };
+}
+
 /** One local PNG parity run; this is not included in the shipped app UI. */
 export async function runPngParity(cpu = true): Promise<Record<string, unknown>> {
   setCpuCanvases(cpu);
   const canvas = createCanvas(1024, 768);
   paintProbe(canvas);
   const phases: CanvasPngDiagnostic[] = [];
-  const longTasks: number[] = [];
-  let observer: PerformanceObserver | undefined;
-  try {
-    observer = new PerformanceObserver((list) => longTasks.push(...list.getEntries().map((e) => e.duration)));
-    observer.observe({ type: 'longtask', buffered: false });
-  } catch { observer = undefined; }
-
+  const workerLongTaskProbe = startLongTasks();
   const workerStart = performance.now();
   const workerPromise = canvasToPngBlob(canvas, { onPhase: (event) => phases.push(event) });
-  const canvasStart = performance.now();
-  const canvasPromise = canvasToBlob(canvas, 'image/png');
-  const [workerBlob, canvasBlob] = await Promise.all([workerPromise, canvasPromise]);
+  const workerBlob = await workerPromise;
   const workerMs = performance.now() - workerStart;
+  const workerLongTasks = await finishLongTasks(workerLongTaskProbe);
+
+  // Run the legacy encoder after the worker observation window so its main-thread tasks are not misattributed.
+  const referenceLongTaskProbe = startLongTasks();
+  const canvasStart = performance.now();
+  const canvasBlob = await canvasToBlob(canvas, 'image/png');
   const canvasMs = performance.now() - canvasStart;
-  observer?.disconnect();
+  const referenceLongTasks = await finishLongTasks(referenceLongTaskProbe);
 
   const [workerPixels, canvasPixels] = await Promise.all([
     readPixels(workerBlob, canvas.width, canvas.height), readPixels(canvasBlob, canvas.width, canvas.height),
@@ -81,6 +103,6 @@ export async function runPngParity(cpu = true): Promise<Record<string, unknown>>
     usedWorker: phases.some((p) => p.phase === 'worker' && p.outcome === 'encoded'),
     fellBack: phases.some((p) => p.phase === 'fallback'), phases,
     parity: { ...parity, exact: parity.differentChannels === 0 },
-    longTasks: { count: longTasks.length, maxMs: Math.max(0, ...longTasks) },
+    longTasks: { worker: workerLongTasks, canvasToBlob: referenceLongTasks },
   };
 }
