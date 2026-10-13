@@ -29,7 +29,7 @@ export function ColorChannels({ value, hue, onHueChange, onChange, alpha, onAlph
     ? [['H', 'Hue', hue, 359, 0], ['S', 'Saturation', hsl[1], 100, 1], ['L', 'Lightness', hsl[2], 100, 2]] as const
     : [['R', 'Red', rgb[0], 255, 0], ['G', 'Green', rgb[1], 255, 1], ['B', 'Blue', rgb[2], 255, 2]] as const;
   return <div className="color-channels">
-    <div className="color-channel-mode" role="group" aria-label="Color channels"><Segmented size="sm" value={mode} options={[{ value: 'hsl', label: 'HSL' }, { value: 'rgb', label: 'RGB' }]} onChange={setMode} /></div>
+    <div className="color-channel-mode" role="group" aria-label="Color channels"><Segmented size="sm" value={mode} options={[{ value: 'hsl', label: 'HSLA', tip: 'Hue, saturation, lightness and alpha' }, { value: 'rgb', label: 'RGBA', tip: 'Red, green, blue and alpha' }]} onChange={setMode} /></div>
     {channels.map((c, i) => <label key={c.label} className="color-channel" title={c.label}>
       <span>{c.short}</span><input className="color-track" type="range" min={0} max={c.max} step={1} value={Math.round(c.value)} aria-label={c.label} style={{ background: c.gradient }} onChange={(e) => {
         const next = Number(e.target.value);

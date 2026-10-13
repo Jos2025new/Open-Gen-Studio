@@ -29,3 +29,12 @@ describe('color picker row', () => {
     expect(hexShown('#34ee25', undefined)).toBe('#34ee25');
   });
 });
+
+describe('mode buttons say what they show', () => {
+  it('HSLA and RGBA, since both carry the alpha channel', () => {
+    const html = render(37);
+    expect(html).toContain('>HSLA<');
+    expect(html).toContain('>RGBA<');
+    expect(html).not.toMatch(/>HSL</);
+  });
+});
