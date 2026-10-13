@@ -62,12 +62,20 @@ const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
 
 /** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
 /** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
+/**
+ * Object and Layer are always shown. Object is disabled (with its reason) when the active layer has no single objects
+ * to pick (a raster layer in Drawing with no editable strokes, ADR 0016). The stored mode is never changed silently:
+ * the same value drives what the tools do.
+ */
 export function EditModeToggle({ objects = true }: { objects?: boolean }) {
-  const stored = useStore((st) => st.ui.selectMode ?? 'objects');
-  // Single strokes are offered only where they exist (Design, or a layer with editable strokes): ADR 0016.
-  const mode = objects ? stored : 'layers';
+  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
+  return <EditModeOptions mode={mode} objects={objects} />;
+}
+
+/** The view of the Edit mode choice, with the mode passed in (the store is read by EditModeToggle). */
+export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'layers'; objects?: boolean }) {
   return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
-    ...(objects ? [{ value: 'objects' as const, label: 'Objects', tip: 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' }] : []),
+    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' : 'Not available on this layer: a raster layer in Drawing has no single strokes. Switch to Design, or choose Layer' },
     { value: 'layers' as const, label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
   ]} /></span>;
 }

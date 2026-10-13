@@ -84,11 +84,11 @@ export function CostTag({ estimate, className }: { estimate: Estimate | null | u
   );
 }
 
-export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: Array<{ value: T; label: ReactNode; tip?: string }>; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
+export function Segmented<T extends string>({ value, options, onChange, size = 'md' }: { value: T; options: Array<{ value: T; label: ReactNode; tip?: string; /** Shown but not pressable; the tip says why. */ disabled?: boolean }>; onChange: (v: T) => void; size?: 'sm' | 'md' }) {
   return (
     <div className={`segmented seg-${size}`} role="radiogroup">
       {options.map((o) => (
-        <button key={o.value} type="button" role="radio" aria-checked={o.value === value} data-tip={o.tip} className={o.value === value ? 'is-active' : ''} onClick={() => onChange(o.value)}>
+        <button key={o.value} type="button" role="radio" aria-checked={o.value === value} disabled={o.disabled} data-tip={o.tip} className={o.value === value ? 'is-active' : ''} onClick={() => onChange(o.value)}>
           {o.label}
         </button>
       ))}
