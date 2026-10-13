@@ -120,7 +120,7 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }
   const a0 = ctx.globalAlpha;
-  const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p); else ctx.fill(); ctx.globalAlpha = a0; } };
+  const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p, s.fillRule); else ctx.fill(s.fillRule); ctx.globalAlpha = a0; } };
   const stroke = () => { if (s.stroke && s.strokeWidth > 0) { ctx.strokeStyle = s.stroke; ctx.globalAlpha *= s.strokeOpacity ?? 1; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); ctx.globalAlpha = a0; } };
   if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
 }

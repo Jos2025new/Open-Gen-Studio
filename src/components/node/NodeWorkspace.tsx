@@ -403,7 +403,7 @@ function Canvas() {
         addAssetAsNode(sessionId, assetId, { x: pos.x - NODE_WIDTH / 2, y: pos.y - 40 });
       }}
     >
-      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={e => {
+      <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={e => {
         const files = [...(e.currentTarget.files ?? [])];
         e.currentTarget.value = '';
         void importImages(files, importPosition.current);

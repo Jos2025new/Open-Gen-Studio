@@ -42,6 +42,17 @@ export default [
     tests: ['tests/eps-server.test.ts', 'tests/imports-eps-heic.test.ts'],
   },
   {
+    id: 'svg-import',
+    what: 'Todo SVG se sanea (sanitize.ts) antes de leerlo, tanto al importarlo como capas en el Designer como al aplanarlo a PNG en el área de nodos; la parte editable y la rasterizada salen del mismo recorrido (structure.ts).',
+    sides: [
+      ['src/engine/design/svgImport/sanitize.ts', 'export function sanitizeSvg'],
+      ['src/engine/design/svgImport/flatten.ts', 'sanitizeSvg(text)'],
+      ['src/engine/design/svgImport/index.ts', 'sanitizeSvg(text)'],
+      ['src/lib/imports.ts', 'convertSvg'],
+    ],
+    tests: ['tests/svg-import.test.ts', 'tests/svg-import-resvg.test.ts'],
+  },
+  {
     id: 'path-node-topology',
     what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [

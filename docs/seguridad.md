@@ -35,3 +35,7 @@ Esta página dice qué está protegido y qué no, con la prueba de cada punto. *
 
 heic2any 0.0.4: MIT, pero su bundle (1,4 MB, carga diferida) incluye libheif, que es LGPL. No es AGPL ni GPL; si el repositorio se publica, hay que mantener el aviso de LGPL de libheif.
 
+
+## Importar SVG (2026-10-13)
+
+El SVG se sanea antes de leerlo (sin script, foreignObject, on*, javascript: ni referencias externas; ver [inkscape-importacion.md](inkscape-importacion.md)) y nunca se inserta en la página. @resvg/resvg-wasm 2.6.2: MPL-2.0, carga diferida, sin red.

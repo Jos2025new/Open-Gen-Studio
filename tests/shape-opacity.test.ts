@@ -6,7 +6,7 @@ import { paintOpacity, paintOpacityPatch } from '../src/engine/design/shapeLook'
 import { alphaFromOpacity, opacityFromAlpha } from '../src/lib/color';
 
 /* fill-opacity and stroke-opacity per shape: absent = 1 (no migration), canvas = SVG = picker's A. */
-const shape = (o: Partial<ShapeSpec> = {}): ShapeSpec & { id: string } => ({ id: 's', type: 'rect', x: 0, y: 0, w: 10, h: 10, fill: '#f00', stroke: '#00f', strokeWidth: 2, radius: 0, ...o });
+const shape = (o: Partial<ShapeSpec & { id: string }> = {}): ShapeSpec & { id: string } => ({ id: 's', type: 'rect', x: 0, y: 0, w: 10, h: 10, fill: '#f00', stroke: '#00f', strokeWidth: 2, radius: 0, ...o });
 const layer = (shapes: Array<ShapeSpec & { id: string }>): VectorLayer => ({ id: 'v', name: 'v', type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes });
 
 function paintAlphas(shapes: Array<ShapeSpec & { id: string }>): Array<[string, number]> {

@@ -24,6 +24,8 @@ export interface ShapeSpec {
   /** Dash pattern and offset in stroke widths. */
   dash?: number[];
   dashOffset?: number;
+  /** Even-odd fill rule (SVG fill-rule); absent = nonzero. */
+  fillRule?: 'evenodd';
   /** 'stroke': stroke painted under the fill. */
   paintOrder?: 'stroke';
   /** Gaussian blur σ in page px (Inkscape's stdDeviation); the panel shows it as Inkscape's blur %. */
