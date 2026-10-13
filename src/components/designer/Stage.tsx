@@ -344,7 +344,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       canvas.width = Math.round(size.w * dpr);
       canvas.height = Math.round(size.h * dpr);
     }
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.w, size.h);

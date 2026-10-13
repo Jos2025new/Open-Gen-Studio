@@ -1,4 +1,5 @@
 import { BLEND_MODES, composeFrame, drawDoc, resetRetainedPage, retainedStats } from '../../src/engine/design/render';
+import { setCpuCanvases } from '../../src/lib/media';
 import { cloneCanvas, composeRaster, getBuffer, setBuffer } from '../../src/engine/design/raster';
 import { clearBelowCache } from '../../src/engine/design/belowFxCache';
 import { editorCacheBudget } from '../../src/engine/design/cacheBudget';
@@ -145,6 +146,7 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
 }
 
 export async function runSequence(count = 200, seed = 20260412, raster = true, tone = true): Promise<SequenceResult> {
+  setCpuCanvases(true);
   const rnd = rng(seed);
   let { doc } = parityDocument();
   // tone=0: no levels/curves (their SVG filters are the only url() filters on canvas): the doc has no curves layer at all.

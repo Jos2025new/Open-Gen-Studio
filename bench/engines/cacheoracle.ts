@@ -1,4 +1,5 @@
 import { BLEND_MODES, drawDoc } from '../../src/engine/design/render';
+import { setCpuCanvases } from '../../src/lib/media';
 import { cloneCanvas, composeRaster, getBuffer, setBuffer } from '../../src/engine/design/raster';
 import { moveRasterStroke } from '../../src/engine/design/rasterStrokes';
 import type { DesignDoc, Layer, RasterLayer } from '../../src/engine/types';
@@ -87,6 +88,7 @@ function mutate(doc: DesignDoc, rnd: (n: number) => number, raster = true, tone 
 }
 
 export async function runCacheOracle(count = 200, seed = 20260412, raster = true, tone = true, nofx = false): Promise<CacheOracleResult> {
+  setCpuCanvases(true);
   const rnd = rng(seed);
   let { doc } = parityDocument();
   if (nofx) doc = { ...doc, layers: doc.layers.filter((l) => l.type !== 'fx') };
@@ -95,7 +97,7 @@ export async function runCacheOracle(count = 200, seed = 20260412, raster = true
   const stage = document.createElement('canvas'); stage.width = doc.width; stage.height = doc.height; stage.className = 'stage-canvas';
   const plain = document.createElement('canvas'); plain.width = doc.width; plain.height = doc.height;
   const read = (c: HTMLCanvasElement, d: DesignDoc) => {
-    const x = c.getContext('2d')!;
+    const x = c.getContext('2d', { willReadFrequently: true })!;
     x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
     drawDoc(x, d);
     return x.getImageData(0, 0, d.width, d.height).data;

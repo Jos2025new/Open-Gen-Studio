@@ -161,3 +161,18 @@ El JSON completo de la pasada válida (todas las repeticiones y metadatos) queda
 | 2. Oráculo de paridad | Compara la vía de exportación (`drawDoc`, sin cachés) con la del editor (cachés activas) sobre documentos sintéticos | No existía | Diferencia 0 de 921 600 canales (navegador, Canvas2D) | `bench/engines/parity.ts`, `tests/parity-oracle.test.ts` |
 | 4. Presupuesto en bytes | `fxCache`, `belowFxCache` y máscaras de trazo comparten un presupuesto de 256 MB en bytes | Tres cachés con límites propios: 48 M px, 48 M px y 16 M px | Un único presupuesto en bytes; descarta lo menos usado | Sin medida de gesto todavía (sandbox ocupado; ver «Pendiente») |
 | 5. Historial en bytes | El deshacer del Designer tiene un tope en bytes (512 MB) sobre los lienzos que conserva; descarta primero el más antiguo y nunca el último | Tope por número de pasos (40), sin límite en bytes | Tope en bytes con conteo de lienzos compartidos una vez; contador de pasos descartados en `historyDepth` | Pendiente: el aviso discreto en la interfaz y la medida del gesto |
+
+## Rasterizado GPU y determinismo (Paso 3, parte 5)
+
+- **Hallazgo.** El rasterizado GPU de Chromium no es bit a bit determinista: el mismo documento compuesto dos veces
+  puede dar píxeles distintos, con diferencias de hasta **63/255** por canal (200 cambios aleatorios, semilla fija,
+  versión de HEAD antes de `0ee9f2f`). Se descartaron como causa: el tiempo de la caja de píxeles (`pixelBox`), la
+  caché de FX de capa, la caché de máscaras de trazo, los lienzos de trabajo compartidos y la reutilización de lienzos.
+  Lo que lo elimina es leer los lienzos por CPU (`willReadFrequently`).
+- **Decisión.** El editor y el Stage usan GPU por defecto (`ctx2d` sin opción). Solo el oráculo de paridad y el banco
+  pasan a CPU (`setCpuCanvases`). Así la paridad valida la lógica de regiones, cachés e invalidación, no el rasterizador.
+- **Paridad con CPU en el oráculo** (200 cambios con pintura, trazos, curvas, FX y carpetas): retenida frente a completa
+  0/255; completa con caché frente a completa sin caché 0/255 (0 de 200 cambios); deriva tras un marco del editor y
+  tras vaciar cachés 0/255. Escenario sin FX frente a dibujo plano directo: 0/255 en 200 de 200.
+- **Memoria.** Con contextos de CPU, el documento profesional de 2048² llegó a **2057 MB** de RSS en el navegador del
+  banco (el tope del vigilante es 1800 MB). Es otro motivo para no usar CPU en el editor.

@@ -1,3 +1,4 @@
+import { sandboxBenchAllowed } from './designerBenchFixtures';
 import { createDoc, newRasterLayer, newVectorLayer } from '../engine/design/doc';
 import { TIP_PRESETS } from '../engine/design/brushEngine';
 import { newFxLayer, newFxOp } from '../engine/fx/commands';
@@ -16,7 +17,8 @@ import type { ShapeSpec } from '../engine/shapeSpec';
  */
 
 export const PROFESSIONAL_SEED = 20261012;
-export const PROFESSIONAL_SIZE = 2048;
+// Bench only: ?size= on the sandbox URL picks the page side (A/B at 1024 and 2048); the default is 2048.
+export const PROFESSIONAL_SIZE = sandboxBenchAllowed(location) ? Number(new URLSearchParams(location.search).get('size') ?? 2048) : 2048;
 export const LONG_STROKE_COUNT = 300;
 export const LONG_STROKE_SEGMENTS = 120;
 /** Id of the layer the bench moves an early stroke from; ids are fixed so the bench can find them. */

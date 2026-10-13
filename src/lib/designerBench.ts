@@ -4,7 +4,11 @@ import { composeRaster, ensureBuffers, getBuffer, setBuffer } from '../engine/de
 import { activeDoc } from '../engine/design/actions';
 import { objectPick } from '../engine/design/objectSelection';
 import { appendBenchSessions, intervalWork, longBenchStrokes, sandboxBenchAllowed } from './designerBenchFixtures';
+import { setCpuCanvases } from './media';
 import { addSyntheticSessions, prepareProfessional, pruneProfessionalSessions, rendererInfo, runProfessional } from './designerBenchProfessionalRun';
+
+// Bench only: ?cpu=1 on the sandbox URL gives the editor's canvases CPU contexts (the A/B's CPU variant).
+if (sandboxBenchAllowed(location) && new URLSearchParams(location.search).get('cpu') === '1') setCpuCanvases(true);
 
 const PERIOD = 1000 / 60;
 const delay = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));

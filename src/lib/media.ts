@@ -68,9 +68,14 @@ export function createCanvas(w: number, h: number): HTMLCanvasElement {
   return c;
 }
 
+let cpuCanvases = false;
+/**
+ * Bench and parity oracle only: engine canvases get CPU-backed contexts, so their pixels are reproducible. GPU by default
+ * (Chromium's GPU canvases are not bit-for-bit deterministic; see docs/render-baseline.md).
+ */
+export function setCpuCanvases(on: boolean): void { cpuCanvases = on; }
 export function ctx2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  // CPU-backed: Chromium's GPU canvases can give other pixels, and the editor reads its canvases back (see render notes).
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  const ctx = canvas.getContext('2d', { willReadFrequently: cpuCanvases });
   if (!ctx) throw new Error('2D canvas is not available');
   return ctx;
 }
