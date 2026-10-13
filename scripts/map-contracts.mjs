@@ -25,11 +25,12 @@ export default [
     sides: [
       ['src/engine/design/drawingChoice.ts', 'export function applyDrawingChoice'],
       ['src/components/designer/StagePaintCommit.ts', 'export function drawingChoiceFirst'],
-      ['src/components/designer/Stage.tsx', 'if (drawingChoiceFirst(sessionId, doc.id, current, erase)) return;'],
+      ['src/components/designer/Stage.tsx', 'if (drawingChoiceFirst(sessionId, doc.id, current, erase, { x: e.clientX, y: e.clientY })) return;'],
       ['src/components/designer/DrawingChoice.tsx', "Don&apos;t show again"],
+      ['src/engine/design/drawingChoice.ts', 'export function promptAnchor'],
       ['src/components/shell/SettingsPanel.tsx', 'Ask every time'],
     ],
-    tests: ['tests/drawing-choice.test.ts'],
+    tests: ['tests/drawing-choice.test.ts', 'tests/drawing-choice-position.test.ts'],
   },
   {
     id: 'eps-import',

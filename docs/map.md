@@ -15,7 +15,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
 | **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
-| **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts) |
+| **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts), [drawing-choice-position.test.ts](../tests/drawing-choice-position.test.ts) |
 | **eps-import** — EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación. | [eps.js](../server/eps.js), [local-store.js](../server/local-store.js), [imports.ts](../src/lib/imports.ts) | [eps-server.test.ts](../tests/eps-server.test.ts), [imports-eps-heic.test.ts](../tests/imports-eps-heic.test.ts) |
 | **svg-import** — Todo SVG se sanea (sanitize.ts) antes de leerlo, tanto al importarlo como capas en el Designer como al aplanarlo a PNG en el área de nodos; la parte editable y la rasterizada salen del mismo recorrido (structure.ts). | [sanitize.ts](../src/engine/design/svgImport/sanitize.ts), [flatten.ts](../src/engine/design/svgImport/flatten.ts), [index.ts](../src/engine/design/svgImport/index.ts), [imports.ts](../src/lib/imports.ts) | [svg-import.test.ts](../tests/svg-import.test.ts), [svg-import-resvg.test.ts](../tests/svg-import-resvg.test.ts) |
 | **path-node-topology** — Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer. | [pathNodeOps.ts](../src/engine/design/pathNodeOps.ts), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx) | [path-nodes.test.ts](../tests/path-nodes.test.ts), [path-nodes.spec.ts](../tests-e2e/path-nodes.spec.ts) |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 170 | 105 |
 | [store.ts](../src/store/store.ts) | 106 | 94 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 47 | 0 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 35 | 15 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 34 | 1 |
@@ -101,13 +101,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 30 | 131 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 75 | 63 |
+| `src/engine/design` | 75 | 64 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 136 |
+| `src/lib` | 24 | 137 |
 | `src/store` | 4 | 96 |
 
 110 de 278 módulos no tienen ningún test que los importe directamente.
