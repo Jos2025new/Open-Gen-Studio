@@ -55,6 +55,7 @@
 - [Plan: Designer fluido](plan-fluidez.md) (2026-10-12): objetivo, umbrales, etapas y autorizaciones; las revisiones lo enmiendan, no lo reabren.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, motor a decidir y tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
+- [Estado del cierre de render-bench](render-estado.md) (2026-10-13): commits de guardado raster, regiones y banco; verificación, revertido y pendiente.
 - [Investigación: cómo resuelve memoria y rendimiento PhotoCraft (Rust+wasm) y qué aplicar en OGS](investigacion-photocraft.md) (2026-10-13), solo lectura del código.
 - [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final](decision-motor.md) (2026-10-12).
 - [Banco de fluidez: instrucciones al agente de pruebas](fluidez-pruebas.md): producción aislada, casos habitual/exigente y límites de las medidas.
