@@ -334,6 +334,18 @@ export default [
     tests: ['tests/brush-engine.test.ts', 'tests/raster-stroke-mask.test.ts'],
   },
   {
+    id: 'raster-png-worker',
+    what: 'Al persistir los píxeles de una capa, el PNG se prepara y codifica en un worker cuando es posible, con fallback al encoder Canvas actual y sin cambiar el acuse de guardado.',
+    sides: [
+      ['src/engine/design/raster.ts', 'await blobDb.set(keyFor(layerId), await canvasToPngBlob(c))'],
+      ['src/lib/canvasPngWorker.ts', 'export async function canvasToPngBlob'],
+      ['src/lib/canvasPng.worker.ts', 'canvas.convertToBlob({ type: \'image/png\' })'],
+      ['bench/engines/png-parity.ts', 'export async function runPngParity'],
+      ['bench/engines/main.ts', "mode === 'png' ? runPngParity"],
+    ],
+    tests: ['tests/canvas-png-worker.test.ts', 'tests/raster-persist.test.ts'],
+  },
+  {
     id: 'fx-editor-cache',
     what: '2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan.',
     sides: [

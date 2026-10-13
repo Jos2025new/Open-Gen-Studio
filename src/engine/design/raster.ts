@@ -3,7 +3,8 @@ import { rasterStrokeMask } from './rasterStrokeMask';
 import { span } from '../../lib/trace';
 import { logged } from '../../lib/log';
 import { blobDb } from '../../lib/idb';
-import { blobToCanvas, canvasToBlob, createCanvas, ctx2d } from '../../lib/media';
+import { canvasToPngBlob } from '../../lib/canvasPngWorker';
+import { blobToCanvas, createCanvas, ctx2d } from '../../lib/media';
 import { uid } from '../../lib/id';
 import type { Layer, RasterLayer, RasterStroke } from '../types';
 import { toast } from '../../store/store';
@@ -446,7 +447,7 @@ function writeLayer(layerId: string): Promise<void> {
       return;
     }
     try {
-      await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'));
+      await blobDb.set(keyFor(layerId), await canvasToPngBlob(c));
       // A change made while writing (new buffer or a new timer) keeps the layer pending.
       if (buffers.get(layerId) === c && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
