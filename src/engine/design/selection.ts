@@ -10,9 +10,15 @@ import { create } from 'zustand';
 export const useLayerSelection = create<{ byDoc: Record<string, string[]> }>(() => ({ byDoc: {} }));
 
 /** The selected layers of a document: its own picks, else just the active layer. */
+/** The layers picked, as they were picked (the active layer is not added): what a multiple selection is. */
+export function pickedLayers(docId: string, existing: string[]): string[] {
+  return (useLayerSelection.getState().byDoc[docId] ?? []).filter((id) => existing.includes(id));
+}
+
 export function layerSelection(docId: string, activeLayerId: string | null, existing: string[]): string[] {
-  const picked = (useLayerSelection.getState().byDoc[docId] ?? []).filter((id) => existing.includes(id));
-  if (activeLayerId && !picked.includes(activeLayerId)) return [...picked, activeLayerId];
+  // The active layer is the selection only when nothing is picked: adding it to a stale pick made a plain click
+  // add to the old selection ("2 selected").
+  const picked = pickedLayers(docId, existing);
   return picked.length ? picked : activeLayerId ? [activeLayerId] : [];
 }
 
