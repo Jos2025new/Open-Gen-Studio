@@ -335,9 +335,9 @@ export default [
   },
   {
     id: 'raster-png-worker',
-    what: 'Al persistir los píxeles de una capa, el PNG se prepara y codifica en un worker cuando es posible, con fallback al encoder Canvas actual y sin cambiar el acuse de guardado.',
+    what: 'La ruta worker PNG está disponible como experimento de paridad; el guardado de capas mantiene activo el encoder Canvas legado hasta demostrar paridad de píxeles.',
     sides: [
-      ['src/engine/design/raster.ts', 'await blobDb.set(keyFor(layerId), await canvasToPngBlob(c))'],
+      ['src/engine/design/raster.ts', "await blobDb.set(keyFor(layerId), await canvasToBlob(c, 'image/png'))"],
       ['src/lib/canvasPngWorker.ts', 'export async function canvasToPngBlob'],
       ['src/lib/canvasPng.worker.ts', 'canvas.convertToBlob({ type: \'image/png\' })'],
       ['bench/engines/png-parity.ts', 'export async function runPngParity'],
