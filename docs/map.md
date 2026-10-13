@@ -50,6 +50,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **state-format-2** — ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2. | [store-v2.js](../server/store-v2.js), [store-v2.d.ts](../server/store-v2.d.ts), [local-store.js](../server/local-store.js), [formatV2.ts](../src/store/formatV2.ts), [idb.ts](../src/lib/idb.ts), [disk.ts](../src/lib/disk.ts) | [store-v2.test.ts](../tests/store-v2.test.ts), [state-format-2.test.ts](../tests/state-format-2.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts), [store-server.test.ts](../tests/store-server.test.ts) |
 | **cache-budget** — Paso 4 (2026-10-13): las cachés del editor (FX de capa, FX below y máscaras de trazo) comparten un presupuesto en bytes; descarta primero lo menos usado y nunca el dibujo del usuario, que no es una entrada. | [cacheBudget.ts](../src/engine/design/cacheBudget.ts), [render.ts](../src/engine/design/render.ts), [belowFxCache.ts](../src/engine/design/belowFxCache.ts), [rasterStrokeMask.ts](../src/engine/design/rasterStrokeMask.ts) | [cache-budget.test.ts](../tests/cache-budget.test.ts), [raster-stroke-mask.test.ts](../tests/raster-stroke-mask.test.ts), [fx-render.test.ts](../tests/fx-render.test.ts) |
 | **raster-dirty-retained** — Una escritura raster localizada invalida su área efectiva y el margen de FX; cambios de geometría o FX usan cajas totales y el redibujado seguro. | [raster.ts](../src/engine/design/raster.ts), [rasterDirty.ts](../src/engine/design/rasterDirty.ts), [rasterBounds.ts](../src/engine/design/rasterBounds.ts), [retainedPage.ts](../src/engine/design/retainedPage.ts), [render.ts](../src/engine/design/render.ts) | [retained-page-plan.test.ts](../tests/retained-page-plan.test.ts), [raster-pixel-box.test.ts](../tests/raster-pixel-box.test.ts), [raster-strokes.test.ts](../tests/raster-strokes.test.ts) |
+| **retained-region-planner** — El memo retenido mantiene pasos estables para capas ocultas y FX inactivos; la composición y exportación siguen usando fxPlan. | [retainedPlanner.ts](../src/engine/design/retainedPlanner.ts), [plan.ts](../src/engine/fx/plan.ts), [render.ts](../src/engine/design/render.ts) | [retained-page-planner.test.ts](../tests/retained-page-planner.test.ts), [fx-svg.test.ts](../tests/fx-svg.test.ts) |
 
 ## Módulos centrales
 
@@ -57,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 156 | 96 |
+| [types.ts](../src/engine/types.ts) | 157 | 97 |
 | [store.ts](../src/store/store.ts) | 101 | 90 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 44 | 0 |
 | [media.ts](../src/lib/media.ts) | 37 | 26 |
@@ -76,7 +77,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [idb.ts](../src/lib/idb.ts) | 17 | 109 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 14 | 1 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 12 | 0 |
+| [types.ts](../src/engine/fx/types.ts) | 13 | 6 |
 
 ## Por área
 
@@ -91,18 +92,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 122 |
+| `src/engine` | 30 | 123 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 55 | 50 |
+| `src/engine/design` | 56 | 51 |
 | `src/engine/flow` | 10 | 11 |
-| `src/engine/fx` | 7 | 7 |
+| `src/engine/fx` | 7 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 21 | 122 |
 | `src/store` | 4 | 92 |
 
-102 de 250 módulos no tienen ningún test que los importe directamente.
+102 de 251 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
