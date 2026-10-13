@@ -215,3 +215,13 @@ Cambios locales para verificar en la próxima pasada: la página retenida consum
 ### Continuación autorizada: umbrales de memoria (2026-10-13)
 
 Samuel autorizó bajar el mínimo previo a cada medición y el disparador del watchdog a **1 200 MB disponibles**; el tope de RSS acumulado del navegador permanece en **1 800 MB**. Se aplica solo al banco de este worktree (`bench/engines/memory-gate.sh` y `watchdog.sh`), sin cambiar límites globales ni tocar datos existentes. Antes de cada medición se registra `free -m` y carga; el watchdog propio se inicia una vez antes del navegador de cada corrida. La A/B se limita a 10 movimientos en los gestos de arrastre para respetar el máximo de 5 s por gesto. La comparación CPU/GPU y 2048² se detienen si cualquiera de los límites se alcanza.
+
+### Oráculo CPU y bloqueo de la continuación (2026-10-13)
+
+| Prueba | Resultado | Recursos observados |
+|---|---|---|
+| Secuencia CPU, 200 ops | Pasa: maxRetainedDiff 0/255, fallbacks 0, cache-vs-uncached 0 y drift 0. Frames: 5 regionales, 49 sin cambio, 146 completos. | Disponibles 2 889 MB al inicio y 2 551 MB al final; carga 0,75 → 1,54. |
+| Secuencia CPU, 2 000 ops, intento 1 | Sin resultado: el watchdog detuvo solo el perfil del banco al observar 2 060 MB RSS, con 1 911 MB disponibles; se superó el tope RSS de 1 800 MB. | Disponible inicial 2 713 MB; carga 1,27. |
+| Secuencia CPU, 2 000 ops, intentos 2 y 3 | Ambos reproducen el mismo fallo: maxRetainedDiff 3/255, dos fallbacks, primer fallo en op 1116 (`paint`). Cache-vs-uncached y drift permanecen en 0. Frames: 678 iguales, 64 regionales, 1 258 completos. El intento 3 probó un margen de un píxel en dirty raster, pero no cambió el resultado; esa hipótesis se retiró. | Con GC explícito, RSS observado 1 155–1 320 MB; disponibles 3 151 → 2 609 MB (intento 2) y 3 147 → 2 691 MB (intento 3). Cargas inicial/final 1,12/2,81 y 1,60/3,26. |
+
+Se alcanzó el máximo autorizado de tres intentos para la misma secuencia de 2 000 operaciones. Por eso no se repitió otra vez. La A/B 1024², la selección CPU/GPU por gesto y la medida GPU 2048² quedan pendientes hasta resolver la diferencia localizada en `paint`; el editor conserva GPU como predeterminado. No se tocaron ni limpiaron datos del sandbox; `state.json` conservó su hash inicial. El navegador, los receptores, los servidores y los watchdogs de esta corrida se cerraron.
