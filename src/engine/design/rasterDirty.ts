@@ -1,7 +1,8 @@
 import type { Layer } from '../types';
 import { mapBox } from './matrix';
-import { getBuffer, rasterBufferIds, takeDirty, type Dirty } from './raster';
+import { bufferVersion, getBuffer, rasterBufferIds, takeDirty, type Dirty } from './raster';
 import type { Rect } from './retainedPage';
+import { extendRasterBounds } from './rasterBounds';
 
 /** Take pending raster writes and map their buffer pixels through layer placement into retained-page pixels. */
 export function rasterDirtyRect(layer: Layer, scale: number): Rect | null {
@@ -9,8 +10,11 @@ export function rasterDirtyRect(layer: Layer, scale: number): Rect | null {
   let area: Rect | null = null;
   for (const id of rasterBufferIds([layer])) {
     const dirty: Dirty | null = takeDirty(id);
-    if (!dirty) continue;
+    // A paint base is only source material for a rebuild. The displayed pixels live in layer.id, whose rebuild marks
+    // its own dirty area; invalidating the page for the base clone alone needlessly turns entering Edit into a repaint.
+    if (id !== layer.id || !dirty) continue;
     const buf = getBuffer(id);
+    if (buf) extendRasterBounds(id, bufferVersion(id), buf.width, buf.height, dirty);
     const local = dirty === 'all' || !buf?.width || !buf.height ? { x: layer.x, y: layer.y, w: layer.width, h: layer.height } : {
       x: layer.x + dirty.x0 * layer.width / buf.width,
       y: layer.y + dirty.y0 * layer.height / buf.height,

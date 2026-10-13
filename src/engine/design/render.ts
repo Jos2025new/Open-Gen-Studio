@@ -13,7 +13,7 @@ import { cachedBelow, keepBelow } from './belowFxCache';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
 import { strokeBox } from './strokes';
-import { rasterStrokeBox } from './rasterStrokes';
+import { rasterPaintedBox } from './rasterBounds';
 import { fxPlan } from '../fx/plan';
 import { paintArea, RetainedPage, stepSig, type FrameMemo, type Rect } from './retainedPage';
 import { rasterDirtyRect } from './rasterDirty';
@@ -52,64 +52,7 @@ export const PIXEL_VIEW_FROM = 4;
 export { layoutText, textAscent, type TextLayout } from './textLayout';
 import { applyLetterSpacing, fontFor, layoutText } from './textLayout';
 
-/**
- * The box of the pixels with alpha above 8. Rows are scanned from the top and the bottom until one is hit; between
- * them each row only scans the columns outside the box found so far, so the work is the area outside the box rather
- * than the whole canvas. Same result as checking every pixel.
- */
-export function alphaBounds(px: Uint32Array, width: number, height: number): { x0: number; y0: number; x1: number; y1: number } | null {
-  const solid = (i: number) => (px[i] >>> 24) > 8; // RGBA bytes read little-endian: alpha is the top byte
-  let y0 = 0;
-  for (; y0 < height; y0++) { const r = y0 * width; let x = 0; while (x < width && !solid(r + x)) x++; if (x < width) break; }
-  if (y0 === height) return null;
-  let y1 = height - 1;
-  for (; y1 > y0; y1--) { const r = y1 * width; let x = 0; while (x < width && !solid(r + x)) x++; if (x < width) break; }
-  let x0 = width, x1 = -1;
-  for (let y = y0; y <= y1; y++) {
-    const r = y * width;
-    for (let x = 0; x < x0; x++) if (solid(r + x)) { x0 = x; break; }
-    for (let x = width - 1; x > x1; x--) if (solid(r + x)) { x1 = x; break; }
-  }
-  return { x0, y0, x1: x1 + 1, y1: y1 + 1 };
-}
-
-/** A painted layer (no image) is page-sized: select and move what is drawn, not the whole page. Cached per buffer version. */
-const painted = new WeakMap<HTMLCanvasElement, { version: number; box: { x0: number; y0: number; x1: number; y1: number } | null }>();
-/** The drawn pixels' box of one buffer, in buffer pixels; null = nothing drawn, undefined = not read yet. */
-export function pixelBox(buf: HTMLCanvasElement, version: number): { x0: number; y0: number; x1: number; y1: number } | null {
-  let hit = painted.get(buf);
-  // Keyed on this buffer's own content version: painting or redrawing another layer does not rescan this one. A live
-  // stroke changes it every segment and reading pixels back stalls the brush; its bounds catch up when the stroke ends.
-  if (!hit || (hit.version !== version && !paintingLive())) {
-    const width = buf.width, height = buf.height;
-    const d = buf.getContext('2d')!.getImageData(0, 0, width, height).data;
-    hit = { version, box: alphaBounds(new Uint32Array(d.buffer, d.byteOffset, width * height), width, height) };
-    painted.set(buf, hit);
-  }
-  return hit.box;
-}
-function paintedBox(l: Extract<Layer, { type: 'raster' }>): Box | null {
-  if (l.sourceAssetId) return null;
-  const buf = getBuffer(l.id);
-  if (!buf || !buf.width || !buf.height) return null;
-  const toPage = (b: { x0: number; y0: number; x1: number; y1: number }, c: HTMLCanvasElement): Box => {
-    const kx = l.width / c.width, ky = l.height / c.height;
-    return { x: l.x + b.x0 * kx, y: l.y + b.y0 * ky, w: (b.x1 - b.x0) * kx, h: (b.y1 - b.y0) * ky };
-  };
-  // Editable strokes over a fixed base: the base's pixels (cached by version) and each stroke's own box. Stroke
-  // geometry is conservative for erasing too, and stays current while the layer buffer is being rebuilt.
-  const base = l.paintBaseId ? getBuffer(l.paintBaseId) : undefined;
-  if (base?.width && l.paintStrokes) {
-    const b0 = pixelBox(base, bufferVersion(l.paintBaseId!));
-    const all = unionBox([...(b0 ? [toPage(b0, base)] : []), ...l.paintStrokes.map((st) => rasterStrokeBox(l, st)).filter((b): b is Box => b != null)]);
-    if (!all) return null;
-    // Only what lands on the layer's canvas shows.
-    const x0 = Math.max(all.x, l.x), y0 = Math.max(all.y, l.y), x1 = Math.min(all.x + all.w, l.x + l.width), y1 = Math.min(all.y + all.h, l.y + l.height);
-    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
-  }
-  const box = pixelBox(buf, bufferVersion(l.id));
-  return box ? toPage(box, buf) : null;
-}
+export { alphaBounds, pixelBox } from './rasterBounds';
 
 export function layerBox(l: Layer): Box | null {
   let b = untransformedBox(l);
@@ -132,7 +75,7 @@ export function toLayerSpace(l: Layer, x: number, y: number): [number, number] {
 function untransformedBox(l: Layer): Box | null {
   switch (l.type) {
     case 'raster':
-      return paintedBox(l) ?? { x: l.x, y: l.y, w: l.width, h: l.height };
+      return rasterPaintedBox(l) ?? { x: l.x, y: l.y, w: l.width, h: l.height };
     case 'vector':
       return unionBox([...l.shapes.map(shapeBox), ...(l.strokes ?? []).map(strokeBox).filter((b): b is Box => b != null)]);
     case 'text': {
@@ -372,6 +315,12 @@ const FX_MAX_PX = 16_000_000;
 const retained = new RetainedPage<HTMLCanvasElement>();
 const fullRect = (W: number, H: number): Rect => ({ x0: 0, y0: 0, x1: W, y1: H });
 const versionsOf = (l: Layer): unknown[] => rasterBufferIds([l]).map(bufferVersion);
+function retainedLayerBox(l: Layer, dirty: Rect | null | undefined): Box | null {
+  if (l.type !== 'raster' || l.sourceAssetId) return layerBox(l);
+  const box = rasterPaintedBox(l, !dirty, true);
+  if (box === undefined) return dirty ? (l.transform ? mapBox(l.transform, { x: l.x, y: l.y, w: l.width, h: l.height }) : { x: l.x, y: l.y, w: l.width, h: l.height }) : layerBox(l);
+  return box && l.transform ? mapBox(l.transform, box) : box;
+}
 
 /** The plan's steps composed into a canvas of `crop` (canvas px of the W×H page at `scale`; the page itself when it is the whole page). */
 function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: number, W: number, H: number, crop: Rect, editor: boolean, trace?: RenderTrace): HTMLCanvasElement {
@@ -437,7 +386,7 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   const cur: FrameMemo = {
     W, H, scale, background: doc.background, fontEpoch,
     base: doc.background ? fullRect(W, H) : null,
-    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, layerBox), versionsOf, dirtyOf)),
+    steps: steps.map((s) => stepSig(s, scale, (l) => paintArea(l, scale, (target) => retainedLayerBox(target, dirtyByLayer.get(target))), versionsOf, dirtyOf)),
   };
   servedStale = false;
   const page = retained.frame(cur, {
@@ -473,7 +422,7 @@ export function composeFrame(doc: DesignDoc, scale: number, retainedPath: boolea
   return retainedPath ? retainedFrame(doc, steps, scale, W, H) : composeFx(doc, steps, scale, W, H, fullRect(W, H), false);
 }
 export const resetRetainedPage = (): void => retained.reset();
-export const retainedStats = () => retained.stats;
+export const retainedStats = () => ({ ...retained.stats, fullWhy: { ...retained.stats.fullWhy }, lastPlan: retained.lastPlan });
 
 export async function exportDoc(doc: DesignDoc, type: 'image/png' | 'image/jpeg' = 'image/png'): Promise<Blob> {
   checkExportSize(doc.width, doc.height, fxPlan(doc.layers).some((step) => step.t !== 'draw'));

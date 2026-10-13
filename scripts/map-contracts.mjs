@@ -394,13 +394,15 @@ export default [
   },
   {
     id: 'raster-dirty-retained',
-    what: 'Una escritura raster localizada invalida en la página retenida su área mapeada y el margen de sus FX; cambios de capa o escrituras sin región conservan el redibujo geométrico seguro.',
+    what: 'Una escritura raster localizada invalida su área efectiva y el margen de FX; cambios de geometría o FX usan cajas totales y el redibujado seguro.',
     sides: [
       ['src/engine/design/raster.ts', 'export function takeDirty('],
       ['src/engine/design/rasterDirty.ts', 'function rasterDirtyRect('],
+      ['src/engine/design/rasterBounds.ts', 'export function rasterPaintedBox('],
       ['src/engine/design/retainedPage.ts', 'function changedArea('],
+      ['src/engine/design/render.ts', 'function retainedLayerBox('],
     ],
-    tests: ['tests/retained-page-plan.test.ts', 'tests/raster-strokes.test.ts'],
+    tests: ['tests/retained-page-plan.test.ts', 'tests/raster-pixel-box.test.ts', 'tests/raster-strokes.test.ts'],
   },
   {
     id: 'raster-editable-stroke-limit',

@@ -58,6 +58,7 @@
 - [Investigación: cómo resuelve memoria y rendimiento PhotoCraft (Rust+wasm) y qué aplicar en OGS](investigacion-photocraft.md) (2026-10-13), solo lectura del código.
 - [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final](decision-motor.md) (2026-10-12).
 - [Banco de fluidez: instrucciones al agente de pruebas](fluidez-pruebas.md): producción aislada, casos habitual/exigente y límites de las medidas.
+- [Regiones retenidas del Designer](render-regions.md): dirty raster, cajas totales, FX y evidencia de paridad.
 
 - [Timeline breve de esta sesión de Designer UX](timeline-designer-ux.md) (desde 2026-10-11).
 
