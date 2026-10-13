@@ -69,7 +69,8 @@ export function createCanvas(w: number, h: number): HTMLCanvasElement {
 }
 
 export function ctx2d(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const ctx = canvas.getContext('2d', { willReadFrequently: false });
+  // CPU-backed: Chromium's GPU canvases can give other pixels, and the editor reads its canvases back (see render notes).
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) throw new Error('2D canvas is not available');
   return ctx;
 }

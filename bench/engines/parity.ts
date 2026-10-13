@@ -49,7 +49,7 @@ export async function runParity(): Promise<ParityResult> {
   const reference = exCtx.getImageData(0, 0, doc.width, doc.height).data;
   // Editor path: Stage canvas, identity transform (zoom 1), caches on; two frames, the second reads the caches.
   const ed = document.createElement('canvas'); ed.width = doc.width; ed.height = doc.height; ed.className = 'stage-canvas';
-  const edCtx = ed.getContext('2d')!;
+  const edCtx = ed.getContext('2d', { willReadFrequently: true })!;
   let last: Uint8ClampedArray = new Uint8ClampedArray(0);
   for (let frame = 0; frame < 2; frame++) {
     edCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -151,7 +151,7 @@ export async function runSequence(count = 200, seed = 20260412, raster = true, t
   if (!tone) doc = { ...doc, layers: doc.layers.filter((l) => l.id !== 'par-fx-curves') };
   composeAll(doc, parityDocument().rasters);
   const ed = document.createElement('canvas'); ed.width = doc.width; ed.height = doc.height; ed.className = 'stage-canvas';
-  const edCtx = ed.getContext('2d')!;
+  const edCtx = ed.getContext('2d', { willReadFrequently: true })!;
   const frame = (d: DesignDoc): Uint8ClampedArray => {
     edCtx.setTransform(1, 0, 0, 1, 0, 0);
     edCtx.clearRect(0, 0, ed.width, ed.height);
