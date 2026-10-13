@@ -4,6 +4,17 @@ Plan único acordado por el usuario con revisiones de Claude y GPT. **Las revisi
 
 ## Objetivo y aceptación
 
+La ejecución vigente es el plan único autorizado el 2026-10-13: (1) PNG raster en worker;
+(2) zonas sucias por id y cajas por versión; (3) pasos vacíos solo en el planificador;
+(4) límite raster con aplanado único; (5) mosaicos de 64² solo en memoria, sin cambiar el guardado;
+(6) A/B final de cinco gestos × tres repeticiones a 1024², 2048² si cabe, y prueba del usuario.
+Tres Lunas implementan en worktrees separados; GPT verifica e integra en `task/render-bench`.
+Cada entrega tiene un propósito, tests dirigidos y su commit. Máximo tres intentos por problema;
+se retira una corrección fallida y se conserva una reproducción pequeña antes de seguir.
+El estrés de 2000 operaciones y su diferencia de 3/255 en la operación 1116 no bloquean esta lista.
+Solo GPT abre un navegador, sin tests simultáneos. Cada medida empieza con ≥1500 MB disponibles;
+el watchdog corta por debajo de 1000 MB disponibles o por encima de 1800 MB RSS del navegador.
+
 Dibujar, seleccionar y mover se sienten inmediatos. Tests verdes o un guardado más rápido no bastan: el plan se cierra con pruebas de interacción y con la prueba del usuario. Si no se alcanza, sigue abierto; un cambio de arquitectura o lenguaje solo se propone si la medida muestra cálculo pesado (no arregla copias, lecturas de GPU ni renders de más).
 
 | Medida (build de producción, sandbox) | Umbral al cierre del plan |
