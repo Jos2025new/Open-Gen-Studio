@@ -537,26 +537,40 @@ export function touchRaster(): void {
  * The file is the full buffer, assembled from the box, so its bytes do not depend on the box.
  */
 const PERSIST_DELAY_MS = 700;
+/** Idle first: a layer's PNG waits for a quiet moment, at most this long (the state save uses the same bound). */
+const PERSIST_IDLE_TIMEOUT_MS = 1000;
 const timers = new Map<string, number>();
+const idles = new Map<string, number>();
 const pending = new Set<string>();
 const chains = new Map<string, Promise<void>>();
 let failureReported = false;
 
+/** One scheduled write per layer: a newer change replaces the waiting one, so several strokes share one write. */
+function cancelScheduled(layerId: string): void {
+  const t = timers.get(layerId);
+  if (t !== undefined) { window.clearTimeout(t); timers.delete(layerId); }
+  const h = idles.get(layerId);
+  if (h !== undefined) { window.cancelIdleCallback?.(h); idles.delete(layerId); }
+}
+
 function schedulePersist(layerId: string): void {
   pending.add(layerId);
   rasterPending(layerId);
-  const t = timers.get(layerId);
-  if (t) window.clearTimeout(t);
-  timers.set(
-    layerId,
-    window.setTimeout(() => void writeLayer(layerId), PERSIST_DELAY_MS),
-  );
+  cancelScheduled(layerId);
+  if (typeof window.requestIdleCallback !== 'function') {
+    timers.set(layerId, window.setTimeout(() => void writeLayer(layerId), PERSIST_DELAY_MS));
+    return;
+  }
+  idles.set(layerId, window.requestIdleCallback(() => {
+    idles.delete(layerId);
+    // Still painting: the stroke's own commit schedules the write again, so wait for the next idle time.
+    if (paintingLive()) { schedulePersist(layerId); return; }
+    void writeLayer(layerId);
+  }, { timeout: PERSIST_IDLE_TIMEOUT_MS }));
 }
 
 function writeLayer(layerId: string): Promise<void> {
-  const t = timers.get(layerId);
-  if (t) window.clearTimeout(t);
-  timers.delete(layerId);
+  cancelScheduled(layerId);
   const run = (chains.get(layerId) ?? Promise.resolve()).then(async () => {
     const c = buffers.get(layerId);
     if (!c) {
@@ -568,7 +582,7 @@ function writeLayer(layerId: string): Promise<void> {
     try {
       await blobDb.set(keyFor(layerId), await canvasToBlob(assembleFull(c), 'image/png'));
       // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
-      if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
+      if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId) && !idles.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
     } catch (err) {
       failSave('Layer pixels pending', err instanceof Error && err.message.includes('Another tab'));
