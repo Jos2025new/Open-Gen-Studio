@@ -6,6 +6,20 @@
  */
 export default [
   {
+    id: 'paint-mode',
+    what: 'ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen.',
+    sides: [
+      ['src/engine/design/paintMode.ts', 'export function paintModeOf'],
+      ['src/engine/design/paintMode.ts', 'export function strokeObjectsAvailable'],
+      ['src/engine/design/doc.ts', "paintMode: 'drawing'"],
+      ['src/components/designer/Stage.tsx', 'const direct = paintsPixelsDirectly(current, target);'],
+      ['src/components/designer/StagePaintCommit.ts', 'if (gesture.direct) {'],
+      ['src/components/designer/PaintModeToggle.tsx', 'export function PaintModeToggle'],
+      ['src/components/designer/ToolSettings.tsx', '<EditModeToggle objects={strokeObjectsAvailable(doc)} />'],
+    ],
+    tests: ['tests/paint-mode.test.ts'],
+  },
+  {
     id: 'path-node-topology',
     what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [

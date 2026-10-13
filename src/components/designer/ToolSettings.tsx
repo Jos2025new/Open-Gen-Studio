@@ -19,6 +19,8 @@ import { clearSelected, fillSelection, getSelection, growSelection, invertSelect
 import { toast } from '../../store/store';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
+import { PaintModeToggle } from './PaintModeToggle';
+import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { RulerSettings } from './StrokeRulerOverlay';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
@@ -60,11 +62,13 @@ const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
 
 /** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
 /** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
-export function EditModeToggle() {
-  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
+export function EditModeToggle({ objects = true }: { objects?: boolean }) {
+  const stored = useStore((st) => st.ui.selectMode ?? 'objects');
+  // Single strokes are offered only where they exist (Design, or a layer with editable strokes): ADR 0016.
+  const mode = objects ? stored : 'layers';
   return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
-    { value: 'objects', label: 'Objects', tip: 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' },
-    { value: 'layers', label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
+    ...(objects ? [{ value: 'objects' as const, label: 'Objects', tip: 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' }] : []),
+    { value: 'layers' as const, label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
   ]} /></span>;
 }
 
@@ -261,7 +265,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
@@ -277,7 +281,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
         </> : tool === 'lineart' ? <>
           <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
           {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
-        </> : paint ? <BrushSettings erase={tool === 'eraser'} compact={compact} /> : <>
+        </> : paint ? <><PaintModeToggle sessionId={sessionId} doc={doc} /><BrushSettings erase={tool === 'eraser'} compact={compact} /></> : <>
           {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
           <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
           <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />

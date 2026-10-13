@@ -36,6 +36,8 @@ export interface StagePaintGesture {
   control: { x: number; y: number };
   time: number;
   erase: boolean;
+  /** Drawing mode: the stroke lands in the pixels only, with no entry in the layer's editable strokes (ADR 0016). */
+  direct?: boolean;
 }
 
 export function commitStagePaintGesture(args: {
@@ -56,6 +58,14 @@ export function commitStagePaintGesture(args: {
   if (pixels) endBrushStroke(gesture.stroke, gesture.live, pixels, layer, brush);
   args.flushFrame();
   commitEdit(gesture.layerId);
+  if (gesture.direct) {
+    setDoc(sessionId, docId, (current) => ({
+      ...current,
+      updatedAt: Date.now(),
+      layers: current.layers.map((item) => (item.id === gesture.layerId && item.type === 'raster' ? { ...item, rev: item.rev + 1 } : item)),
+    }));
+    return;
+  }
 
   const nextStrokes = [...(layer.paintStrokes ?? []), gesture.stroke];
   const shouldFlatten = !args.clipped && (layer.paintFlattened || shouldFlattenRasterPaint({ ...layer, paintStrokes: nextStrokes }, args.limits));

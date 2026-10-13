@@ -5,7 +5,8 @@ import { mapPathShape } from './path';
 import { cornerRadii, roundRectPath, scaleLook } from './shapeLook';
 import { composeShape } from './shapeTransform';
 import { apply, invert, isAxisAligned, lengthScale, multiply, type Mat } from './matrix';
-import { getBuffer, setBuffer, composeRaster } from './raster';
+import {getBuffer, setBuffer} from './raster';
+import {composeRaster} from './rasterCompose';
 
 /*
  * One affine transform (scale, rotate, skew, any mix; page coordinates) applied to what the Edit tool acts on:

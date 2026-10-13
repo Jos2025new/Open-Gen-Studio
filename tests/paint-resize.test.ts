@@ -11,7 +11,8 @@ import { ANCHORS, anchorOffset, resizeCanvas } from '../src/engine/design/canvas
 import { addDoc, getDoc, undoDoc, redoDoc } from '../src/engine/design/actions';
 import { createDoc, newRasterLayer } from '../src/engine/design/doc';
 import { useStore } from '../src/store/store';
-import { beginEdit, beginLiveStroke, composeRaster, flushRaster, getBuffer, paintLive, setBuffer, withPaintBase } from '../src/engine/design/raster';
+import {beginEdit, beginLiveStroke, flushRaster, getBuffer, paintLive, setBuffer, withPaintBase} from '../src/engine/design/raster';
+import { composeRaster } from '../src/engine/design/rasterCompose';
 import type { RasterLayer } from '../src/engine/types';
 import { setDoc } from '../src/store/store';
 

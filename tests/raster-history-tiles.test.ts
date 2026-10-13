@@ -22,7 +22,8 @@ vi.mock('../src/lib/media', async () => {
 import { createDoc, newRasterLayer } from '../src/engine/design/doc';
 import { moveRasterStroke } from '../src/engine/design/rasterStrokes';
 import { redo, record, undo, dropHistory } from '../src/engine/design/history';
-import { beginEdit, beginLiveStroke, commitEdit, composeRaster, flushRaster, getBuffer, paintLive, setBuffer, snapshotHistoryBuffers, withPaintBase } from '../src/engine/design/raster';
+import {beginEdit, beginLiveStroke, commitEdit, flushRaster, getBuffer, paintLive, setBuffer, snapshotHistoryBuffers, withPaintBase} from '../src/engine/design/raster';
+import { composeRaster } from '../src/engine/design/rasterCompose';
 import { restoreRasterTiles, snapshotRasterTiles, takeRasterHistoryCopiedPixels, updateRasterTiles } from '../src/engine/design/rasterHistoryTiles';
 import { alphaAt, pixelCanvas } from './helpers/pixelCanvas';
 import { place } from '../src/engine/design/rasterSurface';

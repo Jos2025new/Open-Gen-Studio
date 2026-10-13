@@ -1,7 +1,8 @@
 import { createSession, newSession, patchSession, selectSession, setUi, useStore } from '../store/store';
 import { deleteSession } from '../engine/actions';
 import { activeDoc, setActiveLayer } from '../engine/design/actions';
-import { composeRaster, setBuffer } from '../engine/design/raster';
+import {setBuffer} from '../engine/design/raster';
+import {composeRaster} from '../engine/design/rasterCompose';
 import { hitTestPixel } from '../engine/design/render';
 import { objectPick } from '../engine/design/objectSelection';
 import { runFx } from '../engine/design/fx';

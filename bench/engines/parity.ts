@@ -1,6 +1,7 @@
 import { BLEND_MODES, composeFrame, drawDoc, resetRetainedPage, retainedStats } from '../../src/engine/design/render';
 import { ctx2d, setCpuCanvases } from '../../src/lib/media';
-import { cloneCanvas, composeRaster, drawRasterStroke, getBuffer, setBuffer, strokeBufferBox, type Dirty } from '../../src/engine/design/raster';
+import { cloneCanvas, drawRasterStroke, getBuffer, setBuffer, type Dirty } from '../../src/engine/design/raster';
+import { composeRaster, strokeBufferBox } from '../../src/engine/design/rasterCompose';
 import { clearBelowCache } from '../../src/engine/design/belowFxCache';
 import { editorCacheBudget } from '../../src/engine/design/cacheBudget';
 import { moveRasterStroke } from '../../src/engine/design/rasterStrokes';

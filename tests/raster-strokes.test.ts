@@ -38,6 +38,7 @@ vi.mock('../src/lib/media', () => {
 });
 import { createCanvas } from '../src/lib/media';
 import * as raster from '../src/engine/design/raster';
+import * as compose from '../src/engine/design/rasterCompose';
 import { record, undo, redo } from '../src/engine/design/history';
 const stroke = (id: string, x: number): RasterStroke => ({ id, x: 0, y: 0, color: '#fff', opacity: 0.5, erase: false, segments: [[x, 10, x + 20, 20, 6]] });
 const layer = (): RasterLayer => ({ ...newRasterLayer('Paint', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), paintStrokes: [stroke('a', 10), stroke('b', 80)] });
@@ -65,12 +66,12 @@ it('recomposes unchanged strokes exactly and keeps the original operation log wh
   raster.setBuffer(l.id, bitmap);
   const entries = l.paintStrokes;
   l = { ...raster.withPaintBase(l), paintStrokes: entries };
-  raster.composeRaster(l);
+  compose.composeRaster(l);
   const before = [...ops(l.id)];
   const doc: DesignDoc = { ...createDoc('test', 200, 100, null), layers: [l], activeLayerId: l.id };
   record(doc);
   const moved = moveRasterStroke(l, 'a', 20, 0);
-  raster.composeRaster(moved);
+  compose.composeRaster(moved);
   expect(ops(l.id)[0]).toBe('existing image');
   expect(ops(l.id)[2]).toEqual(before[2]);
   expect(ops(l.id)[1]).not.toEqual(before[1]);
@@ -79,7 +80,7 @@ it('recomposes unchanged strokes exactly and keeps the original operation log wh
   expect((bitmap as unknown as { ops: unknown[] }).ops).toEqual(['existing image']);
   const copy = cloneLayer(moved) as RasterLayer;
   raster.copyBuffer(moved.id, copy.id);
-  raster.composeRaster(moveRasterStroke(copy, 'b', 0, 12));
+  compose.composeRaster(moveRasterStroke(copy, 'b', 0, 12));
   expect(ops(moved.id)[2]).toEqual(before[2]);
   expect(raster.rasterBufferIds([moved, copy])).toHaveLength(3);
 });
@@ -89,14 +90,15 @@ it('loads the immutable base after reload and can still move a stroke without lo
   raster.setBuffer(l.id, createCanvas(200, 100));
   const entries = l.paintStrokes;
   l = { ...raster.withPaintBase(l), paintStrokes: entries };
-  raster.composeRaster(l);
+  compose.composeRaster(l);
   const expectedOther = ops(l.id)[1];
   await raster.flushRaster();
   vi.resetModules();
   const loaded = await import('../src/engine/design/raster');
   await loaded.ensureBuffers([JSON.parse(JSON.stringify(l))]);
   expect(loaded.getBuffer(l.paintBaseId!)).toBeDefined();
-  expect(loaded.composeRaster(moveRasterStroke(l, 'a', 20, 0))).toBe(true);
+  const reloaded = await import('../src/engine/design/rasterCompose');
+  expect(reloaded.composeRaster(moveRasterStroke(l, 'a', 20, 0))).toBe(true);
   expect((loaded.getBuffer(l.id) as unknown as { ops: unknown[] }).ops[1]).toEqual(expectedOther);
   await loaded.flushRaster();
 });
@@ -107,7 +109,7 @@ it('does not discard existing pixels if the stored foundation is unavailable', a
   (bitmap as unknown as { ops: unknown[] }).ops.push('keep existing pixels');
   raster.setBuffer(l.id, bitmap);
   await raster.ensureBuffers([l]);
-  expect(raster.composeRaster(l)).toBe(false);
+  expect(compose.composeRaster(l)).toBe(false);
   expect(ops(l.id)).toEqual(['keep existing pixels']);
 });
 
@@ -145,9 +147,9 @@ it('moving strokes recomposes from the first moving one on a reused canvas: same
   (bitmap as unknown as { ops: unknown[] }).ops.push('existing image');
   raster.setBuffer(l.id, bitmap);
   l = { ...raster.withPaintBase(l), paintStrokes: l.paintStrokes };
-  raster.composeRaster(l);
+  compose.composeRaster(l);
   const original = raster.getBuffer(l.id)!, before = [...ops(l.id)];
-  const frame = raster.composeMoving(l, ['b'])!;
+  const frame = compose.composeMoving(l, ['b'])!;
   let work: unknown;
   for (const dx of [5, 12, 30]) {
     const moved = moveRasterStroke(l, 'b', dx, 3);
@@ -155,7 +157,7 @@ it('moving strokes recomposes from the first moving one on a reused canvas: same
     const fast = [...ops(l.id)];
     work ??= raster.getBuffer(l.id);
     expect(raster.getBuffer(l.id)).toBe(work); // one canvas for the whole drag
-    raster.composeRaster(moved, false);
+    compose.composeRaster(moved, false);
     expect(fast).toEqual(ops(l.id));
     raster.setBuffer(l.id, work as never, false);
   }
@@ -176,7 +178,7 @@ it('records the parity paint mutation as an editable stroke that survives later 
   let l = layer();
   raster.setBuffer(l.id, createCanvas(l.pxWidth, l.pxHeight), false);
   l = { ...raster.withPaintBase(l), paintStrokes: l.paintStrokes };
-  raster.composeRaster(l, false);
+  compose.composeRaster(l, false);
   const before = [...ops(l.id)];
 
   const painted = appendParityPaintStroke(l, 'parity-paint-test', 24, 26, 12, 8, '#123456');
@@ -184,6 +186,6 @@ it('records the parity paint mutation as an editable stroke that survives later 
   expect(painted.paintStrokes?.at(-1)).toMatchObject({ id: 'parity-paint-test', color: '#123456', opacity: 0.8 });
   expect(afterPaint).not.toEqual(before);
 
-  raster.composeRaster(painted, false);
+  compose.composeRaster(painted, false);
   expect(ops(l.id)).toEqual(afterPaint);
 });

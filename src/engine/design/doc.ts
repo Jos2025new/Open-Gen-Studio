@@ -43,7 +43,8 @@ export const DOC_PRESETS: Array<{ id: string; label: string; width: number; heig
 
 export function createDoc(name: string, width: number, height: number, background: string | null = '#101012'): DesignDoc {
   const now = Date.now();
-  return { id: uid('doc'), name, width, height, background, layers: [], activeLayerId: null, createdAt: now, updatedAt: now };
+  // New documents paint in Drawing (ADR 0016); older ones have no saved choice and open by what they contain.
+  return { id: uid('doc'), name, width, height, background, layers: [], activeLayerId: null, createdAt: now, updatedAt: now, paintMode: 'drawing' };
 }
 
 const base = (name: string) => ({ id: uid('lyr'), name, visible: true, locked: false, opacity: 1, blend: 'normal' as const });

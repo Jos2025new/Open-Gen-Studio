@@ -16,7 +16,8 @@ import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
-import { composeMoving, withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface } from '../../engine/design/raster';
+import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface} from '../../engine/design/raster';
+import {composeMoving} from '../../engine/design/rasterCompose';
 import { record } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
@@ -36,6 +37,7 @@ import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
 import { commitStagePaintGesture, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
+import { hasEditableStrokes, paintModeOf, paintsPixelsDirectly } from '../../engine/design/paintMode';
 
 
 type Drag =
@@ -829,7 +831,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         toast('Layer pixels are still loading. Try again in a moment.', 'error');
         return;
       }
-      const prepared = target.paintFlattened ? target : withPaintBase(target);
+      // Drawing (ADR 0016): the pixels are the layer itself, so a layer with editable strokes cannot take new ones.
+      if (paintModeOf(current) === 'drawing' && hasEditableStrokes(target)) {
+        toast('This layer keeps editable strokes from Design mode. Switch to Design to paint on it, or flatten it first.', 'info');
+        return;
+      }
+      const direct = paintsPixelsDirectly(current, target);
+      const prepared = direct ? (target.paintBaseId ? { ...target, paintBaseId: undefined, paintStrokes: undefined } : target) : target.paintFlattened ? target : withPaintBase(target);
       if (prepared !== target) setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => l.id === target.id ? prepared : l) }));
       // The pixels before the stroke (kept by the undo step, so no copy is needed) are the base it is laid over.
       const before = getRasterSurface(target.id)!.canvas;
@@ -838,7 +846,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // With a pixel selection, the stroke lands only inside it.
       const clip = selectionClipFor(current, prepared);
       const p0 = beginRulerStroke(doc.id, p);
-      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p0, control: p0, time: e.timeStamp, erase };
+      drag.current = { stroke, live: beginLiveStroke(before, brush.color, brush.opacity, erase, clip, stroke.tip), kind: 'paint', layerId: target.id, last: p0, control: p0, time: e.timeStamp, erase, direct };
       paintSegment(target, p0, p0, penPressure(e));
       return;
     }

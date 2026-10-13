@@ -6,7 +6,7 @@ import { shapeBox, translateLayer } from './doc';
 import { looksUnchanged, noChangeNote } from './symmetry';
 import { strokeBox, translateStroke } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
-import { composeRaster } from './raster';
+import {composeRaster} from './rasterCompose';
 import { turnVector, type AlignTo, type RelativeTo, type Turn } from './transform';
 
 /*

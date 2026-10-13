@@ -46,6 +46,7 @@
 - [0013 — Un solo tipo de campo para los ajustes, y la brocha de PaintTool SAI (propuesto)](decisions/0013-campos-y-brocha.md).
 - [0014 — Guardar cada sesión por separado (aceptado 2026-10-12; implementación parcial 2026-10-13)](decisions/0014-sesiones-separadas.md).
 - [0015 — Píxeles en mosaicos de 256² con copia al escribir (propuesto; el historial en mosaicos de 64² ya está en memoria, sin guardado por mosaicos)](decisions/0015-mosaicos-de-pixeles.md).
+- [0016 — Modo Dibujo y modo Diseño (aceptado 2026-10-13; pendiente la regla de capas con trazos editables)](decisions/0016-dibujo-y-diseno.md).
 
 ## Propuestas de interfaz
 

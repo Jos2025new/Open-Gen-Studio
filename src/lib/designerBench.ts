@@ -1,6 +1,7 @@
 import { createSession, DEFAULT_UI, newSession, patchSession, setUi, useStore } from '../store/store';
 import { createDoc, newRasterLayer } from '../engine/design/doc';
-import { composeRaster, ensureBuffers, getBuffer, setBuffer } from '../engine/design/raster';
+import {ensureBuffers, getBuffer, setBuffer} from '../engine/design/raster';
+import {composeRaster} from '../engine/design/rasterCompose';
 import { activeDoc } from '../engine/design/actions';
 import { objectPick } from '../engine/design/objectSelection';
 import { appendBenchSessions, intervalWork, longBenchStrokes, sandboxBenchAllowed } from './designerBenchFixtures';

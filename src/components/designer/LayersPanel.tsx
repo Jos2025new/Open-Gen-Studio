@@ -23,6 +23,7 @@ import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
 import { fxTarget } from '../../engine/fx/plan';
 import { pendingRasterPaintLayer, subscribeRasterPaintGate } from '../../engine/design/rasterLimit';
 import { RasterLimitApproval, RasterLimitControls } from './RasterLimitControls';
+import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
 
 const MIN_W = 200;
 const MAX_W = 520;
@@ -216,7 +217,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         <span className="layer-kind" data-tip={l.type === 'fx' ? `${l.group} layer · ${l.scope === 'layer' ? 'layer below' : 'everything below'}` : `${l.type} layer`} aria-label={l.type === 'fx' ? `${l.group} layer` : `${l.type} layer`}><Icon size={13} /></span>
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
-      </div>{l.type === 'raster' && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}
+      </div>{l.type === 'raster' && (paintModeOf(doc) === 'design' || hasEditableStrokes(l) || l.paintFlattened) && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}
       {!doc.layers.length && <p className="empty-block">Add a layer, draw a shape, or drag an image here.</p>}
     </div>
     <div className="layer-actions">
