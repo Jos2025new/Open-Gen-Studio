@@ -89,6 +89,7 @@ export function stepSig(
   boxOf: (l: Layer) => Rect | null,
   versionsOf: (l: Layer) => unknown[],
   dirtyOf: (l: Layer) => Rect | null = () => null,
+  placementOf: (l: Layer) => Rect | null = boxOf,
 ): StepSig {
   if (s.t === 'below') return { below: true, key: [s.fx], box: null, margin: marginOf([s.fx], scale) };
   const versions = versionsOf(s.layer), dirty = dirtyOf(s.layer);
@@ -96,8 +97,11 @@ export function stepSig(
   const render = renderKeyOf(s.layer, fx), source = s.layer.type === 'raster' ? [s.layer.id, s.layer.paintBaseId ?? null] : [s.layer];
   if (s.t === 'draw') return { below: false, key: [...render, ...versions], source, render, versions, box: boxOf(s.layer), margin: 0, dirty };
   const margin = marginOf(s.fx, scale), box = boxOf(s.layer);
-  const localBox = Number.isFinite(margin) ? box && grow(box, margin) : box;
-  const localDirty = dirty && (Number.isFinite(margin) ? grow(dirty, margin) : localBox);
+  const localBox = Number.isFinite(margin) ? box && grow(box, margin) : placementOf(s.layer);
+  // Layer-scoped filters recreate their full own surface after any source change, so invalidating only the
+  // incoming brush box can leave the retained page with pixels from a different filter result. Keep it local to
+  // this painted layer (plus its FX reach), without forcing unrelated page layers to recompose.
+  const localDirty = dirty && localBox;
   return { below: false, key: [...render, ...versions], source: s.layer.type === 'raster' ? [s.layer.id, s.layer.paintBaseId ?? null] : source, render, versions, box: localBox, margin, dirty: localDirty };
 }
 

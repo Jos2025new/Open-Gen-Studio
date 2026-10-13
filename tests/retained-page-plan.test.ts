@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { RetainedPage, planFrame, stepSig, type FrameMemo, type PageOps, type StepSig } from '../src/engine/design/retainedPage';
+import { RetainedPage, planFrame, stepSig, type FrameMemo, type PageOps, type Rect, type StepSig } from '../src/engine/design/retainedPage';
 import type { FxLayer } from '../src/engine/fx/types';
-import type { VectorLayer } from '../src/engine/types';
+import type { RasterLayer, VectorLayer } from '../src/engine/types';
 
 /*
  * Retained page (Paso 3): the planner and the page are checked against a one-dimensional model of the composite.
@@ -74,6 +74,47 @@ describe('retained page: planner', () => {
     const cur: FrameMemo = { ...prev, steps: [{ ...old, key: ['layer', 2], source: ['raster-id'], render: ['geometry', 'fx'], versions: [2], dirty }] };
     const base: FrameMemo = { ...prev, steps: [{ ...old, key: ['layer', 1], source: ['raster-id'], render: ['geometry', 'fx'], versions: [1] }] };
     expect(planFrame(base, cur)).toEqual({ kind: 'region', rect: dirty, reach: 0 });
+  });
+  it('invalidates a filtered raster layer output box, plus its FX reach, when source pixels change', () => {
+    const layer: RasterLayer = {
+      id: 'filtered-raster', name: 'Filtered', type: 'raster', visible: true, locked: false, opacity: 1, blend: 'normal',
+      x: 0, y: 0, width: 100, height: 100, pxWidth: 100, pxHeight: 100, rev: 1,
+      paintBaseId: 'filtered-base', paintStrokes: [],
+    };
+    const blur: FxLayer = {
+      id: 'filtered-blur', name: 'Blur', type: 'fx', visible: true, locked: false, opacity: 1, blend: 'normal',
+      group: 'effect', scope: 'layer', ops: [{ id: 'blur-op', kind: 'blur', enabled: true, params: { radius: 2 } }],
+    };
+    const box = { x0: 30, y0: 30, x1: 50, y1: 50 };
+    const dirty = { x0: 35, y0: 35, x1: 37, y1: 37 };
+    const sig = (version: number, write: Rect | null) => stepSig(
+      { t: 'clip', layer, fx: [blur] }, 1, () => box, () => [version], () => write,
+    );
+    const before = sig(1, null), after = sig(2, dirty);
+
+    expect(after.dirty).toEqual({ x0: 24, y0: 24, x1: 56, y1: 56 });
+    expect(planFrame({ ...memo([]), W: 100, H: 100, steps: [before] }, { ...memo([]), W: 100, H: 100, steps: [after] }))
+      .toEqual({ kind: 'region', rect: after.dirty, reach: 0 });
+  });
+  it('uses raster placement rather than alpha bounds for an unknown clipped FX on a source change', () => {
+    const layer: RasterLayer = {
+      id: 'unknown-filter-raster', name: 'Unknown filtered', type: 'raster', visible: true, locked: false, opacity: 1, blend: 'normal',
+      x: 0, y: 0, width: 100, height: 100, pxWidth: 100, pxHeight: 100, rev: 1,
+    };
+    const fx: FxLayer = {
+      id: 'unknown-filter', name: 'Flare', type: 'fx', visible: true, locked: false, opacity: 1, blend: 'normal',
+      group: 'effect', scope: 'layer', ops: [{ id: 'flare-op', kind: 'flare', enabled: true, params: {} }],
+    };
+    const painted = { x0: 10, y0: 12, x1: 24, y1: 28 }, placement = { x0: 0, y0: 0, x1: 100, y1: 100 };
+    const sig = (version: number, dirty: Rect | null) => stepSig(
+      { t: 'clip', layer, fx: [fx] }, 1, () => painted, () => [version], () => dirty, () => placement,
+    );
+    const before = sig(1, null), after = sig(2, { x0: 12, y0: 16, x1: 14, y1: 18 });
+
+    expect(after.box).toEqual(placement);
+    expect(after.dirty).toEqual(placement);
+    expect(planFrame({ ...memo([]), W: 200, H: 200, steps: [before] }, { ...memo([]), W: 200, H: 200, steps: [after] }))
+      .toEqual({ kind: 'region', rect: placement, reach: 0 });
   });
   it('keeps a paint-base version change safe when it has no visible dirty rectangle', () => {
     const prev = memo([a]), old = prev.steps[0], box = { x0: 2, y0: 0, x1: 8, y1: 1 };

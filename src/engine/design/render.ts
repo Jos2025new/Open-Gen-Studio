@@ -322,6 +322,11 @@ function retainedLayerBox(l: Layer, dirty: Rect | null | undefined): Box | null 
   if (box === undefined) return dirty ? (l.transform ? mapBox(l.transform, { x: l.x, y: l.y, w: l.width, h: l.height }) : { x: l.x, y: l.y, w: l.width, h: l.height }) : layerBox(l);
   return box && l.transform ? mapBox(l.transform, box) : box;
 }
+function retainedLayerPlacement(l: Layer): Box | null {
+  if (l.type !== 'raster' || l.sourceAssetId) return layerBox(l);
+  const box = { x: l.x, y: l.y, w: l.width, h: l.height };
+  return l.transform ? mapBox(l.transform, box) : box;
+}
 
 /** The plan's steps composed into a canvas of `crop` (canvas px of the W×H page at `scale`; the page itself when it is the whole page). */
 function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: number, W: number, H: number, crop: Rect, editor: boolean, trace?: RenderTrace): HTMLCanvasElement {
@@ -387,7 +392,12 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   const cur: FrameMemo = {
     W, H, scale, background: doc.background, fontEpoch,
     base: doc.background ? fullRect(W, H) : null,
-    steps: retainedPlannerSteps(doc.layers, steps, scale, (l) => paintArea(l, scale, (target) => retainedLayerBox(target, dirtyByLayer.get(target))), versionsOf, dirtyOf),
+    steps: retainedPlannerSteps(
+      doc.layers, steps, scale,
+      (l) => paintArea(l, scale, (target) => retainedLayerBox(target, dirtyByLayer.get(target))),
+      versionsOf, dirtyOf,
+      (l) => paintArea(l, scale, retainedLayerPlacement),
+    ),
   };
   servedStale = false;
   const page = retained.frame(cur, {

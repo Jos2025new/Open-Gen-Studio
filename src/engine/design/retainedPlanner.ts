@@ -11,6 +11,7 @@ export function retainedPlannerSteps(
   boxOf: (layer: Layer) => Rect | null,
   versionsOf: (layer: Layer) => unknown[],
   dirtyOf: (layer: Layer) => Rect | null,
+  placementOf: (layer: Layer) => Rect | null = boxOf,
 ): StepSig[] {
   const out: StepSig[] = [];
   const composedLayers = new Set(compositionSteps.flatMap((step) => step.t === 'below' ? [] : [step.layer.id]));
@@ -19,7 +20,7 @@ export function retainedPlannerSteps(
     const layer = layers[i];
     if (layer.type === 'fx') {
       if (layer.scope === 'below') {
-        const sig = stepSig({ t: 'below', fx: layer }, scale, boxOf, versionsOf, dirtyOf);
+        const sig = stepSig({ t: 'below', fx: layer }, scale, boxOf, versionsOf, dirtyOf, placementOf);
         out.push({ ...sig, id: layer.id, key: [layer.id, composedBelow.has(layer.id), ...fxLayerKey([layer])], margin: fxActive(layer) ? sig.margin : 0 });
       }
       continue;
@@ -30,7 +31,7 @@ export function retainedPlannerSteps(
     while (layers[i + 1]?.type === 'fx' && (layers[i + 1] as FxLayer).scope === 'layer') attached.push(layers[++i] as FxLayer);
     const active = attached.filter(fxActive);
     const compositionStep: FxStep = active.length ? { t: 'clip', layer, fx: active } : { t: 'draw', layer };
-    const sig = stepSig(compositionStep, scale, boxOf, versionsOf, dirtyOf);
+    const sig = stepSig(compositionStep, scale, boxOf, versionsOf, dirtyOf, placementOf);
     const allFx = fxLayerKey(attached);
     const render = [...(sig.render ?? []), 'planner-fx', ...allFx];
     const included = composedLayers.has(layer.id);

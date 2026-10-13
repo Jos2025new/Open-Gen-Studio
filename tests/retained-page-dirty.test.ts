@@ -5,9 +5,11 @@ import { setBuffer } from '../src/engine/design/raster';
 import type { RasterLayer } from '../src/engine/types';
 
 const canvas = (width: number, height: number) => ({ width, height }) as HTMLCanvasElement;
-function paintedCanvas(width: number, height: number, box: { x0: number; y0: number; x1: number; y1: number }, reads: { count: number }): HTMLCanvasElement {
+function paintedCanvas(width: number, height: number, boxes: { x0: number; y0: number; x1: number; y1: number } | { x0: number; y0: number; x1: number; y1: number }[], reads: { count: number }): HTMLCanvasElement {
   const data = new Uint8ClampedArray(width * height * 4);
-  for (let y = box.y0; y < box.y1; y++) for (let x = box.x0; x < box.x1; x++) data[(y * width + x) * 4 + 3] = 255;
+  for (const box of Array.isArray(boxes) ? boxes : [boxes]) {
+    for (let y = box.y0; y < box.y1; y++) for (let x = box.x0; x < box.x1; x++) data[(y * width + x) * 4 + 3] = 255;
+  }
   return { width, height, getContext: () => ({ getImageData: () => { reads.count++; return { data }; } }) } as unknown as HTMLCanvasElement;
 }
 const layer = (id: string, paintBaseId?: string): RasterLayer => ({
@@ -39,10 +41,22 @@ describe('retained raster dirty area', () => {
     expect(rasterPaintedBox(l)).toEqual({ x: 1, y: 2, w: 2, h: 2 });
     expect(rasterDirtyRect(l, 1)).toEqual({ x0: 0, y0: 0, x1: 100, y1: 100 });
     expect(rasterPaintedBox(l)).toEqual({ x: 1, y: 2, w: 2, h: 2 });
-    const changed = paintedCanvas(100, 100, { x0: 50, y0: 51, x1: 55, y1: 57 }, reads);
+    const changed = paintedCanvas(100, 100, [{ x0: 1, y0: 2, x1: 3, y1: 4 }, { x0: 50, y0: 51, x1: 55, y1: 57 }], reads);
     setBuffer(l.id, changed, false, { x0: 50, y0: 51, x1: 55, y1: 57 });
     expect(rasterDirtyRect(l, 1)).toEqual({ x0: 50, y0: 51, x1: 55, y1: 57 });
     expect(rasterPaintedBox(l)).toEqual({ x: 1, y: 2, w: 54, h: 55 });
+    expect(reads.count).toBe(2);
+  });
+
+  it('rechecks a conservative full-dirty placement bound when an idle exact pixel box is requested', () => {
+    const l = layer('retained-full-dirty'), reads = { count: 0 };
+    setBuffer(l.id, paintedCanvas(100, 100, { x0: 11, y0: 17, x1: 20, y1: 26 }, reads), false, 'all');
+
+    expect(rasterDirtyRect(l, 1)).toEqual({ x0: 0, y0: 0, x1: 100, y1: 100 });
+    expect(rasterPaintedBox(l, false)).toEqual({ x: 0, y: 0, w: 100, h: 100 });
+    expect(reads.count).toBe(0);
+
+    expect(rasterPaintedBox(l)).toEqual({ x: 11, y: 17, w: 9, h: 9 });
     expect(reads.count).toBe(1);
   });
 });

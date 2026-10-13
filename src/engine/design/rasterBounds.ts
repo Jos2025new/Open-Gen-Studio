@@ -22,10 +22,10 @@ export function alphaBounds(px: Uint32Array, width: number, height: number, thre
 
 const painted = new WeakMap<HTMLCanvasElement, Map<number, { version: number; box: ReturnType<typeof alphaBounds> }>>();
 // Last measured bounds per layer ID survive immutable canvas replacement. A pending dirty rect is unioned into them.
-const byLayer = new Map<string, { version: number; box: ReturnType<typeof alphaBounds> }>();
-function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>): void {
+const byLayer = new Map<string, { version: number; box: ReturnType<typeof alphaBounds>; exact: boolean }>();
+function rememberLayerBox(id: string, version: number, box: ReturnType<typeof alphaBounds>, exact: boolean): void {
   byLayer.delete(id);
-  byLayer.set(id, { version, box });
+  byLayer.set(id, { version, box, exact });
   if (byLayer.size > 512) byLayer.delete(byLayer.keys().next().value!);
 }
 /** Keep total layer bounds conservative after a write without reading the changed canvas back. */
@@ -33,12 +33,12 @@ export function extendRasterBounds(id: string, version: number, width: number, h
   const cached = byLayer.get(id);
   // Box sampling runs before dirty consumption in retainedFrame. An all-dirty buffer already sampled at this version
   // needs a full redraw, but its exact total painted bounds remain known.
-  if (dirty === 'all' && cached?.version === version) return;
+  if (dirty === 'all' && cached?.version === version && cached.exact) return;
   const previous = cached?.box;
   const next = dirty === 'all' || !previous
     ? { x0: 0, y0: 0, x1: width, y1: height }
     : { x0: Math.min(previous.x0, dirty.x0), y0: Math.min(previous.y0, dirty.y0), x1: Math.max(previous.x1, dirty.x1), y1: Math.max(previous.y1, dirty.y1) };
-  rememberLayerBox(id, version, next);
+  rememberLayerBox(id, version, next, false);
 }
 /** Bounds follow each canvas content version; live paint uses the dirty region until the stroke ends. */
 export function pixelBox(buf: HTMLCanvasElement, version: number, readPixels = true, threshold = 8): ReturnType<typeof alphaBounds> | undefined {
@@ -58,12 +58,15 @@ export function pixelBox(buf: HTMLCanvasElement, version: number, readPixels = t
 function layerPixelBox(id: string, buf: HTMLCanvasElement, version: number, readPixels: boolean): ReturnType<typeof alphaBounds> | undefined {
   const previous = byLayer.get(id);
   if (!readPixels) {
-    if (previous) { rememberLayerBox(id, previous.version, previous.box); return previous.box; }
+    if (previous) { rememberLayerBox(id, previous.version, previous.box, previous.exact); return previous.box; }
     return pixelBox(buf, version, false, 0);
   }
-  if (previous?.version === version) { rememberLayerBox(id, version, previous.box); return previous.box; }
+  if (previous?.version === version && previous.exact) { rememberLayerBox(id, version, previous.box, true); return previous.box; }
+  // A live stroke may mutate its canvas before the next version is committed; keep its dirty bound conservative and
+  // defer the alpha scan until the stroke is idle instead of promoting a stale pixelBox hit to an exact new version.
+  if (paintingLive()) return previous?.box ?? pixelBox(buf, version, false, 0);
   const box = pixelBox(buf, version, true, 0);
-  if (box !== undefined) rememberLayerBox(id, version, box);
+  if (box !== undefined) rememberLayerBox(id, version, box, true);
   return box;
 }
 
