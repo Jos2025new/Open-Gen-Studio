@@ -100,7 +100,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
   const [advanced, setAdvanced] = useState(false);
   if (compact) return <>
     <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
-    {!erase && <InlineColor label="Color" value={brush.color} onChange={(v) => set({ color: v })} />}
+    {!erase && <InlineColor label="Color" value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
     {/* Smoothing and Stabilize live in the Tool tab: set once, not touched every stroke. */}
   </>;
@@ -108,7 +108,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <BrushPreview brush={brush} erase={erase} />
     <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
     <div className="brush-row">
-      {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} />}
+      {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
       <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
       <InlineSlider label="Opacity" icon={<Droplet size={13} />} unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
       <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />

@@ -29,3 +29,19 @@ export function setRgbChannel(hex: string, index: 0 | 1 | 2, text: string): stri
   rgb[index] = v;
   return rgbHex(rgb);
 }
+/** A 0–100 % alpha as the 0–1 opacity the tools store, and back (the one value is the tool's opacity, not a copy). */
+export const opacityFromAlpha = (alpha: number): number => Math.min(100, Math.max(0, alpha)) / 100;
+export const alphaFromOpacity = (opacity: number): number => Math.round(Math.min(1, Math.max(0, opacity)) * 100);
+/** #RRGGBB or #RRGGBBAA typed by hand: the 6-digit color and the alpha in % (100 when there are no alpha digits), or null. */
+export function parseHexAlpha(text: string): { color: string; alpha: number } | null {
+  const m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(text.trim());
+  if (!m) return null;
+  return { color: '#' + m[1].toLowerCase(), alpha: m[2] ? Math.round((parseInt(m[2], 16) / 255) * 100) : 100 };
+}
+/** A 0–100 % alpha typed in the A field; null when it is not a whole number in range. */
+export function parseAlphaText(text: string): number | null {
+  const t = text.trim();
+  if (!/^\d{1,3}$/.test(t)) return null;
+  const v = Number(t);
+  return v <= 100 ? v : null;
+}

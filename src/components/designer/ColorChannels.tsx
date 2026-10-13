@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Segmented } from '../ui/primitives';
-import { colorRgb, colorHsl, rgbHex, hslHex, parseHexInput, setRgbChannel } from '../../lib/color';
+import { colorRgb, colorHsl, rgbHex, hslHex, parseAlphaText, setRgbChannel } from '../../lib/color';
 
-export function ColorChannels({ value, hue, onHueChange, onChange }: { value: string; hue: number; onHueChange: (hue: number) => void; onChange: (color: string) => void }) {
+export function ColorChannels({ value, hue, onHueChange, onChange, alpha, onAlphaChange }: { value: string; hue: number; onHueChange: (hue: number) => void; onChange: (color: string) => void; /** The tool's opacity in %, when the tool has one (the brush). */ alpha?: number; onAlphaChange?: (alpha: number) => void }) {
   const [mode, setMode] = useState<'hsl' | 'rgb'>('hsl');
   const rgb = colorRgb(value), hsl = colorHsl(value);
   const color = (s: number, l: number) => `hsl(${hue} ${s}% ${l}%)`;
@@ -23,22 +23,15 @@ export function ColorChannels({ value, hue, onHueChange, onChange }: { value: st
         else { const result = [hue, hsl[1], hsl[2]]; result[i] = next; if (i === 0) onHueChange(next); onChange(hslHex(result)); }
       }} />
     </label>)}
-    <ColorTextFields value={value} onChange={onChange} />
+    <ColorTextFields value={value} onChange={onChange} alpha={alpha} onAlphaChange={onAlphaChange} />
   </div>;
 }
 
-/** Hex and R G B typed by hand. A wrong entry is not applied; the field goes back to the current color on leaving. */
-function ColorTextFields({ value, onChange }: { value: string; onChange: (color: string) => void }) {
-  const [hex, setHex] = useState(value);
-  const [bad, setBad] = useState(false);
+/** R, G, B and A typed by hand. A is the tool's opacity (one value, no copy); a wrong entry is not applied. */
+function ColorTextFields({ value, onChange, alpha, onAlphaChange }: { value: string; onChange: (color: string) => void; alpha?: number; onAlphaChange?: (alpha: number) => void }) {
   const rgb = colorRgb(value);
-  const commitHex = () => {
-    const next = parseHexInput(hex);
-    setBad(!next);
-    if (next) onChange(next); else setHex(value);
-  };
   return <div className="color-text">
-    <input className="color-hex" aria-label="Hex color" aria-invalid={bad} value={hex} onChange={(e) => { setHex(e.target.value); setBad(false); }} onBlur={commitHex} onKeyDown={(e) => { if (e.key === 'Enter') commitHex(); }} />
     {(['R', 'G', 'B'] as const).map((label, i) => <input key={label} className="color-num" type="number" min={0} max={255} step={1} aria-label={label} value={rgb[i]} onChange={(e) => { const next = setRgbChannel(value, i as 0 | 1 | 2, e.target.value); if (next) onChange(next); }} />)}
+    {onAlphaChange && alpha !== undefined && <input key="A" className="color-num" type="number" min={0} max={100} step={1} aria-label="A" value={alpha} onChange={(e) => { const next = parseAlphaText(e.target.value); if (next !== null) onAlphaChange(next); }} />}
   </div>;
 }

@@ -4,7 +4,7 @@ import { MenuItem, Range } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { useStore } from '../../store/store';
 import { rememberColor, removeSwatch, saveSwatch } from '../../engine/design/swatches';
-import { colorHsl } from '../../lib/color';
+import { alphaFromOpacity, colorHsl, opacityFromAlpha, parseHexAlpha } from '../../lib/color';
 import { ColorPlane } from './ColorPlane';
 import { ColorChannels } from './ColorChannels';
 
@@ -48,7 +48,7 @@ export function InlineChoice<T extends string | number>({ label, value, options,
  * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
  * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
  */
-export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, children }: { label: string; value: string; showValue?: boolean; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
+export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children }: { label: string; value: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
   const [hex, setHex] = useState(value);
@@ -67,11 +67,11 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
       <div className="swatch-panel">
         <ColorPlane value={value} hue={hue} onChange={pick} />
-        <ColorChannels value={value} hue={hue} onHueChange={setHue} onChange={pick} />
+        <ColorChannels value={value} hue={hue} onHueChange={setHue} onChange={pick} alpha={alpha ? alphaFromOpacity(alpha.value) : undefined} onAlphaChange={alpha ? (a) => alpha.onChange(opacityFromAlpha(a)) : undefined} />
         {children}
         <div className="swatch-row">
           <span className="picker-preview" style={{ background: value }} aria-hidden="true" />
-          <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value.toLowerCase()); }} />
+          <input className="swatch-hex" value={hex} aria-label="Hex" spellCheck={false} onChange={(e) => { setHex(e.target.value); const p = parseHexAlpha(e.target.value); if (p) { onChange(p.color); if (alpha && e.target.value.trim().length === 9) alpha.onChange(opacityFromAlpha(p.alpha)); } }} />
           <button type="button" className="sb-link" onClick={() => saveSwatch(value)} disabled={sw.saved.includes(value.toLowerCase())}>Save</button>
         </div>
         {sw.recent.length > 0 && <><span className="field-label">Recent</span><div className="swatch-grid">{sw.recent.map((c) => chip(c, false))}</div></>}
