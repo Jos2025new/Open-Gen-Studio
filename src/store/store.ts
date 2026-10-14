@@ -95,6 +95,8 @@ export interface CatalogState {
   llmStatus: Partial<Record<LlmProviderId, CatalogStatus>>;
   /** Speech-to-text models (Transcribe operation). */
   transcribers?: Record<string, TranscriberSummary>;
+  /** On-demand price lookups (OpenRouter image models): «loading» while the request is out, «failed» when it errored. */
+  priceState: Record<string, 'loading' | 'failed'>;
 }
 
 export interface Toast {
@@ -251,6 +253,7 @@ const initial: AppState = {
     errors: {},
     llm: {},
     llmStatus: {},
+    priceState: {},
   },
   ui: {
     workspace: 'chat',
