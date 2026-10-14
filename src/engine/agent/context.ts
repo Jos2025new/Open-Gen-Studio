@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, WORKFLOW_CONTRACT } from '../procedure';
+import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
@@ -90,9 +90,8 @@ ${guideIndex()}
 - Model guides: outside Direct, never load a video model's guide before phase 2 confirms it (earlier loads are refused); in Direct, the composer's model guides come with the request. Image guides are optional when a difficult prompt needs technique; a required image settings card supplies its confirmed model guide. Multiple op outputs do not make that card or an image guide mandatory. For video_edit / video_extend, load model:video-edit.
 
 Writing prompts
-- Video prompts, any model: spoken lines sized to their beat (~2.5 words per second, no dead air the model fills with odd motion); show the concrete, observable features (the handle, the front panel), never a vague "gestures to the product"; camera as a spec (direction, amount, speed, what it reveals); the last action ends before the close and the full frame holds still; the output aspect stated when the references have another shape; a handheld single take has no hard cuts (real cuts are separate clips).
+- ${VIDEO_DIRECTION_POLICY}
 - Step titles say what the step is: a clip that is the whole piece is "UGC video", not "hook"; a test is "5 s test".
-- Image→video (first_frame or refs): describe what happens — motion, physics, camera movement, pacing — and what must stay unchanged; do not describe the image again: the model sees it.
 - A prompt carries only what the model must render (what is seen and heard). Rules for you — which claims are allowed, what not to invent, the user's constraints about wording — are applied by what you write, never pasted into the prompt.
 - Never paraphrase a reference: cite it by its role (character, style, setting, product) and what it must not bring (e.g. "not its background"); its look comes from the image, which you can see. A reference sets identity or style; the prompt sets subject, action, composition and pose. When a reference's role is unclear from the image and the message, ask (guided mode) in the one questions card.
 - From text: concrete sentences in this order: purpose (poster, product shot, portrait…) → subject → action → setting → composition (shot size, angle, lens) → lighting (source, direction, softness, color temperature: "soft morning window light from the left") → materials and surfaces → style or medium → palette → mood; must-keep requirements first, preferences after; spatial and physical relations ("the cup sits left of the laptop, steam rising"), not keyword lists; usually 40-120 words. Physical terms instead of empty modifiers ("8k, masterpiece, best quality"). Prompts in English unless the user asks otherwise.

@@ -85,7 +85,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const feed = (): FeedItem[] => useStore.getState().sessions[useStore.getState().activeSessionId].feed;
-const clip = (id: string, beat: string) => ({ id, kind: 'video', title: beat, model: 'local::studio-video', prompt: `@Reto ${beat}` });
+const clip = (id: string, beat: string) => ({ id, kind: 'video', title: beat, model: 'local::studio-video', prompt: `@Reto ${beat}`, first_frame: 'asset:char' });
 
 describe('story request in Auto mode (F1–F4 together)', () => {
   it('loads the story workflow, asks one card, saves the character, runs every clip and joins them', async () => {
@@ -116,6 +116,7 @@ describe('story request in Auto mode (F1–F4 together)', () => {
           title: 'Turno de guardia',
           total_duration: 21,
           subjects: [{ name: 'Reto', from: 'asset:char' }],
+          continuity: [{ source: 'asset:char', preserve: 'Reto identity and appearance', steps: ['s1', 's2', 's3'] }],
           steps: [clip('s1', 'sighs at the door'), clip('s2', 'walks the corridor'), clip('s3', 'faces the open hatch'), { id: 's4', kind: 'op', title: 'Join', op: 'join_clips', input: 's1', more: ['s2', 's3'] }],
         },
       },

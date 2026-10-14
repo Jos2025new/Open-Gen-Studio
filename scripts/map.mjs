@@ -9,6 +9,8 @@ import contracts from './map-contracts.mjs';
 
 const root = process.cwd();
 const OUT = 'docs/map.md';
+const CONTRACT_OUT = 'docs/map-contracts.md';
+const CONTRACT_OUT_2 = 'docs/map-contracts-2.md';
 const SOURCE = /\.(ts|tsx|js|mjs)$/;
 const EXTS = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.tsx', '/index.js'];
 const IMPORT = /(?:^|[\s;])(?:import|export)\s[^'"]*?from\s*['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)|vi\.mock\(\s*['"]([^'"]+)['"]|^\s*import\s+['"]([^'"]+)['"]/gm;
@@ -81,6 +83,18 @@ for (const f of src) {
   areas.set(area, a);
 }
 
+const contractPage = (rows, part) => `# Contratos del código (${part}/2)
+
+Generado por \`node scripts/map.mjs --write\`; [índice y cobertura](map.md). Se comprueban todos los archivos, anclas y tests de cada contrato.
+
+| Contrato | Lugares | Tests |
+| --- | --- | --- |
+${rows.join('\n')}
+`;
+const midpoint = Math.ceil(contractRows.length / 2);
+const contractMap = contractPage(contractRows.slice(0, midpoint), 1);
+const contractMap2 = contractPage(contractRows.slice(midpoint), 2);
+
 const map = `# Mapa del código
 
 Generado por \`node scripts/map.mjs --write\` desde [map-contracts.mjs](../scripts/map-contracts.mjs) e imports. \`npm test\` comprueba vigencia y anclas; no editar a mano.
@@ -95,9 +109,7 @@ Generado por \`node scripts/map.mjs --write\` desde [map-contracts.mjs](../scrip
 
 ## Contratos que el compilador no ve
 
-| Contrato | Lugares | Tests |
-| --- | --- | --- |
-${contractRows.join('\n')}
+Las tablas de contratos [1](map-contracts.md) y [2](map-contracts-2.md) incluyen todos sus archivos, anclas y tests. Se generan y comprueban junto a este índice.
 
 ## Módulos centrales
 
@@ -123,10 +135,16 @@ ${untested.length ? untested.map((f) => `- ${link(f)}`).join('\n') : 'Ninguno.'}
 if (process.argv.includes('--write')) {
   if (errors.length) { console.error(`map: FAIL\n${errors.join('\n')}`); process.exit(1); }
   writeFileSync(join(root, OUT), map);
+  writeFileSync(join(root, CONTRACT_OUT), contractMap);
+  writeFileSync(join(root, CONTRACT_OUT_2), contractMap2);
   console.log(`map: written ${OUT} (${Buffer.byteLength(map)} bytes, ${contracts.length} contracts)`);
 } else {
   const current = existsSync(join(root, OUT)) ? readFileSync(join(root, OUT), 'utf8') : '';
   if (current !== map) errors.push(`${OUT} is out of date: run node scripts/map.mjs --write`);
+  const currentContracts = existsSync(join(root, CONTRACT_OUT)) ? readFileSync(join(root, CONTRACT_OUT), 'utf8') : '';
+  if (currentContracts !== contractMap) errors.push(`${CONTRACT_OUT} is out of date: run node scripts/map.mjs --write`);
+  const currentContracts2 = existsSync(join(root, CONTRACT_OUT_2)) ? readFileSync(join(root, CONTRACT_OUT_2), 'utf8') : '';
+  if (currentContracts2 !== contractMap2) errors.push(`${CONTRACT_OUT_2} is out of date: run node scripts/map.mjs --write`);
   if (errors.length) { console.error(`map: FAIL\n${errors.join('\n')}`); process.exit(1); }
   console.log(`map: PASS (${contracts.length} contracts, ${src.length} source files)`);
 }

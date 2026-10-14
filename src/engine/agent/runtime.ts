@@ -182,7 +182,7 @@ function userWords(sessionId: string): string {
   return [...said, s.agent.draft?.request ?? '', ...Object.values(s.agent.draft?.answers ?? {})].join('\n');
 }
 
-function planContext(sessionId: string, workspace: Workspace) {
+function planContext(sessionId: string, workspace: Workspace, strict = false) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
     workspace,
@@ -200,7 +200,8 @@ function planContext(sessionId: string, workspace: Workspace) {
     // In Direct the composer is the choice (ADR 0007): its models run, whatever the plan names.
     composerChosen: (kind: MediaKind) => get().composer.agentStyle === 'direct' || composerChosen(kind),
     routeModel: (mode: 'text' | 'image' | 'reference') => get().composer.videoRoutes?.[mode],
-    subjectNames: () => get().library.map((x) => x.name),
+    librarySubjects:()=>get().library,
+    strictContinuity:strict,
     userText: () => userWords(sessionId),
     // The request being handled, not the whole conversation: an old "un ángulo diferente" must not fit a new request.
     requestText: () => {
@@ -302,9 +303,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // A fresh request.
   if (pending) resolvePendingAsSuperseded(sessionId);
   beginJourney(sessionId, 'settings-response');
-  // Confirmed settings stay confirmed for this session (General Model, Phase 1: reuse the context). Whether a later
-  // plan may reuse them without a card is decided by its cost and choices (needsConfirmation in presentPlan), so a
-  // costly, multi-candidate or video plan is still shown or asked. Per-request comparison parts are cleared.
+  // Cost/candidates in presentPlan still gate reuse of confirmed settings; per-request comparison parts are cleared.
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
   patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
   const engine = agentEngine();
@@ -556,7 +555,7 @@ async function presentPlan(
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
-  const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace), planId);
+  const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId), planId);
   const journey = revision ? 'plan-revision' : 'settings-correction';
   const summarizeInputs = (step: PlanStep) => step.kind === 'video'
     ? { references: step.refs, firstFrame: step.firstFrame, lastFrame: step.lastFrame }
@@ -944,7 +943,7 @@ async function executePlanItem(
     const mapSource = (ref: string) => workspace === 'node' && parseRef(ref)?.type === 'step' ? nodeOf(ref) : ref;
     const groups = plan.continuity.map(g => ({ ...g, source: mapSource(g.source), steps: g.steps.map(id => workspace === 'node' ? nodeOf(id) : id).filter(id => ids.has(id)) }));
     const subjects = plan.subjects?.map(s => ({ ...s, from: mapSource(s.from) }));
-    const errors = continuityErrors(groups, steps, subjects);
+    const errors = continuityErrors(groups, steps, subjects, get().library, get().catalog.schemas);
     if (errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: errors.join(' ') });
       return;

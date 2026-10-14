@@ -1,5 +1,5 @@
 import { lineKey, type VariantRoute } from './variants';
-import { continuityErrors } from './continuity';
+import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
@@ -33,6 +33,7 @@ import type {
   Workspace,
   SubjectKind,
   SettingsChoice,
+  Subject,
 } from './types';
 
 /** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
@@ -164,8 +165,12 @@ export interface PlanContext {
   userText?: () => string;
   /** Images attached to the current request: the start frame a model needs when the plan forgot it. */
   requestImages?: () => string[];
-  /** Library names used to validate mentions and explain name collisions. */
+  /** Sources for known @Name references. */
+  librarySubjects?: () => Subject[];
+  /** Library names for callers that do not need source assets. */
   subjectNames?: () => string[];
+  /** New proposals require recurring continuity coverage. */
+  strictContinuity?: boolean;
   /** Settings the user confirmed (phase 2): model, resolution, duration and aspect for every step of that kind. */
   confirmed?: (kind: MediaKind) => SettingsChoice | undefined;
   /** Every confirmed part of that kind, in card order: several when the card compared models (A/B in one plan). */
@@ -457,6 +462,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   };
 
   const steps: PlanStep[] = [];
+  const st = new Map<string, boolean>();
   /** Shape of an input image: an asset's pixels, or the aspect of the image step that makes it. */
   const inputAspect = (ref: string | undefined): string | undefined => {
     const p = ref ? parseRef(ref) : null;
@@ -668,6 +674,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const { schema } = resolved;
         if (schema.missing?.length) errors.push(`${where}: model "${modelRef}" needs ${schema.missing.join(', ')}, which the app cannot send yet. Pick another model.`);
+        st.set(s.id!, transportsNamedSubjects(schema.slots));
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;
           const extra = schema.slots.source ? 1 : 0;
@@ -695,7 +702,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
-        const prompt = (s.prompt ?? '').trim();
+        const prompt = kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim();
         // A prompt that cites an image the step does not carry would make something new (another person, another
         // product): the reference was forgotten, not dropped on purpose.
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
@@ -725,7 +732,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           seed: s.seed,
           // Only models with a negative prompt field take it (coerceSettings); others get constraints in the prompt.
           negative: typeof s.params?.negative_prompt === 'string' ? s.params.negative_prompt : undefined,
-          shots: kind === 'video' ? s.shots : undefined,
+          shots: kind === 'video' ? s.shots?.map((shot) => ({ ...shot })) : undefined,
           // Structured params (colors as hex, palettes, style codes, ids): coerceSettings keeps only what the model takes.
           extras: s.params,
           advanced: s.model ? cleanParams(s.params) : { ...(defaults.advanced ?? {}), ...cleanParams(s.params) },
@@ -931,17 +938,20 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   }
 
   if (ctx.workspace === 'node' && steps.some((s) => s.kind === 'layer')) errors.push('Layer steps are not valid in the Node workspace.');
-  const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, ctx.subjectNames?.() ?? []);
+  const library = ctx.librarySubjects?.() ?? [];
+  const knownNames = [...(ctx.subjectNames?.() ?? []), ...library.map((x) => x.name)];
+  const subjects = planSubjects(raw.subjects, steps, refKind, errors, adjustments, knownNames);
   const continuity = raw.continuity ?? [];
   for (const group of continuity) {
     if (!group.source?.trim() || !group.preserve?.trim() || !Array.isArray(group.steps) || !group.steps.length) errors.push('continuity: source, preserve and consuming steps are required.');
     else refKind(group.source, 'continuity source');
   }
-  if (continuity.length && !errors.length) errors.push(...continuityErrors(continuity, steps, subjects));
-  unknownMentions(steps, [...(ctx.subjectNames?.() ?? []), ...subjects.map((x) => x.name)], errors);
+  if (continuity.length && !errors.length) errors.push(...continuityErrors(continuity, steps, subjects, library, ctx.strictContinuity ? step => st.get(step.id) ?? false : undefined));
+  if (ctx.strictContinuity) errors.push(...recurringSubjectErrors(steps, subjects, library, continuity));
+  unknownMentions(steps, [...knownNames, ...subjects.map((x) => x.name)], errors);
   const style = raw.style?.trim();
   if (style) {
-    for (const st of steps) if ((st.kind === 'image' || st.kind === 'video') && !st.prompt.includes(style)) st.prompt = `${st.prompt}\n\nStyle: ${style}`;
+    for (const st of steps) applyPlanStyle(st, style);
   }
   // Candidates end a plan: a step that makes several results for the user to choose from cannot feed another step of
   // the same plan (it would silently take #1 before the user picks). The node canvas picks per node, so not there.
@@ -1026,7 +1036,7 @@ function planSubjects(
     for (const st of steps) {
       if (st.id === p.id) continue;
       const text = st.kind === 'image' || st.kind === 'video' || st.kind === 'model3d' || st.kind === 'audio' ? st.prompt : st.kind === 'op' ? Object.values(st.params).join(' ') : undefined;
-      if (mentions(text, subj.name) && !(st.after ?? []).includes(p.id)) st.after = [...(st.after ?? []), p.id];
+      if ((mentions(text, subj.name) || (st.kind === 'video' && st.settings.shots?.some((shot) => mentions(shot.prompt, subj.name)))) && !(st.after ?? []).includes(p.id)) st.after = [...(st.after ?? []), p.id];
     }
   }
   return out;
@@ -1040,7 +1050,8 @@ function unknownMentions(steps: PlanStep[], known: string[], errors: string[]): 
   const names = new Set(known.map((n) => n.toLowerCase()));
   for (const st of steps) {
     if (st.kind !== 'image' && st.kind !== 'video') continue;
-    for (const m of st.prompt.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)) {
+    const prompts = [st.prompt, ...(st.kind === 'video' ? st.settings.shots?.map((shot) => shot.prompt) ?? [] : [])];
+    for (const m of prompts.flatMap((prompt) => [...prompt.matchAll(/(?<![\p{L}\p{N}._-])@([\p{L}\p{N}_-]{1,32})/gu)])) {
       const n = m[1];
       if (REF_SYNTAX.test(n) || names.has(n.toLowerCase())) continue;
       errors.push(`step ${st.id}: @${n} is not in the library; for temporary use of an existing image, carry it in refs and cite its role with the model reference syntax, or describe without @ if no reference is needed. A subject from an image step is temporary; use subjects from asset:<id> only when the user explicitly asked to save or accepted an offer to save.`);

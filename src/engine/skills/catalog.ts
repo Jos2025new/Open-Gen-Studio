@@ -35,10 +35,10 @@ export const SKILLS: Skill[] = [
   {
     id: 'cinematic',
     name: 'Cinematic video',
-    description: 'Shot language, camera moves and film lighting.',
-    guidance: 'Describe shots with film language: shot size, lens, camera movement (dolly, crane, handheld), subject action, lighting and mood, in one sentence per beat. Prefer 16:9 unless asked otherwise. Generate a still first when image-to-video will improve control. Load skill:cinematic before writing clip prompts (exact camera moves, emotion as visible causes, identity on clips without an image).',
+    description: 'Shot framing, camera direction, visual continuity and transitions.',
+    guidance: 'Use skill:cinematic for detailed shot language and continuity when useful. Follow the requested aspect, medium and style; do not add photographic or film traits by default.',
     guide: directingGuide,
-    promptHint: 'cinematic, anamorphic lens, film grain, dramatic lighting',
+    promptHint: 'clear shot framing, camera direction and visual continuity',
   },
   {
     id: 'social',

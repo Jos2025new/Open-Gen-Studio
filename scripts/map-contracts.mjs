@@ -1,7 +1,9 @@
 /** Checked by map.mjs. */
 import designerSelection from './map-contracts-designer.mjs';
+import videoContracts from './map-contracts-video.mjs';
 
 export default [
+  ...videoContracts,
   ...designerSelection,
   {
     id: 'snap-controls',

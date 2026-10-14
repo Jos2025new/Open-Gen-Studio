@@ -18,7 +18,7 @@ const SEEDREAM = 'atlas::bytedance/seedream-v5.0-pro/text-to-image';
 const before = useStore.getState();
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 
-async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; text?: string; steps?: unknown[] }) {
+async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: boolean; planModel?: string; text?: string; steps?: unknown[]; subjects?: unknown[]; continuity?: unknown[] }) {
   vi.stubGlobal('location', { href: 'http://localhost/' });
   const sent: string[] = [];
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -28,7 +28,7 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
     const step = { id: 's1', kind: 'image', title: 'Imagen', prompt: 'a red bicycle', count: 1, ...(opts.planModel ? { model: opts.planModel } : {}) };
     const delta = sent.length > 1
       ? { content: 'Listo.' }
-      : { tool_calls: [{ index: 0, id: 'p', function: { name: 'propose_plan', arguments: JSON.stringify({ title: 't', steps: opts.steps ?? [step] }) } }] };
+      : { tool_calls: [{ index: 0, id: 'p', function: { name: 'propose_plan', arguments: JSON.stringify({ title: 't', steps: opts.steps ?? [step], ...(opts.subjects ? { subjects: opts.subjects } : {}), ...(opts.continuity ? { continuity: opts.continuity } : {}) }) } }] };
     return new Response(`data: ${JSON.stringify({ choices: [{ delta, finish_reason: sent.length > 1 ? 'stop' : 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
   });
   const models = await atlas.listModels(undefined);
@@ -42,7 +42,7 @@ async function run(opts: { style: AgentStyle; confirmed?: string; userPicked: bo
   });
   await sendAgentMessage(opts.text ?? 'Una imagen de una bicicleta roja');
   const plan = useStore.getState().sessions[sid].feed.find((f) => f.type === 'plan') as PlanFeedItem | undefined;
-  return { model: plan ? (plan.plan.steps[0] as ImageStep).modelRef : undefined, plan, first: sent[0] ?? '' };
+  return { model: plan ? (plan.plan.steps[0] as ImageStep).modelRef : undefined, plan, first: sent[0] ?? '', messages: sent };
 }
 
 describe('Direct runs the composer model, not one confirmed earlier in the session', () => {
@@ -94,6 +94,27 @@ describe('a chained upscale reads the source size from the step it comes from', 
     expect(String(s1.settings.resolution).toLowerCase()).toBe('1k');
     expect(s2.params.factor).toBe('4');
     expect(r.plan!.plan.adjustments.join(' ')).not.toContain('source size is unknown');
+  });
+});
+
+describe('new agent proposals require declared continuity for recurring named subjects', () => {
+  const steps = [
+    { id: 's1', kind: 'image', title: 'Reference', prompt: 'a person in a red scarf', count: 1 },
+    { id: 's2', kind: 'image', title: 'Walk', prompt: '@Reto walks through a doorway', refs: ['s1'], count: 1 },
+    { id: 's3', kind: 'image', title: 'Turn', prompt: '@reto turns toward the camera', refs: ['s1'], count: 1 },
+  ];
+  const subjects = [{ name: 'Reto', from: 's1', description: 'person in a red scarf' }];
+
+  it('rejects a repeated @Name without continuity, then accepts the same connected plan with complete coverage', async () => {
+    const rejected = await run({ style: 'direct', userPicked: true, steps, subjects });
+    expect(rejected.plan).toBeUndefined();
+    expect(rejected.messages[1]?.toLowerCase()).toContain('continuity: @reto');
+
+    const accepted = await run({
+      style: 'direct', userPicked: true, steps, subjects,
+      continuity: [{ source: 's1', preserve: 'identity and red scarf', steps: ['s2', 's3'] }],
+    });
+    expect(accepted.plan?.plan.continuity).toEqual([{ source: 's1', preserve: 'identity and red scarf', steps: ['s2', 's3'] }]);
   });
 });
 

@@ -122,6 +122,67 @@ describe('subjects and voices end to end (fal)', () => {
     expect(body.elements).toEqual([{ frontal_image_url: 'data:image/png;base64,mia', reference_image_urls: ['data:image/png;base64,mia2'], voice_id: '829877809978941442' }]);
   });
 
+  it('binds library subjects in every exclusive fal shot without mutating the storyboard', async () => {
+    const ref = 'fal::fal-ai/kling-video/v3/pro/image-to-video';
+    const schema = falSchema('fal-ai/kling-video/v3/pro/image-to-video');
+    expect(schema.slots.shots?.exclusivePrompt).toBe(true);
+    install(ref, schema);
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url.startsWith('https://queue.fal.run/')) {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ detail: 'stop here' }), { status: 400 });
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const shots = [
+      { prompt: '@Mia enters frame in a watercolor style', duration: 4 },
+      { prompt: '@Mia turns; preserve the watercolor style', duration: 4 },
+    ];
+    const id = createGeneration({ sessionId: 's', kind: 'video', prompt: '@Mia moves through a watercolor scene', modelRef: ref, settings: { count: 1, duration: 8, advanced: {}, shots }, inputs: { refs: [], firstFrame: 'mia' }, origin: 'composer' }).id;
+    const before = structuredClone(useStore.getState().generations[id].settings.shots);
+    await expect(runGeneration(id)).rejects.toThrow('stop here');
+
+    expect(body.prompt ?? '').toBe('');
+    const sentShots = body[schema.slots.shots!.key] as Array<{ prompt: string }>;
+    expect(sentShots).toHaveLength(2);
+    expect(sentShots.every((shot) => shot.prompt.includes('@Element1'))).toBe(true);
+    expect(sentShots.every((shot) => /watercolor style/i.test(shot.prompt))).toBe(true);
+    expect(body.elements).toEqual([{ frontal_image_url: 'data:image/png;base64,mia', reference_image_urls: ['data:image/png;base64,mia2'], voice_id: '829877809978941442' }]);
+    expect(useStore.getState().generations[id].settings.shots).toEqual(before);
+  });
+
+  it('keeps global element numbering stable when shot order changes and the top prompt is empty', async () => {
+    const ref = 'fal::fal-ai/kling-video/v3/pro/image-to-video';
+    const schema = falSchema('fal-ai/kling-video/v3/pro/image-to-video');
+    install(ref, schema);
+    const state = useStore.getState();
+    useStore.setState({ library: state.library.map((subject) => subject.name === 'Rex' ? { ...subject, frontalAssetId: 'rex' } : subject) });
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      if (url.startsWith('https://queue.fal.run/')) {
+        body = JSON.parse(String(init?.body));
+        return new Response(JSON.stringify({ detail: 'stop here' }), { status: 400 });
+      }
+      throw new Error(`unexpected ${url}`);
+    });
+    const shots = [
+      { prompt: '@Mia opens the door', duration: 3 },
+      { prompt: '@Rex runs in', duration: 3 },
+      { prompt: '@Rex stops beside @Mia', duration: 2 },
+    ];
+    const id = createGeneration({ sessionId: 's', kind: 'video', prompt: '', modelRef: ref, settings: { count: 1, duration: 8, advanced: {}, shots }, inputs: { refs: [], firstFrame: 'mia' }, origin: 'composer' }).id;
+    await expect(runGeneration(id)).rejects.toThrow('stop here');
+
+    expect(body.prompt ?? '').toBe('');
+    const sentShots = body[schema.slots.shots!.key] as Array<{ prompt: string }>;
+    expect(sentShots.map((shot) => shot.prompt)).toEqual(['@Element1 opens the door', '@Element2 runs in', '@Element2 stops beside @Element1']);
+    expect(body.elements).toEqual([
+      { frontal_image_url: 'data:image/png;base64,mia', reference_image_urls: ['data:image/png;base64,mia2'], voice_id: '829877809978941442' },
+      { frontal_image_url: 'data:image/png;base64,rex' },
+    ]);
+  });
+
   it('refuses a subject without images before sending [SUBJECT_INCOMPLETE]', async () => {
     const ref = `fal::${KLING_REF_FAL}`;
     install(ref, falSchema(KLING_REF_FAL));

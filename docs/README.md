@@ -17,11 +17,14 @@
 - [Diagnóstico: trazos de lineart que se deforman al encoger](diagnostico-escala-lineart.md): hipótesis, experimentos, causa (taper sin escalar y umbrales de perfect-freehand) y arreglo propuesto.
 - [Investigación sK1 (GPL, solo lectura)](investigacion-sk1.md): primitivas, booleanas, degradados, tipos de nodo, color y PDF de sK1 como referencia, con licencia y lo descartado.
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
+- [Contratos del código, parte 1](map-contracts.md) y [parte 2](map-contracts-2.md): tablas completas de lugares y tests, generadas y comprobadas junto al mapa.
 - Cada ficha de feature enlaza comportamiento, código y test; «sin test» marca falta de cobertura directa.
 - Los ADRs conservan contexto, decisión y consecuencias.
 - El historial conserva el texto original y su orden; los prefijos numéricos gobiernan la concatenación. Sus referencias históricas no prueban el estado actual.
 
 ## Features
+
+- [Continuidad y dirección de video](video-quality.md): cobertura de fuentes, estilo por shot, cámara, física y límites de la evidencia.
 
 - [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [biblioteca](features/biblioteca.md).

@@ -22,7 +22,8 @@ import { InputError } from './errors';
 import { model3dProblem, sourceVideoRule } from './modelRules';
 import { modelMime, sniffModelMime } from '../lib/model3d';
 import { OPS, opCount } from './ops';
-import { audioInputProblem, songProblem, clipTrim, coerceSettings, describeMentions, mentionSubjects, refMentionStyle, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
+import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
@@ -471,8 +472,9 @@ async function execute(id: string): Promise<string[]> {
     const local = g.inputs.subjects ?? [];
     const subjects = [...local, ...(g.inputs.nodeLibrary ?? get().library).filter((x) => !local.some((l) => l.name.toLowerCase() === x.name.toLowerCase()))];
     const elSlot = schema.slots.elements;
-    const mentioned = mentionSubjects(g.prompt, subjects, elSlot?.mention);
-    let prompt = mentioned.prompt;
+    const mappedSubjects = mapSubjectPrompts(g.prompt, g.settings.shots, subjects, schema, model.id, refs.length);
+    const mentioned = { ids: mappedSubjects.ids };
+    let prompt = mappedSubjects.prompt;
     let elements: Array<{ name: string; description?: string; frontal?: MediaInput; refs: MediaInput[]; video?: MediaInput; voiceId?: string }> | undefined;
     if (elSlot && mentioned.ids.length) {
       if (mentioned.ids.length > elSlot.max) throw new InputError('SUBJECTS_MAX', `${model.name} takes up to ${elSlot.max} subjects; the prompt mentions ${mentioned.ids.length}.`);
@@ -493,22 +495,16 @@ async function execute(id: string): Promise<string[]> {
     }
     // Subjects on models without elements (R10): their images join the references and the mention becomes the
     // model's own syntax, numbered by the app from the step's real references (frontal views first, extra views after).
-    const subjectImages = !elSlot && !schema.slots.keyframes && (schema.slots.images || schema.slots.mixedRefs);
-    // No way to send the subject's image: the name carries its saved description (O5).
-    if (!elSlot && !subjectImages) prompt = describeMentions(g.prompt, subjects);
+    const subjectImages = mappedSubjects.subjectImages;
     if (subjectImages) {
-      const again = mentionSubjects(g.prompt, subjects);
-      if (again.ids.length) {
-        const chosen = again.ids.map((id) => subjects.find((x) => x.id === id)!);
+      if (mentioned.ids.length) {
+        const chosen = mentioned.ids.map((id) => subjects.find((x) => x.id === id)!);
         const incomplete = chosen.find((s) => !s.frontalAssetId);
         if (incomplete) throw new InputError('SUBJECT_INCOMPLETE', `Subject "${incomplete.name}" needs a frontal image to be used with ${model.name}.`);
         const used = schema.slots.mixedRefs ? refs.length + refVideos.length + refAudios.length : refs.length;
         const max = schema.slots.mixedRefs?.max ?? schema.slots.images!.max;
         const room = max - used;
         if (chosen.length > room) throw new InputError('SUBJECTS_MAX', `${model.name} takes ${max} reference image${max === 1 ? '' : 's'}; the step already has ${used}, so ${chosen.length} subject${chosen.length === 1 ? '' : 's'} do not fit.`);
-        const style = refMentionStyle(model.id, schema.slots.promptRefs);
-        const start = refs.length;
-        prompt = style ? mentionSubjects(g.prompt, subjects, style.template, start - (style.zeroBased ? 1 : 0)).prompt : again.prompt;
         const frontals = await Promise.all(chosen.map((s) => mediaInput(s.frontalAssetId!)));
         const views = chosen.flatMap((s) => s.refAssetIds).slice(0, room - chosen.length);
         refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
@@ -519,10 +515,11 @@ async function execute(id: string): Promise<string[]> {
     // Multi-shot storyboard: shots must add up to the clip; some providers take shots instead of the prompt.
     const shotProblem = schema.slots.shots ? shotsProblem(g.settings.shots, g.settings.duration) : null;
     if (shotProblem) throw new InputError('SHOTS_DURATION', `${model.name}: ${shotProblem}`);
+    let genSettings = g.settings;
+    if (mappedSubjects.shots) genSettings = { ...g.settings, shots: mappedSubjects.shots };
     if (schema.slots.shots?.exclusivePrompt && g.settings.shots?.length) prompt = '';
 
     // Structured inputs: keyframe images at frame positions, reference videos as trimmed clips.
-    let genSettings = g.settings;
     let keyframes: Array<{ input: MediaInput; frame: number }> | undefined;
     let clips: Array<{ input: MediaInput; start: number; end: number }> | undefined;
     if (schema.slots.keyframes && refs.length) {
