@@ -123,7 +123,7 @@ Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con 
 
 ## Ajuste (snapping): estado verificado (2026-10-14)
 
-La investigación fuente y la comparación vigente están en [investigacion-snapping.md](investigacion-snapping.md). Commits relevantes: `7cf09f1` (retardo real conectado), `3f9c9f7` (interruptores independientes de guías y espaciado), `7565c47` (ajuste de nodos), `823f15f` (E2E y estado) y `3945823` (extracción para cumplir el límite de tamaño). El documento conserva Dibujo/Diseño fijado al crearlo o abrirlo (ADR 0016); los ajustes se guardan por modo y solo se aplican si el interruptor de ese modo está encendido. El detalle de evidencia, límites y comprobaciones está en el [cierre del lote](history/026-2026-10-W42.md#cierre-del-lote-de-snapping).
+La investigación fuente y la comparación vigente están en [investigacion-snapping.md](investigacion-snapping.md). Commits relevantes: `7cf09f1` (retardo real conectado), `3f9c9f7` (interruptores independientes de guías y espaciado), `7565c47` (ajuste de nodos), `823f15f` (E2E y estado) y `3945823` (extracción para cumplir el límite de tamaño). El documento conserva Dibujo/Diseño fijado al crearlo o abrirlo (ADR 0016); los ajustes se guardan por modo y solo se aplican si el interruptor de ese modo está encendido. La evidencia histórica del lote y el [cierre final aprobado](history/026-2026-10-W42.md#cierre-final-ajuste-estable-y-aprobación-del-usuario) están enlazados en el historial.
 
 La comparación de **Equal spacing** incluye ahora huecos de referencia horizontales y el hueco vertical del objeto móvil, y a la inversa. Una matriz unitaria refleja el móvil debajo/encima de una pareja horizontal y a derecha/izquierda de una pareja vertical. Un E2E focalizado confirma el gesto real debajo de la pareja: muestra ambas cotas horizontales/verticales, extremos geométricos, posición ajustada, limpieza y undo/redo. Véase [el registro de la corrección](history/026-2026-10-W42.md#huecos-iguales-entre-ejes).
 
@@ -134,6 +134,8 @@ El motor ya alinea cajas mediante bordes y centros: combina cada uno de los tres
 La alineación de capas visibles no exige solape entre sus cajas: las líneas X/Y permanecen candidatas dentro de la sesión acotada. Cuando ambos centros producen el ganador, el indicador enlaza los centros exactos aunque haya un hueco; otros ganadores conservan el enlace entre anclas reales más cercanas. La regresión de sesión fallaba antes del cambio con `gy` indefinido para dos cajas separadas; el gesto, extremos, limpieza y undo/redo se comprueban en el E2E focalizado descrito en [el registro](history/026-2026-10-W42.md#centro-a-centro-en-cajas-separadas).
 
 Una vez adquirido, el ajuste de alineación o espaciado permanece durante movimientos subpíxel mientras la relación siga dentro de tolerancia; adquirir otra relación conserva el umbral y retardo de 150 ms. Alt y el fin/cancelación del gesto limpian la vista. Lo verifican unitarios de sesión y un E2E focalizado con secuencias suaves, cancelación y Alt; detalle y límites en [el registro de estabilidad](history/026-2026-10-W42.md#retención-del-ajuste-durante-movimientos-suaves).
+
+El usuario verificó manualmente la versión actual y la aprobó el 2026-10-14 («Excelente, ya funciona»); esa confirmación no representa una matriz manual exhaustiva. La evidencia por commit, conteos de pruebas y límites está en el [cierre final](history/026-2026-10-W42.md#cierre-final-ajuste-estable-y-aprobación-del-usuario).
 
 ## Modo fijado al crear (2026-10-14)
 
