@@ -54,6 +54,28 @@ export default [
     tests: ['tests/svg-import.test.ts', 'tests/svg-import-resvg.test.ts'],
   },
   {
+    id: 'gradient-frame',
+    what: 'Un degradado editable se guarda en coordenadas de página y cada forma lo pinta en las suyas (elementMatrix): el canvas, la exportación SVG y el importador usan la misma conversión, así que cae en el mismo sitio en pantalla, en PNG y en el SVG.',
+    sides: [
+      ['src/engine/design/gradientPaint.ts', 'export function elementMatrix'],
+      ['src/engine/design/gradientPaint.ts', 'export function gradientSvg'],
+      ['src/engine/design/render.ts', 'gradientStyle(ctx, s.fillGradient, s)'],
+      ['src/engine/design/export.ts', 'gradientSvg(s.fillGradient, s, gradId(s, \'f\'), xmlEscape)'],
+      ['src/engine/design/svgImport/gradients.ts', 'export function importGradient'],
+    ],
+    tests: ['tests/gradients.test.ts'],
+  },
+  {
+    id: 'arrowhead-frame',
+    what: 'Las puntas de flecha tienen una sola geometría unitaria (punta en 0,0, tres unidades, escala por el grosor): el canvas y el <marker> de la exportación SVG dibujan lo mismo.',
+    sides: [
+      ['src/engine/design/markers.ts', 'const UNIT'],
+      ['src/engine/design/markers.ts', 'export function drawMarker'],
+      ['src/engine/design/markers.ts', 'export function markerSvg'],
+    ],
+    tests: ['tests/markers.test.ts'],
+  },
+  {
     id: 'path-node-topology',
     what: 'Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer.',
     sides: [

@@ -8,6 +8,7 @@ import { shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
 import { drawShapeMarkers } from './markers';
+import { gradientStyle } from './gradientPaint';
 import { bufferVersion, cloneCanvas, getBuffer, getRasterSurface, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import { bufferAlpha } from './hitAlpha';
 import { cachedBelow, keepBelow } from './belowFxCache';
@@ -121,8 +122,8 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     else { ctx.moveTo(s.x, s.y); ctx.lineTo(s.x + s.w, s.y + s.h); }
   }
   const a0 = ctx.globalAlpha;
-  const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p, s.fillRule); else ctx.fill(s.fillRule); ctx.globalAlpha = a0; } };
-  const stroke = () => { if (s.stroke && s.strokeWidth > 0) { ctx.strokeStyle = s.stroke; ctx.globalAlpha *= s.strokeOpacity ?? 1; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); ctx.globalAlpha = a0; } };
+  const fill = () => { if ((s.fill || s.fillGradient) && s.type !== 'line') { ctx.fillStyle = s.fillGradient ? gradientStyle(ctx, s.fillGradient, s) : s.fill!; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p, s.fillRule); else ctx.fill(s.fillRule); ctx.globalAlpha = a0; } };
+  const stroke = () => { if ((s.stroke || s.strokeGradient) && s.strokeWidth > 0) { ctx.strokeStyle = s.strokeGradient ? gradientStyle(ctx, s.strokeGradient, s) : s.stroke!; ctx.globalAlpha *= s.strokeOpacity ?? 1; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); ctx.globalAlpha = a0; } };
   if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
   if (s.stroke && s.strokeWidth > 0 && (s.type === 'line' || s.type === 'path')) drawShapeMarkers(ctx, s, sw, s.stroke, s.strokeOpacity ?? 1);
 }
@@ -215,7 +216,7 @@ export function drawLayer(ctx: CanvasRenderingContext2D, l: Layer, plain = false
     (it is composed before its blur); a Lineart stroke counts as several (its tip stamps overlap). */
 function paintOps(l: VectorLayer): number {
   let n = 0;
-  for (const s of l.shapes) n += s.blur ? 1 : (s.fill && s.type !== 'line' ? 1 : 0) + (s.stroke && s.strokeWidth > 0 ? 1 : 0);
+  for (const s of l.shapes) n += s.blur ? 1 : ((s.fill || s.fillGradient) && s.type !== 'line' ? 1 : 0) + ((s.stroke || s.strokeGradient) && s.strokeWidth > 0 ? 1 : 0);
   return n + (l.strokes?.length ?? 0) * 2;
 }
 

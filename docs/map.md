@@ -18,6 +18,8 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 | **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts), [drawing-choice-position.test.ts](../tests/drawing-choice-position.test.ts) |
 | **eps-import** — EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación. | [eps.js](../server/eps.js), [local-store.js](../server/local-store.js), [imports.ts](../src/lib/imports.ts) | [eps-server.test.ts](../tests/eps-server.test.ts), [imports-eps-heic.test.ts](../tests/imports-eps-heic.test.ts) |
 | **svg-import** — Todo SVG se sanea (sanitize.ts) antes de leerlo, tanto al importarlo como capas en el Designer como al aplanarlo a PNG en el área de nodos; la parte editable y la rasterizada salen del mismo recorrido (structure.ts). | [sanitize.ts](../src/engine/design/svgImport/sanitize.ts), [flatten.ts](../src/engine/design/svgImport/flatten.ts), [index.ts](../src/engine/design/svgImport/index.ts), [imports.ts](../src/lib/imports.ts) | [svg-import.test.ts](../tests/svg-import.test.ts), [svg-import-resvg.test.ts](../tests/svg-import-resvg.test.ts) |
+| **gradient-frame** — Un degradado editable se guarda en coordenadas de página y cada forma lo pinta en las suyas (elementMatrix): el canvas, la exportación SVG y el importador usan la misma conversión, así que cae en el mismo sitio en pantalla, en PNG y en el SVG. | [gradientPaint.ts](../src/engine/design/gradientPaint.ts), [render.ts](../src/engine/design/render.ts), [export.ts](../src/engine/design/export.ts), [gradients.ts](../src/engine/design/svgImport/gradients.ts) | [gradients.test.ts](../tests/gradients.test.ts) |
+| **arrowhead-frame** — Las puntas de flecha tienen una sola geometría unitaria (punta en 0,0, tres unidades, escala por el grosor): el canvas y el <marker> de la exportación SVG dibujan lo mismo. | [markers.ts](../src/engine/design/markers.ts) | [markers.test.ts](../tests/markers.test.ts) |
 | **path-node-topology** — Borrar segmentos y soldar nodos conservan curvas exteriores, tipos e índices elegidos; la barra aplica un solo deshacer. | [pathNodeOps.ts](../src/engine/design/pathNodeOps.ts), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx) | [path-nodes.test.ts](../tests/path-nodes.test.ts), [path-nodes.spec.ts](../tests-e2e/path-nodes.spec.ts) |
 | **provider-key-ui** — Connected y Settings reutilizan ProviderRow para guardar claves, refrescar catálogos y mostrar errores. | [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx), [ConnectedProviders.tsx](../src/components/shell/ConnectedProviders.tsx) | [connected-providers.test.ts](../tests/connected-providers.test.ts) |
 | **guided-asks** — Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas. | [context.ts](../src/engine/agent/context.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-mode.test.ts](../tests/agent-mode.test.ts) |
@@ -65,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 175 | 107 |
+| [types.ts](../src/engine/types.ts) | 176 | 108 |
 | [store.ts](../src/store/store.ts) | 106 | 94 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
@@ -82,9 +84,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 6 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 116 |
+| [matrix.ts](../src/engine/design/matrix.ts) | 16 | 2 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
-| [matrix.ts](../src/engine/design/matrix.ts) | 14 | 2 |
 
 ## Por área
 
@@ -94,14 +96,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 29 | 7 |
+| `src/components/designer` | 30 | 7 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 133 |
+| `src/engine` | 30 | 134 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 79 | 68 |
+| `src/engine/design` | 81 | 69 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -110,7 +112,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 138 |
 | `src/store` | 4 | 96 |
 
-111 de 284 módulos no tienen ningún test que los importe directamente.
+112 de 287 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

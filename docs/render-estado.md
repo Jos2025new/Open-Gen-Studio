@@ -81,3 +81,16 @@ Según el informe de cierre de `ab01a02`: `npx tsc --noEmit` sin errores; `npm r
 - Cada capa raster guarda solo la caja alineada a 64 px de sus píxeles (`rasterSurface.ts`); `getRasterSurface` la da con su desplazamiento, `getBuffer` ensambla el lienzo completo para las operaciones que no lo necesitan.
 - El guardado ensambla el lienzo a tamaño de página (mismo PNG); la carga lo recorta; los trazos en vivo y la composición usan la caja. Una capa vacía guarda un lienzo de 1 × 1 (`createCanvas` no admite 0 × 0).
 - Prueba: `tests/raster-surface.test.ts` (crecimiento, capa vacía, guardar y cargar, trazo pequeño en 2048² por debajo del 5 %).
+
+## Cuatro ideas de Designer (sK1, 2026-10-13, en código y tests)
+
+Origen: [investigacion-sk1.md](investigacion-sk1.md). Commits en `task/render-bench`: primitivas paramétricas (`f0a41f7`), puntas de flecha y Scale stroke (`31b0c11`), iconos de tipos de nodo (`8b0e623`) y degradados editables (commit de esta nota). Sin navegador: el sandbox es del usuario; la prueba visual queda para él.
+
+| Idea | Estado | Pendiente |
+| --- | --- | --- |
+| Primitivas paramétricas | Hecho (tests de geometría, conversión y export) | Tiradores en lienzo (hoy solo parámetros en la barra) |
+| Puntas de flecha y Scale stroke | Hecho (tests de dirección, SVG y escala); canvas sin prueba automática | Importar `marker` como editable (hoy se rasteriza) |
+| Tipos de nodo | Ya existían con tests; añadidos iconos | Ninguno |
+| Degradados lineales y radiales | Relleno editable, render, export, import e ida y vuelta (tests) | Tiradores en lienzo; degradado del trazo en la interfaz |
+
+Límite del Stage: `Stage.tsx` ya superaba 30 KB y no puede crecer; la lógica nueva va a `primitives.ts`, `shapeDraw.ts` y `gradientPaint.ts`.

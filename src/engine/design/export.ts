@@ -1,5 +1,8 @@
 import { pathTransform } from './path';
 import { markerSvg } from './markers';
+import { gradientSvg } from './gradientPaint';
+
+const gradId = (s: VectorShape, side: 'f' | 's') => `g-${xmlEscape(s.id)}-${side}`;
 import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
@@ -39,11 +42,13 @@ export function n(v: number): string {
   return String(Math.round(v * 1000) / 1000);
 }
 
-function paint(s: VectorShape, strokeWidth: number, fill = s.fill): string {
+function paint(s: VectorShape, strokeWidth: number, fill: string | null | undefined = s.fill ?? (s.fillGradient ? 'gradient' : null)): string {
+  const fv = fill === 'gradient' && s.fillGradient ? `url(#${gradId(s, 'f')})` : fill;
+  const sv = s.strokeGradient && s.strokeWidth > 0 ? `url(#${gradId(s, 's')})` : s.stroke;
   const fo = fill && s.fillOpacity != null && s.fillOpacity < 1 ? ` fill-opacity="${n(Math.max(0, s.fillOpacity))}"` : '';
   const so = s.stroke && strokeWidth > 0 && s.strokeOpacity != null && s.strokeOpacity < 1 ? ` stroke-opacity="${n(Math.max(0, s.strokeOpacity))}"` : '';
   const fr = fill && s.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : '';
-  return `fill="${fill ? xmlEscape(fill) : 'none'}"${fo}${fr}${so}${s.stroke && strokeWidth > 0 ? ` stroke="${xmlEscape(s.stroke)}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
+  return `fill="${fv ? xmlEscape(fv) : 'none'}"${fo}${fr}${so}${(s.stroke || s.strokeGradient) && strokeWidth > 0 ? ` stroke="${xmlEscape(sv ?? '')}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
 }
 
 /** A shape, wrapped with its own blur filter when it has one (shapeLook.ts: Inkscape's 2.4σ margin). */
@@ -51,7 +56,9 @@ export function shapeSvg(s: VectorShape): string {
   // Arrowheads: <marker> definitions beside the shape, attached to its line or path (markers.ts).
   const mk = s.stroke && s.strokeWidth > 0 ? markerSvg(s, `mk-${xmlEscape(s.id)}`, s.stroke, xmlEscape) : { defs: '', attrs: '' };
   const body = mk.attrs ? shapeBody(s).replace(/\/>$/, ` ${mk.attrs}/>`) : shapeBody(s);
-  const marked = mk.defs ? `<g><defs>${mk.defs}</defs>${body}</g>` : body;
+  // Editable gradients: their <linearGradient>/<radialGradient> definitions sit beside the shape, like its markers.
+  const grads = (s.fillGradient ? gradientSvg(s.fillGradient, s, gradId(s, 'f'), xmlEscape) : '') + (s.strokeGradient && s.strokeWidth > 0 ? gradientSvg(s.strokeGradient, s, gradId(s, 's'), xmlEscape) : '');
+  const marked = mk.defs || grads ? `<g><defs>${mk.defs}${grads}</defs>${body}</g>` : body;
   if (!s.blur || s.blur <= 0) return marked;
   const id = `blur-${xmlEscape(s.id)}`;
   return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${marked}</g>`;

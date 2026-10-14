@@ -5,6 +5,7 @@ import { MAX_PATH_LENGTH } from '../path';
 import { pageBox } from '../shapeTransform';
 import { strokeReach, BLUR_MARGIN } from '../shapeLook';
 import { normalizePath } from './pathData';
+import { importGradient } from './gradients';
 import { numbers, parseLength } from './transforms';
 import { parseOpacity, parsePaint, type Paint, type Style } from './styles';
 
@@ -52,7 +53,10 @@ export function buildShape(el: Element, style: Style, c: ShapeCtx): ShapeOutcome
   const len = (name: string, ref: number, fallback = 0) => parseLength(el.getAttribute(name), ref, c.fontSize) ?? fallback;
   const reasons: string[] = [];
   const fillPaint = parsePaint(style.fill ?? '#000000', style.color), strokePaint = parsePaint(style.stroke, style.color);
-  for (const r of [serverReason(fillPaint, c.ids), serverReason(strokePaint, c.ids)]) if (r && !reasons.includes(r)) reasons.push(r);
+  // A gradient the editor can hold is kept as an editable paint (gradients.ts); any other server is rasterized.
+  const fillGrad = fillPaint.kind === 'ref' ? importGradient(fillPaint.id, c) : null;
+  const strokeGrad = strokePaint.kind === 'ref' ? importGradient(strokePaint.id, c) : null;
+  for (const r of [fillGrad ? null : serverReason(fillPaint, c.ids), strokeGrad ? null : serverReason(strokePaint, c.ids)]) if (r && !reasons.includes(r)) reasons.push(r);
   const blur = blurOf(style, c.ids);
   if (blur === 'other') reasons.push('filter');
   if (style['clip-path'] && style['clip-path'] !== 'none') reasons.push('clip-path');
@@ -75,7 +79,7 @@ export function buildShape(el: Element, style: Style, c: ShapeCtx): ShapeOutcome
     ...(fo < 1 ? { fillOpacity: fo } : {}), ...(so < 1 ? { strokeOpacity: so } : {}),
     ...(typeof blur === 'number' ? { blur } : {}),
   };
-  const base = { fill: fillOk ? (fillPaint as { color: string }).color : null, stroke: strokeOk ? (strokePaint as { color: string }).color : null, strokeWidth: sw, radius: 0, ...look };
+  const base = { fill: fillOk ? (fillPaint as { color: string }).color : null, stroke: strokeOk ? (strokePaint as { color: string }).color : null, strokeWidth: sw, radius: 0, ...look, ...(fillGrad ? { fillGradient: fillGrad } : {}), ...(strokeGrad ? { strokeGradient: strokeGrad } : {}) };
   const k = lengthScale(c.ctm);
   if (!(k > 0)) return { ok: null };
 

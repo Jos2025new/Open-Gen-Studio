@@ -25,16 +25,18 @@ El Designer importa `.svg` (botón «Import image») como un diseño nuevo; el �
 | fill-rule evenodd | `fillRule: 'evenodd'` |
 | `filter` con un solo `feGaussianBlur` (σ igual en x e y) | `blur` (σ), como indica [inkscape-formas.md](inkscape-formas.md) |
 | transform | Escala y traslación van a la geometría; giro e inclinación de rect y elipse, a `rot`; en trazados, a los puntos |
+| `linearGradient` o `radialGradient` con `gradientUnits="userSpaceOnUse"`, `spreadMethod` pad (o ausente), paradas propias o heredadas por `xlink:href`, `gradientTransform` afín y foco sin mover | Degradado editable en coordenadas de página (`fillGradient`, `strokeGradient`; [gradients.ts](../src/engine/design/svgImport/gradients.ts)). Radial con `gradientTransform` no uniforme o con foco movido: se rasteriza |
 | `use` y `symbol` dentro del documento | Se expanden en su sitio (con `x`, `y`, `viewBox`) |
 
 ## Qué se rasteriza
 
-Solo ese elemento, con su estilo heredado, en su caja ya transformada, como capa de píxeles en su posición y orden: relleno o trazo con **gradiente** o **pattern**, **texto** (`text`, `flowRoot`), **clip-path**, **mask**, **filtros** que no sean un desenfoque simple, **markers**, **image**, trazados de más de 20 000 caracteres. Un `<g>` con filtro, clip-path o máscara se rasteriza entero. Motor: resvg-wasm (MPL-2.0, carga diferida) y, para texto o si falla tras tres intentos, el navegador con el SVG saneado del elemento. resvg no trae fuentes, por eso el texto va por el navegador.
+Solo ese elemento, con su estilo heredado, en su caja ya transformada, como capa de píxeles en su posición y orden: relleno o trazo con **gradiente** no convertible (`objectBoundingBox`, `spreadMethod` reflect o repeat, foco movido, `gradientTransform` que sesga un radial) o **pattern**, **texto** (`text`, `flowRoot`), **clip-path**, **mask**, **filtros** que no sean un desenfoque simple, **markers**, **image**, trazados de más de 20 000 caracteres. Un `<g>` con filtro, clip-path o máscara se rasteriza entero. Motor: resvg-wasm (MPL-2.0, carga diferida) y, para texto o si falla tras tres intentos, el navegador con el SVG saneado del elemento. resvg no trae fuentes, por eso el texto va por el navegador.
 
 ## Limitaciones
 
-- Texto, gradientes y demás dejan de ser editables (píxeles a escala 1 de la página; tope de 16 Mpx por elemento).
+- Texto y demás dejan de ser editables (píxeles a escala 1 de la página; tope de 16 Mpx por elemento).
 - La opacidad de grupo se multiplica por capa: con formas superpuestas dentro de un grupo difiere de SVG.
+- Las puntas de flecha (`marker-start`, `marker-end`) se rasterizan al importar: el importador no las lee todavía.
 - El grosor de trazo con escala no uniforme usa la escala media (el modelo no lo distingue).
 - El `<svg>` anidado no recorta a su viewport.
 - Cada SVG crea un diseño nuevo; el diseño actual no se toca.
