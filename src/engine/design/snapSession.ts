@@ -101,3 +101,23 @@ export function snapSessionFor(key: object, make: () => SnapSession): SnapSessio
 export function visibleDocRect(view: { x: number; y: number; zoom: number }, size: { w: number; h: number }): { x0: number; y0: number; x1: number; y1: number } {
   return { x0: -view.x / view.zoom, y0: -view.y / view.zoom, x1: (size.w - view.x) / view.zoom, y1: (size.h - view.y) / view.zoom };
 }
+
+/**
+ * The watchdog of the delayed snap (Inkscape's snap timer, tool-base.cpp): while the pointer is fast a snap is
+ * postponed, and this timer fires once SNAP_IDLE_MS have passed, so the snap happens even if no slower motion event
+ * follows. The clock is injected, so the timing is tested with a simulated one.
+ */
+export class SnapWatchdog {
+  private timer: unknown = null;
+  constructor(private schedule: (fn: () => void, ms: number) => unknown, private cancelTimer: (h: unknown) => void) {}
+  /** Arm (or re-arm) the timer: `fn` runs after `ms`, unless `arm` is called again or `cancel` first. */
+  arm(ms: number, fn: () => void): void {
+    this.cancel();
+    this.timer = this.schedule(() => { this.timer = null; fn(); }, ms);
+  }
+  cancel(): void {
+    if (this.timer != null) this.cancelTimer(this.timer);
+    this.timer = null;
+  }
+  get armed(): boolean { return this.timer != null; }
+}
