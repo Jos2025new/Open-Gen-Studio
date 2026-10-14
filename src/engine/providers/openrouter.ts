@@ -119,13 +119,14 @@ function paramFromSupported(key: string, sp: SupportedParam): ParamDef | null {
 }
 
 const TOKEN_NOTE = 'Billed by tokens; exact cost is reported after generation';
+const priceCacheKey = (id: string) => `or:price:v2:${id}`;
 
 /**
  * Image price from the model's endpoints. Only a valid answer is cached (v2 key: v1 entries saved failures as
  * «token-billed» for 24 h); a failed request returns the note without caching it, so the next load asks again.
  */
 async function imagePrice(id: string): Promise<PriceRule> {
-  const cacheKey = `or:price:v2:${id}`;
+  const cacheKey = priceCacheKey(id);
   const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
   if (cached) return cached;
   let res: { endpoints?: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }> };
@@ -176,7 +177,9 @@ export const openrouter: ProviderAdapter = {
   async listModels() {
     const [images, videos] = await Promise.all([fetchImageModels(), fetchVideoModels()]);
     const out: ModelSummary[] = [];
-    for (const m of images) {
+    // Image prices need one request per model, so the listing only carries those already fetched (cache, no network).
+    const priced = await Promise.all(images.map((m) => cacheDb.get<PriceRule>(priceCacheKey(m.id), DAY)));
+    for (const [i, m] of images.entries()) {
       imageRaw.set(m.id, m);
       const inputs = m.architecture?.input_modalities ?? ['text'];
       const refs = m.supported_parameters?.input_references;
@@ -192,6 +195,7 @@ export const openrouter: ProviderAdapter = {
         acceptsImage: inputs.includes('image') && maxRefs > 0,
         tags: fmt && fmt.type === 'enum' && fmt.values.length === 1 && fmt.values[0] === 'svg' ? ['vector'] : [],
         description: m.description,
+        ...(priced[i] ? { price: priced[i] } : {}),
       });
     }
     for (const m of videos) {

@@ -111,3 +111,14 @@ describe('OpenRouter video pricing units (fix 4)', () => {
     expect(rule.note).toMatch(/tokens per second/);
   });
 });
+
+describe('OpenRouter image price in the listing (fix 1)', () => {
+  it('lists the price of an image model whose price is already cached, and none otherwise', async () => {
+    routeFetch(() => json({ endpoints: [{ pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] }));
+    const before = await openrouter.listModels('k');
+    expect(before.find((m) => m.id === 'acme/pic-1')?.price).toBeUndefined();
+    await priceOf(imageModel);
+    const after = await openrouter.listModels('k');
+    expect(after.find((m) => m.id === 'acme/pic-1')?.price).toEqual({ skus: [{ unit: 'output', usd: 0.04 }] });
+  });
+});
