@@ -317,7 +317,10 @@ function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
  */
 let dragPreview = false;
 export function setDragPreview(on: boolean): void { dragPreview = on; }
-export function isDragPreview(): boolean { return dragPreview; }
+/** A drag over a page with FX layers starts the reduced preview. */
+export function startDragPreview(doc: DesignDoc): void { dragPreview ||= doc.layers.some((l) => l.type === 'fx'); }
+/** Release: the full page is composed on the next frame, not inside the pointer handler. */
+export function endDragPreview(): void { if (dragPreview) { dragPreview = false; redrawSoon(0); } }
 
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
 const FX_MAX_PX = 16_000_000;

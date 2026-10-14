@@ -5,11 +5,11 @@ import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '
 import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
-import { drawDoc, layerBox, hitTest, hitTestPixel, isDragPreview, setDragPreview } from '../../engine/design/render';
+import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
-import { beginLiveStroke, redrawSoon } from '../../engine/design/raster';
+import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
@@ -1046,8 +1046,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         dy += s.dy;
         showGuides({ x: s.gx, y: s.gy });
       } else showGuides({});
-      // A drag over FX layers previews a reduced page (see setDragPreview); release composes the full one.
-      if (doc.layers.some((l) => l.type === 'fx') && !isDragPreview()) setDragPreview(true);
+      startDragPreview(doc);
       const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
     } else if (d.kind === 'scale') {
@@ -1142,8 +1141,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const onPointerUp = (e?: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
-    // The full page comes back on the next frame, not inside this handler.
-    if (isDragPreview()) { setDragPreview(false); redrawSoon(0); }
+    endDragPreview();
     if (!d) return;
     if (d.kind === 'pixelMove') { if (e) d.move.update(toDoc(e.clientX, e.clientY)); return; }
     // A guide lands where the pointer is released (a quick drag may send no move in between).
