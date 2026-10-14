@@ -60,7 +60,7 @@ export function EditModeToggle({ objects = true }: { objects?: boolean }) {
 /** The view of the Edit mode choice, with the mode passed in (the store is read by EditModeToggle). */
 export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'layers'; objects?: boolean }) {
   return <span className="opt edit-mode"><span className="opt-label">Edit</span><Segmented size="sm" value={mode} onChange={(v) => setUi({ selectMode: v })} options={[
-    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' : 'Not available on this layer: a raster layer in Drawing has no single strokes. Switch to Design, or choose Layer' },
+    { value: 'objects' as const, label: 'Object', disabled: !objects, tip: objects ? 'Move, align and transform the strokes and shapes you pick inside a layer; the layer stays put' : 'Object needs editable strokes or shapes; the active raster layer has none. Choose Layer to work with the whole layer.' },
     { value: 'layers' as const, label: 'Layer', tip: 'Move, scale, align and transform whole layers (Ctrl-click picks more layers)' },
   ]} /></span>;
 }
@@ -69,17 +69,6 @@ export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'l
 export function AutoSelectToggle() {
   const on = useStore((st) => st.ui.autoSelect ?? false);
   return <label className="tool-setting" title="Click acts on the topmost layer under the pointer. Off: only the selected layer, and a click elsewhere keeps the selection"><input type="checkbox" checked={on} onChange={(e) => setUi({ autoSelect: e.target.checked })} /><span>Auto-select</span></label>;
-}
-
-/** Edit options: a popover with the same Auto-select checkbox as the bar (one setting, two places). */
-export function EditOptionsControl() {
-  const pop = usePopover();
-  return <>
-    <button type="button" ref={pop.ref} className="tool-setting" aria-expanded={pop.open} onClick={pop.toggle} data-tip="Edit options" aria-label="Edit options"><ChevronDown size={12} /></button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Edit options">
-      <div className="snap-pop"><AutoSelectToggle /></div>
-    </Popover>
-  </>;
 }
 
 /** Edit tool: align, distribute (3+), fit/fill one image, or transform picked objects/layers. */
@@ -257,7 +246,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;
   }
-  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} /><AutoSelectToggle /><EditOptionsControl />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
+  if (tool === 'move') return <div className="tool-settings" role="toolbar" aria-label="Edit settings"><EditModeToggle objects={strokeObjectsAvailable(doc)} /><AutoSelectToggle />{getSelection(doc.id) && <span className="tool-setting" title="Drag inside the selection to cut it into a movable layer; vectors stay editable">Move selection · drag inside</span>}<SnapControl /><EditOps sessionId={sessionId} doc={doc} /><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</div>;
   return <div className="tool-settings" key={tool} role="toolbar" aria-label={`${tool} settings`}>
         {tool === 'text' ? <>
           {!compact && <p className="opt-hint">For the next text you add. A selected text is changed in Properties.</p>}
