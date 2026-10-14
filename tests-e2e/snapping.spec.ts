@@ -115,6 +115,58 @@ test('snapping: fast drag, then stop 300 ms without moving: the layer snaps with
   expect(errors).toEqual([]);
 });
 
+test('snapping: object alignment guide appears during drag, clears on release, and the snap is undoable', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'M', x: cx + 50, y: cy + 20, w: 80, h: 40 },
+    { id: 'N', x: cx + 230, y: cy - 300, w: 120, h: 600 },
+  ], 'drawing');
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true } } }); });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2 + 99, y: before.y + before.h / 2 });
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 });
+  await page.waitForTimeout(220); // the 150 ms snap settles while the gesture remains open
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
+  const during = await boxOf(page, s.ids.M);
+  expect(Math.abs(during.x + during.w - (cx + 230))).toBeLessThan(0.5);
+  await page.mouse.up();
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  expect(await boxOf(page, s.ids.M)).toEqual(before);
+  await page.keyboard.press('Control+Shift+z');
+  expect(Math.abs((await boxOf(page, s.ids.M)).x + before.w - (cx + 230))).toBeLessThan(0.5);
+  expect(errors).toEqual([]);
+});
+
+test('snapping: pointer cancellation clears an active alignment guide', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'M', x: cx + 50, y: cy + 20, w: 80, h: 40 },
+    { id: 'N', x: cx + 230, y: cy - 300, w: 120, h: 600 },
+  ], 'drawing');
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true } } }); });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2 + 99, y: before.y + before.h / 2 });
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 }); await page.waitForTimeout(220);
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
+  await page.locator('canvas.stage-canvas').dispatchEvent('pointercancel', { pointerId: 1, bubbles: true });
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(0);
+  await page.mouse.up();
+  expect(errors).toEqual([]);
+});
+
 // Equal spacing: the switch is set explicitly, so the case does not depend on a value saved in the sandbox.
 test('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
   const errors = await setup(page);

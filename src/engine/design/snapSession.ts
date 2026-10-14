@@ -10,9 +10,10 @@ import { layerBox } from './render';
  */
 
 export const MAX_LINES = 200;
-type Line = { v: number; lo: number; hi: number };
+type Line = { v: number; lo: number; hi: number; source: 'page' | 'guide' | 'layer'; box?: Box };
 type Box = { x: number; y: number; w: number; h: number };
-export interface SessionStep { dx: number; dy: number; gx?: number; gy?: number; measures?: Measure[] }
+export interface AlignmentGuide { a: [number, number]; b: [number, number] }
+export interface SessionStep { dx: number; dy: number; gx?: number; gy?: number; measures?: Measure[]; alignments?: AlignmentGuide[]; viewGuides?: { x?: number; y?: number } }
 
 export class SnapSession {
   private xs: Line[] = [];
@@ -24,12 +25,12 @@ export class SnapSession {
   constructor(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, private opts: SnapOptions, private zoom: number, view: { x0: number; y0: number; x1: number; y1: number }) {
     const always = { lo: -Infinity, hi: Infinity };
     if (opts.page) {
-      for (const v of [0, doc.width / 2, doc.width]) this.xs.push({ v, ...always });
-      for (const v of [0, doc.height / 2, doc.height]) this.ys.push({ v, ...always });
+      for (const v of [0, doc.width / 2, doc.width]) this.xs.push({ v, ...always, source: 'page' });
+      for (const v of [0, doc.height / 2, doc.height]) this.ys.push({ v, ...always, source: 'page' });
     }
     if (opts.guides !== false) {
-      for (const v of doc.guides?.x ?? []) this.xs.push({ v, ...always });
-      for (const v of doc.guides?.y ?? []) this.ys.push({ v, ...always });
+      for (const v of doc.guides?.x ?? []) this.xs.push({ v, ...always, source: 'guide' });
+      for (const v of doc.guides?.y ?? []) this.ys.push({ v, ...always, source: 'guide' });
     }
     if (opts.layers) {
       const seen: Array<{ b: Box; d: number }> = [];
@@ -47,8 +48,8 @@ export class SnapSession {
       for (const { b } of seen) {
         if (this.xs.length + this.ys.length + 6 > 2 * MAX_LINES) break; // a layer adds six lines
         this.boxes.push(b);
-        for (const v of [b.x, b.x + b.w / 2, b.x + b.w]) this.xs.push({ v, lo: b.y, hi: b.y + b.h });
-        for (const v of [b.y, b.y + b.h / 2, b.y + b.h]) this.ys.push({ v, lo: b.x, hi: b.x + b.w });
+        for (const v of [b.x, b.x + b.w / 2, b.x + b.w]) this.xs.push({ v, lo: b.y, hi: b.y + b.h, source: 'layer', box: b });
+        for (const v of [b.y, b.y + b.h / 2, b.y + b.h]) this.ys.push({ v, lo: b.x, hi: b.x + b.w, source: 'layer', box: b });
       }
     }
   }
@@ -71,10 +72,55 @@ export class SnapSession {
     } else this.lastMove = t;
     this.last = { x: screen.x, y: screen.y, t };
     if (!snapNow(speed, t - this.lastMove)) return { dx: 0, dy: 0 };
-    const inBand = (lines: Line[], lo: number, hi: number) => lines.filter((l) => l.hi >= lo && l.lo <= hi).map((l) => l.v);
-    const xs = inBand(this.xs, box.y, box.y + box.h), ys = inBand(this.ys, box.x, box.x + box.w);
+    const inBand = (lines: Line[], lo: number, hi: number) => lines.filter((l) => l.hi >= lo && l.lo <= hi);
+    const xLines = inBand(this.xs, box.y, box.y + box.h), yLines = inBand(this.ys, box.x, box.x + box.w);
+    const xs = xLines.map((l) => l.v), ys = yLines.map((l) => l.v);
     const tol = snapTolerance(this.zoom);
     const r: SessionStep = snapBox(box, { xs, ys }, tol, p);
+    const layerWinner = (lines: Line[], at: number) => lines.find((l) => l.v === at && l.source === 'layer' && l.box);
+    const makeGuide = (axis: 'x' | 'y', at: number, target: Line): AlignmentGuide | null => {
+      const sourceBox = { ...box, x: box.x + r.dx, y: box.y + r.dy };
+      const targetBox = target.box!;
+      const own = axis === 'x'
+        ? [sourceBox.x, sourceBox.x + sourceBox.w / 2, sourceBox.x + sourceBox.w]
+        : [sourceBox.y, sourceBox.y + sourceBox.h / 2, sourceBox.y + sourceBox.h];
+      const other = axis === 'x'
+        ? [targetBox.x, targetBox.x + targetBox.w / 2, targetBox.x + targetBox.w]
+        : [targetBox.y, targetBox.y + targetBox.h / 2, targetBox.y + targetBox.h];
+      const onGuide = (v: number) => Math.abs(v - at) < 1e-6;
+      if (!own.some(onGuide) || !other.some(onGuide)) return null;
+      const sourceCross = axis === 'x'
+        ? [sourceBox.y, sourceBox.y + sourceBox.h / 2, sourceBox.y + sourceBox.h]
+        : [sourceBox.x, sourceBox.x + sourceBox.w / 2, sourceBox.x + sourceBox.w];
+      const targetCross = axis === 'x'
+        ? [targetBox.y, targetBox.y + targetBox.h / 2, targetBox.y + targetBox.h]
+        : [targetBox.x, targetBox.x + targetBox.w / 2, targetBox.x + targetBox.w];
+      let best: AlignmentGuide | null = null, distance = Infinity;
+      for (const a of sourceCross) for (const b of targetCross) {
+        const d = Math.abs(a - b);
+        if (d > 0 && d < distance) {
+          distance = d;
+          best = axis === 'x' ? { a: [at, a], b: [at, b] } : { a: [a, at], b: [b, at] };
+        }
+      }
+      return best;
+    };
+    const alignments: AlignmentGuide[] = [];
+    const viewGuides: { x?: number; y?: number } = {};
+    if (r.gx != null) {
+      const target = layerWinner(xLines, r.gx);
+      const guide = target && makeGuide('x', r.gx, target);
+      if (target) { if (guide) alignments.push(guide); }
+      else viewGuides.x = r.gx;
+    }
+    if (r.gy != null) {
+      const target = layerWinner(yLines, r.gy);
+      const guide = target && makeGuide('y', r.gy, target);
+      if (target) { if (guide) alignments.push(guide); }
+      else viewGuides.y = r.gy;
+    }
+    if (alignments.length) r.alignments = alignments;
+    if (viewGuides.x != null || viewGuides.y != null) r.viewGuides = viewGuides;
     // Equal spacing applies on an axis where no line snapped the box (a line snap keeps its edge on the line).
     const measures: Measure[] = [];
     for (const axis of ['x', 'y'] as const) {

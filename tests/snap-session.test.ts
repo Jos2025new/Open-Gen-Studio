@@ -45,6 +45,24 @@ describe('snap session: candidates once, by band, on screen, capped', () => {
     expect(SNAP_SPEED).toBeGreaterThan(0);
   });
 
+  it('layer alignment returns the nearest real bbox anchors, while page targets retain axis guides', () => {
+    const target = layerAt('target', 140, 100, 80, 100);
+    const s = new SnapSession(doc([target]), 'mover', opts, 1, view);
+    const box = { x: 91, y: 111, w: 40, h: 20 };
+    s.step(box, { x: 135, y: 120 }, { x: 0, y: 0 }, 0);
+    const r = s.step(box, { x: 135, y: 120 }, { x: 0, y: 0 }, 1000);
+    expect(r.dx).toBe(9);
+    expect(r.gx).toBe(140); // preserve the geometric snap result independently from its visual treatment
+    expect(r.viewGuides).toBeUndefined(); // object alignment is represented by its short anchor connector
+    expect(r.alignments).toEqual([{ a: [140, 111], b: [140, 100] }]);
+
+    const page = new SnapSession(doc([]), 'mover', { ...opts, layers: false, page: true }, 1, view);
+    page.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 0);
+    const pageSnap = page.step({ ...box, x: 4 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 1000);
+    expect(pageSnap.gx).toBe(0);
+    expect(pageSnap.viewGuides?.x).toBe(0);
+  });
+
   it('turns guide and equal-spacing targets off independently', () => {
     const guide = new SnapSession({ ...doc([]), guides: { x: [300], y: [] } }, 'mover', { ...opts, guides: false }, 1, view);
     const noGuide = guide.step({ x: 296, y: 0, w: 10, h: 40 }, { x: 300, y: 20 }, { x: 0, y: 0 }, 0);

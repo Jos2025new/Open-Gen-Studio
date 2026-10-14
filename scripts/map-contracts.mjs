@@ -2,17 +2,20 @@
 export default [
   {
     id: 'snap-controls',
-    what: 'Los interruptores de guías, espaciado igual y nodos del menú Snap se guardan por modo y controlan sus candidatos y medidas.',
+    what: 'Los interruptores de Snap se guardan por modo; los ganadores de caja conservan procedencia para mostrar alineación temporal, y el espaciado dibuja medidas.',
     sides: [
       ['src/engine/design/snap.ts', 'equalSpacing?: boolean'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
+      ['src/engine/design/snapSession.ts', 'export interface AlignmentGuide'],
+      ['src/components/designer/SnapIndicator.tsx', 'data-snap-alignment="true"'],
+      ['src/components/designer/Stage.tsx', 'alignments={guideLines.a}'],
       ['src/engine/design/snapNodes.ts', 'export class PathNodeSnapSession'],
       ['src/components/designer/SnapControl.tsx', 'Path nodes'],
       ['src/components/designer/PathNodes.tsx', 'new PathNodeSnapSession(pathNodeTargets'],
       ['src/components/designer/snapIdle.ts', 'export function snapIdleStart'],
       ['src/store/store.ts', 'snapByMode?: SnapByMode'],
     ],
-    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts'],
+    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts', 'tests-e2e/snapping.spec.ts'],
   },
   {
     id: 'paint-mode',

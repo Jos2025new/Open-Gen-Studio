@@ -55,7 +55,7 @@ Código de OGS: `src/engine/design/snap.ts`, `snapSession.ts`, `snapNodes.ts`; i
 | Nodos | Puntos de trayecto y más tipos de ancla | Nodos finales de otros trayectos visibles, recopilados al empezar el gesto | No ajusta a intersecciones, handles, puntos medios de segmentos ni perpendicular/tangente |
 | Guías | Categoría independiente | Interruptor **Guides**, guardado por modo; desactiva sus candidatos | Sin diferencia esencial en esa categoría |
 | Espaciado | Restricción de huecos iguales con indicador | **Equal spacing** independiente; indicador muestra las dos medidas | Solo cajas, no distribución/alineación entre nodos |
-| Indicadores | Líneas, marcas y medidas | Guías de líneas de borde/centro; medidas para espaciado igual | No hay indicador de alineación distinto de la propia guía |
+| Indicadores | Guías temporales entre anclas alineadas; cotas con topes para huecos iguales | El snap de caja a capa muestra un segmento entre anclas reales; página/guías conservan su línea de vista; el espaciado muestra cotas | No se indican alineaciones de nodos ni cadenas de distribución más largas que el caso local |
 | Retardo | No ajusta durante movimiento rápido; temporizador al detenerse | 0,02 px/ms; temporizador real de 150 ms en move/objeto/escala/nodo; suelta cancela | El ajuste de nodos no tiene E2E de navegador; tiene prueba montada de componente |
 | Candidatos | Área visible, caché por gesto, puntos limitados | Cajas: candidatos por gesto y vista; nodos: 200 objetivos más cercanos de trayectos visibles | La búsqueda de nodos todavía recorre todos los trayectos visibles |
 | Interfaz | Panel simple y modo avanzado con categorías | Un popover compacto con activar, página, capas, guías, espaciado y nodos | No hay rejillas o márgenes configurables; el documento no modela esos objetos |
@@ -64,7 +64,7 @@ Código de OGS: `src/engine/design/snap.ts`, `snapSession.ts`, `snapNodes.ts`; i
 ## Qué conviene conservar y qué queda fuera
 
 - Mantener el popover corto y las categorías independientes: activar ajuste, página, capas, guías, espaciado y nodos. Una interfaz simple/avanzada al estilo Inkscape solo se justificaría cuando existan más objetivos reales; no se replica la lista completa por apariencia.
-- La alineación visible de cajas ya existe: al acercar un borde o centro a otro, el snap produce la guía correspondiente. «Sin indicador de alineación» significa que no hay un indicador separado que nombre una relación; no significa que falte ese snap.
+- La alineación geométrica de cajas ya existía: al acercar un borde o centro, el motor ajustaba sus coordenadas. El cambio actual añade un conector temporal entre anclas de la caja móvil y la caja objetivo; no reemplaza el snap ni convierte los objetivos en pares nuevos. Los snaps a página o guía conservan la línea de vista completa.
 - El target de nodo es deliberadamente limitado a nodos de trayecto visibles. Grid y márgenes necesitan entidades/configuración que hoy no existen; intersecciones y restricciones perpendiculares/tangenciales requieren geometría adicional. No se simulan con checks vacíos.
 - El control de nodos usa el mismo zoom, velocidad, retardo de 150 ms, Alt para movimiento libre y un solo snapshot de deshacer que el editor existente. La prueba montada cubre posición, espera, undo y redo; no sustituye una prueba visual en navegador.
 
@@ -72,6 +72,8 @@ Código de OGS: `src/engine/design/snap.ts`, `snapSession.ts`, `snapNodes.ts`; i
 
 - `tests/snap-nodes.test.ts`: fuentes de nodos, coincidencia bidimensional, tolerancia y retardo.
 - `tests/path-node-snap.test.ts`: interacción montada, snap tras el retardo y un solo paso de undo/redo.
+- `tests/snap-session.test.ts`: una caja de tamaño distinto produce un conector entre anclas del borde/centro más cercanas y conserva por separado el ganador geométrico; los objetivos de página mantienen su indicador de eje.
+- `tests-e2e/snapping.spec.ts`: el gesto montado en Stage muestra la guía mientras se arrastra, la retira al soltar y ante `pointercancel`, conserva el ajuste y permite undo/redo.
 - `tests-e2e/snapping.spec.ts`: los dos casos antes marcados `fixme` están activos. La ejecución focalizada del archivo en sandbox pasa 6/6; no demuestra la causa de los fallos históricos.
 - No se ejecutó Inkscape ni se midió rendimiento con documentos grandes. Los valores de Inkscape se leen de las fuentes citadas, no de mediciones de runtime.
 

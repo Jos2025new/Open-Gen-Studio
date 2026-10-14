@@ -11,6 +11,7 @@ import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import type { Measure } from '../../engine/design/snap';
+import type { AlignmentGuide } from '../../engine/design/snapSession';
 import { SnapIndicator } from './SnapIndicator';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke } from '../../engine/design/raster';
@@ -155,8 +156,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
 
   // Snap guides while moving (screen overlay only).
-  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number; m?: Measure[] }>({});
-  const showGuides = (g: { x?: number; y?: number; m?: Measure[] }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y && !g.m ? cur : g));
+  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number; m?: Measure[]; a?: AlignmentGuide[] }>({});
+  const showGuides = (g: { x?: number; y?: number; m?: Measure[]; a?: AlignmentGuide[] }) => setGuideLines((cur) => {
+    const same = <T,>(a?: T[], b?: T[], equal: (x: T, y: T) => boolean = Object.is) => a === b || (!a && !b) || Boolean(a && b && a.length === b.length && a.every((x, i) => equal(x, b[i])));
+    const sameMeasure = (a: Measure, b: Measure) => a.label === b.label && a.a[0] === b.a[0] && a.a[1] === b.a[1] && a.b[0] === b.b[0] && a.b[1] === b.b[1];
+    const sameAlignment = (a: AlignmentGuide, b: AlignmentGuide) => a.a[0] === b.a[0] && a.a[1] === b.a[1] && a.b[0] === b.b[0] && a.b[1] === b.b[1];
+    return cur.x === g.x && cur.y === g.y && same(cur.m, g.m, sameMeasure) && same(cur.a, g.a, sameAlignment) ? cur : g;
+  });
   const [editingText, setEditingText] = useState<string | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
@@ -983,7 +989,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
         const s = snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
-        showGuides({ x: s.gx, y: s.gy, m: s.measures });
+        showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
       }
       rasterMoveAt.current = { d, x: ox, y: oy };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
@@ -999,7 +1005,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const s = snapSessionOf(d, doc, ids, d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         dx += s.dx;
         dy += s.dy;
-        showGuides({ x: s.gx, y: s.gy, m: s.measures });
+        showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
       } else showGuides({});
       startDragPreview(doc);
       const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
@@ -1286,7 +1292,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {tool === 'move' && !editLayers && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
-      <SnapIndicator view={view} measures={guideLines.m} />
+      <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {
