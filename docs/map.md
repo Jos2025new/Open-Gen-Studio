@@ -96,7 +96,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 30 | 7 |
+| `src/components/designer` | 31 | 7 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
@@ -112,7 +112,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 138 |
 | `src/store` | 4 | 96 |
 
-112 de 287 módulos no tienen ningún test que los importe directamente.
+113 de 288 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -135,6 +135,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
+- [stageSprites.ts](../src/components/designer/stageSprites.ts)
 - [usePanRequest.ts](../src/components/designer/usePanRequest.ts)
 - [GalleryPanel.tsx](../src/components/gallery/GalleryPanel.tsx)
 - [CanvasNavigation.tsx](../src/components/node/CanvasNavigation.tsx)
