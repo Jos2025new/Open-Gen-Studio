@@ -97,6 +97,11 @@ export function snapSessionFor(key: object, make: () => SnapSession): SnapSessio
   return s;
 }
 
+/** The session of drag `key`: every layer but `ids` is a candidate; `movingId` is the layer whose box moves ('' for a handle). */
+export function snapSessionOf(key: object, doc: DesignDoc, ids: Set<string>, movingId: string, opts: SnapOptions, view: { x: number; y: number; zoom: number }, size: { w: number; h: number }): SnapSession {
+  return snapSessionFor(key, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, movingId, opts, view.zoom, visibleDocRect(view, size)));
+}
+
 /** The part of the page on screen, in document units, for a view and a screen size (origin at the top-left). */
 export function visibleDocRect(view: { x: number; y: number; zoom: number }, size: { w: number; h: number }): { x0: number; y0: number; x1: number; y1: number } {
   return { x0: -view.x / view.zoom, y0: -view.y / view.zoom, x1: (size.w - view.x) / view.zoom, y1: (size.h - view.y) / view.zoom };
