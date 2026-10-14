@@ -7,6 +7,7 @@ import { layerSelection, useLayerSelection } from '../../engine/design/selection
 import { useState } from 'react';
 import { snapOptsFor } from '../../engine/design/snap';
 import { activeDoc } from '../../engine/design/actions';
+import { paintModeOf } from '../../engine/design/paintMode';
 import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
@@ -101,8 +102,11 @@ export function EditOptionsControl() {
 export function SnapControl() {
   const pop = usePopover();
   const sid = useStore((s) => s.activeSessionId);
-  const snap = snapOptsFor(activeDoc(sid) ?? { layers: [] }, useStore((s) => s.ui.snap));
-  const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });
+  const doc = activeDoc(sid) ?? { layers: [], paintMode: undefined };
+  const byMode = useStore((s) => s.ui.snapByMode);
+  const snap = snapOptsFor(doc as never, byMode);
+  // The switch changes only the mode in use; the other mode keeps its own default.
+  const set = (patch: Partial<typeof snap>) => setUi({ snapByMode: { ...byMode, [paintModeOf(doc as never)]: { ...snap, ...patch } } });
   return <>
     <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip={`Snap while moving · ${snap.on ? "on" : "off"}`} aria-label="Snap"><Magnet size={14} /><ChevronDown size={12} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Snap">

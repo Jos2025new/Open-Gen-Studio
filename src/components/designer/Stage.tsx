@@ -956,7 +956,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (!started(d, p)) return;
       // Scale handles snap too: the dragged side or corner meets page edges, guides and other layers (Alt: free).
       let q = p;
-      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
+      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       if (d.op === 'scale' && snap.on && !e.altKey) {
         const ids = new Set(d.bases.map((b) => b.layer.id));
         const t = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap, view.zoom, visibleDocRect(view, size))).targets();
@@ -974,7 +974,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
       let ox = p.x, oy = p.y;
-      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
+      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
       const b0 = snap.on && !e.altKey && d.base.type !== 'raster' ? objectsBox(d.base, d.ids) : null;
       if (b0) {
@@ -990,7 +990,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
-      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
+      const snap = snapOptsFor(doc, useStore.getState().ui.snapByMode);
       const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));

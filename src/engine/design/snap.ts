@@ -12,10 +12,15 @@ import { layerBox } from './render';
  * The snap options in effect for a document: the user's switch when they have set one; otherwise on in Design and
  * off in Drawing (paintMode.ts), where pixels are painted and snapping would only add lag.
  */
-export function snapOptsFor(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, stored?: SnapOptions): SnapOptions {
-  if (stored) return stored;
-  return { on: paintModeOf(doc) === 'design', page: true, layers: true };
+export function snapOptsFor(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, byMode?: SnapByMode): SnapOptions {
+  const mode = paintModeOf(doc);
+  const saved = byMode?.[mode];
+  if (saved) return saved;
+  return { on: mode === 'design', page: true, layers: true };
 }
+
+/** The switch saved for each mode. A switch saved in the old single format is not read (its default is the mode's). */
+export type SnapByMode = { drawing?: SnapOptions; design?: SnapOptions };
 
 /** How close (screen px) an edge or center must come to a target to snap: Inkscape's default object tolerance. */
 export const SNAP_PX = 10;

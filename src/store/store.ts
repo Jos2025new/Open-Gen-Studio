@@ -137,8 +137,8 @@ export interface UiState {
   lineart: StrokeStyle;
   lineartMode?: 'draw' | 'edit';
   lineartInfluence?: number;
-  /** Edit tool snapping (page and other layers); on by default. */
-  snap?: { on: boolean; page: boolean; layers: boolean };
+  /** Edit tool snapping, saved per mode: Drawing (off by default) and Design (on by default). Unset = that mode's default. */
+  snapByMode?: { drawing?: { on: boolean; page: boolean; layers: boolean }; design?: { on: boolean; page: boolean; layers: boolean } };
   /** Edit tool: Ctrl-click picks more objects of the active layer (default) or more layers. */
   selectMode?: 'objects' | 'layers';
   /** Drawing on a layer with editable strokes: the choice the user saved (ADR 0016); 'ask' shows the prompt. */
