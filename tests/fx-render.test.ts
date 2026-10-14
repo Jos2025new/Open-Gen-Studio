@@ -297,6 +297,23 @@ describe('editor FX cache (filters run again only when what they read changes)',
     expect(getBuffer('img')).toBeDefined();
     vi.unstubAllGlobals();
   });
+  it('moving or fading a raster layer keeps its filtered result; turning it runs the filter again', () => {
+    const img = { ...newRasterLayer('Image', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'img' };
+    readPixel = (() => ({ data: new Uint8ClampedArray(200 * 100 * 4) })) as never;
+    vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined });
+    setFull('img', recordingCanvas(200, 100) as never, false);
+    const doc = { ...createDoc('p', 200, 100), layers: [img, fxOn()] } as DesignDoc;
+    drawDoc(stage(), doc);
+    const n = blurs();
+    expect(n).toBeGreaterThan(0);
+    const moved = { ...doc, layers: doc.layers.map((l) => (l.id === 'img' ? { ...l, x: l.x + 10, y: l.y + 4, opacity: 0.5, blend: 'multiply' as const } : l)) };
+    drawDoc(stage(), moved);
+    expect(blurs()).toBe(n);
+    const turned = { ...doc, layers: doc.layers.map((l) => (l.id === 'img' ? { ...l, transform: [1, 0, 0, 1, 3, 0] as never } : l)) };
+    drawDoc(stage(), turned);
+    expect(blurs()).toBeGreaterThan(n);
+    vi.unstubAllGlobals();
+  });
   it('exports and other offscreen renders always compute', () => {
     const doc = page([fxOn()]);
     drawDoc(view().x, doc);

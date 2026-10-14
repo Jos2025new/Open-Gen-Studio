@@ -275,12 +275,14 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
  * FX_CACHE_PX pixels in all; the oldest entry goes first.
  */
 import { editorCacheBudget } from './cacheBudget';
+import { drawRevision } from './drawRevision';
 const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
 if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
 function contentKey(l: Layer, s: { fx: FxLayer[] }, geom: unknown[]): unknown[] {
-  // The pixels' versions go last: while a stroke is painted only they change (see cachedFx).
-  return [l, ...s.fx, ...geom, fontEpoch, ...rasterBufferIds([l]).map(bufferVersion)];
+  // The pixels' versions go last: while a stroke is painted only they change (see cachedFx). The drawing revision
+  // replaces the layer object, so moving or fading the layer keeps its filtered result.
+  return [...drawRevision(l), ...s.fx, ...geom, fontEpoch, ...rasterBufferIds([l]).map(bufferVersion)];
 }
 /*
  * Mid-stroke on the filtered layer itself, the result may be up to FX_LIVE_MS old instead of filtering on every
@@ -358,7 +360,11 @@ function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: numb
       const ix = box ? Math.floor(box.x * scale) : 0, iy = box ? Math.floor(box.y * scale) : 0;
       const iw = box ? Math.max(1, Math.ceil((box.x + box.w) * scale) - ix) : 1, ih = box ? Math.max(1, Math.ceil((box.y + box.h) * scale) - iy) : 1;
       const inCrop = !!box && ix < ox + cw && iy < oy + ch && ix + iw > ox && iy + ih > oy;
-      const key = editor && inCrop ? contentKey(s.layer, s, [scale, ix, iy, iw, ih]) : null;
+      // A raster layer's box-local result depends on where its box falls between whole pixels, not on the whole pixel
+      // offset (that is applied at composite time), so the key holds the fractional phase instead of ix/iy.
+      const raster = s.layer.type === 'raster';
+      const phase = raster && box ? [box.x * scale - ix, box.y * scale - iy] : [ix, iy];
+      const key = editor && inCrop ? contentKey(s.layer, s, [scale, ...phase, iw, ih]) : null;
       let own = key && cachedFx(s.layer.id, key, versionsOf(s.layer).length);
       if (box && inCrop && !own) {
         own = createCanvas(iw, ih);

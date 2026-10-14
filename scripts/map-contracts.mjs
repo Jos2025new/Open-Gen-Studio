@@ -396,9 +396,10 @@ export default [
   },
   {
     id: 'fx-editor-cache',
-    what: '2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (objeto de capa, versión de contenido de sus píxeles, sus FX, escala). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan.',
+    what: '2026-10-09: el editor reutiliza el resultado de una capa con FX mientras no cambie lo que lee (revisión de dibujo de la capa, versión de contenido de sus píxeles, sus FX, escala y fase fraccional de su caja; mover o desvanecer una capa raster no la invalida). Toda escritura de píxeles sube la versión de su lienzo, también el trazo en vivo; las exportaciones siempre calculan.',
     sides: [
       ['src/engine/design/render.ts', 'function contentKey('],
+      ['src/engine/design/drawRevision.ts', 'export function drawRevision('],
       ['src/engine/design/raster.ts', 'export function bufferVersion('],
       ['src/engine/design/raster.ts', 'export function paintLive(buf0: HTMLCanvasElement, live: LiveStroke, a: { x: number; y: number }, b: { x: number; y: number }, width: number, density = 1): HTMLCanvasElement {\n  touchBuffer(buf0);'],
     ],
