@@ -3,12 +3,16 @@ import type { DesignDoc, VectorShape } from '../../engine/types';
 import { BLUR_MARGIN, blurKnots, clickKnot, cornerKnots, cornerRadii, dragBlur, dragRx, dragRy } from '../../engine/design/shapeLook';
 import { getDoc } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
-import { useStore } from '../../store/store';
 import { PathNodes } from './PathNodes';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
 import { PrimKnots } from './ShapeHandles';
+import { MultiPathNodes } from './MultiPathNodes';
+import { multiPathTargets } from '../../engine/design/multiPathEdit';
+import { useObjectSelection } from '../../engine/design/objectSelection';
+import { useLayerSelection, layerSelection } from '../../engine/design/selection';
+import { useStore } from '../../store/store';
 
 /*
  * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
@@ -24,6 +28,9 @@ const BLUR_GAP = 20; // screen px from the edge, so the blur knots stay apart fr
 export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: string; doc: DesignDoc }) {
   const picked = usePickedShape(doc);
   const edit = useShapeEdit((st) => st.byDoc[doc.id]);
+  const objectPick = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
+  const mode = useStore((st) => st.ui.selectMode ?? 'objects');
   const ref = useRef<SVGSVGElement>(null);
   const drag = useRef<{ knot: Knot; layerId: string; shape: VectorShape; from: [number, number]; at: [number, number]; moved: boolean } | null>(null);
   const editing = !!picked && edit?.shapeId === picked.shape.id && (picked.shape.type === 'rect' || picked.shape.type === 'ellipse' || picked.shape.type === 'path');
@@ -33,6 +40,13 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
   }, [editing, doc.id, picked?.shape.type]);
+  if (edit?.paths && edit.paths.length > 1) {
+    const layers = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+    const pickedLayers = layerPicks ?? [];
+    const targets = multiPathTargets(doc, mode, objectPick, mode === 'layers' ? (pickedLayers.length ? pickedLayers : layers) : []);
+    const same = targets.length === edit.paths.length && targets.every((t, i) => t.layerId === edit.paths![i].layerId && t.shapeId === edit.paths![i].shapeId);
+    return same ? <MultiPathNodes view={view} sessionId={sessionId} docId={doc.id} targets={targets} /> : null;
+  }
   if (!picked || !editing) return null;
   // A primitive edits by its parameters (ShapeHandles.tsx); a path edits its nodes (Inkscape's Node tool); rectangles and ellipses their own knots.
   if (picked.shape.prim) return <PrimKnots view={view} sessionId={sessionId} docId={doc.id} layerId={picked.layerId} shape={picked.shape} />;

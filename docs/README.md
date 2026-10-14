@@ -102,6 +102,7 @@
 - [026-2026-10-W42: Designer, formas, paint, nodos y cierre de snapping (2026-10-13–14)](history/026-2026-10-W42.md) — incluye evidencia por commit, aprobación manual y correcciones de espaciado; la última E2E queda pendiente por sandbox ocupado.
 - [027-2026-10-W42: selección por modo en Edit](history/027-2026-10-W42.md) — Align conserva su guardia de modo y Edit incorpora marquee por objetos/capas.
 - [028-2026-10-W42: redondeo común de rectángulos seleccionados](history/028-2026-10-W42.md) — Rx/Ry actúa sobre los rectángulos del conjunto explícito en Object o Layer.
+- [029-2026-10-W42: edición de nodos en varios paths](history/029-2026-10-W42.md) — selección y movimiento multi-path en Object o Layer, con límites explícitos.
 
 ## Trazabilidad
 

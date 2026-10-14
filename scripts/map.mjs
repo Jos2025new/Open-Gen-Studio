@@ -83,15 +83,15 @@ for (const f of src) {
 
 const map = `# Mapa del código
 
-Generado por \`node scripts/map.mjs --write\` a partir de [map-contracts.mjs](../scripts/map-contracts.mjs) y de los imports. \`npm test\` falla si está desactualizado o si falta un ancla de un contrato. No editar a mano.
+Generado por \`node scripts/map.mjs --write\` desde [map-contracts.mjs](../scripts/map-contracts.mjs) e imports. \`npm test\` comprueba vigencia y anclas; no editar a mano.
 
 ## Antes de cambiar código
 
-1. Busca aquí el archivo que vas a tocar: los **contratos** dicen qué otro lugar debe seguir diciendo lo mismo; los **módulos centrales**, si el cambio se propaga lejos.
-2. Al terminar cada cambio, \`npm run test:related\`: ejecuta solo los tests que alcanzan los archivos modificados.
-3. Si cambias un lado de un contrato, cambia los otros en el mismo commit; si descubres uno nuevo, añádelo a \`scripts/map-contracts.mjs\`.
-4. Antes de dar el trabajo por hecho, \`npm test\` completo.
-5. Para medir rendimiento, el [protocolo](depuracion.md#protocolo), solo en lo que tiene sondas (tabla «Qué se mide hoy»). Una sonda nueva va a esa tabla en el mismo commit: lo comprueba \`tests/trace-domains.test.ts\`.
+1. Busca el archivo y sus **contratos** y **módulos centrales**.
+2. Tras cada cambio, ejecuta \`npm run test:related\`.
+3. Cambia todos los lados de cada contrato en el mismo commit; registra los nuevos en \`scripts/map-contracts.mjs\`.
+4. Antes de cerrar, ejecuta \`npm test\`.
+5. Para rendimiento, sigue el [protocolo](depuracion.md#protocolo). Registra las nuevas sondas en «Qué se mide hoy»; \`tests/trace-domains.test.ts\` lo comprueba.
 
 ## Contratos que el compilador no ve
 

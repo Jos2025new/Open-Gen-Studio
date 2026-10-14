@@ -25,7 +25,7 @@ export function setObjectPick(docId: string, pick: ObjectPick | null): void {
 }
 
 /** The shape being edited (double-click or «Edit shape»): its own knots show, the transform handles hide. */
-export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[] }
+export interface ShapeEdit { layerId: string; shapeId: string; /** Path edit: selected node indices; node remains as the primary index for existing controls. */ node?: number; nodes?: number[]; /** Explicit multi-path node selection; legacy fields above remain the single-path contract. */ paths?: Array<{ layerId: string; shapeId: string; nodes: number[] }> }
 export const useShapeEdit = create<{ byDoc: Record<string, ShapeEdit | undefined> }>(() => ({ byDoc: {} }));
 export function setShapeEdit(docId: string, edit: ShapeEdit | null): void {
   useShapeEdit.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: edit ?? undefined } }));

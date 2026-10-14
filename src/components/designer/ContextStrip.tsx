@@ -16,6 +16,8 @@ import { PaintSwatch, ShapeParams } from './ShapePaint';
 import { editShape, setShapeEdit, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
 import { useLayerSelection } from '../../engine/design/selection';
 import { multiLayerRectangles } from '../../engine/design/multiRectEdit';
+import { multiPathTargets } from '../../engine/design/multiPathEdit';
+import { layerSelection } from '../../engine/design/selection';
 import { MultiRectangleRadii } from './MultiRectangleRadii';
 import { useEffect } from 'react';
 
@@ -46,6 +48,10 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const objectSelection = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
   const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
   const roundTargets = multiLayerRectangles(doc, mode, objectSelection, layerPicks ?? []);
+  const nodeTargets = multiPathTargets(doc, mode, objectSelection, mode === 'layers' ? layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id)) : []);
+  const multiNodeEdit = (edit?.paths?.length ?? 0) > 1
+    && nodeTargets.length === edit!.paths!.length
+    && nodeTargets.every((target, index) => target.layerId === edit!.paths![index].layerId && target.shapeId === edit!.paths![index].shapeId);
   // Another tool leaves shape edit mode (docs/plan-edicion-formas.md).
   useEffect(() => { if (tool !== 'move') setShapeEdit(doc.id, null); }, [tool, doc.id]);
   if (tool === 'hand') return null;
@@ -53,7 +59,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const active = activeLayer(doc);
   const selectedText = tool === 'text' && active?.type === 'text' ? active : null;
   const pageRuler = ruler && ruler.docId === doc.id ? ruler : null;
-  const selectedShape = tool === 'move' && !selectedText ? picked : null;
+  const selectedShape = tool === 'move' && mode === 'objects' && !selectedText ? picked : null;
   const editing = !!selectedShape && edit?.shapeId === selectedShape.shape.id;
   const isPath = selectedShape?.shape.type === 'path';
   return <div className="context-strip" role="toolbar" aria-label={`${TOOL_NAMES[tool]} quick settings`}>
@@ -61,7 +67,13 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
       <strong>{TOOL_NAMES[tool]}</strong>{target && <> → <span>{target}</span></>}
     </span>
     {/* With a text layer selected, the fields change that text, not the settings for the next one. */}
-    {selectedText ? <div className="tool-settings" role="group" aria-label="Selected text">
+    {tool === 'move' && (multiNodeEdit || (!picked && nodeTargets.length > 1)) ? <div className="tool-settings" role="group" aria-label="Multiple path nodes">
+      <span className="context-mode">{multiNodeEdit ? `Editing nodes · ${edit!.paths!.length} paths` : `${nodeTargets.length} paths selected`}</span>
+      {multiNodeEdit
+        ? <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
+        : <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, { layerId: nodeTargets[0].layerId, shapeId: nodeTargets[0].shapeId, paths: nodeTargets.map((t) => ({ layerId: t.layerId, shapeId: t.shapeId, nodes: [] })) })}>Edit nodes</button>}
+      <span className="context-help">Click nodes; Shift-click adds or removes. Drag a selected node to move the group; drag empty space to select nodes. Multi-path topology edits remain per path.</span>
+    </div> : selectedText ? <div className="tool-settings" role="group" aria-label="Selected text">
       <TextStyleFields value={selectedText} compact onChange={(p) => { if (!selectedText.locked) patchLayer(sessionId, doc.id, selectedText.id, p as Partial<Layer>); }} />
     </div> : selectedShape ? <div className="tool-settings" role="group" aria-label={editing ? 'Editing shape' : 'Selected shape'}>
       {/* One click transforms; double-click or «Edit shape» edits (docs/plan-edicion-formas.md). */}

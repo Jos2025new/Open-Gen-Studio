@@ -52,6 +52,70 @@ test('Shift-click adds a second shape; dragging one moves both; a click keeps ju
   expect(errors).toEqual([]);
 });
 
+test('selected paths in Object and Layer modes share node selection and one undoable page-space drag', async ({ page }) => {
+  const errors = await setup(page);
+  await page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), P = await import('/src/engine/design/objectSelection.ts' as string), L = await import('/src/engine/design/selection.ts' as string), F = await import('/src/engine/design/affine.ts' as string), M = await import('/src/engine/design/matrix.ts' as string);
+    const sid = S.useStore.getState().activeSessionId, d = A.activeDoc(sid);
+    const make = (id: string, x: number, y = 300) => ({ id, type: 'path', d: `M ${x} ${y} L ${x + 100} ${y} L ${x + 100} ${y + 100} L ${x} ${y + 100} Z`, box0: { x, y, w: 100, h: 100 }, x, y, w: 100, h: 100, fill: '#fff', stroke: 'none', strokeWidth: 0 });
+    const turned = F.shapeToPath(F.transformShape({ ...make('p2', 300), type: 'rect', d: undefined }, M.rotateAbout(Math.PI / 2, 350, 350)));
+    const a = { id: 'nodes-a', type: 'vector', name: 'A', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [make('p1', 300), { ...turned, id: 'p2' }] };
+    const b = { id: 'nodes-b', type: 'vector', name: 'B', visible: true, locked: false, opacity: 1, blend: 'normal', shapes: [make('p3', 1100)] };
+    S.setDoc(sid, d.id, (doc: any) => ({ ...doc, layers: [a, b], activeLayerId: a.id }));
+    P.setObjectPick(d.id, { layerId: a.id, ids: ['p1', 'p2'] }); L.setLayerPicks(d.id, []);
+    S.setUi({ tool: 'move', selectMode: 'objects', rulers: false, snap: { on: false, page: false, layers: false } });
+  });
+  await page.getByRole('button', { name: 'Edit nodes', exact: true }).click();
+  await expect(page.locator('rect[data-multi-path-node]')).toHaveCount(8);
+  const read = () => page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), H = await import('/src/engine/design/history.ts' as string), P = await import('/src/engine/design/multiPathEdit.ts' as string), N = await import('/src/engine/design/pathNodes.ts' as string);
+    const d = A.activeDoc(S.useStore.getState().activeSessionId); return { shapes: d.layers.flatMap((l: any) => l.shapes).map((s: any) => [s.id, s.d]), nodes: d.layers.flatMap((l: any) => l.shapes).map((s: any) => { const segs = P.editablePageSegs(s); return N.nodeSegs(segs).seg.map((i: number) => segs[i].p.at(-1)); }), undo: H.historyDepth(d.id).undo };
+  });
+  const initial = await read();
+  const n1 = page.locator('rect[data-multi-path-node="p1"][data-node="1"]'), n2 = page.locator('rect[data-multi-path-node="p2"][data-node="0"]');
+  const c1 = (await n1.boundingBox())!, c2 = (await n2.boundingBox())!;
+  const cx = (c1.x + c1.width / 2 + c2.x + c2.width / 2) / 2, cy = (c1.y + c1.height / 2 + c2.y + c2.height / 2) / 2;
+  await page.mouse.move(cx - 9, cy - 9); await page.mouse.down(); await page.mouse.move(cx + 9, cy + 9, { steps: 3 }); await page.mouse.up();
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(2);
+  await page.mouse.move(c1.x + c1.width / 2, c1.y + c1.height / 2); await page.mouse.down();
+  await page.mouse.move(c1.x + c1.width / 2 + 36, c1.y + c1.height / 2 + 24, { steps: 6 }); await page.mouse.up();
+  const moved = await read();
+  expect(moved.shapes[0][1]).not.toBe(initial.shapes[0][1]); expect(moved.shapes[1][1]).not.toBe(initial.shapes[1][1]); expect(moved.shapes[2][1]).toBe(initial.shapes[2][1]);
+  const dx = moved.nodes[0][1][0] - initial.nodes[0][1][0], dy = moved.nodes[0][1][1] - initial.nodes[0][1][1];
+  expect(Math.hypot(dx, dy)).toBeGreaterThan(20);
+  expect(moved.nodes[1][0][0] - initial.nodes[1][0][0]).toBeCloseTo(dx, 1); expect(moved.nodes[1][0][1] - initial.nodes[1][0][1]).toBeCloseTo(dy, 1);
+  expect(moved.nodes[0][0]).toEqual(initial.nodes[0][0]); expect(moved.nodes[1][1]).toEqual(initial.nodes[1][1]);
+  expect(moved.undo).toBe(initial.undo + 1);
+  await page.keyboard.press('Control+z'); expect((await read()).shapes).toEqual(initial.shapes);
+  await page.keyboard.press('Control+y'); expect((await read()).shapes).toEqual(moved.shapes);
+  await page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), P = await import('/src/engine/design/objectSelection.ts' as string), L = await import('/src/engine/design/selection.ts' as string);
+    const sid = S.useStore.getState().activeSessionId, d = A.activeDoc(sid);
+    const separated = { id: 'p2', type: 'path', d: 'M 700 600 L 800 600 L 800 700 L 700 700 Z', box0: { x: 700, y: 600, w: 100, h: 100 }, x: 700, y: 600, w: 100, h: 100, fill: '#fff', stroke: 'none', strokeWidth: 0 };
+    S.setDoc(sid, d.id, (doc: any) => ({ ...doc, layers: doc.layers.map((layer: any) => layer.id === 'nodes-a' ? { ...layer, shapes: layer.shapes.map((shape: any) => shape.id === 'p2' ? separated : shape) } : layer) }));
+    P.setShapeEdit(d.id, null); L.setLayerPicks(d.id, ['nodes-a', 'nodes-b']); S.setUi({ selectMode: 'layers' });
+  });
+  await page.getByRole('button', { name: 'Edit nodes', exact: true }).click();
+  await expect(page.locator('rect[data-multi-path-node]')).toHaveCount(12);
+  const layerBase = await read(), la = page.locator('rect[data-multi-path-node="p1"][data-node="0"]'), lb = page.locator('rect[data-multi-path-node="p3"][data-node="0"]');
+  const hit = page.locator('.multi-path-nodes rect.node-marquee-hit'), hb0 = (await hit.boundingBox())!;
+  await page.mouse.move(hb0.x + 24, hb0.y + 24); await page.mouse.down(); await page.mouse.move(hb0.x + 55, hb0.y + 55, { steps: 2 });
+  await hit.dispatchEvent('pointercancel', { pointerId: 1 }); await page.mouse.up();
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(0);
+  const ba = (await la.boundingBox())!, bb = (await lb.boundingBox())!;
+  await page.mouse.click(ba.x + ba.width / 2, ba.y + ba.height / 2);
+  await page.keyboard.down('Shift'); await page.mouse.click(bb.x + bb.width / 2, bb.y + bb.height / 2); await page.keyboard.up('Shift');
+  await expect(page.locator('rect.path-node.is-picked')).toHaveCount(2);
+  await page.mouse.move(ba.x + ba.width / 2, ba.y + ba.height / 2); await page.mouse.down();
+  await page.mouse.move(ba.x + ba.width / 2 - 30, ba.y + ba.height / 2 + 18, { steps: 6 }); await page.mouse.up();
+  const layerMoved = await read();
+  expect(layerMoved.shapes[0][1]).not.toBe(layerBase.shapes[0][1]); expect(layerMoved.shapes[1][1]).toBe(layerBase.shapes[1][1]); expect(layerMoved.shapes[2][1]).not.toBe(layerBase.shapes[2][1]);
+  expect(layerMoved.undo).toBe(layerBase.undo + 1);
+  await page.keyboard.press('Control+z'); expect((await read()).shapes).toEqual(layerBase.shapes);
+  await page.keyboard.press('Control+y'); expect((await read()).shapes).toEqual(layerMoved.shapes);
+  expect(errors).toEqual([]);
+});
+
 // Isolated sandbox fixtures: real pointer/key events exercise Stage; reads measure its stored geometry.
 async function fixture(page: Page, kind: 'shapes' | 'lineart' | 'raster' | 'image', mode = 'objects') {
   await setup(page);

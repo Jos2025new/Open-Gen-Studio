@@ -1,20 +1,20 @@
 # Mapa del código
 
-Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../scripts/map-contracts.mjs) y de los imports. `npm test` falla si está desactualizado o si falta un ancla de un contrato. No editar a mano.
+Generado por `node scripts/map.mjs --write` desde [map-contracts.mjs](../scripts/map-contracts.mjs) e imports. `npm test` comprueba vigencia y anclas; no editar a mano.
 
 ## Antes de cambiar código
 
-1. Busca aquí el archivo que vas a tocar: los **contratos** dicen qué otro lugar debe seguir diciendo lo mismo; los **módulos centrales**, si el cambio se propaga lejos.
-2. Al terminar cada cambio, `npm run test:related`: ejecuta solo los tests que alcanzan los archivos modificados.
-3. Si cambias un lado de un contrato, cambia los otros en el mismo commit; si descubres uno nuevo, añádelo a `scripts/map-contracts.mjs`.
-4. Antes de dar el trabajo por hecho, `npm test` completo.
-5. Para medir rendimiento, el [protocolo](depuracion.md#protocolo), solo en lo que tiene sondas (tabla «Qué se mide hoy»). Una sonda nueva va a esa tabla en el mismo commit: lo comprueba `tests/trace-domains.test.ts`.
+1. Busca el archivo y sus **contratos** y **módulos centrales**.
+2. Tras cada cambio, ejecuta `npm run test:related`.
+3. Cambia todos los lados de cada contrato en el mismo commit; registra los nuevos en `scripts/map-contracts.mjs`.
+4. Antes de cerrar, ejecuta `npm test`.
+5. Para rendimiento, sigue el [protocolo](depuracion.md#protocolo). Registra las nuevas sondas en «Qué se mide hoy»; `tests/trace-domains.test.ts` lo comprueba.
 
 ## Contratos que el compilador no ve
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
-| **designer-selection** — Edit selecciona objetos en Objects y capas en Layers; marquee y redondeo actúan solo sobre el conjunto explícito, sin mezclar selección raster. | [marquee.ts](../src/engine/design/marquee.ts), [objectSelection.ts](../src/engine/design/objectSelection.ts), [selection.ts](../src/engine/design/selection.ts), [StageEditMarquee.ts](../src/components/designer/StageEditMarquee.ts), [multiRectEdit.ts](../src/engine/design/multiRectEdit.ts), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [marquee.test.ts](../tests/marquee.test.ts), [layer-click-replaces.test.ts](../tests/layer-click-replaces.test.ts), [multi-layer-rect-rounding.test.ts](../tests/multi-layer-rect-rounding.test.ts), [multi-select.spec.ts](../tests-e2e/multi-select.spec.ts) |
+| **designer-selection** — Edit selecciona objetos en Objects y capas en Layers; marquee, redondeo y edición multi-path actúan solo sobre el conjunto explícito, sin mezclar selección raster. | [marquee.ts](../src/engine/design/marquee.ts), [objectSelection.ts](../src/engine/design/objectSelection.ts), [selection.ts](../src/engine/design/selection.ts), [StageEditMarquee.ts](../src/components/designer/StageEditMarquee.ts), [multiRectEdit.ts](../src/engine/design/multiRectEdit.ts), [multiPathEdit.ts](../src/engine/design/multiPathEdit.ts), [MultiPathNodes.tsx](../src/components/designer/MultiPathNodes.tsx), [ContextStrip.tsx](../src/components/designer/ContextStrip.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [marquee.test.ts](../tests/marquee.test.ts), [layer-click-replaces.test.ts](../tests/layer-click-replaces.test.ts), [multi-layer-rect-rounding.test.ts](../tests/multi-layer-rect-rounding.test.ts), [multi-path-edit.test.ts](../tests/multi-path-edit.test.ts), [multi-select.spec.ts](../tests-e2e/multi-select.spec.ts) |
 | **snap-controls** — Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes. | [snap.ts](../src/engine/design/snap.ts), [snapSession.ts](../src/engine/design/snapSession.ts), [SnapIndicator.tsx](../src/components/designer/SnapIndicator.tsx), [Stage.tsx](../src/components/designer/Stage.tsx), [snapNodes.ts](../src/engine/design/snapNodes.ts), [SnapControl.tsx](../src/components/designer/SnapControl.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [snapIdle.ts](../src/components/designer/snapIdle.ts), [store.ts](../src/store/store.ts) | [snap-mode.test.ts](../tests/snap-mode.test.ts), [snap-session.test.ts](../tests/snap-session.test.ts), [snap-spacing.test.ts](../tests/snap-spacing.test.ts), [snap-nodes.test.ts](../tests/snap-nodes.test.ts), [path-node-snap.test.ts](../tests/path-node-snap.test.ts), [snapping.spec.ts](../tests-e2e/snapping.spec.ts) |
 | **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
 | **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts), [drawing-choice-position.test.ts](../tests/drawing-choice-position.test.ts) |
@@ -69,11 +69,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 183 | 118 |
+| [types.ts](../src/engine/types.ts) | 184 | 119 |
 | [store.ts](../src/store/store.ts) | 108 | 96 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
-| [actions.ts](../src/engine/design/actions.ts) | 39 | 16 |
+| [actions.ts](../src/engine/design/actions.ts) | 40 | 16 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 36 | 1 |
 | [doc.ts](../src/engine/design/doc.ts) | 33 | 34 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
@@ -85,8 +85,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
-| [matrix.ts](../src/engine/design/matrix.ts) | 17 | 2 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 17 | 5 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 18 | 5 |
+| [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
 | [idb.ts](../src/lib/idb.ts) | 17 | 118 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 
@@ -98,14 +98,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 38 | 12 |
+| `src/components/designer` | 39 | 12 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 31 | 145 |
+| `src/engine` | 31 | 146 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 88 | 89 |
+| `src/engine/design` | 89 | 90 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -114,7 +114,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 140 |
 | `src/store` | 4 | 98 |
 
-117 de 303 módulos no tienen ningún test que los importe directamente.
+118 de 305 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -132,6 +132,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
+- [MultiPathNodes.tsx](../src/components/designer/MultiPathNodes.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
 - [ShapeHandles.tsx](../src/components/designer/ShapeHandles.tsx)
 - [ShapeKnots.tsx](../src/components/designer/ShapeKnots.tsx)

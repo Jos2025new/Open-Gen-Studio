@@ -1316,7 +1316,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       />
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
-      {tool === 'move' && !editLayers && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
+      {tool === 'move' && (!editLayers || shapeEditing) && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       <SnapIndicator view={view} measures={guideLines.m} alignments={guideLines.a} />
       {rulers && (['top', 'left'] as const).map((side) => (
