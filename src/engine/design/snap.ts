@@ -43,17 +43,40 @@ export function snapTargets(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' |
   return { xs, ys };
 }
 
-/** How much to nudge the box so its nearest edge or center meets a target within `threshold`; and where. */
-export function snapBox(box: Box, targets: { xs: number[]; ys: number[] }, threshold: number): { dx: number; dy: number; gx?: number; gy?: number } {
-  const near = (own: number[], lines: number[]) => {
-    let best: { d: number; at: number } | null = null;
+/** Weight of the pointer against the snap distance: Inkscape's snapweight, 0.5 by default (snapped-point.cpp:367). */
+export const SNAP_WEIGHT = 0.5;
+
+/**
+ * Score of one candidate on one axis; the lowest score wins (snapped-point.cpp:381-386): the pointer distance and the
+ * snap distance, each normalised (the pointer by the closest candidate's distance + 1, the snap by the tolerance,
+ * capped at 50), mixed with weight w.
+ */
+export function snapScore(c: { snapDist: number; pointerDist: number }, minPointer: number, tol: number, w = SNAP_WEIGHT): number {
+  return (w * c.pointerDist) / (minPointer + 1) + ((1 - w) * c.snapDist) / Math.min(50, tol);
+}
+
+/**
+ * How much to nudge the box so one of its edges or its centre meets a target within `threshold`, and where. One
+ * winner per axis, by snapScore; `pointer` is where the pointer is (default: the box centre).
+ */
+export function snapBox(box: Box, targets: { xs: number[]; ys: number[] }, threshold: number, pointer?: { x: number; y: number }): { dx: number; dy: number; gx?: number; gy?: number } {
+  const px = pointer?.x ?? box.x + box.w / 2, py = pointer?.y ?? box.y + box.h / 2;
+  const pick = (own: number[], lines: number[], at: number) => {
+    const cands = [] as Array<{ d: number; t: number; snapDist: number; pointerDist: number }>;
     for (const o of own) for (const t of lines) {
       const d = t - o;
-      if (Math.abs(d) <= threshold && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, at: t };
+      if (Math.abs(d) <= threshold) cands.push({ d, t, snapDist: Math.abs(d), pointerDist: Math.abs(t - at) });
+    }
+    if (!cands.length) return null;
+    const minP = Math.min(...cands.map((c) => c.pointerDist));
+    let best = cands[0], bestS = snapScore(best, minP, threshold);
+    for (const c of cands.slice(1)) {
+      const sc = snapScore(c, minP, threshold);
+      if (sc < bestS || (sc === bestS && c.snapDist < best.snapDist)) { best = c; bestS = sc; }
     }
     return best;
   };
-  const x = near([box.x, box.x + box.w / 2, box.x + box.w], targets.xs);
-  const y = near([box.y, box.y + box.h / 2, box.y + box.h], targets.ys);
-  return { dx: x?.d ?? 0, dy: y?.d ?? 0, ...(x ? { gx: x.at } : {}), ...(y ? { gy: y.at } : {}) };
+  const x = pick([box.x, box.x + box.w / 2, box.x + box.w], targets.xs, px);
+  const y = pick([box.y, box.y + box.h / 2, box.y + box.h], targets.ys, py);
+  return { dx: x?.d ?? 0, dy: y?.d ?? 0, ...(x ? { gx: x.t } : {}), ...(y ? { gy: y.t } : {}) };
 }
