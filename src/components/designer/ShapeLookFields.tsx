@@ -2,6 +2,7 @@ import type { DesignDoc, ShapeSpec, VectorShape } from '../../engine/types';
 import { blurPercent, blurSigma, cornerRadii, MITER_DEFAULT, SHARP } from '../../engine/design/shapeLook';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { shapeToPath } from '../../engine/design/affine';
+import { primToPath } from '../../engine/design/primitives';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 
@@ -69,6 +70,7 @@ export function ShapeSizeFields({ sessionId, docId, layerId, shape }: { sessionI
 
 /** Inkscape's Object to Path: one undo step; the shape keeps its id, so edit mode goes on with its nodes. */
 export function convertToPath(sessionId: string, docId: string, layerId: string, shape: VectorShape): void {
+  if (shape.prim) { patchShape(sessionId, docId, layerId, shape.id, primToPath()); return; }
   const p = shapeToPath(shape);
   patchShape(sessionId, docId, layerId, shape.id, { ...p, rx: undefined, ry: undefined });
 }

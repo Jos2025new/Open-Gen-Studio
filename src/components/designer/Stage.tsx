@@ -25,6 +25,8 @@ import { setDoc, setUi, toast, useStore } from '../../store/store';
 import { rememberColor, sampleColor } from '../../engine/design/swatches';
 import { clearGuides, placeGuide, removeGuide, rulerStep, type GuideAxis } from '../../engine/design/guides';
 import { pathBox, toolPath } from '../../engine/design/shapeTools';
+import { PRIM_TOOLS, placedPath, primFromUi, primShape } from '../../engine/design/primitives';
+import { boxShape } from '../../engine/design/shapeDraw';
 import { gestureBuffers, transformLayer } from '../../engine/design/affine';
 import { rotateAbout, scaleAbout, skewAbout, type Mat } from '../../engine/design/matrix';
 import { applyGradient, paintGradient, type GradientSpec } from '../../engine/design/gradient';
@@ -78,10 +80,10 @@ function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'sc
 }
 const RULER = 18;
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
-const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
+const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
 type ShapeTool = keyof typeof SHAPE_NAMES;
 /** Drawn between two points (stroke only), not inside a box. */
-const STROKE_ONLY = (t: ShapeTool) => t === 'line' || t === 'curve' || t === 'arrow';
+const STROKE_ONLY = (t: ShapeTool) => t === 'line' || t === 'curve' || t === 'arrow' || t === 'arc';
 
 type CurveSelection = { layerId: string; strokeId: string; handles: number[] } | null;
 
@@ -575,7 +577,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.scale(view.zoom, view.zoom);
       ctx.globalAlpha = 0.85;
       const lineLike = STROKE_ONLY(preview.tool);
-      const path = preview.tool === 'polygon' || preview.tool === 'curve' || preview.tool === 'arrow'
+      const previewFit = PRIM_TOOLS.has(preview.tool) ? primShape(preview.x0, preview.y0, preview.x1, preview.y1, primFromUi(preview.tool, shapeStyle)) : null;
+      const path = previewFit ? placedPath(previewFit) : preview.tool === 'curve' || preview.tool === 'arrow'
         ? new Path2D(toolPath(preview.tool, preview.x0, preview.y0, preview.x1, preview.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: shapeStyle.strokeWidth }))
         : new Path2D();
       if (preview.tool === 'rect') { const r = cornerRadii({ ...shapeStyle, w, h }); traceRoundRect(path, { x, y, w, h }, r.rx, r.ry); }
@@ -1220,35 +1223,21 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const h = d.y1 - d.y0;
       if (Math.hypot(w, h) * view.zoom < 4) return;
       const lineLike = STROKE_ONLY(d.tool);
-      const d0 = d.tool === 'polygon' || d.tool === 'curve' || d.tool === 'arrow' ? toolPath(d.tool, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
+      const pfit = PRIM_TOOLS.has(d.tool) ? primShape(d.x0, d.y0, d.x1, d.y1, primFromUi(d.tool, shapeStyle)) : null;
+      const d0 = !pfit && (d.tool === 'curve' || d.tool === 'arrow') ? toolPath(d.tool, d.x0, d.y0, d.x1, d.y1, { sides: shapeStyle.sides ?? 5, bend: (shapeStyle.bend ?? 30) / 100, strokeWidth: Math.max(1, shapeStyle.strokeWidth) }) : null;
       const pbox = d0 ? pathBox(d0) : null;
       if (d0 && !pbox) return;
       // Stroke style of the next shape (ShapeLookFields); corners only for rectangles.
       const { join, cap, miter, dash, dashOffset, paintOrder } = shapeStyle, look = { join, cap, miter, dash, dashOffset, paintOrder };
-      const shape = pbox ? {
+      const shape = pfit || pbox ? {
         id: uid('shp'),
-        type: 'path' as const,
-        d: d0!,
-        box0: pbox,
-        ...pbox,
+        ...(pfit ?? { type: 'path' as const, d: d0!, box0: pbox!, ...pbox! }),
         fill: lineLike ? null : shapeStyle.fill,
         stroke: lineLike ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
         strokeWidth: lineLike ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
         radius: 0,
         ...look,
-      } : {
-        id: uid('shp'),
-        type: d.tool as 'rect' | 'ellipse' | 'line',
-        x: d.tool === 'line' ? d.x0 : Math.min(d.x0, d.x1),
-        y: d.tool === 'line' ? d.y0 : Math.min(d.y0, d.y1),
-        w: d.tool === 'line' ? w : Math.abs(w),
-        h: d.tool === 'line' ? h : Math.abs(h),
-        fill: d.tool === 'line' ? null : shapeStyle.fill,
-        stroke: d.tool === 'line' ? shapeStyle.stroke ?? shapeStyle.fill ?? '#ffffff' : shapeStyle.stroke,
-        strokeWidth: d.tool === 'line' ? Math.max(1, shapeStyle.strokeWidth) : shapeStyle.stroke ? shapeStyle.strokeWidth : 0,
-        radius: d.tool === 'rect' ? shapeStyle.radius : 0,
-        ...look, ...(d.tool === 'rect' ? { rx: shapeStyle.rx, ry: shapeStyle.ry } : {}),
-      };
+      } : boxShape(uid('shp'), d.tool as 'rect' | 'ellipse' | 'line', d.x0, d.y0, d.x1, d.y1, shapeStyle, look);
       const current = getDoc(sessionId, doc.id);
       if (!current) return;
       const act = activeLayer(current);

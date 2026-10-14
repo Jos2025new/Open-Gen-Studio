@@ -5,7 +5,7 @@ export const DESIGN_TOOL_KEYS: Record<string, DesignTool> = { v: 'move', h: 'han
 
 /** One name per tool; typed as a complete record, so a new tool cannot be left out (the inventory test reads it). */
 export const TOOL_NAMES: Record<DesignTool, string> = {
-  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler',
+  move: 'Edit', hand: 'Pan', select: 'Select pixels', eyedropper: 'Eyedropper', brush: 'Brush', fill: 'Fill', gradient: 'Gradient', lineart: 'Lineart', eraser: 'Eraser', rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow', text: 'Text', ruler: 'Ruler',
 };
 
 export interface ShortcutGroup {

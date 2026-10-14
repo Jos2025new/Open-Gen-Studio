@@ -310,7 +310,13 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
           {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
           <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
           <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />
-          {tool === 'polygon' && <InlineSlider label="Sides" min={3} max={12} value={shape.sides ?? 5} onChange={(v) => setUi({ shape: { ...shape, sides: v } })} />}
+          {(tool === 'polygon' || tool === 'star') && <InlineSlider label="Sides" min={3} max={tool === 'star' ? 12 : 12} value={shape.sides ?? 5} onChange={(v) => setUi({ shape: { ...shape, sides: v } })} />}
+          {tool === 'star' && <InlineSlider label="Inner" unit="%" min={10} max={100} value={Math.round((shape.primParams?.inner ?? 0.5) * 100)} onChange={(v) => setUi({ shape: { ...shape, primParams: { ...shape.primParams, inner: v / 100 } } })} />}
+          {(tool === 'polygon' || tool === 'star') && <InlineSlider label="Round" unit="%" min={0} max={100} value={Math.round((shape.primParams?.round ?? 0) * 100)} onChange={(v) => setUi({ shape: { ...shape, primParams: { ...shape.primParams, round: v / 100 } } })} />}
+          {(tool === 'sector' || tool === 'arc' || tool === 'chord') && <>
+            <InlineSlider label="From" unit="°" min={0} max={360} value={shape.primParams?.a0 ?? 0} onChange={(v) => setUi({ shape: { ...shape, primParams: { ...shape.primParams, a0: v } } })} />
+            <InlineSlider label="To" unit="°" min={0} max={360} value={shape.primParams?.a1 ?? 270} onChange={(v) => setUi({ shape: { ...shape, primParams: { ...shape.primParams, a1: v } } })} />
+          </>}
           {tool === 'curve' && <span data-tip="How far the curve bows from the straight line; negative bows to the other side"><InlineSlider label="Bend" unit="%" min={-100} max={100} value={shape.bend ?? 30} onChange={(v) => setUi({ shape: { ...shape, bend: v } })} /></span>}
           <ShapeLookFields value={shape} corners={tool === 'rect'} compact={compact} onChange={(p) => setUi({ shape: { ...shape, ...p } })} />
         </>}

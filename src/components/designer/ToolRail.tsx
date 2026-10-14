@@ -1,4 +1,4 @@
-import { DraftingCompass, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
+import { DraftingCompass, Brush, Pipette, SquareDashed, Blend, Shapes, Spline, Pentagon, Star, PieChart, MoveUpRight, Circle, Eraser, Hand, Minus, MousePointer2, PaintBucket, PenTool, Square, Type, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
@@ -37,7 +37,7 @@ export const RAIL: Array<{ family: string; items: RailItem[] }> = [
 /** Tools that share one rail button: it shows the family's icon and opens its choices. */
 const GROUPS: Array<{ id: string; icon: LucideIcon; label: string; after: DesignTool; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }> = [
   { id: 'shapes', icon: Shapes, label: 'Shapes', after: 'eyedropper', tools: [
-    { id: 'rect', icon: Square, label: 'Rectangle', key: 'R' }, { id: 'ellipse', icon: Circle, label: 'Ellipse', key: 'O' }, { id: 'polygon', icon: Pentagon, label: 'Polygon' },
+    { id: 'rect', icon: Square, label: 'Rectangle', key: 'R' }, { id: 'ellipse', icon: Circle, label: 'Ellipse', key: 'O' }, { id: 'polygon', icon: Pentagon, label: 'Polygon' }, { id: 'star', icon: Star, label: 'Star' }, { id: 'sector', icon: PieChart, label: 'Sector' }, { id: 'arc', icon: Spline, label: 'Arc' }, { id: 'chord', icon: Circle, label: 'Chord' },
   ] },
   { id: 'lines', icon: Spline, label: 'Lines', after: 'eyedropper', tools: [
     { id: 'line', icon: Minus, label: 'Straight line', key: 'L' }, { id: 'curve', icon: Spline, label: 'Curve' }, { id: 'arrow', icon: MoveUpRight, label: 'Arrow' },

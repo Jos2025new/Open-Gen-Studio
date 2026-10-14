@@ -65,7 +65,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 171 | 105 |
+| [types.ts](../src/engine/types.ts) | 174 | 106 |
 | [store.ts](../src/store/store.ts) | 106 | 94 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
@@ -94,14 +94,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 28 | 7 |
+| `src/components/designer` | 29 | 7 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 131 |
+| `src/engine` | 30 | 132 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 76 | 66 |
+| `src/engine/design` | 78 | 67 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -110,7 +110,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 138 |
 | `src/store` | 4 | 96 |
 
-109 de 280 módulos no tienen ningún test que los importe directamente.
+111 de 283 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -154,6 +154,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
 - [gradient.ts](../src/engine/design/gradient.ts)
+- [shapeDraw.ts](../src/engine/design/shapeDraw.ts)
 - [apply.ts](../src/engine/design/svgImport/apply.ts)
 - [useCursorPreview.ts](../src/engine/design/useCursorPreview.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)

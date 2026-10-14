@@ -1,3 +1,5 @@
+import type { PrimSpec } from './design/primitives';
+
 /** A vector shape. Look fields are optional: shapes saved before them keep their look (design/shapeLook.ts). */
 export interface ShapeSpec {
   type: 'rect' | 'ellipse' | 'line' | 'path';
@@ -34,4 +36,6 @@ export interface ShapeSpec {
   rot?: [number, number, number, number];
   /** Path node types as Inkscape's sodipodi:nodetypes (c cusp, s smooth, z symmetric; design/pathNodes.ts). */
   nodeTypes?: string;
+  /** Parametric primitive (design/primitives.ts): its parameters; `d` is rebuilt from them. Absent = plain path. */
+  prim?: PrimSpec;
 }
