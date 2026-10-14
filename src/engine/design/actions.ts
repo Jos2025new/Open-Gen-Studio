@@ -17,7 +17,7 @@ import { drawDoc, exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
-import { pinPaintMode } from './paintMode';
+import { paintModeOf, pinPaintMode } from './paintMode';
 import { awaitFrame } from '../../lib/trace';
 
 export { fxSummary } from '../fx/commands';
@@ -329,14 +329,20 @@ export function undoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const prev = undo(doc);
-  if (prev) (setDoc(sessionId, docId, () => prev), prunePicks(prev), pruneNodePick(doc, prev));
+  if (prev) {
+    const restored = { ...prev, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };
+    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored));
+  }
 }
 
 export function redoDoc(sessionId: string, docId: string): void {
   const doc = getDoc(sessionId, docId);
   if (!doc) return;
   const next = redo(doc);
-  if (next) (setDoc(sessionId, docId, () => next), prunePicks(next), pruneNodePick(doc, next));
+  if (next) {
+    const restored = { ...next, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };
+    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored));
+  }
 }
 
 /** Geometry-only undo keeps node identity; topology changes clear indices that may name a different node. */

@@ -43,8 +43,10 @@ export default [
       ['src/components/designer/StagePaintCommit.ts', 'if (gesture.direct) {'],
       ['src/components/designer/PaintModeToggle.tsx', 'export function PaintModeToggle'],
       ['src/components/designer/ToolSettings.tsx', '<EditModeToggle objects={strokeObjectsAvailable(doc)} />'],
+      ['src/engine/design/actions.ts', 'const restored = { ...prev, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };'],
+      ['src/engine/design/actions.ts', 'const restored = { ...next, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };'],
     ],
-    tests: ['tests/paint-mode.test.ts'],
+    tests: ['tests/paint-mode.test.ts', 'tests/paint-mode-history.test.ts'],
   },
   {
     id: 'drawing-choice',

@@ -46,3 +46,4 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 
 - Resuelve el «límite conocido» de la enmienda anterior. `pinPaintMode` (`paintMode.ts`) guarda en `paintMode` el modo deducido la primera vez que el documento se crea, se importa (SVG), se añade a una sesión, se selecciona o se modifica (`setDoc` lo fija antes de aplicar el cambio). Campo existente, sin migración: un documento antiguo sin campo se deduce como antes y se guarda en ese momento.
 - Después solo lo cambia el interruptor Dibujo/Diseño (y la acción «Paint in Design» del aviso). Pintar el primer píxel o añadir una forma ya no lo cambia. Tests: `tests/paint-mode-pin.test.ts`.
+- Undo y redo conservan el modo actual aunque el snapshot proceda de un documento antiguo sin `paintMode` o tenga un valor anterior. Así, el historial de contenido no deshace una elección del interruptor, que no forma parte del historial. Tests: `tests/paint-mode-history.test.ts`.
