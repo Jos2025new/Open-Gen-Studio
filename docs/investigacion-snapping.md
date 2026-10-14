@@ -1,6 +1,6 @@
 # Investigación: ajuste (snapping) de Inkscape frente a OGS
 
-Investigación de fuente del 2026-10-14, con comparación de implementación actualizada el 2026-10-14 sobre HEAD `7565c47`. La fuente Inkscape se leyó en modo solo lectura; no se ejecutó Inkscape. La verificación OGS está documentada aparte en `render-estado.md`. Fuente: clon `--depth 1` de `gitlab.com/inkscape/inkscape` en el scratchpad, commit **244d48fb2001** (rama master en la fecha del clon). Las rutas son relativas a `src/`. Licencia: Inkscape es GPL; aquí solo se describen principios y fórmulas, sin copiar código.
+Investigación de fuente del 2026-10-14, con comparación actualizada sobre `task/render-bench` (base de snapping `7cf09f1`; estado final `3945823`). La fuente Inkscape se leyó en modo solo lectura; no se ejecutó Inkscape. La verificación OGS está documentada aparte en `render-estado.md`. Fuente: clon `--depth 1` de `gitlab.com/inkscape/inkscape` en el scratchpad, commit **244d48fb2001** (rama master en la fecha del clon). Las rutas son relativas a `src/`. Licencia: Inkscape es GPL; aquí solo se describen principios y fórmulas, sin copiar código.
 
 ## Resumen: por qué el de Inkscape es suave
 
@@ -74,3 +74,5 @@ Código de OGS: `src/engine/design/snap.ts`, `snapSession.ts`, `snapNodes.ts`; i
 - `tests/path-node-snap.test.ts`: interacción montada, snap tras el retardo y un solo paso de undo/redo.
 - `tests-e2e/snapping.spec.ts`: los dos casos antes marcados `fixme` están activos. La ejecución focalizada del archivo en sandbox pasa 6/6; no demuestra la causa de los fallos históricos.
 - No se ejecutó Inkscape ni se midió rendimiento con documentos grandes. Los valores de Inkscape se leen de las fuentes citadas, no de mediciones de runtime.
+
+La regresión de cableado del gesto de nodos falla al retirar temporalmente la integración con el arrastre y pasa al restaurarla; esto verifica el camino montado, no un E2E de navegador. El cierre por commit, los objetivos que siguen sin implementar y el resultado completo de `npm test` están en el [registro del lote](history/026-2026-10-W42.md#cierre-del-lote-de-snapping).
