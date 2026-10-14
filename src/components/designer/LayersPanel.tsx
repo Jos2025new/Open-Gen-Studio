@@ -99,7 +99,8 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const split = useRef<{ y: number; h: number } | null>(null);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
   // Properties, active-tool settings, and the layer list are separate panel destinations.
-  const [tab, setTab] = usePref<'layers' | 'props' | 'tool'>('ogs:layers-tab', 'props');
+  const [savedTab, setTab] = usePref<string>('ogs:layers-tab', 'props');
+  const tab = savedTab === 'layers' || savedTab === 'props' || savedTab === 'tool' ? savedTab : 'tool';
   const [alignPrefs, setAlignPrefs] = useState<{ relativeTo: RelativeTo | null; alignAsGroup: boolean }>({ relativeTo: null, alignAsGroup: false });
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const collapsedRef = useRef(collapsed);
