@@ -82,25 +82,30 @@ Según el informe de cierre de `ab01a02`: `npx tsc --noEmit` sin errores; `npm r
 - El guardado ensambla el lienzo a tamaño de página (mismo PNG); la carga lo recorta; los trazos en vivo y la composición usan la caja. Una capa vacía guarda un lienzo de 1 × 1 (`createCanvas` no admite 0 × 0).
 - Prueba: `tests/raster-surface.test.ts` (crecimiento, capa vacía, guardar y cargar, trazo pequeño en 2048² por debajo del 5 %).
 
-## Cuatro ideas de Designer (sK1, 2026-10-13, en código y tests)
+## Designer: estado al cierre de la tanda (2026-10-13)
 
-Origen: [investigacion-sk1.md](investigacion-sk1.md). Commits en `task/render-bench`: primitivas paramétricas (`f0a41f7`), puntas de flecha y Scale stroke (`31b0c11`), iconos de tipos de nodo (`8b0e623`) y degradados editables (commit de esta nota). Sin navegador: el sandbox es del usuario; la prueba visual queda para él.
+Historial completo en [026](history/026-2026-10-W42.md). Estado: **hecho, bajo supervisión** — verificado por el usuario el 2026-10-13 en la app; pendiente de uso prolongado.
 
-| Idea | Estado | Pendiente |
+| Función | Commits | Estado |
 | --- | --- | --- |
-| Primitivas paramétricas | Hecho, con tiradores en lienzo (segunda pasada) | Prueba visual en el sandbox del usuario |
-| Puntas de flecha y Scale stroke | Hecho (tests de dirección, SVG y escala); canvas sin prueba automática | Importar `marker` como editable (hoy se rasteriza) |
-| Tipos de nodo | Ya existían con tests; añadidos iconos | Ninguno |
-| Degradados lineales y radiales | Relleno y trazo editables, tiradores en lienzo, export, import e ida y vuelta (tests) | Prueba visual en el sandbox del usuario |
+| Primitivas paramétricas (polígono, estrella, sector, arco, cuerda) y sus tiradores | `f0a41f7`, `1aa514e` | Hecho, bajo supervisión |
+| Puntas de flecha y «Scale stroke» | `31b0c11` | Hecho, bajo supervisión |
+| Tipos de nodo (esquina, suave, simétrico) con iconos | `8b0e623`, `d318e0b` | Hecho, bajo supervisión |
+| Degradados lineales y radiales editables (relleno y trazo), con tiradores | `bd63d8f`, `1aa514e`, `929bf4d` | Hecho, bajo supervisión |
+| Barra de forma: «Fill» y «Stroke» como muestras con popover; «Shape» | `ec02c99` | Hecho, bajo supervisión |
+| Edición de nodos completa: dos tiradores, suavizado, arrastre de segmento, doble clic | `d318e0b`, `e5b7bc8`, `08f33e8`, `478a0c4` | Hecho, bajo supervisión |
+| Refactor de Stage (sprites a `stageSprites.ts`) | `db4f2cc` | Hecho |
 
-Límite del Stage: `Stage.tsx` ya superaba 30 KB y no puede crecer; la lógica nueva va a `primitives.ts`, `shapeDraw.ts` y `gradientPaint.ts`.
+Causa de que los nodos no se pudieran agarrar: `designer-connected.css:257` pone `pointer-events: none` en `.stroke-ruler`; la banda de segmento lo heredaba. Lección: los tests de geometría no prueban la interfaz; cada gesto necesita un e2e (`tests-e2e/path-nodes-ux.spec.ts`).
 
-## Segunda pasada: tiradores y degradado del trazo (2026-10-13)
+## Lo que sigue abierto (para la próxima sesión)
 
-- Tiradores de primitivas en `ShapeHandles.tsx` (lógica pura en `primKnots.ts`). La caja del círculo unitario es fija (`UNIT_BOX`), así que un cambio de ángulo o de radio no vuelve a ajustar la caja.
-- Tiradores de degradado en el mismo componente, montados desde Stage con una línea; el trazo tiene el selector Solid / Linear / Radial.
-- Stage.tsx: dibujo de sprites movido a `stageSprites.ts` (commit aparte, sin cambio de comportamiento) para que quepa lo nuevo.
-- Sin navegador: la prueba visual de los tiradores queda para el sandbox del usuario.
-
-
-- Barra de forma (tercera pasada): «Fill» y «Stroke» como muestras con popover (ShapePaint.tsx), «Shape» para primitivas; el texto de los botones es de una línea. Sin navegador: la comprobación a 1280 px queda para el usuario.
+- El e2e `shape-knots` falla desde antes: los documentos nuevos nacen sin capa («Add a layer, draw a shape…»), así que el dibujo no crea formas. Investigar si es regresión.
+- Shift+A (nodo automático): no existe en el modelo.
+- Paradas intermedias de los degradados: se conservan al importar, pero la barra solo edita la primera y la última.
+- Tiradores de degradado en la herramienta de degradado (hoy solo en Edit).
+- «Lo menos usado» de la barra al menú «Settings…» (regla 3 del coordinador): no hecho.
+- Las flechas se rasterizan al reimportar un SVG: el importador no las lee todavía.
+- Booleanas con Clipper2 o paper.js: no empezadas.
+- Ajuste a rejilla, guías y objetos: parcial (sK1 solo como idea).
+- Pendientes de antes: paridad en navegador (entregas 2 y 4), PNG en worker (desactivado), A/B final (entrega 6), ADR 0015 en memoria, máscaras de un canal, y el SVG con un archivo real de Inkscape.
