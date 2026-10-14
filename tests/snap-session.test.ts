@@ -45,3 +45,15 @@ describe('snap session: candidates once, by band, on screen, capped', () => {
     expect(SNAP_SPEED).toBeGreaterThan(0);
   });
 });
+
+describe('snap session: equal spacing with measures', () => {
+  it('a box dragged between two boxes gets equal gaps and the measures to draw', () => {
+    // Neighbours 0–10 and 60–70: the middle of the 50 px gap for a 10 px box is x = 30; no edge of either is in reach.
+    const s = new SnapSession(doc([layerAt('a', 0, 400, 10, 10), layerAt('b', 60, 400, 10, 10)]), 'mover', opts, 1, view);
+    const box = { x: 27, y: 400, w: 10, h: 10 };
+    s.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 0);
+    const r = s.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 1000);
+    expect(27 + r.dx).toBeCloseTo(30, 9);
+    expect(r.measures?.length).toBe(2);
+  });
+});

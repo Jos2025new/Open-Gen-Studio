@@ -90,3 +90,43 @@ export function snapBox(box: Box, targets: { xs: number[]; ys: number[] }, thres
   const y = pick([box.y, box.y + box.h / 2, box.y + box.h], targets.ys, py);
   return { dx: x?.d ?? 0, dy: y?.d ?? 0, ...(x ? { gx: x.t } : {}), ...(y ? { gy: y.t } : {}) };
 }
+
+/** A measured gap to show: from one point to another, with its length (document units). */
+export interface Measure { a: [number, number]; b: [number, number]; label: number }
+
+/**
+ * Equal spacing along one axis (distribution-snapper.cpp): the box moves so that its gap to a neighbour equals the gap
+ * between two other boxes, either between them (the box in the middle) or beyond them (the same gap again). Only boxes
+ * in the box's band count (they overlap it across the axis); the nearest twelve are tried. Null if nothing is within tol.
+ */
+export function equalSpacing(box: Box, others: Box[], tol: number, axis: 'x' | 'y'): { d: number; measures: Measure[] } | null {
+  const span = (b: Box): [number, number] => (axis === 'x' ? [b.x, b.x + b.w] : [b.y, b.y + b.h]);
+  const cross = (b: Box): [number, number] => (axis === 'x' ? [b.y, b.y + b.h] : [b.x, b.x + b.w]);
+  const [m0, m1] = span(box), mw = m1 - m0, [cLo, cHi] = cross(box);
+  const band = others.filter((o) => { const [lo, hi] = cross(o); return hi >= cLo && lo <= cHi; });
+  const near = band.sort((p, q) => Math.abs(span(p)[0] - m0) - Math.abs(span(q)[0] - m0)).slice(0, 12);
+  let best: { d: number; a: Box; b: Box } | null = null;
+  const consider = (d: number, a: Box, b: Box) => { if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, a, b }; };
+  for (const A of near) for (const B of near) {
+    const [a0, a1] = span(A), [b0, b1] = span(B);
+    if (a1 > b0) continue; // A must lie before B
+    const g = b0 - a1;
+    if (g <= 0) continue;
+    if (g > mw) consider((a1 + (g - mw) / 2) - m0, A, B); // between A and B
+    consider((b1 + g) - m0, A, B);                         // beyond B, same gap
+    consider((a0 - g - mw) - m0, A, B);                    // before A, same gap
+  }
+  if (!best) return null;
+  const { d, a, b } = best as { d: number; a: Box; b: Box };
+  const moved = axis === 'x' ? { ...box, x: box.x + d } : { ...box, y: box.y + d };
+  // The three boxes in order along the axis: the gaps between consecutive ones are the measures to show.
+  const across = (cLo + cHi) / 2;
+  const at = (v: number): [number, number] => (axis === 'x' ? [v, across] : [across, v]);
+  const trio = [a, moved, b].sort((p, q) => span(p)[0] - span(q)[0]);
+  const measures: Measure[] = [];
+  for (let i = 0; i + 1 < trio.length; i++) {
+    const gap = span(trio[i + 1])[0] - span(trio[i])[1];
+    if (gap > 1e-9) measures.push({ a: at(span(trio[i])[1]), b: at(span(trio[i + 1])[0]), label: gap });
+  }
+  return { d, measures };
+}

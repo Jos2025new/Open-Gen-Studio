@@ -9,6 +9,8 @@ import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPrev
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_DEFAULT, SNAP_PX } from '../../engine/design/snap';
 import { SnapSession, snapSessionFor, visibleDocRect } from '../../engine/design/snapSession';
+import type { Measure } from '../../engine/design/snap';
+import { SnapIndicator } from './SnapIndicator';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
@@ -152,8 +154,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
 
   // Snap guides while moving (screen overlay only).
-  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number }>({});
-  const showGuides = (g: { x?: number; y?: number }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y ? cur : g));
+  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number; m?: Measure[] }>({});
+  const showGuides = (g: { x?: number; y?: number; m?: Measure[] }) => setGuideLines((cur) => (cur.x === g.x && cur.y === g.y && !g.m ? cur : g));
   const [editingText, setEditingText] = useState<string | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
@@ -978,7 +980,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
         const s = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => l.id !== d.layerId) }, d.layerId, snap, view.zoom, visibleDocRect(view, size))).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
-        showGuides({ x: s.gx, y: s.gy });
+        showGuides({ x: s.gx, y: s.gy, m: s.measures });
       }
       rasterMoveAt.current = { d, x: ox, y: oy };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
@@ -994,7 +996,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const s = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap, view.zoom, visibleDocRect(view, size))).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         dx += s.dx;
         dy += s.dy;
-        showGuides({ x: s.gx, y: s.gy });
+        showGuides({ x: s.gx, y: s.gy, m: s.measures });
       } else showGuides({});
       startDragPreview(doc);
       const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
@@ -1280,6 +1282,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {tool === 'move' && !editLayers && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
       {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
+      <SnapIndicator view={view} measures={guideLines.m} />
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {

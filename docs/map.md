@@ -96,14 +96,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 32 | 9 |
+| `src/components/designer` | 33 | 10 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 31 | 141 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 85 | 79 |
+| `src/engine/design` | 85 | 80 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -112,7 +112,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 139 |
 | `src/store` | 4 | 97 |
 
-113 de 294 módulos no tienen ningún test que los importe directamente.
+113 de 295 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

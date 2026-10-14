@@ -1,5 +1,5 @@
 import type { DesignDoc, Layer } from '../types';
-import { snapBox, snapNow, snapTolerance, type SnapOptions } from './snap';
+import { equalSpacing, snapBox, snapNow, snapTolerance, type Measure, type SnapOptions } from './snap';
 import { layerBox } from './render';
 
 /*
@@ -12,13 +12,14 @@ import { layerBox } from './render';
 export const MAX_LINES = 200;
 type Line = { v: number; lo: number; hi: number };
 type Box = { x: number; y: number; w: number; h: number };
-export interface SessionStep { dx: number; dy: number; gx?: number; gy?: number }
+export interface SessionStep { dx: number; dy: number; gx?: number; gy?: number; measures?: Measure[] }
 
 export class SnapSession {
   private xs: Line[] = [];
   private ys: Line[] = [];
   private last: { x: number; y: number; t: number } | null = null;
   private lastMove = 0;
+  private boxes: Box[] = [];
 
   constructor(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, opts: SnapOptions, private zoom: number, view: { x0: number; y0: number; x1: number; y1: number }) {
     const always = { lo: -Infinity, hi: Infinity };
@@ -43,6 +44,7 @@ export class SnapSession {
       seen.sort((a, c) => a.d - c.d);
       for (const { b } of seen) {
         if (this.xs.length + this.ys.length + 6 > 2 * MAX_LINES) break; // a layer adds six lines
+        this.boxes.push(b);
         for (const v of [b.x, b.x + b.w / 2, b.x + b.w]) this.xs.push({ v, lo: b.y, hi: b.y + b.h });
         for (const v of [b.y, b.y + b.h / 2, b.y + b.h]) this.ys.push({ v, lo: b.x, hi: b.x + b.w });
       }
@@ -69,7 +71,20 @@ export class SnapSession {
     if (!snapNow(speed, t - this.lastMove)) return { dx: 0, dy: 0 };
     const inBand = (lines: Line[], lo: number, hi: number) => lines.filter((l) => l.hi >= lo && l.lo <= hi).map((l) => l.v);
     const xs = inBand(this.xs, box.y, box.y + box.h), ys = inBand(this.ys, box.x, box.x + box.w);
-    return snapBox(box, { xs, ys }, snapTolerance(this.zoom), p);
+    const tol = snapTolerance(this.zoom);
+    const r: SessionStep = snapBox(box, { xs, ys }, tol, p);
+    // Equal spacing applies on an axis where no line snapped the box (a line snap keeps its edge on the line).
+    const measures: Measure[] = [];
+    for (const axis of ['x', 'y'] as const) {
+      const cur = axis === 'x' ? r.dx : r.dy;
+      const sp = cur === 0 ? equalSpacing(box, this.boxes, tol, axis) : null;
+      if (sp) {
+        if (axis === 'x') r.dx = sp.d; else r.dy = sp.d;
+        measures.push(...sp.measures);
+      }
+    }
+    if (measures.length) r.measures = measures;
+    return r;
   }
 }
 
