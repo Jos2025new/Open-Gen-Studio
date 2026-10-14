@@ -60,6 +60,7 @@
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
 - [Investigación: cómo resuelve memoria y rendimiento PhotoCraft (Rust+wasm) y qué aplicar en OGS](investigacion-photocraft.md) (2026-10-13), solo lectura del código.
 - [Investigación: memoria del Designer con 4 GB y 2 GB](investigacion-memoria.md) (2026-10-13), solo lectura: cifras por proyecto, verificación de fuentes, técnicas RAM/DISCO y cálculo por etapas.
+- [Investigación: Patchy frente a OGS en render, memoria y persistencia](investigacion-patchy.md) (2026-10-13), solo lectura: comparación por tema, adopción y cinco ideas priorizadas.
 - [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final; aplazada por decisión del usuario](decision-motor.md) (2026-10-12).
 - [Banco de fluidez: instrucciones al agente de pruebas](fluidez-pruebas.md): producción aislada, casos habitual/exigente y límites de las medidas.
 - [Regiones retenidas del Designer](render-regions.md): dirty raster, cajas totales, FX y evidencia de paridad.
