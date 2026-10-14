@@ -60,3 +60,13 @@ export function defaultGradient(kind: 'linear' | 'radial', box: { x: number; y: 
     ? { kind, x1: cx, y1: cy, x2: cx + box.w / 2, y2: cy, stops }
     : { kind, x1: box.x, y1: cy, x2: box.x + box.w, y2: cy, stops };
 }
+
+/** The handles of a gradient in page coordinates: start and end (linear), or centre and radius point (radial). */
+export function gradientKnots(g: GradientPaint): Array<{ k: 'p1' | 'p2'; p: [number, number] }> {
+  return [{ k: 'p1', p: [g.x1, g.y1] }, { k: 'p2', p: [g.x2, g.y2] }];
+}
+
+/** The gradient with one handle moved to page point `p`; the other stays. */
+export function moveGradientKnot(g: GradientPaint, k: 'p1' | 'p2', p: [number, number]): GradientPaint {
+  return k === 'p1' ? { ...g, x1: p[0], y1: p[1] } : { ...g, x2: p[0], y2: p[1] };
+}

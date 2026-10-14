@@ -15,6 +15,7 @@ import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
 import { checkerTile, drawArrowHandle } from './stageSprites';
+import { GradientKnots } from './ShapeHandles';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
 import { TextEditor } from './TextEditor';
 import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface} from '../../engine/design/raster';
@@ -1278,6 +1279,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       <BrushCursor point={cursor.point} view={view} indicator={cursor.indicator} />
       <StrokeRulerOverlay view={view} docId={doc.id} tool={tool} />
       {tool === 'move' && !editLayers && <ShapeKnots view={view} sessionId={sessionId} doc={doc} />}
+      {tool === 'move' && !editLayers && <GradientKnots view={view} sessionId={sessionId} doc={doc} />}
       {rulers && (['top', 'left'] as const).map((side) => (
         <Ruler key={side} side={side} view={view} size={size} guides={doc.guides}
           onPointerDown={(e) => {

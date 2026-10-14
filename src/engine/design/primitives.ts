@@ -131,21 +131,20 @@ export function drawnBox(d: string): { x: number; y: number; w: number; h: numbe
   return { x: minX, y: minY, w: Math.max(1e-6, maxX - minX), h: Math.max(1e-6, maxY - minY) };
 }
 
+/** The unit frame's box: the circle of radius 1 always fills [-1,1], so an angle or a radius change never refits the box. */
+export const UNIT_BOX = { x: -1, y: -1, w: 2, h: 2 };
+
 /** A primitive fitted in the box x0,y0 → x1,y1 (drag corners in any order): the shape fields for it. */
 export function primShape(x0: number, y0: number, x1: number, y1: number, prim: PrimSpec): Pick<ShapeSpec, 'type' | 'd' | 'box0' | 'x' | 'y' | 'w' | 'h' | 'prim'> {
-  const d = primPath(prim);
-  const box0 = drawnBox(d) ?? { x: -1, y: -1, w: 2, h: 2 };
   const x = Math.min(x0, x1), y = Math.min(y0, y1);
-  return { type: 'path', d, box0, x, y, w: Math.abs(x1 - x0), h: Math.abs(y1 - y0), prim: normalizePrim(prim) };
+  return { type: 'path', d: primPath(prim), box0: UNIT_BOX, x, y, w: Math.abs(x1 - x0), h: Math.abs(y1 - y0), prim: normalizePrim(prim) };
 }
 
 /** New parameters for a shape with `prim`: the path is rebuilt in its unit frame and keeps the placed box. */
 export function withPrim(s: ShapeSpec, change: Partial<PrimSpec>): Partial<ShapeSpec> | null {
   if (!s.prim) return null;
   const prim = normalizePrim({ ...s.prim, ...change });
-  const d = primPath(prim);
-  const box0 = drawnBox(d);
-  return box0 ? { prim, d, box0 } : null;
+  return { prim, d: primPath(prim), box0: UNIT_BOX };
 }
 
 /** «Convert to path»: the same outline as plain path data; parameters are gone. */

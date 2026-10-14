@@ -8,6 +8,7 @@ import { PathNodes } from './PathNodes';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape, usePickedShape } from './ShapeLookFields';
+import { PrimKnots } from './ShapeHandles';
 
 /*
  * Shape edit mode (docs/plan-edicion-formas.md): after a double-click or «Edit shape», the edited shape shows its own
@@ -33,7 +34,8 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
     return () => window.removeEventListener('keydown', key);
   }, [editing, doc.id, picked?.shape.type]);
   if (!picked || !editing) return null;
-  // A path edits its nodes (Inkscape's Node tool); rectangles and ellipses their own knots.
+  // A primitive edits by its parameters (ShapeHandles.tsx); a path edits its nodes (Inkscape's Node tool); rectangles and ellipses their own knots.
+  if (picked.shape.prim) return <PrimKnots view={view} sessionId={sessionId} docId={doc.id} layerId={picked.layerId} shape={picked.shape} />;
   if (picked.shape.type === 'path') return <PathNodes view={view} sessionId={sessionId} docId={doc.id} layerId={picked.layerId} shape={picked.shape} />;
   const s = picked.shape, rect = s.type === 'rect';
   const scr = (p: [number, number]) => documentToScreen({ x: p[0], y: p[1] }, view, { left: 0, top: 0 });
