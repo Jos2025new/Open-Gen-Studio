@@ -123,9 +123,9 @@ const priceCacheKey = (id: string) => `or:price:v2:${id}`;
 
 /**
  * Image price from the model's endpoints. Only a valid answer is cached (v2 key: v1 entries saved failures as
- * «token-billed» for 24 h); a failed request returns the note without caching it, so the next load asks again.
+ * «token-billed» for 24 h). A failed request returns undefined and is not cached, so the next load asks again.
  */
-async function imagePrice(id: string): Promise<PriceRule> {
+export async function imagePrice(id: string): Promise<PriceRule | undefined> {
   const cacheKey = priceCacheKey(id);
   const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
   if (cached) return cached;
@@ -133,9 +133,9 @@ async function imagePrice(id: string): Promise<PriceRule> {
   try {
     res = await requestJson(`${BASE}/images/models/${id}/endpoints`);
   } catch {
-    return { skus: [], note: TOKEN_NOTE };
+    return undefined;
   }
-  if (!Array.isArray(res?.endpoints)) return { skus: [], note: TOKEN_NOTE };
+  if (!Array.isArray(res?.endpoints)) return undefined;
   // Every provider endpoint is read: they may bill differently, and the cheapest one is the only figure safe to show as a floor.
   const pricing = res.endpoints.flatMap((e) => e.pricing ?? []);
   const outputs = new Map<string, PriceSku>();
@@ -242,7 +242,7 @@ export const openrouter: ProviderAdapter = {
               ? { key: 'input_references', max: refs.max ?? 1, min: refs.min ?? 0, multiple: true, format: 'content-part' }
               : undefined,
         },
-        price: await imagePrice(model.id),
+        price: (await imagePrice(model.id)) ?? { skus: [], note: TOKEN_NOTE },
         source: 'catalog',
       };
       return schema;
