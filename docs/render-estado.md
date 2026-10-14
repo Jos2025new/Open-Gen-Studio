@@ -121,3 +121,7 @@ Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con 
 - **Paridad de canvas y PNG** en el navegador (no probada).
 - **Convert to path y flechas** en el lineart (no aplican en este código).
 
+## Investigación: ajuste (snapping) (2026-10-14)
+
+Solo lectura: [investigacion-snapping.md](investigacion-snapping.md). Inkscape usa una puntuación conjunta por candidato, tolerancia en píxeles de pantalla, retardo por velocidad y espaciado igual con indicador. OGS ajusta por eje al más cercano, con 8 px y en cada movimiento. Plan en seis pasos, empezando por 10 px y la puntuación conjunta; el modo Dibujo apagado y el Diseño encendido van en el último paso. Sin cambios de código hasta la aprobación del usuario.
+
