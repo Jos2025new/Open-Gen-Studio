@@ -1,7 +1,7 @@
 import { ShapeLookFields } from './ShapeLookFields';
 import { record } from '../../engine/design/history';
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, ArrowUpFromLine, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterVertical, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
@@ -22,6 +22,7 @@ import { PaintModeToggle } from './PaintModeToggle';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { RulerSettings } from './StrokeRulerOverlay';
 import { SnapControl } from './SnapControl';
+import { AlignPopover } from './AlignPopover';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -33,20 +34,6 @@ export function ContextField({ label, hint, children }: { label: ReactNode; hint
   </>;
 }
 
-const ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVertical }> = [
-  { id: 'left', label: 'Align left', icon: AlignStartVertical },
-  { id: 'center', label: 'Center horizontally', icon: AlignCenterVertical },
-  { id: 'right', label: 'Align right', icon: AlignEndVertical },
-  { id: 'top', label: 'Align top', icon: AlignStartHorizontal },
-  { id: 'middle', label: 'Center vertically', icon: AlignCenterHorizontal },
-  { id: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal },
-];
-const ANCHOR_ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVertical }> = [
-  { id: 'left-to-right', label: 'Align left edge to anchor’s right edge', icon: ArrowRightFromLine },
-  { id: 'right-to-left', label: 'Align right edge to anchor’s left edge', icon: ArrowLeftFromLine },
-  { id: 'top-to-bottom', label: 'Align top edge to anchor’s bottom edge', icon: ArrowDownFromLine },
-  { id: 'bottom-to-top', label: 'Align bottom edge to anchor’s top edge', icon: ArrowUpFromLine },
-];
 // Icons by their drawing, not by lucide's old alias names: in this lucide version "FlipHorizontal2" is the triangles
 // split by a horizontal line (a top↔bottom mirror), so the names alone pointed at the wrong icon.
 const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof TrianglesCenterlineDashedVertical }> = [
@@ -57,14 +44,6 @@ const TURN_ITEMS: Array<{ id: Turn; label: string; icon: typeof TrianglesCenterl
   { id: 'rotate-180', label: 'Rotate 180°', icon: RefreshCw },
 ];
 
-const RELATIVE: Array<{ value: RelativeTo; label: string }> = [
-  { value: 'page', label: 'Page' },
-  { value: 'selection', label: 'Selection' },
-  { value: 'first', label: 'First selected' },
-  { value: 'last', label: 'Last selected' },
-  { value: 'biggest', label: 'Biggest' },
-  { value: 'smallest', label: 'Smallest' },
-];
 
 /** Edit tool snapping: on/off and what it sticks to (Alt while dragging moves freely). */
 /** Edit acts on the objects inside a layer (default) or on whole layers. Also in the layer's Properties. */
@@ -145,28 +124,12 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   return <>
     {!turnOnly && <>
     <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Align'} aria-label="Align"><AlignCenterVertical size={14} /><ChevronDown size={12} /></button>
-    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
-      <div className="menu">
-        <div className="menu-target">{target}</div>
-        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} disabled={Boolean(alignReason)} tip={alignReason} onClick={() => doAlign(a.id)} />)}
-        <div className="menu-sep-label">Align to anchor edge</div>
-        {ANCHOR_ALIGN_ITEMS.map((a) => {
-          const reason = alignReason ?? (anchorEdgeNeedsPair ? 'Choose an anchor from at least two selected objects or layers.' : undefined);
-          return <MenuItem key={a.id} icon={a.icon} label={a.label} disabled={Boolean(reason)} tip={reason} onClick={() => doAlign(a.id)} />;
-        })}
-        <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" disabled={count < 3} onClick={() => doDistribute('h')} />
-        <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" disabled={count < 3} onClick={() => doDistribute('v')} />
-        {!onObjects && !many && one?.type === 'raster' ? <>
-          <div className="menu-sep-label">Size</div>
-          <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
-          <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
-        </> : null}
-        <label className="menu-field align-group-option" data-tip={groupReason ?? 'Move all selected objects together, keeping their spacing. When an object is the reference, it stays fixed.'}>
-          <input type="checkbox" aria-label="Move or align selection as group" checked={alignAsGroup} disabled={count < 2 || (relativeTo === 'selection' && !alignAsGroup)} onChange={(e) => setAlignAsGroup(e.target.checked)} />
-          <span>Move selection as group</span>
-        </label>
-        <label className="menu-field align-reference"><span>Relative to</span><select aria-label="Relative to" value={relativeTo} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
-      </div>
+    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={274} label="Align">
+      <AlignPopover target={target} count={count} relativeTo={relativeTo} setRelativeTo={(value) => setRel(value)} alignAsGroup={alignAsGroup}
+        setAlignAsGroup={setAlignAsGroup} groupReason={groupReason} alignReason={alignReason} anchorEdgeNeedsPair={anchorEdgeNeedsPair}
+        onAlign={doAlign} onDistribute={doDistribute}
+        onFit={!onObjects && !many && one?.type === 'raster' ? () => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); } : undefined}
+        onFill={!onObjects && !many && one?.type === 'raster' ? () => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); } : undefined} />
     </Popover>
     </>}
     {!alignOnly && <>

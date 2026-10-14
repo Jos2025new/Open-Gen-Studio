@@ -1,6 +1,6 @@
 export default [{
   id: 'designer-selection',
-  what: 'Autoselect suma capas; Align mueve objetos y grupos.',
+  what: 'Autoselect suma capas; Align agrupa.',
   sides: [
     ['src/engine/design/marquee.ts', 'export function marqueeIds'],
     ['src/engine/design/objectSelection.ts', 'export function pickObject'],
@@ -18,8 +18,9 @@ export default [{
     ['src/styles/designer-connected.css', '.context-strip .rounding-selection'],
     ['src/engine/design/transform.ts', 'export function alignDeltas'],
     ['src/engine/design/objectOps.ts', 'export function alignObjectDeltas'],
-    ['src/components/designer/ToolSettings.tsx', 'const ANCHOR_ALIGN_ITEMS'],
-    ['src/styles/designer.css', '.align-group-option'],
+    ['src/components/designer/ToolSettings.tsx', 'export function EditOps'],
+    ['src/components/designer/AlignPopover.tsx', 'export function AlignPopover'],
+    ['src/styles/designer.css', '.align-popover'],
   ],
   tests: ['tests/marquee.test.ts', 'tests/layer-transform.test.ts', 'tests/object-ops.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
 }];
