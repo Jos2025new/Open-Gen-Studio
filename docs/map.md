@@ -67,13 +67,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 176 | 108 |
-| [store.ts](../src/store/store.ts) | 106 | 94 |
+| [types.ts](../src/engine/types.ts) | 177 | 109 |
+| [store.ts](../src/store/store.ts) | 106 | 95 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
-| [actions.ts](../src/engine/design/actions.ts) | 35 | 15 |
+| [actions.ts](../src/engine/design/actions.ts) | 36 | 16 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 34 | 1 |
-| [doc.ts](../src/engine/design/doc.ts) | 33 | 26 |
+| [doc.ts](../src/engine/design/doc.ts) | 33 | 27 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
@@ -83,7 +83,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 21 | 6 |
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 17 | 6 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 116 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 117 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 16 | 2 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 3 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
@@ -96,23 +96,23 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 31 | 7 |
+| `src/components/designer` | 32 | 7 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 30 | 134 |
+| `src/engine` | 30 | 136 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 81 | 69 |
+| `src/engine/design` | 82 | 71 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 138 |
-| `src/store` | 4 | 96 |
+| `src/lib` | 24 | 139 |
+| `src/store` | 4 | 97 |
 
-113 de 288 módulos no tienen ningún test que los importe directamente.
+114 de 290 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -131,6 +131,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
+- [ShapeHandles.tsx](../src/components/designer/ShapeHandles.tsx)
 - [ShapeKnots.tsx](../src/components/designer/ShapeKnots.tsx)
 - [Stage.tsx](../src/components/designer/Stage.tsx)
 - [TextEditor.tsx](../src/components/designer/TextEditor.tsx)

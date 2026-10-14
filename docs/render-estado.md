@@ -88,9 +88,17 @@ Origen: [investigacion-sk1.md](investigacion-sk1.md). Commits en `task/render-be
 
 | Idea | Estado | Pendiente |
 | --- | --- | --- |
-| Primitivas paramétricas | Hecho (tests de geometría, conversión y export) | Tiradores en lienzo (hoy solo parámetros en la barra) |
+| Primitivas paramétricas | Hecho, con tiradores en lienzo (segunda pasada) | Prueba visual en el sandbox del usuario |
 | Puntas de flecha y Scale stroke | Hecho (tests de dirección, SVG y escala); canvas sin prueba automática | Importar `marker` como editable (hoy se rasteriza) |
 | Tipos de nodo | Ya existían con tests; añadidos iconos | Ninguno |
-| Degradados lineales y radiales | Relleno editable, render, export, import e ida y vuelta (tests) | Tiradores en lienzo; degradado del trazo en la interfaz |
+| Degradados lineales y radiales | Relleno y trazo editables, tiradores en lienzo, export, import e ida y vuelta (tests) | Prueba visual en el sandbox del usuario |
 
 Límite del Stage: `Stage.tsx` ya superaba 30 KB y no puede crecer; la lógica nueva va a `primitives.ts`, `shapeDraw.ts` y `gradientPaint.ts`.
+
+## Segunda pasada: tiradores y degradado del trazo (2026-10-13)
+
+- Tiradores de primitivas en `ShapeHandles.tsx` (lógica pura en `primKnots.ts`). La caja del círculo unitario es fija (`UNIT_BOX`), así que un cambio de ángulo o de radio no vuelve a ajustar la caja.
+- Tiradores de degradado en el mismo componente, montados desde Stage con una línea; el trazo tiene el selector Solid / Linear / Radial.
+- Stage.tsx: dibujo de sprites movido a `stageSprites.ts` (commit aparte, sin cambio de comportamiento) para que quepa lo nuevo.
+- Sin navegador: la prueba visual de los tiradores queda para el sandbox del usuario.
+

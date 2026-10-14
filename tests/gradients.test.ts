@@ -107,3 +107,17 @@ describe('gradients: canvas', () => {
     near(m[1] * lx1 + m[3] * ly1 + m[5], 20);
   });
 });
+
+describe('gradients: stroke', () => {
+  it('a gradient stroke is written as a gradient referenced by stroke, and comes back on import', async () => {
+    const s = rect({ fill: null, fillGradient: undefined, stroke: null, strokeWidth: 4, strokeGradient: linear });
+    const svg = shapeSvg(s);
+    expect(svg).toContain('<linearGradient id="g-r1-s"');
+    expect(svg).toContain('stroke="url(#g-r1-s)"');
+    const back = await importSvg(svgOf(svg), 't', noRaster);
+    if ('error' in back) throw new Error(back.error);
+    const g = ((back.doc.layers[0] as { shapes: ShapeSpec[] }).shapes[0]).strokeGradient!;
+    near(g.x2, 110);
+    expect(g.stops.map((st) => st.color)).toEqual(['#ff0000', '#0000ff']);
+  });
+});
