@@ -43,6 +43,16 @@ export function snapTargets(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' |
   return { xs, ys };
 }
 
+/** Above this pointer speed (px/ms) snapping waits: a fast drag is not pulled onto lines (Inkscape: tool-base.cpp:1605). */
+export const SNAP_SPEED = 0.02;
+/** A watchdog: after this long without a slower motion, snap anyway (Inkscape's delayed snap timer). */
+export const SNAP_IDLE_MS = 150;
+
+/** Whether to snap at this moment: when the pointer is slow, or when it has been quiet long enough. */
+export function snapNow(speedPxPerMs: number, idleMs: number): boolean {
+  return speedPxPerMs <= SNAP_SPEED || idleMs >= SNAP_IDLE_MS;
+}
+
 /** Weight of the pointer against the snap distance: Inkscape's snapweight, 0.5 by default (snapped-point.cpp:367). */
 export const SNAP_WEIGHT = 0.5;
 
