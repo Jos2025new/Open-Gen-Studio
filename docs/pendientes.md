@@ -127,6 +127,6 @@ Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada 
 - [x] 3D y Designer (`PLAN_3D_DESIGNER.md`, P1–P9): cuatro modelos 3D, visor, exportación PDF/SVG, lineart editable y pinceles con textura. **2026-10-08**, **código** y **test** ([3d-contracts](../tests/3d-contracts.test.ts), [model3d](../tests/model3d.test.ts), [design-export](../tests/design-export.test.ts), [brush-control](../tests/brush-control.test.ts): 22 aprobados). **usuario**: el visor se probó y se amplió después.
 - [x] Banco del agente, antes y después (R0d/R8). **usuario**: lo ejecutó en otras sesiones, con GPT y con Claude, con Grok y MiMo y con gasto real. En el repositorio: [comparación NanoGPT](nanogpt-price-comparison.md), [expansión 2](nanogpt-price-expansion-2.md) y `bench/2026-10-01-3273c0a.json`. No se volvió a ejecutar el 2026-10-08.
 
-## Importar SVG (pendiente, 2026-10-13)
+## Importar SVG de Inkscape (2026-10-13)
 
-Sin hacer. SVG: vectorial si usa solo rect, ellipse, path, line con relleno y trazo; si no, rasterizado; con saneado (sin script, foreignObject ni href externos). Sin hacer: no se añade `image/svg+xml` a los accept hasta que exista el importador.
+Hecho en `6278ed4` (Claude Sonnet 5.5): carpetas y capas con su nombre, formas editables, restos rasterizados y saneado; detalle en [inkscape-importacion.md](inkscape-importacion.md). Pendiente: probarlo con un archivo real del usuario (los tests usan un SVG construido a mano), y revisar qué elementos siguen rasterizados.

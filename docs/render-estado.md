@@ -19,6 +19,10 @@ Rama `task/render-bench` (worktree `ogs-render-bench`), HEAD `ab01a02` al cierre
 | 5 | Mosaicos de 64² solo en memoria | **Hecho para el historial** (copia de mosaicos tocados, sin cambiar el guardado). Guardado por mosaicos no hecho: ver ADR 0015. | `79bf595` (sobre `29c9fc9`, presupuesto en bytes) |
 | 6 | A/B final (5 gestos × 3 repeticiones a 1024², 2048² si cabe) y prueba del usuario | **Pendiente.** | — |
 
+## Sesión del 2026-10-13 (tarde)
+
+HEAD de la rama: `d2f1a6a` (el registro completo de commits, atribución, decisiones del usuario y retrasos está en [historial 025](history/025-2026-10-W42.md#sesión-del-2026-10-13-en-task-render-bench-commits-5a174cb--d2f1a6a)). Lo que quedó sin confirmar en navegador: paridad de las entregas 2 y 4, clic y arrastre en Object y Layer, PNG en worker (desactivado), A/B final, ADR 0015 para el contenido de las capas, y máscaras de un canal para el objetivo de 4 GB.
+
 ## Atribución de los commits del track
 
 Fuente: trailers `Co-Authored-By` de cada commit (`git log 9c061f8..HEAD`). Todos los commits tienen como autor git a Samuel.
