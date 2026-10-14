@@ -193,6 +193,37 @@ test('snapping: three boxes, a moving one dropped in a gap: equal spacing shows 
   expect(errors).toEqual([]);
 });
 
+test('snapping: equal-distance guides compare neighboring gaps across rows during drag', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'A', x: cx + 200, y: cy - 200, w: 40, h: 40 }, { id: 'B', x: cx + 260, y: cy - 200, w: 40, h: 40 },
+    { id: 'E', x: cx + 400, y: cy - 100, w: 40, h: 40 }, { id: 'F', x: cx + 460, y: cy - 100, w: 40, h: 40 },
+    { id: 'C', x: cx - 300, y: cy + 200, w: 40, h: 40 }, { id: 'M', x: cx - 232, y: cy + 200, w: 40, h: 40 },
+  ], 'drawing');
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true, equalSpacing: true } } }); });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2 - 8, y: before.y + before.h / 2 });
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 4 }); await page.waitForTimeout(220);
+  const cotas = page.locator('.snap-indicator text');
+  await expect(cotas).toHaveCount(3); // reference gaps in two other rows plus the moving object's gap
+  expect((await cotas.allTextContents()).every((label) => label === '20.0')).toBe(true);
+  const moved = await boxOf(page, s.ids.M);
+  expect(moved.x).toBeCloseTo(cx - 240, 1);
+  await page.mouse.up();
+  await expect(page.locator('.snap-indicator text')).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  expect(await boxOf(page, s.ids.M)).toEqual(before);
+  await page.keyboard.press('Control+Shift+z');
+  expect((await boxOf(page, s.ids.M)).x).toBeCloseTo(cx - 240, 1);
+  expect(errors).toEqual([]);
+});
+
 test('snapping: in Drawing mode the switch is off, so a layer moved next to an edge does not snap', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;

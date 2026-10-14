@@ -19,6 +19,24 @@ describe('equal spacing: the gaps match a pair of neighbours', () => {
     expect(41 + r.d).toBeCloseTo(40, 9);
   });
 
+  it('shows equal horizontal gaps from separate visible rows without pairing every box', () => {
+    const row = (x: number, y: number) => ({ x, y, w: 10, h: 10 });
+    const references = [row(200, 100), row(230, 100), row(400, 200), row(430, 200), row(0, 500)];
+    const r = equalSpacing(row(32, 500), references, 10, 'x')!;
+    expect(32 + r.d).toBeCloseTo(30, 9); // the gap to the same-row neighbor becomes 20
+    expect(r.measures.map((m) => m.label)).toEqual([20, 20, 20]);
+    expect(r.measures.map((m) => m.a[1])).toEqual([105, 205, 505]); // each cota stays in its own row
+  });
+
+  it('compares vertical gaps from separate columns with the same local candidate bound', () => {
+    const col = (x: number, y: number) => ({ x, y, w: 10, h: 10 });
+    const references = [col(100, 200), col(100, 230), col(200, 400), col(200, 430), col(500, 0)];
+    const r = equalSpacing(col(500, 32), references, 10, 'y')!;
+    expect(32 + r.d).toBeCloseTo(30, 9);
+    expect(r.measures.map((m) => m.label)).toEqual([20, 20, 20]);
+    expect(r.measures.map((m) => m.a[0])).toEqual([105, 205, 505]); // each vertical cota stays in its own column
+  });
+
   it('nothing within the tolerance gives no spacing; boxes outside the band are ignored', () => {
     expect(equalSpacing(B(100), [B(0), B(30)], 5, 'x')).toBeNull();
     const off = { x: 0, y: 500, w: 10, h: 10 };

@@ -87,4 +87,20 @@ describe('snap session: equal spacing with measures', () => {
     expect(27 + r.dx).toBeCloseTo(30, 9);
     expect(r.measures?.length).toBe(2);
   });
+
+  it('cross-row equal gaps obey zoom tolerance and the independent switch', () => {
+    const refs = [layerAt('a', 200, 100, 10, 10), layerAt('b', 230, 100, 10, 10), layerAt('c', 0, 500, 10, 10)];
+    const box = { x: 38, y: 500, w: 10, h: 10 };
+    const session = (zoom: number, equalSpacing = true) => new SnapSession(doc(refs), 'moving', { ...opts, equalSpacing }, zoom, view);
+    const step = (s: SnapSession) => { s.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 0); return s.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 1000); };
+    const close = step(session(1));
+    expect(close.dx).toBe(-8);
+    expect(close.measures).toHaveLength(2);
+    const zoomed = step(session(2));
+    expect(zoomed.dx).toBe(0); // 8 doc px exceeds the 5 doc px tolerance at 200% zoom
+    expect(zoomed.measures).toBeUndefined();
+    const off = step(session(1, false));
+    expect(off.dx).toBe(0);
+    expect(off.measures).toBeUndefined();
+  });
 });

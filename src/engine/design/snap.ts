@@ -113,39 +113,76 @@ export function snapBox(box: Box, targets: { xs: number[]; ys: number[] }, thres
 /** A measured gap to show: from one point to another, with its length (document units). */
 export interface Measure { a: [number, number]; b: [number, number]; label: number }
 
-/**
- * Equal spacing along one axis (distribution-snapper.cpp): the box moves so that its gap to a neighbour equals the gap
- * between two other boxes, either between them (the box in the middle) or beyond them (the same gap again). Only boxes
- * in the box's band count (they overlap it across the axis); the nearest twelve are tried. Null if nothing is within tol.
- */
+/** Equal spacing by comparing local adjacent gaps. Reference gaps may be in other visible rows/columns. */
 export function equalSpacing(box: Box, others: Box[], tol: number, axis: 'x' | 'y'): { d: number; measures: Measure[] } | null {
   const span = (b: Box): [number, number] => (axis === 'x' ? [b.x, b.x + b.w] : [b.y, b.y + b.h]);
   const cross = (b: Box): [number, number] => (axis === 'x' ? [b.y, b.y + b.h] : [b.x, b.x + b.w]);
-  const [m0, m1] = span(box), mw = m1 - m0, [cLo, cHi] = cross(box);
-  const band = others.filter((o) => { const [lo, hi] = cross(o); return hi >= cLo && lo <= cHi; });
-  const near = band.sort((p, q) => Math.abs(span(p)[0] - m0) - Math.abs(span(q)[0] - m0)).slice(0, 12);
-  let best: { d: number; a: Box; b: Box } | null = null;
-  const consider = (d: number, a: Box, b: Box) => { if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, a, b }; };
-  for (const A of near) for (const B of near) {
-    const [a0, a1] = span(A), [b0, b1] = span(B);
-    if (a1 > b0) continue; // A must lie before B
-    const g = b0 - a1;
-    if (g <= 0) continue;
-    if (g > mw) consider((a1 + (g - mw) / 2) - m0, A, B); // between A and B
-    consider((b1 + g) - m0, A, B);                         // beyond B, same gap
-    consider((a0 - g - mw) - m0, A, B);                    // before A, same gap
+  const [m0, m1] = span(box), mw = m1 - m0;
+  const overlaps = (a: Box, b: Box) => { const [lo, hi] = cross(a), [otherLo, otherHi] = cross(b); return hi >= otherLo && otherHi >= lo; };
+  const center = (b: Box) => { const [lo, hi] = span(b), [cl, ch] = cross(b); return [(lo + hi) / 2, (cl + ch) / 2] as const; };
+  // SnapSession already caps boxes to the visible viewport. Keep only the twelve nearest to this drag before comparing
+  // directional neighbors; never build an all-document pair list.
+  const mc = center(box);
+  const near = others.slice().sort((a, b) => {
+    const ac = center(a), bc = center(b);
+    return Math.hypot(ac[0] - mc[0], ac[1] - mc[1]) - Math.hypot(bc[0] - mc[0], bc[1] - mc[1]);
+  }).slice(0, 12);
+  const local = new Set(near);
+  type Gap = { a: Box; b: Box; size: number };
+  const gaps: Gap[] = [];
+  for (const a of near) {
+    const [, end] = span(a);
+    const b = others.filter((candidate) => candidate !== a && span(candidate)[0] >= end && overlaps(a, candidate))
+      .sort((p, q) => span(p)[0] - span(q)[0])[0];
+    if (!b || !local.has(b)) continue;
+    const size = span(b)[0] - end;
+    if (size > 0) gaps.push({ a, b, size });
+  }
+  type Winner = { d: number; a: Box; b: Box; gap: number; neighbor?: Box; repeated: boolean };
+  let best: Winner | null = null;
+  const consider = (candidate: Winner) => {
+    if (Math.abs(candidate.d) <= tol && (!best || Math.abs(candidate.d) < Math.abs(best.d))) best = candidate;
+  };
+  const sameGap = (a: number, b: number) => Math.abs(a - b) <= 1e-7 * Math.max(1, a, b);
+  const [bandLo, bandHi] = cross(box);
+  const movingBand = near.filter((o) => { const [lo, hi] = cross(o); return hi >= bandLo && lo <= bandHi; });
+  for (const { a, b, size: gap } of gaps) {
+    const [a0, a1] = span(a), [, b1] = span(b);
+    // The original three-box behavior remains for a reference pair in the moving box's band.
+    if (overlaps(a, box) && overlaps(b, box)) {
+      if (gap > mw) consider({ d: (a1 + (gap - mw) / 2) - m0, a, b, gap, repeated: false });
+      consider({ d: b1 + gap - m0, a, b, gap, repeated: false });
+      consider({ d: a0 - gap - mw - m0, a, b, gap, repeated: false });
+    }
+    // A locally adjacent gap in another row/column can match the moving box's gap to one visible neighbor.
+    for (const neighbor of movingBand) {
+      if (neighbor === a || neighbor === b) continue;
+      const [n0, n1] = span(neighbor);
+      for (const d of [n0 - gap - mw - m0, n1 + gap - m0]) {
+        const start = m0 + d, end = start + mw;
+        if (near.some((other) => other !== neighbor && start < span(other)[1] && end > span(other)[0])) continue;
+        consider({ d, a, b, gap, neighbor, repeated: true });
+      }
+    }
   }
   if (!best) return null;
-  const { d, a, b } = best as { d: number; a: Box; b: Box };
+  const { d, a, b, gap, neighbor, repeated } = best;
   const moved = axis === 'x' ? { ...box, x: box.x + d } : { ...box, y: box.y + d };
-  // The three boxes in order along the axis: the gaps between consecutive ones are the measures to show.
-  const across = (cLo + cHi) / 2;
-  const at = (v: number): [number, number] => (axis === 'x' ? [v, across] : [across, v]);
-  const trio = [a, moved, b].sort((p, q) => span(p)[0] - span(q)[0]);
-  const measures: Measure[] = [];
-  for (let i = 0; i + 1 < trio.length; i++) {
-    const gap = span(trio[i + 1])[0] - span(trio[i])[1];
-    if (gap > 1e-9) measures.push({ a: at(span(trio[i])[1]), b: at(span(trio[i + 1])[0]), label: gap });
+  const measure = (left: Box, right: Box): Measure => {
+    const [leftLo, leftHi] = cross(left), [rightLo, rightHi] = cross(right);
+    const across = (Math.max(leftLo, rightLo) + Math.min(leftHi, rightHi)) / 2;
+    const [, leftEnd] = span(left), [rightStart] = span(right);
+    return axis === 'x'
+      ? { a: [leftEnd, across], b: [rightStart, across], label: rightStart - leftEnd }
+      : { a: [across, span(left)[1]], b: [across, rightStart], label: rightStart - span(left)[1] };
+  };
+  let measures: Measure[];
+  if (repeated && neighbor) {
+    measures = [...gaps.filter((candidate) => sameGap(candidate.size, gap)).map((candidate) => measure(candidate.a, candidate.b)),
+      ...(span(moved)[0] < span(neighbor)[0] ? [measure(moved, neighbor)] : [measure(neighbor, moved)])];
+  } else {
+    const trio = [a, moved, b].sort((p, q) => span(p)[0] - span(q)[0]);
+    measures = [measure(trio[0], trio[1]), measure(trio[1], trio[2])];
   }
   return { d, measures };
 }

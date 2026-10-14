@@ -2,9 +2,9 @@
 export default [
   {
     id: 'snap-controls',
-    what: 'Los interruptores de Snap se guardan por modo; los ganadores de caja conservan procedencia para mostrar alineación temporal, y el espaciado dibuja medidas.',
+    what: 'Snap guarda opciones por modo; muestra alineaciones y compara huecos locales visibles entre filas/columnas.',
     sides: [
-      ['src/engine/design/snap.ts', 'equalSpacing?: boolean'],
+      ['src/engine/design/snap.ts', 'export function equalSpacing'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
       ['src/engine/design/snapSession.ts', 'export interface AlignmentGuide'],
       ['src/components/designer/SnapIndicator.tsx', 'data-snap-alignment="true"'],
@@ -15,7 +15,7 @@ export default [
       ['src/components/designer/snapIdle.ts', 'export function snapIdleStart'],
       ['src/store/store.ts', 'snapByMode?: SnapByMode'],
     ],
-    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts', 'tests-e2e/snapping.spec.ts'],
+    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-spacing.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts', 'tests-e2e/snapping.spec.ts'],
   },
   {
     id: 'paint-mode',
