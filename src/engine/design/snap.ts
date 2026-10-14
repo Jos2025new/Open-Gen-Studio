@@ -163,7 +163,12 @@ export function equalSpacing(box: Box, others: Box[], tol: number, axis: 'x' | '
       const [n0, n1] = span(neighbor);
       for (const d of [n0 - gap - mw - m0, n1 + gap - m0]) {
         const start = m0 + d, end = start + mw;
-        if (near.some((other) => other !== neighbor && start < span(other)[1] && end > span(other)[0])) continue;
+        const [movingCross0, movingCross1] = cross(box);
+        const blocked = near.some((other) => {
+          const [other0, other1] = span(other), [otherCross0, otherCross1] = cross(other);
+          return other !== neighbor && start < other1 && end > other0 && movingCross0 < otherCross1 && movingCross1 > otherCross0;
+        });
+        if (blocked) continue;
         consider({ d, a, b, gap, gapAxis, neighbor, repeated: true });
       }
     }

@@ -139,6 +139,8 @@ El usuario verificó manualmente la versión actual y la aprobó el 2026-10-14 (
 
 Detalle de borde posterior a esa aprobación: equal spacing ya acepta el siguiente hueco cuando el móvil está debajo de la referencia y sus bandas solo se tocan por el borde derecho; el reflejo izquierdo y el rechazo a 0,1 px separado están cubiertos por unitarios. El E2E de esa escena está preparado, pero pendiente de ejecución porque el sandbox ajeno ocupaba el puerto requerido; no se reutilizó. Evidencia y causa en el [registro del caso tocante](history/026-2026-10-W42.md#hueco-vertical-con-proyección-tocante).
 
+La disposición bajo el extremo pequeño de la pareja también queda cubierta en el motor: un candidato solo se bloquea si el obstáculo se cruza en ambos ejes, no por coincidir únicamente con la proyección del movimiento. La tabla incluye reflejos, intercambio de ejes y un obstáculo real dentro del hueco. Su E2E de Stage está preparado y sigue sin ejecutarse por el mismo sandbox ajeno; el límite y resultados están en el [registro de la corrección](history/026-2026-10-W42.md#espaciado-debajo-del-extremo-pequeño).
+
 ## Modo fijado al crear (2026-10-14)
 
 Resuelto el límite conocido del ADR 0016: el modo (Dibujo/Diseño) se guarda en el documento la primera vez que se crea o lee (`pinPaintMode`), y después solo lo cambia el interruptor.

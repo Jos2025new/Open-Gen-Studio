@@ -67,6 +67,28 @@ describe('equal spacing: the gaps match a pair of neighbours', () => {
     expect(equalSpacing({ x: 400.1, y: 470, w: 100, h: 100 }, refs, 10, 'y')).toBeNull();
   });
 
+  const blockerFixtures: [string, 'x' | 'y', { x: number; y: number; w: number; h: number }[], { x: number; y: number; w: number; h: number }, number][] = [
+    ['below the smaller left endpoint (reported failure)', 'y', [{ x: 0, y: 0, w: 200, h: 300 }, { x: 233, y: 0, w: 430, h: 395 }], { x: -100, y: 337, w: 300, h: 250 }, 333],
+    ['above the smaller left endpoint', 'y', [{ x: 0, y: 0, w: 200, h: 300 }, { x: 233, y: 0, w: 430, h: 395 }], { x: -100, y: -287, w: 300, h: 250 }, -283],
+    ['below the larger right endpoint (positive capture)', 'y', [{ x: 0, y: 0, w: 200, h: 300 }, { x: 233, y: 0, w: 430, h: 395 }], { x: 333, y: 432, w: 300, h: 250 }, 428],
+    ['above the larger right endpoint', 'y', [{ x: 0, y: 0, w: 200, h: 300 }, { x: 233, y: 0, w: 430, h: 395 }], { x: 333, y: -287, w: 300, h: 250 }, -283],
+    ['below the smaller right endpoint after horizontal reflection', 'y', [{ x: 0, y: 0, w: 430, h: 395 }, { x: 463, y: 0, w: 200, h: 300 }], { x: 463, y: 337, w: 300, h: 250 }, 333],
+    ['to the right of the upper endpoint after swapping axes', 'x', [{ x: 0, y: 0, w: 300, h: 200 }, { x: 0, y: 233, w: 395, h: 430 }], { x: 337, y: -100, w: 250, h: 300 }, 333],
+  ];
+  it.each(blockerFixtures)('matches the reference gap when another box is only an axis projection %s', (_name, axis, refs, box, expected) => {
+    const r = equalSpacing(box, refs, 10, axis);
+    expect(r).not.toBeNull();
+    expect((axis === 'x' ? box.x : box.y) + r!.d).toBeCloseTo(expected, 9);
+    expect(r!.measures.map((m) => m.label)).toEqual([33, 33]);
+  });
+
+  it('still blocks a repeated gap when a real box occupies the proposed gap', () => {
+    const refs = [{ x: 0, y: 0, w: 200, h: 300 }, { x: 233, y: 0, w: 430, h: 395 }];
+    const moving = { x: -100, y: 337, w: 300, h: 250 };
+    const obstacle = { x: 0, y: 320, w: 100, h: 40 };
+    expect(equalSpacing(moving, [...refs, obstacle], 10, 'y')).toBeNull();
+  });
+
   it('nothing within the tolerance gives no spacing; boxes outside the band are ignored', () => {
     expect(equalSpacing(B(100), [B(0), B(30)], 5, 'x')).toBeNull();
     const off = { x: 0, y: 500, w: 10, h: 10 };
