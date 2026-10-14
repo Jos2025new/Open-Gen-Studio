@@ -873,6 +873,8 @@ export interface LlmMessage {
   content: string | null | LlmContentPart[];
   tool_calls?: Array<{ id: string; type: 'function'; function: { name: string; arguments: string } }>;
   tool_call_id?: string;
+  /** OpenRouter's reasoning blocks, kept verbatim and in order; sent back with the tool calls they belong to. */
+  reasoning_details?: unknown[];
 }
 
 export interface AgentState {

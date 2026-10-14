@@ -30,6 +30,8 @@ export interface ToolSpec {
 
 export interface ChatResult {
   text: string;
+  /** OpenRouter `reasoning_details`, exactly as streamed (no merging); present only when the model sent some. */
+  reasoningDetails?: unknown[];
   toolCalls: Array<{ id: string; name: string; arguments: string }>;
   finishReason: string | null;
   usage?: { inputTokens: number; outputTokens: number; costUsd?: number; reasoningTokens?: number; cachedTokens?: number };
@@ -215,6 +217,13 @@ export function limitedLlmFallback(models: LlmModel[]): LlmModel | undefined {
 /** Silence after which an agent call counts as stalled (no headers yet, or no chunk while streaming). */
 export const STALL_MS = 120_000;
 
+/** Only OpenRouter reads `reasoning_details` back; other providers get the message without them. */
+function withoutDetails(m: LlmMessage, provider: LlmProviderId): LlmMessage {
+  if (provider === 'openrouter' || !m.reasoning_details) return m;
+  const { reasoning_details: _drop, ...rest } = m;
+  return rest;
+}
+
 /** Stream a chat completion, reporting text deltas. */
 export async function chat(opts: {
   provider: LlmProviderId;
@@ -235,7 +244,7 @@ export async function chat(opts: {
 }): Promise<ChatResult> {
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: [{ role: 'system', content: opts.system }, ...opts.messages],
+    messages: [{ role: 'system', content: opts.system }, ...opts.messages.map((m) => withoutDetails(m, opts.provider))],
     tools: opts.tools,
     tool_choice: 'auto',
     stream: true,
@@ -314,6 +323,7 @@ export async function chat(opts: {
   let finishReason: string | null = null;
   let usage: ChatResult['usage'];
   const calls = new Map<number, { id: string; name: string; arguments: string }>();
+  const details: unknown[] = [];
   for await (const payload of readSse(res.body, watch.signal)) {
     arm();
     if (payload === '[DONE]') break;
@@ -351,6 +361,7 @@ export async function chat(opts: {
       text += delta.content;
       opts.onText?.(delta.content, text);
     }
+    if (Array.isArray(delta.reasoning_details)) details.push(...delta.reasoning_details);
     const tcs = delta.tool_calls as Array<Loose> | undefined;
     if (tcs?.length && !toolCallSeen) {
       outputMs ??= Date.now() - t0;
@@ -372,6 +383,13 @@ export async function chat(opts: {
     .sort((a, b) => a[0] - b[0])
     .map(([i, c]) => ({ ...c, id: c.id || `call_${Date.now().toString(36)}_${i}` }))
     .filter((c) => c.name);
-  return { text, toolCalls, finishReason, usage, timing: { ttfbMs, reasoningMs, outputMs, toolMs, totalMs: Date.now() - t0 } };
+  return {
+    text,
+    ...(details.length ? { reasoningDetails: details } : {}),
+    toolCalls,
+    finishReason,
+    usage,
+    timing: { ttfbMs, reasoningMs, outputMs, toolMs, totalMs: Date.now() - t0 },
+  };
   }
 }

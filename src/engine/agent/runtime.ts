@@ -1484,6 +1484,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
         role: 'assistant',
         content: result.text || null,
         tool_calls: result.toolCalls.length ? result.toolCalls.map((c) => ({ id: c.id, type: 'function' as const, function: { name: c.name, arguments: c.arguments } })) : undefined,
+        ...(result.reasoningDetails ? { reasoning_details: result.reasoningDetails } : {}),
       });
       if (!result.toolCalls.length) {
         // Nothing to show and nothing to run (T2): say what actually happened, and leave the turn retryable.
