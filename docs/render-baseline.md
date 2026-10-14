@@ -1,5 +1,7 @@
 # Cifras de partida: documento profesional con Canvas2D (Tarea 1)
 
+> Nota (2026-10-13): documento de referencia de las cifras de 2026-10-12. Lo que cambió después (historial de 3 estados mínimos, revisión de dibujo, vista previa al arrastrar, LUT de niveles y curvas) está en [render-estado.md](render-estado.md); las cifras de aquí no se han vuelto a medir.
+
 Fecha: 2026-10-12. Rama `task/render-bench`. Medido en el sandbox (build de producción, puerto 5183, `.sandbox/data`). Es la tarea 1 de [arquitectura-render.md](arquitectura-render.md), sección 5. Umbrales: [plan-fluidez.md](plan-fluidez.md) (≤ 8 ms de trabajo por fotograma p95, 0 tareas > 50 ms).
 
 ## Resumen

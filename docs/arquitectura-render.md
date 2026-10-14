@@ -70,7 +70,7 @@ La composición incremental (puntos 1–3) depende del motor; por eso el motor s
 | 1 | Documento profesional sintético en el banco del sandbox y cifras de partida con Canvas2D | Cifras de mover, pintar, ocultar y ajustar en ese documento |
 | 2 | Prueba de motor (sección 4) | Decisión documentada con las cifras |
 | 3 | Núcleo de composición en GPU + página retenida | Mismos píxeles que la exportación (tolerancia fijada); ocultar o mover una capa no recompone las demás |
-| 4 | Grafo de invalidación con márgenes de FX y caché de FX `below` | Cambiar un personaje no recalcula los demás ni los FX que no dependen de él |
+| 4 | Grafo de invalidación, márgenes de FX y caché de FX `below` | **Parcial.** Márgenes de FX, caché de `below` con presupuesto y revisión de dibujo separada (`793f94d`) hechos; el grafo completo no. Paridad en navegador pendiente. | `4e25877`, `2427ddb`, `7a9e88c`, `7da0a51`, `ae0aa2e`, `793f94d` |
 | 5 | Límite raster (etapa 3 acordada) + pinceles en GPU | Mismos píxeles al integrar; deshacer en un paso; sin recálculo de máscaras dentro del límite |
 | 6 | Mosaicos con copia al escribir para deshacer + presupuesto de memoria | Memoria del historial proporcional a lo pintado, no a la página |
 | 7 | PNG, exportar e integrar en workers | 0 tareas > 50 ms al soltar el trazo |

@@ -1,6 +1,6 @@
 # Estado de render-bench (cierre del 2026-10-13)
 
-Rama `task/render-bench` (worktree `ogs-render-bench`), HEAD `ab01a02` al cierre, sin fusionar ni subir. Esta nota es la **fuente única** de lo pendiente del trabajo de rendimiento: el resto de notas de render enlazan aquí. Plan vigente: [plan-fluidez.md](plan-fluidez.md) (plan único del 2026-10-13). Rumbo y tareas originales: [arquitectura-render.md](arquitectura-render.md), sección 6. Investigación de memoria con cifras (4 GB y 2 GB): [investigacion-memoria.md](investigacion-memoria.md). Comparación con el editor de escritorio Patchy y cinco ideas de render: [investigacion-patchy.md](investigacion-patchy.md).
+Rama `task/render-bench` (worktree `ogs-render-bench`), HEAD `ab01a02` al cierre de la auditoría y `9ebd8bf` tras las cinco ideas de Patchy (2026-10-13), sin fusionar ni subir. Esta nota es la **fuente única** de lo pendiente del trabajo de rendimiento: el resto de notas de render enlazan aquí. Plan vigente: [plan-fluidez.md](plan-fluidez.md) (plan único del 2026-10-13). Rumbo y tareas originales: [arquitectura-render.md](arquitectura-render.md), sección 6. Investigación de memoria con cifras (4 GB y 2 GB): [investigacion-memoria.md](investigacion-memoria.md). Comparación con el editor de escritorio Patchy y cinco ideas de render: [investigacion-patchy.md](investigacion-patchy.md).
 
 ## Cronología de decisiones
 
@@ -34,19 +34,39 @@ Fuente: trailers `Co-Authored-By` de cada commit (`git log 9c061f8..HEAD`). Todo
 
 Ningún commit ni documento del track cita a Claude Opus ni a GPT/Luna en un trailer; esas atribuciones solo constan en el historial 025.
 
+## Cerrado el 2026-10-13 (cinco ideas de Patchy, en código y tests)
+
+Detalle y atribución en [historial 025](history/025-2026-10-W42.md#cinco-ideas-de-patchy-implementadas-en-task-render-bench-2026-10-13-claude-haiku-55); origen en [investigacion-patchy.md](investigacion-patchy.md).
+
+| Idea | Estado | Commits |
+|---|---|---|
+| Historial: al menos 3 estados de deshacer dentro del tope en bytes | Hecho (tests) | `be389ef` |
+| Revisión de dibujo separada: mover o desvanecer una capa raster no invalida su FX | Hecho (tests) | `793f94d` |
+| Vista previa reducida al arrastrar sobre páginas con FX; recomposición al soltar | Parcial (ver pendientes 2 y 3) | `d5347fa`, `dda36e0` |
+| Helper FNV-1a y referencia de paridad | Parcial: helper hecho, digests pendientes (pendiente 1) | `5dfbb62` |
+| LUT de 256 entradas para niveles y curvas (SVG, editor y exportación) | Hecho (tests); brillo y contraste sin cambio | `d4c0abe` |
+| Corrección de la caché `below` en `arquitectura-render.md` §2 | Hecho | `9ebd8bf` |
+
 ## Pendiente (fuente única)
 
-1. **Entrega 6:** A/B final a 1024², 2048² si cabe, CPU y GPU por gesto, y prueba del usuario. Lo ejecuta el verificador con navegador que autoriza el plan (solo GPT abre navegador, sin tests en paralelo). El límite de memoria es 1 200 MB disponibles antes de medir y 1 800 MB de RSS del navegador.
-2. **Contradicción sin resolver en el oráculo de 200 operaciones (CPU)** (2026-10-13: el guardián FNV-1a existe en `bench/engines/fnv1a.ts` con `bench/engines/parity-digests.json` *pendiente*; los digests no se han generado porque el oráculo corre solo en el navegador del sandbox y no se usó navegador en esta sesión; la contradicción sigue abierta): [render-baseline.md](render-baseline.md) (sección «Oráculo CPU») registra que pasa con 0/255. [historial 025](history/025-2026-10-W42.md), entrada 5, registra con la semilla 20260412 que no pasa: 11 de 200 operaciones superan la tolerancia, máximo 182/255. Hay que reejecutar el oráculo y decidir cuál registro es el vigente. No se resolvió en esta nota (solo se documentó).
-3. **Diferencia de 2 000 operaciones:** `paint` en la operación 1116, 3/255 (dos intentos iguales, máximo de tres). El plan no la considera bloqueante, pero sigue abierta.
-4. **Paridad en navegador:** regiones con dirty raster y cajas de FX (entregas 2 y 4) no verificadas en navegador.
-5. **Comprobación visual** del límite raster y de la cuota provisional (64 trazos / 8192 segmentos, a medir).
-6. **PNG en worker:** no hay método exacto y más rápido. Mientras tanto, el guardado usa el encoder legado.
-7. **Medida limpia de la tarea 1:** el sandbox guarda seis copias del documento profesional (`state.json` de 30 MB), así que las cifras incluyen un guardado grande. Separarlo requiere limpiar las sesiones del banco, con aprobación.
-8. **Medidas de d y e antes y después** (Etapa C, ADR 0014): el «antes» está en el worktree `ogs-render-bench-before` (HEAD `4e238f8`), que se eliminará con `git worktree remove` al terminar.
-9. **Atribución de d y e** con una medida limpia (sandbox vacío, una sola sesión), y repetir sin procesos ajenos consumiendo CPU.
-10. **Motor (tarea 2 de arquitectura):** aplazado por decisión del usuario; [decision-motor.md](decision-motor.md) no tiene recomendación.
-11. **Riesgos abiertos:** memoria del documento de 2048² con CPU, 2 057 MB (supera el tope de 1 800 MB); la CPU puede ser más lenta al dibujar (no medido); GPU no determinista, hasta 63/255 entre editor y exportación.
+1. **Digests reales de paridad (FNV-1a):** generar `bench/engines/parity-digests.json` en el navegador del sandbox (CPU, Canvas2D) y añadir `npm run parity:update`. No existe aún; no se ha usado navegador. Ligado a la contradicción de abajo.
+2. **Vista previa para selecciones grandes:** no hecha. La vista reducida solo cubre capas con FX.
+3. **Limitación de la vista previa al arrastrar:** mientras se arrastra, los FX «below» no cacheados no se calculan; el resultado exacto aparece al soltar.
+4. **Clic y arrastre en Object y Layer:** pendiente de prueba del usuario en su sandbox.
+5. **Importación SVG de Inkscape con un archivo real:** los tests usan un SVG construido a mano (`6278ed4`).
+6. **PNG en worker (entrega 1):** desactivado; no hay método exacto y más rápido. El guardado usa el encoder legado.
+7. **A/B final (entrega 6):** 5 gestos × 3 repeticiones a 1024², 2048² si cabe, CPU y GPU por gesto, y prueba del usuario. Lo ejecuta el verificador con navegador (límite: 1 200 MB disponibles antes de medir y 1 800 MB de RSS).
+8. **ADR 0015 en memoria para el contenido de las capas:** pendiente de decisión del usuario; el historial en mosaicos ya está hecho (`79bf595`).
+9. **Máscaras de un canal** para el objetivo de 4 GB: no hechas.
+10. **Contradicción sin resolver en el oráculo de 200 operaciones (CPU):** [render-baseline.md](render-baseline.md) registra 0/255; [historial 025](history/025-2026-10-W42.md), entrada 5, registra con la semilla 20260412 que no pasa (11 de 200 operaciones, máximo 182/255). Reejecutar y decidir cuál registro vale.
+11. **Diferencia de 2 000 operaciones:** `paint` en la operación 1116, 3/255. Sigue abierta.
+12. **Paridad en navegador:** regiones con dirty raster y cajas de FX (entregas 2 y 4) no verificadas en navegador.
+13. **Comprobación visual** del límite raster y de la cuota provisional (64 trazos / 8192 segmentos, a medir).
+14. **Medida limpia de la tarea 1:** el sandbox guarda seis copias del documento profesional (`state.json` de 30 MB). Separarlo requiere limpiar las sesiones del banco, con aprobación.
+15. **Medidas de d y e antes y después** (ADR 0014): el «antes» está en el worktree `ogs-render-bench-before` (HEAD `4e238f8`), que se eliminará con `git worktree remove` al terminar.
+16. **Atribución de d y e** con una medida limpia (sandbox vacío, una sola sesión).
+17. **Motor (tarea 2 de arquitectura):** aplazado por decisión del usuario; [decision-motor.md](decision-motor.md) no tiene recomendación.
+18. **Riesgos abiertos:** memoria del documento de 2048² con CPU, 2 057 MB (supera el tope de 1 800 MB); la CPU puede ser más lenta al dibujar (no medido); GPU no determinista, hasta 63/255 entre editor y exportación.
 
 **Para decidir por el usuario (no cambiado por esta nota):** el [ADR 0015](decisions/0015-mosaicos-de-pixeles.md) sigue en estado «Propuesto». Su parte de historial en mosaicos ya está implementada en memoria (`79bf595`), pero no el guardado por mosaicos ni la migración. Si se acepta parcialmente, el estado lo cambia el usuario.
 

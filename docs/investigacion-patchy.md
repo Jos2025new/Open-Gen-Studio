@@ -178,3 +178,17 @@ deshacer (es un problema que Patchy tiene, no un modelo a seguir).
   respecto a §6 (ver resumen).
 - No se revisó la licencia de dependencias de Patchy (`NOTICE-THIRD-PARTY.md`); sí es MIT el código propio.
   Ninguna idea de este informe copia código: son patrones de diseño.
+
+## 6. Estado de implementación (2026-10-13)
+
+Las cinco ideas de la sección 4 se han implementado en `task/render-bench`. Lo que queda abierto está en [render-estado.md](render-estado.md).
+
+| # | Idea | Estado | Commits |
+|---|---|---|---|
+| 1 | Presupuesto de historial en bytes con poda y mínimo de estados | Hecho: mínimo de 3 estados de deshacer | `be389ef` |
+| 2 | Separar revisión de contenido y de dibujo | Hecho para la caché FX de capas raster (mover o desvanecer no la invalida). Máscaras de trazo y cajas ya dependían solo del contenido | `793f94d` |
+| 3 | Vista previa de arrastre desde un proxy y recomposición al soltar | Parcial: vista reducida para páginas con FX; las selecciones grandes no están cubiertas | `d5347fa`, `dda36e0` |
+| 4 | Digest FNV-1a como guardián de regresión | Parcial: helper y referencia con estado pendiente; sin digests reales ni `parity:update` | `5dfbb62` |
+| 5 | LUT de 256 entradas por canal | Hecho para niveles y curvas en el camino SVG; brillo y contraste ya son lineales en el filtro del navegador | `d4c0abe` |
+
+La corrección de `arquitectura-render.md` §2 (caché `below`) está en `9ebd8bf`.
