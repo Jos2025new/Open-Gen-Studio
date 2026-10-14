@@ -137,6 +137,8 @@ Una vez adquirido, el ajuste de alineación o espaciado permanece durante movimi
 
 El usuario verificó manualmente la versión actual y la aprobó el 2026-10-14 («Excelente, ya funciona»); esa confirmación no representa una matriz manual exhaustiva. La evidencia por commit, conteos de pruebas y límites está en el [cierre final](history/026-2026-10-W42.md#cierre-final-ajuste-estable-y-aprobación-del-usuario).
 
+Detalle de borde posterior a esa aprobación: equal spacing ya acepta el siguiente hueco cuando el móvil está debajo de la referencia y sus bandas solo se tocan por el borde derecho; el reflejo izquierdo y el rechazo a 0,1 px separado están cubiertos por unitarios. El E2E de esa escena está preparado, pero pendiente de ejecución porque el sandbox ajeno ocupaba el puerto requerido; no se reutilizó. Evidencia y causa en el [registro del caso tocante](history/026-2026-10-W42.md#hueco-vertical-con-proyección-tocante).
+
 ## Modo fijado al crear (2026-10-14)
 
 Resuelto el límite conocido del ADR 0016: el modo (Dibujo/Diseño) se guarda en el documento la primera vez que se crea o lee (`pinPaintMode`), y después solo lo cambia el interruptor.

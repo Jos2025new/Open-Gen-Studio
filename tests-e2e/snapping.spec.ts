@@ -313,6 +313,43 @@ test('snapping: a horizontal reference gap guides a moving box below it', async 
   expect(errors).toEqual([]);
 });
 
+test('snapping: repeats a vertical gap when the lower box touches the reference right edge', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'A', x: cx - 500, y: cy - 400, w: 100, h: 100 },
+    { id: 'B', x: cx - 400, y: cy - 267, w: 300, h: 300 },
+    { id: 'M', x: cx - 100, y: cy + 70, w: 200, h: 200 },
+  ], 'drawing');
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string);
+    st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true, equalSpacing: true } } });
+  });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
+  const to = { x: from.x, y: from.y - 6 * zoom }; // 6 document px: actual gap starts 37, target is 33
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 4 });
+  await page.waitForTimeout(220);
+
+  const cotas = page.locator('.snap-indicator text');
+  await expect(cotas).toHaveCount(2);
+  expect((await cotas.allTextContents()).every((label) => label === '33.0')).toBe(true);
+  const moved = await boxOf(page, s.ids.M);
+  expect(moved.x).toBeCloseTo(cx - 100, 1); // B.right and M.left touch in projection
+  expect(moved.y).toBeCloseTo(cy + 66, 1); // the reference gap of 33 is repeated below B
+  await page.mouse.up();
+  await expect(cotas).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  expect(await boxOf(page, s.ids.M)).toEqual(before);
+  await page.keyboard.press('Control+Shift+z');
+  expect((await boxOf(page, s.ids.M)).y).toBeCloseTo(cy + 66, 1);
+  expect(errors).toEqual([]);
+});
+
 test('snapping: holding Alt clears an acquired alignment and allows free movement', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;

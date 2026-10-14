@@ -50,6 +50,23 @@ describe('equal spacing: the gaps match a pair of neighbours', () => {
     expect(r.measures.map((m) => m.label)).toEqual([40, 40]);
   });
 
+  it('repeats a vertical reference gap below the right edge when the boxes touch in projection', () => {
+    const refs = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 100, y: 133, w: 300, h: 300 }];
+    const moving = { x: 400, y: 470, w: 100, h: 100 }; // right edge of the large reference touches the moving box
+    const r = equalSpacing(moving, refs, 10, 'y');
+    expect(r).not.toBeNull();
+    expect(moving.y + r!.d).toBe(466);
+    expect(r!.measures.map((m) => m.label)).toEqual([33, 33]);
+  });
+
+  it('keeps the touching left-edge reflection and rejects a separated projection', () => {
+    const refs = [{ x: 0, y: 0, w: 100, h: 100 }, { x: 100, y: 133, w: 300, h: 300 }];
+    const leftTouch = equalSpacing({ x: 0, y: 470, w: 100, h: 100 }, refs, 10, 'y');
+    expect(leftTouch).not.toBeNull();
+    expect(leftTouch!.measures.map((m) => m.label)).toEqual([33, 33]);
+    expect(equalSpacing({ x: 400.1, y: 470, w: 100, h: 100 }, refs, 10, 'y')).toBeNull();
+  });
+
   it('nothing within the tolerance gives no spacing; boxes outside the band are ignored', () => {
     expect(equalSpacing(B(100), [B(0), B(30)], 5, 'x')).toBeNull();
     const off = { x: 0, y: 500, w: 10, h: 10 };

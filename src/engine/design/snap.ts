@@ -158,7 +158,8 @@ export function equalSpacing(box: Box, others: Box[], tol: number, axis: 'x' | '
     }
     // A locally adjacent gap in another row/column can match the moving box's gap to one visible neighbor.
     for (const neighbor of movingBand) {
-      if (gapAxis === axis && (neighbor === a || neighbor === b)) continue;
+      // The three-box branch above owns a shared band; at a touching projection, an endpoint may be the next neighbor.
+      if (gapAxis === axis && (neighbor === a || neighbor === b) && overlaps(a, box, axis) && overlaps(b, box, axis)) continue;
       const [n0, n1] = span(neighbor);
       for (const d of [n0 - gap - mw - m0, n1 + gap - m0]) {
         const start = m0 + d, end = start + mw;
