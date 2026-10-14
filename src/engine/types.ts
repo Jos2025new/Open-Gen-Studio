@@ -847,8 +847,11 @@ export interface StrokeTexture {
  */
 export interface Stroke extends StrokeStyle {
   id: string;
+  /** The gesture as drawn, in its own frame (never rewritten by a transform). */
   points: Array<[number, number, number]>;
   simulatePressure: boolean;
+  /** Accumulated transform from the frame of `points` to the page (absent = identity). Outline and export use it. */
+  matrix?: [number, number, number, number, number, number];
 }
 
 export interface VectorLayer extends LayerBase {

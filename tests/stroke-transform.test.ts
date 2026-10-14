@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { transformStroke, transformObjects } from '../src/engine/design/affine';
-import { newStroke, strokeOutline, DEFAULT_STROKE_STYLE } from '../src/engine/design/strokes';
+import { newStroke, strokeOutline, bakeStroke, DEFAULT_STROKE_STYLE } from '../src/engine/design/strokes';
 import { newVectorLayer } from '../src/engine/design/doc';
 import type { Stroke } from '../src/engine/types';
 
@@ -17,10 +17,13 @@ describe('lineart stroke under transform: width and tapers follow the scale', ()
     let s = s0;
     for (let i = 0; i < 5; i++) s = transformStroke(s, [k, 0, 0, k, 0, 0]);
     const once = transformStroke(s0, [k ** 5, 0, 0, k ** 5, 0, 0]);
-    expect(s.size).toBeCloseTo(once.size, 12);
-    expect(s.taperStart).toBeCloseTo(once.taperStart, 12);
-    expect(s.size).toBeCloseTo(4 * k ** 5, 12);
-    expect(s.taperStart).toBeCloseTo(6 * k ** 5, 12);
+    // Structural: the width and tapers stay in the stroke's frame; the matrix holds the scale. Baking gives the numbers.
+    const bs = bakeStroke(s), bo = bakeStroke(once);
+    expect(bs.size).toBeCloseTo(bo.size, 12);
+    expect(bs.taperStart).toBeCloseTo(bo.taperStart, 12);
+    expect(bs.size).toBeCloseTo(4 * k ** 5, 12);
+    expect(bs.taperStart).toBeCloseTo(6 * k ** 5, 12);
+    expect(s.size).toBe(4);
   });
 
   it('the outline area is proportional to the scale squared (the stroke does not turn into a blob)', () => {
@@ -32,13 +35,9 @@ describe('lineart stroke under transform: width and tapers follow the scale', ()
     expect(Math.abs(a1 / a0 - k * k) / (k * k)).toBeLessThan(0.15);
   });
 
-  it('the width has a floor of 0.5 px, as scaleStroke has', () => {
-    expect(transformStroke(line(50, 0), [0.01, 0, 0, 0.01, 0, 0]).size).toBe(0.5);
-  });
-
   it('a layer transform keeps the same rule for every picked stroke', () => {
     const layer = { ...newVectorLayer('l'), strokes: [line(100, 3)] } as any;
     const out = transformObjects(layer, null, [0.5, 0, 0, 0.5, 0, 0]);
-    expect((out as { strokes: Stroke[] }).strokes[0].taperStart).toBeCloseTo(1.5, 12);
+    expect(bakeStroke((out as { strokes: Stroke[] }).strokes[0]).taperStart).toBeCloseTo(1.5, 12);
   });
 });

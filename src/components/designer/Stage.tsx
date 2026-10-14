@@ -14,6 +14,7 @@ import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../.
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
 import { ShapeKnots, shapeEditHint } from './ShapeKnots';
+import { worldPoints } from '../../engine/design/strokes';
 import { checkerTile, drawArrowHandle } from './stageSprites';
 import { GradientKnots } from './ShapeHandles';
 import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/design/shapeLook';
@@ -481,10 +482,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         ctx.strokeStyle = '#d4f25a';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        stroke.points.forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)));
+        worldPoints(stroke).forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)));
         ctx.stroke();
         for (const i of selectedCurve.handles) {
-          const point = stroke.points[i];
+          const point = worldPoints(stroke)[i];
           if (!point) continue;
           ctx.beginPath();
           ctx.arc(sx(point[0]), sy(point[1]), 4, 0, Math.PI * 2);

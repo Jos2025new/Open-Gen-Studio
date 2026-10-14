@@ -1,4 +1,3 @@
-import { MIN_STROKE_SIZE } from './strokes';
 import { allVectorObjects } from './vectorMask';
 import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
@@ -50,16 +49,12 @@ export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
   return { ...mapPathShape(s, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
 }
 
-/** A stroke under a transform: points moved; width and tapers follow the average scale (the «Scale stroke» rule). */
+/**
+ * A stroke under a transform: only the matrix is composed; the gesture's points, width and tapers stay as drawn, so
+ * repeated transforms never accumulate rounding or change the outline's thresholds (diagnostico-escala-lineart.md).
+ */
 export function transformStroke(s: Stroke, m: Mat): Stroke {
-  const k = lengthScale(m);
-  return {
-    ...s,
-    size: Math.max(MIN_STROKE_SIZE, s.size * k),
-    taperStart: s.taperStart * k,
-    taperEnd: s.taperEnd * k,
-    points: s.points.map(([x, y, p]) => [...apply(m, x, y), p] as [number, number, number]),
-  };
+  return { ...s, matrix: multiply(m, s.matrix ?? [1, 0, 0, 1, 0, 0]) };
 }
 
 /** Page coordinates → a raster layer's buffer pixels. */

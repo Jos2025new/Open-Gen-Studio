@@ -2,6 +2,7 @@ import { getStroke, getStrokePoints, type StrokeOptions } from 'perfect-freehand
 import { uid } from '../../lib/id';
 import type { Stroke, StrokeStyle } from '../types';
 import type { Box } from './doc';
+import { apply, lengthScale } from './matrix';
 
 /** Strokes never get thinner than this (px) when scaled. Lives here: affine.ts imports it, and strokes.ts must not import affine (store.ts reads DEFAULT_STROKE_STYLE while loading). */
 export const MIN_STROKE_SIZE = 0.5;
@@ -38,10 +39,31 @@ export function strokeOptions(s: Stroke, last = true): StrokeOptions {
 
 const outlines = new WeakMap<Stroke, { outline: number[][]; path: string }>();
 
+/** The gesture's points in page coordinates (the stored ones when the stroke has no matrix). */
+export function worldPoints(s: Stroke): Array<[number, number, number]> {
+  const m = s.matrix;
+  return m ? s.points.map(([x, y, p]) => [...apply(m, x, y), p] as [number, number, number]) : s.points;
+}
+
+/**
+ * The stroke with its matrix applied to its numbers: points moved, width and tapers scaled by the matrix's average
+ * scale. Exact (no clamping), so editing a baked stroke gives the same outline the matrix gave. Strokes with no
+ * matrix come back as they are.
+ */
+export function bakeStroke(s: Stroke): Stroke {
+  if (!s.matrix) return s;
+  const k = lengthScale(s.matrix);
+  const { matrix: _m, ...rest } = s;
+  return { ...rest, size: s.size * k, taperStart: s.taperStart * k, taperEnd: s.taperEnd * k, points: worldPoints(s) };
+}
+
 function computed(s: Stroke): { outline: number[][]; path: string } {
   let c = outlines.get(s);
   if (!c) {
-    const outline = getStroke(s.points, strokeOptions(s));
+    // The outline is computed in the stroke's own frame, with its own numbers, then mapped by the matrix: the
+    // thresholds in perfect-freehand then see the geometry as it was drawn.
+    const local = getStroke(s.points, strokeOptions(s));
+    const outline = s.matrix ? local.map(([x, y]) => apply(s.matrix!, x, y)) : local;
     c = { outline, path: outlinePath(outline) };
     outlines.set(s, c);
   }
@@ -78,7 +100,8 @@ export function outlinePath(points: number[][]): string {
 
 /** Centerline samples with pressure, running length and direction (for texture stamping). */
 export function strokeSamples(s: Stroke) {
-  return getStrokePoints(s.points, strokeOptions(s));
+  const b = bakeStroke(s);
+  return getStrokePoints(b.points, strokeOptions(b));
 }
 
 export function strokeBox(s: Stroke): Box | null {
@@ -119,28 +142,31 @@ export function strokeHandles(s: Stroke): number[] {
 }
 
 export function nearStroke(s: Stroke, x: number, y: number, tolerance: number): boolean {
-  for (let i = 0; i < s.points.length; i++) {
-    const a = s.points[Math.max(0, i - 1)], b = s.points[i];
+  const pts = worldPoints(s), size = s.matrix ? s.size * lengthScale(s.matrix) : s.size;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[i];
     const dx = b[0] - a[0], dy = b[1] - a[1];
     const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
-    if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= tolerance + s.size / 2) return true;
+    if (Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) <= tolerance + size / 2) return true;
   }
   return false;
 }
 
 export function translateStroke(s: Stroke, dx: number, dy: number): Stroke {
-  return { ...s, points: s.points.map(([x, y, p]) => [x + dx, y + dy, p]) };
+  const b = bakeStroke(s);
+  return { ...b, points: b.points.map(([x, y, p]) => [x + dx, y + dy, p]) };
 }
 
 /** Scale about an anchor; width and tapers follow the average scale so the line keeps its look. */
 export function scaleStroke(s: Stroke, sx: number, sy: number, ax: number, ay: number): Stroke {
   const k = Math.sqrt(Math.abs(sx * sy));
+  const b = bakeStroke(s);
   return {
-    ...s,
-    points: s.points.map(([x, y, p]) => [ax + (x - ax) * sx, ay + (y - ay) * sy, p]),
-    size: Math.max(MIN_STROKE_SIZE, s.size * k),
-    taperStart: s.taperStart * k,
-    taperEnd: s.taperEnd * k,
+    ...b,
+    points: b.points.map(([x, y, p]) => [ax + (x - ax) * sx, ay + (y - ay) * sy, p]),
+    size: Math.max(MIN_STROKE_SIZE, b.size * k),
+    taperStart: b.taperStart * k,
+    taperEnd: b.taperEnd * k,
   };
 }
 
@@ -149,7 +175,7 @@ export function nearestPoint(strokes: Stroke[], x: number, y: number, tolerance:
   let best: { stroke: number; point: number } | null = null;
   let bestD = tolerance;
   strokes.forEach((s, si) =>
-    s.points.forEach(([px, py], pi) => {
+    worldPoints(s).forEach(([px, py], pi) => {
       const d = Math.hypot(px - x, py - y);
       if (d <= bestD) {
         bestD = d;
@@ -165,13 +191,13 @@ export function nearestPoint(strokes: Stroke[], x: number, y: number, tolerance:
  * falloff, so the curve bends instead of kinking. Pressure is kept.
  */
 export function bendStroke(s: Stroke, index: number, dx: number, dy: number, radius: number): Stroke {
-  const pts = s.points;
+  const b = bakeStroke(s), pts = b.points;
   const along = new Array<number>(pts.length).fill(Infinity);
   along[index] = 0;
   for (let i = index + 1; i < pts.length; i++) along[i] = along[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   for (let i = index - 1; i >= 0; i--) along[i] = along[i + 1] + Math.hypot(pts[i][0] - pts[i + 1][0], pts[i][1] - pts[i + 1][1]);
   return {
-    ...s,
+    ...b,
     points: pts.map(([x, y, p], i) => {
       const t = radius > 0 ? Math.max(0, 1 - along[i] / radius) : i === index ? 1 : 0;
       const w = t * t * (3 - 2 * t);

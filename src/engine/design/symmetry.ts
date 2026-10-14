@@ -1,3 +1,4 @@
+import { worldPoints } from './strokes';
 import type { Layer, VectorLayer } from '../types';
 import { shapeBox } from './doc';
 import { pathTransform } from './path';
@@ -18,7 +19,7 @@ function vectorPoints(layer: VectorLayer, ids?: string[]): Array<[number, number
     } else if (s.type === 'line') pts.push([s.x, s.y], [s.x + s.w, s.y + s.h]);
     else { const b = shapeBox(s); pts.push([b.x, b.y], [b.x + b.w, b.y + b.h]); }
   }
-  for (const st of layer.strokes ?? []) if (!ids || ids.includes(st.id)) for (const [x, y] of st.points) pts.push([x, y]);
+  for (const st of layer.strokes ?? []) if (!ids || ids.includes(st.id)) for (const [x, y] of worldPoints(st)) pts.push([x, y]);
   return pts;
 }
 
