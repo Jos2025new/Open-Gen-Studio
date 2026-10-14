@@ -14,7 +14,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
-| **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
+| **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx), [actions.ts](../src/engine/design/actions.ts) | [paint-mode.test.ts](../tests/paint-mode.test.ts), [paint-mode-history.test.ts](../tests/paint-mode-history.test.ts) |
 | **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts), [drawing-choice-position.test.ts](../tests/drawing-choice-position.test.ts) |
 | **eps-import** — EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación. | [eps.js](../server/eps.js), [local-store.js](../server/local-store.js), [imports.ts](../src/lib/imports.ts) | [eps-server.test.ts](../tests/eps-server.test.ts), [imports-eps-heic.test.ts](../tests/imports-eps-heic.test.ts) |
 | **svg-import** — Todo SVG se sanea (sanitize.ts) antes de leerlo, tanto al importarlo como capas en el Designer como al aplanarlo a PNG en el área de nodos; la parte editable y la rasterizada salen del mismo recorrido (structure.ts). | [sanitize.ts](../src/engine/design/svgImport/sanitize.ts), [flatten.ts](../src/engine/design/svgImport/flatten.ts), [index.ts](../src/engine/design/svgImport/index.ts), [imports.ts](../src/lib/imports.ts) | [svg-import.test.ts](../tests/svg-import.test.ts), [svg-import-resvg.test.ts](../tests/svg-import-resvg.test.ts) |
@@ -68,12 +68,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 178 | 115 |
-| [store.ts](../src/store/store.ts) | 106 | 95 |
+| [store.ts](../src/store/store.ts) | 106 | 96 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
-| [actions.ts](../src/engine/design/actions.ts) | 36 | 16 |
+| [actions.ts](../src/engine/design/actions.ts) | 36 | 17 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 35 | 1 |
-| [doc.ts](../src/engine/design/doc.ts) | 33 | 33 |
+| [doc.ts](../src/engine/design/doc.ts) | 33 | 34 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
@@ -84,7 +84,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 19 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 18 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 2 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 117 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 118 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 15 | 4 |
 | [http.ts](../src/lib/http.ts) | 15 | 4 |
 
@@ -103,14 +103,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 31 | 142 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 85 | 85 |
+| `src/engine/design` | 85 | 86 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 139 |
-| `src/store` | 4 | 97 |
+| `src/lib` | 24 | 140 |
+| `src/store` | 4 | 98 |
 
 113 de 296 módulos no tienen ningún test que los importe directamente.
 
