@@ -1,6 +1,6 @@
 export default [{
   id: 'designer-selection',
-  what: 'Autoselect suma capas en Object; marquee y editores usan selección explícita.',
+  what: 'Autoselect suma capas; Align mueve objetos y grupos.',
   sides: [
     ['src/engine/design/marquee.ts', 'export function marqueeIds'],
     ['src/engine/design/objectSelection.ts', 'export function pickObject'],
@@ -16,6 +16,10 @@ export default [{
     ['src/components/designer/ContextStrip.tsx', 'MultiRectangleRadii'],
     ['src/components/designer/MultiRectangleRadii.tsx', 'data-multi-rectangle-convert'],
     ['src/styles/designer-connected.css', '.context-strip .rounding-selection'],
+    ['src/engine/design/transform.ts', 'export function alignDeltas'],
+    ['src/engine/design/objectOps.ts', 'export function alignObjectDeltas'],
+    ['src/components/designer/ToolSettings.tsx', 'const ANCHOR_ALIGN_ITEMS'],
+    ['src/styles/designer.css', '.align-group-option'],
   ],
-  tests: ['tests/marquee.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
+  tests: ['tests/marquee.test.ts', 'tests/layer-transform.test.ts', 'tests/object-ops.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
 }];

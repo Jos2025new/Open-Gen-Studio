@@ -56,6 +56,19 @@ describe('Edit in Objects mode: only the picked objects change', () => {
     expect(both.get('r2')).toEqual({ dx: -500, dy: 0 });
     expect(both.has('r1')).toBe(false);
   });
+  it('aligns opposing edges to the selected anchor and preserves spacing in group mode', () => {
+    const l = { ...newVectorLayer('v'), shapes: [
+      { ...rect('r1', 0, 0), w: 100 }, { ...rect('r2', 300, 200), w: 160, h: 80 }, rect('r3', 700, 500), rect('outside', 900, 900),
+    ] } as VectorLayer;
+    const ids = ['r1', 'r2', 'r3'];
+    const individual = alignObjectDeltas(doc, l, ids, 'left-to-right', 'last');
+    expect(individual).toEqual(new Map([['r1', { dx: 800, dy: 0 }], ['r2', { dx: 500, dy: 0 }]]));
+    const grouped = alignObjectDeltas(doc, l, ids, 'left-to-right', 'last', true);
+    expect(grouped).toEqual(new Map([['r1', { dx: 800, dy: 0 }], ['r2', { dx: 800, dy: 0 }]]));
+    expect(grouped.has('r3')).toBe(false);
+    expect(grouped.has('outside')).toBe(false);
+    expect(alignObjectDeltas(doc, l, ids, 'left', 'selection', true).size).toBe(0);
+  });
 });
 
 import { deletePickedObjects } from '../src/engine/design/objectOps';

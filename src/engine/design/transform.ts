@@ -17,7 +17,7 @@ import { layerBox } from './render';
  * strokes; text can be aligned but not flipped or rotated (no rotation in the layer model). Each is one undo step.
  */
 
-export type AlignTo = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+export type AlignTo = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom' | 'left-to-right' | 'right-to-left' | 'top-to-bottom' | 'bottom-to-top';
 export type Turn = 'flip-h' | 'flip-v' | 'rotate-cw' | 'rotate-ccw' | 'rotate-180';
 
 const get = () => useStore.getState();
@@ -153,8 +153,7 @@ export function fitLayer(sessionId: string, docId: string, layerId: string, mode
 // Several layers
 
 export type RelativeTo = 'page' | 'selection' | 'first' | 'last' | 'biggest' | 'smallest';
-type Box = { x: number; y: number; w: number; h: number };
-
+export type Box = { x: number; y: number; w: number; h: number };
 /** The box the layers line up against (Inkscape's "Relative to"). */
 export function referenceBox(doc: Pick<DesignDoc, 'width' | 'height'>, layers: Layer[], rel: RelativeTo): Box | null {
   if (rel === 'page' || !layers.length) return { x: 0, y: 0, w: doc.width, h: doc.height };
@@ -167,17 +166,57 @@ export function referenceBox(doc: Pick<DesignDoc, 'width' | 'height'>, layers: L
   return { x: x0, y: y0, w: Math.max(...boxes.map((b) => b.x + b.w)) - x0, h: Math.max(...boxes.map((b) => b.y + b.h)) - y0 };
 }
 
-/** How far each layer moves to line up with the reference box. */
-export function alignDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layers: Layer[], to: AlignTo, rel: RelativeTo): Map<string, { dx: number; dy: number }> {
+export const unionBoxes = (boxes: Box[]): Box | null => {
+  if (!boxes.length) return null;
+  const x = Math.min(...boxes.map((b) => b.x)), y = Math.min(...boxes.map((b) => b.y));
+  return { x, y, w: Math.max(...boxes.map((b) => b.x + b.w)) - x, h: Math.max(...boxes.map((b) => b.y + b.h)) - y };
+};
+
+export function alignBoxDelta(b: Box, ref: Box, to: AlignTo): { dx: number; dy: number } {
+  const dx = to === 'left' ? ref.x - b.x
+    : to === 'right' ? ref.x + ref.w - (b.x + b.w)
+      : to === 'center' ? ref.x + ref.w / 2 - (b.x + b.w / 2)
+        : to === 'left-to-right' ? ref.x + ref.w - b.x
+          : to === 'right-to-left' ? ref.x - (b.x + b.w) : 0;
+  const dy = to === 'top' ? ref.y - b.y
+    : to === 'bottom' ? ref.y + ref.h - (b.y + b.h)
+      : to === 'middle' ? ref.y + ref.h / 2 - (b.y + b.h / 2)
+        : to === 'top-to-bottom' ? ref.y + ref.h - b.y
+          : to === 'bottom-to-top' ? ref.y - (b.y + b.h) : 0;
+  return { dx, dy };
+}
+
+function alignmentAnchor(layers: Layer[], rel: RelativeTo): Layer | undefined {
+  if (rel === 'first') return layers[0];
+  if (rel === 'last') return layers[layers.length - 1];
+  if (rel !== 'biggest' && rel !== 'smallest') return undefined;
+  return [...layers].sort((a, b) => {
+    const aa = layerBox(a), bb = layerBox(b);
+    return (rel === 'biggest' ? -1 : 1) * ((aa?.w ?? 0) * (aa?.h ?? 0) - (bb?.w ?? 0) * (bb?.h ?? 0));
+  })[0];
+}
+
+/** Align selected layers individually, or translate the remaining selection together while its anchor stays fixed. */
+export function alignDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layers: Layer[], to: AlignTo, rel: RelativeTo, asGroup = false): Map<string, { dx: number; dy: number }> {
   const ref = referenceBox(doc, layers, rel);
   const out = new Map<string, { dx: number; dy: number }>();
   if (!ref) return out;
-  for (const l of layers) {
+  if (asGroup && rel === 'selection') return out;
+  const anchor = alignmentAnchor(layers, rel);
+  const moving = asGroup && anchor ? layers.filter((l) => l.id !== anchor.id) : layers;
+  if (asGroup) {
+    const box = unionBoxes(moving.map(layerBox).filter((b): b is Box => Boolean(b)));
+    if (!box) return out;
+    const delta = alignBoxDelta(box, ref, to);
+    if (delta.dx || delta.dy) for (const l of moving) out.set(l.id, delta);
+    return out;
+  }
+  for (const l of moving) {
+    if (anchor && l.id === anchor.id) continue;
     const b = layerBox(l);
     if (!b) continue;
-    const dx = to === 'left' ? ref.x - b.x : to === 'right' ? ref.x + ref.w - (b.x + b.w) : to === 'center' ? ref.x + ref.w / 2 - (b.x + b.w / 2) : 0;
-    const dy = to === 'top' ? ref.y - b.y : to === 'bottom' ? ref.y + ref.h - (b.y + b.h) : to === 'middle' ? ref.y + ref.h / 2 - (b.y + b.h / 2) : 0;
-    if (dx || dy) out.set(l.id, { dx, dy });
+    const delta = alignBoxDelta(b, ref, to);
+    if (delta.dx || delta.dy) out.set(l.id, delta);
   }
   return out;
 }
@@ -218,9 +257,9 @@ const pick = (sessionId: string, docId: string, ids: string[]) => {
 };
 
 /** Align several layers (or one) to the page, the selection, the first or last picked, or the biggest or smallest. */
-export function alignLayers(sessionId: string, docId: string, ids: string[], to: AlignTo, rel: RelativeTo): void {
+export function alignLayers(sessionId: string, docId: string, ids: string[], to: AlignTo, rel: RelativeTo, asGroup = false): void {
   const { doc, layers } = pick(sessionId, docId, ids);
-  if (doc && layers.length) moveLayers(sessionId, docId, alignDeltas(doc, layers, to, rel));
+  if (doc && layers.length) moveLayers(sessionId, docId, alignDeltas(doc, layers, to, rel, asGroup));
 }
 
 export function distributeLayers(sessionId: string, docId: string, ids: string[], axis: 'h' | 'v'): void {

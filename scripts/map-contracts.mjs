@@ -22,7 +22,7 @@ export default [
   },
   {
     id: 'paint-mode',
-    what: 'ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen.',
+    what: 'ADR 0016: Dibujo/Diseño coincide al crear, abrir y pintar; Dibujo no crea trazos editables.',
     sides: [
       ['src/engine/design/paintMode.ts', 'export function paintModeOf'],
       ['src/engine/design/paintMode.ts', 'export function strokeObjectsAvailable'],
@@ -36,7 +36,7 @@ export default [
   },
   {
     id: 'drawing-choice',
-    what: 'ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia.',
+    what: 'ADR 0016: pintar trazos editables en Dibujo pregunta; cerrar cancela y Ajustes reinicia la preferencia.',
     sides: [
       ['src/engine/design/drawingChoice.ts', 'export function applyDrawingChoice'],
       ['src/components/designer/StagePaintCommit.ts', 'export function drawingChoiceFirst'],
@@ -59,7 +59,7 @@ export default [
   },
   {
     id: 'svg-import',
-    what: 'Todo SVG se sanea (sanitize.ts) antes de leerlo, tanto al importarlo como capas en el Designer como al aplanarlo a PNG en el área de nodos; la parte editable y la rasterizada salen del mismo recorrido (structure.ts).',
+    what: 'SVG se sanea antes de importarlo editable o aplanarlo a PNG; ambas rutas comparten estructura.',
     sides: [
       ['src/engine/design/svgImport/sanitize.ts', 'export function sanitizeSvg'],
       ['src/engine/design/svgImport/flatten.ts', 'sanitizeSvg(text)'],

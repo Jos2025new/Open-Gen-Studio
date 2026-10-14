@@ -1,7 +1,7 @@
 import { ShapeLookFields } from './ShapeLookFields';
 import { record } from '../../engine/design/history';
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ArrowDownFromLine, ArrowLeftFromLine, ArrowRightFromLine, ArrowUpFromLine, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
@@ -40,6 +40,12 @@ const ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVe
   { id: 'top', label: 'Align top', icon: AlignStartHorizontal },
   { id: 'middle', label: 'Center vertically', icon: AlignCenterHorizontal },
   { id: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal },
+];
+const ANCHOR_ALIGN_ITEMS: Array<{ id: AlignTo; label: string; icon: typeof AlignStartVertical }> = [
+  { id: 'left-to-right', label: 'Align left edge to anchor’s right edge', icon: ArrowRightFromLine },
+  { id: 'right-to-left', label: 'Align right edge to anchor’s left edge', icon: ArrowLeftFromLine },
+  { id: 'top-to-bottom', label: 'Align top edge to anchor’s bottom edge', icon: ArrowDownFromLine },
+  { id: 'bottom-to-top', label: 'Align bottom edge to anchor’s top edge', icon: ArrowUpFromLine },
 ];
 // Icons by their drawing, not by lucide's old alias names: in this lucide version "FlipHorizontal2" is the triangles
 // split by a horizontal line (a top↔bottom mirror), so the names alone pointed at the wrong icon.
@@ -97,15 +103,12 @@ export function EditOptionsControl() {
   </>;
 }
 
-/**
- * Edit tool: Align (to the page, or with several layers picked relative to the selection, the first or last picked,
- * the biggest or smallest; distribute with 3+; fit or fill for one image) and Transform (flip, quarter turns, each
- * picked layer about its own center).
- */
+/** Edit tool: align, distribute (3+), fit/fill one image, or transform picked objects/layers. */
 export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean; turnOnly?: boolean }) {
   const align = usePopover();
   const turn = usePopover();
   const [rel, setRel] = useState<RelativeTo | null>(null);
+  const [alignAsGroup, setAlignAsGroup] = useState(false);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -126,13 +129,17 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   const count = onObjects ? objIds.length : layers.length;
   const many = count > 1;
   const relativeTo = rel ?? (many ? 'selection' : 'page');
+  const groupReason = count < 2 ? 'Select at least two objects or layers to move them as a group.'
+    : relativeTo === 'selection' ? 'Choose Page or an anchor; aligning a group to its own selection would not move it.' : undefined;
+  const alignReason = alignAsGroup && relativeTo === 'selection' ? groupReason : undefined;
+  const anchorEdgeNeedsPair = count < 2 && ['first', 'last', 'biggest', 'smallest'].includes(relativeTo);
   const one = layers[0];
   const locked = onObjects ? Boolean(objLayer?.locked) : layers.some((l) => l.locked);
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
   const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
   const why = !emptyPick ? undefined : !layerGroup ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
-  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo) : alignLayers(sessionId, doc.id, ids, to, relativeTo));
+  const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo, alignAsGroup) : alignLayers(sessionId, doc.id, ids, to, relativeTo, alignAsGroup));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
   return <>
@@ -141,7 +148,12 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
     <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={230} label="Align">
       <div className="menu">
         <div className="menu-target">{target}</div>
-        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} onClick={() => doAlign(a.id)} />)}
+        {ALIGN_ITEMS.map((a) => <MenuItem key={a.id} icon={a.icon} label={a.label} disabled={Boolean(alignReason)} tip={alignReason} onClick={() => doAlign(a.id)} />)}
+        <div className="menu-sep-label">Align to anchor edge</div>
+        {ANCHOR_ALIGN_ITEMS.map((a) => {
+          const reason = alignReason ?? (anchorEdgeNeedsPair ? 'Choose an anchor from at least two selected objects or layers.' : undefined);
+          return <MenuItem key={a.id} icon={a.icon} label={a.label} disabled={Boolean(reason)} tip={reason} onClick={() => doAlign(a.id)} />;
+        })}
         <MenuItem icon={AlignHorizontalDistributeCenter} label="Even horizontal gaps" disabled={count < 3} onClick={() => doDistribute('h')} />
         <MenuItem icon={AlignVerticalDistributeCenter} label="Even vertical gaps" disabled={count < 3} onClick={() => doDistribute('v')} />
         {!onObjects && !many && one?.type === 'raster' ? <>
@@ -149,6 +161,10 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
           <MenuItem icon={Minimize} label="Fit inside the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); }} />
           <MenuItem icon={Maximize} label="Fill the page" onClick={() => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); }} />
         </> : null}
+        <label className="menu-field align-group-option" data-tip={groupReason ?? 'Move all selected objects together, keeping their spacing. When an object is the reference, it stays fixed.'}>
+          <input type="checkbox" aria-label="Move or align selection as group" checked={alignAsGroup} disabled={count < 2 || (relativeTo === 'selection' && !alignAsGroup)} onChange={(e) => setAlignAsGroup(e.target.checked)} />
+          <span>Move selection as group</span>
+        </label>
         <label className="menu-field align-reference"><span>Relative to</span><select aria-label="Relative to" value={relativeTo} onChange={(e) => setRel(e.target.value as RelativeTo)}>{RELATIVE.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></label>
       </div>
     </Popover>

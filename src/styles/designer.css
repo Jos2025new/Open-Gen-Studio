@@ -120,6 +120,8 @@
 /* "Relative to" at the top of the Align menu. */
 .menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-2); }
 .menu-field select { font-size: 11px; padding: 3px 6px; }
+.align-group-option { justify-content: flex-start; cursor: pointer; }
+.align-group-option input { flex: 0 0 auto; margin: 0; }
 
 /* Snap: the bar button shows when it is on; its options in a small panel. */
 .tool-setting.is-on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }

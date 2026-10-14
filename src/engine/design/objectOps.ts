@@ -7,7 +7,7 @@ import { looksUnchanged, noChangeNote } from './symmetry';
 import { strokeBox, translateStroke } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
 import {composeRaster} from './rasterCompose';
-import { turnVector, type AlignTo, type RelativeTo, type Turn } from './transform';
+import { alignBoxDelta, turnVector, unionBoxes, type AlignTo, type Box, type RelativeTo, type Turn } from './transform';
 
 /*
  * Edit in Objects mode: the operations act on the objects picked inside the active layer (objectSelection.ts), and
@@ -15,7 +15,6 @@ import { turnVector, type AlignTo, type RelativeTo, type Turn } from './transfor
  * and strokes, never flattened). One undo step each.
  */
 
-type Box = { x: number; y: number; w: number; h: number };
 const union = (bs: Box[]): Box | null => {
   if (!bs.length) return null;
   const x = Math.min(...bs.map((b) => b.x)), y = Math.min(...bs.map((b) => b.y));
@@ -110,21 +109,32 @@ export function turnObjects(layer: Layer, ids: string[], turn: Turn): Layer {
 }
 
 /** How far each picked object moves to line up with the chosen reference. */
-export function alignObjectDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layer: Layer, ids: string[], to: AlignTo, rel: RelativeTo): Map<string, { dx: number; dy: number }> {
-  const objs = layerObjects(layer).filter((o) => ids.includes(o.id));
+/** Align picked objects, or preserve their spacing while moving them as one group. */
+export function alignObjectDeltas(doc: Pick<DesignDoc, 'width' | 'height'>, layer: Layer, ids: string[], to: AlignTo, rel: RelativeTo, asGroup = false): Map<string, { dx: number; dy: number }> {
+  const byId = new Map(layerObjects(layer).map((o) => [o.id, o]));
+  const objs = ids.map((id) => byId.get(id)).filter((o): o is { id: string; box: Box } => Boolean(o));
   const out = new Map<string, { dx: number; dy: number }>();
   if (!objs.length) return out;
   const boxes = objs.map((o) => o.box);
+  const biggest = () => [...objs].sort((a, b) => b.box.w * b.box.h - a.box.w * a.box.h)[0];
+  const smallest = () => [...objs].sort((a, b) => a.box.w * a.box.h - b.box.w * b.box.h)[0];
+  const anchor = rel === 'first' ? objs[0] : rel === 'last' ? objs[objs.length - 1] : rel === 'biggest' ? biggest() : rel === 'smallest' ? smallest() : null;
   const ref: Box | null = rel === 'page' ? { x: 0, y: 0, w: doc.width, h: doc.height }
-    : rel === 'first' ? boxes[0] : rel === 'last' ? boxes[boxes.length - 1]
-      : rel === 'biggest' || rel === 'smallest' ? [...boxes].sort((a, b) => (rel === 'biggest' ? b.w * b.h - a.w * a.h : a.w * a.h - b.w * b.h))[0]
-        : union(boxes);
+    : anchor?.box ?? unionBoxes(boxes);
   if (!ref) return out;
-  for (const o of objs) {
-    const b = o.box;
-    const dx = to === 'left' ? ref.x - b.x : to === 'right' ? ref.x + ref.w - (b.x + b.w) : to === 'center' ? ref.x + ref.w / 2 - (b.x + b.w / 2) : 0;
-    const dy = to === 'top' ? ref.y - b.y : to === 'bottom' ? ref.y + ref.h - (b.y + b.h) : to === 'middle' ? ref.y + ref.h / 2 - (b.y + b.h / 2) : 0;
-    if (dx || dy) out.set(o.id, { dx, dy });
+  if (asGroup && rel === 'selection') return out;
+  const moving = asGroup && anchor ? objs.filter((o) => o.id !== anchor.id) : objs;
+  if (asGroup) {
+    const groupBox = unionBoxes(moving.map((o) => o.box));
+    if (!groupBox) return out;
+    const delta = alignBoxDelta(groupBox, ref, to);
+    if (delta.dx || delta.dy) for (const o of moving) out.set(o.id, delta);
+    return out;
+  }
+  for (const o of moving) {
+    if (anchor && o.id === anchor.id) continue;
+    const delta = alignBoxDelta(o.box, ref, to);
+    if (delta.dx || delta.dy) out.set(o.id, delta);
   }
   return out;
 }
@@ -182,10 +192,10 @@ function moveEach(layer: Layer, deltas: Map<string, { dx: number; dy: number }>)
   return out;
 }
 
-export function alignPickedObjects(sessionId: string, docId: string, layerId: string, ids: string[], to: AlignTo, rel: RelativeTo): void {
+export function alignPickedObjects(sessionId: string, docId: string, layerId: string, ids: string[], to: AlignTo, rel: RelativeTo, asGroup = false): void {
   const doc = docOf(sessionId, docId), l = picked(sessionId, docId, layerId);
   if (!doc || !l) return;
-  const deltas = alignObjectDeltas(doc, l, ids, to, rel);
+  const deltas = alignObjectDeltas(doc, l, ids, to, rel, asGroup);
   if (deltas.size) commitObjects(sessionId, docId, moveEach(l, deltas));
 }
 

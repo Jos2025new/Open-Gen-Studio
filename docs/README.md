@@ -107,6 +107,7 @@
 - [031-2026-10-W42: edición de nodos desde rectángulos seleccionados](history/031-2026-10-W42.md) — Rx/Ry conserva la edición paramétrica y una acción explícita convierte la selección para editar nodos juntos.
 - [032-2026-10-W42: Autoselect entre capas en Edit](history/032-2026-10-W42.md) — Shift/Ctrl amplía la selección sin obligar a cambiar a Layer; Align y Rx operan sobre el grupo.
 - [033-2026-10-W42: control compacto de radios múltiples](history/033-2026-10-W42.md) — Rx/Ry, esquinas agudas y conversión a paths ocupan menos lienzo y se envuelven en estrecho.
+- [034-2026-10-W42: alineación de bordes opuestos y grupo](history/034-2026-10-W42.md) — cuatro acciones contra el borde opuesto y movimiento conjunto con referencia fija.
 
 ## Trazabilidad
 

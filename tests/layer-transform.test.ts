@@ -44,6 +44,25 @@ describe('Edit with several layers: relative to and distribute', () => {
     expect(alignDeltas(doc, [a, b, c], 'right', 'smallest').get('b')).toEqual({ dx: 320, dy: 0 });
     expect(alignDeltas(doc, [a, b, c], 'right', 'page').get('c')).toEqual({ dx: 180, dy: 0 });
   });
+  it('aligns opposing edges to an anchor without moving the anchor', () => {
+    const a = rect('a', 100, 100, 50, 50), b = rect('b', 300, 300, 200, 200), c = rect('c', 800, 800, 20, 20);
+    expect(alignDeltas(doc, [a, b, c], 'left-to-right', 'last')).toEqual(new Map([
+      ['a', { dx: 720, dy: 0 }], ['b', { dx: 520, dy: 0 }],
+    ]));
+    expect(alignDeltas(doc, [a, b, c], 'right-to-left', 'first').get('b')).toEqual({ dx: -400, dy: 0 });
+    expect(alignDeltas(doc, [a, b, c], 'top-to-bottom', 'last').get('b')).toEqual({ dx: 0, dy: 520 });
+    expect(alignDeltas(doc, [a, b, c], 'bottom-to-top', 'first').get('b')).toEqual({ dx: 0, dy: -400 });
+  });
+  it('moves the non-anchor selection as one group and leaves relative selection as a no-op', () => {
+    const a = rect('a', 100, 0, 50, 50), b = rect('b', 300, 0, 200, 200), c = rect('c', 800, 0, 20, 20);
+    const group = alignDeltas(doc, [a, b, c], 'left-to-right', 'last', true);
+    expect(group).toEqual(new Map([['a', { dx: 720, dy: 0 }], ['b', { dx: 720, dy: 0 }]]));
+    expect(group.has('c')).toBe(false);
+    expect(alignDeltas(doc, [a, b, c], 'left', 'page', true)).toEqual(new Map([
+      ['a', { dx: -100, dy: 0 }], ['b', { dx: -100, dy: 0 }], ['c', { dx: -100, dy: 0 }],
+    ]));
+    expect(alignDeltas(doc, [a, b, c], 'center', 'selection', true).size).toBe(0);
+  });
   it('spaces 3+ layers evenly, the outer two staying', () => {
     const d = distributeDeltas([a, b, c], 'h');
     expect(d.has('a') || d.has('c')).toBe(false);
