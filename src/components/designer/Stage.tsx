@@ -7,7 +7,7 @@ import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
-import { SNAP_DEFAULT, snapBox, snapTargets } from '../../engine/design/snap';
+import { SNAP_DEFAULT, SNAP_PX, snapBox, snapTargets } from '../../engine/design/snap';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
@@ -65,8 +65,6 @@ type Drag =
 const HANDLE = 8;
 type XformOp = 'scale' | 'rotate' | 'skew' | 'pivot';
 /** A transform handle on the selection box: where it sits, what it does, and (for scale) which axes it moves. */
-/** How close (screen px) an edge or center must come to a target to snap to it. */
-const SNAP_PX = 8;
 
 interface Handle { op: XformOp; x: number; y: number; fx: number; fy: number }
 /** Inkscape's two sets: scale (corners and sides), or rotate (corners), skew (sides) and the rotation center. */

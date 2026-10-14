@@ -7,6 +7,11 @@ import { layerBox } from './render';
  * lines it sticks to come back as guides to draw. Simple on purpose: one nearest match per axis.
  */
 
+/** How close (screen px) an edge or center must come to a target to snap: Inkscape's default object tolerance. */
+export const SNAP_PX = 10;
+/** The tolerance in document units at a zoom: the screen distance divided by the zoom (snap.cpp getSnapperTolerance). */
+export const snapTolerance = (zoom: number): number => SNAP_PX / Math.max(1e-9, zoom);
+
 export interface SnapOptions {
   on: boolean;
   page: boolean;
