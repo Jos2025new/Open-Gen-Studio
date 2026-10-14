@@ -73,6 +73,7 @@ async function fetchVideoModels(): Promise<OrVideoModel[]> {
 export function parseOrVideoPricing(skus: Record<string, string> | null | undefined): PriceRule {
   const out: PriceSku[] = [];
   let minimumUsd: number | undefined;
+  const unpriced: string[] = [];
   for (const [k, raw] of Object.entries(skus ?? {})) {
     const v = parseFloat(raw);
     if (!Number.isFinite(v)) continue;
@@ -94,10 +95,14 @@ export function parseOrVideoPricing(skus: Record<string, string> | null | undefi
     m = /^cents_per_(?:second_output|video_output_second)(?:_(\w+))?$/.exec(k);
     if (m) {
       out.push({ unit: 'second', usd: v / 100, resolution: m[1] });
+      continue;
     }
+    // Rates we do not model (megapixel-seconds, tokens): shown, never folded into a total as if exact.
+    unpriced.push(`${k.replace(/_/g, ' ')} ${raw}`);
   }
-  if (!out.length) return { skus: [], minimumUsd, note: 'Token-billed; exact cost is reported after generation' };
-  return { skus: out, minimumUsd };
+  const other = unpriced.length ? `Also billed: ${unpriced.join(', ')}` : '';
+  if (!out.length) return { skus: [], minimumUsd, note: ['Token-billed; exact cost is reported after generation', other].filter(Boolean).join('. ') };
+  return unpriced.length ? { skus: out, minimumUsd, approximate: true, note: other } : { skus: out, minimumUsd };
 }
 
 function paramFromSupported(key: string, sp: SupportedParam): ParamDef | null {

@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { openrouter } from '../src/engine/providers/openrouter';
+import { openrouter, parseOrVideoPricing } from '../src/engine/providers/openrouter';
 import type { ModelSummary } from '../src/engine/types';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -93,5 +93,21 @@ describe('OpenRouter image price across endpoints (fix 3)', () => {
     const price = await priceOf(imageModel);
     expect(price.lowerBound).toBeUndefined();
     expect(price.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
+  });
+});
+
+describe('OpenRouter video pricing units (fix 4)', () => {
+  it('shows unrecognised rates as a note and never calls the total exact', () => {
+    const rule = parseOrVideoPricing({ duration_seconds_with_audio: '0.1', megapixel_seconds: '0.0002', tokens_per_second: '5' });
+    expect(rule.skus).toEqual([expect.objectContaining({ unit: 'second', usd: 0.1, audio: true })]);
+    expect(rule.approximate).toBe(true);
+    expect(rule.note).toMatch(/megapixel seconds/);
+    expect(rule.note).toMatch(/tokens per second/);
+  });
+
+  it('a token-only video has no sku and says so', () => {
+    const rule = parseOrVideoPricing({ tokens_per_second: '5' });
+    expect(rule.skus).toEqual([]);
+    expect(rule.note).toMatch(/tokens per second/);
   });
 });
