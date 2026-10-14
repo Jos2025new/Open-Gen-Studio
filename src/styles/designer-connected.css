@@ -134,6 +134,8 @@
 .picker-preview { flex: 0 0 26px; height: 26px; border: 1px solid var(--border-strong); border-radius: 5px; }
 
 .sidebar-tool-settings { padding: 12px 10px; border-bottom: 1px solid var(--border); }
+.sidebar-align-settings { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.sidebar-align-settings h3 { margin: 0 0 6px; font-size: 11px; }
 .sidebar-tool-settings .tool-settings { display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; max-width: none; overflow: visible; gap: 8px; }
 .sidebar-tool-settings .tool-settings > .opt-slider { flex: 1 1 140px; }
 .sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 36px; padding: 0 12px; background: var(--surface-2); border: 0; border-radius: var(--radius); }

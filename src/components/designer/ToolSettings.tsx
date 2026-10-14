@@ -88,6 +88,7 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, p
   alignPanel?: { relativeTo: RelativeTo | null; setRelativeTo: (value: RelativeTo) => void; alignAsGroup: boolean; setAlignAsGroup: (value: boolean) => void };
 }) {
   const turn = usePopover();
+  const activeTool = useStore((st) => st.ui.tool);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -130,9 +131,10 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, p
       onFit={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'contain') : undefined}
       onFill={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'cover') : undefined} />;
   }
-  const openAlign = () => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: 'align' }));
+  const openAlign = () => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: 'tool' }));
+  const alignUnavailable = alignOnly && activeTool !== 'move';
   return <>
-    {!turnOnly && <button type="button" className="tool-setting" aria-controls="designer-align-panel" onClick={openAlign} disabled={locked || emptyPick} data-tip={why ?? 'Align settings in the right panel'} aria-label="Align"><AlignCenterVertical size={14} /></button>}
+    {!turnOnly && <button type="button" className="tool-setting" aria-controls="designer-align-panel" onClick={openAlign} disabled={locked || emptyPick || alignUnavailable} data-tip={alignUnavailable ? 'Switch to Edit to align the selection.' : why ?? 'Align settings in the Tool panel'} aria-label="Align"><AlignCenterVertical size={14} /></button>}
     {!alignOnly && <>
     <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
