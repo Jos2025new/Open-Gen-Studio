@@ -68,6 +68,7 @@ El usuario aprobó los arreglos 1 y 2. La herramienta de lineart es de las favor
 - **Sin mínimo de 0,5 px con matriz:** el mínimo sigue en `scaleStroke`; con matriz el contorno escala exacto.
 - **Escala no uniforme:** un trazo estirado se ensancha en la dirección del estiramiento; Inkscape usa el factor medio (1/descrim). Queda abierto.
 
-### Pendiente antes de dar el arreglo por bueno
-- **e2e `tests-e2e/lineart-scale.spec.ts`:** escrito, pero no ejecutado. El puerto 5183 lo ocupa el sandbox del usuario (pid 1325837, cwd de este worktree), y mi arranque de `dev:sandbox` falló por ese motivo; no se ha tocado ese proceso. Hay que ejecutarlo cuando el puerto esté libre.
-- **Paridad canvas/PNG:** la prueba de píxeles en el navegador no se ha hecho (sin navegador en esta tanda).
+### Verificación
+- **e2e `tests-e2e/lineart-scale.spec.ts`:** pasa (`--workers=1`, sandbox propio en 5183, preparado por el store). Cinco encogimientos seguidos: el área del contorno sigue k² y el grosor sigue la escala. Se esperó a que el puerto 5183 quedara libre (lo cerró el usuario); no se tocó el proceso del usuario.
+- **`npm test`:** EXIT=0, 223 archivos, 1509 tests.
+- **Paridad canvas/PNG:** no probada en el navegador (sin navegador en esta tanda); la exportación SVG se compara con el mismo contorno en tests unitarios.

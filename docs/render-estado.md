@@ -116,5 +116,5 @@ Investigación sin cambios de código: [diagnostico-escala-lineart.md](diagnosti
 
 ### CRÍTICO, pendiente de revisión del usuario: lineart y escala (2026-10-13)
 
-Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con el grosor, `1266df4`) y el arreglo 2 (matriz acumulada, `6319284`; trazos sin matriz intactos). Detalle, decisiones y límites en [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md#arreglo-aplicado-2026-10-13-crítico-pendiente-de-revisión-del-usuario). Pendiente: ejecutar `tests-e2e/lineart-scale.spec.ts` cuando el puerto 5183 esté libre (ocupado por el sandbox del usuario) y revisar la escala no uniforme frente a Inkscape.
+Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con el grosor, `1266df4`) y el arreglo 2 (matriz acumulada, `6319284`; trazos sin matriz intactos). Detalle, decisiones y límites en [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md#arreglo-aplicado-2026-10-13-crítico-pendiente-de-revisión-del-usuario). Verificado en código y e2e (`tests-e2e/lineart-scale.spec.ts`, pasa; `npm test` EXIT=0). Pendiente: revisión del usuario en la app, la paridad en navegador de canvas y PNG, y la escala no uniforme frente a Inkscape.
 
