@@ -47,3 +47,27 @@ Conclusión de los experimentos: el contorno de un trazo escalado no coincide co
 - No quedó aislada la causa exacta de la distancia de 1,4–2,5 px sin taper; el umbral de 3 px del final no explica por sí solo que no baje con la longitud.
 - No se leyó el código de escritura de rutas de Inkscape (redondeo de salida); solo `sp-item.cpp`.
 - No se probó en el navegador: el diagnóstico es de código y de pruebas unitarias.
+
+## Arreglo aplicado (2026-10-13, crítico: pendiente de revisión del usuario)
+
+El usuario aprobó los arreglos 1 y 2. La herramienta de lineart es de las favoritas del usuario: **no se ha cambiado el dibujo**, y el estado queda como «crítico, pendiente de revisión del usuario».
+
+### Arreglo 1: tapers con el grosor (`1266df4`)
+- `transformStroke` escalaba `size` pero no `taperStart`/`taperEnd`. Ahora los escala con la misma escala media que `scaleStroke`.
+- Mínimo de 0,5 px (`MIN_STROKE_SIZE`, en `strokes.ts`, para no crear un ciclo con `store.ts`). Un primer intento rompió `designer-context-menu.test.ts` y se corrigió.
+- Test (`tests/stroke-transform.test.ts`): cinco escalas de 0,7 dan el mismo grosor y taper que una de 0,7⁵; el área del contorno sigue k² con tolerancia del 15 % (la deriva de perfect-freehand, ver H3).
+
+### Arreglo 2: matriz acumulada (`6319284`)
+- El trazo guarda sus puntos originales y un campo opcional `matrix` (`types.ts`, `Stroke`). Ausente = identidad: sin migración, los trazos antiguos se dibujan igual.
+- `transformStroke` solo compone la matriz (`affine.ts`); no reescribe puntos, grosor ni tapers.
+- El contorno se calcula en el marco original con los parámetros originales y después se transforma con la matriz (`strokes.ts`, `computed`). Así los umbrales absolutos de perfect-freehand ven la geometría tal como se dibujó. Exportación SVG y canvas usan ese mismo contorno (`strokePath`).
+- Editar un trazo con matriz la hornea una vez, con precisión flotante, antes de editar (`bakeStroke`): `translateStroke`, `scaleStroke`, `bendStroke`. La prueba de acierto (`nearStroke`), el hit de `nearestPoint`, `symmetry.ts`, la rotación de capa (`transform.ts`) y el overlay de Stage (`Stage.tsx`) leen los puntos en página (`worldPoints`).
+- Tests (`tests/stroke-matrix.test.ts`): cinco escalas frente a una (Hausdorff < 0,5 px), rotar y escalar, trazo sin matriz igual a perfect-freehand, ida y vuelta por JSON, exportación igual al canvas, edición tras transformar y prueba de acierto.
+
+### Diferencias con lo aprobado (documentadas)
+- **Sin mínimo de 0,5 px con matriz:** el mínimo sigue en `scaleStroke`; con matriz el contorno escala exacto.
+- **Escala no uniforme:** un trazo estirado se ensancha en la dirección del estiramiento; Inkscape usa el factor medio (1/descrim). Queda abierto.
+
+### Pendiente antes de dar el arreglo por bueno
+- **e2e `tests-e2e/lineart-scale.spec.ts`:** escrito, pero no ejecutado. El puerto 5183 lo ocupa el sandbox del usuario (pid 1325837, cwd de este worktree), y mi arranque de `dev:sandbox` falló por ese motivo; no se ha tocado ese proceso. Hay que ejecutarlo cuando el puerto esté libre.
+- **Paridad canvas/PNG:** la prueba de píxeles en el navegador no se ha hecho (sin navegador en esta tanda).

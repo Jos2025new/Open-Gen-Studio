@@ -113,3 +113,8 @@ Causa de que los nodos no se pudieran agarrar: `designer-connected.css:257` pone
 ## Diagnóstico abierto: lineart que se deforma al encoger (2026-10-13)
 
 Investigación sin cambios de código: [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md). Causa más probable: `transformStroke` no escala los tapers (`affine.ts:52-54`), y `perfect-freehand` usa umbrales absolutos que hacen el contorno no equivariante. Arreglo inmediato propuesto: escalar tapers como `scaleStroke`; el estructural, guardar el trazo con matriz acumulada.
+
+### CRÍTICO, pendiente de revisión del usuario: lineart y escala (2026-10-13)
+
+Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con el grosor, `1266df4`) y el arreglo 2 (matriz acumulada, `6319284`; trazos sin matriz intactos). Detalle, decisiones y límites en [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md#arreglo-aplicado-2026-10-13-crítico-pendiente-de-revisión-del-usuario). Pendiente: ejecutar `tests-e2e/lineart-scale.spec.ts` cuando el puerto 5183 esté libre (ocupado por el sandbox del usuario) y revisar la escala no uniforme frente a Inkscape.
+
