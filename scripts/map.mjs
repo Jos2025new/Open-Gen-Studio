@@ -87,11 +87,11 @@ Generado por \`node scripts/map.mjs --write\` desde [map-contracts.mjs](../scrip
 
 ## Antes de cambiar código
 
-1. Busca el archivo y sus **contratos** y **módulos centrales**.
-2. Tras cada cambio, ejecuta \`npm run test:related\`.
-3. Cambia todos los lados de cada contrato en el mismo commit; registra los nuevos en \`scripts/map-contracts.mjs\`.
-4. Antes de cerrar, ejecuta \`npm test\`.
-5. Para rendimiento, sigue el [protocolo](depuracion.md#protocolo). Registra las nuevas sondas en «Qué se mide hoy»; \`tests/trace-domains.test.ts\` lo comprueba.
+1. Busca archivo, **contratos** y **módulos centrales**.
+2. Cada cambio: \`npm run test:related\`.
+3. Actualiza juntos los lados del contrato; registra nuevos en \`scripts/map-contracts.mjs\`.
+4. Al cerrar: \`npm test\`.
+5. Para rendimiento, sigue el [protocolo](depuracion.md#protocolo); registra sondas en «Qué se mide hoy». \`tests/trace-domains.test.ts\` lo comprueba.
 
 ## Contratos que el compilador no ve
 

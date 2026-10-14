@@ -109,6 +109,7 @@
 - [033-2026-10-W42: control compacto de radios múltiples](history/033-2026-10-W42.md) — Rx/Ry, esquinas agudas y conversión a paths ocupan menos lienzo y se envuelven en estrecho.
 - [034-2026-10-W42: alineación de bordes opuestos y grupo](history/034-2026-10-W42.md) — cuatro acciones contra el borde opuesto y movimiento conjunto con referencia fija.
 - [035-2026-10-W42: menú compacto de Align](history/035-2026-10-W42.md) — diez acciones en cuadrícula con nombres accesibles y referencia/grupo arriba.
+- [036-2026-10-W42: Align en el panel derecho](history/036-2026-10-W42.md) — pestaña propia; la barra navega sin cambiar herramienta o selección.
 
 ## Trazabilidad
 

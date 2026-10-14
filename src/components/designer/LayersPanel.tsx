@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
+import { AlertTriangle, AlignCenterVertical, ArrowDown, ArrowUp, ChevronDown, ChevronRight, Copy, Eye, Grid2x2, Merge, Layers as LayersIcon, SlidersHorizontal, Plus, RotateCcw, Wrench, MoreHorizontal, Folder, FolderInput, FolderOutput, EyeOff, Image, Lock, PanelRightClose, PanelRightOpen, Shapes, Sparkles, Trash, Type, Unlock } from 'lucide-react';
 import type { DesignDoc, Layer, OpId, VectorShape } from '../../engine/types';
+import type { RelativeTo } from '../../engine/design/transform';
 import { activeLayer, dropIndex, FONT_NAMES } from '../../engine/design/doc';
 import { paintOpacity, paintOpacityPatch } from '../../engine/design/shapeLook';
 import { StrokeStyleFields } from './StrokeStyleFields';
@@ -15,7 +16,7 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
-import { ToolSettings } from './ToolSettings';
+import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
 import { InlineColor, InlineSlider } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
@@ -97,8 +98,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   const morePop = usePopover();
   const split = useRef<{ y: number; h: number } | null>(null);
   const [collapsed, setCollapsed] = usePref('ogs:layers-collapsed', false);
-  // Three destinations: Properties (what is selected), Tool (the active tool's full settings), Layers (the list alone).
-  const [tab, setTab] = usePref<'layers' | 'props' | 'tool'>('ogs:layers-tab', 'props');
+  // Properties, active-tool settings, Align, and the layer list are separate panel destinations.
+  const [tab, setTab] = usePref<'layers' | 'props' | 'tool' | 'align'>('ogs:layers-tab', 'props');
+  const [alignPrefs, setAlignPrefs] = useState<{ relativeTo: RelativeTo | null; alignAsGroup: boolean }>({ relativeTo: null, alignAsGroup: false });
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const collapsedRef = useRef(collapsed);
   collapsedRef.current = collapsed;
@@ -110,7 +112,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
   // Changing tools keeps the panel as the user left it (closed, or on Layers); only Settings… opens the Tool tab.
   // "Settings…" in the context strip opens this panel on the tool's full settings.
   useEffect(() => {
-    const open = (e: Event) => { setTab((e as CustomEvent<'layers' | 'props' | 'tool'>).detail); setCollapsed(false); };
+    const open = (e: Event) => { setTab((e as CustomEvent<'layers' | 'props' | 'tool' | 'align'>).detail); setCollapsed(false); };
     window.addEventListener('ogs:designer-panel', open);
     return () => window.removeEventListener('ogs:designer-panel', open);
   }, [setTab, setCollapsed]);
@@ -164,7 +166,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       onPointerUp={() => { resize.current = null; }} onPointerCancel={() => { resize.current = null; }}
       onDoubleClick={() => setWidth(260)} />
     <div className="panel-tabs" role="tablist" aria-label="Layers panel">
-      {([['props', SlidersHorizontal, 'Properties', 'Properties of the selected layer'], ['tool', Wrench, 'Tool', 'All the settings of the active tool'], ['layers', LayersIcon, 'Layers', `Layers only · page ${doc.width} × ${doc.height}`]] as const).map(([id, Icon, name, label]) => (
+      {([['props', SlidersHorizontal, 'Properties', 'Properties of the selected layer'], ['tool', Wrench, 'Tool', 'All the settings of the active tool'], ['align', AlignCenterVertical, 'Align', 'Align selected objects or layers'], ['layers', LayersIcon, 'Layers', `Layers only · page ${doc.width} × ${doc.height}`]] as const).map(([id, Icon, name, label]) => (
         <button key={id} type="button" role="tab" aria-selected={tab === id} aria-label={label} data-tip={tab === id ? undefined : label} className={`panel-tab${tab === id ? ' is-active' : ''}`} onClick={() => setTab(id)}>
           {/* Only the active tab spells its name: three tabs fit the panel; the others say it on hover. */}
           <Icon size={14} />{tab === id && <span>{name}</span>}
@@ -252,6 +254,9 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
     </div>
     </section>
     <div className="layers-body">
+    {tab === 'align' && <section id="designer-align-panel" className="sidebar-tool-settings settings-align" aria-label="Align settings">
+      <EditOps sessionId={sessionId} doc={doc} panelOnly alignPanel={{ ...alignPrefs, setRelativeTo: (relativeTo) => setAlignPrefs((v) => ({ ...v, relativeTo })), setAlignAsGroup: (alignAsGroup) => setAlignPrefs((v) => ({ ...v, alignAsGroup })) }} />
+    </section>}
     {tab === 'tool' && <section className={`sidebar-tool-settings settings-${tool}`} aria-label="Active tool settings">
       {tool === 'hand' ? <p className="field-hint">Pan has no additional settings.</p> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} />}
     </section>}

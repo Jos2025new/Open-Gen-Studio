@@ -117,10 +117,10 @@
 .layer-row.is-picked:not(.is-active) .layer-name { color: var(--text); }
 .layers-picked { font-size: 10px; color: var(--accent); white-space: nowrap; }
 .layers-picked button { margin-left: 4px; color: var(--text-2); text-decoration: underline; font-size: 10px; }
-/* "Relative to" at the top of the Align menu. */
+/* Reference and group controls at the top of the Align panel. */
 .menu-field { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 8px; margin-bottom: 2px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--text-2); }
 .menu-field select { font-size: 11px; padding: 3px 6px; }
-.align-popover { display: grid; gap: 6px; min-width: 0; padding: 2px; }
+.align-panel-controls { display: grid; width: 100%; gap: 6px; min-width: 0; padding: 2px; }
 .align-options { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .align-reference, .align-group-option { display: flex; align-items: center; gap: 5px; min-height: 30px; font-size: 11px; color: var(--text-2); }
 .align-reference { flex: 1 1 130px; min-width: 0; }

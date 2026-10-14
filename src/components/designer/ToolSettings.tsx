@@ -22,7 +22,7 @@ import { PaintModeToggle } from './PaintModeToggle';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { RulerSettings } from './StrokeRulerOverlay';
 import { SnapControl } from './SnapControl';
-import { AlignPopover } from './AlignPopover';
+import { AlignControls } from './AlignControls';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -83,11 +83,11 @@ export function EditOptionsControl() {
 }
 
 /** Edit tool: align, distribute (3+), fit/fill one image, or transform picked objects/layers. */
-export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }: { sessionId: string; doc: DesignDoc; alignOnly?: boolean; turnOnly?: boolean }) {
-  const align = usePopover();
+export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false, panelOnly = false, alignPanel }: {
+  sessionId: string; doc: DesignDoc; alignOnly?: boolean; turnOnly?: boolean; panelOnly?: boolean;
+  alignPanel?: { relativeTo: RelativeTo | null; setRelativeTo: (value: RelativeTo) => void; alignAsGroup: boolean; setAlignAsGroup: (value: boolean) => void };
+}) {
   const turn = usePopover();
-  const [rel, setRel] = useState<RelativeTo | null>(null);
-  const [alignAsGroup, setAlignAsGroup] = useState(false);
   useLayerSelection((st) => st.byDoc[doc.id]);
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
@@ -107,7 +107,8 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   const emptyPick = !onObjects && !layers.length;
   const count = onObjects ? objIds.length : layers.length;
   const many = count > 1;
-  const relativeTo = rel ?? (many ? 'selection' : 'page');
+  const relativeTo = alignPanel?.relativeTo ?? (many ? 'selection' : 'page');
+  const alignAsGroup = alignPanel?.alignAsGroup ?? false;
   const groupReason = count < 2 ? 'Select at least two objects or layers to move them as a group.'
     : relativeTo === 'selection' ? 'Choose Page or an anchor; aligning a group to its own selection would not move it.' : undefined;
   const alignReason = alignAsGroup && relativeTo === 'selection' ? groupReason : undefined;
@@ -121,17 +122,17 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo, alignAsGroup) : alignLayers(sessionId, doc.id, ids, to, relativeTo, alignAsGroup));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));
+  if (panelOnly) {
+    if (!alignPanel) return null;
+    return <AlignControls target={target} count={count} relativeTo={relativeTo} setRelativeTo={alignPanel.setRelativeTo} alignAsGroup={alignAsGroup}
+      setAlignAsGroup={alignPanel.setAlignAsGroup} groupReason={groupReason} alignReason={alignReason} disabledReason={why ?? (locked ? 'Unlock selected layers before aligning or distributing them.' : undefined)} anchorEdgeNeedsPair={anchorEdgeNeedsPair}
+      onAlign={doAlign} onDistribute={doDistribute}
+      onFit={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'contain') : undefined}
+      onFill={!onObjects && !many && one?.type === 'raster' ? () => fitLayer(sessionId, doc.id, one.id, 'cover') : undefined} />;
+  }
+  const openAlign = () => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: 'align' }));
   return <>
-    {!turnOnly && <>
-    <button type="button" ref={align.ref} className="tool-setting" aria-expanded={align.open} onClick={align.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Align'} aria-label="Align"><AlignCenterVertical size={14} /><ChevronDown size={12} /></button>
-    <Popover open={align.open} anchor={align.ref} onClose={align.close} placement="bottom-start" width={274} label="Align">
-      <AlignPopover target={target} count={count} relativeTo={relativeTo} setRelativeTo={(value) => setRel(value)} alignAsGroup={alignAsGroup}
-        setAlignAsGroup={setAlignAsGroup} groupReason={groupReason} alignReason={alignReason} anchorEdgeNeedsPair={anchorEdgeNeedsPair}
-        onAlign={doAlign} onDistribute={doDistribute}
-        onFit={!onObjects && !many && one?.type === 'raster' ? () => { fitLayer(sessionId, doc.id, one.id, 'contain'); align.close(); } : undefined}
-        onFill={!onObjects && !many && one?.type === 'raster' ? () => { fitLayer(sessionId, doc.id, one.id, 'cover'); align.close(); } : undefined} />
-    </Popover>
-    </>}
+    {!turnOnly && <button type="button" className="tool-setting" aria-controls="designer-align-panel" onClick={openAlign} disabled={locked || emptyPick} data-tip={why ?? 'Align settings in the right panel'} aria-label="Align"><AlignCenterVertical size={14} /></button>}
     {!alignOnly && <>
     <button type="button" ref={turn.ref} className="tool-setting" aria-expanded={turn.open} onClick={turn.toggle} disabled={locked || emptyPick} data-tip={why ?? 'Transform: mirror and rotate'} aria-label="Transform"><TrianglesCenterlineDashedVertical size={14} /><ChevronDown size={12} /></button>
     <Popover open={turn.open} anchor={turn.ref} onClose={turn.close} placement="bottom-start" width={220} label="Transform">
