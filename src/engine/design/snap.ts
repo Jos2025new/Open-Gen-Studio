@@ -15,7 +15,7 @@ import { layerBox } from './render';
 export function snapOptsFor(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, byMode?: SnapByMode): SnapOptions {
   const mode = paintModeOf(doc);
   const saved = byMode?.[mode];
-  return { on: mode === 'design', page: true, layers: true, guides: true, equalSpacing: true, ...saved };
+  return { on: mode === 'design', page: true, layers: true, guides: true, equalSpacing: true, nodes: true, ...saved };
 }
 
 /** The switches saved for each mode. Missing newer switches preserve their original on behavior. */
@@ -33,8 +33,9 @@ export interface SnapOptions {
   /** Optional for settings saved before these independent switches existed; missing means on. */
   guides?: boolean;
   equalSpacing?: boolean;
+  nodes?: boolean;
 }
-export const SNAP_DEFAULT: SnapOptions = { on: true, page: true, layers: true, guides: true, equalSpacing: true };
+export const SNAP_DEFAULT: SnapOptions = { on: true, page: true, layers: true, guides: true, equalSpacing: true, nodes: true };
 
 type Box = { x: number; y: number; w: number; h: number };
 

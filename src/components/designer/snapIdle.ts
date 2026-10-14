@@ -20,6 +20,13 @@ export class SnapIdleBridge {
     this.wd = new SnapWatchdog(schedule, cancel);
   }
 
+  /** Seed a drag from pointerdown when its first move must be classified by real pointer speed. */
+  start(key: object, e: MoveLike): void {
+    this.wd.cancel();
+    this.key = key;
+    this.last = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+  }
+
   /** One move of drag `key`: arm the timer when the pointer is fast; `replay` gets the last position once it is idle. */
   feed(key: object, e: MoveLike, replay: Replay): void {
     if (key !== this.key) { this.key = key; this.last = null; }
@@ -42,8 +49,11 @@ export class SnapIdleBridge {
 
 const bridge = new SnapIdleBridge((fn, ms) => setTimeout(fn, ms), (h) => clearTimeout(h as never));
 
-/** Called by Stage on each move of a drag; only moves and transforms are delayed (pivot, paint, pan and the rest are not). */
-export function snapIdleFeed(d: { kind: string; op?: string }, e: MoveLike, replay: Replay): void {
-  if (d.kind === 'move' || d.kind === 'objMove' || (d.kind === 'xform' && d.op === 'scale')) bridge.feed(d, e, replay);
+/** Called by Stage and the path-node editor on each move; only supported move/scale/node drags are delayed. */
+export function snapIdleFeed(d: { kind?: string; op?: string }, e: MoveLike, replay: Replay): void {
+  if (d.kind === 'move' || d.kind === 'objMove' || d.kind === 'pathNode' || (d.kind === 'xform' && d.op === 'scale')) bridge.feed(d, e, replay);
+}
+export function snapIdleStart(d: { kind?: string; op?: string }, e: MoveLike): void {
+  if (d.kind === 'pathNode') bridge.start(d, e);
 }
 export const snapIdleStop = (): void => bridge.stop();

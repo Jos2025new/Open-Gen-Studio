@@ -7,14 +7,17 @@
 export default [
   {
     id: 'snap-controls',
-    what: 'Los interruptores de guías y espaciado igual del menú Snap se guardan por modo y controlan sus candidatos y medidas.',
+    what: 'Los interruptores de guías, espaciado igual y nodos del menú Snap se guardan por modo y controlan sus candidatos y medidas.',
     sides: [
       ['src/engine/design/snap.ts', 'equalSpacing?: boolean'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
-      ['src/components/designer/ToolSettings.tsx', 'Equal spacing'],
+      ['src/engine/design/snapNodes.ts', 'export class PathNodeSnapSession'],
+      ['src/components/designer/ToolSettings.tsx', 'Path nodes'],
+      ['src/components/designer/PathNodes.tsx', 'new PathNodeSnapSession(pathNodeTargets'],
+      ['src/components/designer/snapIdle.ts', 'export function snapIdleStart'],
       ['src/store/store.ts', 'snapByMode?: SnapByMode'],
     ],
-    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts'],
+    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts', 'tests/snap-nodes.test.ts', 'tests/path-node-snap.test.ts'],
   },
   {
     id: 'paint-mode',

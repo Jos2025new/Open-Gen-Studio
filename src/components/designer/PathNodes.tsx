@@ -9,6 +9,10 @@ import { getDoc, patchLayer } from '../../engine/design/actions';
 import { toLocal, toPage } from '../../engine/design/shapeTransform';
 import { documentToScreen, screenToDocument, type View } from '../../engine/design/viewCoordinates';
 import { patchShape } from './ShapeLookFields';
+import { snapOptsFor } from '../../engine/design/snap';
+import { pathNodeTargets, PathNodeSnapSession } from '../../engine/design/snapNodes';
+import { useStore } from '../../store/store';
+import { snapIdleFeed, snapIdleStart, snapIdleStop } from './snapIdle';
 
 /*
  * Inkscape's Node tool on a path shape in edit mode (docs/plan-edicion-formas.md): square nodes, round handles on
@@ -17,7 +21,7 @@ import { patchShape } from './ShapeLookFields';
  */
 export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: View; sessionId: string; docId: string; layerId: string; shape: VectorShape }) {
   const ref = useRef<SVGSVGElement>(null);
-  const drag = useRef<{ pt?: NodePoint; base: Seg[]; shape: VectorShape; from: { x: number; y: number }; moved: boolean; selected: number[]; initialSelected: number[]; types: NodeType[]; mods: { shift: boolean; ctrl: boolean }; start?: { x: number; y: number }; screenStart?: { x: number; y: number } } | null>(null);
+  const drag = useRef<{ kind?: 'pathNode'; pt?: NodePoint; base: Seg[]; shape: VectorShape; from: { x: number; y: number }; moved: boolean; selected: number[]; initialSelected: number[]; types: NodeType[]; mods: { shift: boolean; ctrl: boolean }; start?: { x: number; y: number }; screenStart?: { x: number; y: number }; snapNode?: PathNodeSnapSession } | null>(null);
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   // Nodes on the same spot (an arrow's tip): each press there picks the next one, as Inkscape cycles with Alt.
   const turn = useRef<{ at: string; i: number }>({ at: '', i: 0 });
@@ -101,11 +105,20 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     }
     if (!d.pt) return;
     if (!d.moved && d.pt.kind === 'node' && d.screenStart && Math.hypot(e.clientX - d.screenStart.x, e.clientY - d.screenStart.y) <= 2) return;
+    if (d.pt.kind === 'node' && d.snapNode) {
+      if (e.altKey) snapIdleStop();
+      else snapIdleFeed(d, e, (replay) => move(replay as React.PointerEvent));
+    }
     // Each frame from the segments at the start of the drag: no drift; the first change records the undo step.
     // From the shape at the start of the drag (review of 480cfc3: the current one compounded the turn correction).
     const n0 = d.pt.kind === 'node' ? nodeSegs(d.base).seg.indexOf(d.pt.seg) : -1;
-    const nextSegs = d.mods.shift && n0 >= 0 ? pullHandle(d.base, n0, n0 === nodeSegs(d.base).seg.length - 1 ? 'in' : 'out', q.x - d.from.x, q.y - d.from.y)
-      : d.pt.kind === 'node' && d.selected.length > 1 ? moveSelectedNodes(d.base, d.selected, q.x - d.from.x, q.y - d.from.y, d.types) : moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y, d.types);
+    let dx = q.x - d.from.x, dy = q.y - d.from.y;
+    if (d.pt.kind === 'node' && d.snapNode && !e.altKey) {
+      const target = d.snapNode.step([d.pt.at[0] + dx, d.pt.at[1] + dy], { x: e.clientX, y: e.clientY }, e.timeStamp);
+      if (target) { dx = target[0] - d.pt.at[0]; dy = target[1] - d.pt.at[1]; }
+    }
+    const nextSegs = d.mods.shift && n0 >= 0 ? pullHandle(d.base, n0, n0 === nodeSegs(d.base).seg.length - 1 ? 'in' : 'out', dx, dy)
+      : d.pt.kind === 'node' && d.selected.length > 1 ? moveSelectedNodes(d.base, d.selected, dx, dy, d.types) : moveNodePoint(d.base, d.pt, dx, dy, d.types);
     const next = withSegs(d.shape, nextSegs);
     patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !d.moved });
     d.moved = true;
@@ -123,7 +136,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
       const n = nodeSegs(d.base).seg.indexOf(d.pt.seg), nodes = d.mods.shift ? toggleNodeSelection(d.initialSelected, n) : [n];
       setShapeEdit(docId, { ...edit!, node: nodes[0], nodes });
     }
-    drag.current = null; setBox(null);
+    drag.current = null; snapIdleStop(); setBox(null);
   };
   // The outline on screen: double-click on it adds a node there (Inkscape), keeping the curve.
   const outline = serializeSegs(segs.map((g) => ({ c: g.c, p: g.p.map((q) => { const c = scr(q); return [c.x, c.y] as [number, number]; }) })));
@@ -140,7 +153,7 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
     drag.current = { base: segs, shape, from: page(e), moved: false, selected: [...selected], initialSelected: [...selected], types: [...types], mods: { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey }, start: { x: e.clientX - ref.current!.getBoundingClientRect().left, y: e.clientY - ref.current!.getBoundingClientRect().top } };
-  }} onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest('.path-node, .path-handle'))) addAt(e); }} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { drag.current = null; setBox(null); }}>
+  }} onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest('.path-node, .path-handle'))) addAt(e); }} onPointerMove={move} onPointerUp={finish} onPointerCancel={() => { drag.current = null; snapIdleStop(); setBox(null); }}>
     <rect className="node-marquee-hit" x="0" y="0" width="100%" height="100%" />
     {box && <rect className="node-marquee" x={box.x} y={box.y} width={box.w} height={box.h} />}
     <path className="path-outline" d={outline} data-tip="Double-click to add a node" onDoubleClick={addAt} />
@@ -174,10 +187,14 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
           const pt = same[turn.current.i] ?? p;
           const n = pt.kind === 'node' ? nodeSegs(segs).seg.indexOf(pt.seg) : -1;
           const group = pt.kind === 'node' && selected.includes(n) ? selected : pt.kind === 'node' ? (e.shiftKey ? toggleNodeSelection(selected, n) : [n]) : [];
-          drag.current = { pt, base: segs, shape, from: page(e), moved: false, selected: group, initialSelected: [...selected], types: [...types], mods: { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey }, screenStart: { x: e.clientX, y: e.clientY } };
+          const doc = getDoc(sessionId, docId), snap = doc && snapOptsFor(doc, useStore.getState().ui.snapByMode);
+          const snapNode = doc && pt.kind === 'node' && snap?.on && snap.nodes !== false && !e.altKey && !e.shiftKey
+            ? new PathNodeSnapSession(pathNodeTargets(doc, shape.id, pt.at), view.zoom, { x: e.clientX, y: e.clientY, t: e.timeStamp }) : undefined;
+          drag.current = { kind: snapNode ? 'pathNode' : undefined, pt, base: segs, shape, from: page(e), moved: false, selected: group, initialSelected: [...selected], types: [...types], mods: { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey }, screenStart: { x: e.clientX, y: e.clientY }, snapNode };
+          if (snapNode) snapIdleStart(drag.current, e);
           if (pt.kind === 'node' && edit && !selected.includes(n)) setShapeEdit(docId, { ...edit, node: group[0], nodes: group });
         },
-        onPointerCancel: () => { drag.current = null; setBox(null); },
+        onPointerCancel: () => { drag.current = null; snapIdleStop(); setBox(null); },
       };
       return p.kind === 'node'
         ? <rect key={`n${p.seg}`} className={`stroke-ruler-handle shape-knot path-node${selected.includes(nodeSegs(segs).seg.indexOf(p.seg)) ? ' is-picked' : ''}`} data-node={p.seg} data-tip="Node · Shift-click to add or remove · drag selected nodes together" x={c.x - 4.5} y={c.y - 4.5} width={9} height={9} {...handlers} />
