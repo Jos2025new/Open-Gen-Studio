@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { openrouter, parseOrVideoPricing } from '../src/engine/providers/openrouter';
+import { openrouter } from '../src/engine/providers/openrouter';
 import type { ModelSummary } from '../src/engine/types';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -62,5 +62,36 @@ describe('OpenRouter image price cache (fix 2)', () => {
     routeFetch(() => json({ endpoints: [{ pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] }));
     await priceOf(imageModel);
     expect([...cache.keys()].filter((k) => k.startsWith('or:price'))).toEqual(['or:price:v2:acme/pic-1']);
+  });
+});
+
+describe('OpenRouter image price across endpoints (fix 3)', () => {
+  it('reads every endpoint and marks a varying price as a lower bound', async () => {
+    routeFetch(() =>
+      json({
+        endpoints: [
+          { pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.06 }] },
+          { pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] },
+        ],
+      }),
+    );
+    const price = await priceOf(imageModel);
+    expect(price.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
+    expect(price.lowerBound).toBe(true);
+    expect(price.note).toMatch(/lowest/);
+  });
+
+  it('an agreed price across endpoints is exact', async () => {
+    routeFetch(() =>
+      json({
+        endpoints: [
+          { pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] },
+          { pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] },
+        ],
+      }),
+    );
+    const price = await priceOf(imageModel);
+    expect(price.lowerBound).toBeUndefined();
+    expect(price.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
   });
 });

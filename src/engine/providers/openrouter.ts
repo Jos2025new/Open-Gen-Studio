@@ -130,16 +130,38 @@ async function imagePrice(id: string): Promise<PriceRule> {
     return { skus: [], note: TOKEN_NOTE };
   }
   if (!Array.isArray(res?.endpoints)) return { skus: [], note: TOKEN_NOTE };
-  const pricing = res.endpoints[0]?.pricing ?? [];
-  const skus: PriceSku[] = pricing
-    .filter((p) => p.unit === 'image' && /output/.test(p.billable) && Number.isFinite(p.cost_usd))
-    .map((p) => ({ unit: 'output' as const, usd: p.cost_usd, resolution: p.resolution }));
+  // Every provider endpoint is read: they may bill differently, and the cheapest one is the only figure safe to show as a floor.
+  const pricing = res.endpoints.flatMap((e) => e.pricing ?? []);
+  const outputs = new Map<string, PriceSku>();
+  for (const p of pricing) {
+    if (p.unit !== 'image' || !/output/.test(p.billable) || !Number.isFinite(p.cost_usd)) continue;
+    const key = p.resolution ?? '';
+    const prev = outputs.get(key);
+    if (!prev || p.cost_usd < prev.usd) outputs.set(key, { unit: 'output', usd: p.cost_usd, resolution: p.resolution });
+  }
+  const skus = [...outputs.values()];
+  const varies = endpointsVary(res.endpoints);
   const mp = pricing.find((p) => /megapixel/i.test(p.unit) && Number.isFinite(p.cost_usd));
   let rule: PriceRule = { skus: [], note: TOKEN_NOTE };
-  if (skus.length) rule = { skus };
+  if (skus.length) rule = varies ? { skus, lowerBound: true, note: 'Providers bill this model differently; the lowest is shown' } : { skus };
   else if (mp) rule = { skus: [{ unit: 'megapixel', usd: mp.cost_usd }], approximate: true };
   await cacheDb.set(cacheKey, rule);
   return rule;
+}
+
+/** True when two endpoints of the same model quote different output prices. */
+function endpointsVary(endpoints: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }>): boolean {
+  const seen = new Map<string, number>();
+  for (const e of endpoints) {
+    for (const p of e.pricing ?? []) {
+      if (p.unit !== 'image' || !/output/.test(p.billable) || !Number.isFinite(p.cost_usd)) continue;
+      const key = p.resolution ?? '';
+      const prev = seen.get(key);
+      if (prev !== undefined && prev !== p.cost_usd) return true;
+      seen.set(key, p.cost_usd);
+    }
+  }
+  return false;
 }
 
 export const openrouter: ProviderAdapter = {
