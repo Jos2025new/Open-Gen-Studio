@@ -39,3 +39,8 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 - **Motivo:** el usuario quiere que los documentos de formas empiecen con las ayudas de diseño (ajuste, espaciado), y que los documentos de pintura empiecen en Dibujo, sin lag. Código: `src/engine/design/paintMode.ts` (`paintModeOf`, `hasPaintedPixels`); tests `tests/paint-mode-default.test.ts`.
 - **No excluyentes:** el interruptor de ajuste se guarda por modo (`snapByMode`) y puede activar en Dibujo lo que Diseño tiene por defecto, o apagarlo en Diseño.
 - **Límite conocido:** el modo por defecto se calcula al leer el documento; el primer píxel pintado en una capa vacía puede cambiar el modo de Diseño a Dibujo durante la sesión. Guardar la elección al crear el documento queda como mejora pendiente.
+
+## Enmienda (2026-10-14, segunda): el modo se fija al crear o leer por primera vez
+
+- Resuelve el «límite conocido» de la enmienda anterior. `pinPaintMode` (`paintMode.ts`) guarda en `paintMode` el modo deducido la primera vez que el documento se crea, se importa (SVG), se añade a una sesión, se selecciona o se modifica (`setDoc` lo fija antes de aplicar el cambio). Campo existente, sin migración: un documento antiguo sin campo se deduce como antes y se guarda en ese momento.
+- Después solo lo cambia el interruptor Dibujo/Diseño (y la acción «Paint in Design» del aviso). Pintar el primer píxel o añadir una forma ya no lo cambia. Tests: `tests/paint-mode-pin.test.ts`.

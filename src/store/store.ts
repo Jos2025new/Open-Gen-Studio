@@ -17,6 +17,7 @@ import { formatUsd } from '../lib/format';
 import type { AgentTier, LlmModel } from '../engine/providers/llm';
 import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
+import { pinPaintMode } from '../engine/design/paintMode';
 import { DEFAULT_STROKE_STYLE } from '../engine/design/strokes';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
 import type {
@@ -515,7 +516,7 @@ export function setGraph(sessionId: string, fn: (g: Graph) => Graph): void {
 }
 
 export function setDoc(sessionId: string, docId: string, fn: (d: DesignDoc) => DesignDoc): void {
-  patchSession(sessionId, (s) => ({ ...s, docs: s.docs.map((d) => (d.id === docId ? fn(d) : d)) }));
+  patchSession(sessionId, (s) => ({ ...s, docs: s.docs.map((d) => (d.id === docId ? fn(pinPaintMode(d)) : d)) }));
 }
 
 export function setComposer(patch: Partial<ComposerState> | ((c: ComposerState) => Partial<ComposerState>)): void {

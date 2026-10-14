@@ -157,3 +157,7 @@ Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo**
 - **Modo por defecto según el contenido** (enmienda al ADR 0016): documentos de formas o sin píxeles pintados, en Diseño; con píxeles pintados, en Dibujo. Commit `9fbe94f`. El interruptor por modo puede activar lo del otro modo.
 - **Temporizador del ajuste:** la clase `SnapWatchdog` (commit `64445d8`) está probada con reloj simulado. **Cableado en Stage pendiente**: Stage no lo usa todavía; no hay e2e de «detenerse 300 ms y se ajusta».
 - **Primer arrastre:** reproducido en el e2e en los dos modos (Object y Layer), por separado, sobre una capa sin seleccionar. **Pasa en los dos.** El fallo anterior ocurría en la escena del caso de borde (la capa móvil centrada en la página, con otras capas cerca), no en el arrastre aislado; queda sin reproducir en aislamiento. El caso de borde sigue como `fixme`.
+
+## Modo fijado al crear (2026-10-14)
+
+Resuelto el límite conocido del ADR 0016: el modo (Dibujo/Diseño) se guarda en el documento la primera vez que se crea o lee (`pinPaintMode`), y después solo lo cambia el interruptor.

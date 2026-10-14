@@ -16,6 +16,7 @@ import { drawDoc, exportDoc, layoutText, textAscent } from './render';
 import { docToSvg, svgToPdf, type ExportFormat, type SvgDeps } from './export';
 import { isProtectedImage, placementError } from './rules';
 import { rebasePaintPixels } from './paintBounds';
+import { pinPaintMode } from './paintMode';
 import { awaitFrame } from '../../lib/trace';
 
 export { fxSummary } from '../fx/commands';
@@ -50,11 +51,11 @@ export function mutateDoc(sessionId: string, docId: string, fn: (d: DesignDoc) =
 }
 
 export function addDoc(sessionId: string, doc: DesignDoc): void {
-  patchSession(sessionId, (s) => ({ ...s, docs: [...s.docs, doc], activeDocId: doc.id }));
+  patchSession(sessionId, (s) => ({ ...s, docs: [...s.docs, pinPaintMode(doc)], activeDocId: doc.id }));
 }
 
 export function selectDoc(sessionId: string, docId: string): void {
-  patchSession(sessionId, (s) => ({ ...s, activeDocId: docId }));
+  patchSession(sessionId, (s) => ({ ...s, activeDocId: docId, docs: s.docs.map((d) => (d.id === docId ? pinPaintMode(d) : d)) }));
   const doc = getDoc(sessionId, docId);
   if (doc) void ensureBuffers(doc.layers);
 }

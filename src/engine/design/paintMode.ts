@@ -18,6 +18,14 @@ export function paintModeOf(doc: Pick<DesignDoc, 'paintMode' | 'layers'>): Paint
   return doc.layers.some((l) => hasPaintedPixels(l)) ? 'drawing' : 'design';
 }
 
+/**
+ * The document with its mode fixed (ADR 0016, amendment 2026-10-14): a saved choice stays; one with none gets the mode
+ * it deduces now, so painting the first pixel or adding a shape later cannot change it. Same object when nothing is missing.
+ */
+export function pinPaintMode<T extends Pick<DesignDoc, 'paintMode' | 'layers'>>(doc: T): T {
+  return doc.paintMode ? doc : { ...doc, paintMode: paintModeOf(doc) };
+}
+
 /** A raster layer that holds painted pixels or an imported image (not counted: an empty layer). */
 export function hasPaintedPixels(layer: Layer | null | undefined): boolean {
   return !!layer && layer.type === 'raster' && !!(layer.sourceAssetId || layer.paintBaseId || (layer.paintStrokes?.length ?? 0) > 0);

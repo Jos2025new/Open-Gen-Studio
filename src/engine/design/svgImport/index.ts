@@ -1,5 +1,6 @@
 import type { DesignDoc, Layer, LayerGroup, ShapeSpec } from '../../types';
 import { uid } from '../../../lib/id';
+import { pinPaintMode } from '../paintMode';
 import { createDoc, newRasterLayer, newVectorLayer } from '../doc';
 import { sanitizeSvg } from './sanitize';
 import { walkSvg, type Folder, type Item, type RasterItem } from './structure';
@@ -86,5 +87,5 @@ export async function importSvg(text: string, name: string, rasterizer: Rasteriz
     for (const k of item.reasons) report.reasons[k] = (report.reasons[k] ?? 0) + 1;
   }
   flush();
-  return { doc: { ...doc, layers, groups, activeLayerId: layers.length ? layers[layers.length - 1].id : null }, buffers, report };
+  return { doc: { ...pinPaintMode({ ...doc, paintMode: undefined, layers }), layers, groups, activeLayerId: layers.length ? layers[layers.length - 1].id : null }, buffers, report };
 }
