@@ -5,7 +5,8 @@ import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEn
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
-import { SNAP_DEFAULT } from '../../engine/design/snap';
+import { snapOptsFor } from '../../engine/design/snap';
+import { activeDoc } from '../../engine/design/actions';
 import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
@@ -99,7 +100,8 @@ export function EditOptionsControl() {
 
 export function SnapControl() {
   const pop = usePopover();
-  const snap = useStore((s) => s.ui.snap) ?? SNAP_DEFAULT;
+  const sid = useStore((s) => s.activeSessionId);
+  const snap = snapOptsFor(activeDoc(sid) ?? { layers: [] }, useStore((s) => s.ui.snap));
   const set = (patch: Partial<typeof snap>) => setUi({ snap: { ...snap, ...patch } });
   return <>
     <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip={`Snap while moving · ${snap.on ? "on" : "off"}`} aria-label="Snap"><Magnet size={14} /><ChevronDown size={12} /></button>

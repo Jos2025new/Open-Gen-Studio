@@ -1,3 +1,4 @@
+import { paintModeOf } from './paintMode';
 import type { DesignDoc, Layer } from '../types';
 import { layerBox } from './render';
 
@@ -6,6 +7,15 @@ import { layerBox } from './render';
  * page edges and center and to the same lines of the other visible layers, when within a few screen pixels. The
  * lines it sticks to come back as guides to draw. Simple on purpose: one nearest match per axis.
  */
+
+/**
+ * The snap options in effect for a document: the user's switch when they have set one; otherwise on in Design and
+ * off in Drawing (paintMode.ts), where pixels are painted and snapping would only add lag.
+ */
+export function snapOptsFor(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, stored?: SnapOptions): SnapOptions {
+  if (stored) return stored;
+  return { on: paintModeOf(doc) === 'design', page: true, layers: true };
+}
 
 /** How close (screen px) an edge or center must come to a target to snap: Inkscape's default object tolerance. */
 export const SNAP_PX = 10;

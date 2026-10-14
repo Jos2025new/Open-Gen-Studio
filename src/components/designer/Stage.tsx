@@ -7,7 +7,7 @@ import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
-import { SNAP_DEFAULT, SNAP_PX } from '../../engine/design/snap';
+import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { SnapSession, snapSessionFor, visibleDocRect } from '../../engine/design/snapSession';
 import type { Measure } from '../../engine/design/snap';
 import { SnapIndicator } from './SnapIndicator';
@@ -956,7 +956,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (!started(d, p)) return;
       // Scale handles snap too: the dragged side or corner meets page edges, guides and other layers (Alt: free).
       let q = p;
-      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
+      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
       if (d.op === 'scale' && snap.on && !e.altKey) {
         const ids = new Set(d.bases.map((b) => b.layer.id));
         const t = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap, view.zoom, visibleDocRect(view, size))).targets();
@@ -974,8 +974,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // frame (each compose copies the whole layer). Pointer up applies the latest one before closing the step.
       // Picked objects snap like whole layers do (page, guides, other layers; Alt: free).
       let ox = p.x, oy = p.y;
-      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
-      const b0 = snap.on && !e.altKey ? objectsBox(d.base, d.ids) : null;
+      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
+      // Raster strokes are painted, never snapped (Drawing); the switch applies to vector objects and layers.
+      const b0 = snap.on && !e.altKey && d.base.type !== 'raster' ? objectsBox(d.base, d.ids) : null;
       if (b0) {
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
         const s = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => l.id !== d.layerId) }, d.layerId, snap, view.zoom, visibleDocRect(view, size))).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
@@ -989,7 +990,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       // The dragged layer and the other picked ones move together; the group's box snaps (Alt held: free move).
       const group = [d.base, ...(d.others ?? [])];
       let dx = p.x - d.startX, dy = p.y - d.startY;
-      const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
+      const snap = snapOptsFor(doc, useStore.getState().ui.snap);
       const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));
