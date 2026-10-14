@@ -38,6 +38,7 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 - **Sin elección guardada**, el documento abre en **Diseño** si no tiene píxeles pintados en ninguna capa raster (solo formas vectoriales, o capas vacías), y en **Dibujo** si alguna capa raster tiene píxeles pintados o una imagen importada. Trazos editables: Diseño, como antes.
 - **Motivo:** el usuario quiere que los documentos de formas empiecen con las ayudas de diseño (ajuste, espaciado), y que los documentos de pintura empiecen en Dibujo, sin lag. Código: `src/engine/design/paintMode.ts` (`paintModeOf`, `hasPaintedPixels`); tests `tests/paint-mode-default.test.ts`.
 - **No excluyentes:** el interruptor de ajuste se guarda por modo (`snapByMode`) y puede activar en Dibujo lo que Diseño tiene por defecto, o apagarlo en Diseño.
+- **Opciones por modo:** el menú Snap permite activar por separado página, otras capas, guías y espaciado igual. Los documentos con preferencias anteriores, sin los campos nuevos, conservan guías y espaciado igual activados como antes; la opción global y los valores por modo no se mezclan.
 - **Límite conocido:** el modo por defecto se calcula al leer el documento; el primer píxel pintado en una capa vacía puede cambiar el modo de Diseño a Dibujo durante la sesión. Guardar la elección al crear el documento queda como mejora pendiente.
 
 ## Enmienda (2026-10-14, segunda): el modo se fija al crear o leer por primera vez

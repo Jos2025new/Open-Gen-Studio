@@ -5,8 +5,8 @@ import type { DesignDoc } from '../src/engine/types';
 
 const raster = () => newRasterLayer('r', { x: 0, y: 0, width: 10, height: 10 }, { width: 10, height: 10 });
 const docWith = (layers: any[], paintMode?: 'drawing' | 'design') => ({ layers, paintMode } as unknown as Pick<DesignDoc, 'paintMode' | 'layers'>);
-const on = { on: true, page: true, layers: true };
-const off = { on: false, page: true, layers: true };
+const on = { on: true, page: true, layers: true, guides: true, equalSpacing: true };
+const off = { on: false, page: true, layers: true, guides: true, equalSpacing: true };
 
 describe('snapping by mode', () => {
   it('Design: on by default; Drawing: off by default, and raster painting has no snap', () => {
@@ -32,5 +32,12 @@ describe('snapping by mode', () => {
     const legacy = { snap: off } as unknown as Parameters<typeof snapOptsFor>[1];
     expect(snapOptsFor(docWith([], 'design'), legacy).on).toBe(true);
     expect(snapOptsFor(docWith([], 'drawing'), legacy).on).toBe(false);
+  });
+
+  it('older per-mode values retain guide and equal-spacing behavior; new values override them independently', () => {
+    const doc = docWith([], 'design');
+    expect(snapOptsFor(doc, { design: { on: true, page: true, layers: true } })).toMatchObject({ guides: true, equalSpacing: true });
+    expect(snapOptsFor(doc, { design: { guides: false, equalSpacing: false } })).toMatchObject({ guides: false, equalSpacing: false });
+    expect(snapOptsFor(docWith([], 'drawing'), { design: { guides: false, equalSpacing: false } })).toMatchObject({ guides: true, equalSpacing: true });
   });
 });

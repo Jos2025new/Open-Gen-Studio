@@ -6,6 +6,17 @@
  */
 export default [
   {
+    id: 'snap-controls',
+    what: 'Los interruptores de guías y espaciado igual del menú Snap se guardan por modo y controlan sus candidatos y medidas.',
+    sides: [
+      ['src/engine/design/snap.ts', 'equalSpacing?: boolean'],
+      ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
+      ['src/components/designer/ToolSettings.tsx', 'Equal spacing'],
+      ['src/store/store.ts', 'snapByMode?: SnapByMode'],
+    ],
+    tests: ['tests/snap-mode.test.ts', 'tests/snap-session.test.ts'],
+  },
+  {
     id: 'paint-mode',
     what: 'ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen.',
     sides: [

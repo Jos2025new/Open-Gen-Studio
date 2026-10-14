@@ -44,6 +44,19 @@ describe('snap session: candidates once, by band, on screen, capped', () => {
     expect(slow.dx).toBeCloseTo(-1, 9);
     expect(SNAP_SPEED).toBeGreaterThan(0);
   });
+
+  it('turns guide and equal-spacing targets off independently', () => {
+    const guide = new SnapSession({ ...doc([]), guides: { x: [300], y: [] } }, 'mover', { ...opts, guides: false }, 1, view);
+    const noGuide = guide.step({ x: 296, y: 0, w: 10, h: 40 }, { x: 300, y: 20 }, { x: 0, y: 0 }, 0);
+    expect(noGuide.dx).toBe(0);
+
+    const layers = [layerAt('a', 0, 400, 10, 10), layerAt('b', 60, 400, 10, 10)];
+    const spacing = new SnapSession(doc(layers), 'mover', { ...opts, equalSpacing: false }, 1, view);
+    spacing.step({ x: 27, y: 400, w: 10, h: 10 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 0);
+    const noSpacing = spacing.step({ x: 27, y: 400, w: 10, h: 10 }, { x: 0, y: 0 }, { x: 0, y: 0 }, 1000);
+    expect(noSpacing.dx).toBe(0);
+    expect(noSpacing.measures).toBeUndefined();
+  });
 });
 
 describe('snap session: equal spacing with measures', () => {

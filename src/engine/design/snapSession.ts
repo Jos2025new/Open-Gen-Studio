@@ -21,14 +21,16 @@ export class SnapSession {
   private lastMove = 0;
   private boxes: Box[] = [];
 
-  constructor(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, opts: SnapOptions, private zoom: number, view: { x0: number; y0: number; x1: number; y1: number }) {
+  constructor(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, private opts: SnapOptions, private zoom: number, view: { x0: number; y0: number; x1: number; y1: number }) {
     const always = { lo: -Infinity, hi: Infinity };
     if (opts.page) {
       for (const v of [0, doc.width / 2, doc.width]) this.xs.push({ v, ...always });
       for (const v of [0, doc.height / 2, doc.height]) this.ys.push({ v, ...always });
     }
-    for (const v of doc.guides?.x ?? []) this.xs.push({ v, ...always });
-    for (const v of doc.guides?.y ?? []) this.ys.push({ v, ...always });
+    if (opts.guides !== false) {
+      for (const v of doc.guides?.x ?? []) this.xs.push({ v, ...always });
+      for (const v of doc.guides?.y ?? []) this.ys.push({ v, ...always });
+    }
     if (opts.layers) {
       const seen: Array<{ b: Box; d: number }> = [];
       const cx = (view.x0 + view.x1) / 2, cy = (view.y0 + view.y1) / 2;
@@ -77,7 +79,7 @@ export class SnapSession {
     const measures: Measure[] = [];
     for (const axis of ['x', 'y'] as const) {
       const cur = axis === 'x' ? r.dx : r.dy;
-      const sp = cur === 0 ? equalSpacing(box, this.boxes, tol, axis) : null;
+      const sp = this.opts.equalSpacing !== false && cur === 0 ? equalSpacing(box, this.boxes, tol, axis) : null;
       if (sp) {
         if (axis === 'x') r.dx = sp.d; else r.dy = sp.d;
         measures.push(...sp.measures);

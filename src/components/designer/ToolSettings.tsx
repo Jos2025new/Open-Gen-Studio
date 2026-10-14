@@ -114,6 +114,8 @@ export function SnapControl() {
         <label className="check-row"><input type="checkbox" checked={snap.on} onChange={(e) => set({ on: e.target.checked })} />Snap while moving</label>
         <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.page} onChange={(e) => set({ page: e.target.checked })} />Page edges and center</label>
         <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.layers} onChange={(e) => set({ layers: e.target.checked })} />Other layers</label>
+        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.guides !== false} onChange={(e) => set({ guides: e.target.checked })} />Guides</label>
+        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.equalSpacing !== false} onChange={(e) => set({ equalSpacing: e.target.checked })} />Equal spacing</label>
         <p className="faint">Hold Alt while dragging to move freely.</p>
       </div>
     </Popover>

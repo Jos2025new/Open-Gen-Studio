@@ -19,6 +19,7 @@ import type { DesignTool } from '../engine/design/rules';
 import { DEFAULT_TEXT_STYLE } from '../engine/design/doc';
 import { pinPaintMode } from '../engine/design/paintMode';
 import { DEFAULT_STROKE_STYLE } from '../engine/design/strokes';
+import type { SnapByMode } from '../engine/design/snap';
 import type { ShapeSpec, StrokeStyle } from '../engine/types';
 import type {
   AgentStyle,
@@ -139,7 +140,7 @@ export interface UiState {
   lineartMode?: 'draw' | 'edit';
   lineartInfluence?: number;
   /** Edit tool snapping, saved per mode: Drawing (off by default) and Design (on by default). Unset = that mode's default. */
-  snapByMode?: { drawing?: { on: boolean; page: boolean; layers: boolean }; design?: { on: boolean; page: boolean; layers: boolean } };
+  snapByMode?: SnapByMode;
   /** Edit tool: Ctrl-click picks more objects of the active layer (default) or more layers. */
   selectMode?: 'objects' | 'layers';
   /** Drawing on a layer with editable strokes: the choice the user saved (ADR 0016); 'ask' shows the prompt. */

@@ -15,12 +15,11 @@ import { layerBox } from './render';
 export function snapOptsFor(doc: Pick<DesignDoc, 'paintMode' | 'layers'>, byMode?: SnapByMode): SnapOptions {
   const mode = paintModeOf(doc);
   const saved = byMode?.[mode];
-  if (saved) return saved;
-  return { on: mode === 'design', page: true, layers: true };
+  return { on: mode === 'design', page: true, layers: true, guides: true, equalSpacing: true, ...saved };
 }
 
-/** The switch saved for each mode. A switch saved in the old single format is not read (its default is the mode's). */
-export type SnapByMode = { drawing?: SnapOptions; design?: SnapOptions };
+/** The switches saved for each mode. Missing newer switches preserve their original on behavior. */
+export type SnapByMode = { drawing?: Partial<SnapOptions>; design?: Partial<SnapOptions> };
 
 /** How close (screen px) an edge or center must come to a target to snap: Inkscape's default object tolerance. */
 export const SNAP_PX = 10;
@@ -31,8 +30,11 @@ export interface SnapOptions {
   on: boolean;
   page: boolean;
   layers: boolean;
+  /** Optional for settings saved before these independent switches existed; missing means on. */
+  guides?: boolean;
+  equalSpacing?: boolean;
 }
-export const SNAP_DEFAULT: SnapOptions = { on: true, page: true, layers: true };
+export const SNAP_DEFAULT: SnapOptions = { on: true, page: true, layers: true, guides: true, equalSpacing: true };
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -43,9 +45,10 @@ export function snapTargets(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' |
     xs.push(0, doc.width / 2, doc.width);
     ys.push(0, doc.height / 2, doc.height);
   }
-  // The user's own guides always count while snapping is on.
-  xs.push(...(doc.guides?.x ?? []));
-  ys.push(...(doc.guides?.y ?? []));
+  if (opts.guides !== false) {
+    xs.push(...(doc.guides?.x ?? []));
+    ys.push(...(doc.guides?.y ?? []));
+  }
   if (opts.layers) {
     for (const l of doc.layers) {
       if (l.id === movingId || !l.visible) continue;
