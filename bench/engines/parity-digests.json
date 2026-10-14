@@ -1,0 +1,7 @@
+{
+  "format": 1,
+  "status": "pendiente: los digests se generan en el navegador del sandbox (CPU, Canvas2D) y no se han medido",
+  "seed": 20260412,
+  "ops": 200,
+  "digests": {}
+}
