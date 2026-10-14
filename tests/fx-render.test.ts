@@ -225,6 +225,8 @@ describe('passes', () => {
 });
 
 import { beginLiveStroke, commitEdit, getBuffer, paintLive, setBuffer, subscribeRaster } from '../src/engine/design/raster';
+import { resetRetainedPage, setDragPreview } from '../src/engine/design/render';
+import { clearBelowCache } from '../src/engine/design/belowFxCache';
 import { place } from '../src/engine/design/rasterSurface';
 /** A test canvas injected as a full buffer: placed at (0, 0) over its whole size, so it is stored as it is. */
 const setFull = (id: string, c: { width: number; height: number }, persist?: boolean, dirty?: Parameters<typeof setBuffer>[3]) => setBuffer(id, place(c as HTMLCanvasElement, { x0: 0, y0: 0, fw: c.width, fh: c.height }), persist, dirty);
@@ -306,12 +308,40 @@ describe('editor FX cache (filters run again only when what they read changes)',
     drawDoc(stage(), doc);
     const n = blurs();
     expect(n).toBeGreaterThan(0);
-    const moved = { ...doc, layers: doc.layers.map((l) => (l.id === 'img' ? { ...l, x: l.x + 10, y: l.y + 4, opacity: 0.5, blend: 'multiply' as const } : l)) };
+    const moved = { ...doc, layers: doc.layers.map((l) => (l.id === 'img' ? { ...l, x: (l as { x: number }).x + 10, y: (l as { y: number }).y + 4, opacity: 0.5, blend: 'multiply' as const } : l)) };
     drawDoc(stage(), moved);
     expect(blurs()).toBe(n);
     const turned = { ...doc, layers: doc.layers.map((l) => (l.id === 'img' ? { ...l, transform: [1, 0, 0, 1, 3, 0] as never } : l)) };
     drawDoc(stage(), turned);
     expect(blurs()).toBeGreaterThan(n);
+    vi.unstubAllGlobals();
+  });
+  it('a drag preview skips the filters under the dragged layer; releasing computes them again', () => {
+    const img = { ...newRasterLayer('Image', { x: 0, y: 0, width: 200, height: 100 }, { width: 200, height: 100 }), id: 'img' };
+    readPixel = (() => ({ data: new Uint8ClampedArray(200 * 100 * 4) })) as never;
+    vi.stubGlobal('window', { setTimeout: () => 0, clearTimeout: () => undefined });
+    setFull('img', recordingCanvas(200, 100) as never, false);
+    const belowFx = newFxLayer('filter', { scope: 'below', ops: [newFxOp('blur', { radius: 2 })] });
+    const under = { ...createDoc('p', 200, 100), layers: [img, belowFx] } as DesignDoc;
+    drawDoc(stage(), under);
+    const full = blurs();
+    expect(full).toBeGreaterThan(0);
+    setDragPreview(true);
+    drawDoc(stage(), { ...under, layers: under.layers.map((l) => (l.id === 'img' ? { ...l, x: (l as { x: number }).x + 6 } : l)) });
+    expect(blurs()).toBe(full);
+    setDragPreview(false);
+    const dragged = { ...under, layers: under.layers.map((l) => (l.id === 'img' ? { ...l, x: (l as { x: number }).x + 6 } : l)) };
+    const signature = () => calls.filter((c) => c.fn === 'drawImage').map((c) => `${c.filter}|${c.op}|${c.alpha}`);
+    calls.length = 0;
+    drawDoc(stage(), dragged);
+    expect(blurs()).toBeGreaterThan(0);
+    // Parity: the frame after release matches the same page drawn from scratch.
+    const afterRelease = signature();
+    calls.length = 0;
+    resetRetainedPage();
+    clearBelowCache();
+    drawDoc(stage(), dragged);
+    expect(signature()).toEqual(afterRelease);
     vi.unstubAllGlobals();
   });
   it('exports and other offscreen renders always compute', () => {

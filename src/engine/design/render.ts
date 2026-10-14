@@ -311,6 +311,14 @@ function keepFx(id: string, key: unknown[], canvas: HTMLCanvasElement): void {
   editorCacheBudget.put(`fx:${id}`, canvas.width * canvas.height * 4, () => fxCache.delete(id));
 }
 
+/*
+ * While a layer is dragged, the page is a reduced preview: 'below' FX run only where a result is already cached, and
+ * the retained page is not used. Releasing the drag (setDragPreview(false), then a redraw) composes the full page.
+ */
+let dragPreview = false;
+export function setDragPreview(on: boolean): void { dragPreview = on; }
+export function isDragPreview(): boolean { return dragPreview; }
+
 /** Most canvas pixels an FX composite uses (the view's resolution, capped). */
 const FX_MAX_PX = 16_000_000;
 
@@ -351,6 +359,7 @@ function composeFx(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: numb
     else if (s.t === 'below') {
       const key = editor ? [...below, s.fx] : null, hit = key && cachedBelow(s.fx.id, key);
       if (hit) { acc = createCanvas(cw, ch); ctx2d(acc).drawImage(hit, 0, 0); }
+      else if (dragPreview && editor) { /* reduced preview: not computed until the drag is released */ }
       else { acc = mixFx(acc, s.fx, { scale, clip: false, trace }); if (key) keepBelow(s.fx.id, key, cloneCanvas(acc)); }
       if (editor) below.push(s.fx);
     }
@@ -430,7 +439,7 @@ function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: Return
   const m = ctx.getTransform();
   const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
   const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
-  const page = editor && !fullResolution ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
+  const page = editor && !fullResolution && !dragPreview ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(page, 0, 0, doc.width, doc.height);
 }

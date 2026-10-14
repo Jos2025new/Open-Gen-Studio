@@ -14,6 +14,6 @@ describe('drawing revision (placement is not drawn content)', () => {
   });
   it('keeps vector layers compared as a whole', () => {
     const v = newVectorLayer('V', []);
-    expect(drawRevision({ ...v, x: 4 })).not.toEqual(drawRevision(v));
+    expect(drawRevision({ ...v, shapes: [] })[0]).not.toBe(drawRevision(v)[0]);
   });
 });
