@@ -114,7 +114,10 @@ Causa de que los nodos no se pudieran agarrar: `designer-connected.css:257` pone
 
 Investigación sin cambios de código: [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md). Causa más probable: `transformStroke` no escala los tapers (`affine.ts:52-54`), y `perfect-freehand` usa umbrales absolutos que hacen el contorno no equivariante. Arreglo inmediato propuesto: escalar tapers como `scaleStroke`; el estructural, guardar el trazo con matriz acumulada.
 
-### CRÍTICO, pendiente de revisión del usuario: lineart y escala (2026-10-13)
+### Lineart y escala: Aprobado con reservas por el usuario (90/100), 2026-10-13; sigue bajo supervisión (2026-10-13)
 
-Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con el grosor, `1266df4`) y el arreglo 2 (matriz acumulada, `6319284`; trazos sin matriz intactos). Detalle, decisiones y límites en [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md#arreglo-aplicado-2026-10-13-crítico-pendiente-de-revisión-del-usuario). Verificado en código y e2e (`tests-e2e/lineart-scale.spec.ts`, pasa; `npm test` EXIT=0). Pendiente: revisión del usuario en la app, la paridad en navegador de canvas y PNG, y la escala no uniforme frente a Inkscape.
+Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con el grosor, `1266df4`) y el arreglo 2 (matriz acumulada, `6319284`; trazos sin matriz intactos). Detalle, decisiones y límites en [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md#arreglo-aplicado-2026-10-13-crítico-pendiente-de-revisión-del-usuario). Verificado en código y e2e (`tests-e2e/lineart-scale.spec.ts`, pasa; `npm test` EXIT=0). Pendiente de mejora:
+- **Deformación residual** (el usuario la estima en un 10 %): causa probable, los umbrales absolutos de perfect-freehand en tamaños muy pequeños, o la escala no uniforme con factor medio. Hay que pedirle al usuario un caso concreto.
+- **Paridad de canvas y PNG** en el navegador (no probada).
+- **Convert to path y flechas** en el lineart (no aplican en este código).
 

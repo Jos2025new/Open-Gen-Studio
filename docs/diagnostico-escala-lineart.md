@@ -48,9 +48,9 @@ Conclusión de los experimentos: el contorno de un trazo escalado no coincide co
 - No se leyó el código de escritura de rutas de Inkscape (redondeo de salida); solo `sp-item.cpp`.
 - No se probó en el navegador: el diagnóstico es de código y de pruebas unitarias.
 
-## Arreglo aplicado (2026-10-13, crítico: pendiente de revisión del usuario)
+## Arreglo aplicado (2026-10-13, Aprobado con reservas por el usuario (90/100), 2026-10-13; sigue bajo supervisión)
 
-El usuario aprobó los arreglos 1 y 2. La herramienta de lineart es de las favoritas del usuario: **no se ha cambiado el dibujo**, y el estado queda como «crítico, pendiente de revisión del usuario».
+El usuario aprobó los arreglos 1 y 2. La herramienta de lineart es de las favoritas del usuario: **no se ha cambiado el dibujo**, y el estado es: Aprobado con reservas por el usuario (90/100), 2026-10-13; sigue bajo supervisión.
 
 ### Arreglo 1: tapers con el grosor (`1266df4`)
 - `transformStroke` escalaba `size` pero no `taperStart`/`taperEnd`. Ahora los escala con la misma escala media que `scaleStroke`.
@@ -72,3 +72,6 @@ El usuario aprobó los arreglos 1 y 2. La herramienta de lineart es de las favor
 - **e2e `tests-e2e/lineart-scale.spec.ts`:** pasa (`--workers=1`, sandbox propio en 5183, preparado por el store). Cinco encogimientos seguidos: el área del contorno sigue k² y el grosor sigue la escala. Se esperó a que el puerto 5183 quedara libre (lo cerró el usuario); no se tocó el proceso del usuario.
 - **`npm test`:** EXIT=0, 223 archivos, 1509 tests.
 - **Paridad canvas/PNG:** no probada en el navegador (sin navegador en esta tanda); la exportación SVG se compara con el mismo contorno en tests unitarios.
+
+### Veredicto del usuario
+Aprobado con reservas por el usuario (90/100), 2026-10-13; sigue bajo supervisión. Dice «mejoró bastante, no al 100 %». Deformación residual pendiente: pedir un caso concreto.
