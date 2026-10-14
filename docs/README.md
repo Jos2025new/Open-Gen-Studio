@@ -103,6 +103,7 @@
 - [027-2026-10-W42: selección por modo en Edit](history/027-2026-10-W42.md) — Align conserva su guardia de modo y Edit incorpora marquee por objetos/capas.
 - [028-2026-10-W42: redondeo común de rectángulos seleccionados](history/028-2026-10-W42.md) — Rx/Ry actúa sobre los rectángulos del conjunto explícito en Object o Layer.
 - [029-2026-10-W42: edición de nodos en varios paths](history/029-2026-10-W42.md) — selección y movimiento multi-path en Object o Layer, con límites explícitos.
+- [030-2026-10-W42: correcciones de marquee y selección](history/030-2026-10-W42.md) — coordenadas del indicador, pista click-through y limpieza/modificación coherente de Object/Layer.
 
 ## Trazabilidad
 

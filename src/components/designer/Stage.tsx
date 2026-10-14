@@ -12,7 +12,7 @@ import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import type { Measure } from '../../engine/design/snap';
 import type { AlignmentGuide } from '../../engine/design/snapSession';
 import { SnapIndicator } from './SnapIndicator';
-import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
+import { layerSelection, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
 import { beginLiveStroke } from '../../engine/design/raster';
@@ -56,7 +56,7 @@ import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 type Drag =
   | { kind: 'pixelMove'; move: PixelMove }
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
-  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; solo?: string }
+  | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
@@ -364,9 +364,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke();
       ctx.restore();
     }
-    if (editMarquee) {
-      drawEditMarquee(ctx, editMarquee, view);
-    }
     // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
     ctx.strokeStyle = '#55555e';
     ctx.lineWidth = 1 / view.zoom;
@@ -375,6 +372,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     ctx.restore();
 
     // Overlays in screen space.
+    // The document context has been restored: draw the marquee in screen space here so its
+    // view offset and zoom are applied exactly once, like the other screen-space overlays.
+    if (editMarquee) drawEditMarquee(ctx, editMarquee, view);
     const sx = (x: number) => view.x + x * view.zoom;
     const sy = (y: number) => view.y + y * view.zoom;
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -681,34 +681,34 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         return;
       }
 
-      // Objects mode: parts of one layer; Shift (below) selects layers.
-      if (!editLayers && !e.shiftKey) {
-        const ctrl = e.ctrlKey || e.metaKey;
+      // Objects mode: plain click replaces; Shift/Ctrl/Cmd toggles objects in the picked layer.
+      if (!editLayers) {
+        const additive = e.ctrlKey || e.metaKey || e.shiftKey;
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
-        // The top layer wins. Ctrl picks parts of one layer, or whole layers for a group.
+        // The top layer wins. A modifier picks parts of one layer, or whole layers for a group.
         const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => Boolean(objectAt(l, p.x, p.y))); 
         let layer: Layer | null = null;
-        if (ctrl) layer = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)).length === 1 && owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
+        if (additive) layer = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)).length === 1 && owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
         else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
         else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
           if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
           const cur = objectPick(doc.id);
-          if (ctrl) {
-            // Ctrl held: press and drag moves everything picked (adding this one first if needed); a Ctrl-click
-            // without dragging adds it, or takes it out if it was already picked.
+          if (additive) {
+            // A modifier toggles an object; dragging an existing pick still moves the whole group.
             const had = cur?.layerId === layer.id && cur.ids.includes(id);
             if (!had) pickObject(doc.id, layer.id, id, true);
+            setLayerPicks(doc.id, []);
             const ids = objectPick(doc.id)?.ids ?? [id];
             drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, ctrlToggle: had ? id : undefined, pre: current };
             return;
           }
           setActiveLayer(sessionId, doc.id, layer.id);
-          // Pressing one of several picked layers drags them all; a click keeps just it (Inkscape).
+          // Pressing a picked layer drags the whole selection; a plain click preserves its membership.
           const grp = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-          if (grp.length > 1 && grp.includes(layer.id)) return void (drag.current = { kind: 'move', layerId: layer.id, startX: p.x, startY: p.y, base: layer, others: otherPickedLayers(current, layer.id), pre: current, solo: layer.id });
-          pickLayer(doc.id, layer.id, false, []);
+          if (grp.length > 1 && grp.includes(layer.id)) return void (drag.current = { kind: 'move', layerId: layer.id, startX: p.x, startY: p.y, base: layer, others: otherPickedLayers(current, layer.id), pre: current });
+          setLayerPicks(doc.id, []);
           // Dragging one of several picked objects moves them all; another object starts a new pick.
           const again = cur?.layerId === layer.id && cur.ids.includes(id);
           const ids = again ? cur!.ids : [id];
@@ -716,16 +716,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           drag.current = { kind: 'objMove', layerId: layer.id, ids, startX: p.x, startY: p.y, base: layer, again, pre: current };
           return;
         }
-        if (ctrl) {
-          // Ctrl adds layers; releasing without dragging toggles a picked layer.
+        if (additive) {
+          // Do not silently turn an Object selection into layer picks. Use Layer mode for that set.
           const hit = hitTestPixel(current, p.x, p.y);
-          if (!hit || hit.locked) return;
-          setObjectPick(doc.id, null);
-          const ids = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-          const had = ids.length > 1 && ids.includes(hit.id);
-          if (!had) pickLayer(doc.id, hit.id, true, ids);
-          setActiveLayer(sessionId, doc.id, hit.id);
-          drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(getDoc(sessionId, doc.id) ?? current, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
+          if (hit && hit.id !== objectPick(doc.id)?.layerId && hit.id !== current.activeLayerId) toast('Object mode selects shapes in one layer. Switch Edit to Layer to select multiple layers.', 'info');
           return;
         }
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
@@ -1147,7 +1141,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.kind === 'move') for (const o of d.others ?? []) rebasePaintLayer(sessionId, doc.id, o.id);
     // A Ctrl-click (no drag) on something already picked takes it out of the pick.
     if (d.kind === 'objMove' && d.ctrlToggle && !d.moved) pickObject(doc.id, d.layerId, d.ctrlToggle, true);
-    if (d.kind === 'move' && d.solo && !d.moved) pickLayer(doc.id, d.solo, false, []);
     if (d.kind === 'move' && d.ctrlToggle && !d.moved) { const cur = getDoc(sessionId, doc.id) ?? doc; const ids = pickLayer(doc.id, d.ctrlToggle, true, layerSelection(doc.id, cur.activeLayerId, cur.layers.map((l) => l.id))); setActiveLayer(sessionId, doc.id, ids.at(-1) ?? null); }
     if (d.kind === 'objMove') {
       applyRasterMove();

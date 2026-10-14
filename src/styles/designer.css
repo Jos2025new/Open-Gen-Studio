@@ -201,8 +201,8 @@
 .panel-tab-body .layer-list { max-height: none; flex: 1; min-height: 0; }
 
 /* Tips with a close button take clicks (the plain warning tips stay click-through). */
-.stage-hint.has-close { display: flex; align-items: center; gap: 8px; pointer-events: auto; padding-right: 4px; }
-.stage-hint-close { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--text-2); flex-shrink: 0; }
+.stage-hint.has-close { display: flex; align-items: center; gap: 8px; pointer-events: none; padding-right: 4px; }
+.stage-hint-close { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; color: var(--text-2); flex-shrink: 0; pointer-events: auto; }
 .stage-hint-close:hover { background: var(--surface-2); color: var(--text); }
 /* FX layers (ADR 0011): row icon, editor and op list. */
 .layer-thumb-wrap.is-fx { display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }

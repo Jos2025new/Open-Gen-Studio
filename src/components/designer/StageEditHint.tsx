@@ -13,7 +13,7 @@ export function StageEditHint(props: {
     : marquee ? <StageHint id="edit-marquee" subtle>Drag selects objects or layers · Shift adds · Alt removes</StageHint>
     : layersEmpty ? <StageHint id="layers-marquee" subtle>Drag empty space to select visible layers · Shift adds · Alt removes</StageHint>
     : canShowHandles ? (handleMode === 'scale' ? <StageHint id="handles-scale" subtle>Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate</StageHint> : <StageHint id="handles-rotate" subtle>Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize</StageHint>)
-    : canShowObjects && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · drag empty space to select · Shift adds · Alt removes · drag moves picked</StageHint>
+    : canShowObjects && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · Shift/Ctrl-click adds or toggles objects · drag empty space to select · Alt subtracts from marquee</StageHint>
     : null;
 }
 

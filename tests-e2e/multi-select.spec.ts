@@ -3,7 +3,7 @@ import { setup } from './shapeHelpers';
 
 /*
  * Picking several shapes as in Inkscape and Photoshop (each shape is its own layer): Shift-click (or Ctrl-click)
- * adds, dragging a picked one moves them all, a click without dragging keeps just it; clicks add no empty undo
+ * toggles, dragging a picked one moves them all, clicking a picked member keeps the group; clicks add no empty undo
  * steps. Sandbox only: `npm run dev:sandbox`, then `npx playwright test tests-e2e/multi-select.spec.ts`.
  */
 test.use({ viewport: { width: 1500, height: 940 }, launchOptions: { executablePath: chromium.executablePath() } });
@@ -17,17 +17,20 @@ const state = (page: Page) => page.evaluate(async () => {
   return { boxes: vec.map((l: any) => [l.shapes[0].x, l.shapes[0].y]), picked: S.layerSelection(d.id, d.activeLayerId, d.layers.map((l: any) => l.id)).length, undo: H.historyDepth(d.id).undo };
 });
 
-test('Shift-click adds a second shape; dragging one moves both; a click keeps just it; clicks add no undo steps', async ({ page }) => {
+test('Shift-click toggles a second shape; dragging one moves both; clicking a selected member keeps group; no empty undo steps', async ({ page }) => {
   const errors = await setup(page);
+  await page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), D = await import('/src/engine/design/doc.ts' as string);
+    const sid = S.useStore.getState().activeSessionId, d = A.activeDoc(sid);
+    const a = D.newVectorLayer('A', [{ type: 'rect', x: 360, y: 300, w: 200, h: 160, fill: '#fff', stroke: null, strokeWidth: 0 } as any]);
+    const b = D.newVectorLayer('B', [{ type: 'rect', x: 900, y: 300, w: 200, h: 160, fill: '#fff', stroke: null, strokeWidth: 0 } as any]);
+    S.setDoc(sid, d.id, (doc: any) => ({ ...doc, layers: [a, b], activeLayerId: a.id }));
+    S.setUi({ tool: 'move', selectMode: 'layers', rulers: false, snap: { on: false, page: false, layers: false } });
+  });
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
-  const at = (fx: number, fy: number) => ({ x: c.x + c.width * fx, y: c.y + c.height * fy });
-  for (const [x0, y0] of [[0.2, 0.3], [0.55, 0.3]]) {
-    await page.keyboard.press('r');
-    const a = at(x0, y0), b = at(x0 + 0.15, y0 + 0.25);
-    await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 5 }); await page.mouse.up();
-  }
-  await page.keyboard.press('v');
-  const p1 = at(0.27, 0.42), p2 = at(0.62, 0.42);
+  const z = Math.min((c.width - 48) / 1920, (c.height - 144) / 1080, 4);
+  const at = (x: number, y: number) => ({ x: c.x + (c.width - 1920 * z) / 2 + x * z, y: c.y + Math.max(12, (c.height - 120 - 1080 * z) / 2) + y * z });
+  const p1 = at(420, 340), p2 = at(960, 340);
   await page.mouse.click(p1.x, p1.y);
   const u0 = (await state(page)).undo;
   // Plain Shift-click on the other shape: both picked (no Ctrl+Shift needed); clicks record no undo step.
@@ -46,9 +49,9 @@ test('Shift-click adds a second shape; dragging one moves both; a click keeps ju
   await page.keyboard.press('Control+z');
   s = await state(page);
   expect(s.boxes).toEqual(before);
-  // A click without dragging on one of the picked keeps just it.
+  // A click without dragging on an already picked member keeps the group (Inkscape selection behavior).
   await page.mouse.click(p2.x, p2.y);
-  expect((await state(page)).picked).toBe(1);
+  expect((await state(page)).picked).toBe(2);
   expect(errors).toEqual([]);
 });
 

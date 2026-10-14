@@ -10,7 +10,7 @@ import { IconButton } from '../ui/primitives';
  * are one complete record: the inventory test fails if a tool has none.
  */
 export const TOOL_HELP: Record<DesignTool, string> = {
-  move: 'Click to pick a layer or object · drag to move · Shift- or Ctrl-click adds more · drag a picked one to move them all · double-click a stroke to edit its points',
+  move: 'Click picks; Shift/Ctrl-click toggles objects or layers · drag a picked one moves the group · double-click a stroke to edit points (OGS uses Ctrl as a selection modifier; Inkscape uses it to pick inside groups)',
   hand: 'Drag to pan the page · hold Space to pan with any tool · Ctrl+wheel zooms',
   select: 'Drag a rectangle or lasso, or click with the wand · Shift adds · Alt subtracts · Ctrl+J copies it to a layer · Ctrl+D deselects',
   eyedropper: 'Click to pick the visible colour · Alt-click does the same with the Brush or Fill',
