@@ -109,3 +109,7 @@ Causa de que los nodos no se pudieran agarrar: `designer-connected.css:257` pone
 - Booleanas con Clipper2 o paper.js: no empezadas.
 - Ajuste a rejilla, guías y objetos: parcial (sK1 solo como idea).
 - Pendientes de antes: paridad en navegador (entregas 2 y 4), PNG en worker (desactivado), A/B final (entrega 6), ADR 0015 en memoria, máscaras de un canal, y el SVG con un archivo real de Inkscape.
+
+## Diagnóstico abierto: lineart que se deforma al encoger (2026-10-13)
+
+Investigación sin cambios de código: [diagnostico-escala-lineart.md](diagnostico-escala-lineart.md). Causa más probable: `transformStroke` no escala los tapers (`affine.ts:52-54`), y `perfect-freehand` usa umbrales absolutos que hacen el contorno no equivariante. Arreglo inmediato propuesto: escalar tapers como `scaleStroke`; el estructural, guardar el trazo con matriz acumulada.

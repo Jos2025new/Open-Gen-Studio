@@ -13,6 +13,7 @@
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
 - [Importar SVG de Inkscape](inkscape-importacion.md): qué queda editable (carpetas, formas, opacidades, blur) y qué se rasteriza, y cómo se sanea.
 - [Formas al estilo de Inkscape](inkscape-formas.md): fórmulas de esquinas, trazo y desenfoque, con la línea exacta del código de Inkscape y las diferencias deliberadas.
+- [Diagnóstico: trazos de lineart que se deforman al encoger](diagnostico-escala-lineart.md): hipótesis, experimentos, causa (taper sin escalar y umbrales de perfect-freehand) y arreglo propuesto.
 - [Investigación sK1 (GPL, solo lectura)](investigacion-sk1.md): primitivas, booleanas, degradados, tipos de nodo, color y PDF de sK1 como referencia, con licencia y lo descartado.
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
 - Cada ficha de feature enlaza comportamiento, código y test; «sin test» marca falta de cobertura directa.
