@@ -1,6 +1,6 @@
 export default [{
   id: 'designer-selection',
-  what: 'Autoselect permite sumar capas en Object; marquee, radios y nodos consumen selección explícita.',
+  what: 'Autoselect suma capas en Object; marquee y editores usan selección explícita.',
   sides: [
     ['src/engine/design/marquee.ts', 'export function marqueeIds'],
     ['src/engine/design/objectSelection.ts', 'export function pickObject'],
@@ -15,6 +15,7 @@ export default [{
     ['src/components/designer/MultiPathNodes.tsx', 'export function MultiPathNodes'],
     ['src/components/designer/ContextStrip.tsx', 'MultiRectangleRadii'],
     ['src/components/designer/MultiRectangleRadii.tsx', 'data-multi-rectangle-convert'],
+    ['src/styles/designer-connected.css', '.context-strip .rounding-selection'],
   ],
   tests: ['tests/marquee.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
 }];
