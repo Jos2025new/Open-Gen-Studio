@@ -1392,6 +1392,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
+          onNotice: (text) => notice(sessionId, workspace, text, 'info'),
           onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
           signal,
           onToolCall: () => {

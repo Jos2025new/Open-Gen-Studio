@@ -241,6 +241,8 @@ export async function chat(opts: {
   onReasoning?: (delta: string, full: string) => void;
   /** Called once, when the first tool-call fragment arrives (the plan is being written). */
   onToolCall?: () => void;
+  /** Told when the provider refused the reasoning settings and the answer runs without them. */
+  onNotice?: (text: string) => void;
 }): Promise<ChatResult> {
   const body: Record<string, unknown> = {
     model: opts.model,
@@ -309,6 +311,7 @@ export async function chat(opts: {
     // A model that refuses the reasoning fields still answers without them (one retry, same request otherwise).
     const err = await failure(res);
     if (!/reason|effort|think/i.test(err.message)) throw err;
+    opts.onNotice?.(`${LLM_LABELS[opts.provider]} refused the reasoning setting (${err.message}); this answer runs without it.`);
     res = await send(false);
   }
   if (!res.ok || !res.body) throw await failure(res);

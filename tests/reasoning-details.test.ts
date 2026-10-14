@@ -77,3 +77,26 @@ describe('reasoning_details round trip (fix 5a)', () => {
     expect((body.messages as LlmMessage[])[1]).toEqual(old);
   });
 });
+
+describe('reasoning refusal is not silent (fix 5b)', () => {
+  it('tells the user when the retry drops the reasoning settings', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', async () => {
+      calls++;
+      if (calls === 1) return new Response(JSON.stringify({ error: { message: 'reasoning effort is not supported' } }), { status: 400 });
+      return sse([{ choices: [{ delta: { content: 'ok' } }] }]);
+    });
+    const notes: string[] = [];
+    const res = await chat({ provider: 'openrouter', apiKey: 'k', model: 'm', system: 's', messages: [], tools: [], effort: 'high', signal: new AbortController().signal, onNotice: (t) => notes.push(t) });
+    expect(res.text).toBe('ok');
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toMatch(/OpenRouter refused the reasoning setting/);
+  });
+
+  it('a 400 that is not about reasoning is not retried and not noted', async () => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ error: { message: 'bad image' } }), { status: 400 }));
+    const notes: string[] = [];
+    await expect(chat({ provider: 'openrouter', apiKey: 'k', model: 'm', system: 's', messages: [], tools: [], effort: 'high', signal: new AbortController().signal, onNotice: (t) => notes.push(t) })).rejects.toThrow();
+    expect(notes).toEqual([]);
+  });
+});
