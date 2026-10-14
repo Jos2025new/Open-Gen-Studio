@@ -38,3 +38,21 @@ Investigación del 2026-10-11 para tiradores de esquina, estilo de trazo y desen
 
 GPT revisó 523dd35 y 0f8ad16 y encontró siete fallos, ya corregidos con tests: líneas con blur que desaparecían del SVG, trazos gruesos recortados, blur de relleno y trazo distinto entre lienzo y SVG, Ry con Rx sin definir, tirador de blur sobre el de escala, Rotate 90° con las esquinas sin girar, y una diferencia de 3/255 en formas antiguas. En la segunda revisión: Rx tapaba la escala en formas pequeñas, el rectángulo de ancho 0 desaparecía del SVG y el zoom era más lento (21,7 → 28,4 ms); los tres, corregidos. Queda aparte la opacidad y fusión de capa con formas superpuestas, que ya diferían entre lienzo y SVG antes de este trabajo. Rondas siguientes (giro, nodos, Convert to path): cada hallazgo y su corrección, por commit, en el [historial 024](history/024-2026-10-W41.md).
 - Sin marcadores en esta pasada.
+
+## Nodos y arrastre de segmentos (2026-10-13)
+
+Fuente: Inkscape `master` en el commit 21f4270, leído con curl. Código nuestro: `src/engine/design/nodeTypes.ts`, `src/engine/design/segmentDrag.ts`, `src/components/designer/PathNodes.tsx`.
+
+| Qué | Inkscape | Línea | Nuestro código |
+| --- | --- | --- | --- |
+| Arrastrar un segmento | Peso de la curva por t: 0 hasta t = 1/6, sube a 1/2 en t = 1/2, 1 desde t = 5/6 | [curve-drag-point.cpp 99–104](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/curve-drag-point.cpp#L99-104) | `dragWeight` |
+| Reparto entre los dos tiradores | Tiradores de entrada y de salida: (1−w)/(3t(1−t)²) y w/(3t²(1−t)) del desplazamiento; su suma da el desplazamiento entero | [curve-drag-point.cpp 109–110](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/curve-drag-point.cpp#L109-110) | `dragSegment` |
+| Segmento recto | Sus tiradores se colocan al tercio al empezar el arrastre | [curve-drag-point.cpp 54–64](https://gitlab.com/inkscape/inkscape/-/blob/21f427000de1e19f5a262e75cfa83c3f82564f8b/src/ui/tool/curve-drag-point.cpp#L54-64) | `dragSegment`, `pullHandle` |
+
+Comprobación: tras arrastrar, la curva en el parámetro t pasa por el punto arrastrado (exacto, porque los dos pesos suman 1); los nodos de los extremos no se mueven. Tests en `tests/node-drag.test.ts`.
+
+Tipos de nodo: esquina deja los tiradores independientes; suave alinea los dos por la tangente (la perpendicular a la bisectriz de sus direcciones) conservando cada longitud; simétrico, alineado y con la misma longitud. Un tirador de longitud cero, al convertir, toma un tercio del segmento vecino y después se alinea. Atajos: Shift+C, Shift+S, Shift+Y (ya existían). Automático (Shift+A): no implementado.
+
+Tiradores: el nodo seleccionado y sus vecinos muestran siempre sus dos tiradores, aunque sean de longitud cero. Shift-arrastre desde un nodo saca el tirador de ese lado; en un segmento recto lo convierte en curva. Los extremos de un trazado abierto solo tienen el tirador interior.
+
+Doble clic en un segmento inserta un nodo en su punto sin cambiar la forma (partición de De Casteljau; test por muestreo). Un trazo invisible de 10 px sobre el contorno recoge el clic y cambia el cursor.
