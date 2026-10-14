@@ -64,7 +64,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         <PrimFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
-        {isPath && edit?.node != null && (() => { const t = readTypes(pageSegs(selectedShape.shape), selectedShape.shape.nodeTypes)[edit.node] ?? 'c'; return <InlineChoice label="Node" value={t} options={[{ value: 'c' as const, label: 'Cusp node (Shift+C): handles move apart' }, { value: 's' as const, label: 'Smooth node (Shift+S): handles stay in line' }, { value: 'z' as const, label: 'Symmetric node (Shift+Y): in line and the same length' }].map((o) => ({ ...o, render: { c: 'Cusp', s: 'Smooth', z: 'Sym' }[o.value] }))} onChange={(v) => setPathNodeType(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit.node!, v)} />; })()}
+        {isPath && edit?.node != null && (() => { const t = readTypes(pageSegs(selectedShape.shape), selectedShape.shape.nodeTypes)[edit.node] ?? 'c'; return <InlineChoice label="Node" value={t} options={[{ value: 'c' as const, label: 'Cusp node (Shift+C): handles move apart' }, { value: 's' as const, label: 'Smooth node (Shift+S): handles stay in line' }, { value: 'z' as const, label: 'Symmetric node (Shift+Y): in line and the same length' }].map((o) => ({ ...o, render: <NodeTypeIcon t={o.value} /> }))} onChange={(v) => setPathNodeType(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit.node!, v)} />; })()}
         {isPath && (edit?.nodes?.length ?? 0) >= 1 && <button type="button" className="opt" data-tip="Break the path at the selected nodes into separate ends (Shift+B)" onClick={() => setBreakNodes(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!)}>Break</button>}
         {isPath && (edit?.nodes?.length ?? 0) >= 2 && <>
           <button type="button" className="opt" data-tip="Merge selected ends, or weld adjacent selected nodes if there are no end pairs (Shift+J)" onClick={() => setJoinEnds(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit!.nodes!, 'merge')}>Join</button>
@@ -85,4 +85,11 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
     <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
   </div>;
+}
+
+/* Node types as Inkscape draws them: a node with its two handles. Cusp: the handles bend apart; smooth: in line,
+   unequal lengths; symmetric: in line and equal. The name stays as the choice's label and tooltip. */
+function NodeTypeIcon({ t }: { t: 'c' | 's' | 'z' }) {
+  const handles = t === 'c' ? 'M4 15 L9 9 L15 15' : t === 's' ? 'M3 9 H9 H16' : 'M4 9 H9 H14';
+  return <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d={handles} fill="none" stroke="currentColor" strokeWidth="1.5" /><rect x="7.5" y="7.5" width="3" height="3" fill="currentColor" /></svg>;
 }
