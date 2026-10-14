@@ -1,5 +1,6 @@
 import type { DesignDoc, ShapeSpec } from '../types';
 import type { ObjectPick } from './objectSelection';
+import { shapeToPath } from './affine';
 import { cornerRadii } from './shapeLook';
 
 export type RectangleTarget = { layerId: string; shapeId: string };
@@ -40,5 +41,20 @@ export function patchMultiLayerRectangles(doc: DesignDoc, targets: RectangleTarg
     const ids = byLayer.get(layer.id);
     if (!ids || layer.type !== 'vector' || !layer.visible || layer.locked) return layer;
     return { ...layer, shapes: layer.shapes.map((shape) => ids.has(shape.id) && shape.type === 'rect' ? { ...shape, ...patch } : shape) };
+  }) };
+}
+
+/** Convert only the explicit, still-editable rectangle targets; rounded outlines and IDs are preserved. */
+export function convertMultiRectanglesToPaths(doc: DesignDoc, targets: RectangleTarget[]): DesignDoc {
+  const byLayer = new Map<string, Set<string>>();
+  for (const target of targets) {
+    const ids = byLayer.get(target.layerId) ?? new Set<string>();
+    ids.add(target.shapeId);
+    byLayer.set(target.layerId, ids);
+  }
+  return { ...doc, updatedAt: Date.now(), layers: doc.layers.map((layer) => {
+    const ids = byLayer.get(layer.id);
+    if (!ids || layer.type !== 'vector' || !layer.visible || layer.locked) return layer;
+    return { ...layer, shapes: layer.shapes.map((shape) => ids.has(shape.id) && shape.type === 'rect' ? shapeToPath(shape) : shape) };
   }) };
 }

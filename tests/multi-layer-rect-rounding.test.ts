@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { DesignDoc, VectorLayer } from '../src/engine/types';
-import { mixedRectangleRadii, multiLayerRectangles, patchMultiLayerRectangles } from '../src/engine/design/multiRectEdit';
+import type { DesignDoc, ShapeSpec, VectorLayer } from '../src/engine/types';
+import { convertMultiRectanglesToPaths, mixedRectangleRadii, multiLayerRectangles, patchMultiLayerRectangles } from '../src/engine/design/multiRectEdit';
 
 const vector = (id: string, shapes: any[], extra: Partial<VectorLayer> = {}): VectorLayer => ({
   id, name: id, type: 'vector', visible: true, locked: false, opacity: 1, blend: 'normal', shapes, ...extra,
@@ -39,5 +39,22 @@ describe('rounding selected rectangles across layers', () => {
       ['a1', 12, 6], ['oval', 0, undefined],
     ]);
     expect(next.layers[1].type === 'vector' && next.layers[1].shapes[0]).toMatchObject({ id: 'b1', rx: 12, ry: 6 });
+  });
+
+  it('converts only explicit rectangles to paths while preserving their rounded outline and unrelated shapes', () => {
+    const first = { ...rect('a1', 12), ry: 6, fill: '#e33', stroke: '#123', strokeWidth: 4, rot: [0, 1, -1, 0] as [number, number, number, number] } as ShapeSpec;
+    const second = rect('a2', 4) as ShapeSpec;
+    const other = doc([vector('a', [first, ellipse, second]), vector('b', [rect('outside')])]);
+    const targets = multiLayerRectangles(other, 'objects', { layerId: 'a', ids: ['a1', 'a2'] }, []);
+    const next = convertMultiRectanglesToPaths(other, targets);
+    const shapes = next.layers[0].type === 'vector' ? next.layers[0].shapes : [];
+    expect(shapes[0]).toMatchObject({ id: 'a1', type: 'path', x: 0, y: 0, w: 80, h: 40, fill: '#e33', stroke: '#123', strokeWidth: 4, rx: undefined, ry: undefined, radius: 0, rot: first.rot });
+    expect(shapes[0].d).toContain('M 12 0 L 68 0');
+    expect(shapes[0].d).toContain('80 6 L 80 34');
+    expect(shapes[0].d).toContain('0 34 L 0 6');
+    expect(shapes[1]).toBe(ellipse);
+    expect(shapes[2]).toMatchObject({ id: 'a2', type: 'path', rx: undefined, ry: undefined, radius: 0 });
+    expect(shapes[2].d).toContain('M 4 0 L 76 0');
+    expect(next.layers[1]).toBe(other.layers[1]);
   });
 });

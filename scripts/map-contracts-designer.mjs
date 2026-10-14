@@ -10,10 +10,11 @@ export default [{
     ['src/components/designer/Stage.tsx', 'Object mode selects shapes in one layer. Switch Edit to Layer'],
     ['src/styles/designer.css', '.stage-hint.has-close'],
     ['src/engine/design/multiRectEdit.ts', 'export function multiLayerRectangles'],
+    ['src/engine/design/multiRectEdit.ts', 'export function convertMultiRectanglesToPaths'],
     ['src/engine/design/multiPathEdit.ts', 'export function multiPathTargets'],
     ['src/components/designer/MultiPathNodes.tsx', 'export function MultiPathNodes'],
     ['src/components/designer/ContextStrip.tsx', 'MultiRectangleRadii'],
-    ['src/components/designer/ToolSettings.tsx', 'function EditOps'],
+    ['src/components/designer/MultiRectangleRadii.tsx', 'data-multi-rectangle-convert'],
   ],
-  tests: ['tests/marquee.test.ts', 'tests/layer-click-replaces.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
+  tests: ['tests/marquee.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
 }];

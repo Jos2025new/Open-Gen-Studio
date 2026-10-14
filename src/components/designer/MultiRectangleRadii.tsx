@@ -1,7 +1,8 @@
 import type { DesignDoc, ShapeSpec, VectorShape } from '../../engine/types';
 import { cornerRadii, SHARP } from '../../engine/design/shapeLook';
-import { mixedRectangleRadii, patchMultiLayerRectangles, type RectangleTarget } from '../../engine/design/multiRectEdit';
+import { convertMultiRectanglesToPaths, mixedRectangleRadii, patchMultiLayerRectangles, type RectangleTarget } from '../../engine/design/multiRectEdit';
 import { mutateDoc, getDoc } from '../../engine/design/actions';
+import { setShapeEdit } from '../../engine/design/objectSelection';
 import { InlineSlider } from './InlineControls';
 
 export function MultiRectangleRadii({ sessionId, doc, targets }: { sessionId: string; doc: DesignDoc; targets: RectangleTarget[] }) {
@@ -17,6 +18,12 @@ export function MultiRectangleRadii({ sessionId, doc, targets }: { sessionId: st
     const current = getDoc(sessionId, doc.id);
     if (current) mutateDoc(sessionId, doc.id, (latest) => patchMultiLayerRectangles(latest, targets, patch));
   };
+  const convertForNodes = () => {
+    const current = getDoc(sessionId, doc.id);
+    if (!current) return;
+    mutateDoc(sessionId, doc.id, (latest) => convertMultiRectanglesToPaths(latest, targets));
+    setShapeEdit(doc.id, { layerId: targets[0].layerId, shapeId: targets[0].shapeId, paths: targets.map((target) => ({ ...target, nodes: [] })) });
+  };
   const maxRx = Math.max(1, ...shapes.map((shape) => Math.ceil(Math.abs(shape.w) / 2)));
   const maxRy = Math.max(1, ...shapes.map((shape) => Math.ceil(Math.abs(shape.h) / 2)));
   return <fieldset className="shape-properties" data-rounding-selection="" aria-label="Round selected rectangles">
@@ -25,5 +32,8 @@ export function MultiRectangleRadii({ sessionId, doc, targets }: { sessionId: st
     <InlineSlider label="Rx" unit="px" min={0} max={maxRx} allowManualOverflow value={radii.rx} step={0.5} onChange={(rx) => apply({ rx })} />
     <InlineSlider label="Ry" unit="px" min={0} max={maxRy} allowManualOverflow value={radii.ry} step={0.5} onChange={(ry) => apply({ ry })} />
     <button type="button" className="opt" disabled={!shapes.some((shape) => cornerRadii(shape).rx || cornerRadii(shape).ry)} onClick={() => apply(SHARP)} data-tip="Make every selected rectangle sharp">Sharp corners</button>
+    <button type="button" className="opt" onClick={convertForNodes} aria-label={`Convert ${shapes.length} selected rectangles to paths for node editing`} data-multi-rectangle-convert="">
+      Convert {shapes.length} rectangles to paths for node editing
+    </button>
   </fieldset>;
 }

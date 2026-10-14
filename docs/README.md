@@ -104,6 +104,7 @@
 - [028-2026-10-W42: redondeo común de rectángulos seleccionados](history/028-2026-10-W42.md) — Rx/Ry actúa sobre los rectángulos del conjunto explícito en Object o Layer.
 - [029-2026-10-W42: edición de nodos en varios paths](history/029-2026-10-W42.md) — selección y movimiento multi-path en Object o Layer, con límites explícitos.
 - [030-2026-10-W42: correcciones de marquee y selección](history/030-2026-10-W42.md) — coordenadas del indicador, pista click-through y limpieza/modificación coherente de Object/Layer.
+- [031-2026-10-W42: edición de nodos desde rectángulos seleccionados](history/031-2026-10-W42.md) — Rx/Ry conserva la edición paramétrica y una acción explícita convierte la selección para editar nodos juntos.
 
 ## Trazabilidad
 
