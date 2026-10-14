@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { VectorShape } from '../../engine/types';
-import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, setNodeType, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
+import { marqueeNodeSelection, moveNodePoint, moveSelectedNodes, nodePoints, nodeSegs, pageSegs, readTypes, serializeSegs, toggleNodeSelection, withSegs, writeTypes, type NodePoint, type NodeType, type Seg } from '../../engine/design/pathNodes';
+import { alignNode, focusNodes, nodePosition, pullHandle } from '../../engine/design/nodeTypes';
+import { dragSegment, nearestSegment } from '../../engine/design/segmentDrag';
 import { breakNodes, deleteSegments, joinEnds, segmentsTo, deleteSelectedNodes, insertNode, nearestOnPath } from '../../engine/design/pathNodeOps';
 import { setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { getDoc, patchLayer } from '../../engine/design/actions';
@@ -19,6 +21,8 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   const [box, setBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   // Nodes on the same spot (an arrow's tip): each press there picks the next one, as Inkscape cycles with Alt.
   const turn = useRef<{ at: string; i: number }>({ at: '', i: 0 });
+  // A drag on a segment bends it (segmentDrag.ts); a Shift-drag from a node pulls one of its handles out (nodeTypes.ts).
+  const segDrag = useRef<{ i: number; t: number; base: Seg[]; shape: VectorShape; moved: boolean } | null>(null);
   // Segments in the path's own coordinates; a converted shape's turn (rot) maps them to the page, both ways.
   const segs = pageSegs(shape), types = readTypes(segs, shape.nodeTypes);
   const edit = useShapeEdit((st) => st.byDoc[docId]), selected = edit?.shapeId === shape.id ? (edit.nodes ?? (edit.node == null ? [] : [edit.node])) : [], picked = selected[0];
@@ -73,9 +77,20 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
   const page = (e: { clientX: number; clientY: number }, sh: VectorShape = shape) => { const q = screenToDocument({ x: e.clientX, y: e.clientY }, view, ref.current!.getBoundingClientRect()); const [x, y] = toLocal(sh, q.x, q.y); return { x, y }; };
   // Handles under nodes, and none that sit on their node (Inkscape hides zero-length handles): a node is always
   // what a click on it picks.
-  const all = nodePoints(segs).filter((p) => p.kind === 'node' || (() => { const a = scr(p.at), b = scr(p.from!); return Math.hypot(a.x - b.x, a.y - b.y) >= 6; })());
+  // The handles of the selected nodes and their neighbours always show, even when retracted (Inkscape); the others
+  // show when they stick out (≥ 6 px).
+  const focus = focusNodes(segs, selected).map((n) => nodePosition(segs, n));
+  const focused = (q: NodePoint) => focus.some((f) => Math.hypot(f[0] - q.from![0], f[1] - q.from![1]) < 1e-6);
+  const all = nodePoints(segs).filter((p) => p.kind === 'node' || focused(p) || (() => { const a = scr(p.at), b = scr(p.from!); return Math.hypot(a.x - b.x, a.y - b.y) >= 6; })());
   const pts = [...all.filter((p) => p.kind === 'handle'), ...all.filter((p) => p.kind === 'node')];
   const move = (e: React.PointerEvent) => {
+    const sd = segDrag.current;
+    if (sd) {
+      const q = page(e, sd.shape), next = withSegs(sd.shape, dragSegment(sd.base, sd.i, sd.t, [q.x, q.y]));
+      patchShape(sessionId, docId, layerId, sd.shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !sd.moved });
+      sd.moved = true;
+      return;
+    }
     const d = drag.current;
     if (!d) return;
     const q = page(e, d.shape);
@@ -88,7 +103,9 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     if (!d.moved && d.pt.kind === 'node' && d.screenStart && Math.hypot(e.clientX - d.screenStart.x, e.clientY - d.screenStart.y) <= 2) return;
     // Each frame from the segments at the start of the drag: no drift; the first change records the undo step.
     // From the shape at the start of the drag (review of 480cfc3: the current one compounded the turn correction).
-    const nextSegs = d.pt.kind === 'node' && d.selected.length > 1 ? moveSelectedNodes(d.base, d.selected, q.x - d.from.x, q.y - d.from.y, d.types) : moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y, d.types);
+    const n0 = d.pt.kind === 'node' ? nodeSegs(d.base).seg.indexOf(d.pt.seg) : -1;
+    const nextSegs = d.mods.shift && n0 >= 0 ? pullHandle(d.base, n0, n0 === nodeSegs(d.base).seg.length - 1 ? 'in' : 'out', q.x - d.from.x, q.y - d.from.y)
+      : d.pt.kind === 'node' && d.selected.length > 1 ? moveSelectedNodes(d.base, d.selected, q.x - d.from.x, q.y - d.from.y, d.types) : moveNodePoint(d.base, d.pt, q.x - d.from.x, q.y - d.from.y, d.types);
     const next = withSegs(d.shape, nextSegs);
     patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h }, { record: !d.moved });
     d.moved = true;
@@ -127,6 +144,17 @@ export function PathNodes({ view, sessionId, docId, layerId, shape }: { view: Vi
     <rect className="node-marquee-hit" x="0" y="0" width="100%" height="100%" />
     {box && <rect className="node-marquee" x={box.x} y={box.y} width={box.w} height={box.h} />}
     <path className="path-outline" d={outline} data-tip="Double-click to add a node" onDoubleClick={addAt} />
+    {/* A wide invisible band over the outline: grab any point of a segment to bend it (the cursor says so). */}
+    <path className="segment-hit" d={outline} fill="none" stroke="transparent" strokeWidth={10} style={{ cursor: 'move' }} data-tip="Drag to bend this segment · double-click to add a node"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        const q = page(e), r = nearestSegment(segs, [q.x, q.y]);
+        if (!r) return;
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        segDrag.current = { i: r.i, t: r.t, base: segs, shape, moved: false };
+      }}
+      onPointerUp={() => { segDrag.current = null; }} onPointerCancel={() => { segDrag.current = null; }} />
     <g className="shape-knot-lines">{pts.filter((p) => p.kind === 'handle').map((p) => { const a = scr(p.from!), b = scr(p.at); return <line key={`l${p.seg}-${p.k}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />; })}</g>
     {pts.map((p) => {
       const c = scr(p.at), handlers = {
@@ -163,7 +191,7 @@ export function setPathNodeType(sessionId: string, docId: string, layerId: strin
   const segs = pageSegs(shape), types = readTypes(segs, shape.nodeTypes);
   if (n < 0 || n >= types.length) return;
   types[n] = t;
-  const next = withSegs(shape, setNodeType(segs, n, t));
+  const next = withSegs(shape, alignNode(segs, n, t));
   patchShape(sessionId, docId, layerId, shape.id, { d: next.d, box0: next.box0, x: next.x, y: next.y, w: next.w, h: next.h, nodeTypes: writeTypes(segs, types) });
 }
 
