@@ -27,6 +27,7 @@
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
+- [selección y marquee de Edit por modo](features/designer-selection.md).
 - [cuota provisional de trazos raster](raster-limit.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
@@ -99,6 +100,7 @@
 - [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 29926 bytes.
 - [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12; sesión del 2026-10-13 al final)](history/025-2026-10-W42.md) — ver tamaño en el archivo.
 - [026-2026-10-W42: Designer, formas, paint, nodos y cierre de snapping (2026-10-13–14)](history/026-2026-10-W42.md) — incluye evidencia por commit, aprobación manual y correcciones de espaciado; la última E2E queda pendiente por sandbox ocupado.
+- [027-2026-10-W42: selección por modo en Edit](history/027-2026-10-W42.md) — Align conserva su guardia de modo y Edit incorpora marquee por objetos/capas.
 
 ## Trazabilidad
 

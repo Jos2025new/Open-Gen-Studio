@@ -29,6 +29,11 @@ export function pickLayer(docId: string, id: string, additive: boolean, current:
   return next;
 }
 
+/** Set a marquee result without toggling its members one by one. */
+export function setLayerPicks(docId: string, ids: string[]): void {
+  useLayerSelection.setState((s) => ({ byDoc: { ...s.byDoc, [docId]: [...ids] } }));
+}
+
 /** Shift-click: every layer between the anchor (the active layer) and this one, as in a file list. */
 export function pickLayerRange(docId: string, anchorId: string | null, id: string, order: string[]): string[] {
   const a = anchorId ? order.indexOf(anchorId) : -1, b = order.indexOf(id);

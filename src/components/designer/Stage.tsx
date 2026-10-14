@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
@@ -14,11 +13,13 @@ import type { Measure } from '../../engine/design/snap';
 import type { AlignmentGuide } from '../../engine/design/snapSession';
 import { SnapIndicator } from './SnapIndicator';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
+import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
+import { StageEditHint, StageHint } from './StageEditHint';
 import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
 import { beginRulerStroke, rulerPoint } from '../../engine/design/strokeRuler';
 import { StrokeRulerOverlay } from './StrokeRulerOverlay';
-import { ShapeKnots, shapeEditHint } from './ShapeKnots';
+import { ShapeKnots } from './ShapeKnots';
 import { worldPoints } from '../../engine/design/strokes';
 import { checkerTile, drawArrowHandle } from './stageSprites';
 import { GradientKnots } from './ShapeHandles';
@@ -59,6 +60,7 @@ type Drag =
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
   | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
   | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
+  | EditMarqueeDrag
   | StagePaintGesture
   | { kind: 'guide'; axis: GuideAxis; index?: number; at: number }
   | { kind: 'gradient'; x0: number; y0: number; x1: number; y1: number }
@@ -212,6 +214,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const gradientSpec: GradientSpec = { ...gradientUi, color: brush.color };
   // The selection being drawn (page coordinates), shown until pointer up.
   const [selDraft, setSelDraft] = useState<Array<[number, number]> | null>(null);
+  const [editMarquee, setEditMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const fitted = useRef<string | null>(null);
 
   const active = activeLayer(doc);
@@ -360,6 +363,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.strokeStyle = '#ffffff';
       ctx.stroke();
       ctx.restore();
+    }
+    if (editMarquee) {
+      drawEditMarquee(ctx, editMarquee, view);
     }
     // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
     ctx.strokeStyle = '#55555e';
@@ -551,7 +557,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       ctx.stroke(path);
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, rulers, guidePreview, paintFrame, targetSig, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidePreview, paintFrame, targetSig, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -667,6 +673,13 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         }
       }
       setSelectedCurve(null);
+
+      const marquee = beginEditMarquee({ doc: current, point: p, layersMode: editLayers, shift: e.shiftKey, alt: e.altKey });
+      if (marquee) {
+        drag.current = marquee;
+        setEditMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+        return;
+      }
 
       // Objects mode: parts of one layer; Shift (below) selects layers.
       if (!editLayers && !e.shiftKey) {
@@ -958,6 +971,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     if (d.kind === 'pixelMove') { d.move.update(p);
     } else if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
+    } else if (d.kind === 'editMarquee') {
+      setEditMarquee(updateEditMarquee(d, p));
     } else if (d.kind === 'xform' && d.op === 'pivot') {
       setPivot({ x: p.x, y: p.y });
     } else if (d.kind === 'xform') {
@@ -1111,6 +1126,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
     snapIdleStop();
     endDragPreview();
     if (!d) return;
+    if (d.kind === 'editMarquee') {
+      setEditMarquee(null);
+      finishEditMarquee({ drag: d, sessionId, doc, zoom: view.zoom, release: e ? toDoc(e.clientX, e.clientY) : undefined, cancelled: e?.type === 'pointercancel' });
+      return;
+    }
     if (d.kind === 'pixelMove') { if (e) d.move.update(toDoc(e.clientX, e.clientY)); return; }
     // A guide lands where the pointer is released (a quick drag may send no move in between).
     if (d.kind === 'guide' && e) { const p = toDoc(e.clientX, e.clientY); d.at = d.axis === 'x' ? p.x : p.y; }
@@ -1325,9 +1345,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         />
       ) : null}
       {tool === 'move' && getSelection(doc.id) ? <StageHint id="move-region">Drag inside the pixel selection to extract and move it · vectors stay editable</StageHint> : tool === 'move' && selectedCurve ? <StageHint id="curve-points">Drag points to edit · Click away to move again</StageHint> : tool === 'lineart' && lineartMode === 'edit' ? <StageHint id="lineart-edit">Select a stroke · Drag its points · Influence controls the bend</StageHint> : null}
-      {tool === 'move' && shapeEditing ? <StageHint id={shapeEditHint(doc).id} subtle>{shapeEditHint(doc).text}</StageHint>
-        : tool === 'move' && !getSelection(doc.id) && !selectedCurve && tBox && drag.current?.kind !== 'xform' ? (handleMode === 'scale' ? <StageHint id="handles-scale" subtle>Drag the squares to resize (Ctrl or Shift keeps proportions) · click the selection again to rotate</StageHint> : <StageHint id="handles-rotate" subtle>Drag a corner to rotate, a side to skew (Ctrl or Shift: 15° steps) · move the center · click again to resize</StageHint>)
-        : tool === 'move' && !getSelection(doc.id) && drag.current?.kind !== 'xform' && !editLayers && active && layerObjects(active).length ? <StageHint id="objects" subtle>Objects: click or drag an object · Shift- or Ctrl-click adds more · drag moves all picked</StageHint> : null}
+      {tool === 'move' ? <StageEditHint doc={doc} shapeEditing={shapeEditing} marquee={Boolean(editMarquee)}
+        layersEmpty={editLayers && !tBox} canShowHandles={!getSelection(doc.id) && !selectedCurve && Boolean(tBox) && drag.current?.kind !== 'xform'}
+        handleMode={handleMode} canShowObjects={!getSelection(doc.id) && drag.current?.kind !== 'xform' && !editLayers} active={active} /> : null}
       {blocked && (tool === 'brush' || tool === 'eraser') ? <div className="stage-hint">{blocked}</div> : null}
     </div>
   );
@@ -1354,21 +1374,3 @@ function beginEditCurrent(layerId: string): HTMLCanvasElement | undefined {
 }
 
 export type { DesignTool };
-
-
-/** A how-to tip over the canvas with an × to close it; once closed it stays closed (this browser). */
-const HINTS_KEY = 'ogs.designer.hintsClosed';
-function closedHints(): string[] {
-  try { return JSON.parse(localStorage.getItem(HINTS_KEY) ?? '[]'); } catch { return []; }
-}
-function StageHint({ id, subtle, children }: { id: string; subtle?: boolean; children: React.ReactNode }) {
-  const [closed, setClosed] = useState(() => closedHints().includes(id));
-  if (closed) return null;
-  return <div className={`stage-hint has-close ${subtle ? 'subtle' : ''}`}>
-    <span>{children}</span>
-    <button type="button" className="stage-hint-close" aria-label="Close this tip" data-tip="Close this tip" onClick={() => {
-      setClosed(true);
-      try { localStorage.setItem(HINTS_KEY, JSON.stringify([...new Set([...closedHints(), id])])); } catch { /* storage blocked */ }
-    }}><X size={12} /></button>
-  </div>;
-}

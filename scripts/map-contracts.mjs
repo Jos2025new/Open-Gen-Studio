@@ -1,5 +1,8 @@
-/** Cross-file contracts: map.mjs checks each file, anchor and test path. */
+/** Checked by map.mjs. */
+import designerSelection from './map-contracts-designer.mjs';
+
 export default [
+  ...designerSelection,
   {
     id: 'snap-controls',
     what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
