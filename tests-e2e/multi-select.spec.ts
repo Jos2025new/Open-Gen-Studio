@@ -115,6 +115,54 @@ test('Ctrl-click toggles across layers; Ctrl-click lineart within one layer keep
   await page.screenshot({ path: `${shots}/lineart-edit.png` });
 });
 
+test('rounding controls edit picked rectangles in Objects and rectangles across picked layers in Layers', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string);
+    const D = await import('/src/engine/design/doc.ts' as string), P = await import('/src/engine/design/objectSelection.ts' as string);
+    const L = await import('/src/engine/design/selection.ts' as string);
+    const sid = S.useStore.getState().activeSessionId, d = A.activeDoc(sid);
+    const a = D.newVectorLayer('A', [
+      { type: 'rect', x: 400, y: 300, w: 240, h: 160, radius: 0, fill: '#fff', stroke: null, strokeWidth: 0 },
+      { type: 'rect', x: 760, y: 300, w: 240, h: 160, radius: 0, fill: '#fff', stroke: null, strokeWidth: 0 },
+    ]);
+    const b = D.newVectorLayer('B', [{ type: 'rect', x: 1100, y: 300, w: 240, h: 160, radius: 0, fill: '#fff', stroke: null, strokeWidth: 0 }]);
+    S.setDoc(sid, d.id, (dd: any) => ({ ...dd, layers: [a, b], activeLayerId: a.id }));
+    P.setObjectPick(d.id, null); L.setLayerPicks(d.id, []);
+    S.setUi({ tool: 'move', selectMode: 'objects', rulers: false, snap: { on: false, page: false, layers: false } });
+  });
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const z = Math.min((c.width - 48) / 1920, (c.height - 144) / 1080, 4);
+  const at = (x: number, y: number) => ({ x: c.x + (c.width - 1920 * z) / 2 + x * z, y: c.y + Math.max(12, (c.height - 120 - 1080 * z) / 2) + y * z });
+  const a = at(330, 240), b = at(1050, 520);
+  await page.mouse.move(a.x, a.y); await page.mouse.down(); await page.mouse.move(b.x, b.y, { steps: 5 }); await page.mouse.up();
+  const rounding = page.locator('[data-rounding-selection]');
+  expect(await rounding.count()).toBe(1);
+  const rx = rounding.getByRole('spinbutton', { name: 'Rx value' });
+  await rx.fill('30');
+  const shapes = () => page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string);
+    const d = A.activeDoc(S.useStore.getState().activeSessionId);
+    return d.layers.map((l: any) => l.shapes.map((s: any) => [s.rx, s.ry]));
+  });
+  expect((await shapes())[0].map((r: any[]) => r[0])).toEqual([30, 30]);
+  await page.keyboard.press('Control+z'); expect((await shapes())[0].map((r: any[]) => r[0])).toEqual([0, 0]);
+  await page.keyboard.press('Control+Shift+z'); expect((await shapes())[0].map((r: any[]) => r[0])).toEqual([30, 30]);
+
+  await page.evaluate(async () => {
+    const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string), L = await import('/src/engine/design/selection.ts' as string);
+    const d = A.activeDoc(S.useStore.getState().activeSessionId);
+    S.setUi({ selectMode: 'layers' }); L.setLayerPicks(d.id, d.layers.map((l: any) => l.id));
+  });
+  const layerRounding = page.locator('[data-rounding-selection]');
+  expect(await layerRounding.count()).toBe(1);
+  const ry = layerRounding.getByRole('spinbutton', { name: 'Ry value' });
+  await expect(ry).toBeVisible(); await ry.fill('18');
+  expect((await shapes()).flat().map((r: any[]) => r[1])).toEqual([18, 18, 18]);
+  await page.keyboard.press('Control+z'); expect((await shapes()).flat().map((r: any[]) => r[1])).toEqual([0, 0, 0]);
+  await page.keyboard.press('Control+Shift+z'); expect((await shapes()).flat().map((r: any[]) => r[1])).toEqual([18, 18, 18]);
+});
+
 test('Layer mode: clicks add no history; group scales, switches to rotate, rotates and undoes', async ({ page }) => {
   const at = await fixture(page, 'shapes', 'layers'), a = at(550, 400), b = at(1150, 400);
   const u0 = (await details(page)).undo;

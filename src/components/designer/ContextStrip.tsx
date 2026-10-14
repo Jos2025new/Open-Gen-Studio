@@ -13,7 +13,10 @@ import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPat
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
 import { PaintSwatch, ShapeParams } from './ShapePaint';
-import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
+import { editShape, setShapeEdit, useObjectSelection, useShapeEdit } from '../../engine/design/objectSelection';
+import { useLayerSelection } from '../../engine/design/selection';
+import { multiLayerRectangles } from '../../engine/design/multiRectEdit';
+import { MultiRectangleRadii } from './MultiRectangleRadii';
 import { useEffect } from 'react';
 
 /*
@@ -37,8 +40,12 @@ export function editTarget(doc: DesignDoc, tool: string): string | null {
 export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: DesignDoc }) {
   const tool = useStore((s) => s.ui.tool);
   const ruler = useStore((s) => s.ui.strokeRuler);
+  const mode = useStore((s) => s.ui.selectMode ?? 'objects');
   const lockRadii = useStore((s) => !!s.ui.shapeLockRadii);
   const picked = usePickedShape(doc), edit = useShapeEdit((st) => st.byDoc[doc.id]);
+  const objectSelection = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
+  const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
+  const roundTargets = multiLayerRectangles(doc, mode, objectSelection, layerPicks ?? []);
   // Another tool leaves shape edit mode (docs/plan-edicion-formas.md).
   useEffect(() => { if (tool !== 'move') setShapeEdit(doc.id, null); }, [tool, doc.id]);
   if (tool === 'hand') return null;
@@ -84,6 +91,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) && <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button>}
       </>}
     </div> : <ToolSettings sessionId={sessionId} doc={doc} selectedCurve={null} compact />}
+    {tool === 'move' && roundTargets.length > 1 && <MultiRectangleRadii sessionId={sessionId} doc={doc} targets={roundTargets} />}
     {(tool === 'brush' || tool === 'eraser') && pageRuler && <InlineToggle label="Follow stroke ruler" tip="Strokes follow the guide placed with the Ruler tool (K)" checked={pageRuler.on} onChange={(on) => setRuler({ ...pageRuler, on })} />}
     <button type="button" className="opt context-more" onClick={() => window.dispatchEvent(new CustomEvent('ogs:designer-panel', { detail: selectedText || selectedShape ? 'props' : 'tool' }))} data-tip={selectedText ? 'All the properties of the selected text, in the right panel' : 'All the settings of this tool, in the right panel'}><Settings2 size={13} />Settings…</button>
   </div>;
