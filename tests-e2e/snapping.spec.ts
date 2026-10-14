@@ -136,3 +136,37 @@ test('snapping: in Drawing mode the switch is off, so a layer moved next to an e
   expect(Math.abs(b.x + b.w - (cx + 200))).toBeGreaterThan(0.5); // the same gesture that snapped in Design does not here
   expect(errors).toEqual([]);
 });
+
+// The first drag of an unselected layer, in each mode on its own (Object and Layer in the strip's switch).
+for (const mode of ['Object', 'Layer'] as const) {
+  test(`snapping: first drag moves an unselected layer in ${mode} mode`, async ({ page }) => {
+    const errors = await setup(page);
+    const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+    const ids = await page.evaluate(async () => {
+      const st = await import('/src/store/store.ts' as string);
+      const A = await import('/src/engine/design/actions.ts' as string);
+      const sid = st.useStore.getState().activeSessionId;
+      const doc = A.activeDoc(sid)!;
+      const mk = (x: number) => { const id = A.addEmptyLayer(sid, doc.id, 'vector')!; A.patchLayer(sid, doc.id, id, { shapes: [{ id: id + 's', type: 'rect', x, y: 300, w: 200, h: 200, fill: '#8fd', stroke: null, strokeWidth: 0, radius: 0 }] }); return id; };
+      const m = mk(700), n = mk(1200);
+      st.setUi({ tool: 'move' });
+      return { m, n, w: doc.width, h: doc.height };
+    });
+    const radio = page.getByRole('radio', { name: mode, exact: true }).first();
+    await radio.click();
+    await expect(radio).toHaveAttribute('aria-checked', 'true');
+    const box = () => page.evaluate(async (id: string) => {
+      const st = await import('/src/store/store.ts' as string); const A = await import('/src/engine/design/actions.ts' as string);
+      const d = A.activeDoc(st.useStore.getState().activeSessionId)!; const l = d.layers.find((x: any) => x.id === id) as any; return l.shapes[0].x;
+    }, ids.m);
+    const before = await box();
+    const z = Number(await page.locator('input[aria-label="Zoom percent"]').inputValue()) / 100;
+    const sx = c.x + (c.width - ids.w * z) / 2 + (700 + 100) * z, sy = c.y + 70 + 400 * z;
+    await page.mouse.move(sx, sy); await page.mouse.down();
+    await page.mouse.move(sx - 150 * z, sy, { steps: 6 }); await page.mouse.up();
+    const after = await box();
+    // The first drag on an unselected layer moves it in this mode (the layer is alone on its band: no snap involved).
+    expect(Math.abs(after - before + 150)).toBeLessThan(3); // the pointer moved 150 doc px (150 · zoom screen px)
+    expect(errors).toEqual([]);
+  });
+}

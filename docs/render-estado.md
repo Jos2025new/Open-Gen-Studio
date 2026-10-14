@@ -151,3 +151,9 @@ Pendiente, fuera de este encargo: retardo por temporizador real (hoy el ajuste l
 | Preferencia por modo | `snapByMode.drawing` / `snapByMode.design`; el interruptor cambia solo el modo en uso; el formato antiguo `snap` se descarta. Probado. | `96d7b39` |
 
 Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo** (`paintModeOf`, ADR 0016), así que el ajuste viene apagado hasta que el usuario lo enciende. Es la regla actual; no se ha cambiado.
+
+### Lote 2026-10-14: modo por defecto, temporizador y primer arrastre
+
+- **Modo por defecto según el contenido** (enmienda al ADR 0016): documentos de formas o sin píxeles pintados, en Diseño; con píxeles pintados, en Dibujo. Commit `9fbe94f`. El interruptor por modo puede activar lo del otro modo.
+- **Temporizador del ajuste:** la clase `SnapWatchdog` (commit `64445d8`) está probada con reloj simulado. **Cableado en Stage pendiente**: Stage no lo usa todavía; no hay e2e de «detenerse 300 ms y se ajusta».
+- **Primer arrastre:** reproducido en el e2e en los dos modos (Object y Layer), por separado, sobre una capa sin seleccionar. **Pasa en los dos.** El fallo anterior ocurría en la escena del caso de borde (la capa móvil centrada en la página, con otras capas cerca), no en el arrastre aislado; queda sin reproducir en aislamiento. El caso de borde sigue como `fixme`.
