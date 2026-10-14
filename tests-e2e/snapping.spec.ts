@@ -252,6 +252,67 @@ test('snapping: equal-distance guides compare neighboring gaps across rows durin
   expect(errors).toEqual([]);
 });
 
+test('snapping: a horizontal reference gap guides a moving box below it', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'A', x: cx + 200, y: cy - 200, w: 40, h: 40 },
+    { id: 'B', x: cx + 260, y: cy - 200, w: 40, h: 40 },
+    { id: 'M', x: cx + 260, y: cy - 144, w: 40, h: 40 },
+  ], 'drawing');
+  await page.evaluate(async () => {
+    const st = await import('/src/store/store.ts' as string);
+    st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true, equalSpacing: true } } });
+  });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + 20, y: before.y + 20 });
+  const to = { x: from.x, y: from.y + 6 * zoom }; // cross Stage's 3 screen px drag threshold, leave a 2 px correction
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 4 });
+  await page.waitForTimeout(220);
+
+  const cotas = page.locator('.snap-indicator text');
+  await expect(cotas).toHaveCount(2);
+  expect((await cotas.allTextContents()).every((label) => label === '20.0')).toBe(true);
+  const moved = await boxOf(page, s.ids.M);
+  expect(moved.x).toBeCloseTo(cx + 260, 1);
+  expect(moved.y).toBeCloseTo(cy - 140, 1); // horizontal reference gap is reproduced vertically below B
+
+  const measures = page.locator('.snap-indicator g');
+  await expect(measures).toHaveCount(2);
+  const expectedHorizontalA = fittedStagePoint(c, doc.w, doc.h, { x: cx + 240, y: cy - 180 });
+  const expectedHorizontalB = fittedStagePoint(c, doc.w, doc.h, { x: cx + 260, y: cy - 180 });
+  const expectedVerticalA = fittedStagePoint(c, doc.w, doc.h, { x: cx + 280, y: cy - 160 });
+  const expectedVerticalB = fittedStagePoint(c, doc.w, doc.h, { x: cx + 280, y: cy - 140 });
+  const actual = await measures.evaluateAll((groups) => groups.map((group) => {
+    const line = group.querySelector(':scope > line')!;
+    return {
+    x1: Number(line.getAttribute('x1')), y1: Number(line.getAttribute('y1')),
+    x2: Number(line.getAttribute('x2')), y2: Number(line.getAttribute('y2')),
+    };
+  }));
+  const horizontal = actual.find((line) => Math.abs(line.y1 - line.y2) < 0.01)!;
+  const vertical = actual.find((line) => Math.abs(line.x1 - line.x2) < 0.01)!;
+  expect(horizontal).toBeDefined(); expect(vertical).toBeDefined();
+  for (const [actualValue, expectedValue] of [
+    [horizontal.x1, expectedHorizontalA.x], [horizontal.y1, expectedHorizontalA.y],
+    [horizontal.x2, expectedHorizontalB.x], [horizontal.y2, expectedHorizontalB.y],
+    [vertical.x1, expectedVerticalA.x], [vertical.y1, expectedVerticalA.y],
+    [vertical.x2, expectedVerticalB.x], [vertical.y2, expectedVerticalB.y],
+  ]) expect(Math.abs(actualValue - expectedValue)).toBeLessThan(0.5);
+
+  await page.mouse.up();
+  await expect(cotas).toHaveCount(0);
+  await page.keyboard.press('Control+z');
+  expect(await boxOf(page, s.ids.M)).toEqual(before);
+  await page.keyboard.press('Control+Shift+z');
+  expect((await boxOf(page, s.ids.M)).y).toBeCloseTo(cy - 140, 1);
+  expect(errors).toEqual([]);
+});
+
 test('snapping: holding Alt clears an acquired alignment and allows free movement', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
