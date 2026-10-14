@@ -92,4 +92,9 @@ describe('OpenRouter image price on demand (fix 1)', () => {
     expect(peak).toBeLessThanOrEqual(3);
     expect(refs.every((r) => useStore.getState().catalog.models[r].price)).toBe(true);
   });
+  it('the estimate uses the loaded price even when the schema holds only the token note', () => {
+    setCatalog({ schemas: { [REF]: { ref: REF, params: [], slots: { prompt: 'prompt', promptRequired: true }, price: { skus: [], note: 'Billed by tokens' }, source: 'catalog' } } });
+    setCatalog((c) => ({ models: { ...c.models, [REF]: { ...model, price: { skus: [{ unit: 'output', usd: 0.04 }] } } } }));
+    expect(estimateMedia(REF, 'image', { ...settings, count: 2 }, false).usd).toBe(0.08);
+  });
 });

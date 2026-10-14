@@ -12,7 +12,10 @@ const get = useStore.getState;
 
 export function priceOf(ref: string): PriceRule | undefined {
   const c = get().catalog;
-  return c.schemas[ref]?.price ?? c.models[ref]?.price;
+  const schema = c.schemas[ref]?.price;
+  const listed = c.models[ref]?.price;
+  // A schema that only says «billed by tokens» must not hide a price loaded for the listing (OpenRouter images).
+  return schema && !schema.skus.length && listed?.skus.length ? listed : schema ?? listed;
 }
 
 /** Longest duration a model accepts, to price an automatic (-1) duration. */
