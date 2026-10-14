@@ -1,6 +1,6 @@
 # Estado de render-bench (cierre del 2026-10-13)
 
-Rama `task/render-bench` (worktree `ogs-render-bench`), HEAD `ab01a02` al cierre de la auditoría y `9ebd8bf` tras las cinco ideas de Patchy (2026-10-13), sin fusionar ni subir. Esta nota es la **fuente única** de lo pendiente del trabajo de rendimiento: el resto de notas de render enlazan aquí. Plan vigente: [plan-fluidez.md](plan-fluidez.md) (plan único del 2026-10-13). Rumbo y tareas originales: [arquitectura-render.md](arquitectura-render.md), sección 6. Investigación de memoria con cifras (4 GB y 2 GB): [investigacion-memoria.md](investigacion-memoria.md). Comparación con el editor de escritorio Patchy y cinco ideas de render: [investigacion-patchy.md](investigacion-patchy.md).
+Rama `task/render-bench` (worktree `ogs-render-bench`), HEAD `ab01a02` al cierre de la auditoría y `9ebd8bf` tras las cinco ideas de Patchy (2026-10-13), sin fusionar ni subir. Esta nota es la **fuente única** de lo pendiente del trabajo de rendimiento: el resto de notas de render enlazan aquí. Plan vigente: [plan-fluidez.md](plan-fluidez.md) (plan único del 2026-10-13). Rumbo y tareas originales: [arquitectura-render.md](arquitectura-render.md), sección 6. Investigación de memoria con cifras (4 GB y 2 GB): [investigacion-memoria.md](investigacion-memoria.md). Comparación con el editor de escritorio Patchy y cinco ideas de render: [investigacion-patchy.md](investigacion-patchy.md). Repintado y estructura de sK1 (sin cambios de código): [investigacion-sk1.md](investigacion-sk1.md).
 
 ## Cronología de decisiones
 
