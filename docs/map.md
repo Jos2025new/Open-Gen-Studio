@@ -14,7 +14,7 @@ Generado por `node scripts/map.mjs --write` a partir de [map-contracts.mjs](../s
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
-| **snap-controls** — Los interruptores de guías, espaciado igual y nodos del menú Snap se guardan por modo y controlan sus candidatos y medidas. | [snap.ts](../src/engine/design/snap.ts), [snapSession.ts](../src/engine/design/snapSession.ts), [snapNodes.ts](../src/engine/design/snapNodes.ts), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [snapIdle.ts](../src/components/designer/snapIdle.ts), [store.ts](../src/store/store.ts) | [snap-mode.test.ts](../tests/snap-mode.test.ts), [snap-session.test.ts](../tests/snap-session.test.ts), [snap-nodes.test.ts](../tests/snap-nodes.test.ts), [path-node-snap.test.ts](../tests/path-node-snap.test.ts) |
+| **snap-controls** — Los interruptores de guías, espaciado igual y nodos del menú Snap se guardan por modo y controlan sus candidatos y medidas. | [snap.ts](../src/engine/design/snap.ts), [snapSession.ts](../src/engine/design/snapSession.ts), [snapNodes.ts](../src/engine/design/snapNodes.ts), [SnapControl.tsx](../src/components/designer/SnapControl.tsx), [PathNodes.tsx](../src/components/designer/PathNodes.tsx), [snapIdle.ts](../src/components/designer/snapIdle.ts), [store.ts](../src/store/store.ts) | [snap-mode.test.ts](../tests/snap-mode.test.ts), [snap-session.test.ts](../tests/snap-session.test.ts), [snap-nodes.test.ts](../tests/snap-nodes.test.ts), [path-node-snap.test.ts](../tests/path-node-snap.test.ts) |
 | **paint-mode** — ADR 0016: el ajuste Dibujo/Diseño se lee igual al crear, al abrir y al pintar; Dibujo nunca crea entradas editables de trazo y la barra de Edit solo ofrece trazos sueltos donde existen. | [paintMode.ts](../src/engine/design/paintMode.ts), [doc.ts](../src/engine/design/doc.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [PaintModeToggle.tsx](../src/components/designer/PaintModeToggle.tsx), [ToolSettings.tsx](../src/components/designer/ToolSettings.tsx) | [paint-mode.test.ts](../tests/paint-mode.test.ts) |
 | **drawing-choice** — ADR 0016: pintar en Dibujo sobre una capa con trazos editables muestra el aviso con sus tres acciones (o aplica la preferencia guardada); cerrarlo no pinta; Ajustes la reinicia. | [drawingChoice.ts](../src/engine/design/drawingChoice.ts), [StagePaintCommit.ts](../src/components/designer/StagePaintCommit.ts), [Stage.tsx](../src/components/designer/Stage.tsx), [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx), [SettingsPanel.tsx](../src/components/shell/SettingsPanel.tsx) | [drawing-choice.test.ts](../tests/drawing-choice.test.ts), [drawing-choice-position.test.ts](../tests/drawing-choice-position.test.ts) |
 | **eps-import** — EPS se convierte solo en el servidor local con gs (-dSAFER, límites y carpeta temporal), y sin gs la app dice cómo instalarlo; el aviso del cliente nombra la misma instalación. | [eps.js](../server/eps.js), [local-store.js](../server/local-store.js), [imports.ts](../src/lib/imports.ts) | [eps-server.test.ts](../tests/eps-server.test.ts), [imports-eps-heic.test.ts](../tests/imports-eps-heic.test.ts) |
@@ -69,11 +69,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 179 | 117 |
-| [store.ts](../src/store/store.ts) | 107 | 96 |
+| [store.ts](../src/store/store.ts) | 108 | 96 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
-| [actions.ts](../src/engine/design/actions.ts) | 36 | 16 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 35 | 1 |
+| [actions.ts](../src/engine/design/actions.ts) | 37 | 16 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 36 | 1 |
 | [doc.ts](../src/engine/design/doc.ts) | 33 | 34 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
@@ -97,7 +97,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 10 | 2 |
 | `src/components/chat` | 9 | 3 |
 | `src/components/composer` | 10 | 4 |
-| `src/components/designer` | 34 | 12 |
+| `src/components/designer` | 35 | 12 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
@@ -113,7 +113,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 140 |
 | `src/store` | 4 | 98 |
 
-113 de 297 módulos no tienen ningún test que los importe directamente.
+114 de 298 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

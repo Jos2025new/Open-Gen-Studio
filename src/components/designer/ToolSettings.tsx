@@ -1,13 +1,10 @@
 import { ShapeLookFields } from './ShapeLookFields';
 import { record } from '../../engine/design/history';
 import type { ReactNode } from 'react';
-import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Magnet, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
+import { AlignCenterHorizontal, AlignCenterVertical, AlignEndHorizontal, AlignEndVertical, AlignStartHorizontal, AlignStartVertical, AlignHorizontalDistributeCenter, AlignVerticalDistributeCenter, ChevronDown, TrianglesCenterlineDashedVertical, TrianglesCenterlineDashedHorizontal, Maximize, Minimize, RefreshCw, RotateCcw, RotateCw } from 'lucide-react';
 import { alignLayers, distributeLayers, fitLayer, turnLayers, turnProblem, type AlignTo, type RelativeTo, type Turn } from '../../engine/design/transform';
 import { layerSelection, useLayerSelection } from '../../engine/design/selection';
 import { useState } from 'react';
-import { snapOptsFor } from '../../engine/design/snap';
-import { activeDoc } from '../../engine/design/actions';
-import { paintModeOf } from '../../engine/design/paintMode';
 import { MenuItem, Segmented } from '../ui/primitives';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { alignPickedObjects, distributePickedObjects, layerObjects, turnPickedObjects } from '../../engine/design/objectOps';
@@ -24,6 +21,7 @@ import { BrushSettings } from './BrushSettings';
 import { PaintModeToggle } from './PaintModeToggle';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
 import { RulerSettings } from './StrokeRulerOverlay';
+import { SnapControl } from './SnapControl';
 
 export function ContextField({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
   const pop = usePopover();
@@ -95,30 +93,6 @@ export function EditOptionsControl() {
     <button type="button" ref={pop.ref} className="tool-setting" aria-expanded={pop.open} onClick={pop.toggle} data-tip="Edit options" aria-label="Edit options"><ChevronDown size={12} /></button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Edit options">
       <div className="snap-pop"><AutoSelectToggle /></div>
-    </Popover>
-  </>;
-}
-
-export function SnapControl() {
-  const pop = usePopover();
-  const sid = useStore((s) => s.activeSessionId);
-  const doc = activeDoc(sid) ?? { layers: [], paintMode: undefined };
-  const byMode = useStore((s) => s.ui.snapByMode);
-  const snap = snapOptsFor(doc as never, byMode);
-  // The switch changes only the mode in use; the other mode keeps its own default.
-  const set = (patch: Partial<typeof snap>) => setUi({ snapByMode: { ...byMode, [paintModeOf(doc as never)]: { ...snap, ...patch } } });
-  return <>
-    <button type="button" ref={pop.ref} className={`tool-setting ${snap.on ? 'is-on' : ''}`} aria-expanded={pop.open} onClick={pop.toggle} data-tip={`Snap while moving · ${snap.on ? "on" : "off"}`} aria-label="Snap"><Magnet size={14} /><ChevronDown size={12} /></button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={220} label="Snap">
-      <div className="snap-pop">
-        <label className="check-row"><input type="checkbox" checked={snap.on} onChange={(e) => set({ on: e.target.checked })} />Snap while moving</label>
-        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.page} onChange={(e) => set({ page: e.target.checked })} />Page edges and center</label>
-        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.layers} onChange={(e) => set({ layers: e.target.checked })} />Other layers</label>
-        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.guides !== false} onChange={(e) => set({ guides: e.target.checked })} />Guides</label>
-        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.equalSpacing !== false} onChange={(e) => set({ equalSpacing: e.target.checked })} />Equal spacing</label>
-        <label className="check-row is-sub"><input type="checkbox" disabled={!snap.on} checked={snap.nodes !== false} onChange={(e) => set({ nodes: e.target.checked })} />Path nodes</label>
-        <p className="faint">Hold Alt while dragging to move freely.</p>
-      </div>
     </Popover>
   </>;
 }

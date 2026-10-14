@@ -6,7 +6,8 @@ import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { setUi, useStore } from '../../store/store';
 import { IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
-import { EditOps, SnapControl } from './ToolSettings';
+import { EditOps } from './ToolSettings';
+import { SnapControl } from './SnapControl';
 import { ContextStrip } from './ContextStrip';
 
 const TOOLS: Array<{ id: DesignTool; icon: LucideIcon; label: string }> = [

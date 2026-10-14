@@ -1,9 +1,4 @@
-/**
- * Links the compiler does not see: two places that must say the same thing (a prompt line and the runtime rule it
- * describes, a card and the parameter it shows). Each side names a file and a literal anchor that must exist in it.
- * scripts/map.mjs fails when a file or an anchor is gone, so whoever changes one side is sent to the other.
- * Add a contract when a change shows two places that must agree; keep "what" in one plain sentence.
- */
+/** Cross-file contracts: map.mjs checks each file, anchor and test path. */
 export default [
   {
     id: 'snap-controls',
@@ -12,7 +7,7 @@ export default [
       ['src/engine/design/snap.ts', 'equalSpacing?: boolean'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],
       ['src/engine/design/snapNodes.ts', 'export class PathNodeSnapSession'],
-      ['src/components/designer/ToolSettings.tsx', 'Path nodes'],
+      ['src/components/designer/SnapControl.tsx', 'Path nodes'],
       ['src/components/designer/PathNodes.tsx', 'new PathNodeSnapSession(pathNodeTargets'],
       ['src/components/designer/snapIdle.ts', 'export function snapIdleStart'],
       ['src/store/store.ts', 'snapByMode?: SnapByMode'],
