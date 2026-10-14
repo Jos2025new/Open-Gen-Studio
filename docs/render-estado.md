@@ -102,3 +102,5 @@ Límite del Stage: `Stage.tsx` ya superaba 30 KB y no puede crecer; la lógica n
 - Stage.tsx: dibujo de sprites movido a `stageSprites.ts` (commit aparte, sin cambio de comportamiento) para que quepa lo nuevo.
 - Sin navegador: la prueba visual de los tiradores queda para el sandbox del usuario.
 
+
+- Barra de forma (tercera pasada): «Fill» y «Stroke» como muestras con popover (ShapePaint.tsx), «Shape» para primitivas; el texto de los botones es de una línea. Sin navegador: la comprobación a 1280 px queda para el usuario.

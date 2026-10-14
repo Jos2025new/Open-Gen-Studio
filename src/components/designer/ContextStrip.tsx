@@ -12,8 +12,7 @@ import { InlineChoice, InlineToggle } from './InlineControls';
 import { deletePickedNode, setBreakNodes, setDeleteSegments, setJoinEnds, setPathNodeType, setSegmentsTo } from './PathNodes';
 import { pageSegs, readTypes } from '../../engine/design/pathNodes';
 import { convertToPath, patchShape, ShapeLookFields, ShapeSizeFields, usePickedShape } from './ShapeLookFields';
-import { PrimFields } from './PrimFields';
-import { GradientFields } from './GradientFields';
+import { PaintSwatch, ShapeParams } from './ShapePaint';
 import { editShape, setShapeEdit, useShapeEdit } from '../../engine/design/objectSelection';
 import { useEffect } from 'react';
 
@@ -62,7 +61,7 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
       {editing ? <>
         <span className="context-mode" data-tip={isPath ? 'Shift-click to toggle nodes, drag a selected node to move the group; Esc clears selection, then exits' : 'Drag the round handles; Esc or Done to leave'}>{isPath ? 'Editing nodes' : 'Editing shape'}</span>
         <ShapeSizeFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
-        <PrimFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
+        <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
         <ShapeLookFields value={selectedShape.shape} corners={selectedShape.shape.type === 'rect'} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {selectedShape.shape.type === 'rect' && <InlineToggle label="Lock radii" tip="Rx and Ry move together when you drag a corner handle · without the lock, hold Ctrl while dragging" checked={lockRadii} onChange={(v) => setUi({ shapeLockRadii: v })} />}
         {isPath && edit?.node != null && (() => { const t = readTypes(pageSegs(selectedShape.shape), selectedShape.shape.nodeTypes)[edit.node] ?? 'c'; return <InlineChoice label="Node" value={t} options={[{ value: 'c' as const, label: 'Cusp node (Shift+C): handles move apart' }, { value: 's' as const, label: 'Smooth node (Shift+S): handles stay in line' }, { value: 'z' as const, label: 'Symmetric node (Shift+Y): in line and the same length' }].map((o) => ({ ...o, render: <NodeTypeIcon t={o.value} /> }))} onChange={(v) => setPathNodeType(sessionId, doc.id, selectedShape.layerId, selectedShape.shape, edit.node!, v)} />; })()}
@@ -78,9 +77,9 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
         {(!isPath || selectedShape.shape.prim) && <button type="button" className="opt" data-tip="Inkscape's Object to Path: the same outline as editable nodes; the corner and size handles are gone (Ctrl+Z undoes it)" onClick={() => convertToPath(sessionId, doc.id, selectedShape.layerId, selectedShape.shape)}>Convert to path</button>}
         <button type="button" className="opt" onClick={() => setShapeEdit(doc.id, null)}>Done</button>
       </> : <>
-        <PrimFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
-        <GradientFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
-        <GradientFields sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape}  side="stroke" />
+        <ShapeParams sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} />
+        <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="fill" />
+        <PaintSwatch sessionId={sessionId} docId={doc.id} layerId={selectedShape.layerId} shape={selectedShape.shape} side="stroke" />
         <ShapeLookFields value={selectedShape.shape} blur compact onChange={(p) => patchShape(sessionId, doc.id, selectedShape.layerId, selectedShape.shape.id, p)} />
         {(selectedShape.shape.type === 'rect' || selectedShape.shape.type === 'ellipse' || isPath) && <button type="button" className="opt" data-tip={isPath ? 'Its nodes and curve handles (or double-click the path)' : 'Corner radius and blur handles (or double-click the shape)'} onClick={() => editShape(doc.id, selectedShape.layerId, selectedShape.shape.id)}>{isPath ? 'Edit nodes' : 'Edit shape'}</button>}
       </>}

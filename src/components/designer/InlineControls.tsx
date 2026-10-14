@@ -48,7 +48,7 @@ export function InlineChoice<T extends string | number>({ label, value, options,
  * A color in the bar: click for the picker, a hex field, the recent colors and the saved ones (shared by every tool).
  * The color is remembered as recent when the panel closes, so dragging in the picker does not fill the list.
  */
-export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children }: { label: string; value: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
+export function InlineColor({ label, value, onChange, showValue = false, iconOnly = false, alpha, children, preview }: { label: string; value: string; /** CSS background of the swatch when it is not just the value (a gradient). */ preview?: string; showValue?: boolean; /** The tool's opacity (0–1) as alpha: A and #RRGGBBAA read and write it. */ alpha?: { value: number; onChange: (opacity: number) => void }; /** Just the swatch, as a round button (the brush row). */ iconOnly?: boolean; children?: ReactNode; onChange: (v: string) => void }) {
   const pop = usePopover();
   const sw = useStore((s) => s.ui.swatches) ?? { recent: [], saved: [] };
   const [hex, setHex] = useState(() => hexShown(value, alpha?.value));
@@ -62,7 +62,7 @@ export function InlineColor({ label, value, onChange, showValue = false, iconOnl
   );
   return <>
     <button type="button" ref={pop.ref} className={`opt opt-color${iconOnly ? ' is-icon' : ''}`} aria-label={`${label} · ${value}`} data-tip={label} aria-haspopup="dialog" aria-expanded={pop.open} onClick={() => { setHex(hexShown(value, alpha?.value)); pop.toggle(); }}>
-      {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
+      {!iconOnly && <span className="opt-label">{label}</span>}<span className="opt-swatch" style={{ background: preview ?? value }} />{!iconOnly && (showValue || label === 'Text color') && <span className="opt-value">{value.toUpperCase()}</span>}
     </button>
     <Popover open={pop.open} anchor={pop.ref} onClose={close} placement="bottom-start" width={260} label={label}>
       <div className="swatch-panel">

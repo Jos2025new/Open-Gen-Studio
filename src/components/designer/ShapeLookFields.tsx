@@ -5,7 +5,6 @@ import { shapeToPath } from '../../engine/design/affine';
 import { primToPath } from '../../engine/design/primitives';
 import { getDoc, patchLayer } from '../../engine/design/actions';
 import { InlineChoice, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
-import { MARKER_KINDS, type MarkerKind } from '../../engine/design/markers';
 
 /*
  * Corners, stroke style and blur of a shape (Inkscape's rectangle toolbar and Fill & Stroke → Stroke style):
@@ -32,11 +31,6 @@ export function ShapeLookFields({ value, onChange, corners, stroke = true, blur,
       <button type="button" className="opt" disabled={!r.rx && !r.ry} onClick={() => onChange(SHARP)} data-tip="Make corners sharp (Shift-click a corner handle does the same)">Sharp corners</button>
     </>}
     {blur && <span data-tip="Inkscape's blur: σ = (blur/100)² · (width + height) / 4"><InlineSlider label="Blur" unit="%" min={0} max={100} step={0.1} value={Math.round(blurPercent(value.blur ?? 0, w, h) * 10) / 10} onChange={(p) => onChange({ blur: blurSigma(p, w, h) })} /></span>}
-    {stroke && (value.type === 'line' || value.type === 'path') && <>
-      <InlineSelect label="Start" value={value.markerStart ?? 'none'} options={MARKER_KINDS} onChange={(v) => onChange({ markerStart: v as MarkerKind })} />
-      <InlineSelect label="End" value={value.markerEnd ?? 'none'} options={MARKER_KINDS} onChange={(v) => onChange({ markerEnd: v as MarkerKind })} />
-      {value.type === 'path' && <InlineToggle label="Scale stroke" tip="On: the stroke and its arrowheads grow with the path when it is scaled. Off: they keep their width" checked={!!value.scaleStroke} onChange={(on) => onChange({ scaleStroke: on })} />}
-    </>}
     {stroke && !compact && <>
       <InlineChoice label="Join" value={join} options={[{ value: 'miter' as const, label: 'Miter join', render: <JoinIcon j="miter" /> }, { value: 'round' as const, label: 'Round join', render: <JoinIcon j="round" /> }, { value: 'bevel' as const, label: 'Bevel join', render: <JoinIcon j="bevel" /> }]} onChange={(j) => onChange({ join: j })} />
       {join === 'miter' && <InlineSlider label="Miter limit" min={1} max={20} step={0.5} value={value.miter ?? MITER_DEFAULT} onChange={(miter) => onChange({ miter })} />}
