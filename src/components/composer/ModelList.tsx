@@ -1,10 +1,11 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lucide-react';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
 import { groupLines, groupVariants, modelFamily, variantLabel, type VariantGroup } from '../../engine/variants';
 import { formatUsd } from '../../lib/format';
+import { requestImagePrice } from '../../engine/priceLoad';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
 import { MenuItem, Spinner } from '../ui/primitives';
@@ -17,7 +18,23 @@ export function priceHint(m: ModelSummary): string {
   const sku = m.price?.skus[0];
   if (!sku) return '';
   const per = sku.unit === 'second' ? '/s' : sku.unit === 'megapixel' ? '/MP' : m.kind === 'image' ? '/img' : m.kind === 'audio' ? (m.textOutput ? '/text' : '/song') : m.kind === 'model3d' ? '/model' : '/clip';
-  return `${formatUsd(sku.usd)}${per}`;
+  // ≥ a floor (the price varies or the cheapest tier is shown); ≈ an estimate; nothing prefixed means the listed price is exact.
+  const mark = m.price?.lowerBound ? '≥ ' : m.price?.approximate ? '≈ ' : '';
+  return `${mark}${formatUsd(sku.usd)}${per}`;
+}
+
+/** The price cell of a row: the listed price, or for an OpenRouter image the state of its background lookup. */
+function RowPrice({ m }: { m: ModelSummary }) {
+  const state = useStore((s) => s.catalog.priceState[m.ref]);
+  const text = priceHint(m);
+  if (text) return <span className="ml-price num">{text}</span>;
+  if (m.provider !== 'openrouter' || m.kind !== 'image') return <span className="ml-price num" />;
+  if (state === 'failed') return <span className="ml-price num faint">Price unavailable</span>;
+  return (
+    <span className="ml-price num faint" aria-live="polite">
+      <Spinner size={11} /> Loading price
+    </span>
+  );
 }
 
 function badges(m: ModelSummary): string[] {
@@ -195,6 +212,12 @@ export function ModelList({
     return [...g.entries()].sort(([a], [b]) => (familyTree ? a.localeCompare(b) * dir : byFamily ? rank(a) - rank(b) : rank(a) - rank(b) || a.localeCompare(b) * dir));
   }, [entries, byPrice, kind, full, sort, familyTree]);
 
+  // Background price lookups for the rows on screen (the first entries, and the selected model), see priceLoad.ts.
+  useEffect(() => {
+    for (const e of entries.slice(0, 40)) requestImagePrice(e.best.ref);
+    if (value) requestImagePrice(value);
+  }, [entries, value]);
+
   const remoteConnected = providers.length > 1;
 
   return (
@@ -279,7 +302,7 @@ export function ModelList({
                           {b}
                         </span>
                       ))}
-                      <span className="ml-price num">{priceHint(m)}</span>
+                      <RowPrice m={m} />
                     </span>
                     {selected ? <Check size={14} className="ml-check" /> : null}
                   </button>
