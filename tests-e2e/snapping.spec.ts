@@ -49,6 +49,12 @@ const boxOf = (page: Page, layerId: string) => page.evaluate(async (id: string) 
 const PAGE_TOP = 70;
 const screenOf = (c: { x: number; y: number; width: number }, docW: number, _docH: number, zoom: number, p: { x: number; y: number }) =>
   ({ x: c.x + (c.width - docW * zoom) / 2 + p.x * zoom, y: c.y + PAGE_TOP + p.y * zoom });
+/** Stage's exact fit transform for checking SVG endpoints (the visible zoom field is rounded to whole percent). */
+const fittedStagePoint = (c: { width: number; height: number }, docW: number, docH: number, p: { x: number; y: number }) => {
+  const pad = c.width < 500 ? 12 : 24, bottom = 1500 < 768 ? 12 : 120;
+  const zoom = Math.max(0.05, Math.min((c.width - pad * 2) / docW, (c.height - pad - bottom) / docH, 4));
+  return { x: (c.width - docW * zoom) / 2 + p.x * zoom, y: Math.max(pad / 2, (c.height - bottom - docH * zoom) / 2) + p.y * zoom };
+};
 
 // This case was previously disabled after a non-reproducible first-drag failure. It now runs with an explicit mode
 // preference; the historical cause was not established (see docs/render-estado.md).
@@ -122,25 +128,32 @@ test('snapping: object alignment guide appears during drag, clears on release, a
   const { doc } = await scene(page, [], 'drawing');
   const cx = doc.w / 2, cy = doc.h / 2;
   const s = await scene(page, [
-    { id: 'M', x: cx + 50, y: cy + 20, w: 80, h: 40 },
-    { id: 'N', x: cx + 230, y: cy - 300, w: 120, h: 600 },
+    { id: 'M', x: cx + 50, y: cy + 60, w: 100, h: 100 },
+    { id: 'N', x: cx + 250, y: cy, w: 100, h: 100 },
   ], 'drawing');
   await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true } } }); });
   const before = await boxOf(page, s.ids.M);
   const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
-  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2 + 99, y: before.y + before.h / 2 });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 - 54 });
   await page.mouse.move(from.x, from.y); await page.mouse.down();
   await page.mouse.move(to.x, to.y, { steps: 6 });
   await page.waitForTimeout(220); // the 150 ms snap settles while the gesture remains open
   await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
   const during = await boxOf(page, s.ids.M);
-  expect(Math.abs(during.x + during.w - (cx + 230))).toBeLessThan(0.5);
+  expect(Math.abs(during.y + during.h / 2 - (cy + 50))).toBeLessThan(0.5);
+  const guide = page.locator('.snap-indicator [data-snap-alignment="true"]');
+  const expectedA = fittedStagePoint(c, doc.w, doc.h, { x: cx + 100, y: cy + 50 });
+  const expectedB = fittedStagePoint(c, doc.w, doc.h, { x: cx + 300, y: cy + 50 });
+  expect(Number(await guide.getAttribute('x1'))).toBeCloseTo(expectedA.x, 0); // half-screen-pixel precision
+  expect(Number(await guide.getAttribute('y1'))).toBeCloseTo(expectedA.y, 0);
+  expect(Number(await guide.getAttribute('x2'))).toBeCloseTo(expectedB.x, 0);
+  expect(Number(await guide.getAttribute('y2'))).toBeCloseTo(expectedB.y, 0);
   await page.mouse.up();
   await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(0);
   await page.keyboard.press('Control+z');
   expect(await boxOf(page, s.ids.M)).toEqual(before);
   await page.keyboard.press('Control+Shift+z');
-  expect(Math.abs((await boxOf(page, s.ids.M)).x + before.w - (cx + 230))).toBeLessThan(0.5);
+  expect(Math.abs((await boxOf(page, s.ids.M)).y + before.h / 2 - (cy + 50))).toBeLessThan(0.5);
   expect(errors).toEqual([]);
 });
 

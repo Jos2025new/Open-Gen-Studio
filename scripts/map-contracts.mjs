@@ -2,7 +2,7 @@
 export default [
   {
     id: 'snap-controls',
-    what: 'Snap por modo; alinea cajas y compara huecos locales entre ejes.',
+    what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
     sides: [
       ['src/engine/design/snap.ts', 'export function equalSpacing'],
       ['src/engine/design/snapSession.ts', 'this.opts.equalSpacing !== false'],

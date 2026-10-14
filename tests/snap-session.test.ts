@@ -12,14 +12,15 @@ const doc = (layers: any[]) => ({ width: 1000, height: 1000, layers, guides: und
 const view = { x0: 0, y0: 0, x1: 1000, y1: 1000 };
 const opts = { on: true, page: false, layers: true };
 
-describe('snap session: candidates once, by band, on screen, capped', () => {
-  it('a layer in another horizontal band is not a line for the moving box', () => {
-    const s = new SnapSession(doc([layerAt('near', 300, 0), layerAt('far', 300, 700)]), 'mover', opts, 1, view);
-    // The box is in the top band (y 0–40): its x may snap to the near layer's edge at 300 but not to the far layer's.
-    const xsNear = s.step({ x: 296, y: 0, w: 10, h: 40 }, { x: 300, y: 20 }, { x: 0, y: 0 }, 0);
-    expect(xsNear.gx).toBe(300);
+describe('snap session: candidates once, on screen, capped', () => {
+  it('a visible layer in another horizontal band remains an alignment target', () => {
+    const s = new SnapSession(doc([layerAt('far', 300, 700)]), 'mover', opts, 1, view);
+    s.step({ x: 296, y: 600, w: 10, h: 40 }, { x: 300, y: 620 }, { x: 0, y: 0 }, 0);
+    const acrossGap = s.step({ x: 296, y: 600, w: 10, h: 40 }, { x: 300, y: 620 }, { x: 0, y: 0 }, 1000);
+    expect(acrossGap.gx).toBe(300);
+    expect(acrossGap.alignments).toEqual([{ a: [300, 640], b: [300, 700] }]);
     const t = s.targets().ys;
-    expect(t).toContain(700); // the far layer is still known for a vertical snap in its own band
+    expect(t).toContain(700);
   });
 
   it('lines far off the view are never collected', () => {
@@ -103,4 +104,21 @@ describe('snap session: equal spacing with measures', () => {
     expect(off.dx).toBe(0);
     expect(off.measures).toBeUndefined();
   });
+
+  it('shows center-to-center guides across gaps, in either axis, for unlike box sizes', () => {
+    const horizontalTarget = layerAt('horizontal-target', 100, 100, 100, 100);
+    const horizontal = new SnapSession(doc([horizontalTarget]), 'moving', opts, 1, view);
+    const horizontalBox = { x: 220, y: 100, w: 100, h: 100 };
+    const horizontalGuide = horizontal.step(horizontalBox, { x: 270, y: 150 }, { x: 270, y: 150 }, 0);
+    expect(horizontalGuide.gy).toBe(150);
+    expect(horizontalGuide.alignments).toEqual([{ a: [270, 150], b: [150, 150] }]);
+
+    const verticalTarget = layerAt('vertical-target', 100, 300, 100, 100);
+    const vertical = new SnapSession(doc([verticalTarget]), 'moving', opts, 1, view);
+    const verticalBox = { x: 120, y: 180, w: 60, h: 100 };
+    const verticalGuide = vertical.step(verticalBox, { x: 150, y: 230 }, { x: 150, y: 230 }, 0);
+    expect(verticalGuide.gx).toBe(150);
+    expect(verticalGuide.alignments).toEqual([{ a: [150, 230], b: [150, 350] }]);
+  });
+
 });

@@ -5,8 +5,7 @@ import { layerBox } from './render';
 /*
  * One snapping session per drag (Inkscape's SnapManager::setup and its candidate search, snap.cpp:696-992): the lines
  * to stick to are collected once, when the drag starts, and only for what is on screen (capped at MAX_LINES). Each
- * move then filters them by band (a line counts when its layer overlaps the moving box on the other axis) and
- * scores them; no layer is visited again during the drag.
+ * move scores their alignment coordinates; bounded visible candidates avoid rebuilding geometry on every drag move.
  */
 
 export const MAX_LINES = 200;
@@ -72,8 +71,7 @@ export class SnapSession {
     } else this.lastMove = t;
     this.last = { x: screen.x, y: screen.y, t };
     if (!snapNow(speed, t - this.lastMove)) return { dx: 0, dy: 0 };
-    const inBand = (lines: Line[], lo: number, hi: number) => lines.filter((l) => l.hi >= lo && l.lo <= hi);
-    const xLines = inBand(this.xs, box.y, box.y + box.h), yLines = inBand(this.ys, box.x, box.x + box.w);
+    const xLines = this.xs, yLines = this.ys;
     const xs = xLines.map((l) => l.v), ys = yLines.map((l) => l.v);
     const tol = snapTolerance(this.zoom);
     const r: SessionStep = snapBox(box, { xs, ys }, tol, p);
@@ -88,13 +86,20 @@ export class SnapSession {
         ? [targetBox.x, targetBox.x + targetBox.w / 2, targetBox.x + targetBox.w]
         : [targetBox.y, targetBox.y + targetBox.h / 2, targetBox.y + targetBox.h];
       const onGuide = (v: number) => Math.abs(v - at) < 1e-6;
-      if (!own.some(onGuide) || !other.some(onGuide)) return null;
+      const ownIndex = own.findIndex(onGuide), otherIndex = other.findIndex(onGuide);
+      if (ownIndex < 0 || otherIndex < 0) return null;
       const sourceCross = axis === 'x'
         ? [sourceBox.y, sourceBox.y + sourceBox.h / 2, sourceBox.y + sourceBox.h]
         : [sourceBox.x, sourceBox.x + sourceBox.w / 2, sourceBox.x + sourceBox.w];
       const targetCross = axis === 'x'
         ? [targetBox.y, targetBox.y + targetBox.h / 2, targetBox.y + targetBox.h]
         : [targetBox.x, targetBox.x + targetBox.w / 2, targetBox.x + targetBox.w];
+      // A center-to-center winner should use the centers as its endpoints; other matches keep the nearest real anchors.
+      if (ownIndex === 1 && otherIndex === 1) {
+        return axis === 'x'
+          ? { a: [at, sourceCross[1]], b: [at, targetCross[1]] }
+          : { a: [sourceCross[1], at], b: [targetCross[1], at] };
+      }
       let best: AlignmentGuide | null = null, distance = Infinity;
       for (const a of sourceCross) for (const b of targetCross) {
         const d = Math.abs(a - b);
