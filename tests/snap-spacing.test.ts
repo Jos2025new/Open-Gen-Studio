@@ -37,6 +37,19 @@ describe('equal spacing: the gaps match a pair of neighbours', () => {
     expect(r.measures.map((m) => m.a[0])).toEqual([105, 205, 505]); // each vertical cota stays in its own column
   });
 
+  const perpendicularCases: [string, 'x' | 'y', { x: number; y: number; w: number; h: number }[], { x: number; y: number; w: number; h: number }, number][] = [
+    ['below a horizontal reference pair', 'y', [{ x: 100, y: 100, w: 40, h: 40 }, { x: 180, y: 100, w: 40, h: 40 }], { x: 180, y: 184, w: 40, h: 40 }, -4],
+    ['above a horizontal reference pair', 'y', [{ x: 100, y: 100, w: 40, h: 40 }, { x: 180, y: 100, w: 40, h: 40 }], { x: 180, y: 16, w: 40, h: 40 }, 4],
+    ['right of a vertical reference pair', 'x', [{ x: 100, y: 100, w: 40, h: 40 }, { x: 100, y: 180, w: 40, h: 40 }], { x: 184, y: 180, w: 40, h: 40 }, -4],
+    ['left of a vertical reference pair', 'x', [{ x: 100, y: 100, w: 40, h: 40 }, { x: 100, y: 180, w: 40, h: 40 }], { x: 16, y: 180, w: 40, h: 40 }, 4],
+  ];
+  it.each(perpendicularCases)('matches perpendicular equal gaps %s', (_name, axis, rawRefs, rawBox, expected) => {
+    const r = equalSpacing(rawBox, rawRefs, 10, axis)!;
+    expect(r).not.toBeNull();
+    expect(r.d).toBe(expected);
+    expect(r.measures.map((m) => m.label)).toEqual([40, 40]);
+  });
+
   it('nothing within the tolerance gives no spacing; boxes outside the band are ignored', () => {
     expect(equalSpacing(B(100), [B(0), B(30)], 5, 'x')).toBeNull();
     const off = { x: 0, y: 500, w: 10, h: 10 };
