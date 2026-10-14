@@ -7,7 +7,8 @@ import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
-import { SNAP_DEFAULT, SNAP_PX, snapBox, snapTargets } from '../../engine/design/snap';
+import { SNAP_DEFAULT, SNAP_PX } from '../../engine/design/snap';
+import { SnapSession, snapSessionFor, visibleDocRect } from '../../engine/design/snapSession';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginLiveStroke } from '../../engine/design/raster';
 import { addBrushSegment, brushSegment, newBrushStroke, penPressure } from '../../engine/design/brushStroke';
@@ -956,7 +957,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const snap = useStore.getState().ui.snap ?? SNAP_DEFAULT;
       if (d.op === 'scale' && snap.on && !e.altKey) {
         const ids = new Set(d.bases.map((b) => b.layer.id));
-        const t = snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap);
+        const t = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, '', snap, view.zoom, visibleDocRect(view, size))).targets();
         const tol = SNAP_PX / view.zoom;
         const near = (v: number, lines: number[]) => lines.reduce<number | undefined>((best, l) => (Math.abs(l - v) <= tol && (best === undefined || Math.abs(l - v) < Math.abs(best - v)) ? l : best), undefined);
         const gx = d.h.fx ? near(p.x, t.xs) : undefined, gy = d.h.fy ? near(p.y, t.ys) : undefined;
@@ -975,7 +976,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const b0 = snap.on && !e.altKey ? objectsBox(d.base, d.ids) : null;
       if (b0) {
         const box = { ...b0, x: b0.x + p.x - d.startX, y: b0.y + p.y - d.startY };
-        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => l.id !== d.layerId) }, d.layerId, snap), SNAP_PX / view.zoom);
+        const s = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => l.id !== d.layerId) }, d.layerId, snap, view.zoom, visibleDocRect(view, size))).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
         showGuides({ x: s.gx, y: s.gy });
       }
@@ -990,7 +991,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       const box = snap.on && !e.altKey ? unionBox(group.map((l) => layerBox(translateLayer(l, dx, dy))).filter((b): b is NonNullable<typeof b> => Boolean(b))) : null;
       if (box) {
         const ids = new Set(group.map((l) => l.id));
-        const s = snapBox(box, snapTargets({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap), SNAP_PX / view.zoom);
+        const s = snapSessionFor(d, () => new SnapSession({ ...doc, layers: doc.layers.filter((l) => !ids.has(l.id)) }, d.layerId, snap, view.zoom, visibleDocRect(view, size))).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         dx += s.dx;
         dy += s.dy;
         showGuides({ x: s.gx, y: s.gy });
