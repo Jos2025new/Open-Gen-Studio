@@ -85,15 +85,15 @@ test('snapping: near an edge it snaps within 10 screen px; a fast drag does not'
   expect(errors).toEqual([]);
 });
 
-// Known failing (2026-10-14): the spacing indicator does not appear during the drag. The snap session's lines are
-// taken from the document of the first move of the gesture, and a line equal to the moving box's own centre shows up in
-// the candidates (see docs/render-estado.md, snapping). Unit tests of the formulas pass; this e2e is kept for the fix.
-test.fixme('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
+// Equal spacing: the switch is set explicitly, so the case does not depend on a value saved in the sandbox.
+test('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const zoom = await zoomOf(page);
   const { doc } = await scene(page, []);
   const cx = doc.w / 2, cy = doc.h / 2;
+  // The switch is set explicitly: a saved value from an earlier run must not decide this case.
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snap: { on: true, page: true, layers: true } }); });
   const sp = await scene(page, [{ id: 'A', x: cx - 500, y: cy - 50, w: 100, h: 100 }, { id: 'B', x: cx + 100, y: cy - 50, w: 100, h: 100 }, { id: 'C', x: cx - 195, y: cy - 50, w: 100, h: 100 }]);
   await page.keyboard.press('Escape');
   await page.mouse.click(c.x + 600, c.y + 30);
