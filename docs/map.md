@@ -103,14 +103,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/agent` | 19 | 54 |
 | `src/engine/design` | 76 | 66 |
 | `src/engine/flow` | 10 | 11 |
-| `src/engine/fx` | 7 | 8 |
+| `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 37 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 24 | 138 |
 | `src/store` | 4 | 96 |
 
-109 de 279 módulos no tienen ningún test que los importe directamente.
+109 de 280 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

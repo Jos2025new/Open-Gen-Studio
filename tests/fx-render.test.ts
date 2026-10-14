@@ -371,6 +371,7 @@ describe('raster layers close up', () => {
 });
 
 import { toneTable, TONE_STEPS } from '../src/engine/fx/defs';
+import { toneLut } from '../src/engine/fx/lut';
 import { opPrimitives } from '../src/engine/fx/svg';
 describe('levels and curves (one tone table for the view and the SVG export)', () => {
   it('levels: input points clip, gamma bends the midtones, output range limits; defaults are identity', () => {
@@ -385,6 +386,28 @@ describe('levels and curves (one tone table for the view and the SVG export)', (
     expect(t[8]).toBeCloseTo(0.15, 2); expect(t[16]).toBeCloseTo(0.5, 2); expect(t[24]).toBeCloseTo(0.9, 2);
     for (let i = 1; i < t.length; i++) expect(t[i]).toBeGreaterThanOrEqual(t[i - 1]);
     expect(opPrimitives(newFxOp('curves', {}), 'SourceGraphic', 'o')).toMatch(/feComponentTransfer.*type="table" tableValues="0 /);
+  });
+});
+describe('levels and curves as 256-entry channel LUTs', () => {
+  it('the LUT reads the same curve at every 8-bit input (equal to the 33-point table, interpolated)', () => {
+    for (const op of [newFxOp('levels', { inBlack: 0.2, inWhite: 0.8, gamma: 1.6 }), newFxOp('curves', { shadows: 0.1, midtones: 0.6, highlights: 0.85 })]) {
+      const t = toneTable(op), lut = toneLut(op);
+      expect(lut).toHaveLength(256);
+      expect(lut[0]).toBeCloseTo(t[0], 6);
+      expect(lut[255]).toBeCloseTo(t[TONE_STEPS - 1], 6);
+      for (let v = 0; v < 256; v++) {
+        const x = (v / 255) * (TONE_STEPS - 1), i = Math.min(TONE_STEPS - 2, Math.floor(x));
+        expect(lut[v]).toBeCloseTo(t[i] + (t[i + 1] - t[i]) * (x - i), 9);
+      }
+      for (let v = 1; v < 256; v++) expect(lut[v]).toBeGreaterThanOrEqual(lut[v - 1]);
+    }
+  });
+  it('identity levels give the identity LUT within one 8-bit step', () => {
+    const lut = toneLut(newFxOp('levels', {}));
+    lut.forEach((y, v) => expect(Math.abs(y * 255 - v)).toBeLessThanOrEqual(1));
+  });
+  it('the SVG table carries 256 values', () => {
+    expect(opPrimitives(newFxOp('levels', {}), 'a', 'b')!.match(/tableValues="([^"]+)"/)![1].split(' ')).toHaveLength(256);
   });
 });
 
