@@ -141,3 +141,13 @@ Registrada por el encargo del usuario: el ajuste funcionaba, pero era soso y sin
 Tests unitarios: `snap-tolerance`, `snap-speed`, `snap-session`, `snap-spacing`, `snap-indicator`, `snap-mode` (todos pasan). E2E `tests-e2e/snapping.spec.ts`: el ajuste junto a un borde y el arrastre rápido pasan; el modo Dibujo no ajusta, pasa. **El espaciado igual en el e2e está como `fixme`:** el indicador no aparece durante el arrastre. Causa probable, sin confirmar: la sesión toma `doc` del render del primer movimiento (`Stage.tsx`, sitios de `snapSessionFor`), y la línea del centro de la propia caja entra en los candidatos. Pendiente: pasar el documento actual a la sesión y excluir la caja móvil de forma explícita; después quitar el `fixme`.
 
 Pendiente, fuera de este encargo: retardo por temporizador real (hoy el ajuste llega con el siguiente movimiento lento, no al parar del todo); alineación con indicador propio (hoy la guía de línea); el interruptor guardado en la sandbox tapa el valor por modo (`ui.snap` persiste entre sesiones).
+
+### Pendientes del ajuste, segunda vuelta (2026-10-14)
+
+| Punto | Estado | Commit |
+| --- | --- | --- |
+| Espaciado igual en la app | Fórmulas y sesión probadas (unit). El e2e de tres cajas **pasa** cuando la preferencia de Dibujo está activada en la escena. Hipótesis del documento obsoleto **descartada**: la causa del fallo fue el interruptor guardado en la sandbox. El e2e de tres cajas queda como `test` y el de «borde + arrastre rápido» como `fixme` (el primer arrastre no mueve la capa en la sandbox; igual en HEAD anterior). | `8685a69`, `96d7b39` |
+| Temporizador real | Clase `SnapWatchdog` con reloj inyectado, probada con reloj simulado. **Cableado en Stage pendiente**: falta arrancarlo tras un paso gateado y solicitar el fotograma. | `64445d8` |
+| Preferencia por modo | `snapByMode.drawing` / `snapByMode.design`; el interruptor cambia solo el modo en uso; el formato antiguo `snap` se descarta. Probado. | `96d7b39` |
+
+Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo** (`paintModeOf`, ADR 0016), así que el ajuste viene apagado hasta que el usuario lo enciende. Es la regla actual; no se ha cambiado.
