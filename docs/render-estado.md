@@ -121,42 +121,13 @@ Herramienta de lineart favorita del usuario. Aplicados el arreglo 1 (tapers con 
 - **Paridad de canvas y PNG** en el navegador (no probada).
 - **Convert to path y flechas** en el lineart (no aplican en este código).
 
-## Investigación: ajuste (snapping) (2026-10-14)
+## Ajuste (snapping): estado verificado (2026-10-14)
 
-Solo lectura: [investigacion-snapping.md](investigacion-snapping.md). Inkscape usa una puntuación conjunta por candidato, tolerancia en píxeles de pantalla, retardo por velocidad y espaciado igual con indicador. OGS ajusta por eje al más cercano, con 8 px y en cada movimiento. Plan en seis pasos, empezando por 10 px y la puntuación conjunta; el modo Dibujo apagado y el Diseño encendido van en el último paso. Sin cambios de código hasta la aprobación del usuario.
+La investigación fuente y la comparación vigente están en [investigacion-snapping.md](investigacion-snapping.md). Commits relevantes: `7cf09f1` (retardo real conectado), `3f9c9f7` (interruptores independientes de guías y espaciado), `7565c47` (ajuste de nodos de trayecto). El documento conserva Dibujo/Diseño fijado al crearlo o abrirlo (ADR 0016); los ajustes se guardan por modo y solo se aplican si el interruptor de ese modo está encendido.
 
-## Ajuste (snapping): nueva etapa (2026-10-14)
+Verificación focalizada, sobre el sandbox `.sandbox/data`, puerto 5183, en el checkout basado en HEAD `7565c47` con los dos casos reactivados: `npx playwright test tests-e2e/snapping.spec.ts --workers=1` pasa **6/6**. Los antiguos `fixme` —borde más arrastre rápido y espaciado entre tres cajas— pasan con sus aserciones originales. También pasan el ajuste por temporizador sin nuevos movimientos, Drawing apagado por defecto y el primer arrastre en Object y Layer. No se demostró la causa de los fallos históricos; no se reprodujeron en esta ejecución. `tests/path-node-snap.test.ts` monta el editor y comprueba el gesto, la espera de 150 ms y un solo undo/redo.
 
-Registrada por el encargo del usuario: el ajuste funcionaba, pero era soso y sin grado profesional. Investigación en [investigacion-snapping.md](investigacion-snapping.md) (fuentes de Inkscape 244d48f, solo principios y fórmulas). Seis pasos, cada uno con commit y tests:
-
-| Paso | Commit | Qué hace |
-| --- | --- | --- |
-| 1 | `3f25da5` | Tolerancia de 10 px de pantalla divididos entre el zoom (`SNAP_PX`, `snapTolerance`). |
-| 2 | `c1966ac` | Un solo ganador por eje con puntuación conjunta: peso 0,5 entre puntero y distancia de ajuste (`snapScore`). |
-| 3 | `0a8bd10` | Retardo por velocidad: no se ajusta por encima de 0,02 px/ms; sí al frenar o tras 150 ms (`snapNow`). |
-| 4 | `0ed7b5f` | Candidatos una vez por gesto (`snapSession.ts`), solo en pantalla, por bandas, tope de 200 líneas. Stage usa la sesión en lugar de recalcular en cada movimiento. |
-| 5 | `4fef3e1` | Espaciado igual entre cajas vecinas (`equalSpacing`) con indicador de medidas (`SnapIndicator.tsx`). |
-| 6 | `f60038b` | Modos: encendido en Diseño, apagado en Dibujo por defecto (`snapOptsFor`); los trazos raster no se ajustan; un solo interruptor. |
-
-Tests unitarios: `snap-tolerance`, `snap-speed`, `snap-session`, `snap-spacing`, `snap-indicator`, `snap-mode` (todos pasan). E2E `tests-e2e/snapping.spec.ts`: el ajuste junto a un borde y el arrastre rápido pasan; el modo Dibujo no ajusta, pasa. **El espaciado igual en el e2e está como `fixme`:** el indicador no aparece durante el arrastre. Causa probable, sin confirmar: la sesión toma `doc` del render del primer movimiento (`Stage.tsx`, sitios de `snapSessionFor`), y la línea del centro de la propia caja entra en los candidatos. Pendiente: pasar el documento actual a la sesión y excluir la caja móvil de forma explícita; después quitar el `fixme`.
-
-Pendiente, fuera de este encargo: retardo por temporizador real (hoy el ajuste llega con el siguiente movimiento lento, no al parar del todo); alineación con indicador propio (hoy la guía de línea); el interruptor guardado en la sandbox tapa el valor por modo (`ui.snap` persiste entre sesiones).
-
-### Pendientes del ajuste, segunda vuelta (2026-10-14)
-
-| Punto | Estado | Commit |
-| --- | --- | --- |
-| Espaciado igual en la app | Fórmulas y sesión probadas (unit). El e2e de tres cajas **pasa** cuando la preferencia de Dibujo está activada en la escena. Hipótesis del documento obsoleto **descartada**: la causa del fallo fue el interruptor guardado en la sandbox. El e2e de tres cajas queda como `test` y el de «borde + arrastre rápido» como `fixme` (el primer arrastre no mueve la capa en la sandbox; igual en HEAD anterior). | `8685a69`, `96d7b39` |
-| Temporizador real | Clase `SnapWatchdog` con reloj inyectado, probada con reloj simulado. **Cableado en Stage hecho** (`SnapIdleBridge`, `snapIdle.ts`): un movimiento rápido arma el temporizador de 150 ms; al parar, se repite el último movimiento con su posición y el ajuste se aplica por el camino de fotograma habitual. Un movimiento lento o el pointerup lo cancelan. | `64445d8`, puente en el commit `feat(snap): connect the delay timer to the drag` |
-| Preferencia por modo | `snapByMode.drawing` / `snapByMode.design`; el interruptor cambia solo el modo en uso; el formato antiguo `snap` se descarta. Probado. | `96d7b39` |
-
-Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo** (`paintModeOf`, ADR 0016), así que el ajuste viene apagado hasta que el usuario lo enciende. Es la regla actual; no se ha cambiado.
-
-### Lote 2026-10-14: modo por defecto, temporizador y primer arrastre
-
-- **Modo por defecto según el contenido** (enmienda al ADR 0016): documentos de formas o sin píxeles pintados, en Diseño; con píxeles pintados, en Dibujo. Commit `9fbe94f`. El interruptor por modo puede activar lo del otro modo.
-- **Temporizador del ajuste:** cableado (2026-10-14). Unit `tests/snap-idle-bridge.test.ts` (reloj simulado) y e2e `snapping.spec.ts`: movimiento rápido a 6 px del borde, 300 ms sin mover, el objeto queda ajustado sin otro pointermove (sin el puente el e2e falla: 4,87 px). El pointerup conserva esa posición; un solo paso de deshacer (no se registra otro). Stage no crece: `snapSessionOf` lo recortó antes.
-- **Primer arrastre:** reproducido en el e2e en los dos modos (Object y Layer), por separado, sobre una capa sin seleccionar. **Pasa en los dos.** El fallo anterior ocurría en la escena del caso de borde (la capa móvil centrada en la página, con otras capas cerca), no en el arrastre aislado; queda sin reproducir en aislamiento. El caso de borde sigue como `fixme`.
+El motor ya alinea cajas mediante bordes y centros: combina cada uno de los tres anclajes horizontales y verticales con líneas de página, guías y otras capas. Por ello también cubre esquinas y puntos medios; no se añadieron objetivos duplicados. El ajuste de nodos actual se limita a nodos de otros trayectos visibles. Aún no cubre rejilla, márgenes, intersecciones, perpendicular/tangente ni alineación o espaciado entre nodos; esas categorías requieren entidades u objetivos geométricos que el documento hoy no modela. Los indicadores de borde/centro son guías; el indicador de espaciado igual sí muestra medidas.
 
 ## Modo fijado al crear (2026-10-14)
 

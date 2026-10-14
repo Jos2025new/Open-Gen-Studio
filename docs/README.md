@@ -13,7 +13,7 @@
 - [Edición de formas](plan-edicion-formas.md): un clic transforma, doble clic edita; qué pidió el usuario, qué se aceptó y con qué fuentes.
 - [Importar SVG de Inkscape](inkscape-importacion.md): qué queda editable (carpetas, formas, opacidades, blur) y qué se rasteriza, y cómo se sanea.
 - [Formas al estilo de Inkscape](inkscape-formas.md): fórmulas de esquinas, trazo y desenfoque, con la línea exacta del código de Inkscape y las diferencias deliberadas.
-- [Investigación: ajuste (snapping) de Inkscape frente a OGS](investigacion-snapping.md): fórmulas con cita, comparación y plan por pasos; sin cambios de código.
+- [Investigación: ajuste (snapping) de Inkscape frente a OGS](investigacion-snapping.md): fórmulas con cita, comparación vigente, límites comprobados y pruebas locales.
 - [Diagnóstico: trazos de lineart que se deforman al encoger](diagnostico-escala-lineart.md): hipótesis, experimentos, causa (taper sin escalar y umbrales de perfect-freehand) y arreglo propuesto.
 - [Investigación sK1 (GPL, solo lectura)](investigacion-sk1.md): primitivas, booleanas, degradados, tipos de nodo, color y PDF de sK1 como referencia, con licencia y lo descartado.
 - [Mapa del código](map.md): contratos entre lugares que deben decir lo mismo, módulos centrales y cobertura directa. Generado; léelo antes de cambiar código.
@@ -98,7 +98,7 @@
 - [023-2026-10-W41: Revisión de Astra, exportación, Niveles y Curvas, reglas (2026-10-10)](history/023-2026-10-W41.md) — 4623 bytes.
 - [024-2026-10-W41: Formas al estilo de Inkscape: esquinas, trazo, blur, giro y nodos (2026-10-11)](history/024-2026-10-W41.md) — 29926 bytes.
 - [025-2026-10-W42: Formas y nodos del Designer, continuación (desde 2026-10-12; sesión del 2026-10-13 al final)](history/025-2026-10-W42.md) — ver tamaño en el archivo.
-- [026-2026-10-W42: Designer, formas, paint y nodos (2026-10-13)](history/026-2026-10-W42.md) — ver tamaño en el archivo.
+- [026-2026-10-W42: Designer, formas, paint y nodos (2026-10-13–14)](history/026-2026-10-W42.md) — ver tamaño en el archivo.
 
 ## Trazabilidad
 

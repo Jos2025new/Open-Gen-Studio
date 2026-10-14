@@ -1,6 +1,6 @@
 # Investigación: ajuste (snapping) de Inkscape frente a OGS
 
-Investigación de solo lectura del 2026-10-14. No hay cambios de código; no se ha compilado ni ejecutado nada de Inkscape. Fuente: clon `--depth 1` de `gitlab.com/inkscape/inkscape` en el scratchpad, commit **244d48fb2001** (rama master en la fecha del clon). Las rutas son relativas a `src/`. Licencia: Inkscape es GPL; aquí solo se describen principios y fórmulas, sin copiar código.
+Investigación de fuente del 2026-10-14, con comparación de implementación actualizada el 2026-10-14 sobre HEAD `7565c47`. La fuente Inkscape se leyó en modo solo lectura; no se ejecutó Inkscape. La verificación OGS está documentada aparte en `render-estado.md`. Fuente: clon `--depth 1` de `gitlab.com/inkscape/inkscape` en el scratchpad, commit **244d48fb2001** (rama master en la fecha del clon). Las rutas son relativas a `src/`. Licencia: Inkscape es GPL; aquí solo se describen principios y fórmulas, sin copiar código.
 
 ## Resumen: por qué el de Inkscape es suave
 
@@ -43,42 +43,34 @@ Sobre la «histéresis»: Inkscape no tiene una histéresis explícita en píxel
 
 No se ha encontrado por nombre la «GSoC 2021 snapping improvements» ni un merge request concreto del rediseño de 1.2; las búsquedas de la API pública devolvieron sobre todo paquetes «Snap». Queda como no verificado.
 
-## Comparación con OGS
+## Comparación con OGS al 2026-10-14
 
-Código de OGS: `src/engine/design/snap.ts` (2,3 KB) y `src/engine/design/guides.ts` (1,6 KB); la llamada está en `src/components/designer/Stage.tsx:958-995`.
+Código de OGS: `src/engine/design/snap.ts`, `snapSession.ts`, `snapNodes.ts`; integración en `src/components/designer/Stage.tsx` y `PathNodes.tsx`.
 
-| Función | Inkscape | OGS hoy | Falta |
+| Función | Inkscape | OGS verificado | Diferencia vigente |
 | --- | --- | --- | --- |
-| Tolerancia | px de pantalla / zoom; 10 px | `SNAP_PX = 8` (`Stage.tsx:69`) dividido entre zoom; valor distinto | Igualar a 10 px y exponerlo en preferencias |
-| Elección del candidato | un solo ganador con puntuación normalizada y peso puntero/imán (`snapped-point.cpp:361-410`) | Por eje, el más cercano (`snap.ts`, `snapBox`) | Puntuación conjunta, peso 0,5, penalizaciones |
-| Objetivos | objetos (bordes, centros, nodos), guías, rejilla, alineación, distribución | Bordes y centros de página, guías del usuario y capas (`snap.ts`, `snapTargets`) | Nodos y rejilla; distribución |
-| Espaciado igual | cadenas de cajas a la misma distancia, con indicador (`distribution-snapper.cpp`) | No existe | Todo el mecanismo |
-| Indicadores | líneas y marcas de distancia; `snap-indicator.cpp` | Solo líneas de guía (`showGuides`) | Marcas de distancia y de huecos iguales |
-| Retardo por velocidad | sí, 0,02 px/ms y vigilancia (`tool-base.cpp`) | No: ajusta en cada movimiento | Retardo y vigilancia |
-| Candidatos | una vez por gesto, área visible, bandas (`snap.cpp`, `distribution-snapper.cpp`) | `snapTargets` en cada movimiento, sobre todas las capas (`Stage.tsx:961,980,995`) | Calcular al empezar el arrastre; filtrar por área y banda |
-| Índice espacial | no hay RBush; usa el área visible y bandas | No hay (el proyecto no depende de RBush ni de flatbush) | Bandas primero; un índice solo si el conteo lo pide |
-| Modo Dibujo / Diseño | no aplica (Inkscape no tiene dos modos) | El ajuste está encendido en todo (`SNAP_DEFAULT`, `snap.ts`) | Modo Dibujo apagado; Diseño encendido |
+| Tolerancia | 10 px de pantalla, divididos entre zoom | `SNAP_PX = 10`, `snapTolerance(zoom)` | No hay control de tolerancia configurable |
+| Elección | Puntuación que compara candidatos | Puntuación por eje para caja; distancia euclídea al objetivo de nodo | No hay un único ganador global que compare caja, guía y nodo a la vez |
+| Caja | Bordes, esquinas, puntos medios y centro | Bordes y centro X/Y; sus combinaciones producen esquinas y puntos medios | No hace falta otro control ni otro candidato de caja |
+| Nodos | Puntos de trayecto y más tipos de ancla | Nodos finales de otros trayectos visibles, recopilados al empezar el gesto | No ajusta a intersecciones, handles, puntos medios de segmentos ni perpendicular/tangente |
+| Guías | Categoría independiente | Interruptor **Guides**, guardado por modo; desactiva sus candidatos | Sin diferencia esencial en esa categoría |
+| Espaciado | Restricción de huecos iguales con indicador | **Equal spacing** independiente; indicador muestra las dos medidas | Solo cajas, no distribución/alineación entre nodos |
+| Indicadores | Líneas, marcas y medidas | Guías de líneas de borde/centro; medidas para espaciado igual | No hay indicador de alineación distinto de la propia guía |
+| Retardo | No ajusta durante movimiento rápido; temporizador al detenerse | 0,02 px/ms; temporizador real de 150 ms en move/objeto/escala/nodo; suelta cancela | El ajuste de nodos no tiene E2E de navegador; tiene prueba montada de componente |
+| Candidatos | Área visible, caché por gesto, puntos limitados | Cajas: candidatos por gesto y vista; nodos: 200 objetivos más cercanos de trayectos visibles | La búsqueda de nodos todavía recorre todos los trayectos visibles |
+| Interfaz | Panel simple y modo avanzado con categorías | Un popover compacto con activar, página, capas, guías, espaciado y nodos | No hay rejillas o márgenes configurables; el documento no modela esos objetos |
+| Modo | No aplica | Valores guardados por modo; Diseño y Dibujo tienen defaults propios; los trazos raster no se ajustan | El usuario puede encender el ajuste en Dibujo con su interruptor |
 
-## Reglas de producto (pedidas por el usuario)
+## Qué conviene conservar y qué queda fuera
 
-- **Dibujo:** el ajuste está apagado por defecto y nunca se aplica al pintar ni a trazos raster. Solo se ofrece al mover una capa, si el usuario lo activa, para no lastrar la fluidez con muchos trazos. Se decide con `paintModeOf` (`src/engine/design/paintMode.ts:13`).
-- **Diseño:** encendido por defecto, con sugerencias de espaciado y alineación al mover.
-- **Rendimiento:** los candidatos se calculan al empezar el arrastre (como `setup`, `snap.cpp:696`), se limitan al área visible y se filtran por bandas, y la comparación por movimiento es solo sobre esos pocos candidatos.
+- Mantener el popover corto y las categorías independientes: activar ajuste, página, capas, guías, espaciado y nodos. Una interfaz simple/avanzada al estilo Inkscape solo se justificaría cuando existan más objetivos reales; no se replica la lista completa por apariencia.
+- La alineación visible de cajas ya existe: al acercar un borde o centro a otro, el snap produce la guía correspondiente. «Sin indicador de alineación» significa que no hay un indicador separado que nombre una relación; no significa que falte ese snap.
+- El target de nodo es deliberadamente limitado a nodos de trayecto visibles. Grid y márgenes necesitan entidades/configuración que hoy no existen; intersecciones y restricciones perpendiculares/tangenciales requieren geometría adicional. No se simulan con checks vacíos.
+- El control de nodos usa el mismo zoom, velocidad, retardo de 150 ms, Alt para movimiento libre y un solo snapshot de deshacer que el editor existente. La prueba montada cubre posición, espera, undo y redo; no sustituye una prueba visual en navegador.
 
-## Plan de implementación (del más rentable al menos)
+## Verificación local
 
-1. **Tolerancia de 10 px de pantalla y umbral común** (pequeño). Cambiar `SNAP_PX` a 10 y leerlo de un único sitio. Test: `snapBox` con zoom 0,5 y 2 da la misma distancia visual.
-2. **Elegir un ganador con puntuación conjunta** (pequeño). Función pura `pickSnap(candidates, pointer, weight=0.5, tolerance)` con la fórmula de `snapped-point.cpp:381-386`. Test: dos candidatos, el más cercano al puntero gana cuando la distancia de ajuste empata; el de menor distancia gana con `weight=0`.
-3. **Retardo por velocidad** (pequeño-mediano). En Stage, si la velocidad del puntero supera 0,02 px/ms, no ajustar; ajustar al frenar o tras 150 ms (vigilancia). Test: función pura `shouldSnapNow(speed, idleMs)`.
-4. **Candidatos al empezar el arrastre y filtrados por banda** (mediano). Calcular `snapTargets` al pulsar, filtrar por el área visible y por solape en horizontal o vertical. Test: con 500 capas, solo entran las de la banda; el conteo no cambia entre movimientos.
-5. **Espaciado igual** (mediano-alto). Función pura en la línea de `distribution-snapper.cpp`: cadenas de cajas a la misma distancia en la banda, con la tolerancia por nivel de `0,5·10⁻⁴`. Indicador: marca de hueco en Stage. Test: tres cajas con huecos 10 y 10,00005 se igualan; con 12 no.
-6. **Modo Dibujo apagado y Diseño encendido** (pequeño). Leer `paintModeOf` en la inicialización del snap. Test: un documento en Dibujo nunca produce ajustes al pintar; uno en Diseño sí.
-
-Cada paso lleva tests de la función pura y, en lo visual, un e2e con preparación por el store (la lección de `path-nodes-ux`: los tests de geometría no prueban la interfaz).
-
-## Lo no verificado
-
-- No se ejecutó Inkscape; las fórmulas son de lectura del código del commit 244d48f, no de su comportamiento medido.
-- No se encontró por nombre la GSoC 2021 de snapping ni el merge request del rediseño de 1.2; las URLs citadas son issues relacionados, no el rediseño.
-- Los valores 0,02 px/ms, 150 ms de vigilancia y 0,5·10⁻⁴ del hueco se han tomado del código; no se han medido en el navegador.
-- No se midió el coste de OGS con muchos objetos; la recomendación de bandas se basa en la lectura del código.
+- `tests/snap-nodes.test.ts`: fuentes de nodos, coincidencia bidimensional, tolerancia y retardo.
+- `tests/path-node-snap.test.ts`: interacción montada, snap tras el retardo y un solo paso de undo/redo.
+- `tests-e2e/snapping.spec.ts`: los dos casos antes marcados `fixme` están activos. La ejecución focalizada del archivo en sandbox pasa 6/6; no demuestra la causa de los fallos históricos.
+- No se ejecutó Inkscape ni se midió rendimiento con documentos grandes. Los valores de Inkscape se leen de las fuentes citadas, no de mediciones de runtime.

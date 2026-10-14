@@ -50,10 +50,9 @@ const PAGE_TOP = 70;
 const screenOf = (c: { x: number; y: number; width: number }, docW: number, _docH: number, zoom: number, p: { x: number; y: number }) =>
   ({ x: c.x + (c.width - docW * zoom) / 2 + p.x * zoom, y: c.y + PAGE_TOP + p.y * zoom });
 
-// Known failing (2026-10-14): in the last runs the first drag does not move the layer (received 150 doc px: the box never
-// leaves its place), at HEAD too; the saved sandbox ui makes the outcome depend on the previous run. The formulas are
-// covered by unit tests; this e2e is kept for the fix (see docs/render-estado.md).
-test.fixme('snapping: near an edge it snaps within 10 screen px; a fast drag does not', async ({ page }) => {
+// This case was previously disabled after a non-reproducible first-drag failure. It now runs with an explicit mode
+// preference; the historical cause was not established (see docs/render-estado.md).
+test('snapping: near an edge it snaps within 10 screen px; a fast drag does not', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const zoom = await zoomOf(page); // the readout is rounded to whole percent: a few px of error at most
@@ -117,7 +116,7 @@ test('snapping: fast drag, then stop 300 ms without moving: the layer snaps with
 });
 
 // Equal spacing: the switch is set explicitly, so the case does not depend on a value saved in the sandbox.
-test.fixme('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
+test('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
   const errors = await setup(page);
   const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
   const zoom = await zoomOf(page);
