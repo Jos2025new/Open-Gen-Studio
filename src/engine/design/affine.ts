@@ -1,3 +1,4 @@
+import { MIN_STROKE_SIZE } from './strokes';
 import { allVectorObjects } from './vectorMask';
 import type { Layer, RasterLayer, ShapeSpec, Stroke, VectorLayer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
@@ -49,8 +50,16 @@ export function transformShape<T extends ShapeSpec>(s: T, m: Mat): T {
   return { ...mapPathShape(s, (x, y) => apply(m, x, y)), strokeWidth: s.strokeWidth * k, ...(s.blur ? { blur: s.blur * k } : {}) };
 }
 
+/** A stroke under a transform: points moved; width and tapers follow the average scale (the «Scale stroke» rule). */
 export function transformStroke(s: Stroke, m: Mat): Stroke {
-  return { ...s, size: s.size * lengthScale(m), points: s.points.map(([x, y, p]) => [...apply(m, x, y), p] as [number, number, number]) };
+  const k = lengthScale(m);
+  return {
+    ...s,
+    size: Math.max(MIN_STROKE_SIZE, s.size * k),
+    taperStart: s.taperStart * k,
+    taperEnd: s.taperEnd * k,
+    points: s.points.map(([x, y, p]) => [...apply(m, x, y), p] as [number, number, number]),
+  };
 }
 
 /** Page coordinates → a raster layer's buffer pixels. */

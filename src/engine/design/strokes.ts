@@ -3,6 +3,9 @@ import { uid } from '../../lib/id';
 import type { Stroke, StrokeStyle } from '../types';
 import type { Box } from './doc';
 
+/** Strokes never get thinner than this (px) when scaled. Lives here: affine.ts imports it, and strokes.ts must not import affine (store.ts reads DEFAULT_STROKE_STYLE while loading). */
+export const MIN_STROKE_SIZE = 0.5;
+
 /*
  * Editable pressure strokes. A stroke keeps its gesture (points with pressure) and its style; the outline is
  * computed from them (perfect-freehand) and cached per stroke object. Strokes are replaced, never mutated,
@@ -135,7 +138,7 @@ export function scaleStroke(s: Stroke, sx: number, sy: number, ax: number, ay: n
   return {
     ...s,
     points: s.points.map(([x, y, p]) => [ax + (x - ax) * sx, ay + (y - ay) * sy, p]),
-    size: Math.max(0.5, s.size * k),
+    size: Math.max(MIN_STROKE_SIZE, s.size * k),
     taperStart: s.taperStart * k,
     taperEnd: s.taperEnd * k,
   };
