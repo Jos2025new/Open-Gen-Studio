@@ -113,25 +113,31 @@ function paramFromSupported(key: string, sp: SupportedParam): ParamDef | null {
   return { key, label: humanizeKey(key), role, type: 'integer', min, max, step: 1, default: role === 'count' ? 1 : undefined };
 }
 
+const TOKEN_NOTE = 'Billed by tokens; exact cost is reported after generation';
+
+/**
+ * Image price from the model's endpoints. Only a valid answer is cached (v2 key: v1 entries saved failures as
+ * «token-billed» for 24 h); a failed request returns the note without caching it, so the next load asks again.
+ */
 async function imagePrice(id: string): Promise<PriceRule> {
-  const cacheKey = `or:price:${id}`;
+  const cacheKey = `or:price:v2:${id}`;
   const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
   if (cached) return cached;
-  let rule: PriceRule = { skus: [], note: 'Billed by tokens; exact cost is reported after generation' };
+  let res: { endpoints?: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }> };
   try {
-    const res = await requestJson<{ endpoints?: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }> }>(
-      `${BASE}/images/models/${id}/endpoints`,
-    );
-    const pricing = res.endpoints?.[0]?.pricing ?? [];
-    const skus: PriceSku[] = pricing
-      .filter((p) => p.unit === 'image' && /output/.test(p.billable) && Number.isFinite(p.cost_usd))
-      .map((p) => ({ unit: 'output' as const, usd: p.cost_usd, resolution: p.resolution }));
-    const mp = pricing.find((p) => /megapixel/i.test(p.unit) && Number.isFinite(p.cost_usd));
-    if (skus.length) rule = { skus };
-    else if (mp) rule = { skus: [{ unit: 'megapixel', usd: mp.cost_usd }], approximate: true };
+    res = await requestJson(`${BASE}/images/models/${id}/endpoints`);
   } catch {
-    /* keep token-billed note */
+    return { skus: [], note: TOKEN_NOTE };
   }
+  if (!Array.isArray(res?.endpoints)) return { skus: [], note: TOKEN_NOTE };
+  const pricing = res.endpoints[0]?.pricing ?? [];
+  const skus: PriceSku[] = pricing
+    .filter((p) => p.unit === 'image' && /output/.test(p.billable) && Number.isFinite(p.cost_usd))
+    .map((p) => ({ unit: 'output' as const, usd: p.cost_usd, resolution: p.resolution }));
+  const mp = pricing.find((p) => /megapixel/i.test(p.unit) && Number.isFinite(p.cost_usd));
+  let rule: PriceRule = { skus: [], note: TOKEN_NOTE };
+  if (skus.length) rule = { skus };
+  else if (mp) rule = { skus: [{ unit: 'megapixel', usd: mp.cost_usd }], approximate: true };
   await cacheDb.set(cacheKey, rule);
   return rule;
 }
