@@ -79,20 +79,23 @@ export function bytesOfSnapshots(snaps: ReadonlyArray<ByteSnapshot>): number {
   return total;
 }
 
+/** Undo steps always kept, even over the byte limit (the newest ones: the last changes can always be undone). */
+export const MIN_UNDO_STEPS = 3;
+
 /**
- * Drops the oldest undo steps until the steps hold at most `limit` bytes. The newest undo step is never dropped (the
- * last change can always be undone). Returns how many steps were dropped.
+ * Drops the oldest undo steps until the steps hold at most `limit` bytes, never leaving fewer than MIN_UNDO_STEPS undo
+ * steps. Returns how many steps were dropped.
  */
 export function trimByBytes<T extends { buffers: ReadonlyMap<string, unknown> }>(past: T[], future: T[], limit: number): number {
   let n = 0;
-  while (past.length > 1 && bytesOfSnapshots([...past, ...future]) > limit) {
+  while (past.length > MIN_UNDO_STEPS && bytesOfSnapshots([...past, ...future]) > limit) {
     past.shift();
     n++;
   }
   return n;
 }
 
-/** Sets the byte limit of the undo history (0 keeps only the newest undo step). */
+/** Sets the byte limit of the undo history (the MIN_UNDO_STEPS newest undo steps are kept regardless). */
 export function setHistoryByteLimit(bytes: number): void {
   historyByteLimit = Math.max(0, bytes);
 }
