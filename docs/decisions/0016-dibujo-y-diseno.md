@@ -32,3 +32,10 @@ Cada trazo raster se guarda como entrada editable hasta un límite (`paintStroke
 
 - Módulo nuevo `src/engine/design/paintMode.ts` (la lógica) y `src/components/designer/PaintModeToggle.tsx` (el interruptor). `raster.ts` y `Stage.tsx` solo enrutan. El aviso y sus acciones están en `drawingChoice.ts` y `DrawingChoice.tsx`.
 - El píxel de un trazo de Dibujo sale del mismo camino de pintura (`beginEdit`, `paintLive`, `endBrushStroke`, `commitEdit`) que el de un trazo de Diseño aplanado. Los tests comprueban ese camino, no el píxel: el entorno de pruebas no tiene canvas real.
+
+## Enmienda (2026-10-14): modo por defecto según el contenido
+
+- **Sin elección guardada**, el documento abre en **Diseño** si no tiene píxeles pintados en ninguna capa raster (solo formas vectoriales, o capas vacías), y en **Dibujo** si alguna capa raster tiene píxeles pintados o una imagen importada. Trazos editables: Diseño, como antes.
+- **Motivo:** el usuario quiere que los documentos de formas empiecen con las ayudas de diseño (ajuste, espaciado), y que los documentos de pintura empiecen en Dibujo, sin lag. Código: `src/engine/design/paintMode.ts` (`paintModeOf`, `hasPaintedPixels`); tests `tests/paint-mode-default.test.ts`.
+- **No excluyentes:** el interruptor de ajuste se guarda por modo (`snapByMode`) y puede activar en Dibujo lo que Diseño tiene por defecto, o apagarlo en Diseño.
+- **Límite conocido:** el modo por defecto se calcula al leer el documento; el primer píxel pintado en una capa vacía puede cambiar el modo de Diseño a Dibujo durante la sesión. Guardar la elección al crear el documento queda como mejora pendiente.

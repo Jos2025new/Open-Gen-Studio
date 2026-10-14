@@ -12,7 +12,15 @@ export type PaintMode = 'drawing' | 'design';
 /** The mode the document is in: its saved choice, or the default for documents that never had one. */
 export function paintModeOf(doc: Pick<DesignDoc, 'paintMode' | 'layers'>): PaintMode {
   if (doc.paintMode) return doc.paintMode;
-  return doc.layers.some((l) => hasEditableStrokes(l)) ? 'design' : 'drawing';
+  // Editable strokes: Design. Vector shapes only, or no painted raster content: Design (ADR 0016, amendment 2026-10-14).
+  // A raster layer with painted pixels: Drawing.
+  if (doc.layers.some((l) => hasEditableStrokes(l))) return 'design';
+  return doc.layers.some((l) => hasPaintedPixels(l)) ? 'drawing' : 'design';
+}
+
+/** A raster layer that holds painted pixels or an imported image (not counted: an empty layer). */
+export function hasPaintedPixels(layer: Layer | null | undefined): boolean {
+  return !!layer && layer.type === 'raster' && !!(layer.sourceAssetId || layer.paintBaseId || (layer.paintStrokes?.length ?? 0) > 0);
 }
 
 /** A raster layer whose strokes are still kept as editable entries (not flattened into its pixels). */

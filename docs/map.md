@@ -73,7 +73,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 36 | 16 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 35 | 1 |
-| [doc.ts](../src/engine/design/doc.ts) | 33 | 30 |
+| [doc.ts](../src/engine/design/doc.ts) | 33 | 31 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [params.ts](../src/engine/params.ts) | 30 | 17 |
 | [ops.ts](../src/engine/ops.ts) | 27 | 10 |
@@ -103,7 +103,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 31 | 142 |
 | `src/engine/agent` | 19 | 54 |
-| `src/engine/design` | 85 | 82 |
+| `src/engine/design` | 85 | 83 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |

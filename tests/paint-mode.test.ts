@@ -43,10 +43,11 @@ describe('Drawing or Design (ADR 0016)', () => {
     expect(paintModeOf(createDoc('new', 10, 10))).toBe('drawing');
   });
 
-  it('an existing document with no saved choice opens in Design only when it has editable strokes', () => {
-    expect(paintModeOf(docWith([raster()]))).toBe('drawing');
+  it('with no saved choice: editable strokes or no painted pixels open in Design; painted pixels open in Drawing (amendment 2026-10-14)', () => {
+    expect(paintModeOf(docWith([raster()]))).toBe('design');
     expect(paintModeOf(docWith([raster(editable)]))).toBe('design');
-    expect(paintModeOf(docWith([raster({ ...editable, paintFlattened: true })]))).toBe('drawing');
+    expect(paintModeOf(docWith([raster({ ...editable, paintFlattened: true, paintBaseId: 'b' })]))).toBe('drawing');
+    expect(paintModeOf(docWith([raster({ paintBaseId: 'b' } as never)]))).toBe('drawing');
   });
 
   it('a saved choice wins over what the document contains', () => {
@@ -55,7 +56,7 @@ describe('Drawing or Design (ADR 0016)', () => {
   });
 
   it('Drawing paints pixels directly only on layers with no editable strokes', () => {
-    expect(paintsPixelsDirectly(docWith([raster()]), raster())).toBe(true);
+    expect(paintsPixelsDirectly(docWith([raster({ paintBaseId: 'b' } as never)]), raster())).toBe(true);
     expect(paintsPixelsDirectly(docWith([raster(editable)], { paintMode: 'drawing' }), raster(editable))).toBe(false);
     expect(paintsPixelsDirectly(docWith([raster()], { paintMode: 'design' }), raster())).toBe(false);
     expect(hasEditableStrokes(raster(editable))).toBe(true);
