@@ -1,4 +1,5 @@
 import type { PrimSpec } from './design/primitives';
+import type { MarkerKind } from './design/markers';
 
 /** A vector shape. Look fields are optional: shapes saved before them keep their look (design/shapeLook.ts). */
 export interface ShapeSpec {
@@ -38,4 +39,9 @@ export interface ShapeSpec {
   nodeTypes?: string;
   /** Parametric primitive (design/primitives.ts): its parameters; `d` is rebuilt from them. Absent = plain path. */
   prim?: PrimSpec;
+  /** Arrowheads at the first and last point of a line or path (design/markers.ts). Absent = none. */
+  markerStart?: MarkerKind;
+  markerEnd?: MarkerKind;
+  /** Stroke width follows the shape's scale (paths); absent = the stroke keeps its width when scaled. */
+  scaleStroke?: boolean;
 }

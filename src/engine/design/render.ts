@@ -7,6 +7,7 @@ import type { BlendMode, DesignDoc, Layer, TextLayer, VectorLayer, VectorShape }
 import { shapeBox, unionBox, type Box } from './doc';
 import { shapeMatrix } from './shapeTransform';
 import { applyStrokeLook, BLUR_MARGIN, blurRegion, cornerRadii, rectBox, traceRoundRect } from './shapeLook';
+import { drawShapeMarkers } from './markers';
 import { bufferVersion, cloneCanvas, getBuffer, getRasterSurface, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import { bufferAlpha } from './hitAlpha';
 import { cachedBelow, keepBelow } from './belowFxCache';
@@ -105,7 +106,7 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
     if (s.rot) { const m = shapeMatrix(s); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); }
     ctx.setTransform(ctx.getTransform().multiply(new DOMMatrix([t.sx, 0, 0, t.sy, t.tx, t.ty])));
     p = new Path2D(s.d);
-    sw = s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
+    sw = s.scaleStroke ? s.strokeWidth : s.strokeWidth / Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
   } else {
     // A turned or skewed rectangle or ellipse: drawn in its own coordinates (shapeTransform.ts).
     if (s.rot) { const m = shapeMatrix(s); ctx.transform(m[0], m[1], m[2], m[3], m[4], m[5]); }
@@ -123,6 +124,7 @@ function paintShape(ctx: CanvasRenderingContext2D, s: VectorShape): void {
   const fill = () => { if (s.fill && s.type !== 'line') { ctx.fillStyle = s.fill; ctx.globalAlpha *= s.fillOpacity ?? 1; if (p) ctx.fill(p, s.fillRule); else ctx.fill(s.fillRule); ctx.globalAlpha = a0; } };
   const stroke = () => { if (s.stroke && s.strokeWidth > 0) { ctx.strokeStyle = s.stroke; ctx.globalAlpha *= s.strokeOpacity ?? 1; applyStrokeLook(ctx, s, sw); if (p) ctx.stroke(p); else ctx.stroke(); ctx.globalAlpha = a0; } };
   if (s.paintOrder === 'stroke') { stroke(); fill(); } else { fill(); stroke(); }
+  if (s.stroke && s.strokeWidth > 0 && (s.type === 'line' || s.type === 'path')) drawShapeMarkers(ctx, s, sw, s.stroke, s.strokeOpacity ?? 1);
 }
 
 /**

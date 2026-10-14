@@ -1,4 +1,5 @@
 import { pathTransform } from './path';
+import { markerSvg } from './markers';
 import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
@@ -47,10 +48,13 @@ function paint(s: VectorShape, strokeWidth: number, fill = s.fill): string {
 
 /** A shape, wrapped with its own blur filter when it has one (shapeLook.ts: Inkscape's 2.4σ margin). */
 export function shapeSvg(s: VectorShape): string {
-  const body = shapeBody(s);
-  if (!s.blur || s.blur <= 0) return body;
+  // Arrowheads: <marker> definitions beside the shape, attached to its line or path (markers.ts).
+  const mk = s.stroke && s.strokeWidth > 0 ? markerSvg(s, `mk-${xmlEscape(s.id)}`, s.stroke, xmlEscape) : { defs: '', attrs: '' };
+  const body = mk.attrs ? shapeBody(s).replace(/\/>$/, ` ${mk.attrs}/>`) : shapeBody(s);
+  const marked = mk.defs ? `<g><defs>${mk.defs}</defs>${body}</g>` : body;
+  if (!s.blur || s.blur <= 0) return marked;
   const id = `blur-${xmlEscape(s.id)}`;
-  return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${body}</g>`;
+  return `<g filter="url(#${id})"><defs>${blurFilterSvg(id, s)}</defs>${marked}</g>`;
 }
 
 function shapeBody(s: VectorShape): string {
@@ -62,7 +66,7 @@ function shapeBody(s: VectorShape): string {
     const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
     // A turned path (converted shape): its turn and its own placement in one matrix.
     const m = multiply(s.rot ? shapeMatrix(s) : [1, 0, 0, 1, 0, 0], [t.sx, 0, 0, t.sy, t.tx, t.ty]);
-    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})"${s.nodeTypes ? ` sodipodi:nodetypes="${xmlEscape(s.nodeTypes)}"` : ''} ${paint(s, s.strokeWidth / k)}/>`;
+    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})"${s.nodeTypes ? ` sodipodi:nodetypes="${xmlEscape(s.nodeTypes)}"` : ''} ${paint(s, s.scaleStroke ? s.strokeWidth : s.strokeWidth / k)}/>`;
   }
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);
