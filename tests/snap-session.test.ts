@@ -38,7 +38,7 @@ describe('snap session: candidates once, on screen, capped', () => {
     const s = new SnapSession(doc([layerAt('a', 300, 0)]), 'mover', opts, 1, view);
     const box = { x: 296, y: 0, w: 10, h: 40 };
     s.step(box, { x: 0, y: 0 }, { x: 0, y: 0 }, 0);
-    const fast = s.step(box, { x: 0, y: 0 }, { x: 100, y: 0 }, 1); // 100 px in 1 ms
+    const fast = s.step({ ...box, x: 396 }, { x: 100, y: 20 }, { x: 100, y: 0 }, 1); // pointer and box move 100 px in 1 ms
     expect(fast.dx).toBe(0);
     const slow = s.step(box, { x: 0, y: 0 }, { x: 100.01, y: 0 }, 1000); // tiny move, long gap
     // The box centre (301) is the nearest edge to the line at 300: it wins with snap distance 1.
@@ -119,6 +119,48 @@ describe('snap session: equal spacing with measures', () => {
     const verticalGuide = vertical.step(verticalBox, { x: 150, y: 230 }, { x: 150, y: 230 }, 0);
     expect(verticalGuide.gx).toBe(150);
     expect(verticalGuide.alignments).toEqual([{ a: [150, 230], b: [150, 350] }]);
+  });
+
+  it('holds an acquired alignment through subpixel pointer moves, then releases it outside tolerance', () => {
+    const target = layerAt('target', 300, 500, 10, 40);
+    const s = new SnapSession(doc([target]), 'moving', opts, 1, view);
+    s.step({ x: 279, y: 0, w: 10, h: 40 }, { x: 284, y: 20 }, { x: 0, y: 0 }, 0);
+    const acquired = s.step({ x: 280, y: 0, w: 10, h: 40 }, { x: 285, y: 20 }, { x: 2, y: 0 }, 200);
+    expect(acquired.dx).toBe(10);
+    expect(acquired.alignments).toHaveLength(1);
+    for (let i = 1; i <= 4; i++) {
+      const offset = i * 0.25;
+      const held = s.step({ x: 280 + offset, y: 0, w: 10, h: 40 }, { x: 285 + offset, y: 20 }, { x: 2 + offset, y: 0 }, 200 + i * 10);
+      expect(280 + offset + held.dx + 10).toBeCloseTo(300, 9);
+      expect(held.gx).toBe(300);
+      expect(held.alignments).toHaveLength(1);
+    }
+    const outside = s.step({ x: 311, y: 0, w: 10, h: 40 }, { x: 316, y: 20 }, { x: 4, y: 0 }, 250);
+    expect(outside.dx).toBe(0);
+    expect(outside.alignments).toBeUndefined();
+    const fastReturn = s.step({ x: 310, y: 0, w: 10, h: 40 }, { x: 315, y: 20 }, { x: 5, y: 0 }, 260);
+    expect(fastReturn.dx).toBe(0); // a new relation still waits for the 150 ms idle gate
+  });
+
+  it('holds equal-spacing cotas through subpixel moves and clear() drops them until idle', () => {
+    const targets = [layerAt('a', 0, 0, 10, 10), layerAt('b', 30, 0, 10, 10)];
+    const s = new SnapSession(doc(targets), 'moving', { ...opts, equalSpacing: true }, 1, view);
+    const acquired = s.step({ x: 58, y: 0, w: 10, h: 10 }, { x: 63, y: 5 }, { x: 0, y: 0 }, 0);
+    expect(acquired.dx).toBe(2);
+    expect(acquired.measures?.map((m) => m.label)).toEqual([20, 20]);
+    for (let i = 1; i <= 4; i++) {
+      const offset = i * 0.25;
+      const held = s.step({ x: 58 + offset, y: 0, w: 10, h: 10 }, { x: 63 + offset, y: 5 }, { x: offset, y: 0 }, i * 10);
+      expect(58 + offset + held.dx).toBeCloseTo(60, 9);
+      expect(held.measures?.map((m) => m.label)).toEqual([20, 20]);
+    }
+    s.clear(); // Stage calls this when Alt/free movement disables snapping.
+    const free = s.step({ x: 58.75, y: 0, w: 10, h: 10 }, { x: 63.75, y: 5 }, { x: 1.25, y: 0 }, 50);
+    expect(free.dx).toBe(0);
+    expect(free.measures).toBeUndefined();
+    const idle = s.step({ x: 58.75, y: 0, w: 10, h: 10 }, { x: 63.75, y: 5 }, { x: 1.25, y: 0 }, 200);
+    expect(idle.dx).toBeCloseTo(1.25, 9);
+    expect(idle.measures?.map((m) => m.label)).toEqual([20, 20]);
   });
 
 });

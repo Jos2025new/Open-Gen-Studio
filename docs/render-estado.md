@@ -133,6 +133,8 @@ El motor ya alinea cajas mediante bordes y centros: combina cada uno de los tres
 
 La alineación de capas visibles no exige solape entre sus cajas: las líneas X/Y permanecen candidatas dentro de la sesión acotada. Cuando ambos centros producen el ganador, el indicador enlaza los centros exactos aunque haya un hueco; otros ganadores conservan el enlace entre anclas reales más cercanas. La regresión de sesión fallaba antes del cambio con `gy` indefinido para dos cajas separadas; el gesto, extremos, limpieza y undo/redo se comprueban en el E2E focalizado descrito en [el registro](history/026-2026-10-W42.md#centro-a-centro-en-cajas-separadas).
 
+Una vez adquirido, el ajuste de alineación o espaciado permanece durante movimientos subpíxel mientras la relación siga dentro de tolerancia; adquirir otra relación conserva el umbral y retardo de 150 ms. Alt y el fin/cancelación del gesto limpian la vista. Lo verifican unitarios de sesión y un E2E focalizado con secuencias suaves, cancelación y Alt; detalle y límites en [el registro de estabilidad](history/026-2026-10-W42.md#retención-del-ajuste-durante-movimientos-suaves).
+
 ## Modo fijado al crear (2026-10-14)
 
 Resuelto el límite conocido del ADR 0016: el modo (Dibujo/Diseño) se guarda en el documento la primera vez que se crea o lee (`pinPaintMode`), y después solo lo cambia el interruptor.

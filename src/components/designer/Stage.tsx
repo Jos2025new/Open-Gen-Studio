@@ -990,6 +990,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         const s = snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).step(box, p, { x: e.clientX, y: e.clientY }, e.timeStamp);
         ox += s.dx; oy += s.dy;
         showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
+      } else {
+        snapSessionOf(d, doc, new Set([d.layerId]), d.layerId, snap, view, size).clear();
+        showGuides({});
       }
       rasterMoveAt.current = { d, x: ox, y: oy };
       rasterMoveFrame.current ??= requestAnimationFrame(applyRasterMove);
@@ -1006,7 +1009,10 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         dx += s.dx;
         dy += s.dy;
         showGuides({ x: s.viewGuides?.x, y: s.viewGuides?.y, m: s.measures, a: s.alignments });
-      } else showGuides({});
+      } else {
+        snapSessionOf(d, doc, new Set(group.map((l) => l.id)), d.layerId, snap, view, size).clear();
+        showGuides({});
+      }
       startDragPreview(doc);
       const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));

@@ -139,8 +139,15 @@ test('snapping: object alignment guide appears during drag, clears on release, a
   await page.mouse.move(to.x, to.y, { steps: 6 });
   await page.waitForTimeout(220); // the 150 ms snap settles while the gesture remains open
   await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
-  const during = await boxOf(page, s.ids.M);
+  let during = await boxOf(page, s.ids.M);
   expect(Math.abs(during.y + during.h / 2 - (cy + 50))).toBeLessThan(0.5);
+  for (let i = 1; i <= 4; i++) {
+    await page.mouse.move(to.x, to.y + i * 0.5);
+    await page.waitForTimeout(15);
+    await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
+    during = await boxOf(page, s.ids.M);
+    expect(Math.abs(during.y + during.h / 2 - (cy + 50))).toBeLessThan(0.5);
+  }
   const guide = page.locator('.snap-indicator [data-snap-alignment="true"]');
   const expectedA = fittedStagePoint(c, doc.w, doc.h, { x: cx + 100, y: cy + 50 });
   const expectedB = fittedStagePoint(c, doc.w, doc.h, { x: cx + 300, y: cy + 50 });
@@ -226,14 +233,49 @@ test('snapping: equal-distance guides compare neighboring gaps across rows durin
   const cotas = page.locator('.snap-indicator text');
   await expect(cotas).toHaveCount(3); // reference gaps in two other rows plus the moving object's gap
   expect((await cotas.allTextContents()).every((label) => label === '20.0')).toBe(true);
-  const moved = await boxOf(page, s.ids.M);
+  let moved = await boxOf(page, s.ids.M);
   expect(moved.x).toBeCloseTo(cx - 240, 1);
+  for (let i = 1; i <= 4; i++) {
+    await page.mouse.move(to.x - i * 0.5, to.y);
+    await page.waitForTimeout(15);
+    await expect(cotas).toHaveCount(3);
+    expect((await cotas.allTextContents()).every((label) => label === '20.0')).toBe(true);
+    moved = await boxOf(page, s.ids.M);
+    expect(moved.x).toBeCloseTo(cx - 240, 1);
+  }
   await page.mouse.up();
   await expect(page.locator('.snap-indicator text')).toHaveCount(0);
   await page.keyboard.press('Control+z');
   expect(await boxOf(page, s.ids.M)).toEqual(before);
   await page.keyboard.press('Control+Shift+z');
   expect((await boxOf(page, s.ids.M)).x).toBeCloseTo(cx - 240, 1);
+  expect(errors).toEqual([]);
+});
+
+test('snapping: holding Alt clears an acquired alignment and allows free movement', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [
+    { id: 'M', x: cx + 50, y: cy + 60, w: 100, h: 100 },
+    { id: 'N', x: cx + 250, y: cy, w: 100, h: 100 },
+  ], 'drawing');
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true } } }); });
+  const before = await boxOf(page, s.ids.M);
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: before.x + before.w / 2, y: before.y + before.h / 2 - 54 });
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 6 }); await page.waitForTimeout(220);
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(1);
+  await page.keyboard.down('Alt');
+  await page.mouse.move(to.x, to.y + 10);
+  await expect(page.locator('.snap-indicator [data-snap-alignment="true"]')).toHaveCount(0);
+  const free = await boxOf(page, s.ids.M);
+  expect(Math.abs(free.y + free.h / 2 - (cy + 50))).toBeGreaterThan(1);
+  await page.keyboard.up('Alt');
+  await page.mouse.up();
   expect(errors).toEqual([]);
 });
 

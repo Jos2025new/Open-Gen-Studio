@@ -11,6 +11,7 @@ import { layerBox } from './render';
 export const MAX_LINES = 200;
 type Line = { v: number; lo: number; hi: number; source: 'page' | 'guide' | 'layer'; box?: Box };
 type Box = { x: number; y: number; w: number; h: number };
+type ActiveSnap = { kind: 'line'; line: Line } | { kind: 'spacing'; measures: Measure[] };
 export interface AlignmentGuide { a: [number, number]; b: [number, number] }
 export interface SessionStep { dx: number; dy: number; gx?: number; gy?: number; measures?: Measure[]; alignments?: AlignmentGuide[]; viewGuides?: { x?: number; y?: number } }
 
@@ -20,6 +21,8 @@ export class SnapSession {
   private last: { x: number; y: number; t: number } | null = null;
   private lastMove = 0;
   private boxes: Box[] = [];
+  private activeX: ActiveSnap | null = null;
+  private activeY: ActiveSnap | null = null;
 
   constructor(doc: Pick<DesignDoc, 'width' | 'height' | 'layers' | 'guides'>, movingId: string, private opts: SnapOptions, private zoom: number, view: { x0: number; y0: number; x1: number; y1: number }) {
     const always = { lo: -Infinity, hi: Infinity };
@@ -60,7 +63,7 @@ export class SnapSession {
 
   /**
    * One move: the box at `box`, the pointer at page point `p` and screen point `screen` at time `t` (ms). Returns no
-   * nudge while the pointer is fast (snapNow), otherwise the snap of the box to the lines in its bands.
+   * new snap while the pointer is fast; an acquired relation stays active while it remains within tolerance.
    */
   step(box: Box, p: { x: number; y: number }, screen: { x: number; y: number }, t: number): SessionStep {
     let speed = 0;
@@ -70,11 +73,49 @@ export class SnapSession {
       if (dist > 0) this.lastMove = t;
     } else this.lastMove = t;
     this.last = { x: screen.x, y: screen.y, t };
-    if (!snapNow(speed, t - this.lastMove)) return { dx: 0, dy: 0 };
-    const xLines = this.xs, yLines = this.ys;
-    const xs = xLines.map((l) => l.v), ys = yLines.map((l) => l.v);
+    const ready = snapNow(speed, t - this.lastMove);
     const tol = snapTolerance(this.zoom);
-    const r: SessionStep = snapBox(box, { xs, ys }, tol, p);
+    const r: SessionStep = { dx: 0, dy: 0 };
+    let xLines: Line[] = [], yLines: Line[] = [];
+    let nextX: ActiveSnap | null = null, nextY: ActiveSnap | null = null;
+    let spacingX: Measure[] | null = null, spacingY: Measure[] | null = null;
+    const sameMeasures = (a: Measure[], b: Measure[]) => a.length === b.length && a.every((m, i) => {
+      const n = b[i];
+      return Math.abs(m.label - n.label) < 1e-6 && Math.abs(m.a[0] - n.a[0]) < 1e-6 && Math.abs(m.a[1] - n.a[1]) < 1e-6 && Math.abs(m.b[0] - n.b[0]) < 1e-6 && Math.abs(m.b[1] - n.b[1]) < 1e-6;
+    });
+    const runAxis = (axis: 'x' | 'y', lines: Line[]) => snapBox(box, axis === 'x' ? { xs: lines.map((l) => l.v), ys: [] } : { xs: [], ys: lines.map((l) => l.v) }, tol, p);
+    for (const axis of ['x', 'y'] as const) {
+      const active = axis === 'x' ? this.activeX : this.activeY;
+      const allLines = axis === 'x' ? this.xs : this.ys;
+      const applyLine = (lines: Line[]) => {
+        const candidate = runAxis(axis, lines);
+        const at = axis === 'x' ? candidate.gx : candidate.gy;
+        if (at == null) return false;
+        if (axis === 'x') { r.dx = candidate.dx; r.gx = at; xLines = lines; }
+        else { r.dy = candidate.dy; r.gy = at; yLines = lines; }
+        const line = lines.find((l) => l.v === at && l.source === 'layer') ?? lines.find((l) => l.v === at);
+        if (line) { if (axis === 'x') nextX = { kind: 'line', line }; else nextY = { kind: 'line', line }; }
+        return true;
+      };
+      if (active?.kind === 'line' && applyLine([active.line])) continue;
+      if (active?.kind === 'spacing') {
+        const sp = this.opts.equalSpacing !== false ? equalSpacing(box, this.boxes, tol, axis) : null;
+        if (sp && sameMeasures(sp.measures, active.measures)) {
+          if (axis === 'x') { r.dx = sp.d; spacingX = sp.measures; nextX = { kind: 'spacing', measures: sp.measures }; }
+          else { r.dy = sp.d; spacingY = sp.measures; nextY = { kind: 'spacing', measures: sp.measures }; }
+          continue;
+        }
+      }
+      if (!ready) continue;
+      if (applyLine(allLines)) continue;
+      const sp = this.opts.equalSpacing !== false ? equalSpacing(box, this.boxes, tol, axis) : null;
+      if (sp) {
+        if (axis === 'x') { r.dx = sp.d; spacingX = sp.measures; nextX = { kind: 'spacing', measures: sp.measures }; }
+        else { r.dy = sp.d; spacingY = sp.measures; nextY = { kind: 'spacing', measures: sp.measures }; }
+      }
+    }
+    this.activeX = nextX;
+    this.activeY = nextY;
     const layerWinner = (lines: Line[], at: number) => lines.find((l) => l.v === at && l.source === 'layer' && l.box);
     const makeGuide = (axis: 'x' | 'y', at: number, target: Line): AlignmentGuide | null => {
       const sourceBox = { ...box, x: box.x + r.dx, y: box.y + r.dy };
@@ -127,18 +168,13 @@ export class SnapSession {
     if (alignments.length) r.alignments = alignments;
     if (viewGuides.x != null || viewGuides.y != null) r.viewGuides = viewGuides;
     // Equal spacing applies on an axis where no line snapped the box (a line snap keeps its edge on the line).
-    const measures: Measure[] = [];
-    for (const axis of ['x', 'y'] as const) {
-      const cur = axis === 'x' ? r.dx : r.dy;
-      const sp = this.opts.equalSpacing !== false && cur === 0 ? equalSpacing(box, this.boxes, tol, axis) : null;
-      if (sp) {
-        if (axis === 'x') r.dx = sp.d; else r.dy = sp.d;
-        measures.push(...sp.measures);
-      }
-    }
+    const measures = [...(spacingX ?? []), ...(spacingY ?? [])];
     if (measures.length) r.measures = measures;
     return r;
   }
+
+  /** Alt/free movement drops held candidates; the next snap must satisfy the normal speed/idle gate. */
+  clear(): void { this.activeX = null; this.activeY = null; }
 }
 
 const sessions = new WeakMap<object, SnapSession>();
