@@ -90,6 +90,32 @@ test.fixme('snapping: near an edge it snaps within 10 screen px; a fast drag doe
   expect(errors).toEqual([]);
 });
 
+// The delayed snap: a fast drag to 6 doc px of a neighbour's edge, then the pointer stops for 300 ms with no other
+// pointermove. The watchdog (snapIdle.ts) snaps by itself at 150 ms; the release then keeps that position.
+test('snapping: fast drag, then stop 300 ms without moving: the layer snaps with no further pointermove', async ({ page }) => {
+  const errors = await setup(page);
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const zoom = await zoomOf(page);
+  const { doc } = await scene(page, [], 'drawing');
+  const cx = doc.w / 2, cy = doc.h / 2;
+  const s = await scene(page, [{ id: 'M', x: cx - 50, y: cy - 50, w: 100, h: 100 }, { id: 'N', x: cx + 200, y: cy - 50, w: 100, h: 100 }], 'drawing');
+  await page.evaluate(async () => { const st = await import('/src/store/store.ts' as string); st.setUi({ snapByMode: { drawing: { on: true, page: true, layers: true }, design: { on: true, page: true, layers: true } } }); });
+  const from = screenOf(c, doc.w, doc.h, zoom, { x: cx, y: cy });
+  const to = screenOf(c, doc.w, doc.h, zoom, { x: cx + 144, y: cy });
+  await page.mouse.move(from.x, from.y); await page.mouse.down();
+  await page.mouse.move(from.x + 4, from.y); // the drag's first sample (a move has no speed before it)
+  await page.mouse.move(to.x, to.y, { steps: 1 }); // then one fast jump
+  const during = await boxOf(page, s.ids.M);
+  expect(Math.abs(during.x + during.w - (cx + 200))).toBeGreaterThan(1); // fast: not snapped yet
+  await page.waitForTimeout(300); // no pointermove
+  const idle = await boxOf(page, s.ids.M);
+  expect(Math.abs(idle.x + idle.w - (cx + 200))).toBeLessThan(0.5); // snapped by the timer alone
+  await page.mouse.up();
+  const after = await boxOf(page, s.ids.M);
+  expect(Math.abs(after.x + after.w - (cx + 200))).toBeLessThan(0.5); // release keeps the snapped position
+  expect(errors).toEqual([]);
+});
+
 // Equal spacing: the switch is set explicitly, so the case does not depend on a value saved in the sandbox.
 test.fixme('snapping: three boxes, a moving one dropped in a gap: equal spacing shows and equalises', async ({ page }) => {
   const errors = await setup(page);

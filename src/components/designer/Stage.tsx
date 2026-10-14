@@ -9,6 +9,7 @@ import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPrev
 import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
 import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
+import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import type { Measure } from '../../engine/design/snap';
 import { SnapIndicator } from './SnapIndicator';
 import { layerSelection, pickLayer, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
@@ -947,6 +948,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
       if (over !== guideHover) setGuideHover(over);
     }
     if (!d) return;
+    snapIdleFeed(d, e, onPointerMove);
     if (d.kind === 'pixelMove') { d.move.update(p);
     } else if (d.kind === 'pan') {
       setView((v) => ({ ...v, x: d.vx + (e.clientX - d.sx), y: d.vy + (e.clientY - d.sy) }));
@@ -1094,6 +1096,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const onPointerUp = (e?: React.PointerEvent) => {
     const d = drag.current;
     drag.current = null;
+    snapIdleStop();
     endDragPreview();
     if (!d) return;
     if (d.kind === 'pixelMove') { if (e) d.move.update(toDoc(e.clientX, e.clientY)); return; }

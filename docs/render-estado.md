@@ -147,7 +147,7 @@ Pendiente, fuera de este encargo: retardo por temporizador real (hoy el ajuste l
 | Punto | Estado | Commit |
 | --- | --- | --- |
 | Espaciado igual en la app | Fórmulas y sesión probadas (unit). El e2e de tres cajas **pasa** cuando la preferencia de Dibujo está activada en la escena. Hipótesis del documento obsoleto **descartada**: la causa del fallo fue el interruptor guardado en la sandbox. El e2e de tres cajas queda como `test` y el de «borde + arrastre rápido» como `fixme` (el primer arrastre no mueve la capa en la sandbox; igual en HEAD anterior). | `8685a69`, `96d7b39` |
-| Temporizador real | Clase `SnapWatchdog` con reloj inyectado, probada con reloj simulado. **Cableado en Stage pendiente**: falta arrancarlo tras un paso gateado y solicitar el fotograma. | `64445d8` |
+| Temporizador real | Clase `SnapWatchdog` con reloj inyectado, probada con reloj simulado. **Cableado en Stage hecho** (`SnapIdleBridge`, `snapIdle.ts`): un movimiento rápido arma el temporizador de 150 ms; al parar, se repite el último movimiento con su posición y el ajuste se aplica por el camino de fotograma habitual. Un movimiento lento o el pointerup lo cancelan. | `64445d8`, puente en el commit `feat(snap): connect the delay timer to the drag` |
 | Preferencia por modo | `snapByMode.drawing` / `snapByMode.design`; el interruptor cambia solo el modo en uso; el formato antiguo `snap` se descarta. Probado. | `96d7b39` |
 
 Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo** (`paintModeOf`, ADR 0016), así que el ajuste viene apagado hasta que el usuario lo enciende. Es la regla actual; no se ha cambiado.
@@ -155,7 +155,7 @@ Nota de producto: un documento de solo formas vectoriales cuenta como **Dibujo**
 ### Lote 2026-10-14: modo por defecto, temporizador y primer arrastre
 
 - **Modo por defecto según el contenido** (enmienda al ADR 0016): documentos de formas o sin píxeles pintados, en Diseño; con píxeles pintados, en Dibujo. Commit `9fbe94f`. El interruptor por modo puede activar lo del otro modo.
-- **Temporizador del ajuste:** la clase `SnapWatchdog` (commit `64445d8`) está probada con reloj simulado. **Cableado en Stage pendiente**: Stage no lo usa todavía; no hay e2e de «detenerse 300 ms y se ajusta».
+- **Temporizador del ajuste:** cableado (2026-10-14). Unit `tests/snap-idle-bridge.test.ts` (reloj simulado) y e2e `snapping.spec.ts`: movimiento rápido a 6 px del borde, 300 ms sin mover, el objeto queda ajustado sin otro pointermove (sin el puente el e2e falla: 4,87 px). El pointerup conserva esa posición; un solo paso de deshacer (no se registra otro). Stage no crece: `snapSessionOf` lo recortó antes.
 - **Primer arrastre:** reproducido en el e2e en los dos modos (Object y Layer), por separado, sobre una capa sin seleccionar. **Pasa en los dos.** El fallo anterior ocurría en la escena del caso de borde (la capa móvil centrada en la página, con otras capas cerca), no en el arrastre aislado; queda sin reproducir en aislamiento. El caso de borde sigue como `fixme`.
 
 ## Modo fijado al crear (2026-10-14)
