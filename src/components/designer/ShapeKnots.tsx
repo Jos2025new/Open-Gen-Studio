@@ -43,7 +43,8 @@ export function ShapeKnots({ view, sessionId, doc }: { view: View; sessionId: st
   if (edit?.paths && edit.paths.length > 1) {
     const layers = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
     const pickedLayers = layerPicks ?? [];
-    const targets = multiPathTargets(doc, mode, objectPick, mode === 'layers' ? (pickedLayers.length ? pickedLayers : layers) : []);
+    const layerGroup = mode === 'layers' || (!objectPick && pickedLayers.filter((id) => doc.layers.some((l) => l.id === id)).length > 1);
+    const targets = multiPathTargets(doc, layerGroup ? 'layers' : 'objects', objectPick, layerGroup ? (pickedLayers.length ? pickedLayers : layers) : []);
     const same = targets.length === edit.paths.length && targets.every((t, i) => t.layerId === edit.paths![i].layerId && t.shapeId === edit.paths![i].shapeId);
     return same ? <MultiPathNodes view={view} sessionId={sessionId} docId={doc.id} targets={targets} /> : null;
   }

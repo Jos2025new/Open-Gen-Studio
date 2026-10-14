@@ -12,7 +12,7 @@ import { snapIdleFeed, snapIdleStop } from './snapIdle';
 import type { Measure } from '../../engine/design/snap';
 import type { AlignmentGuide } from '../../engine/design/snapSession';
 import { SnapIndicator } from './SnapIndicator';
-import { layerSelection, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
+import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
 import { StageEditHint, StageHint } from './StageEditHint';
 import { beginLiveStroke } from '../../engine/design/raster';
@@ -681,20 +681,23 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
         return;
       }
 
-      // Objects mode: plain click replaces; Shift/Ctrl/Cmd toggles objects in the picked layer.
+      // Objects mode: modifiers pick parts in the active layer, or whole layers across a layer boundary.
       if (!editLayers) {
         const additive = e.ctrlKey || e.metaKey || e.shiftKey;
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
         // The top layer wins. A modifier picks parts of one layer, or whole layers for a group.
         const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => Boolean(objectAt(l, p.x, p.y))); 
         let layer: Layer | null = null;
-        if (additive) layer = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id)).length === 1 && owner(act) && objectAt(act!, p.x, p.y) ? act! : null;
-        else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
+        const currentObject = objectPick(doc.id);
+        const pickedLayerIds = pickedLayers(doc.id, current.layers.map((l) => l.id));
+        if (additive) {
+          if (pickedLayerIds.length < 2 && owner(act) && objectAt(act!, p.x, p.y) && (!currentObject || currentObject.layerId === act!.id)) layer = act!;
+        } else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
         else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
           if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
-          const cur = objectPick(doc.id);
+          const cur = currentObject;
           if (additive) {
             // A modifier toggles an object; dragging an existing pick still moves the whole group.
             const had = cur?.layerId === layer.id && cur.ids.includes(id);
@@ -717,17 +720,30 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
           return;
         }
         if (additive) {
-          // Do not silently turn an Object selection into layer picks. Use Layer mode for that set.
           const hit = hitTestPixel(current, p.x, p.y);
-          if (hit && hit.id !== objectPick(doc.id)?.layerId && hit.id !== current.activeLayerId) toast('Object mode selects shapes in one layer. Switch Edit to Layer to select multiple layers.', 'info');
+          if (hit && hit.visible && !hit.locked) {
+            const cur = objectPick(doc.id);
+            const ids = cur ? [cur.layerId] : layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
+            if (cur) setObjectPick(doc.id, null);
+            const had = ids.length > 1 && ids.includes(hit.id);
+            if (!had) pickLayer(doc.id, hit.id, true, ids);
+            setActiveLayer(sessionId, doc.id, had ? ids.find((id) => id !== hit.id) ?? current.activeLayerId : hit.id);
+            const next = getDoc(sessionId, doc.id) ?? current;
+            drag.current = { kind: 'move', layerId: hit.id, startX: p.x, startY: p.y, base: hit, others: otherPickedLayers(next, hit.id), ctrlToggle: had ? hit.id : undefined, pre: current };
+          }
           return;
         }
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
         const whole = hitTestPixel(current, p.x, p.y);
+        if (whole && !(useStore.getState().ui.autoSelect ?? false) && whole.id !== current.activeLayerId) return;
         setObjectPick(doc.id, null);
-        // Plain click outside the picked layers (or on empty canvas): start over with just what was clicked.
+        // Plain click on empty canvas clears both stores; a hit replaces a different layer group.
+        if (!whole) {
+          setLayerPicks(doc.id, []);
+          return;
+        }
         const pickedNow = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-        if (!whole || !pickedNow.includes(whole.id)) pickLayer(doc.id, whole?.id ?? '', false, pickedNow);
+        if (!pickedNow.includes(whole.id)) pickLayer(doc.id, whole.id, false, pickedNow);
         if (whole && !layerObjects(whole).length && whole.type !== 'vector') {
           const again = current.activeLayerId === whole.id;
           setActiveLayer(sessionId, doc.id, whole.id);

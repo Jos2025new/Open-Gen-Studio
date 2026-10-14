@@ -152,22 +152,82 @@ const details = (page: Page) => page.evaluate(async () => {
   const S = await import('/src/store/store.ts' as string), A = await import('/src/engine/design/actions.ts' as string);
   const H = await import('/src/engine/design/history.ts' as string), P = await import('/src/engine/design/objectSelection.ts' as string), L = await import('/src/engine/design/selection.ts' as string);
   const d = A.activeDoc(S.useStore.getState().activeSessionId);
-  return { layers: d.layers, objects: P.objectPick(d.id)?.ids ?? [], picked: L.layerSelection(d.id, d.activeLayerId, d.layers.map((l: any) => l.id)), undo: H.historyDepth(d.id).undo };
+  return {
+    layers: d.layers,
+    objects: P.objectPick(d.id)?.ids ?? [],
+    objectLayer: P.objectPick(d.id)?.layerId ?? null,
+    picked: L.layerSelection(d.id, d.activeLayerId, d.layers.map((l: any) => l.id)),
+    explicitLayers: L.useLayerSelection.getState().byDoc[d.id] ?? [],
+    mode: S.useStore.getState().ui.selectMode ?? 'objects',
+    autoSelect: S.useStore.getState().ui.autoSelect ?? false,
+    undo: H.historyDepth(d.id).undo,
+  };
 });
 async function move(page: Page, p: { x: number; y: number }, dx = 70, dy = 35) {
   await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(p.x + dx, p.y + dy, { steps: 8 }); await page.mouse.up();
+}
+async function pagePoint(page: Page, x: number, y: number) {
+  const c = (await page.locator('canvas.stage-canvas').boundingBox())!;
+  const z = Math.min((c.width - 48) / 1920, (c.height - 144) / 1080, 4);
+  return { x: c.x + (c.width - 1920 * z) / 2 + x * z, y: c.y + Math.max(12, (c.height - 120 - 1080 * z) / 2) + y * z };
 }
 const shots = '/tmp/ogs-multiselect-review';
 
 test('Ctrl-click toggles across layers; Ctrl-click lineart within one layer keeps both objects', async ({ page }) => {
   let at = await fixture(page, 'shapes');
+  await page.evaluate(async () => { const S = await import('/src/store/store.ts' as string); S.setUi({ autoSelect: true }); });
   const a = at(550, 400), b = at(1150, 400);
   await page.mouse.click(a.x, a.y); await page.keyboard.down('Control'); await page.mouse.click(b.x, b.y); await page.keyboard.up('Control');
   expect((await details(page)).picked).toHaveLength(2);
   expect((await details(page)).objects).toHaveLength(0);
+  expect((await details(page)).explicitLayers).toHaveLength(2);
+  expect((await details(page)).mode).toBe('objects');
+  await expect(page.getByRole('toolbar', { name: 'Edit settings' }).getByRole('button', { name: 'Align' })).toBeEnabled();
+  await page.getByRole('toolbar', { name: 'Edit settings' }).getByRole('button', { name: 'Align' }).click();
+  await expect(page.getByText('On 2 layers')).toBeVisible();
+  await page.keyboard.press('Escape');
+  const rounding = page.locator('[data-rounding-selection]');
+  await expect(rounding).toBeVisible();
+  await expect(rounding.getByRole('button', { name: 'Convert 2 selected rectangles to paths for node editing' })).toBeVisible();
+  await rounding.getByRole('spinbutton', { name: 'Rx value' }).fill('24');
+  expect((await details(page)).layers.map((l: any) => l.shapes[0].rx)).toEqual([24, 24]);
+  await page.keyboard.press('Control+z'); expect((await details(page)).layers.map((l: any) => l.shapes[0].rx)).toEqual([0, 0]);
+  await page.keyboard.press('Control+Shift+z'); expect((await details(page)).layers.map((l: any) => l.shapes[0].rx)).toEqual([24, 24]);
   await page.screenshot({ path: `${shots}/ctrl-layers.png` });
   await page.keyboard.down('Control'); await page.mouse.click(b.x, b.y); await page.keyboard.up('Control');
   expect((await details(page)).picked).toHaveLength(1);
+  let empty = await pagePoint(page, 100, 900);
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('canvas.stage-canvas') != null, empty)).toBe(true);
+  await page.mouse.click(empty.x, empty.y, { modifiers: [] });
+  expect((await details(page)).explicitLayers).toEqual([]);
+  expect((await details(page)).objects).toEqual([]);
+  await page.mouse.click(a.x, a.y);
+  expect((await details(page)).objectLayer).toBe((await details(page)).layers[0].id);
+  await page.keyboard.down('Shift'); await page.mouse.click(b.x, b.y); await page.keyboard.up('Shift');
+  expect((await details(page)).explicitLayers).toHaveLength(2);
+  empty = await pagePoint(page, 100, 900);
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('canvas.stage-canvas') != null, empty)).toBe(true);
+  await page.mouse.click(empty.x, empty.y, { modifiers: [] });
+  expect((await details(page)).explicitLayers).toEqual([]);
+  expect((await details(page)).objects).toEqual([]);
+  await page.mouse.click(a.x, a.y);
+  await page.mouse.click(b.x, b.y);
+  expect((await details(page)).objectLayer).toBe((await details(page)).layers[1].id);
+  await page.evaluate(async () => { const S = await import('/src/store/store.ts' as string); S.setUi({ autoSelect: false }); });
+  await page.mouse.click(a.x, a.y);
+  expect((await details(page)).objectLayer).toBe((await details(page)).layers[1].id);
+  await page.keyboard.down('Shift'); await page.mouse.click(a.x, a.y); await page.keyboard.up('Shift');
+  expect((await details(page)).explicitLayers).toHaveLength(2);
+  expect((await details(page)).objects).toEqual([]);
+  const beforeGroupDrag = await details(page);
+  await move(page, await pagePoint(page, 550, 400), 28, 16);
+  const afterGroupDrag = await details(page);
+  const dx = afterGroupDrag.layers[0].shapes[0].x - beforeGroupDrag.layers[0].shapes[0].x;
+  expect(dx).toBeGreaterThan(0);
+  expect(afterGroupDrag.layers[1].shapes[0].x - beforeGroupDrag.layers[1].shapes[0].x).toBeCloseTo(dx, 5);
+  expect(afterGroupDrag.undo).toBe(beforeGroupDrag.undo + 1);
+  await page.keyboard.press('Control+z'); expect((await details(page)).layers).toEqual(beforeGroupDrag.layers);
+  await page.keyboard.press('Control+Shift+z'); expect((await details(page)).layers).toEqual(afterGroupDrag.layers);
   at = await fixture(page, 'lineart');
   const p = at(480, 300), q = at(480, 550);
   await page.mouse.click(p.x, p.y); await page.keyboard.down('Control'); await page.mouse.click(q.x, q.y); await page.keyboard.up('Control');

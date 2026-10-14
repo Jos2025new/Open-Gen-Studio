@@ -110,14 +110,16 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   const objPickNow = useObjectSelection((st) => st.byDoc[doc.id]);
   const mode = useStore((st) => st.ui.selectMode ?? 'objects');
   const layerIds = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+  // A cross-layer group picked on the canvas in Objects mode remains the effective target set.
+  const layerGroup = mode === 'layers' || (!objPickNow && layerIds.length > 1);
   const active = doc.layers.find((l) => l.id === doc.activeLayerId);
   // Objects mode: the objects picked inside the active layer. A layer with no parts (an image, a text) is its own
   // object, so it acts on that layer; a layer with parts and none picked acts on nothing (it says so).
   const objLayer = objPickNow && doc.layers.find((l) => l.id === objPickNow.layerId);
   const objIds = objLayer ? objPickNow!.ids.filter((id) => layerObjects(objLayer).some((o) => o.id === id)) : [];
   const onObjects = mode === 'objects' && Boolean(objLayer && objIds.length);
-  const noParts = mode === 'objects' && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
-  const ids = mode === 'layers' ? layerIds : noParts ? [active!.id] : [];
+  const noParts = !layerGroup && !onObjects && active && !layerObjects(active).length && active.type !== 'vector';
+  const ids = layerGroup ? layerIds : noParts ? [active!.id] : [];
   const layers = ids.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
   // Nothing to act on: the buttons stay (disabled, with the reason) so the bar never changes width or shifts.
   const emptyPick = !onObjects && !layers.length;
@@ -129,7 +131,7 @@ export function EditOps({ sessionId, doc, alignOnly = false, turnOnly = false }:
   const noun = onObjects ? (objIds.length === 1 ? 'object' : 'objects') : layers.length === 1 ? 'layer' : 'layers';
   // What the menus act on, said at the top of each menu (not on the buttons).
   const target = `On ${count} ${noun}${onObjects ? ` of ${objLayer!.name}` : ''}`;
-  const why = !emptyPick ? undefined : mode === 'objects' ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
+  const why = !emptyPick ? undefined : !layerGroup ? 'Pick objects on the canvas first (click; Ctrl-click for more), or switch Edit to Layer' : 'Select a layer first';
   const doAlign = (to: AlignTo) => (onObjects ? alignPickedObjects(sessionId, doc.id, objLayer!.id, objIds, to, relativeTo) : alignLayers(sessionId, doc.id, ids, to, relativeTo));
   const doDistribute = (axis: 'h' | 'v') => (onObjects ? distributePickedObjects(sessionId, doc.id, objLayer!.id, objIds, axis) : distributeLayers(sessionId, doc.id, ids, axis));
   const doTurn = (t: Turn) => (onObjects ? turnPickedObjects(sessionId, doc.id, objLayer!.id, objIds, t) : turnLayers(sessionId, doc.id, ids, t));

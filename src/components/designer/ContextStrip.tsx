@@ -47,8 +47,10 @@ export function ContextStrip({ sessionId, doc }: { sessionId: string; doc: Desig
   const picked = usePickedShape(doc), edit = useShapeEdit((st) => st.byDoc[doc.id]);
   const objectSelection = useObjectSelection((st) => st.byDoc[doc.id] ?? null);
   const layerPicks = useLayerSelection((st) => st.byDoc[doc.id]);
-  const roundTargets = multiLayerRectangles(doc, mode, objectSelection, layerPicks ?? []);
-  const nodeTargets = multiPathTargets(doc, mode, objectSelection, mode === 'layers' ? layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id)) : []);
+  const layerGroup = mode === 'layers' || (!objectSelection && (layerPicks?.filter((id) => doc.layers.some((l) => l.id === id)).length ?? 0) > 1);
+  const targetMode = layerGroup ? 'layers' : 'objects';
+  const roundTargets = multiLayerRectangles(doc, targetMode, objectSelection, layerPicks ?? []);
+  const nodeTargets = multiPathTargets(doc, targetMode, objectSelection, layerGroup ? layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id)) : []);
   const multiNodeEdit = (edit?.paths?.length ?? 0) > 1
     && nodeTargets.length === edit!.paths!.length
     && nodeTargets.every((target, index) => target.layerId === edit!.paths![index].layerId && target.shapeId === edit!.paths![index].shapeId);

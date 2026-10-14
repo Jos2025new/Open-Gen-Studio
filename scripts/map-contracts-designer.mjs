@@ -1,13 +1,13 @@
 export default [{
   id: 'designer-selection',
-  what: 'Edit separa objetos/capas; marquee, radios y nodos usan selección explícita.',
+  what: 'Autoselect permite sumar capas en Object; marquee, radios y nodos consumen selección explícita.',
   sides: [
     ['src/engine/design/marquee.ts', 'export function marqueeIds'],
     ['src/engine/design/objectSelection.ts', 'export function pickObject'],
     ['src/engine/design/selection.ts', 'export function setLayerPicks'],
     ['src/components/designer/StageEditMarquee.ts', "kind: 'editMarquee'"],
     ['src/components/designer/Stage.tsx', 'drawEditMarquee(ctx, editMarquee, view)'],
-    ['src/components/designer/Stage.tsx', 'Object mode selects shapes in one layer. Switch Edit to Layer'],
+    ['src/components/designer/Stage.tsx', 'pickLayer(doc.id, hit.id, true, ids)'],
     ['src/styles/designer.css', '.stage-hint.has-close'],
     ['src/engine/design/multiRectEdit.ts', 'export function multiLayerRectangles'],
     ['src/engine/design/multiRectEdit.ts', 'export function convertMultiRectanglesToPaths'],
