@@ -308,3 +308,5 @@
 .path-nodes .node-marquee-hit { fill: transparent; pointer-events: all; }
 .path-nodes .node-marquee { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .path-outline { fill: none; stroke: transparent; stroke-width: 12; pointer-events: none; }
+/* The segment band takes the press (it inherits pointer-events: none from .stroke-ruler); only its stroke is hit. */
+.path-nodes .segment-hit { pointer-events: stroke; }
