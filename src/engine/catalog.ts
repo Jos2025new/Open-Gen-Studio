@@ -366,6 +366,25 @@ export function opModelFromRef(ref: string | undefined, kind: 'image' | 'video')
   return routeTwins(ref).find((m) => takesImage(m.ref))?.ref ?? null;
 }
 
+/**
+ * The single place that turns a model + the inputs of the work into the concrete endpoint of its family:
+ * a text-only model with an image attached runs as its edit / image-to-video variant. null = none exists
+ * (or the model already takes the image), so the caller keeps its current behavior.
+ */
+export function inputVariant(ref: string | undefined, kind: 'image' | 'video'): { ref: string; route: VariantRoute } | null {
+  const m = ref ? modelSummary(ref) : undefined;
+  if (!ref || !m || m.acceptsImage) return null;
+  const alt = opModelFromRef(ref, kind) ?? (kind === 'image' ? lineRoutes(ref).edit ?? lineRoutes(ref).reference : lineRoutes(ref).image ?? lineRoutes(ref).reference) ?? null;
+  const v = alt && alt !== ref ? modelSummary(alt) : undefined;
+  return v?.acceptsImage ? { ref: v.ref, route: variantRoute(v) } : null;
+}
+
+/** One line for the agent's context: the family's image-input variant, or null when the model needs none. */
+export function variantLine(ref: string, kind: string): string | null {
+  const v = kind === 'image' || kind === 'video' ? inputVariant(ref, kind) : null;
+  return v ? `family takes image input: attached images run as ${modelSummary(v.ref)?.name} (${v.route}) automatically` : null;
+}
+
 /** The other routes of the same model line on the same provider (text-to-image ↔ edit ↔ reference…). */
 function routeTwins(ref: string): ModelSummary[] {
   const me = get().catalog.models[ref];

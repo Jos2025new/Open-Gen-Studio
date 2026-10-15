@@ -28,7 +28,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes, inputVariant } from '../catalog';
 import type {
   AgentStyle,
   LlmContentPart,
@@ -1536,7 +1536,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
             const built = await buildSettings(
               { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
-              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },
+              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
             );
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });

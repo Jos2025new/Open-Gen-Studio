@@ -5,7 +5,7 @@ import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
 import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skills';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
-import { composerChosen, isConnected, modelSummary } from '../catalog';
+import { composerChosen, isConnected, modelSummary, variantLine } from '../catalog';
 import { routeHead, VIDEO_PURPOSES } from '../routing';
 import { guideForModel } from '../guides';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
@@ -164,7 +164,7 @@ function describeModel(kind: MediaKind): string {
     if (d.length) parts.push(`durations [${d.map((x) => (x > 0 ? x : 'auto')).join(', ')}]s`);
     if (paramByRole(schema, 'audio')) parts.push('audio optional');
   }
-  parts.push(`inputs: ${capabilityHints(schema, kind).join('; ')}`);
+  parts.push(variantLine(modelRef, kind) ?? `inputs: ${capabilityHints(schema, kind).join('; ')}`);
   const fit = m && modelFit(m.id);
   if (fit) parts.push(fit);
   const cur = [
@@ -236,7 +236,7 @@ function alternatives(): string {
       const fit = modelFit(m.id);
       lines.push(`${m.ref} — ${what}${m.acceptsImage ? ', image input' : ''} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}${fit ? ` — ${fit}` : ''}`);
     }
-    // Models with special inputs, so the agent can pick one when the request needs it.
+    // Models with special inputs.
     const special = Object.values(st.catalog.models).filter((m) => m.provider === p && /(keyframes|reference)-to-(video|image)/.test(m.id)).slice(0, 6);
     for (const m of special) {
       const schema = st.catalog.schemas[m.ref];
@@ -254,7 +254,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const st = get();
   const lines: string[] = [];
   lines.push(`workspace: ${opts.workspace}`);
-  // State only, no orders: these lines stay in the history and are re-read in later requests.
+  // State only, no orders: these lines stay in the history.
   lines.push(
     opts.style === 'auto'
       ? `mode: auto (ask only missing user data, once; decide the rest) · rounds used for this request: ${Math.min(opts.round, 1)} of 1`
@@ -269,7 +269,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const subjects = st.library;
   if (subjects.length) lines.push(`library (mention as @Name; the app sends its image): ${subjects.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
-  // A video model the user never picked is only an app default: steps follow the purpose table instead (C2).
+  // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);
   const videoOverrides = Object.entries(st.composer.videoRoutes ?? {});
   if (videoOverrides.length) {

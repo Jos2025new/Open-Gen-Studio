@@ -8,6 +8,7 @@ import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
 import { Button, Range } from '../ui/primitives';
 import { ensureSchema } from '../../engine/catalog';
+import { variantRoute } from '../../engine/variants';
 import { AspectGlyph } from '../composer/MediaControls';
 import { EditAnswerButton } from './EditAnswerButton';
 
@@ -156,7 +157,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
       <div className="q-block">
         <div className="q-question">Model</div>
         <div className="set-models">
-          {modelRow(item.recommended.modelRef, 'recommended')}
+          {modelRow(item.recommended.modelRef, [item.recommended.needsImage && models[item.recommended.modelRef] && ['edit', 'image', 'reference'].includes(variantRoute(models[item.recommended.modelRef])) ? variantRoute(models[item.recommended.modelRef]) : '', 'recommended'].filter(Boolean).join(' · '))}
           {item.alternatives.length ? (
             <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
               {moreOpen ? 'Hide other models' : `Show ${item.alternatives.length} other model${item.alternatives.length === 1 ? '' : 's'}`} <ChevronDown size={13} className={moreOpen ? 'is-flipped' : ''} />

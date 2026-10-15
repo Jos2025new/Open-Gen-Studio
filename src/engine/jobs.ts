@@ -12,7 +12,7 @@ import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
@@ -364,12 +364,12 @@ async function execute(id: string): Promise<string[]> {
     // Inputs on a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
     if ((g.kind === 'image' || g.kind === 'video') && !g.op && (g.inputs.refs.length || g.inputs.firstFrame)) {
       const cur = modelSummary(g.modelRef);
-      const twin = cur && !cur.acceptsImage ? opModelFromRef(g.modelRef, g.kind) : null;
+      const twin = cur && !cur.acceptsImage ? inputVariant(g.modelRef, g.kind)?.ref ?? null : null;
       if (twin && twin !== g.modelRef) {
         const before = { modelRef: g.modelRef, variant: cur ? variantRoute(cur) : 'unknown', inputRoles: { references: g.inputs.refs.length, firstFrame: Boolean(g.inputs.firstFrame), lastFrame: Boolean(g.inputs.lastFrame) } };
         patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName });
         g = get().generations[g.id];
-        recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late image-input twin resolution in job runner', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
+        recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late variant resolution', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
       }
     }
     const resolved = await resolveModel(g.modelRef);
