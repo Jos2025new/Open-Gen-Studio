@@ -1,4 +1,4 @@
-import { statusChecker } from './checkStatus';
+import { CHECK_RESTART, statusChecker } from './checkStatus';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
 import { uid } from '../lib/id';
@@ -651,6 +651,7 @@ async function execute(id: string): Promise<string[]> {
   } catch (err) {
     if (err instanceof PriceReviewRequired) throw err;
     const cur = get().generations[id];
+    if (signal.reason === CHECK_RESTART) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
       patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
@@ -672,10 +673,7 @@ function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
   return input ? [{ mime: input.mime, width: input.width, height: input.height }] : undefined;
 }
 
-/**
- * A submitted job ends only when the provider says it failed. A failed status check, the local time limit
- * or a local cancel just stop waiting: the job may still finish (and be charged), so keep it for "Check again".
- */
+/** A submitted job ends only when the provider says it failed; a local stop keeps it for "Check again". */
 function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
   return err instanceof JobFailedError ? undefined : job;
 }
@@ -914,7 +912,7 @@ export const checkStatusNow = statusChecker({
   restartable: (id) => { const g = get().generations[id]; return (g?.settings.count ?? 1) <= 1 && !g?.variants?.length; },
 });
 
-/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
+/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, stop, reload). */
 export function recheckGeneration(id: string): Promise<string[]> {
   const pending = running.get(id);
   if (pending) return pending;
@@ -982,6 +980,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
       return assets.map((a) => a.id);
     } catch (err) {
+      if (controller.signal.reason === CHECK_RESTART) return [];
       const remoteJob = keptJob(err, job);
       if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
       else {
