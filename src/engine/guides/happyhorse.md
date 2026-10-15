@@ -8,7 +8,7 @@ CONTRACT ON OUR PROVIDERS (differs from other platforms; the app reads it from e
 - Audio: native on fal (synchronised; voice in Chinese or English, other languages are translated to English; write English speech in lowercase, acronyms and proper nouns in capitals). On NanoGPT it is silent. Only write dialogue or sound when the variant makes audio; otherwise treat the clip as silent.
 
 ONE CONTINUOUS SHOT
-It does not do multi-shot or keep characters across cuts: never ask for "scene 1 / scene 2" in one clip. Size the duration to one shot.
+HappyHorse 1.1 can run several consecutive scenes in one prompt (source: https://github.com/modelstudioai/awesome-happyhorse-prompts, which mentions 6-8 scenes); 1.0 should still get one continuous shot. Timecode ranges (e.g. 00-05 then 05-10, per https://artlist.io/ai/models/happyhorse-1-1) and 3x3 storyboard grids are not verified; do not rely on them. Keep one physical action per beat and about 2-5 s per beat; characters may drift across cuts, so reuse the same references.
 
 ORDER OF THE PROMPT
 1. Subject + concrete action in the first sentence: who or what, and exactly what it does (a physical verb, not a state). "A bay horse gallops along a beach at sunset" beats "something nice with a horse".
@@ -22,7 +22,7 @@ Example (9:16, 8 s): A young rider in a leather jacket gallops across a field of
 
 OPENING IMAGE AND REFERENCES
 - With an opening image, it is the first frame: describe only motion and camera. Re-describing what the image shows makes the model reinterpret it and change the identity.
-- With reference images, say in the prompt how each is used, by order and role ("the woman in the first reference image, wearing the jacket from the second"). No provider documents a tag syntax for HappyHorse: do not invent one.
+- With reference images, say in the prompt how each is used, by order and role ("the woman in the first reference image, wearing the jacket from the second"). Reference-to-video hosts cite references by order as [Image 1], [Image 2] (with a space; Wiro https://wiro.ai/models/alibaba/happyhorse-1-1-reference, Apiframe https://apiframe.ai/guides/happy-horse-1-1-guide); some hosts use character1, character2 instead (Atlas): if the model's inputs give another syntax, that one wins. Do not claim the form without a space fails (not verified).
 - The image beats the text: its look wins. Use the style block to reinforce that same look, not to change it.
 
 STYLE: PHOTOREAL, 2D OR 3D

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
   AudioLines,
+  Image as ImageIcon,
   ChevronDown,
   Brush,
   Eraser,
@@ -42,6 +43,7 @@ import { OpForm } from './OpForm';
 
 export const OP_ICONS: Record<OpId, LucideIcon> = {
   relight: Sun,
+  replace_background: ImageIcon,
   angle: Rotate3d,
   upscale: Maximize,
   remove_bg: Scissors,

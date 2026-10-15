@@ -95,7 +95,7 @@ describe('each operation, by its parameters', () => {
   });
   it('edit is the catch-all: it fires only when no specific operation covers the image', () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
-    expect(fired('cambia el fondo por uno de estudio', ['img1'])).toEqual(['edit']);
+    expect(fired('cambia el fondo por uno de estudio', ['img1'])).toEqual(['replace_background']);
     expect(fired('quita el fondo y agrega una sombra', ['img1'])).toEqual(['remove_bg']);
   });
   it('nothing attached: named, not fired', () => {

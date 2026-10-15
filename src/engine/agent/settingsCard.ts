@@ -30,6 +30,8 @@ export interface SettingsDeps {
   composerChosen: (kind: 'video' | 'image') => boolean;
   routeModel: (mode: 'text' | 'image' | 'reference') => string | undefined;
   defaultModel: (kind: 'video' | 'image', needsImage: boolean) => string | null;
+  /** The family's edit / image-to-video endpoint for a text-only model (one resolution point, catalog.inputVariant). */
+  inputVariant?: (ref: string, kind: 'video' | 'image') => string | undefined;
 }
 
 /** The short list the agent may pick from without being asked (system prompt, "Image by task"). */
@@ -131,6 +133,11 @@ export async function buildSettings(req: SettingsRequest, deps: SettingsDeps): P
     else recommended = (await routeVideo(req.purpose, { firstFrame: mode === 'image', refs: req.refs, duration: req.duration }, deps.getModel))?.ref ?? deps.defaultModel('video', needsImage) ?? undefined;
   } else {
     recommended = deps.defaultModel('image', needsImage) ?? undefined;
+  }
+  // Images attached to a text-only endpoint: the app runs the family's variant, nobody picks it.
+  if (recommended && needsImage && deps.inputVariant) {
+    const cur = await deps.getModel(recommended);
+    if (cur && !cur.model.acceptsImage) recommended = deps.inputVariant(recommended, req.kind) ?? recommended;
   }
   if (!recommended) return { error: `No ${req.kind} model is available. Ask the user to connect a provider.` };
 

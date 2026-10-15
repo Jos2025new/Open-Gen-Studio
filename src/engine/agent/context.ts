@@ -5,7 +5,7 @@ import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
 import { activeSkill, guideIndex, workflowById, describeWorkflow } from '../skills';
 import { PREFERRED, REMOTE_PROVIDERS } from '../providers/registry';
-import { composerChosen, isConnected, modelSummary } from '../catalog';
+import { composerChosen, isConnected, modelSummary, variantLine } from '../catalog';
 import { routeHead, VIDEO_PURPOSES } from '../routing';
 import { guideForModel } from '../guides';
 import type { AgentStyle, MediaKind, Session, Workspace } from '../types';
@@ -36,7 +36,7 @@ The procedure (every message, every mode, every size of piece)
 6. Close honestly: say only what you saw and what the app reports (the model that really ran, what came back different).
 
 How the app works (its checks run before anything is shown; write so they pass the first time)
-- Order of your calls for work: read_guide (when needed) → ask_questions (only for missing user data) → confirm_settings (when the settings policy below requires it) → propose_plan. Each request's mode line says which of these you have. ${SETTINGS_POLICY}
+- Order of your calls for work: if the request has a real doubt, ask_questions once; then read_guide for the workflow that fits; then confirm_settings if required; then propose_plan. With no doubt, read_guide and follow it. Each request's mode line says which you have. ${SETTINGS_POLICY}
 - In confirm_settings, give the inputs the steps will really have (refs: how many reference images, start_image): the card shows the model's variant for them (an edit variant when there are refs), and the user judges what they see.
 - To compare models (the user names two or more for the same work, e.g. "one set with Nano Banana and the same set with Grok"), give confirm_settings one part per model, each with its "model"; then every step names the model of its part, and the app keeps each step on its own model. Never fold a model the user named into another.
 - After confirm_settings you get the confirmed model, values and that model's prompting guide: the app applies those values to every step of that kind, so write for them. Video model guides cannot be loaded before that.
@@ -68,7 +68,7 @@ What the user's data is, by kind of piece (load the guide; it holds the detail �
 - A specific person, creator or character that recurs: their image or the library item; if invented, what kind (in the user's own terms). → skill:staged.
 - A story, series or script: the brief when there is none, the length if it does not fit. → workflow:story (chat canvas), skill:staged.
 - Their building, room or plan (archviz): the project's image, sketch or plan when they mean theirs. → the archviz workflows.
-- An edit of their image: nothing more to ask — do it directly.
+- An edit of their image: nothing more to ask (card per the mode line).
 - A single image from a clear description (no product, person or brand of theirs): nothing to ask — plan it.
 
 Default route (the same model/authorization policy also applies inside workflows)
@@ -97,9 +97,11 @@ Writing prompts
 - From text: concrete sentences in this order: purpose (poster, product shot, portrait…) → subject → action → setting → composition (shot size, angle, lens) → lighting (source, direction, softness, color temperature: "soft morning window light from the left") → materials and surfaces → style or medium → palette → mood; must-keep requirements first, preferences after; spatial and physical relations ("the cup sits left of the laptop, steam rising"), not keyword lists; usually 40-120 words. Physical terms instead of empty modifiers ("8k, masterpiece, best quality"). Prompts in English unless the user asks otherwise.
 - Text in an image: short literal text in "double quotes", never translated, with its position and typeface ("the headline "OPEN LATE" in bold condensed sans at the top"). Never bake long text into image prompts. In the Designer, headlines and copy go on text layers.
 - Edits (edit op, edit models, a revision of a result): "Change only X; keep A, B and C; match the existing lighting, perspective, texture and depth of field; do not add Z"; repeat what is kept at every iteration (models drift); one change at a time. Upscale never redefines content: only sharpness and detail.
+- Realism: realistic images get camera and light automatically ("photographic" default, "ugc", "studio"); for illustration, anime, painting, vector or 3D set "realism": "none". Optional "shot" (portrait, street, product, landscape, interior, food, pet, ugc, studio); else the app picks. Order: subject → camera + light → mood.
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
 - Several results of one step are numbered as the user sees them (#1, #2… left to right, top to bottom): "la 2", "the second" = #2; an image the user attached is their choice. When the next step depends on a choice the user has not made, ask which one in the questions card.
 - References in a fixed order: place or setting first, then characters, then objects and products, then style; each cited with its role.
+- A ref may carry its role as data: { "ref": "asset:x", "role": "identity|pose|style|lighting|clothing|expression|background" }. The app writes the role sentence ("Image 1 = identity…") in the model's syntax and puts it before the prompt; do not repeat it there. A plain string ref has no role.
 - No proper names in prompts (models render names as nothing or as text): a person or thing is its role and a short visible descriptor ("the woman in the mustard raincoat") or the model's reference syntax; @Name only as the library handle (the app replaces it). Names inside spoken lines are fine.
 - Citing references: when a model's inputs give a "prompt:" syntax, use exactly that. Otherwise, by family:
 ${REFERENCE_PROTOCOLS.map((p) => `  ${p.family}: ${p.note}`).join('\n')}
@@ -162,7 +164,7 @@ function describeModel(kind: MediaKind): string {
     if (d.length) parts.push(`durations [${d.map((x) => (x > 0 ? x : 'auto')).join(', ')}]s`);
     if (paramByRole(schema, 'audio')) parts.push('audio optional');
   }
-  parts.push(`inputs: ${capabilityHints(schema, kind).join('; ')}`);
+  parts.push(variantLine(modelRef, kind) ?? `inputs: ${capabilityHints(schema, kind).join('; ')}`);
   const fit = m && modelFit(m.id);
   if (fit) parts.push(fit);
   const cur = [
@@ -234,7 +236,7 @@ function alternatives(): string {
       const fit = modelFit(m.id);
       lines.push(`${m.ref} — ${what}${m.acceptsImage ? ', image input' : ''} — ${m.name}${schema ? ` — inputs: ${capabilityHints(schema, m.kind).join('; ')}` : ''}${fit ? ` — ${fit}` : ''}`);
     }
-    // Models with special inputs, so the agent can pick one when the request needs it.
+    // Models with special inputs.
     const special = Object.values(st.catalog.models).filter((m) => m.provider === p && /(keyframes|reference)-to-(video|image)/.test(m.id)).slice(0, 6);
     for (const m of special) {
       const schema = st.catalog.schemas[m.ref];
@@ -252,7 +254,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const st = get();
   const lines: string[] = [];
   lines.push(`workspace: ${opts.workspace}`);
-  // State only, no orders: these lines stay in the history and are re-read in later requests.
+  // State only, no orders: these lines stay in the history.
   lines.push(
     opts.style === 'auto'
       ? `mode: auto (ask only missing user data, once; decide the rest) · rounds used for this request: ${Math.min(opts.round, 1)} of 1`
@@ -267,14 +269,14 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const subjects = st.library;
   if (subjects.length) lines.push(`library (mention as @Name; the app sends its image): ${subjects.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
-  // A video model the user never picked is only an app default: steps follow the purpose table instead (C2).
+  // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);
   const videoOverrides = Object.entries(st.composer.videoRoutes ?? {});
   if (videoOverrides.length) {
     lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
   }
   const confirmed = Object.entries(session.agent.settings ?? {}).filter(([, c]) => c);
-  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user for this work: ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}`).join('; ')}`);
+  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}`).join('; ')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);

@@ -52,7 +52,7 @@ describe('HappyHorse guide', () => {
     expect(guideIndex()).toContain('  model:happyhorse — how to write prompts for HappyHorse 1.0 / 1.1');
     for (const id of ['alibaba/happyhorse-1.1/reference-to-video', 'alibaba/happyhorse-1.0/text-to-video', 'alibaba/happy-horse/image-to-video']) expect(guideForModel(id)?.id).toBe('happyhorse');
     const t = readGuide('model:happyhorse')!;
-    for (const rule of ['1–9 reference images', '2 500 characters', 'native on fal', 'One continuous shot', 'do not invent one', 'no CGI']) expect(t).toContain(rule);
+    for (const rule of ['1–9 reference images', '2 500 characters', 'native on fal', 'One continuous shot', '[Image 1], [Image 2]', 'no CGI']) expect(t).toContain(rule);
   });
 });
 

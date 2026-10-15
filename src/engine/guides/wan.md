@@ -13,6 +13,11 @@ PICK THE MODE FIRST (they are exclusive)
 HOW TO CITE REFERENCES (Wan is NOT Seedance)
 - Positional words without "@": Image 1, Image 2, Video 1, Audio 1, in the order the refs are sent ("the subject in Image 1 walks past Video 1"; "Image 1 is the character; do not use its background"; "the camera move of Video 1").
 - Bind each reference to a named role once, then reuse the role name.
+- With video references, the image sets identity and the video contributes only choreography, rhythm or camera; it must not pass on the look of the person in the source video.
+- Image to video: separate the opening image (first frame) from the identity or design image (reference); an identity reference must not fix pose or background.
+- Source: https://www.alibabacloud.com/help/en/model-studio/wan3-video-generation-prompt-guide (first 100 000 characters read; the rest not verified). One item per type: "the reference image" is enough; two or more: always the number. The same material may be cited again for another use, with a role phrase ("appearance only", "camera movement only", "style only"); the voice goes once as "voice timbre reference Audio N" and covers all that character's lines.
+- Storyboard: overall description, then shot number, timestamp and content; timestamps end to end with no gap or overlap, about 2–5 s each; one format throughout. A panel grid is only shot guidance: say so, list the panels in reading order and close with one style and aspect line.
+- Order: overall description → references → shots → dialogue → sound → style and mood → negative prompt (only what must not appear; empty if nothing). The page documents a prompt-optimizer skill, not a thinking mode.
 
 STRUCTURE (the order of a cinematic brief)
 1. Scene context — 1–2 sentences, only what happens in this shot.

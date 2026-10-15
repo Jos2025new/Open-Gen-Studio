@@ -2,6 +2,7 @@ import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
 import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
+import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
 import { createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS, opCount } from './ops';
@@ -150,11 +151,21 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
    * Text results (a transcription, lyrics, a voice, a style) finish with text and no files, so they are exempt.
    * A runner that resolves without recording anything is taken at its word (some callers answer with assets only).
    */
+  // A run that returns before its job is over (Check status took over the follower) waits for the follower.
+  const runSettled = async (id: string) => {
+    const assetIds = await runGeneration(id);
+    await settleGeneration(id);
+    return assetIds;
+  };
+
   const stepOutputs = (generationId: string, assetIds: string[]): StepOutput => {
     const g = useStore.getState().generations[generationId];
     if (!g || g.kind === 'text') return { assetIds };
     if (g.status === 'error' || g.status === 'canceled') throw new Error(g.error || `${g.modelName} did not finish (${g.status}).`);
-    if (!assetIds.length && !g.assetIds.length) throw new Error(`${g.modelName} returned no result.`);
+    if (!assetIds.length && !g.assetIds.length) {
+      if (isLiveStatus(g.status)) throw new StepStillRunning(g.modelName);
+      throw new Error(`${g.modelName} returned no result.`);
+    }
     return { assetIds };
   };
 
@@ -171,7 +182,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const runStep = async (s: PlanStep): Promise<StepOutput> => {
     const reuse = ctx.reuseGenerations?.[s.id];
     if (reuse) {
-      const out = stepOutputs(reuse, await runGeneration(reuse));
+      const out = stepOutputs(reuse, await runSettled(reuse));
       return { ...out, text: get().generations[reuse]?.text };
     }
     const nodeSubjects: Subject[] = [];
@@ -193,7 +204,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         }
         const g = createGeneration({ ...base, kind: 'image', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }), variants: s.variations });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runGeneration(g.id));
+        return stepOutputs(g.id, await runSettled(g.id));
       }
       case 'model3d': {
         const refs: string[] = [];
@@ -203,7 +214,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         }
         const g = createGeneration({ ...base, kind: 'model3d', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs: inputsFor({ refs }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runGeneration(g.id));
+        return stepOutputs(g.id, await runSettled(g.id));
       }
       case 'video': {
         const firstFrame = (await resolveAsset(s.firstFrame)) ?? undefined;
@@ -220,7 +231,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const inputs = inputsFor({ refs, firstFrame, lastFrame, times: Object.keys(times).length ? times : undefined });
         const g = createGeneration({ ...base, kind: 'video', prompt: promptFor(s), modelRef: s.modelRef, settings: s.settings, inputs });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        return stepOutputs(g.id, await runGeneration(g.id));
+        return stepOutputs(g.id, await runSettled(g.id));
       }
       case 'audio': {
         // Lyrics from an earlier step (a lyrics result keeps only the song text) into the model's lyrics field.
@@ -235,7 +246,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
         const kind = s.textOutput ? 'text' : 'audio';
         const g = createGeneration({ ...base, kind, prompt: promptFor(s), modelRef: s.modelRef, settings, inputs: inputsFor({ refs: [] }) });
         ctx.onState(s.id, 'running', { generationId: g.id });
-        const out = stepOutputs(g.id, await runGeneration(g.id));
+        const out = stepOutputs(g.id, await runSettled(g.id));
         return { ...out, text: get().generations[g.id]?.text };
       }
       case 'op': {
@@ -252,10 +263,18 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           // Music under the joined video: an audio step of this plan or an audio asset.
           if (typeof params.music === 'string' && params.music) params = { ...params, music: (await resolveAsset(params.music)) ?? '' };
         }
+        if (s.refs?.length) {
+          const got: Array<{ asset: string; role?: string; note?: string }> = [];
+          for (const r of s.refs) {
+            const a = await resolveAsset(r.ref);
+            if (a) got.push({ asset: a, role: r.role, note: r.note });
+          }
+          params = { ...params, _refs: got.map((g) => g.asset).join(','), _refRoles: JSON.stringify(got) };
+        }
         const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
-        const out = stepOutputs(g.id, await runGeneration(g.id));
+        const out = stepOutputs(g.id, await runSettled(g.id));
         // Text results (Transcribe) feed later prompts through prompt_from.
         return { ...out, text: useStore.getState().generations[g.id]?.text };
       }
@@ -333,6 +352,13 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
             ctx.onState(id, 'done');
           })
           .catch((err: unknown) => {
+            // Still live at the provider: the plan waits for it, it does not fail (see settleGeneration).
+            if (err instanceof StepStillRunning) {
+              state.set(id, 'review');
+              waiting.push(id);
+              ctx.onState(id, 'review');
+              return;
+            }
             if (err instanceof PriceReviewRequired) {
               state.set(id, 'review');
               waiting.push(id);

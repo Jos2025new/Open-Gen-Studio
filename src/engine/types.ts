@@ -199,6 +199,10 @@ export interface ModelSchema {
 export type AdvancedValue = string | number | boolean;
 
 export interface GenSettings {
+  /** Photographic conditions added to realistic image prompts; default 'photographic'. */
+  realism?: 'photographic' | 'ugc' | 'studio' | 'none';
+  /** Shot sheet id (portrait, street, product, landscape, interior, food, pet, ugc, studio); chosen from the prompt when absent. */
+  shot?: string;
   aspect?: string;
   resolution?: string;
   count: number;
@@ -267,7 +271,7 @@ export interface SavedView3D {
   grid: boolean;
 }
 
-export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | 'variations' | 'reference_sheet' | 'edit' | 'animate' | 'extract_frame' | 'continue' | 'contact_sheet' | 'grid_split' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'create_voice' | 'edit_region' | 'remove_object' | 'join_clips' | 'fx';
+export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | 'variations' | 'reference_sheet' | 'edit' | 'animate' | 'extract_frame' | 'continue' | 'contact_sheet' | 'grid_split' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'create_voice' | 'edit_region' | 'remove_object' | 'join_clips' | 'fx' | 'replace_background' | 'replace_background';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
@@ -438,6 +442,8 @@ export interface OpStep extends StepBase {
   input: StepRef;
   /** join_clips: the clips after `input`, in order. */
   more?: StepRef[];
+  /** Extra images with the role they play (lighting, pose, background…); the op's source is Image 1. */
+  refs?: Array<{ ref: StepRef; role?: string; note?: string }>;
   params: Record<string, AdvancedValue>;
   note?: string;
 }

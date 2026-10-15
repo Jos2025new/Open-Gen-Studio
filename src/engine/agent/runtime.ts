@@ -28,7 +28,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes, inputVariant } from '../catalog';
 import type {
   AgentStyle,
   LlmContentPart,
@@ -80,6 +80,7 @@ import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides }
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
+import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -254,8 +255,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
     return;
   }
-  // Typing while the settings card is open never confirms it (a question or an objection is not a yes): the card
-  // closes unconfirmed and the agent answers; if the work still stands it shows a new card with what was asked.
+  // Typing while the settings card is open never confirms it: it closes unconfirmed and the agent answers.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.reply_received', reason: 'typed message is not confirmation', sessionId, approvalId: pendingItem.id, before: { status: pendingItem.status, confirmed: false }, after: { status: 'skipped', confirmed: false } });
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
@@ -335,7 +335,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const confirmFirst = get().composer.agentStyle !== 'direct' && !session(sessionId).agent.settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
   const forced = steerNote(gate, confirmFirst);
   // The route goes first: an instruction buried after the context was followed after the prompt's own steps.
-  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
+  const askFirst = session(sessionId).agent.questionRound === 0;
+  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
 
@@ -573,6 +574,7 @@ async function presentPlan(
       workspace,
       kinds: settingKinds,
       settings: session(sessionId).agent.settings,
+      style: get().composer.agentStyle,
       userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
       estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
@@ -595,7 +597,6 @@ async function presentPlan(
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
-  // Changes to a model the user picked also pop up for 5 s: the card alone is easy to miss.
   for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') {
@@ -824,6 +825,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan.adjustments)} The app is executing the plan now.` });
     closeRequest(sessionId, 'approved', total.usd);
+    if (item.style === 'direct') inheritApproved(chosen);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
@@ -1536,7 +1538,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
             const built = await buildSettings(
               { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
-              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: (kind, needsImage) => defaultModelFor(kind, needsImage) },
+              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
             );
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });

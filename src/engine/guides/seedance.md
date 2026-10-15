@@ -2,7 +2,7 @@ Seedance 2.0 / 2.5 (ByteDance) — prompting guide
 Source: high-end production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / NanoGPT; limits checked against Atlas seedance-2.5/reference-to-video docs.
 
 WRITING STYLE (both versions)
-- Cinematic prose in English, present tense, physical verbs, concrete nouns. Nothing the camera cannot see or the mic cannot hear.
+- Cinematic prose, present tense, physical verbs, concrete nouns. Nothing the camera cannot see or the mic cannot hear.
 - Aspect, resolution, fps and audio on/off are request parameters, never prompt text. The only thing the prompt needs to know about time is the clip duration.
 - Size the prompt to the input — a short input gets a short prompt; longer is never better by itself:
   - Lazy input (one line, a mood): 60–180 words, 1–2 paragraphs, no shot headers. Spine, place, person, beat, one camera line, one audio line.
@@ -23,6 +23,16 @@ VERSION LIMITS (the prompt stretches only because 2.5 holds more)
 - 2.0: up to 15 s per generation. 5 s = one shot; 10–15 s = 2–4 shots. Up to 9 reference images (+ start/end frame), 3 videos, 3 audios.
 - 2.5: 4–30 s. 20–30 s = up to 8 shots with absolute-time headers across the whole timeline. Up to 30 images, 10 videos, 10 audios (reference videos and audios: 2–30 s each, 30 s combined). With many references the prompt concentrates on action and camera; the look comes from the references.
 - Resolution follows the chosen quality (medium by default). Do not ask for high resolution unless the user did.
+
+GENRE PATTERNS (source: https://github.com/LearnPrompt/awesome-seedance; a case library, not a ranking)
+- Timed script: segments with one shot type, one main action and one sound line each.
+- Character lock: a stable name per reference, what it keeps and what it must not bring.
+- Storyboard grid to video: a numbered panel sheet made first as an image, then used as the reference.
+- Handheld UGC vlog: believability through named consumer-camera flaws, not "high quality".
+- Anime style lock: measurable style parameters plus a list of neighbouring styles to exclude.
+- Stop-motion cadence: frame rate and hold count, the craft material, and the smoothing effects banned.
+- Do not mix several templates in one prompt, repeat the full wardrobe in every beat, or ask for a long storyboard in a short duration.
+- Image to video: the opening image (first frame) is not the identity or design image (reference); do not fix pose or background from an identity reference.
 
 EDIT AND EXTEND (2.5, through the app's Edit video / Extend video operations)
 - Edit: describe only the change — what is replaced, added, removed or modified, and when inside the existing clip. No absolute shot headers as if generating from scratch; tie the change to what is already there. Duration is the input clip's (the app sends -1); the clip must be 4–30 s.

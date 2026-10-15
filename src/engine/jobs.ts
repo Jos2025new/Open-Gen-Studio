@@ -1,4 +1,4 @@
-import { statusChecker } from './checkStatus';
+import { CHECK_RESTART, statusChecker } from './checkStatus';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
 import { uid } from '../lib/id';
@@ -12,7 +12,7 @@ import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, opModelFromRef, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
@@ -28,6 +28,8 @@ import { ADAPTERS } from './providers/registry';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
+import { opRealism, negFor } from './realism';
+import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
 
@@ -362,12 +364,12 @@ async function execute(id: string): Promise<string[]> {
     // Inputs on a text-only model: switch to its image-input twin of the same family (edit / image-to-video).
     if ((g.kind === 'image' || g.kind === 'video') && !g.op && (g.inputs.refs.length || g.inputs.firstFrame)) {
       const cur = modelSummary(g.modelRef);
-      const twin = cur && !cur.acceptsImage ? opModelFromRef(g.modelRef, g.kind) : null;
+      const twin = cur && !cur.acceptsImage ? inputVariant(g.modelRef, g.kind)?.ref ?? null : null;
       if (twin && twin !== g.modelRef) {
         const before = { modelRef: g.modelRef, variant: cur ? variantRoute(cur) : 'unknown', inputRoles: { references: g.inputs.refs.length, firstFrame: Boolean(g.inputs.firstFrame), lastFrame: Boolean(g.inputs.lastFrame) } };
         patchGeneration(g.id, { modelRef: twin, modelName: modelSummary(twin)?.name ?? g.modelName });
         g = get().generations[g.id];
-        recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late image-input twin resolution in job runner', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
+        recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late variant resolution', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
       }
     }
     const resolved = await resolveModel(g.modelRef);
@@ -410,6 +412,7 @@ async function execute(id: string): Promise<string[]> {
         firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
       } else {
         refs.push(await mediaInput(g.op.sourceAssetId));
+        for (const id of String(g.op.params._refs ?? '').split(',').filter(Boolean)) refs.push(await mediaInput(id));
       }
     } else {
       for (const r of g.inputs.refs) {
@@ -548,6 +551,8 @@ async function execute(id: string): Promise<string[]> {
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
+    const shown = opRealism(g, kind, prompt, model.id);
+    genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];
@@ -569,7 +574,7 @@ async function execute(id: string): Promise<string[]> {
         kind,
         model,
         schema,
-        prompt: variants ? `${prompt}\n${variants[done]}` : prompt,
+        prompt: variants ? `${shown}\n${variants[done]}` : shown,
         settings,
         count: n,
         refs,
@@ -646,6 +651,7 @@ async function execute(id: string): Promise<string[]> {
   } catch (err) {
     if (err instanceof PriceReviewRequired) throw err;
     const cur = get().generations[id];
+    if (signal.reason === CHECK_RESTART) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
       patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
@@ -667,10 +673,7 @@ function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
   return input ? [{ mime: input.mime, width: input.width, height: input.height }] : undefined;
 }
 
-/**
- * A submitted job ends only when the provider says it failed. A failed status check, the local time limit
- * or a local cancel just stop waiting: the job may still finish (and be charged), so keep it for "Check again".
- */
+/** A submitted job ends only when the provider says it failed; a local stop keeps it for "Check again". */
 function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
   return err instanceof JobFailedError ? undefined : job;
 }
@@ -909,7 +912,7 @@ export const checkStatusNow = statusChecker({
   restartable: (id) => { const g = get().generations[id]; return (g?.settings.count ?? 1) <= 1 && !g?.variants?.length; },
 });
 
-/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, cancel, reload). */
+/** Ask the provider again about a job we stopped waiting for (connection problem, time limit, stop, reload). */
 export function recheckGeneration(id: string): Promise<string[]> {
   const pending = running.get(id);
   if (pending) return pending;
@@ -977,6 +980,7 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
       return assets.map((a) => a.id);
     } catch (err) {
+      if (controller.signal.reason === CHECK_RESTART) return [];
       const remoteJob = keptJob(err, job);
       if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
       else {
@@ -1090,7 +1094,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
 export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: boolean, schema: ModelSchema | undefined): GenerationSpec {
   const def = OPS[input.op];
   const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
-  const prompt = def.instruction ? def.instruction(input.params) : def.label;
+  const prompt = def.instruction ? opRolesLine(input.params, input.sourceAssetId, modelRef, schema) + def.instruction(input.params) : def.label;
   const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';

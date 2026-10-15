@@ -17,6 +17,7 @@ vi.mock('../../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
+import { withRealism } from '../../src/engine/realism';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PlanCard } from '../../src/components/chat/PlanCard';
@@ -161,7 +162,7 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     await approvePlan(run.sessionId, run.item!.id);
     expect(run.sent).toHaveLength(1);
     // Captured from unchanged 6c58cb2 with this same fixture and real adapter.
-    expect(run.sent).toEqual([{ body: { model: 'journey/studio-7/text-to-image', prompt: 'blue mug', image_urls: ['https://simulated.invalid/input.png'] }, simulatedUsd: 0.2 }]);
+    expect(run.sent).toEqual([{ body: { model: 'journey/studio-7/text-to-image', prompt: withRealism('blue mug'), image_urls: ['https://simulated.invalid/input.png'] }, simulatedUsd: 0.2 }]);
     expect(lastJourneyTrace().some(e => e.event === 'plan.step_cost_stopped')).toBe(false);
     expectWithinTestAuthorization(run.sent, 0.2);
   });

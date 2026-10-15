@@ -36,7 +36,7 @@ export interface OpDef {
 
 const opt = (...pairs: Array<[string, string]>) => pairs.map(([value, label]) => ({ value, label }));
 
-const PRESERVE = 'Keep the subject identity, composition, pose, materials and every detail unchanged.';
+const PRESERVE = 'Keep the identity, face, clothing, materials and colors of the subject consistent; the camera position, pose visibility, shadows and occlusions may change.';
 
 export const OPS: Record<OpId, OpDef> = {
   relight: {
@@ -150,7 +150,7 @@ export const OPS: Record<OpId, OpDef> = {
         'close-up': 'a tighter close-up framing',
         wide: 'a wider establishing shot',
       };
-      return `Change only the camera viewpoint: show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}, re-rendering perspective and occlusion consistently. Keep identity, face, outfit, materials, colors, lighting and style. Do not add new objects, people or scenery.${note(p)}`;
+      return `Change only the camera viewpoint: show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}, re-rendering perspective and occlusion consistently. Keep identity, face, outfit, materials, colors and style; let shadows adapt to the new viewpoint. Do not add new objects, people or scenery.${note(p)}`;
     },
   },
   upscale: {
@@ -248,6 +248,21 @@ export const OPS: Record<OpId, OpDef> = {
     quick: false,
     fields: [{ key: 'instruction', label: 'Change', type: 'text', default: '', placeholder: 'e.g. make the jacket red', required: true }],
     instruction: (p) => `Change only this: ${String(p.instruction).trim().replace(/\.$/, '')}. Keep everything else identical: subject and identity, composition and framing, lighting, colors and style. Do not add anything else.`,
+  },
+  replace_background: {
+    id: 'replace_background',
+    label: 'Replace background',
+    description: 'Put the subject in a new setting, described or taken from a reference with the background role.',
+    input: 'image',
+    output: 'image',
+    engine: 'edit',
+    quick: false,
+    fields: [{ key: 'background', label: 'New background', type: 'text', default: '', placeholder: 'e.g. a rainy neon street at night', required: true }],
+    instruction: (p) => {
+      const bg = String(p.background ?? '').trim().replace(/\.$/, '');
+      const where = bg ? `with this new background: ${bg}` : 'with the setting of the background reference';
+      return `Replace only the background, ${where}. Keep the subject, its edges and its hair exactly as they are, with no halo or cut-out look. Match the new background's perspective and scale, and add contact shadows and reflected light from the new surroundings on the subject. Do not change the subject's identity, pose, clothing or proportions.${note(p)}`;
+    },
   },
   animate: {
     id: 'animate',

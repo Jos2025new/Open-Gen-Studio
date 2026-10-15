@@ -68,9 +68,10 @@ function directModelGuides(sessionId: string): string {
  * model's guide comes later, with the confirmed settings (phase 2), so it is the model the user actually chose. In
  * Direct, the guides of the composer's models come with the request.
  */
-export function pickedWorkflowGuides(sessionId: string): string {
+export function pickedWorkflowGuides(sessionId: string, askFirst = false): string {
   const id = get().composer.workflowId;
-  return (id ? modelGuidesFor(sessionId, `workflow:${id}`) : '') + directModelGuides(sessionId);
+  // Before the agent has asked (a request that may need questions), the workflow is left to read_guide.
+  return (id && !askFirst ? modelGuidesFor(sessionId, `workflow:${id}`) : '') + directModelGuides(sessionId);
 }
 
 /** Why a video model's guide cannot be loaded yet (phase 2 not confirmed, or another model was confirmed); undefined when it can. */

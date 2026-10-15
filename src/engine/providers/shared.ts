@@ -1,6 +1,6 @@
 import { blobToDataUrl, base64ToBlob, guessMimeFromUrl, prepareImageForUpload } from '../../lib/media';
 import type { ImageInputFormat, InputSlots, MediaKind } from '../types';
-import { HttpError, isTransient, JobFailedError, sleep } from '../../lib/http';
+import { HttpError, isAbort, isTransient, JobFailedError, sleep } from '../../lib/http';
 import type { GenOutput, GenResult, MediaInput, ResumeContext } from './types';
 
 /** Encode an input image for a JSON body (data URL, or an OpenAI-style content part). */
@@ -193,10 +193,15 @@ export async function pollJob(ctx: ResumeContext, provider: string, intervalMs: 
       // An error status whose body says the job failed (Atlas: HTTP 511 with status "failed") is final, not a retry.
       const failed = err instanceof HttpError ? failedJobMessage(err.body) : undefined;
       if (failed) throw new JobFailedError(`${provider}: ${failed}`);
-      if (!isTransient(err)) throw err;
+      // A rejected key stays final (retrying cannot fix it). Aborts (Stop, Check status restart) end the wait. Any other
+      // failure to ask about the job keeps it followed: the card says so and the question goes out again, instead of
+      // marking a job that may still finish as failed.
+      const rejectedKey = err instanceof HttpError && (err.status === 401 || err.status === 403);
+      if (err instanceof JobFailedError || rejectedKey || ctx.signal.aborted || isAbort(err)) throw err;
       failures++;
       wait = Math.min(60_000, intervalMs * 2 ** failures);
-      ctx.onStatus(`Connection problem · retrying in ${Math.round(wait / 1000)}s`);
+      const why = isTransient(err) ? 'Connection problem' : `Could not check the job (${(err as Error).message.slice(0, 120)})`;
+      ctx.onStatus(`${why} · retrying in ${Math.round(wait / 1000)}s`);
     }
     if (Date.now() - started + wait > maxWaitMs) {
       throw new Error(`Stopped waiting after ${maxWaitMs / 60_000} min; the job may still finish at ${provider}. Use Check again later.`);

@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
- * The cost-based automation gate (needsConfirmation) on a real propose_plan call: a plan whose cost is unknown is not
- * shown, the agent is told to ask for confirm_settings; a low-cost plan with several candidates is shown without a card.
+ * The cost-based automation gate (needsConfirmation) on a real propose_plan call: (Auto) a costly or unknown-cost plan of a confirmed kind is shown for approval, not blocked by a new settings card; a low-cost plan with several candidates is shown without a card.
  * The price is forced through estimateSteps; nothing reaches a provider.
  */
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
@@ -73,14 +72,6 @@ const imagePlan = (count: number, model?: string) => ({
 });
 
 describe('propose_plan with a confirmed image kind, decided by the plan cost', () => {
-  it('does not show a plan whose cost cannot be predicted; the agent is told to confirm the settings', async () => {
-    forcedUsd = null;
-    replies = [imagePlan(1), 'Necesito confirmar los ajustes.'];
-    await sendAgentMessage('Una imagen de este vestido');
-    expect(feedOf('plan')).toHaveLength(0);
-    expect(sentMessages.join('\n')).toContain('cannot be predicted');
-  });
-
   it('shows a low-cost plan with several candidates without a settings card (expose)', async () => {
     forcedUsd = 0.1;
     replies = [imagePlan(3, 'local::studio-image'), 'Listo.'];
@@ -99,18 +90,45 @@ describe('propose_plan with a confirmed image kind, decided by the plan cost', (
   });
 });
 
-describe('a costly plan after the card was confirmed in this request', () => {
-  it('is shown: the confirmation already covers the cost (no loop of cards)', async () => {
-    forcedUsd = 2;
-    replies = [imagePlan(1), { name: 'confirm_settings', args: { parts: [{ kind: 'image', refs: 0 }] } }];
-    await sendAgentMessage('Una imagen de este vestido');
-    expect(feedOf('plan')).toHaveLength(0);
-    const card = useStore.getState().sessions[sid()].feed.find((f) => f.type === 'settings') as unknown as SettingsFeedItem;
-    expect(card).toBeTruthy();
-    expect(sentMessages.join('\n')).toContain('for image; then');
+const settingsCards = () => useStore.getState().sessions[sid()].feed.filter((f) => f.type === 'settings');
+
+describe('Auto: the settings card comes once per kind; spending is approved on the plan card', () => {
+  it.each([2, null])('a confirmed kind with cost %s shows the plan (awaiting approval) and no settings card', async (usd) => {
+    forcedUsd = usd;
     replies = [imagePlan(1), 'Listo.'];
-    await confirmSettings(sid(), card.id, [card.sections[0].recommended]);
-    expect(feedOf('plan')).toHaveLength(1);
+    await sendAgentMessage('Una imagen de este vestido');
+    const plans = feedOf('plan');
+    expect(plans).toHaveLength(1);
+    expect(plans[0].status).toBe('awaiting');
+    expect(settingsCards()).toHaveLength(0);
+  });
+  it('two image requests ask nothing again (1 card in total, here the one confirmed beforehand)', async () => {
+    forcedUsd = 2;
+    replies = [imagePlan(1), 'Listo.', imagePlan(1), 'Listo.'];
+    await sendAgentMessage('Una imagen de este vestido');
+    await sendAgentMessage('Otra imagen de este vestido');
+    expect(feedOf('plan').length).toBeGreaterThanOrEqual(1);
+    expect(settingsCards()).toHaveLength(0);
+  });
+  it('a kind never confirmed still blocks: video asks its own card', async () => {
+    forcedUsd = 0.1;
+    replies = [{ name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', title: 'Clip', prompt: 'a dress twirling' }] } }, 'Necesito ajustes.'];
+    await sendAgentMessage('Un clip del vestido');
+    expect(feedOf('plan')).toHaveLength(0);
+    expect(sentMessages.join('\n')).toContain('confirm_settings');
   });
 });
 
+describe('Guided: the settings card comes in every request', () => {
+  it('two requests → two cards, even with the kind confirmed before', async () => {
+    useStore.setState({ composer: { ...useStore.getState().composer, agentStyle: 'guided' } });
+    const ask = { name: 'confirm_settings', args: { parts: [{ kind: 'image', refs: 0 }] } };
+    replies = [ask];
+    await sendAgentMessage('Una imagen de este vestido');
+    const first = settingsCards()[0] as unknown as SettingsFeedItem;
+    await confirmSettings(sid(), first.id, [first.sections[0].recommended]);
+    replies = [ask];
+    await sendAgentMessage('Otra imagen de este vestido');
+    expect(settingsCards()).toHaveLength(2);
+  });
+});

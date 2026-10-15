@@ -69,6 +69,8 @@
 - [Investigación: memoria del Designer con 4 GB y 2 GB](investigacion-memoria.md) (2026-10-13), solo lectura: cifras por proyecto, verificación de fuentes, técnicas RAM/DISCO y cálculo por etapas.
 - [Investigación: Patchy frente a OGS en render, memoria y persistencia](investigacion-patchy.md) (2026-10-13), solo lectura: comparación por tema, adopción y cinco ideas priorizadas.
 - [Decisión del motor de render (Tarea 2): estado, bloqueos y cifras sin recomendación final; aplazada por decisión del usuario](decision-motor.md) (2026-10-12).
+- [Pruebas de modelos y prompting](modelos-pruebas.md): casillas para el usuario (estilos, realismo, roles, operaciones, guías, precios, latencia); marca las de pago.
+- [Investigación: prompting y roles de referencia](investigacion-prompting-referencias.md) (2026-10-14): roles por modelo, esquemas, guías nuevas y URLs.
 - [Banco de fluidez: instrucciones al agente de pruebas](fluidez-pruebas.md): producción aislada, casos habitual/exigente y límites de las medidas.
 - [Regiones retenidas del Designer](render-regions.md): dirty raster, cajas totales, FX y evidencia de paridad.
 
@@ -113,6 +115,8 @@
 - [034-2026-10-W42: alineación de bordes opuestos y grupo](history/034-2026-10-W42.md) — cuatro acciones contra el borde opuesto y movimiento conjunto con referencia fija.
 - [035-2026-10-W42: menú compacto de Align](history/035-2026-10-W42.md) — diez acciones en cuadrícula con nombres accesibles y referencia/grupo arriba.
 - [036-2026-10-W42: Align en el panel derecho](history/036-2026-10-W42.md) — Align contextual dentro de Tool cuando Edit está activa.
+- [037-2026-10-W42: roles de referencia, realismo y precios de OpenRouter](history/037-2026-10-W42.md) — cambios de dos ramas, decisiones, bugs y pendientes.
+- [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](history/038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
 
 ## Trazabilidad
 

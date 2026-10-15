@@ -151,6 +151,12 @@ export const MODEL_FITS: ModelFit[] = [
   { match: /step-?image-?edit/i, bestFor: 'quick edits', prompt: 'short and direct', source: 'PLAN_PROMPTING.md §2' },
 ];
 
+/** Realism clause by image family: none for posters and vector, short where the prompt budget is tight, else full. */
+export const REALISM_POLICY: Array<{ match: RegExp; policy: 'none' | 'short' }> = [
+  { match: /ideogram|recraft/i, policy: 'none' },
+  { match: /step-?image|krea|p-image|prunaai/i, policy: 'short' },
+];
+
 export function modelFit(modelId: string): string | undefined {
   const f = MODEL_FITS.find((x) => x.match.test(modelId));
   return f ? `best for ${f.bestFor}${f.avoidFor ? `; avoid for ${f.avoidFor}` : ''}${f.prompt ? `; prompt shape: ${f.prompt}` : ''}` : undefined;
