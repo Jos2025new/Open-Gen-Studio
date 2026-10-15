@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 187 | 127 |
-| [store.ts](../src/store/store.ts) | 110 | 101 |
+| [store.ts](../src/store/store.ts) | 111 | 101 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 40 | 16 |
@@ -54,18 +54,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 13 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 37 | 159 |
+| `src/engine` | 38 | 159 |
 | `src/engine/agent` | 20 | 58 |
 | `src/engine/design` | 89 | 90 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/providers` | 13 | 42 |
+| `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
 | `src/lib` | 24 | 150 |
 | `src/store` | 4 | 103 |
 
-121 de 313 módulos no tienen ningún test que los importe directamente.
+122 de 314 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

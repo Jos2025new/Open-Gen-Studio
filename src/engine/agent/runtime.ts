@@ -335,7 +335,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const confirmFirst = get().composer.agentStyle !== 'direct' && !session(sessionId).agent.settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
   const forced = steerNote(gate, confirmFirst);
   // The route goes first: an instruction buried after the context was followed after the prompt's own steps.
-  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId)}\n</app_context>`, parts));
+  const askFirst = session(sessionId).agent.questionRound === 0;
+  pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
 }
 
