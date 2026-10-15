@@ -1,0 +1,22 @@
+/* Sidebar destinations (SidebarNav.tsx) and the narrow bar's icon-only rule. Tokens only. */
+.side-scroll { flex: 1; min-height: 0; width: 100%; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; gap: var(--sp-1); scrollbar-width: thin; }
+.sidebar:not(.is-wide) .side-label { display: none; }
+.sidebar:not(.is-wide) .side-btn { height: 40px; }
+.nav-section { display: flex; flex-direction: column; gap: var(--sp-1); margin-top: var(--sp-2); }
+.nav-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-1) var(--sp-2); color: var(--text-3); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; }
+.nav-head:hover { color: var(--text-2); }
+.nav-head svg { transition: transform .12s; }
+.nav-head svg.is-closed { transform: rotate(-90deg); }
+.nav-list { display: flex; flex-direction: column; gap: 2px; }
+.nav-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-1); }
+.nav-item { display: flex; align-items: center; gap: var(--sp-2); border-radius: var(--r-s); color: var(--text-2); font-size: var(--fs-m); text-align: left; }
+.nav-item:hover:not(:disabled) { color: var(--text); background: var(--surface-3); }
+.nav-item:disabled { opacity: .5; cursor: default; }
+.nav-item.is-active { color: var(--accent); background: var(--accent-soft); }
+.nav-item.is-row { height: 30px; padding: 0 var(--sp-2); }
+.nav-list.is-tall .nav-item.is-row { height: 38px; }
+.nav-item.is-tile { flex-direction: column; justify-content: center; gap: var(--sp-1); height: 56px; padding: var(--sp-1); font-size: var(--fs-s); border: 1px solid var(--border); border-radius: var(--r-m); }
+.nav-soon { margin-left: auto; font-size: var(--fs-xs); color: var(--text-4); }
+.nav-more { color: var(--text-3); font-size: var(--fs-s); }
+.nav-flyout { display: grid; gap: var(--sp-2); padding: var(--sp-2); }
+.nav-flyout .nav-item.is-tile { height: 68px; }

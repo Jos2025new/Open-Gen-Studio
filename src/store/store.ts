@@ -107,6 +107,8 @@ export interface Toast {
 
 export interface UiState {
   workspace: Workspace;
+  /** The Home view is showing instead of the workspace; any destination clears it. */
+  home?: boolean;
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */

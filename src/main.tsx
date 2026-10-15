@@ -12,6 +12,8 @@ import './styles/node.css';
 import './styles/designer.css';
 import './styles/prompt-box.css';
 import './styles/designer-connected.css';
+import './styles/sidebar-nav.css';
+import './styles/home.css';
 import { App } from './App';
 
 createRoot(document.getElementById('root')!).render(

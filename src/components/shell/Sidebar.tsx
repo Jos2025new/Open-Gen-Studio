@@ -1,12 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FolderOpen, Wallet, PanelLeftClose, PanelLeftOpen, PanelTopClose, PanelTopOpen, Plus } from 'lucide-react';
 import { newSession, setUi, useStore } from '../../store/store';
-import type { Workspace } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { ProviderPool } from './ProviderPool';
 import { usePref } from '../ui/hooks';
-import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
-import { Popover, usePopover } from '../ui/Popover';
+import { SidebarNav } from './SidebarNav';
+import { openHome } from './navModel';
 
 /**
  * Library: a drawer (a rounded box, the line of its top, a handle below it), drawn here: lucide's archive box has a
@@ -26,36 +25,26 @@ function HomeIcon() {
   </svg>;
 }
 
-/** Home: one button for the three canvases (Chat, Node, Designer); the one open is marked in its menu. */
-function HomeMenu({ workspace }: { workspace: Workspace }) {
-  const pop = usePopover();
-  const current = WORKSPACES.find((w) => w.id === workspace);
-  // Opens on hover (a click still toggles it, for touch); a short grace lets the pointer cross into the menu.
-  const closing = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const keep = () => { if (closing.current) clearTimeout(closing.current); closing.current = null; };
-  const show = () => { keep(); pop.setOpen(true); };
-  const hide = () => { keep(); closing.current = setTimeout(pop.close, 220); };
-  return <>
-    <button
-      onPointerEnter={(e) => { if (e.pointerType === 'mouse') show(); }}
-      onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}
-      ref={pop.ref}
-      type="button"
-      className={`side-btn is-active`}
-      aria-label={`Home — ${current?.label ?? ''} canvas`}
-      aria-haspopup="menu"
-      aria-expanded={pop.open}
-      onClick={pop.toggle}
-    >
-      <HomeIcon />
-      <span className="side-label">Home</span>
-    </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={240} label="Canvases">
-      <div className="menu" role="menu" onPointerEnter={keep} onPointerLeave={(e) => { if (e.pointerType === 'mouse') hide(); }}>
-        <WorkspaceMenuItems workspace={workspace} onClose={pop.close} />
-      </div>
-    </Popover>
-  </>;
+/** Home: opens the Home view (the three workspaces live under Spaces). */
+function HomeButton({ home }: { home: boolean }) {
+  return <button type="button" className={`side-btn ${home ? 'is-active' : ''}`} aria-label="Home" aria-current={home ? 'page' : undefined} data-tip="Home" data-tip-side="right" onClick={openHome}>
+    <HomeIcon />
+    <span className="side-label">Home</span>
+  </button>;
+}
+
+/** The bar shows its icon-only form below this width whatever the saved preference. */
+function useNarrowScreen(): boolean {
+  const query = '(max-width: 767px)';
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia?.(query);
+    if (!m) return;
+    const on = () => setNarrow(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return narrow;
 }
 
 export function Sidebar() {
@@ -64,6 +53,8 @@ export function Sidebar() {
   const remaining = useStore((s) => (s.settings.budgetOn ? s.settings.budgetUsd - s.spentUsd : null));
   const spent = useStore((s) => s.spentUsd);
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
+  const home = useStore((s) => !!s.ui.home);
+  const narrow = useNarrowScreen();
   const sidebarRef = useRef<HTMLElement>(null);
   const [wide, setWide] = usePref('ogs:sidebar-wide', false);
   const [folded, setFolded] = usePref('ogs:sidebar-folded', false);
@@ -99,12 +90,12 @@ export function Sidebar() {
     window.addEventListener('resize', alignBudget);
     alignBudget();
     return () => { observer.disconnect(); window.removeEventListener('resize', alignBudget); };
-  }, [workspace, wide, folded]);
+  }, [workspace, wide, folded, home]);
 
   const togglePanel = (p: 'gallery' | 'sessions' | 'spending') => setUi((u) => ({ panel: u.panel === p ? null : p }));
 
   return (
-    <nav ref={sidebarRef} className={`sidebar ${folded ? 'is-folded' : ''}`} aria-label="Main">
+    <nav ref={sidebarRef} className={`sidebar ${folded ? 'is-folded' : ''} ${wide && !narrow && !folded ? 'is-wide' : ''}`} aria-label="Main">
       <div className="brand">
         <span className="brand-mark" aria-hidden />
         <span className="brand-name">Open Gen Studio</span>
@@ -129,10 +120,10 @@ export function Sidebar() {
           <Plus size={18} strokeWidth={2} />
           <span className="side-label wide-only">New session</span>
         </button>
-        <HomeMenu workspace={workspace} />
+        <HomeButton home={home} />
       </div>
-      <div className="side-sep" />
-      <div className="side-group">
+      <div className="side-scroll"><SidebarNav wide={wide && !narrow && !folded} /></div>
+      <div className="side-group side-footer">
         <button
           type="button"
           className={`side-btn ${panel === 'sessions' ? 'is-open' : ''}`}
@@ -158,9 +149,6 @@ export function Sidebar() {
           <span className="side-label">Library</span>
           {running ? <span className="side-badge num">{running}</span> : null}
         </button>
-      </div>
-      <div className="side-spacer" />
-      <div className="side-group side-footer">
         <button
           type="button"
           className={`side-btn ${panel === 'spending' ? 'is-open' : ''}`}

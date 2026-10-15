@@ -29,6 +29,7 @@
 - [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
+- [home y barra lateral: vista Home, secciones Spaces/Create/Tools](features/home.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
 - [selección y marquee de Edit por modo](features/designer-selection.md).
 - [cuota provisional de trazos raster](raster-limit.md).

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useStore } from './store/store';
+import { setUi, useStore } from './store/store';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
 import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
 import { settleInterruptedPlans } from './engine/agent/runtime';
@@ -15,12 +15,17 @@ import { DesignerWorkspace } from './components/designer/DesignerWorkspace';
 import { Composer } from './components/composer/Composer';
 import { Toasts } from './components/ui/Toasts';
 import { TooltipLayer } from './components/ui/TooltipLayer';
+import { HomeView } from './components/shell/HomeView';
 import { TraceControl } from './components/shell/TraceControl';
 
 export function App() {
   const hydrated = useStore((s) => s.hydrated);
   const workspace = useStore((s) => s.ui.workspace);
+  const home = useStore((s) => !!s.ui.home);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+
+  // Reaching a workspace by any route (top bar, session switch) leaves Home.
+  useEffect(() => { setUi({ home: false }); }, [workspace]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -56,9 +61,10 @@ export function App() {
         <Sidebar />
         <main className="main">
           <TopBar slotRef={setSlot} />
-          <div className={`workspace ws-${workspace}`}>
+          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''}`}>
             {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
             <Composer />
+            {home ? <HomeView /> : null}
           </div>
         </main>
         <SidePanel />
