@@ -28,6 +28,7 @@ import { ADAPTERS } from './providers/registry';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
+import { withRealism } from './realism';
 import { rolesPhrase, type RefRole } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
@@ -550,6 +551,8 @@ async function execute(id: string): Promise<string[]> {
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
+    // Photographic conditions: the single point where realism enters an image prompt.
+    const shown = kind === 'image' && (!g.op || REALISM_OPS.includes(g.op.id)) ? withRealism(prompt, g.settings.realism) : prompt;
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];
@@ -571,7 +574,7 @@ async function execute(id: string): Promise<string[]> {
         kind,
         model,
         schema,
-        prompt: variants ? `${prompt}\n${variants[done]}` : prompt,
+        prompt: variants ? `${shown}\n${variants[done]}` : shown,
         settings,
         count: n,
         refs,
@@ -1089,6 +1092,8 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
 }
 
 /** Build the same operation parameters using an already chosen model and in-memory schema. No selection or I/O. */
+const REALISM_OPS: OpId[] = ['edit', 'relight', 'angle', 'replace_background'];
+
 /** "Image 2 = lighting reference only…" for the extra images of an edit op (the source is Image 1). */
 function opRolesLine(input: OpSpecInput, modelRef: string, schema: ModelSchema | undefined): string {
   const raw = input.params._refRoles;

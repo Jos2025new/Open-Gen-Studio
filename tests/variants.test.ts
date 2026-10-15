@@ -28,6 +28,6 @@ describe('candidates with their own variation', () => {
     } finally {
       ADAPTERS.local.generate = real;
     }
-    expect(prompts[0]).toMatch(/gamer girl sheet\npink hair$/);
+    expect(prompts[0]).toMatch(/^gamer girl sheet Photographic realism[^\n]*\npink hair$/);
   });
 });

@@ -1,0 +1,20 @@
+import { describe, expect, it } from 'vitest';
+import { withRealism } from '../src/engine/realism';
+
+describe('realism', () => {
+  it('is photographic by default', () => {
+    const t = withRealism('A woman reading by a window.');
+    expect(t).toContain('Photographic realism: believable natural light with slight imperfections');
+    expect(t).not.toMatch(/8k|masterpiece/i);
+  });
+  it('none leaves the prompt untouched', () => {
+    expect(withRealism('A woman reading.', 'none')).toBe('A woman reading.');
+  });
+  it('another medium is left alone', () => {
+    expect(withRealism('An anime girl in a garden')).toBe('An anime girl in a garden');
+  });
+  it('ugc and studio differ', () => {
+    expect(withRealism('x', 'ugc')).toContain('Candid phone-camera realism');
+    expect(withRealism('x', 'studio')).toContain('Studio photographic realism');
+  });
+});

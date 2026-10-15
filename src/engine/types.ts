@@ -199,6 +199,8 @@ export interface ModelSchema {
 export type AdvancedValue = string | number | boolean;
 
 export interface GenSettings {
+  /** Photographic conditions added to realistic image prompts; default 'photographic'. */
+  realism?: 'photographic' | 'ugc' | 'studio' | 'none';
   aspect?: string;
   resolution?: string;
   count: number;
