@@ -36,7 +36,7 @@ export interface OpDef {
 
 const opt = (...pairs: Array<[string, string]>) => pairs.map(([value, label]) => ({ value, label }));
 
-const PRESERVE = 'Keep the subject identity, composition, pose, materials and every detail unchanged.';
+const PRESERVE = 'Keep the identity, face, clothing, materials and colors of the subject consistent; the camera position, pose visibility, shadows and occlusions may change.';
 
 export const OPS: Record<OpId, OpDef> = {
   relight: {
@@ -150,7 +150,7 @@ export const OPS: Record<OpId, OpDef> = {
         'close-up': 'a tighter close-up framing',
         wide: 'a wider establishing shot',
       };
-      return `Change only the camera viewpoint: show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}, re-rendering perspective and occlusion consistently. Keep identity, face, outfit, materials, colors, lighting and style. Do not add new objects, people or scenery.${note(p)}`;
+      return `Change only the camera viewpoint: show the exact same subject and scene from ${names[String(p.angle)] ?? p.angle}, re-rendering perspective and occlusion consistently. Keep identity, face, outfit, materials, colors and style; let shadows adapt to the new viewpoint. Do not add new objects, people or scenery.${note(p)}`;
     },
   },
   upscale: {
