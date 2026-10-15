@@ -25,6 +25,11 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
     const st = useStore.getState();
     const g = st.generations[id];
     runs.push(g.stepId ?? id);
+    if (mode === 'live') {
+      // The job was submitted and is still rendering at the provider; nothing follows it locally any more.
+      useStore.setState({ generations: { ...st.generations, [id]: { ...g, status: 'running', remoteJob: { provider: 'atlas', id: 'job_live' } as never } } });
+      return [];
+    }
     if (mode === 'empty') {
       // The runner resolved, but the generation holds no result: nothing was made.
       useStore.setState({ generations: { ...st.generations, [id]: { ...g, status: 'done', assetIds: [] } } });
@@ -109,6 +114,13 @@ describe('a step is done only if its generation finished with results (T1)', () 
     const result = await executeSteps([oneStep], { sessionId: sid(), workspace: 'chat', origin: 'agent', onState: () => undefined });
     expect(result.failed).toHaveLength(1);
     expect(result.failed[0].error).toMatch(/Stopped waiting after 10 min/);
+  });
+
+  it('a step whose job is still live at the provider waits; it is not reported as failed', async () => {
+    mode = 'live';
+    const result = await executeSteps([oneStep], { sessionId: sid(), workspace: 'chat', origin: 'agent', onState: () => undefined });
+    expect(result.failed).toHaveLength(0);
+    expect(result.waiting).toContain('s1');
   });
 
   it('a text result (transcription, lyrics) finishes with no files and stays done', async () => {
