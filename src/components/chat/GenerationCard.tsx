@@ -131,6 +131,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
   const [expanded, setExpanded] = useState(false);
   const regen = usePopover();
   const del = usePopover();
+  const stopFollowing = usePopover();
   const info = usePopover();
   // Text from a lyrics model (MiniMax Lyrics), as opposed to a transcription or an id.
   const lyrics = useStore((s) => Boolean(g && s.catalog.models[g.modelRef]?.textOutput));
@@ -317,7 +318,10 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           </>
         ) : null}
         {/* Stop while it runs; Delete once it is over. Both stand apart, at the far end. */}
-        {busy ? (
+        {busy && g.remoteJob ? (
+          // Submitted: the provider keeps going and charges it, so stopping only stops following it here.
+          <IconButton ref={stopFollowing.ref} icon={CircleStop} label="Dejar de seguir" size="sm" tone="danger" active={stopFollowing.open} className="gen-delete" onClick={stopFollowing.toggle} />
+        ) : busy ? (
           <IconButton icon={CircleStop} label="Stop" size="sm" tone="danger" className="gen-delete" onClick={() => cancelGeneration(g.id)} />
         ) : (
           <IconButton ref={del.ref} icon={Trash} label="Delete" size="sm" tone="danger" active={del.open} className="gen-delete" onClick={del.toggle} />
@@ -356,6 +360,27 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
               }}
             >
               Delete
+            </Button>
+          </div>
+        </div>
+      </Popover>
+      <Popover open={stopFollowing.open} anchor={stopFollowing.ref} onClose={stopFollowing.close} width={300} label="Dejar de seguir">
+        <div className="confirm">
+          <p>
+            {`${g.remoteJob?.provider ?? 'The provider'} keeps generating this and will charge the estimate (${formatUsd(g.estimate.usd)}). Stopping only stops following it here; Check status can pick it up again.`}
+          </p>
+          <div className="spend-actions">
+            <Button variant="ghost" onClick={stopFollowing.close}>
+              Keep following
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                stopFollowing.close();
+                cancelGeneration(g.id);
+              }}
+            >
+              Dejar de seguir
             </Button>
           </div>
         </div>
