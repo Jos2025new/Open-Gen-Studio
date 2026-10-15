@@ -18,3 +18,11 @@ describe('realism', () => {
     expect(withRealism('x', 'studio')).toContain('Studio photographic realism');
   });
 });
+
+import { opRealism } from '../src/engine/realism';
+describe('opRealism', () => {
+  const op = { id: 'edit' };
+  it('edit without explicit realism: no clause', () => expect(opRealism({ op, settings: {} }, 'image', 'make the coat red')).toBe('make the coat red'));
+  it('edit with explicit ugc: clause', () => expect(opRealism({ op, settings: { realism: 'ugc' } }, 'image', 'x')).toContain('Candid phone-camera realism'));
+  it('new generation: default photographic', () => expect(opRealism({ settings: {} }, 'image', 'a cup')).toContain('Photographic realism'));
+});

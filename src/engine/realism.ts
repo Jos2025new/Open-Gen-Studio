@@ -17,10 +17,10 @@ export function withRealism(prompt: string, mode: Realism = 'photographic'): str
   return `${text} ${CLAUSE[mode]}`;
 }
 
-const OPS_WITH_REALISM = ['edit', 'relight', 'angle', 'replace_background'];
-/** Realism for a generation request: image generations and the edit ops that redraw the picture. */
-export function opRealism(g: { op?: { id: string }; settings: { realism?: Realism } }, kind: string, prompt: string): string {
-  return kind === 'image' && (!g.op || OPS_WITH_REALISM.includes(g.op.id)) ? withRealism(prompt, g.settings.realism) : prompt;
+/** Image generations get realism by default; edits of a source image only when realism is set explicitly (the source's style rules). */
+export function opRealism(g: { op?: unknown; settings: { realism?: Realism } }, kind: string, prompt: string): string {
+  if (kind !== 'image' || (g.op && !g.settings.realism)) return prompt;
+  return withRealism(prompt, g.settings.realism);
 }
 
 export const withRealismSetting = <S extends object>(settings: S, kind: string, realism?: Realism): S => (realism && kind === 'image' ? { ...settings, realism } : settings);
