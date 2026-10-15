@@ -551,7 +551,7 @@ async function execute(id: string): Promise<string[]> {
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
-    const shown = opRealism(g, kind, prompt);
+    const shown = opRealism(g, kind, prompt, model.id);
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];

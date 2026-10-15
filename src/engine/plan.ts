@@ -3,7 +3,7 @@ import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectE
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { normalizeStepRefs, opStepRefs, stepRolesLine, type RefSpec } from './refRoles';
+import { normalizeStepRefs, opStepRefs, placeRoles, stepRolesLine, type RefSpec } from './refRoles';
 import { videoFix } from './planFix';
 import { withRealismSetting, type Realism } from './realism';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
@@ -693,7 +693,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
         const rolesLine = stepRolesLine(stepRoles.get(s.id!), imageRefs, modelRef, schema.slots.promptRefs, where, errors);
-        const prompt = rolesLine + (kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim());
+        const prompt = placeRoles(rolesLine, kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim(), modelRef, kind);
         // A prompt that cites an image the step does not carry would make something new (another person, another
         // product): the reference was forgotten, not dropped on purpose.
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];

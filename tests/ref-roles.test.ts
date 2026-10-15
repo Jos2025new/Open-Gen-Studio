@@ -41,3 +41,12 @@ import { detectOps } from '../src/engine/agent/triggers';
 it('replace_background is detected from the request', () => {
   expect(detectOps('cambia el fondo por una calle')).toContain('replace_background');
 });
+
+import { placeRoles } from '../src/engine/refRoles';
+describe('placeRoles', () => {
+  it('flux and video: after the first sentence', () => {
+    expect(placeRoles('Image 1 = identity: keep face and body. ', 'A woman runs. Rain falls.', 'fal::flux-2', 'image')).toBe('A woman runs. Image 1 = identity: keep face and body. Rain falls.');
+    expect(placeRoles('R. ', 'A woman runs. Rain.', 'x', 'video')).toBe('A woman runs. R. Rain.');
+  });
+  it('others: first', () => expect(placeRoles('R. ', 'A woman runs.', 'gpt-image', 'image')).toBe('R. A woman runs.'));
+});

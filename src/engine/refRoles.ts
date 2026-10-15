@@ -101,3 +101,10 @@ export function opStepRefs(engine: string, opId: string, ids: string[], roles: R
   for (const r of got.refs) if (!['image', 'raster', undefined, null].includes(kindOf(r.ref, where))) errors.push(`${where}: ref "${r.ref}" must be an image.`);
   return got.refs;
 }
+
+/** Roles go first; flux and video prompts lead with the shot, so there they follow its first sentence. */
+export function placeRoles(line: string, prompt: string, modelId: string, kind: string): string {
+  if (!line || !(kind === 'video' || /flux/i.test(modelId))) return line + prompt;
+  const m = prompt.match(/^.*?[.!?](\s|$)/s);
+  return m ? `${m[0].trimEnd()} ${line}${prompt.slice(m[0].length)}`.trimEnd() : `${prompt} ${line}`.trimEnd();
+}

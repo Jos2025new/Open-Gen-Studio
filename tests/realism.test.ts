@@ -26,3 +26,13 @@ describe('opRealism', () => {
   it('edit with explicit ugc: clause', () => expect(opRealism({ op, settings: { realism: 'ugc' } }, 'image', 'x')).toContain('Candid phone-camera realism'));
   it('new generation: default photographic', () => expect(opRealism({ settings: {} }, 'image', 'a cup')).toContain('Photographic realism'));
 });
+
+describe('realism policy', () => {
+  it('none for ideogram and recraft', () => { expect(withRealism('a cafe scene', 'photographic', 'fal::ideogram-v3')).toBe('a cafe scene'); expect(withRealism('a cup', 'photographic', 'recraft-v3')).toBe('a cup'); });
+  it('short for krea', () => { const t = withRealism('a cup', 'photographic', 'krea-1'); expect(t).toBe('a cup Natural light, real textures, plausible lens, restrained retouching.'); });
+  it('never on JSON', () => expect(withRealism('{"prompt":"x"}')).toBe('{"prompt":"x"}'));
+  it('not with a style reference', () => expect(withRealism('Image 1 = style reference only: do not copy its subject or content. a cup')).not.toContain('Photographic realism'));
+  it('photoreal sketch render still applies', () => { expect(withRealism('photorealistic render of this sketch')).toContain('Photographic realism'); expect(withRealism('a pencil sketch of a cup')).toBe('a pencil sketch of a cup'); });
+  it('poster is not photographic', () => expect(withRealism('a poster for a gig')).toBe('a poster for a gig'));
+  it('no duplicate when photographic vocabulary exists', () => expect(withRealism('portrait, 85mm, f/1.8, golden hour')).toBe('portrait, 85mm, f/1.8, golden hour'));
+});
