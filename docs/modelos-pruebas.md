@@ -55,3 +55,7 @@ Comprueban si los modelos **responden al prompting** de la app. Separado de [flu
 ## Pendiente de este bloque
 
 Prueba visual de ambas ramas en sandbox (ninguna hecha); 5c: cómo se ven en ajustes los esfuerzos no admitidos; un paso `op` del plan aún no admite `realism` explícito; añadir fecha/modelo/proveedor a `agentMetrics`.
+
+## Vídeo: caso Wan de las 3 chicas 💲
+
+- [ ] Repetir el caso Wan 3.0 reference-to-video de las 3 chicas (10 s, mismo mensaje en español) y comprobar: prompt en inglés, menos planos (2–5 s cada uno, una acción física), restricciones agrupadas al final en positivo, audio mínimo (ambiente más un elemento) y la estatura con un objeto de escala visible. Coste: 1 vídeo; fijar el máximo antes.
