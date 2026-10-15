@@ -3,6 +3,7 @@ import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectE
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
+import { rolesPhrase, splitRefs, type RefSpec, type RoleRef } from './refRoles';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
@@ -60,7 +61,7 @@ export interface RawStep {
   duration?: number;
   audio?: boolean;
   seed?: number;
-  refs?: string[];
+  refs?: RefSpec[];
   times?: Array<number | null>;
   shots?: Array<{ prompt: string; duration: number }>;
   first_frame?: string;
@@ -395,6 +396,15 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   const fit = fitState(Boolean(ctx.direct?.()), ctx.canAsk?.() ?? true, ctx.answered?.() ?? false);
   const planFit = fitPlanSteps(Array.isArray(raw.steps) ? raw.steps : [], ctx.requestText?.() ?? '', fit);
   const rawSteps = planFit.steps;
+  // Refs with a role ({ref, role}) become plain ids here; the roles are kept per step for the prompt.
+  const stepRoles = new Map<string, RoleRef[]>();
+  for (const s of rawSteps) {
+    if (!s.refs?.some((r) => typeof r !== 'string')) continue;
+    const { ids, roles, problems } = splitRefs(s.refs);
+    errors.push(...problems.map((m) => `Step ${s.id}: ${m}`));
+    s.refs = ids;
+    stepRoles.set(s.id!, roles);
+  }
   errors.push(...planFit.errors);
   adjustments.push(...planFit.adjustments);
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
@@ -536,7 +546,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         // The start frame listed again in refs is the same input twice: keep it as the start frame only.
         if (s.first_frame && s.refs?.includes(s.first_frame)) s.refs = s.refs.filter((r) => r !== s.first_frame);
-        const refs = (s.refs ?? []).filter(Boolean);
+        const refs = ((s.refs ?? []) as string[]).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
           if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step. Fix: write the text in "prompt" and drop prompt_from (an image or clip goes in refs or first_frame).`);
@@ -702,7 +712,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
-        const prompt = kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim();
+        const roles = stepRoles.get(s.id!) ?? [];
+        for (const r of roles) if (!imageRefs.includes(r.ref)) errors.push(`${where}: role "${r.role}" is on "${r.ref}", which is not an image in refs.`);
+        const rolesLine = roles.length ? rolesPhrase(modelRef, imageRefs, roles, schema.slots.promptRefs) : '';
+        const prompt = (rolesLine ? `${rolesLine} ` : '') + (kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim());
         // A prompt that cites an image the step does not carry would make something new (another person, another
         // product): the reference was forgotten, not dropped on purpose.
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];

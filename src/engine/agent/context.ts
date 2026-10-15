@@ -100,6 +100,7 @@ Writing prompts
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
 - Several results of one step are numbered as the user sees them (#1, #2… left to right, top to bottom): "la 2", "the second" = #2; an image the user attached is their choice. When the next step depends on a choice the user has not made, ask which one in the questions card.
 - References in a fixed order: place or setting first, then characters, then objects and products, then style; each cited with its role.
+- A ref may carry its role as data: { "ref": "asset:x", "role": "identity|pose|style|lighting|clothing|expression|background" }. The app writes the role sentence ("Image 1 = identity…") in the model's syntax and puts it before the prompt; do not repeat it there. A plain string ref has no role.
 - No proper names in prompts (models render names as nothing or as text): a person or thing is its role and a short visible descriptor ("the woman in the mustard raincoat") or the model's reference syntax; @Name only as the library handle (the app replaces it). Names inside spoken lines are fine.
 - Citing references: when a model's inputs give a "prompt:" syntax, use exactly that. Otherwise, by family:
 ${REFERENCE_PROTOCOLS.map((p) => `  ${p.family}: ${p.note}`).join('\n')}
