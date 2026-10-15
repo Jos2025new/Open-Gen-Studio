@@ -51,3 +51,53 @@ export const OP_REF_ROLES: Partial<Record<string, RefRole[]>> = {
   relight: ['lighting'],
   replace_background: ['background'],
 };
+
+/** "Image 2 = lighting reference only…" for the extra images of an edit op (the source is Image 1). */
+export function opRolesLine(params: Record<string, unknown>, source: string, modelRef: string, schema?: { slots: { promptRefs?: string } }): string {
+  const raw = params._refRoles;
+  if (typeof raw !== 'string' || !raw) return '';
+  const got = JSON.parse(raw) as Array<{ asset: string; role: RefRole; note?: string }>;
+  const line = rolesPhrase(modelRef, [source, ...got.map((g) => g.asset)], got.map((g) => ({ ref: g.asset, role: g.role, note: g.note })), schema?.slots.promptRefs);
+  return line ? `${line} ` : '';
+}
+
+/** Op-step refs: ids with their role (default = the op's first role); problems for roles the op does not take. */
+export function opRefList(opId: string, ids: string[], roles: RoleRef[]): { refs: Array<{ ref: string; role: RefRole; note?: string }>; problems: string[] } {
+  const allowed = OP_REF_ROLES[opId];
+  if (!allowed) return { refs: [], problems: [`op "${opId}" takes no refs.`] };
+  const problems: string[] = [];
+  const refs = ids.map((ref) => {
+    const found = roles.find((r) => r.ref === ref);
+    const role = found?.role ?? allowed[0];
+    if (!allowed.includes(role)) problems.push(`op "${opId}" takes refs with role ${allowed.join(' or ')}, not "${role}".`);
+    return { ref, role, note: found?.note };
+  });
+  return { refs, problems };
+}
+
+/** Refs written as { ref, role } become plain ids on the raw steps; returns the roles per step id. */
+export function normalizeStepRefs(steps: Array<{ id?: string; refs?: RefSpec[] }>, errors: string[]): Map<string, RoleRef[]> {
+  const byStep = new Map<string, RoleRef[]>();
+  for (const s of steps) {
+    if (!s.refs?.some((r) => typeof r !== 'string')) continue;
+    const { ids, roles, problems } = splitRefs(s.refs);
+    errors.push(...problems.map((m) => `Step ${s.id}: ${m}`));
+    s.refs = ids;
+    byStep.set(s.id!, roles);
+  }
+  return byStep;
+}
+
+/** The role sentence of a media step, with its trailing space ('' without roles); a role on a ref that is not an image is an error. */
+export function stepRolesLine(roles: RoleRef[] | undefined, images: string[], modelId: string, promptRefs: string | undefined, where: string, errors: string[]): string {
+  for (const r of roles ?? []) if (!images.includes(r.ref)) errors.push(`${where}: role "${r.role}" is on "${r.ref}", which is not an image in refs.`);
+  return roles?.length ? `${rolesPhrase(modelId, images, roles, promptRefs)} ` : '';
+}
+
+/** The refs of an op step, checked: only edit ops take them, with their roles, and they must be images. */
+export function opStepRefs(engine: string, opId: string, ids: string[], roles: RoleRef[] | undefined, where: string, errors: string[], kindOf: (ref: string, where: string) => string | null | undefined): Array<{ ref: string; role: RefRole; note?: string }> {
+  const got = engine === 'edit' ? opRefList(opId, ids, roles ?? []) : { refs: [], problems: [`op "${opId}" takes no refs.`] };
+  errors.push(...got.problems.map((m) => `${where}: ${m}`));
+  for (const r of got.refs) if (!['image', 'raster', undefined, null].includes(kindOf(r.ref, where))) errors.push(`${where}: ref "${r.ref}" must be an image.`);
+  return got.refs;
+}

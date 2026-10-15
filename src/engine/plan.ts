@@ -3,7 +3,9 @@ import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectE
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { OP_REF_ROLES, rolesPhrase, splitRefs, type RefSpec, type RoleRef } from './refRoles';
+import { normalizeStepRefs, opStepRefs, stepRolesLine, type RefSpec } from './refRoles';
+import { videoFix } from './planFix';
+import { withRealismSetting, type Realism } from './realism';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
@@ -62,7 +64,7 @@ export interface RawStep {
   audio?: boolean;
   seed?: number;
   refs?: RefSpec[];
-  realism?: 'photographic' | 'ugc' | 'studio' | 'none';
+  realism?: Realism;
   times?: Array<number | null>;
   shots?: Array<{ prompt: string; duration: number }>;
   first_frame?: string;
@@ -113,21 +115,6 @@ function familyRef(ctx: PlanContext, model: string | undefined, kind: MediaKind,
 function didYouMean(ctx: PlanContext, ref: string, kind: MediaKind, needsImage: boolean): string {
   const near = ctx.suggestModel?.(ref, kind, needsImage);
   return near ? ` Did you mean "${near}"?` : ' Use a listed model ref, one returned by find_models, or omit "model".';
-}
-
-/** The exact change that makes a video step's inputs fit its model (O2: constructive errors, one round). */
-function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; images: string[]; videos: string[] }, named: boolean): string {
-  const other = named ? ' Or leave "model" out: the app picks a model for these inputs.' : '';
-  if (n.firstFrame && !slots.firstFrame) return `move first_frame "${n.firstFrame}" into refs, or drop it.${other}`;
-  const imageMax = slots.mixedRefs?.max ?? slots.keyframes?.max ?? slots.images?.max ?? 0;
-  if (n.images.length > imageMax) {
-    if (!imageMax && slots.firstFrame && !n.firstFrame) return `first_frame: "${n.images[0]}" and drop refs.${other}`;
-    return imageMax ? `refs: [${n.images.slice(0, imageMax).map((r) => `"${r}"`).join(', ')}] (drop ${n.images.slice(imageMax).join(', ')}).${other}` : `drop ${n.images.join(', ')} from refs (this model takes only first_frame).${other}`;
-  }
-  const videoMax = slots.mixedRefs?.max ?? (slots.clips ?? slots.refVideos)?.max ?? 0;
-  if (n.videos.length > videoMax) return `keep ${videoMax} video(s) in refs (drop ${n.videos.slice(videoMax).join(', ')}).${other}`;
-  if (slots.firstFrame?.required && !n.firstFrame) return `set first_frame to an image step or asset:<id>.${other}`;
-  return `add the missing input (an image step or asset:<id> in refs).${other}`;
 }
 
 /** Words that name a route or tier, not a model family ("image to video", "pro", "developer"). */
@@ -397,15 +384,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   const fit = fitState(Boolean(ctx.direct?.()), ctx.canAsk?.() ?? true, ctx.answered?.() ?? false);
   const planFit = fitPlanSteps(Array.isArray(raw.steps) ? raw.steps : [], ctx.requestText?.() ?? '', fit);
   const rawSteps = planFit.steps;
-  // Refs with a role ({ref, role}) become plain ids here; the roles are kept per step for the prompt.
-  const stepRoles = new Map<string, RoleRef[]>();
-  for (const s of rawSteps) {
-    if (!s.refs?.some((r) => typeof r !== 'string')) continue;
-    const { ids, roles, problems } = splitRefs(s.refs);
-    errors.push(...problems.map((m) => `Step ${s.id}: ${m}`));
-    s.refs = ids;
-    stepRoles.set(s.id!, roles);
-  }
+  const stepRoles = normalizeStepRefs(rawSteps, errors);
   errors.push(...planFit.errors);
   adjustments.push(...planFit.adjustments);
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
@@ -713,10 +692,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
-        const roles = stepRoles.get(s.id!) ?? [];
-        for (const r of roles) if (!imageRefs.includes(r.ref)) errors.push(`${where}: role "${r.role}" is on "${r.ref}", which is not an image in refs.`);
-        const rolesLine = roles.length ? rolesPhrase(modelRef, imageRefs, roles, schema.slots.promptRefs) : '';
-        const prompt = (rolesLine ? `${rolesLine} ` : '') + (kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim());
+        const rolesLine = stepRolesLine(stepRoles.get(s.id!), imageRefs, modelRef, schema.slots.promptRefs, where, errors);
+        const prompt = rolesLine + (kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim());
         // A prompt that cites an image the step does not carry would make something new (another person, another
         // product): the reference was forgotten, not dropped on purpose.
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
@@ -762,7 +739,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else settings.count = variations.length;
         }
         if (kind === 'image' || kind === 'model3d') {
-          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: s.realism && kind === 'image' ? { ...settings, realism: s.realism } : settings, refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
+          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: withRealismSetting(settings, kind, s.realism), refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
         } else {
           steps.push({
             id: s.id!,
@@ -875,21 +852,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         // Otherwise the confirmed (or, in Direct, the composer's) image model runs it, in its edit variant (ADR 0009).
         const opModel = def.engine === 'edit' && !params._modelRef ? ctx.opModel?.() : undefined;
         if (opModel) params._modelRef = ctx.variantModel?.(opModel, 'edit') ?? opModel;
-        let opRefs: OpStep['refs'];
-        if (s.refs?.length) {
-          const roles = stepRoles.get(s.id!) ?? [];
-          const allowed = OP_REF_ROLES[opId];
-          if (def.engine !== 'edit' || !allowed) errors.push(`${where}: op "${opId}" takes no refs.`);
-          else {
-            opRefs = (s.refs as string[]).map((ref) => {
-              const role = roles.find((r) => r.ref === ref)?.role ?? allowed[0];
-              if (!allowed.includes(role)) errors.push(`${where}: op "${opId}" takes refs with role ${allowed.join(' or ')}, not "${role}".`);
-              const k = refKind(ref, where);
-              if (k && k !== 'image' && k !== 'raster') errors.push(`${where}: ref "${ref}" must be an image, it is ${k}.`);
-              return { ref, role, note: roles.find((r) => r.ref === ref)?.note };
-            });
-          }
-        }
+        const opRefs = s.refs?.length ? opStepRefs(def.engine, opId, s.refs as string[], stepRoles.get(s.id!), where, errors, refKind) : undefined;
         let more: string[] | undefined;
         if (def.multiInput) {
           more = (Array.isArray(s.more) ? s.more : []).map((r) => String(r).trim()).filter(Boolean);
