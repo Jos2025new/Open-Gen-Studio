@@ -63,5 +63,5 @@ import { negFor } from '../src/engine/realism';
 describe('negative prompt', () => {
   it('filled when realism applied and none set', () => expect(negFor({ count: 1 } as { negative?: string }, true).negative).toBe('cartoon, illustration, painting, 3d render, airbrushed skin, plastic skin'));
   it('kept when the user set one', () => expect(negFor({ negative: 'blur' }, true).negative).toBe('blur'));
-  it('untouched when realism did not apply', () => expect(negFor({}, false).negative).toBeUndefined());
+  it('untouched when realism did not apply', () => expect(negFor({} as { negative?: string }, false).negative).toBeUndefined());
 });
