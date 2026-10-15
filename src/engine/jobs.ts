@@ -28,7 +28,7 @@ import { ADAPTERS } from './providers/registry';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
-import { opRealism } from './realism';
+import { opRealism, negFor } from './realism';
 import { opRolesLine } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
@@ -552,6 +552,7 @@ async function execute(id: string): Promise<string[]> {
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
     if (proposed) checkStepAuthorization(g, proposed);
     const shown = opRealism(g, kind, prompt, model.id);
+    genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
     const fallback = expectedDims(kind, g.settings);
     const assetIds: string[] = [];
     const delivered: Asset[] = [];

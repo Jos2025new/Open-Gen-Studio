@@ -48,6 +48,10 @@ Comprueban si los modelos **responden al prompting** de la app. Separado de [flu
 
 - [ ] Mensaje corto al agente → ~5 s esperado. Si son 10–30 s, anotar modelo, proveedor y hora (`agentMetrics` aún no los guarda).
 
+## Realismo: fichas de toma 💲
+
+- [ ] Comparar la cláusula antigua («plausible lens optics…») con las fichas de toma en Nano Banana, Seedream y GPT Image: ≈12 imágenes (4 escenas × 3 modelos), mismo prompt, mirar el «look IA». Coste: 12 imágenes.
+
 ## Pendiente de este bloque
 
 Prueba visual de ambas ramas en sandbox (ninguna hecha); 5c: cómo se ven en ajustes los esfuerzos no admitidos; un paso `op` del plan aún no admite `realism` explícito; añadir fecha/modelo/proveedor a `agentMetrics`.

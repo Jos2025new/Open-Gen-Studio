@@ -65,6 +65,7 @@ export interface RawStep {
   seed?: number;
   refs?: RefSpec[];
   realism?: Realism;
+  shot?: string;
   times?: Array<number | null>;
   shots?: Array<{ prompt: string; duration: number }>;
   first_frame?: string;
@@ -739,7 +740,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else settings.count = variations.length;
         }
         if (kind === 'image' || kind === 'model3d') {
-          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: withRealismSetting(settings, kind, s.realism), refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
+          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: withRealismSetting(settings, kind, s.realism, s.shot), refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
         } else {
           steps.push({
             id: s.id!,

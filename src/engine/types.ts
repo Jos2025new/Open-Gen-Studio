@@ -201,6 +201,8 @@ export type AdvancedValue = string | number | boolean;
 export interface GenSettings {
   /** Photographic conditions added to realistic image prompts; default 'photographic'. */
   realism?: 'photographic' | 'ugc' | 'studio' | 'none';
+  /** Shot sheet id (portrait, street, product, landscape, interior, food, pet, ugc, studio); chosen from the prompt when absent. */
+  shot?: string;
   aspect?: string;
   resolution?: string;
   count: number;
