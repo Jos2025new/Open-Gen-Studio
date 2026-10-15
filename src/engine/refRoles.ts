@@ -44,3 +44,10 @@ export function rolesPhrase(modelId: string, orderedImages: string[], roles: Rol
     .map(({ r, i }) => `${name(i)} = ${PHRASE[r.role]}${r.note ? ` (${r.note.replace(/[.\s]+$/, '')})` : ''}.`)
     .join(' ');
 }
+
+/** The roles an edit op takes for its extra images; the first is the default. */
+export const OP_REF_ROLES: Partial<Record<string, RefRole[]>> = {
+  edit: ['pose', 'expression', 'clothing'],
+  relight: ['lighting'],
+  replace_background: ['background'],
+};

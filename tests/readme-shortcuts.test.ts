@@ -15,6 +15,7 @@ const cell = (s: string) => s.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
 /** The reader's sentence for each tool and flow. The lists come from the code: a new one fails here until it has its line. */
 const TOOL_ES: Record<string, string> = {
   relight: 'Cambia la luz y conserva el sujeto.',
+  replace_background: 'Cambia el fondo y conserva al sujeto, sus bordes y su pelo.',
   angle: 'La misma escena vista desde otra cámara: de frente, de perfil, desde arriba…',
   upscale: 'Más resolución y más detalle (×2 o ×4).',
   remove_bg: 'Recorta el sujeto sobre fondo transparente.',

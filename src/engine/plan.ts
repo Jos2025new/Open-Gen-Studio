@@ -3,7 +3,7 @@ import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectE
 import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
-import { rolesPhrase, splitRefs, type RefSpec, type RoleRef } from './refRoles';
+import { OP_REF_ROLES, rolesPhrase, splitRefs, type RefSpec, type RoleRef } from './refRoles';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
@@ -246,7 +246,7 @@ function ownDeps(step: PlanStep): StepRef[] {
     case 'audio':
       return [step.promptFrom, step.lyricsFrom].filter((r): r is string => Boolean(r));
     case 'op':
-      return [step.input, ...(step.more ?? []), ...(typeof step.params?.music === 'string' && step.params.music ? [step.params.music] : [])];
+      return [step.input, ...(step.more ?? []), ...(step.refs ?? []).map((r) => r.ref), ...(typeof step.params?.music === 'string' && step.params.music ? [step.params.music] : [])];
     case 'layer':
       return [...(step.source ? [step.source] : []), ...(step.after ?? [])];
   }
@@ -874,6 +874,21 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         // Otherwise the confirmed (or, in Direct, the composer's) image model runs it, in its edit variant (ADR 0009).
         const opModel = def.engine === 'edit' && !params._modelRef ? ctx.opModel?.() : undefined;
         if (opModel) params._modelRef = ctx.variantModel?.(opModel, 'edit') ?? opModel;
+        let opRefs: OpStep['refs'];
+        if (s.refs?.length) {
+          const roles = stepRoles.get(s.id!) ?? [];
+          const allowed = OP_REF_ROLES[opId];
+          if (def.engine !== 'edit' || !allowed) errors.push(`${where}: op "${opId}" takes no refs.`);
+          else {
+            opRefs = (s.refs as string[]).map((ref) => {
+              const role = roles.find((r) => r.ref === ref)?.role ?? allowed[0];
+              if (!allowed.includes(role)) errors.push(`${where}: op "${opId}" takes refs with role ${allowed.join(' or ')}, not "${role}".`);
+              const k = refKind(ref, where);
+              if (k && k !== 'image' && k !== 'raster') errors.push(`${where}: ref "${ref}" must be an image, it is ${k}.`);
+              return { ref, role, note: roles.find((r) => r.ref === ref)?.note };
+            });
+          }
+        }
         let more: string[] | undefined;
         if (def.multiInput) {
           more = (Array.isArray(s.more) ? s.more : []).map((r) => String(r).trim()).filter(Boolean);
@@ -890,7 +905,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             if (k && k !== 'audio') errors.push(`${where}: params.music must be an audio step or asset; "${music}" is ${k}.`);
           }
         }
-        steps.push({ id: s.id!, kind: 'op', title, op: opId, input: s.input ?? '', ...(more ? { more } : {}), params } satisfies OpStep);
+        steps.push({ id: s.id!, kind: 'op', title, op: opId, input: s.input ?? '', ...(more ? { more } : {}), ...(opRefs ? { refs: opRefs } : {}), params } satisfies OpStep);
         break;
       }
       case 'layer': {

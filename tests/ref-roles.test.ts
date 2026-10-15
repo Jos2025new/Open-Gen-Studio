@@ -16,3 +16,28 @@ describe('ref roles', () => {
     expect(splitRefs([{ ref: '', role: 'pose' }]).problems).toHaveLength(1);
   });
 });
+
+import { OPS } from '../src/engine/ops';
+import { OP_REF_ROLES } from '../src/engine/refRoles';
+
+describe('ops with roles', () => {
+  it('relight, edit and replace_background take the right roles', () => {
+    expect(OP_REF_ROLES.relight).toEqual(['lighting']);
+    expect(OP_REF_ROLES.edit).toEqual(['pose', 'expression', 'clothing']);
+    expect(OP_REF_ROLES.replace_background).toEqual(['background']);
+  });
+  it('lighting phrase for a relight ref (source is Image 1)', () => {
+    expect(rolesPhrase('x/y', ['src', 'l'], [{ ref: 'l', role: 'lighting' }])).toBe('Image 2 = lighting reference only: match its light, do not copy its content.');
+  });
+  it('replace_background wording', () => {
+    const t = OPS.replace_background.instruction!({ background: 'a rainy street.' });
+    expect(t).toContain('Replace only the background, with this new background: a rainy street.');
+    expect(t).toContain('contact shadows and reflected light');
+    expect(OPS.replace_background.instruction!({ background: '' })).toContain('with the setting of the background reference');
+  });
+});
+
+import { detectOps } from '../src/engine/agent/triggers';
+it('replace_background is detected from the request', () => {
+  expect(detectOps('cambia el fondo por una calle')).toContain('replace_background');
+});

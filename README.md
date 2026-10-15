@@ -75,6 +75,7 @@ Sobre cualquier imagen o vídeo puedes pedir, con palabras o desde el menú, una
 | Reference sheet | imagen → imagen | Hoja de referencia de un personaje u objeto (vistas, expresiones o vestuario) para mantenerlo igual después. |
 | Variations | imagen → imagen | Otras versiones con el mismo sujeto y estilo. |
 | Edit with prompt | imagen → imagen | Describe el cambio y se aplica a la imagen. |
+| Replace background | imagen → imagen | Cambia el fondo y conserva al sujeto, sus bordes y su pelo. |
 | Animate | imagen → vídeo | Convierte la imagen en un vídeo. |
 | Extract frame | vídeo → imagen · gratis, local | Guarda un fotograma del vídeo como imagen. |
 | Continue shot | vídeo → vídeo | Un clip nuevo que arranca donde terminó el anterior. |

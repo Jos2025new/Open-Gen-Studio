@@ -28,6 +28,7 @@ import { ADAPTERS } from './providers/registry';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
+import { rolesPhrase, type RefRole } from './refRoles';
 import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation, GenerationFeedItem, GenerationOrigin, GraphNode, MediaKind, ModelSchema, OpId, PlanFeedItem, RemoteJob } from './types';
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
 
@@ -410,6 +411,7 @@ async function execute(id: string): Promise<string[]> {
         firstFrame = g.op.id === 'continue' ? await frameInput(g.op.sourceAssetId, 'last') : await mediaInput(g.op.sourceAssetId);
       } else {
         refs.push(await mediaInput(g.op.sourceAssetId));
+        for (const id of String(g.op.params._refs ?? '').split(',').filter(Boolean)) refs.push(await mediaInput(id));
       }
     } else {
       for (const r of g.inputs.refs) {
@@ -1087,10 +1089,19 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
 }
 
 /** Build the same operation parameters using an already chosen model and in-memory schema. No selection or I/O. */
+/** "Image 2 = lighting reference only…" for the extra images of an edit op (the source is Image 1). */
+function opRolesLine(input: OpSpecInput, modelRef: string, schema: ModelSchema | undefined): string {
+  const raw = input.params._refRoles;
+  if (typeof raw !== 'string' || !raw) return '';
+  const got = JSON.parse(raw) as Array<{ asset: string; role: RefRole; note?: string }>;
+  const line = rolesPhrase(modelRef, [input.sourceAssetId, ...got.map((g) => g.asset)], got.map((g) => ({ ref: g.asset, role: g.role, note: g.note })), schema?.slots.promptRefs);
+  return line ? `${line} ` : '';
+}
+
 export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: boolean, schema: ModelSchema | undefined): GenerationSpec {
   const def = OPS[input.op];
   const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
-  const prompt = def.instruction ? def.instruction(input.params) : def.label;
+  const prompt = (def.instruction ? opRolesLine(input, modelRef, schema) + def.instruction(input.params) : def.label);
   const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';

@@ -252,6 +252,14 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
           // Music under the joined video: an audio step of this plan or an audio asset.
           if (typeof params.music === 'string' && params.music) params = { ...params, music: (await resolveAsset(params.music)) ?? '' };
         }
+        if (s.refs?.length) {
+          const got: Array<{ asset: string; role?: string; note?: string }> = [];
+          for (const r of s.refs) {
+            const a = await resolveAsset(r.ref);
+            if (a) got.push({ asset: a, role: r.role, note: r.note });
+          }
+          params = { ...params, _refs: got.map((g) => g.asset).join(','), _refRoles: JSON.stringify(got) };
+        }
         const spec = await opSpec({ ...base, sourceAssetId: source, op: s.op, params, nodeChoice: ctx.nodeOperations?.[s.id] });
         const g = createGeneration(spec);
         ctx.onState(s.id, 'running', { generationId: g.id });
