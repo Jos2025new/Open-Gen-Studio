@@ -1,6 +1,6 @@
 .composer-dock { bottom: 24px; }
 .composer-dock { width: min(800px, calc(100% - 48px)); }
-.composer { padding: 12px 18px; border-radius: 24px; }
+.composer { padding: 12px 18px; border-radius: var(--r-l); }
 .composer-prompt-row { display: block; margin-bottom: 8px; }
 .composer-prompt-row .composer-input { font-size: 15px; line-height: 1.65; min-height: 34px; max-height: min(180px, 25dvh); padding: 4px 2px; overflow-y: auto; scrollbar-width: thin; }
 .composer-bar { gap: 10px; min-height: 36px; flex-wrap: wrap; }

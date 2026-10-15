@@ -106,7 +106,7 @@
 .palette-quick .opt-swatch { width: 20px; height: 20px; }
 .palette-quick .opt-slider { display: inline-flex; gap: 5px; }
 .palette-quick .opt-range { width: 52px; }
-.palette-quick .opt-label { font-size: 10px; }
+.palette-quick .opt-label { font-size: var(--fs-xs); }
 .view-history { display: flex; flex-direction: column; gap: 3px; border-bottom: 1px solid var(--border-strong); padding-bottom: 6px; margin-bottom: 3px; }
 
 .palette-snap { display: flex; align-items: center; }
@@ -117,7 +117,7 @@
 
 .designer-view .zoom-value { width: var(--control-h); gap: 1px; }
 .designer-view .zoom-value input { width: 3.5ch; min-width: 0; padding: 3px 0 !important; border: 0 !important; background: transparent !important; font-size: 11px; text-align: center; }
-.designer-view .zoom-value span { font-size: 10px; color: var(--text-2); }
+.designer-view .zoom-value span { font-size: var(--fs-xs); color: var(--text-2); }
 
 .palette-fixed { display: flex; gap: 3px; flex-shrink: 0; }
 .palette-fixed + .palette-quick { border-left: 1px solid var(--border-strong); padding-left: 7px; margin-left: 4px; }
@@ -217,7 +217,7 @@
 .opt-choice .opt-choices button:hover { color: var(--text); background: var(--surface-3); }
 .opt-choice .opt-choices button.is-on { color: var(--accent-ink, #111); background: var(--accent); }
 .opt.opt-presets { height: auto; padding: 6px; gap: 2px; flex-wrap: wrap; justify-content: flex-start; }
-.opt-presets button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 34px; height: 40px; padding-bottom: 3px; border-radius: var(--radius-s); color: var(--text-2); font-size: 9px; }
+.opt-presets button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 34px; height: 40px; padding-bottom: 3px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); }
 .opt-presets button i { display: block; border-radius: 50%; background: currentColor; }
 .opt-presets button:hover { background: var(--surface-3); color: var(--text); }
 .opt-presets button.is-on { background: var(--accent-soft); color: var(--accent); }
@@ -271,10 +271,10 @@
 .context-strip .opt.opt-toggle, .context-strip .opt.opt-choice { flex: 0 0 auto; }
 .context-strip .opt-hint { display: none; }
 .context-strip .rounding-selection { display: flex; flex: 0 1 auto; flex-direction: column; gap: 3px; width: max-content; max-width: 100%; min-width: 0; margin: 0; padding: 2px 6px 5px; border: 1px solid var(--border); }
-.context-strip .rounding-selection legend { max-width: 100%; padding: 0 4px; color: var(--text-2); font-size: 10px; white-space: nowrap; }
+.context-strip .rounding-selection legend { max-width: 100%; padding: 0 4px; color: var(--text-2); font-size: var(--fs-xs); white-space: nowrap; }
 .context-strip .rounding-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%; min-width: 0; }
 .context-strip .rounding-controls > .opt-slider { flex: 1 1 88px; width: 120px; min-width: 72px; }
-.context-strip .rounding-controls > .opt:not(.opt-slider) { flex: 0 1 auto; min-width: 0; max-width: 100%; padding-inline: 6px; font-size: 10px; white-space: nowrap; }
+.context-strip .rounding-controls > .opt:not(.opt-slider) { flex: 0 1 auto; min-width: 0; max-width: 100%; padding-inline: 6px; font-size: var(--fs-xs); white-space: nowrap; }
 .context-strip .rounding-controls > [data-multi-rectangle-convert] { overflow: hidden; text-overflow: ellipsis; }
 .context-target { display: inline-flex; gap: 4px; align-items: baseline; padding: 0 6px 0 2px; font-size: 11px; color: var(--text-2); white-space: nowrap; border-right: 1px solid var(--border-strong); margin-right: 2px; }
 .context-target strong { color: var(--text); font-weight: 600; }
@@ -294,7 +294,7 @@
 .layers-split:hover, .layers-split:active { background: var(--accent-line); }
 .layers-panel .layer-shelf .layer-row { position: relative; }
 /* Under the FX layer's name: what it acts on ("→ Photo"), small, after the thumbnail. */
-.layer-fx-target { position: absolute; left: 52px; right: 56px; bottom: 4px; font-size: 9px; line-height: 1; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.layer-fx-target { position: absolute; left: 52px; right: 56px; bottom: 4px; font-size: var(--fs-xs); line-height: 1; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 /* Tool help line (ToolHelp.tsx, plan step 5): discreet, above the canvas, never moving it. */
 .tool-help { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 7; max-width: min(720px, calc(100% - var(--layers-w,260px) - 380px)); display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font-size: 11px; color: var(--text-2); background: color-mix(in srgb, var(--surface-2) 88%, transparent); border: 1px solid var(--border); border-radius: 999px; pointer-events: auto; }
 .tool-help strong { color: var(--text); font-weight: 600; white-space: nowrap; }
@@ -304,7 +304,7 @@
 /* Narrow windows put Conversation above the dock, on the left: the strip aligns right so it never covers it. */
 @media (max-width: 1400px) { .composer-tools-bar .context-strip { left: auto; right: 18px; max-width: calc(100% - 314px); } }
 @media (max-width: 767px) { .composer-tools-bar .context-strip { left: 0; right: auto; width: max-content; max-width: 100%; } }
-.layer-appearance-title { padding: 0 2px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, var(--text-2)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-appearance-title { padding: 0 2px 4px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--text-3, var(--text-2)); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Shape knots (ShapeKnots.tsx): Inkscape's corner and blur handles on the picked shape. */
 .shape-knots { z-index: 4; }
 .shape-knot { cursor: pointer; }
