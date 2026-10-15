@@ -284,6 +284,8 @@ async function uploadMedia(blob: Blob, apiKey: string, signal: AbortSignal): Pro
 
 function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const kind = ctx.kind === 'text' ? 'audio' : ctx.kind; // text jobs are lyrics (audio models)
+  // "completed" can arrive before the files are listed: ask again a few times before calling the job empty.
+  let emptyAnswers = 0;
   return pollJob(ctx, 'Atlas Cloud', ctx.kind === 'image' || ctx.kind === 'text' ? 2000 : 5000, async () => {
     const res = await requestJson<{ data?: { status?: string; error?: unknown; outputs?: string[] | null; files?: AtlasFile[]; thumbnail?: string; lyrics_result?: LyricsResult | null } }>(
       job.meta.pollUrl ? keyedUrl(job.meta.pollUrl, BASE, 'Atlas Cloud') : `${BASE}/api/v1/model/prediction/${encodeURIComponent(job.id)}`,
@@ -309,7 +311,10 @@ function poll(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
           }
         }),
       );
-      if (!outputs.length) throw new JobFailedError('Atlas Cloud finished without outputs');
+      if (!outputs.length) {
+        if (++emptyAnswers <= 3) return 'Finishing';
+        throw new JobFailedError('Atlas Cloud finished without outputs');
+      }
       return { outputs };
     }
     if (status === 'failed' || status === 'canceled' || status === 'cancelled') {
