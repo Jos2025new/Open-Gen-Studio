@@ -18,5 +18,9 @@
 .nav-item.is-tile { flex-direction: column; justify-content: center; gap: var(--sp-1); height: 56px; padding: var(--sp-1); font-size: var(--fs-s); border: 1px solid var(--border); border-radius: var(--r-m); }
 .nav-soon { margin-left: auto; font-size: var(--fs-xs); color: var(--text-4); }
 .nav-more { color: var(--text-3); font-size: var(--fs-s); }
-.nav-flyout { display: grid; gap: var(--sp-2); padding: var(--sp-2); }
-.nav-flyout .nav-item.is-tile { height: 68px; }
+.nav-flyout-title { padding: var(--sp-3) var(--sp-3) var(--sp-2); font-size: var(--fs-m); font-weight: 600; color: var(--text); }
+.nav-flyout { display: grid; gap: var(--sp-2); padding: 0 var(--sp-3) var(--sp-3); }
+.nav-flyout .nav-item.is-tile { height: 84px; gap: var(--sp-2); text-align: center; line-height: 1.25; background: var(--surface-3); border-color: var(--border); font-size: var(--fs-s); color: var(--text); }
+.nav-flyout .nav-item.is-tile:hover:not(:disabled) { background: var(--surface-hover); border-color: var(--border-strong); }
+.nav-flyout .nav-item.is-tile svg { width: 20px; height: 20px; }
+.popover:has(.nav-flyout) { padding: 0; border-radius: var(--r-m); }

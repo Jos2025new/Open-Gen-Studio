@@ -65,10 +65,11 @@ function WideNav() {
 function Flyout({ label, icon: Icon, active, items, cols }: { label: string; icon: LucideIcon; active?: boolean; items: Entry[]; cols: number }) {
   const pop = usePopover();
   return <>
-    <button ref={pop.ref} type="button" className={`side-btn nav-icon ${active ? 'is-active' : ''} ${pop.open ? 'is-open' : ''}`} aria-label={label} aria-haspopup="menu" aria-expanded={pop.open} data-tip={label} data-tip-side="right" onClick={pop.toggle}>
+    <button ref={pop.ref} type="button" className={`side-btn nav-icon ${active ? 'is-active' : ''} ${pop.open ? 'is-open' : ''}`} aria-label={label} aria-haspopup="menu" aria-expanded={pop.open} data-tip={pop.open ? undefined : label} data-tip-side="right" onClick={pop.toggle}>
       <Icon size={18} strokeWidth={1.7} />
     </button>
-    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={cols * 92 + 16} label={label}>
+    <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="right-start" width={cols * 112 + 32} label={label}>
+      <div className="nav-flyout-title">{label}</div>
       <div className="nav-flyout" role="menu" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         {items.map((e) => <Item key={e.key} e={e} variant="tile" after={pop.close} />)}
       </div>
