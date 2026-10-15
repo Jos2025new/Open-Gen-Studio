@@ -80,7 +80,7 @@ import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides }
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
-import { inheritDirectModels } from './inherit';
+import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -596,7 +596,6 @@ async function presentPlan(
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
-  if (style === 'direct') inheritDirectModels(plan.steps, userWords(sessionId));
   for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') {
@@ -825,6 +824,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan.adjustments)} The app is executing the plan now.` });
     closeRequest(sessionId, 'approved', total.usd);
+    if (item.style === 'direct') inheritApproved(chosen);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({

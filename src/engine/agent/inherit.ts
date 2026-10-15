@@ -1,21 +1,22 @@
 import { pickComposerModel } from '../catalog';
-import { userNamed } from '../modelNaming';
-import { useStore } from '../../store/store';
-import type { MediaKind } from '../types';
-
-const get = () => useStore.getState();
+import { setComposerMedia, useStore } from '../../store/store';
+import type { MediaKind, PlanStep } from '../types';
 
 /**
- * Direct has no settings card: a model the user names in their message is used for that plan (plan.ts) and
- * from then on is the composer's pick for its kind, so later requests inherit it instead of reverting.
+ * Direct has no settings card: when the user approves a plan, the model and values of each step become the
+ * composer's defaults for that kind, so the next request starts from them (the user changes them by saying so).
+ * A rejected or never-approved plan never reaches this.
  */
-export function inheritDirectModels(steps: Array<{ kind: string; modelRef?: string }>, said: string): void {
+export function inheritApproved(steps: PlanStep[]): void {
   const done = new Set<string>();
-  for (const s of steps) {
-    const kind = s.kind as MediaKind;
-    if ((kind !== 'image' && kind !== 'video') || !s.modelRef || done.has(kind) || s.modelRef === get().composer[kind].modelRef) continue;
-    if (!userNamed([s.modelRef.split('::')[1] ?? '', get().catalog.models[s.modelRef]?.name ?? ''], said)) continue;
+  for (const st of steps) {
+    const kind = st.kind as MediaKind;
+    if ((kind !== 'image' && kind !== 'video') || done.has(kind) || !('settings' in st)) continue;
     done.add(kind);
-    void pickComposerModel(kind, s.modelRef);
+    const cur = useStore.getState().composer[kind];
+    const { aspect, resolution, count, duration } = st.settings;
+    const settings = { ...cur.settings, ...(aspect ? { aspect } : {}), ...(resolution ? { resolution } : {}), ...(count ? { count } : {}), ...(kind === 'video' && duration ? { duration } : {}) };
+    setComposerMedia(kind, { settings });
+    if ('modelRef' in st && st.modelRef && st.modelRef !== cur.modelRef) void pickComposerModel(kind, st.modelRef);
   }
 }

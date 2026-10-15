@@ -1,29 +1,23 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
-import { inheritDirectModels } from '../src/engine/agent/inherit';
+import { inheritApproved } from '../src/engine/agent/inherit';
 import { useStore } from '../src/store/store';
-import type { ModelSummary } from '../src/engine/types';
+import type { PlanStep } from '../src/engine/types';
 
 const initial = useStore.getState();
-const nano = 'atlas::google/nano-banana-2/text-to-image';
-const other = 'atlas::openai/gpt-image-2.5-flare/text-to-image';
-const mk = (ref: string, name: string) => ({ ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name, acceptsText: true, acceptsImage: false, tags: [] }) as ModelSummary;
-afterEach(() => useStore.setState({ catalog: initial.catalog, composer: initial.composer }));
+afterEach(() => useStore.setState({ composer: initial.composer }));
+const clip = { id: 's1', kind: 'video', modelRef: 'local::studio-video', prompt: 'x', settings: { aspect: '9:16', resolution: '1080p', duration: 8, count: 1, advanced: {} } } as unknown as PlanStep;
 
-describe('Direct inherits what the user names', () => {
-  const setup = () => {
-    useStore.setState({ catalog: { ...initial.catalog, models: { [nano]: mk(nano, 'Nano Banana 2'), [other]: mk(other, 'GPT Image 2.5 Flare') } }, composer: { ...initial.composer, image: { ...initial.composer.image, modelRef: other } } });
-  };
-  it('a model the user named becomes the composer pick', () => {
-    setup();
-    inheritDirectModels([{ kind: 'image', modelRef: nano }], 'hazlo con nano banana');
-    expect(useStore.getState().composer.image.modelRef).toBe(nano);
-    expect(useStore.getState().composer.userPicked?.image).toBe(true);
+describe('Direct inherits the values of the plan the user approves', () => {
+  it('the approved 9:16 / 1080p clip is where the next video request starts', () => {
+    inheritApproved([clip]);
+    const v = useStore.getState().composer.video.settings;
+    expect(v.aspect).toBe('9:16');
+    expect(v.resolution).toBe('1080p');
+    expect(v.duration).toBe(8);
   });
-  it('a model only the plan names is not inherited', () => {
-    setup();
-    inheritDirectModels([{ kind: 'image', modelRef: nano }], 'una casa roja');
-    expect(useStore.getState().composer.image.modelRef).toBe(other);
+  it('a plan nobody approved changes nothing', () => {
+    expect(useStore.getState().composer.video.settings).toEqual(initial.composer.video.settings);
   });
 });
