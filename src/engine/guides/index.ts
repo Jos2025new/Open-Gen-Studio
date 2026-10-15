@@ -15,6 +15,9 @@ import krea from './krea.md?raw';
 import zImage from './z-image.md?raw';
 import pImage from './p-image.md?raw';
 import stepImage from './step-image.md?raw';
+import qwenImage from './qwen-image.md?raw';
+import recraft from './recraft.md?raw';
+import grokImage from './grok-imagine-image.md?raw';
 
 /*
  * Prompting guides per model family: how to write for that model (style), next to the schema the app already
@@ -50,6 +53,9 @@ export const MODEL_GUIDES: ModelGuide[] = [
   { id: 'z-image', name: 'Z-Image images', match: /z-?image/i, text: zImage, optional: true },
   { id: 'p-image', name: 'P-Image images', match: /(^|[/_.-])p-image|prunaai/i, text: pImage, optional: true },
   { id: 'step-image', name: 'Step Image Edit images', match: /step-?image|step1x/i, text: stepImage, optional: true },
+  { id: 'qwen-image', name: 'Qwen-Image images', match: /qwen-?image/i, text: qwenImage, optional: true },
+  { id: 'recraft', name: 'Recraft images', match: /recraft/i, text: recraft, optional: true },
+  { id: 'grok-imagine-image', name: 'Grok Imagine Image', match: /grok-imagine-image/i, text: grokImage, optional: true },
 ];
 
 export function modelGuide(id: string): ModelGuide | undefined {
