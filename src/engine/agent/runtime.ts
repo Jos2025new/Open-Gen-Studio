@@ -573,6 +573,7 @@ async function presentPlan(
       workspace,
       kinds: settingKinds,
       settings: session(sessionId).agent.settings,
+      style: get().composer.agentStyle,
       userChoseModel: (raw.steps ?? []).some((s) => Boolean(s.model)),
       estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),

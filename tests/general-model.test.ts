@@ -177,3 +177,12 @@ describe('operationId and retry (Operation vs Attempt)', () => {
     expect(useStore.getState().generations[failed.id].status).toBe('error');
   });
 });
+
+describe('needsConfirmation — Auto never blocks a confirmed kind for its cost', () => {
+  it('keeps the settings card for a never-confirmed kind and exposes costly plans of confirmed kinds', () => {
+    expect(needsConfirmation({ ...base, settings: undefined, style: 'auto' })).toBe('ask');
+    expect(needsConfirmation({ ...base, estimatedCost: LOW_COST_USD + 0.01, style: 'auto' })).toBe('expose');
+    expect(needsConfirmation({ ...base, estimatedCost: null, style: 'auto' })).toBe('expose');
+    expect(needsConfirmation({ ...base, estimatedCost: LOW_COST_USD + 0.01, style: 'guided' })).toBe('ask');
+  });
+});

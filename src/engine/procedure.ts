@@ -36,6 +36,8 @@ export interface ConfirmationInput {
   estimatedCost: number | null;
   /** The plan has multiple candidate counts (count > 1 per step). */
   hasMultipleCandidates: boolean;
+  /** Auto asks the settings card once per kind; spending is still approved on the plan card. */
+  style?: AgentStyle;
 }
 
 /** Cost above which a plan's price is not reused silently (USD). Default chosen by the implementer; the user can change it. */
@@ -55,14 +57,16 @@ export const LOW_COST_USD = 0.5;
  * settings card must come first.
  */
 export function needsConfirmation(input: ConfirmationInput): ConfirmationAction {
-  const { workspace, kinds, settings, userChoseModel, estimatedCost, hasMultipleCandidates } = input;
+  const { workspace, kinds, settings, userChoseModel, estimatedCost, hasMultipleCandidates, style } = input;
   if (workspace === 'node') return 'automate'; // Nodes own their settings per-node.
 
   // A kind never confirmed in this session has nothing to reuse.
   if (kinds.some((kind) => !settings?.[kind])) return 'ask';
 
   // Unknown or costly plans must be confirmed: the price cannot be bounded enough to reuse silently.
-  if (estimatedCost === null || estimatedCost > LOW_COST_USD) return 'ask';
+  const costly = estimatedCost === null || estimatedCost > LOW_COST_USD;
+  if (costly && style !== 'auto') return 'ask';
+  if (costly) return 'expose';
 
   // Low cost, but a choice the user should see on the card before approving.
   if (userChoseModel || hasMultipleCandidates || kinds.includes('video')) return 'expose';
@@ -84,8 +88,8 @@ export const AUTOMATION_POLICY =
   'The app reuses settings confirmed earlier in this session, without a new card, when the plan is a low-cost ' +
   'single image and the user did not name a model. It shows the same plan with its model, count and cost on the card ' +
   '(without asking) when the user named a model, the plan is a video, or it asks for several candidates. ' +
-  'It asks and blocks when a kind was never confirmed in this session, or when the plan\'s cost is unknown or above $' +
-  LOW_COST_USD.toFixed(2) + '.';
+  'It asks and blocks when a kind was never confirmed in this session, or (not in Auto) when the plan\'s cost is unknown or above $' +
+  LOW_COST_USD.toFixed(2) + '. In Auto a confirmed kind is never asked again for its cost: the plan card shows the price and the user approves the spending there.';
 
 /**
  * The gate before a plan is normalized: a kind that was never confirmed still blocks, as before.
