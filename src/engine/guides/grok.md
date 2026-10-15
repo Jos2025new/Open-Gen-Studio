@@ -25,6 +25,7 @@ Example: A young woman in a beige trench coat runs through a night market in the
 REFERENCES
 - Reference images give subject, style or composition; a start image fixes the first frame. Say what each brings: "the same person as <IMAGE_0>, the colour style of <IMAGE_1>".
 - Syntax: <IMAGE_0>, <IMAGE_1>… counted from zero (Atlas v1.5, fal v1.5). If the model's inputs give another syntax (fal v1: @Image1), that one wins; the app rewrites @Name subjects accordingly.
+- With a start image sent as the first frame, it takes <IMAGE_0> and the references start at <IMAGE_1> (xAI: https://docs.x.ai/developers/model-capabilities/video/reference-to-video). xAI documents up to 14 references on 1.5 and 7 on v1; the host's schema decides the real limit. One role per reference, a small cast, static props.
 
 EDIT AND EXTEND
 - Edit (restyle, add or remove objects): an imperative, surgical prompt — "keep the composition and motion; replace only X with Y" — not a new scene.
