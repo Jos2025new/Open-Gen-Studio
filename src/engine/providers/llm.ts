@@ -217,11 +217,14 @@ export function limitedLlmFallback(models: LlmModel[]): LlmModel | undefined {
 /** Silence after which an agent call counts as stalled (no headers yet, or no chunk while streaming). */
 export const STALL_MS = 120_000;
 
-/** Only OpenRouter reads `reasoning_details` back; other providers get the message without them. */
-function withoutDetails(m: LlmMessage, provider: LlmProviderId): LlmMessage {
-  if (provider === 'openrouter' || !m.reasoning_details) return m;
-  const { reasoning_details: _drop, ...rest } = m;
-  return rest;
+/** Only OpenRouter reads `reasoning_details` back, and only those of the current turn (after the last user message); older ones add input tokens for nothing. */
+function withoutDetails(messages: LlmMessage[], provider: LlmProviderId): LlmMessage[] {
+  const lastUser = provider === 'openrouter' ? messages.map((m) => m.role).lastIndexOf('user') : messages.length;
+  return messages.map((m, i) => {
+    if (!m.reasoning_details || (provider === 'openrouter' && i > lastUser)) return m;
+    const { reasoning_details: _drop, ...rest } = m;
+    return rest;
+  });
 }
 
 /** Stream a chat completion, reporting text deltas. */
@@ -246,7 +249,7 @@ export async function chat(opts: {
 }): Promise<ChatResult> {
   const body: Record<string, unknown> = {
     model: opts.model,
-    messages: [{ role: 'system', content: opts.system }, ...opts.messages.map((m) => withoutDetails(m, opts.provider))],
+    messages: [{ role: 'system', content: opts.system }, ...withoutDetails(opts.messages, opts.provider)],
     tools: opts.tools,
     tool_choice: 'auto',
     stream: true,

@@ -99,4 +99,26 @@ describe('reasoning refusal is not silent (fix 5b)', () => {
     await expect(chat({ provider: 'openrouter', apiKey: 'k', model: 'm', system: 's', messages: [], tools: [], effort: 'high', signal: new AbortController().signal, onNotice: (t) => notes.push(t) })).rejects.toThrow();
     expect(notes).toEqual([]);
   });
+
+  it('openrouter gets only the details of the current turn, not of earlier ones', async () => {
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return sse([{ choices: [{ delta: { content: 'hi' } }] }]);
+    });
+    const call = (id: string) => ({ id, type: 'function' as const, function: { name: 'propose_plan', arguments: '{}' } });
+    const history: LlmMessage[] = [
+      { role: 'user', content: 'one' },
+      { role: 'assistant', content: null, tool_calls: [call('c1')], reasoning_details: [DETAILS_A] },
+      { role: 'tool', tool_call_id: 'c1', content: 'ok' },
+      { role: 'assistant', content: 'done one', reasoning_details: [DETAILS_A] },
+      { role: 'user', content: 'two' },
+      { role: 'assistant', content: null, tool_calls: [call('c2')], reasoning_details: [DETAILS_B] },
+      { role: 'tool', tool_call_id: 'c2', content: 'ok' },
+    ];
+    await chat({ provider: 'openrouter', apiKey: 'k', model: 'm', system: 's', messages: history, tools: [], signal: new AbortController().signal });
+    const sent = body.messages as LlmMessage[];
+    expect(sent.filter((m) => m.reasoning_details).map((m) => m.reasoning_details)).toEqual([[DETAILS_B]]);
+    expect(history[1].reasoning_details).toEqual([DETAILS_A]);
+  });
 });
