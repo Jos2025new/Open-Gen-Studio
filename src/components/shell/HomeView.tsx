@@ -1,12 +1,11 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { ArrowRight, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react';
 import { selectSession, setUi, useStore } from '../../store/store';
-import type { Asset, AssetKind } from '../../engine/types';
+import type { AssetKind } from '../../engine/types';
 import { formatRelative } from '../../lib/format';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, isListed, openCreate, openSpace, openTool, type CreateItem, type ToolItem } from './navModel';
 
-const newest = (assets: Asset[], kind: AssetKind): Asset | undefined => assets.filter((a) => a.kind === kind).sort((a, b) => b.createdAt - a.createdAt)[0];
 
 function Head({ kicker, title, action }: { kicker: string; title: string; action?: ReactNode }) {
   return <header className="home-head">
@@ -15,12 +14,11 @@ function Head({ kicker, title, action }: { kicker: string; title: string; action
   </header>;
 }
 
-/** Fixed card anatomy: background (latest asset of the kind, else a gradient), icon square, title, subtitle, optional count pill. */
-function Card({ icon: Icon, title, hint, count, bg, disabled, big, onClick }: {
-  icon: LucideIcon; title: string; hint: string; count?: string; bg?: Asset; disabled?: boolean; big?: boolean; onClick: () => void;
+/** Fixed card anatomy: icon square, title, subtitle, optional count pill. `area` places it in the bento. */
+function Card({ icon: Icon, title, hint, count, disabled, area, onClick }: {
+  icon: LucideIcon; title: string; hint: string; count?: string; disabled?: boolean; area: string; onClick: () => void;
 }) {
-  return <button type="button" className={`home-card ${big ? 'is-big' : ''} ${bg ? 'has-bg' : ''}`} disabled={disabled} onClick={onClick} aria-label={disabled ? `${title} — soon` : title}>
-    {bg ? <span className="home-card-bg" aria-hidden><AssetMedia assetId={bg.id} hoverPlay={false} autoPlay={false} draggable={false} /></span> : null}
+  return <button type="button" className="home-card" style={{ gridArea: area }} disabled={disabled} onClick={onClick} aria-label={disabled ? `${title} — soon` : title}>
     <span className="home-card-top">
       <span className="home-card-icon"><Icon size={18} strokeWidth={1.7} /></span>
       {disabled ? <span className="home-pill">Soon</span> : count ? <span className="home-pill">{count}<ArrowRight size={12} /></span> : null}
@@ -54,10 +52,13 @@ export function HomeView() {
     <section className="home-section" aria-label="Create">
       <Head kicker="Create" title="What do you want to make?" />
       <div className="home-bento">
-        <Card big icon={SPACES[0].icon} title="Studio" hint={SPACES[0].hint} count={`${sessionCount} session${sessionCount === 1 ? '' : 's'}`} onClick={() => openSpace(SPACES[0])} />
-        {CREATE.map((c) => <Card key={c.id} icon={c.icon} title={c.label} hint={c.hint} count={countOf(c)} bg={c.soon ? undefined : newest(listed, c.kind)} disabled={c.soon} onClick={() => openCreate(c)} />)}
-        <Card icon={SPACES[1].icon} title="Node Canvas" hint={SPACES[1].hint} onClick={() => openSpace(SPACES[1])} />
-        <Card icon={SPACES[2].icon} title="Designer" hint={SPACES[2].hint} onClick={() => openSpace(SPACES[2])} />
+        <Card area="studio" icon={SPACES[0].icon} title="Studio" hint={SPACES[0].hint} count={`${sessionCount} session${sessionCount === 1 ? '' : 's'}`} onClick={() => openSpace(SPACES[0])} />
+        {CREATE.map((c) => <button key={c.id} type="button" className={`home-tile t-${c.id}`} style={{ gridArea: c.id }} disabled={c.soon} onClick={() => openCreate(c)} aria-label={c.soon ? `${c.label} — soon` : c.label} title={c.hint}>
+          <c.icon size={34} strokeWidth={1.6} aria-hidden />
+          <span className="home-tile-label">{c.label}{c.soon ? <span className="home-pill">Soon</span> : countOf(c) ? <span className="home-tile-count">{countOf(c)}</span> : null}</span>
+        </button>)}
+        <Card area="canvas" icon={SPACES[1].icon} title="Node Canvas" hint={SPACES[1].hint} onClick={() => openSpace(SPACES[1])} />
+        <Card area="designer" icon={SPACES[2].icon} title="Designer" hint={SPACES[2].hint} onClick={() => openSpace(SPACES[2])} />
       </div>
     </section>
 

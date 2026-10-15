@@ -65,7 +65,8 @@ describe('rendering', () => {
   it('Home has its three sections, the bento cards and a disabled 3D', () => {
     const html = renderToStaticMarkup(createElement(HomeView));
     for (const label of ['Create', 'Tools', 'Latest']) expect(html).toContain(`aria-label="${label}"`);
-    for (const t of ['Studio', 'Image', 'Video', 'Audio', '3D', 'Node Canvas', 'Designer']) expect(html).toContain(`<span class="home-card-title">${t}</span>`);
+    for (const t of ['Studio', 'Node Canvas', 'Designer']) expect(html).toContain(`<span class="home-card-title">${t}</span>`);
+    for (const t of ['image', 'video', 'audio', 'model3d']) expect(html).toContain(`style="grid-area:${t}"`);
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="3D — soon"/);
   });
   it('the wide bar has collapsible Spaces, Create and Tools sections with text', () => {
