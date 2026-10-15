@@ -31,6 +31,8 @@ GENRE PATTERNS (source: https://github.com/LearnPrompt/awesome-seedance; a case 
 - Handheld UGC vlog: believability through named consumer-camera flaws, not "high quality".
 - Anime style lock: measurable style parameters plus a list of neighbouring styles to exclude.
 - Stop-motion cadence: frame rate and hold count, the craft material, and the smoothing effects banned.
+- Do not mix several templates in one prompt, repeat the full wardrobe in every beat, or ask for a long storyboard in a short duration.
+- Image to video: the opening image (first frame) is not the identity or design image (reference); do not fix pose or background from an identity reference.
 
 EDIT AND EXTEND (2.5, through the app's Edit video / Extend video operations)
 - Edit: describe only the change — what is replaced, added, removed or modified, and when inside the existing clip. No absolute shot headers as if generating from scratch; tie the change to what is already there. Duration is the input clip's (the app sends -1); the clip must be 4–30 s.

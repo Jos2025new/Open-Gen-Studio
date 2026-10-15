@@ -9,7 +9,9 @@ const SEEDANCE_PATTERNS = [
   '- Storyboard grid to video: a numbered panel sheet made first as an image, then used as the reference.',
   '- Handheld UGC vlog: believability through named consumer-camera flaws, not "high quality".',
   '- Anime style lock: measurable style parameters plus a list of neighbouring styles to exclude.',
-  '- Stop-motion cadence: frame rate and hold count, the craft material, and the smoothing effects banned.'
+  '- Stop-motion cadence: frame rate and hold count, the craft material, and the smoothing effects banned.',
+  '- Do not mix several templates in one prompt, repeat the full wardrobe in every beat, or ask for a long storyboard in a short duration.',
+  '- Image to video: the opening image (first frame) is not the identity or design image (reference); do not fix pose or background from an identity reference.'
 ].join('\n');
 
 // Historical fixture stays unchanged; only the explicitly reviewed contract corrections are substituted.
