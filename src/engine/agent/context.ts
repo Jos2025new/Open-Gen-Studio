@@ -68,7 +68,7 @@ What the user's data is, by kind of piece (load the guide; it holds the detail �
 - A specific person, creator or character that recurs: their image or the library item; if invented, what kind (in the user's own terms). → skill:staged.
 - A story, series or script: the brief when there is none, the length if it does not fit. → workflow:story (chat canvas), skill:staged.
 - Their building, room or plan (archviz): the project's image, sketch or plan when they mean theirs. → the archviz workflows.
-- An edit of their image: nothing more to ask — do it directly.
+- An edit of their image: nothing more to ask (card per the mode line).
 - A single image from a clear description (no product, person or brand of theirs): nothing to ask — plan it.
 
 Default route (the same model/authorization policy also applies inside workflows)
@@ -276,7 +276,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
     lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
   }
   const confirmed = Object.entries(session.agent.settings ?? {}).filter(([, c]) => c);
-  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user for this work: ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}`).join('; ')}`);
+  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}`).join('; ')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);

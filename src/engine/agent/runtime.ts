@@ -80,6 +80,7 @@ import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides }
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
 import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
+import { inheritDirectModels } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { canvasParts } from './canvasView';
@@ -254,8 +255,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     await submitAnswers(sessionId, pendingItem.id, { note: clean }, 'typed');
     return;
   }
-  // Typing while the settings card is open never confirms it (a question or an objection is not a yes): the card
-  // closes unconfirmed and the agent answers; if the work still stands it shows a new card with what was asked.
+  // Typing while the settings card is open never confirms it: it closes unconfirmed and the agent answers.
   if (pending?.kind === 'settings' && pendingItem?.type === 'settings' && pendingItem.status === 'pending') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.reply_received', reason: 'typed message is not confirmation', sessionId, approvalId: pendingItem.id, before: { status: pendingItem.status, confirmed: false }, after: { status: 'skipped', confirmed: false } });
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
@@ -595,7 +595,7 @@ async function presentPlan(
   const replaced = closeRevisedPlan(sessionId, revision);
   if (replaced) item.revised = true;
   appendFeed(sessionId, item);
-  // Changes to a model the user picked also pop up for 5 s: the card alone is easy to miss.
+  if (style === 'direct') inheritDirectModels(plan.steps, userWords(sessionId));
   for (const a of plan.adjustments.filter((x) => /\byour [\w-]+ model\b/.test(x))) toast(a.replace(/^[\w-]+: /, ''), 'error', 5000);
   patchAgent(sessionId, { pending: { toolCallId, kind: 'plan', feedItemId: item.id } });
   if (workspace === 'node') {
