@@ -22,6 +22,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 ## Por probar
 
 - [ ] Modelos y prompting (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas.md](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer. **2026-10-14**, el usuario.
+- [ ] Tras 038 (**2026-10-15**, propuesta): `triggers.ts` con triggers demasiado amplios (no aprobado); tarjeta de ajustes en vivo (diferida hasta que el usuario pruebe); guías faltantes o sin verificar (Flash Omni 1.1, Kling O3, FLUX 3, MiniMax H3, Grok, HappyHorse); el fallback de realismo elige retrato para cualquier hombre/mujer; `inheritApproved` solo hereda imagen y vídeo. Detalle en [038](history/038-2026-10-W42.md).
 - [ ] `agentMetrics`: añadir fecha, modelo y proveedor por mensaje; `op` del plan con `realism` explícito; decidir UI de esfuerzos no admitidos (5c) y selector de roles. **2026-10-14**, propuesta.
 - [ ] Capas FX (ADR 0011): plan completo en [fx-pruebas.md](fx-pruebas.md). La rama `task/fx` ya está dentro de `task/agent-forcing` (2026-10-08) y se borró en la purga del 2026-10-09. **2026-10-08**, pendiente.
 - [ ] Bucle de tarjetas con un vídeo caro (`3f551d1`), y P2, P3 y P4 (`95eab99`). **2026-10-08**, lo prueba el usuario en el sandbox.

@@ -59,3 +59,12 @@ Prueba visual de ambas ramas en sandbox (ninguna hecha); 5c: cómo se ven en aju
 ## Vídeo: caso Wan de las 3 chicas 💲
 
 - [ ] Repetir el caso Wan 3.0 reference-to-video de las 3 chicas (10 s, mismo mensaje en español) y comprobar: prompt en inglés, menos planos (2–5 s cada uno, una acción física), restricciones agrupadas al final en positivo, audio mínimo (ambiente más un elemento) y la estatura con un objeto de escala visible. Coste: 1 vídeo; fijar el máximo antes.
+
+## Modos, Check status y guías nuevas (2026-10-15, ver [038](history/038-2026-10-W42.md))
+
+- [ ] Auto: tarjeta de ajustes una vez por tipo y luego hereda; la tarjeta del plan sigue pidiendo aprobar el gasto. Gratis hasta aprobar.
+- [ ] Direct: nunca tarjeta; tras aprobar un plan, la siguiente petición parte de su modelo y valores (global por tipo).
+- [ ] Guided: tarjeta siempre. «Settings · before the plan is written» no se repite.
+- [ ] Check status en un trabajo vivo y «Dejar de seguir» con confirmación; un plan con remoteJob vivo no falla. 💲 mínima.
+- [ ] Atlas `completed` sin salidas: se reintenta hasta 3 veces (solo tests hasta ahora).
+- [ ] Guías Wan, MiniMax, Seedance, HappyHorse y Grok nuevas: un prompt cada una 💲. Flash Omni 1.1, Kling O3, FLUX 3 y MiniMax H3 aún sin guía verificada.

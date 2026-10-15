@@ -116,6 +116,7 @@
 - [035-2026-10-W42: menú compacto de Align](history/035-2026-10-W42.md) — diez acciones en cuadrícula con nombres accesibles y referencia/grupo arriba.
 - [036-2026-10-W42: Align en el panel derecho](history/036-2026-10-W42.md) — Align contextual dentro de Tool cuando Edit está activa.
 - [037-2026-10-W42: roles de referencia, realismo y precios de OpenRouter](history/037-2026-10-W42.md) — cambios de dos ramas, decisiones, bugs y pendientes.
+- [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](history/038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
 
 ## Trazabilidad
 
