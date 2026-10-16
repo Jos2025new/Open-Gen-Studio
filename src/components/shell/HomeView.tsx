@@ -52,8 +52,8 @@ export function HomeView() {
     <nav className="home-tabs" aria-label="Home sections">
       <button type="button" className="home-tab is-active" aria-current="page">Home</button>
       <button type="button" className="home-tab" disabled title="Coming soon">Projects</button>
-      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'sessions' })}>Sessions</button>
-      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'gallery' })}>Library</button>
+      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'sessions', panelExpanded: true })}>Sessions</button>
+      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'gallery', panelExpanded: true })}>Library</button>
     </nav>
     <section className="home-section" aria-label="Create">
       <Head kicker="Create" title="What do you want to make?" />
@@ -83,7 +83,7 @@ export function HomeView() {
       <Head kicker="Latest" title="Pick up where you left off" />
       <div className="home-latest">
         <div>
-          <div className="home-sub"><span>Sessions</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'sessions' })}>See all<ArrowRight size={12} /></button></div>
+          <div className="home-sub"><span>Sessions</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'sessions', panelExpanded: true })}>See all<ArrowRight size={12} /></button></div>
           <div className="home-list">
             {recentSessions.map((s) => <button key={s.id} type="button" className="home-row" onClick={() => { selectSession(s.id); setUi({ home: false, panel: null }); }}>
               <span className="home-row-title">{s.title || 'Untitled'}</span><span className="home-row-meta">{formatRelative(s.updatedAt)}</span>
@@ -91,7 +91,7 @@ export function HomeView() {
           </div>
         </div>
         <div>
-          <div className="home-sub"><span>Library</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'gallery' })}>See all<ArrowRight size={12} /></button></div>
+          <div className="home-sub"><span>Library</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'gallery', panelExpanded: true })}>See all<ArrowRight size={12} /></button></div>
           <div className="home-thumbs">
             {recentAssets.length ? recentAssets.map((a) => <button key={a.id} type="button" className="home-thumb" aria-label={a.name || `Open ${a.kind}`} onClick={() => setUi({ lightbox: { assetIds: recentAssets.map((x) => x.id), index: recentAssets.indexOf(a) } })}>
               <AssetMedia assetId={a.id} hoverPlay={false} autoPlay={false} draggable={false} />
