@@ -12,6 +12,8 @@ import { VideoUpscaleControls } from './VideoUpscaleControls';
 
 export type OpTarget = { kind: 'asset'; assetId: string; parentId?: string } | { kind: 'layer'; sessionId: string; docId: string; layerId: string };
 
+const CALCULATING: Estimate = { usd: null, approximate: true, note: 'Calculating…' };
+
 /** The state of one operation run: its fields, the cost check and the launch. Shared by the op popover and the Tools space. */
 export function useOpRun(op: OpId, targetProp: OpTarget | null) {
   const def = OPS[op];
@@ -19,13 +21,17 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null) {
   const targetKey = JSON.stringify(targetProp);
   const target = useMemo(() => targetProp, [targetKey]);
   const [params, setParams] = useState<Record<string, AdvancedValue>>(() => defaultOpParams(def));
-  const [estimate, setEstimate] = useState<Estimate>({ usd: null, approximate: true, note: 'Calculating…' });
-  const [via, setVia] = useState<string>('');
   // Model for this run only; null = the model that made the source (or the Settings default).
   const [picked, setPicked] = useState<string | null>(null);
-  const pickable = target?.kind === 'asset' && opFollowsSource(def.engine);
   const opsSettings = useStore((s) => s.settings.ops);
   const videoSettings = useStore((s) => s.composer.video.settings);
+  const [estimate, setEstimate] = useState<Estimate>(CALCULATING);
+  // The inputs the shown estimate was calculated for: any other state of the inputs has a cost still pending.
+  const sig = JSON.stringify([op, targetKey, params, picked, opsSettings, videoSettings]);
+  const [settled, setSettled] = useState('');
+  const pending = Boolean(target) && settled !== sig;
+  const [via, setVia] = useState<string>('');
+  const pickable = target?.kind === 'asset' && opFollowsSource(def.engine);
 
   useEffect(() => {
     let alive = true;
@@ -35,7 +41,7 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null) {
       if (target.kind === 'asset') {
         let r;
         try { r = await opEstimate(target.assetId, op, params, picked ?? undefined); }
-        catch (e) { if (alive && op === 'video_upscale') { setEstimate({ usd: null, approximate: true, note: String((e as Error).message) }); setVia(''); } return; }
+        catch (e) { if (alive) { setEstimate({ usd: null, approximate: true, note: String((e as Error).message) }); if (op === 'video_upscale') setVia(''); setSettled(sig); } return; }
         if (!alive) return;
         setEstimate(r.estimate);
         setVia(r.modelName);
@@ -43,23 +49,24 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null) {
         const e = await layerOpEstimate(target.sessionId, target.docId, target.layerId, op, params);
         if (alive) setEstimate(e);
       }
+      if (alive) setSettled(sig);
     }, 120);
     return () => {
       alive = false;
       window.clearTimeout(t);
     };
-  }, [op, params, target, opsSettings, videoSettings, picked]);
+  }, [sig]);
 
   const missing = def.fields.find((f) => f.required && !String(params[f.key] ?? '').trim());
-  const blocked = op === 'video_upscale' && !via ? estimate.note ?? 'Choose an available video upscaler.' : missing ? `Fill in “${missing.label}”.` : null;
+  const blocked = pending ? 'Calculating the cost…' : op === 'video_upscale' && !via ? estimate.note ?? 'Choose an available video upscaler.' : missing ? `Fill in “${missing.label}”.` : null;
 
   /** The one launch: the same calls the op popover makes after its cost confirmation. */
   const run = () => {
-    if (!target) return;
+    if (!target || pending) return;
     if (target.kind === 'asset') void runAssetOp(target.assetId, op, params, target.parentId, picked ?? undefined);
     else void runLayerOp(target.sessionId, target.docId, target.layerId, op, params);
   };
-  return { params, setParams, estimate, via, picked, setPicked, pickable, missing, blocked, run };
+  return { params, setParams, estimate: pending ? CALCULATING : estimate, via, picked, setPicked, pickable, missing, blocked, run };
 }
 export type OpRun = ReturnType<typeof useOpRun>;
 

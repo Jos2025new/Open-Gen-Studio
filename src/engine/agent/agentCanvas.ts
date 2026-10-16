@@ -17,6 +17,12 @@ export function agentCanvas(): Workspace {
   return b.open && b.view === 'nodes' ? 'node' : b.open && b.view === 'designer' ? 'designer' : 'chat';
 }
 
+/** The agent is back on the chat canvas: the board stops showing Nodes or the Designer (the board stays as open or closed as it was). */
+export function backToChatCanvas(): Workspace {
+  if (getStudioBoard().view !== 'assets') setStudioBoard({ view: 'assets' });
+  return agentCanvas();
+}
+
 /** What the context says about Studio's board, or nothing outside Studio. */
 export function studioLine(): string[] {
   if (useStore.getState().ui.workspace !== 'chat') return [];

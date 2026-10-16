@@ -93,15 +93,18 @@ describe('key guard while the space shows', () => {
     window.removeEventListener('keydown', seen);
     return seen.mock.calls.length;
   };
-  it('stops workspace shortcuts, lets keys typed inside the space through', () => {
+  it('stops workspace shortcuts, lets keys typed inside the space reach the space but not the window', () => {
     const space = document.createElement('div');
     space.className = 'space';
     const input = document.createElement('textarea');
+    const own = vi.fn();
+    input.addEventListener('keydown', own);
     space.append(input);
     document.body.append(space);
     setUi({ space: 'create' });
     expect(press(document.body)).toBe(0);
-    expect(press(input)).toBe(1);
+    expect(press(input)).toBe(0);
+    expect(own).toHaveBeenCalledTimes(1);
     setUi({ space: undefined });
     expect(press(document.body)).toBe(1);
     space.remove();

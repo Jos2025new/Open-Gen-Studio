@@ -70,6 +70,18 @@ describe('effective agent canvas', () => {
   });
 });
 
+describe('continue_in_chat with a Studio board left on Nodes', () => {
+  it('the board goes back to Generations so the agent canvas is the chat in the same turn', async () => {
+    goLive('node');
+    setStudioBoard({ open: true, view: 'nodes' });
+    script([{ name: 'continue_in_chat', args: {} }]);
+    await sendAgentMessage('back to chat');
+    expect(useStore.getState().ui.workspace).toBe('chat');
+    expect(getStudioBoard()).toMatchObject({ open: true, view: 'assets' });
+    expect(agentCanvas()).toBe('chat');
+  });
+});
+
 describe('open_board', () => {
   it('is a real tool, in the capability map', () => {
     expect(TOOLS.some((t) => t.function.name === 'open_board')).toBe(true);

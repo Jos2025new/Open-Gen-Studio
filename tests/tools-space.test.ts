@@ -109,4 +109,28 @@ describe('Generate in the Tools panel', () => {
     act(() => { host.querySelector('.space-slot')!.dispatchEvent(drop); });
     expect(host.querySelector('.space-slot-empty')).not.toBeNull();
   });
+  it('an input asset of another kind than the tool takes (left over from another tab) is dropped', () => {
+    useStore.setState((s) => ({ assets: { ...s.assets, v2: { id: 'v2', kind: 'video', origin: 'generated', createdAt: 3, favorite: false } as unknown as Asset } }));
+    act(() => setUi({ toolAsset: 'v2' }));
+    expect(host.querySelector('.space-slot-empty')).not.toBeNull();
+    expect(generate().getAttribute('aria-disabled')).toBe('true');
+  });
+  it('while the cost is being calculated Generate runs nothing; it runs once the estimate is in, and again waits after a change', async () => {
+    const drop = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(drop, 'dataTransfer', { value: { getData: () => 'a1', types: ['application/x-ogs-asset'], files: [] } });
+    act(() => { host.querySelector('.space-slot')!.dispatchEvent(drop); });
+    expect(generate().getAttribute('aria-disabled')).toBe('true');
+    act(() => generate().click());
+    expect(runAssetOp).not.toHaveBeenCalled();
+    await wait();
+    expect(generate().getAttribute('aria-disabled')).toBe('false');
+    const choice = host.querySelector<HTMLButtonElement>('.space-opfields button:not(.is-active)');
+    expect(choice).not.toBeNull();
+    act(() => choice!.click());
+    expect(generate().getAttribute('aria-disabled')).toBe('true');
+    act(() => generate().click());
+    expect(runAssetOp).not.toHaveBeenCalled();
+    await wait();
+    expect(generate().getAttribute('aria-disabled')).toBe('false');
+  });
 });

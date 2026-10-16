@@ -7,13 +7,24 @@ import { setUi, useStore } from '../../store/store';
  * Keys aimed at Home itself, a popover, the lightbox or the sketch editor still pass.
  */
 export function installHomeKeyGuard(): void {
+  const covered = () => { const ui = useStore.getState().ui; return (ui.home || ui.space) && !ui.lightbox && !ui.sketch; };
+  const OWN = '.popover, .lightbox, .sketch-editor, .side-panel, [role="dialog"]';
+  const target = (e: Event) => (e.target instanceof Element ? e.target : null);
   window.addEventListener('keydown', (e) => {
-    const ui = useStore.getState().ui;
-    if (!(ui.home || ui.space) || ui.lightbox || ui.sketch) return;
-    const t = e.target instanceof Element ? e.target : null;
-    if (t?.closest('.home, .space, .popover, .lightbox, .sketch-editor, .side-panel, [role="dialog"]')) return;
+    if (!covered() || target(e)?.closest(`.home, .space, ${OWN}`)) return;
     e.stopImmediatePropagation();
   }, true);
+  // Keys aimed at Home or a Space still bubble to window, where the hidden canvas listens (Ctrl+Z after clicking
+  // "More" would undo in the Designer). Registered first, this one cuts them there, except Ctrl+Alt shortcuts (the trace key) and
+  // Escape while a side panel is open, which rely on window listeners of their own.
+  const bubble = (e: KeyboardEvent) => {
+    const t = target(e);
+    if (!covered() || !t?.closest('.home, .space') || t.closest(OWN)) return;
+    if (((e.ctrlKey || e.metaKey) && e.altKey) || (e.key === 'Escape' && useStore.getState().ui.panel)) return;
+    e.stopImmediatePropagation();
+  };
+  window.addEventListener('keydown', bubble);
+  window.addEventListener('keyup', bubble);
 }
 
 /** Reaching a workspace or a session by any route, or anything asking for the composer, leaves Home. */

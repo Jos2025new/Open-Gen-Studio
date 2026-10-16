@@ -58,8 +58,9 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
   const pre = useStore((s) => s.ui.toolAsset);
   const [assetId, setAssetId] = useState<string | undefined>(pre);
   useEffect(() => { if (pre) setAssetId(pre); }, [pre]);
-  const exists = useStore((s) => (assetId ? Boolean(s.assets[assetId]) : false));
-  const target = assetId && exists ? assetId : undefined;
+  // Only an asset of the kind this tool takes: switching kind tabs drops an incompatible input.
+  const fits = useStore((s) => (assetId ? s.assets[assetId]?.kind === def.input : false));
+  const target = assetId && fits ? assetId : undefined;
   const state = useOpRun(op, target ? { kind: 'asset', assetId: target } : null);
   const pop = usePopover();
   const unknown = state.estimate.usd == null;

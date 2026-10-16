@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), checkStatusNow: vi.fn() }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
@@ -18,6 +19,7 @@ import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
 import { doneExpanded } from '../src/components/space/boardModel';
 import { useStore } from '../src/store/store';
+import { checkStatusNow } from '../src/engine/jobs';
 import type { Asset, Generation } from '../src/engine/types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -158,6 +160,20 @@ describe('compact generation in Studio chat', () => {
     render(createElement(StudioGeneration, { generationId: 'g2', fallback }));
     expect(q('.studio-thumb.is-pending')).not.toBeNull();
     expect(q('.studio-gen-head')!.textContent).toContain('Creating');
+  });
+  it('a followed remote job can be checked or unfollowed (with confirmation); a plain busy one just stops; the card is findable by id', () => {
+    setData([gen('g1', 'running', [], { remoteJob: { provider: 'demo', id: 'j' } as never }), gen('g2', 'running')]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    expect(q('#gen-g1.studio-gen')).not.toBeNull();
+    const btn = (l: string) => host.querySelector<HTMLElement>(`[aria-label="${l}"]`);
+    act(() => btn('Check status')!.click());
+    expect(checkStatusNow).toHaveBeenCalledWith('g1');
+    expect(btn('Stop')).toBeNull();
+    act(() => btn('Dejar de seguir')!.click());
+    expect(document.body.textContent).toContain('Keep following');
+    render(createElement(StudioGeneration, { generationId: 'g2', fallback }));
+    expect(btn('Stop')).not.toBeNull();
+    expect(btn('Check status')).toBeNull();
   });
   it('failures and sound keep the full card', () => {
     setData([gen('g1', 'error'), gen('g2', 'done', ['a1'], { kind: 'audio' })]);

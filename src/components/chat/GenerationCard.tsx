@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
+import { StopFollowingPopover } from './StopFollowing';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
@@ -364,27 +365,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           </div>
         </div>
       </Popover>
-      <Popover open={stopFollowing.open} anchor={stopFollowing.ref} onClose={stopFollowing.close} width={300} label="Dejar de seguir">
-        <div className="confirm">
-          <p>
-            {`${g.remoteJob?.provider ?? 'The provider'} keeps generating this and will charge the estimate (${formatUsd(g.estimate.usd)}). Stopping only stops following it here; Check status can pick it up again.`}
-          </p>
-          <div className="spend-actions">
-            <Button variant="ghost" onClick={stopFollowing.close}>
-              Keep following
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                stopFollowing.close();
-                cancelGeneration(g.id);
-              }}
-            >
-              Dejar de seguir
-            </Button>
-          </div>
-        </div>
-      </Popover>
+      <StopFollowingPopover g={g} pop={stopFollowing} />
       <Popover open={info.open} anchor={info.ref} onClose={info.close} width={340} label="Details" className="pop-scroll">
         <PopoverHeader title="Details" sub={g.kind === 'video' ? 'Video' : 'Image'} />
         <GenerationInfo generation={g} asset={sel ? useStore.getState().assets[sel] : undefined} />

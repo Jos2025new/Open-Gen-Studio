@@ -83,7 +83,7 @@ import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
-import { agentCanvas, openBoard } from './agentCanvas';
+import { agentCanvas, backToChatCanvas, openBoard } from './agentCanvas';
 import { endedWithoutPlan } from './endedWithoutPlan';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
@@ -1703,7 +1703,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           else {
             const { added } = nodesToChat(sessionId, v.data.node_ids);
             if (get().ui.workspace !== 'chat') setUi({ workspace: 'chat', panel: null, lightbox: null });
-            workspace = agentCanvas();
+            workspace = backToChatCanvas();
             log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} node results to Chat` : 'Nothing new from Nodes' });
             respond(added.length
               ? `Shown in Chat (same generations, selected results, nothing ran): ${added.map((item) => `${item.nodeId} → ${item.generationId} result ${item.outputIndex + 1}`).join('; ')}.`

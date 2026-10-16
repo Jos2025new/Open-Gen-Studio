@@ -69,3 +69,4 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-layer.is-hidden .studio-layer-name { opacity: .5; }
 .studio-layer-name { flex: 1; min-width: 0; text-align: left; padding: var(--sp-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-board-main > .studio-designer { flex: 1; min-height: 0; }
+.studio-gen.is-flash { animation: gen-flash 1.6s ease-out; }
