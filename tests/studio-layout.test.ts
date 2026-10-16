@@ -73,8 +73,12 @@ describe('Studio board layout state', () => {
     act(() => q('[aria-label="Close board"]')!.click());
     expect(q('.studio-board')).toBeNull();
     expect(getStudioBoard().open).toBe(false);
+    expect(q('[aria-label="Show generations"]')?.getAttribute('aria-pressed')).toBe('false');
     act(() => q('[aria-label="Show generations"]')!.click());
     expect(q('.studio-board')).not.toBeNull();
+    expect(q('[aria-label="Hide generations"]')?.getAttribute('aria-pressed')).toBe('true');
+    act(() => q('[aria-label="Hide generations"]')!.click());
+    expect(q('.studio-board')).toBeNull();
   });
   it('has Done and Ongoing only: no Actions suggested', () => {
     setData([]);

@@ -1,8 +1,10 @@
 import { PanelRight } from 'lucide-react';
 import { IconButton } from '../ui/primitives';
-import { setStudioBoard } from '../../lib/studioBoard';
+import { setStudioBoard, useStudioBoard } from '../../lib/studioBoard';
 
-/** Composer control that reopens Studio's closed generations board. */
+/** Composer toggle for Studio's generations board: opens it when closed, closes it when open. */
 export function StudioReopen() {
-  return <IconButton icon={PanelRight} label="Show generations" size="sm" className="studio-reopen-btn" onClick={() => setStudioBoard({ open: true })} />;
+  const { open } = useStudioBoard();
+  const label = open ? 'Hide generations' : 'Show generations';
+  return <IconButton icon={PanelRight} label={label} size="sm" active={open} aria-pressed={open} className="studio-reopen-btn" onClick={() => setStudioBoard({ open: !open })} />;
 }
