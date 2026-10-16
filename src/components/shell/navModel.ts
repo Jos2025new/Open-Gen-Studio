@@ -17,7 +17,7 @@ export const CREATE: CreateItem[] = [
   { id: 'image', label: 'Image', hint: 'Generate pictures from a prompt', icon: ImageIcon, kind: 'image', mode: 'image' },
   { id: 'video', label: 'Video', hint: 'Animate a scene or a still', icon: Film, kind: 'video', mode: 'video' },
   { id: 'audio', label: 'Audio', hint: 'Voice, music and effects', icon: AudioLines, kind: 'audio', mode: 'audio' },
-  { id: 'model3d', label: '3D', hint: 'Models from text or images', icon: Box, kind: 'model3d', mode: 'model3d', soon: true },
+  { id: 'model3d', label: '3D', hint: 'Models from text or images', icon: Box, kind: 'model3d', mode: 'model3d' },
 ];
 
 /** The operations shown first, per input kind; the rest sit behind "More". */

@@ -34,19 +34,14 @@ describe('navigation model', () => {
     openSpace(SPACES[2]);
     expect(ui().workspace).toBe('designer');
   });
-  it('Image, Video and Audio open the chat with that mode; 3D is disabled and does nothing', () => {
-    for (const c of CREATE.filter((x) => !x.soon)) {
+  it('Image, Video, Audio and 3D open the chat with that mode', () => {
+    expect(CREATE.map((c) => c.id)).toEqual(['image', 'video', 'audio', 'model3d']);
+    for (const c of CREATE) {
       openHome();
       openCreate(c);
       expect(useStore.getState().composer.mode).toBe(c.mode);
       expect(ui()).toMatchObject({ workspace: 'chat', home: false });
     }
-    const model3d = CREATE.find((c) => c.id === 'model3d')!;
-    expect(model3d.soon).toBe(true);
-    openHome();
-    openCreate(model3d);
-    expect(useStore.getState().composer.mode).not.toBe('model3d');
-    expect(ui().home).toBe(true);
   });
   it('a tool opens the Library to pick an asset, with a notice naming the operation', () => {
     openHome();
@@ -62,12 +57,12 @@ describe('navigation model', () => {
 });
 
 describe('rendering', () => {
-  it('Home has its three sections, the bento cards and a disabled 3D', () => {
+  it('Home has its three sections, the bento cards and an enabled 3D', () => {
     const html = renderToStaticMarkup(createElement(HomeView));
     for (const label of ['Create', 'Tools', 'Latest']) expect(html).toContain(`aria-label="${label}"`);
     for (const t of ['Studio', 'Node Canvas', 'Designer']) expect(html).toContain(`<span class="home-card-title">${t}</span>`);
     for (const t of ['image', 'video', 'audio', 'model3d']) expect(html).toContain(`style="grid-area:${t}"`);
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-label="3D — soon"/);
+    expect(html).toMatch(/<button type="button" class="home-tile t-model3d" style="grid-area:model3d" aria-label="3D"/);
   });
   it('the wide bar has collapsible Spaces, Create and Tools sections with text', () => {
     const html = renderToStaticMarkup(createElement(SidebarNav, { wide: true }));
