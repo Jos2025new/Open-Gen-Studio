@@ -1,0 +1,34 @@
+/* Studio: the chat workspace as chat (left) + a Generations board (right), closable and resizable. Tokens only. */
+.workspace.ws-chat.has-studio-board { padding-right: var(--studio-w); }
+.workspace.ws-chat.has-studio-board .composer-dock { left: calc((100% - var(--studio-w)) / 2); width: min(800px, calc(100% - var(--studio-w) - 48px)); }
+.workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(800px, calc(100% - 48px)); }
+.workspace.ws-chat.has-studio-board > .chat { height: 100%; }
+.workspace.is-home > .studio-board, .workspace.is-space > .studio-board, .workspace.is-home > .studio-reopen, .workspace.is-space > .studio-reopen { visibility: hidden; }
+.studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--border); background: var(--surface); }
+.studio-board > .space-board { flex: 1; min-width: 0; }
+.studio-divider { position: absolute; top: 0; bottom: 0; left: calc(var(--sp-1) * -1); width: var(--sp-2); cursor: col-resize; z-index: 1; touch-action: none; }
+.studio-divider::after { content: ''; position: absolute; inset: 0 calc(50% - 1px); transition: background .12s; }
+.studio-divider:hover::after, .studio-divider.is-dragging::after, .studio-divider:focus-visible::after { background: var(--border-focus); }
+.studio-divider:focus-visible { outline: none; }
+.studio-reopen { position: absolute; top: var(--sp-3); right: var(--sp-3); z-index: 13; }
+.space-board.is-studio .space-lower { grid-template-columns: minmax(0, 1fr); max-height: none; min-height: 0; }
+.space-board.is-studio.is-done-folded .space-lower { flex: 1; }
+.space-board.is-studio.is-done-folded .space-ongoing { min-height: 0; flex: 1; }
+
+/* Generations in Studio's chat: small inline results, not cards. */
+.studio-gen { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+.studio-gen-head { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-s); color: var(--text-3); }
+.studio-gen-head:hover { color: var(--text); }
+.studio-gen-head svg.is-closed { transform: rotate(-90deg); }
+.studio-gen-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.studio-thumb { position: relative; width: 200px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); }
+.studio-thumb:hover { border-color: var(--border-strong); }
+.studio-thumb > .media { width: 100%; height: 100%; object-fit: cover; }
+.studio-thumb-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text); pointer-events: none; }
+.studio-thumb.is-pending { cursor: default; }
+.studio-gen-actions { display: flex; align-items: center; gap: var(--sp-1); }
+.studio-gen-head .spin { animation: studio-spin 1s linear infinite; }
+@keyframes studio-spin { to { transform: rotate(360deg); } }
+@media (max-width: 760px) { .studio-board, .studio-reopen { display: none; } .workspace.ws-chat.has-studio-board { padding-right: 0; } .workspace.ws-chat.has-studio-board .composer-dock { left: 50%; width: calc(100% - 20px); } }
+.studio-thumb .shimmer { position: absolute; inset: 0; }
+.space-board.is-studio .space-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }

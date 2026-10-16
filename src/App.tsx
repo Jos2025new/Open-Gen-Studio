@@ -17,6 +17,8 @@ import { Toasts } from './components/ui/Toasts';
 import { TooltipLayer } from './components/ui/TooltipLayer';
 import { HomeView } from './components/shell/HomeView';
 import { ToolsSpace } from './components/space/ToolsSpace';
+import { StudioBoard } from './components/studio/StudioBoard';
+import { useStudioBoard } from './components/studio/studioBoard';
 import { CreateSpace } from './components/space/CreateSpace';
 import { TraceControl } from './components/shell/TraceControl';
 
@@ -25,6 +27,7 @@ export function App() {
   const workspace = useStore((s) => s.ui.workspace);
   const home = useStore((s) => !!s.ui.home);
   const space = useStore((s) => s.ui.space);
+  const board = useStudioBoard();
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
 
 
@@ -62,9 +65,10 @@ export function App() {
         <Sidebar />
         <main className="main">
           <TopBar slotRef={setSlot} />
-          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''}`}>
+          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''} ${workspace === 'chat' && board.open ? 'has-studio-board' : ''}`} style={workspace === 'chat' ? ({ ['--studio-w' as string]: `${board.open ? board.width : 0}px` }) : undefined}>
             {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
             <Composer />
+            {workspace === 'chat' ? <StudioBoard /> : null}
             {home ? <HomeView /> : space === 'create' ? <CreateSpace /> : space === 'tools' ? <ToolsSpace /> : null}
           </div>
         </main>

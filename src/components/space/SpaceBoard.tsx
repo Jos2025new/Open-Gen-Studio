@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
+import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
@@ -10,14 +10,14 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, Segmented } from '../ui/primitives';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
-import { splitBoard, suggestedOps, targetAsset } from './boardModel';
+import { doneExpanded, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
 import { goWithAction } from './actionGo';
 
 type Density = 'compact' | 'comfortable';
 
 /** Generated Assets: finished results on top; running ones and the actions suggested for the chosen asset below. It cannot be closed. */
-export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' }: { kind: AssetKind; empty?: string }) {
+export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing generated yet.', studio = false, onClose }: { kind?: AssetKind; empty?: string; /** Studio's board: Done and Ongoing only, Done folds while something runs, closable. */ studio?: boolean; onClose?: () => void }) {
   const generations = useStore((s) => s.generations);
   const assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -51,8 +51,12 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
   };
   const reset = () => { setKind('all'); setScope('all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
   const filtered = kind !== 'all' || scope !== 'all';
+  const running = rows.ongoing.length > 0;
+  const [userDone, setUserDone] = useState<boolean | null>(null);
+  useEffect(() => { if (studio) setUserDone(null); }, [running, studio]);
+  const doneOpen = doneExpanded({ running, override: userDone, auto: studio });
 
-  return <section className="space-board" aria-label="Generated assets">
+  return <section className={`space-board ${studio ? 'is-studio' : ''} ${doneOpen ? '' : 'is-done-folded'}`} aria-label="Generated assets">
     <header className="space-board-head">
       <div className="space-board-tools">
         <IconButton icon={RefreshCw} label="Reset view" size="sm" onClick={reset} />
@@ -65,6 +69,7 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
         <IconButton icon={Star} label="Favorites only" size="sm" active={starred} aria-pressed={starred} onClick={() => setStarred(!starred)} />
         <IconButton icon={MousePointerClick} label="Select" size="sm" active={selecting} aria-pressed={selecting} onClick={() => { setSelecting(!selecting); setSelected([]); }} />
         <IconButton icon={CircleAlert} label="Show failed" size="sm" active={showFailed} aria-pressed={showFailed} onClick={() => setShowFailed(!showFailed)} />
+        {onClose ? <IconButton icon={X} label="Close board" size="sm" onClick={onClose} /> : null}
       </div>
     </header>
     <Popover open={filter.open} anchor={filter.ref} onClose={filter.close} width={300} label="Filter">
@@ -91,8 +96,11 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
       </div></div>
     </Popover>
 
-    <div className="space-done" aria-label="Done">
-      {rows.done.length ? <div className={`space-grid is-${density}`}>
+    <div className={`space-done ${doneOpen ? '' : 'is-folded'}`} aria-label="Done">
+      <button type="button" className="space-sub space-fold" aria-expanded={doneOpen} onClick={() => setUserDone(!doneOpen)}>
+        <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
+      </button>
+      {!doneOpen ? null : rows.done.length ? <div className={`space-grid is-${density}`}>
         {rows.done.map((c) => <button key={c.assetId} type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
@@ -114,14 +122,14 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
         <div className="space-sub">Ongoing</div>
         {rows.ongoing.length ? rows.ongoing.map((g) => <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
       </div>
-      <div className="space-actions" aria-label="Actions suggested">
+      {studio ? null : <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
         {ops.length && target ? <div className="space-ops">
           {ops.map((id) => <Chip key={id} icon={OP_ICONS[id]} active={chosen === id} aria-pressed={chosen === id} data-tip={OPS[id].description} onClick={() => choose(id)}>{QUICK_LABEL[id] ?? OPS[id].label}</Chip>)}
           {picked && chosen ? <IconButton icon={ArrowRight} label="Go" size="sm" className="space-go" onClick={() => void goWithAction(chosen, picked)} /> : null}
         </div> : <p className="space-empty">No {kind_ === 'model3d' ? '3D model' : kind_} yet: generate one to see its actions.</p>}
         {hint ? <p className="space-empty space-hint-note" role="status">Pick {nounOf(kind_)} from your generations first (use Select), then press → to use it here.</p> : null}
-      </div>
+      </div>}
     </div>
   </section>;
 }

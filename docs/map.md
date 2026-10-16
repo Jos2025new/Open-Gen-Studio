@@ -20,26 +20,26 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 196 | 130 |
-| [store.ts](../src/store/store.ts) | 121 | 106 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 49 | 0 |
+| [types.ts](../src/engine/types.ts) | 196 | 131 |
+| [store.ts](../src/store/store.ts) | 122 | 107 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 51 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 40 | 16 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 38 | 1 |
-| [ops.ts](../src/engine/ops.ts) | 35 | 16 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 39 | 1 |
+| [ops.ts](../src/engine/ops.ts) | 36 | 16 |
 | [doc.ts](../src/engine/design/doc.ts) | 33 | 34 |
 | [params.ts](../src/engine/params.ts) | 32 | 17 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [catalog.ts](../src/engine/catalog.ts) | 24 | 13 |
 | [format.ts](../src/lib/format.ts) | 24 | 1 |
+| [actions.ts](../src/engine/actions.ts) | 22 | 11 |
 | [types.ts](../src/engine/providers/types.ts) | 22 | 6 |
 | [id.ts](../src/lib/id.ts) | 22 | 0 |
-| [actions.ts](../src/engine/actions.ts) | 21 | 11 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 132 |
-| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 15 | 0 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 133 |
+| [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
 
@@ -47,15 +47,16 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | --- | --- | --- |
 | `src` | 2 | 0 |
 | `src/components/assets` | 11 | 2 |
-| `src/components/chat` | 9 | 3 |
+| `src/components/chat` | 10 | 4 |
 | `src/components/composer` | 10 | 5 |
 | `src/components/designer` | 40 | 12 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 19 | 6 |
-| `src/components/space` | 9 | 3 |
+| `src/components/space` | 9 | 4 |
+| `src/components/studio` | 2 | 1 |
 | `src/components/ui` | 12 | 1 |
-| `src/engine` | 38 | 163 |
+| `src/engine` | 38 | 164 |
 | `src/engine/agent` | 20 | 58 |
 | `src/engine/design` | 89 | 90 |
 | `src/engine/flow` | 10 | 11 |
@@ -63,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 155 |
-| `src/store` | 4 | 108 |
+| `src/lib` | 24 | 156 |
+| `src/store` | 4 | 109 |
 
-129 de 330 módulos no tienen ningún test que los importe directamente.
+129 de 333 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

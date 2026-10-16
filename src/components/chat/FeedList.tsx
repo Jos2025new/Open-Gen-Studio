@@ -6,6 +6,7 @@ import { copyText } from '../../engine/actions';
 import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
+import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
 import { ActivityBlock } from './ActivityBlock';
@@ -142,7 +143,7 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
 }
 
 /** One row. Memoized: while the agent writes only its own bubble changes, so the rest of the conversation is not redrawn. */
-export const FeedItemView = memo(function FeedItemView({ item, sessionId, compact }: { item: FeedItem; sessionId: string; compact?: boolean }) {
+export const FeedItemView = memo(function FeedItemView({ item, sessionId, compact, studio }: { item: FeedItem; sessionId: string; compact?: boolean; studio?: boolean }) {
   const current = useStore((s) => s.ui.workspace);
   const tag = item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
   switch (item.type) {
@@ -173,13 +174,15 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
     case 'plan':
       return <PlanCard item={item} sessionId={sessionId} />;
     case 'generation':
+      if (studio) return <StudioGeneration generationId={item.generationId} fallback={<GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />} />;
       return <GenerationCard generationId={item.generationId} compact={compact} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />;
     case 'notice':
       return <NoticeView item={item} sessionId={sessionId} />;
   }
 });
 
-export function FeedList({ sessionId, compact }: { sessionId: string; compact?: boolean }) {
+/** `studio`: Studio's chat, where generations show as small inline results instead of cards. */
+export function FeedList({ sessionId, compact, studio }: { sessionId: string; compact?: boolean; studio?: boolean }) {
   // Each canvas shows its own messages; the agent's conversation is one per session, so the others can be shown too.
   const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const canvas = useStore((s) => s.ui.workspace);
@@ -199,7 +202,7 @@ export function FeedList({ sessionId, compact }: { sessionId: string; compact?: 
         </button>
       ) : null}
       {feed.map((item) => (
-        <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} />
+        <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} studio={studio} />
       ))}
       {showStatus ? (
         <div className="agent-status faint" role="status">

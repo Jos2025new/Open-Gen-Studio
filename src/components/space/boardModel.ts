@@ -47,3 +47,11 @@ export function targetAsset(rows: BoardRows, selected: string[], assets: Record<
   const live = selected.filter((id) => ids.includes(id));
   return live.length ? live[live.length - 1] : ids[0];
 }
+
+/**
+ * Whether the Done row is open. Studio folds it while something runs (Ongoing gets the room) and opens it again when
+ * nothing does; the user's own toggle wins until the running state next changes. Elsewhere it is open unless folded by hand.
+ */
+export function doneExpanded({ running, override, auto }: { running: boolean; override: boolean | null; auto: boolean }): boolean {
+  return override ?? (auto ? !running : true);
+}

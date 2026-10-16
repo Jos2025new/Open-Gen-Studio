@@ -57,7 +57,7 @@ export function ChatWorkspace() {
     <div className="chat" ref={scrollRef} onScroll={onScroll}>
       {count ? (
         <div className="chat-column">
-          <FeedList sessionId={sessionId} />
+          <FeedList sessionId={sessionId} studio />
         </div>
       ) : (
         <div className="chat-empty">
