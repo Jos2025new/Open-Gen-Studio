@@ -202,6 +202,50 @@ describe('pick mode for per-image actions', () => {
   });
 });
 
+describe('pick mode: several, and single-select actions', () => {
+  const fallback = createElement('div');
+  const btn = (l: string) => host.querySelector<HTMLElement>(`[aria-label="${l}"]`);
+  const thumbs = () => [...host.querySelectorAll<HTMLElement>('.studio-thumb')];
+  const boxes = () => [...host.querySelectorAll<HTMLElement>('.studio-pick-box')];
+  const on = () => boxes().map((b) => b.getAttribute('aria-checked'));
+  it('Download: tick 1, 2, 3 by thumbnail and box, untick, confirm downloads the rest', () => {
+    setData([gen('g1', 'done', ['a1', 'a2', 'a3'])], [asset('a1'), asset('a2'), asset('a3')]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    act(() => btn('Download')!.click());
+    act(() => thumbs()[0].click()); act(() => boxes()[1].click()); act(() => thumbs()[2].click());
+    expect(on()).toEqual(['true', 'true', 'true']);
+    act(() => boxes()[1].click());
+    expect(on()).toEqual(['true', 'false', 'true']);
+    expect(q('.studio-pick-go')!.textContent).toBe('Download 2');
+    act(() => q('.studio-pick-go')!.click());
+    expect(vi.mocked(downloadAsset).mock.calls.map((c) => c[0])).toEqual(['a1', 'a3']);
+  });
+  it('Favorite: several ticked end up all favorited', () => {
+    setData([gen('g1', 'done', ['a1', 'a2', 'a3'])], [{ ...asset('a1'), favorite: true } as Asset, asset('a2'), asset('a3')]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    act(() => btn('Favorite')!.click());
+    act(() => thumbs()[0].click()); act(() => thumbs()[1].click()); act(() => thumbs()[2].click());
+    act(() => q('.studio-pick-go')!.click());
+    expect(['a1', 'a2', 'a3'].map((id) => useStore.getState().assets[id].favorite)).toEqual([true, true, true]);
+  });
+  it('Copy, Reuse and Details take one selection only', () => {
+    setData([gen('g1', 'done', ['a1', 'a2'], { variants: ['v1', 'v2'] } as never)]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    const copy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText: copy }, configurable: true });
+    act(() => btn('Copy prompt')!.click());
+    expect(q('.studio-pick-hint')!.textContent).toContain('Select an image');
+    act(() => thumbs()[0].click()); act(() => thumbs()[1].click());
+    expect(on()).toEqual(['false', 'true']);
+    act(() => q('.studio-pick-go')!.click());
+    expect(q('.studio-pick-hint')).toBeNull();
+    expect(copy).toHaveBeenCalledWith('prompt g1 v2');
+    act(() => btn('Reuse: prompt, inputs, model and settings in the composer')!.click());
+    act(() => thumbs()[0].click()); act(() => thumbs()[1].click());
+    expect(on()).toEqual(['false', 'true']);
+  });
+});
+
 describe('compact generation in Studio chat', () => {
   const fallback = createElement('div', { className: 'full-card' }, 'card');
   it('shows "Created N files" and small thumbnails that open the viewer; the line folds', () => {
