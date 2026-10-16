@@ -92,6 +92,7 @@ export function createStoreV2(dir) {
     const { savedAt, baseAt, version, globals, order, sessions = {} } = body;
     // Every 400 says why (the body), so a refused save is never a silent 400.
     if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
+    if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
     if (typeof globals !== 'string' || !globals.startsWith('{') || !globals.endsWith('}')) return { status: 400, reason: 'globals must be a JSON text (a string), not an object' };
     if (new Set(order).size !== order.length || !order.every((id) => typeof id === 'string' && SAFE_ID.test(id))) return { status: 400, reason: 'order has a duplicate or unsafe id' };
     for (const [id, text] of Object.entries(sessions)) {

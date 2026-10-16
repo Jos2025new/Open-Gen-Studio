@@ -19,6 +19,18 @@ const commitOf = (text: string, baseAt: number, changed?: Record<string, string>
 };
 
 describe('store format 2: migration, commit and reading', () => {
+  it('refuses a commit without a valid version and writes nothing', async () => {
+    const legacy = format1({ ses_a: session('ses_a') });
+    const { dir, v2 } = setup(legacy);
+    for (const version of [undefined, null, 'x', 0, 1.5]) {
+      const bad = { ...commitOf(legacy, 100), version } as never;
+      const res = await v2.commit(bad);
+      expect(res.status).toBe(400);
+      expect(res.reason).toMatch(/version/);
+    }
+    expect(existsSync(join(dir, 'store-v2', 'HEAD.json'))).toBe(false);
+  });
+
   it('the first write copies state.json whole and leaves it untouched', async () => {
     const legacy = format1({ ses_a: session('ses_a') });
     const { dir, v2 } = setup(legacy);
