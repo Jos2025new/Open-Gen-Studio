@@ -5,6 +5,9 @@ import type { AssetKind } from '../../engine/types';
 import { formatRelative } from '../../lib/format';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, isListed, openCreate, openSpace, openTool, type CreateItem, type ToolItem } from './navModel';
+import { PanelEmbed } from './panelEmbed';
+import { SessionsPanel } from './SessionsPanel';
+import { GalleryPanel } from '../gallery/GalleryPanel';
 
 
 function Head({ kicker, title, action }: { kicker: string; title: string; action?: ReactNode }) {
@@ -37,10 +40,14 @@ function ToolGrid({ items }: { items: ToolItem[] }) {
   </button>)}</>;
 }
 
+type HomeTab = 'home' | 'projects' | 'sessions' | 'gallery';
+const TABS: Array<[HomeTab, string]> = [['home', 'Home'], ['projects', 'Projects'], ['sessions', 'Sessions'], ['gallery', 'Library']];
+
 export function HomeView() {
   const assets = useStore((s) => s.assets);
   const sessions = useStore((s) => s.sessions);
   const [more, setMore] = useState(false);
+  const [tab, setTab] = useState<HomeTab>('home');
   const listed = useMemo(() => Object.values(assets).filter(isListed), [assets]);
   const count = (kind: AssetKind) => listed.filter((a) => a.kind === kind).length;
   const recentSessions = useMemo(() => Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4), [sessions]);
@@ -50,11 +57,9 @@ export function HomeView() {
 
   return <div className="home" role="region" aria-label="Home"><div className="home-inner">
     <nav className="home-tabs" aria-label="Home sections">
-      <button type="button" className="home-tab is-active" aria-current="page">Home</button>
-      <button type="button" className="home-tab" disabled title="Coming soon">Projects</button>
-      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'sessions', panelExpanded: true })}>Sessions</button>
-      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'gallery', panelExpanded: true })}>Library</button>
+      {TABS.map(([id, label]) => <button key={id} type="button" className={`home-tab ${tab === id ? 'is-active' : ''}`} aria-current={tab === id ? 'page' : undefined} disabled={id === 'projects'} title={id === 'projects' ? 'Coming soon' : undefined} onClick={() => setTab(id)}>{label}</button>)}
     </nav>
+    {tab === 'sessions' || tab === 'gallery' ? <PanelEmbed.Provider value><div className={`side-panel is-expanded home-embed panel-${tab}`}>{tab === 'sessions' ? <SessionsPanel /> : <GalleryPanel />}</div></PanelEmbed.Provider> : <>
     <section className="home-section" aria-label="Create">
       <Head kicker="Create" title="What do you want to make?" />
       <div className="home-bento">
@@ -83,7 +88,7 @@ export function HomeView() {
       <Head kicker="Latest" title="Pick up where you left off" />
       <div className="home-latest">
         <div>
-          <div className="home-sub"><span>Sessions</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'sessions', panelExpanded: true })}>See all<ArrowRight size={12} /></button></div>
+          <div className="home-sub"><span>Sessions</span><button type="button" className="home-link" onClick={() => setTab('sessions')}>See all<ArrowRight size={12} /></button></div>
           <div className="home-list">
             {recentSessions.map((s) => <button key={s.id} type="button" className="home-row" onClick={() => { selectSession(s.id); setUi({ home: false, panel: null }); }}>
               <span className="home-row-title">{s.title || 'Untitled'}</span><span className="home-row-meta">{formatRelative(s.updatedAt)}</span>
@@ -91,7 +96,7 @@ export function HomeView() {
           </div>
         </div>
         <div>
-          <div className="home-sub"><span>Library</span><button type="button" className="home-link" onClick={() => setUi({ panel: 'gallery', panelExpanded: true })}>See all<ArrowRight size={12} /></button></div>
+          <div className="home-sub"><span>Library</span><button type="button" className="home-link" onClick={() => setTab('gallery')}>See all<ArrowRight size={12} /></button></div>
           <div className="home-thumbs">
             {recentAssets.length ? recentAssets.map((a) => <button key={a.id} type="button" className="home-thumb" aria-label={a.name || `Open ${a.kind}`} onClick={() => setUi({ lightbox: { assetIds: recentAssets.map((x) => x.id), index: recentAssets.indexOf(a) } })}>
               <AssetMedia assetId={a.id} hoverPlay={false} autoPlay={false} draggable={false} />
@@ -100,5 +105,6 @@ export function HomeView() {
         </div>
       </div>
     </section>
+  </>}
   </div></div>;
 }

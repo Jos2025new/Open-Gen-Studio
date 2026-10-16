@@ -8,6 +8,7 @@ import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Session, Workspace } from '../../engine/types';
+import { usePanelExpanded } from './panelEmbed';
 
 type CanvasFilter = 'all' | Workspace;
 
@@ -49,7 +50,7 @@ export function SessionsPanel() {
   const bulkDel = usePopover();
   const view = usePopover();
   const newPop = usePopover();
-  const expanded = useStore((s) => s.ui.panelExpanded);
+  const { expanded, embedded } = usePanelExpanded();
 
   const stats = useMemo(() => {
     const m = new Map<string, Stats>();
@@ -128,7 +129,7 @@ export function SessionsPanel() {
                     onClick={() => {
                       newPop.close();
                       newSession();
-                      setUi({ panel: null, workspace: w });
+                      setUi({ panel: null, workspace: w, home: false });
                     }}
                   >
                     <Icon size={14} /> {CANVAS[w].label}
@@ -137,8 +138,10 @@ export function SessionsPanel() {
               })}
             </div>
           </Popover>
-          <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
-          <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+          {embedded ? null : <>
+            <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Full view'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
+            <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
+          </>}
         </div>
       </div>
       <div className="sessions-controls">
@@ -285,7 +288,7 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
     if (selecting) return onToggle();
     if (editing) return;
     selectSession(session.id);
-    setUi({ panel: null });
+    setUi({ panel: null, home: false });
   };
 
   return (

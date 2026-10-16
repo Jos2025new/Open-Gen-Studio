@@ -10,6 +10,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
 import type { Asset, Subject, SubjectKind } from '../../engine/types';
+import { usePanelExpanded } from '../shell/panelEmbed';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
 type Scope = 'session' | 'all';
@@ -17,16 +18,16 @@ type Scope = 'session' | 'all';
 /** Assets: every generation and upload, and the library of saved characters, objects, products and styles. */
 export function GalleryPanel() {
   const [tab, setTab] = useState<'generated' | 'library'>('generated');
-  const expanded = useStore((s) => s.ui.panelExpanded);
+  const { expanded, embedded } = usePanelExpanded();
   const libraryCount = useStore((s) => s.library.length);
   return (
     <div className="gallery">
       <div className="panel-head">
         <div className="panel-title">Library</div>
-        <div className="panel-head-actions">
+        {embedded ? null : <div className="panel-head-actions">
           <IconButton icon={expanded ? Minimize2 : Maximize2} label={expanded ? 'Collapse' : 'Expand'} size="sm" onClick={() => setUi({ panelExpanded: !expanded })} />
           <IconButton icon={X} label="Close" size="sm" onClick={() => setUi({ panel: null })} />
-        </div>
+        </div>}
       </div>
       <div className="assets-tabs">
         <Segmented
@@ -104,7 +105,7 @@ function GeneratedAssets() {
   const assets = useStore((s) => s.assets);
   const generations = useStore((s) => s.generations);
   const sessionId = useStore((s) => s.activeSessionId);
-  const expanded = useStore((s) => s.ui.panelExpanded);
+  const { expanded } = usePanelExpanded();
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');

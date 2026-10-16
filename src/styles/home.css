@@ -58,3 +58,4 @@
 .home-tab:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
 .home-tab.is-active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .home-tab:disabled { opacity: .45; cursor: default; }
+.side-panel.home-embed { position: static; width: auto; min-height: 60vh; border: 1px solid var(--border); border-radius: var(--r-m); box-shadow: none; overflow: hidden; z-index: auto; }
