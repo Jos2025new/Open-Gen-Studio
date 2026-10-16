@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Maximize, Minus, Plus, Redo2, Undo2 } from 'lucide-react';
+import { Hand, Maximize, Minus, MousePointer2, Plus, Redo2, Undo2 } from 'lucide-react';
 import { IconButton } from '../ui/primitives';
 import { Stage } from '../designer/Stage';
 import { designerKey } from '../designer/designerKeys';
@@ -47,6 +47,8 @@ export function EmbeddedDesigner() {
       {doc ? <>
         <span className="studio-designer-name" title={doc.name}>{doc.name}</span>
         <span className="studio-designer-tools">
+          <IconButton icon={MousePointer2} label="Select and move" size="sm" active={tool === 'move'} aria-pressed={tool === 'move'} onClick={() => setUi({ tool: 'move' })} />
+          <IconButton icon={Hand} label="Pan (or hold Space and drag)" size="sm" active={tool === 'hand'} aria-pressed={tool === 'hand'} onClick={() => setUi({ tool: 'hand' })} />
           <IconButton icon={Undo2} label="Undo" size="sm" disabled={!undoReady} onClick={() => undoDoc(session.id, doc.id)} />
           <IconButton icon={Redo2} label="Redo" size="sm" disabled={!redoReady} onClick={() => redoDoc(session.id, doc.id)} />
           <IconButton icon={Minus} label="Zoom out" size="sm" onClick={() => win('ogs:designer-zoom', 0.8)} />

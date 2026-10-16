@@ -67,6 +67,9 @@ describe('the Designer view of the Studio board', () => {
     expect(q('.studio-designer .stage')).not.toBeNull();
     for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Line art', 'Size', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
     expect(q('[aria-label^="Pan"]')).not.toBeNull();
+    // Top bar keeps: select · hand · undo · redo · zoom − · % · zoom + · fit; the bottom bar has no select/hand.
+    expect([...document.querySelectorAll('.studio-designer-tools [aria-label]')].map((b) => b.getAttribute('aria-label'))).toEqual(['Select and move', 'Pan (or hold Space and drag)', 'Undo', 'Redo', 'Zoom out', 'Zoom in', 'Fit canvas']);
+    expect(q('.studio-palette [aria-label="Select and move"], .studio-palette [aria-label^="Pan"]')).toBeNull();
     expect(q('.studio-palette .tool-rail > [aria-label^="Color"]')).not.toBeNull();
     expect(q('.studio-palette .tool-group-btn')).not.toBeNull();
     for (const sel of ['.designer-view', '.layers-panel', '.document-picker', '.studio-layers']) expect(q(sel), sel).toBeNull();

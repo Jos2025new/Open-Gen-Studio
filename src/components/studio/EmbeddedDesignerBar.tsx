@@ -1,4 +1,4 @@
-import { Brush as BrushIcon, Circle, Eraser, Hand, Layers as LayersIcon, MousePointer2, PenTool, Type } from 'lucide-react';
+import { Brush as BrushIcon, Circle, Eraser, Hand, Layers as LayersIcon, PenTool, Type } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import { activeLayer } from '../../engine/design/doc';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
@@ -48,8 +48,6 @@ export function EmbeddedDesignerBar({ sessionId, doc }: { sessionId: string; doc
   return <div className="designer-palette is-docked studio-palette">
     {STRIP_TOOLS.has(tool) && <ContextStrip sessionId={sessionId} doc={doc} />}
     <div className="tool-rail" role="toolbar" aria-label="Design tools">
-      {button('move', MousePointer2, 'Select and move')}
-      {button('hand', Hand, 'Pan (or hold Space and drag)')}
       {button('lineart', PenTool, 'Line art')}
       {paint.color === null
         ? <IconButton icon={BrushIcon} label="Color" size="sm" disabled data-tip="The eraser has no color" />
