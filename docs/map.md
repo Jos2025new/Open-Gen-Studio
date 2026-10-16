@@ -32,7 +32,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [format.ts](../src/lib/format.ts) | 25 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 24 | 13 |
-| [actions.ts](../src/engine/actions.ts) | 23 | 14 |
+| [actions.ts](../src/engine/actions.ts) | 23 | 15 |
 | [types.ts](../src/engine/providers/types.ts) | 22 | 6 |
 | [id.ts](../src/lib/id.ts) | 22 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |

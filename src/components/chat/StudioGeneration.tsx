@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Copy, CopyPlus, Info, Play, RefreshCw, CircleStop } from 'lucide-react';
+import { ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
-import { copyText, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
+import { copyText, downloadAsset, editInComposer, toggleFavorite, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { OPS } from '../../engine/ops';
 import { KindBackdrop } from '../ui/KindBackdrop';
@@ -25,10 +25,27 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
   const regen = usePopover();
   const info = usePopover();
   const stopFollowing = usePopover();
+  const [pick, setPick] = useState<'fav' | 'dl' | 'info' | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [infoId, setInfoId] = useState<string | null>(null);
   if (!g || (g.kind !== 'image' && g.kind !== 'video') || !['done', 'running', 'queued'].includes(g.status)) return <>{fallback}</>;
   const busy = g.status !== 'done';
   const outputs = g.assetIds;
   const first = outputs[0];
+  const multi = !busy && outputs.length > 1;
+  const cancelPick = () => { setPick(null); setPicked([]); };
+  const startPick = (k: 'fav' | 'dl' | 'info') => { setPick(k); setPicked([]); };
+  const confirmPick = () => {
+    if (pick === 'dl') picked.forEach((id) => void downloadAsset(id));
+    else if (pick === 'fav') { const all = useStore.getState().assets; const target = picked.some((id) => !all[id]?.favorite); picked.forEach((id) => { if (Boolean(all[id]?.favorite) !== target) toggleFavorite(id); }); }
+    else if (pick === 'info') { setInfoId(picked[0]); info.toggle(); }
+    cancelPick();
+  };
+  const pickBtn = (k: 'fav' | 'dl' | 'info', label: string, noun: string) => pick === k
+    ? <span className="studio-pick-hint" role="status">
+        {picked.length ? <button type="button" className="studio-pick-go" onClick={confirmPick}>{noun}{k === 'info' ? '' : ` ${picked.length}`}</button> : <span>{k === 'info' ? 'Select an image' : 'Select images first'}</span>}
+        <IconButton icon={X} label="Cancel selection" size="sm" onClick={cancelPick} />
+      </span> : null;
   return <div className="studio-gen" id={`gen-${g.id}`} aria-label={busy ? 'Generating' : 'Generated'}>
     {busy ? (() => {
       const total = g.op ? 1 : g.settings.count;
@@ -43,19 +60,21 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
       <ChevronDown size={13} className={open ? '' : 'is-closed'} />
     </button>
     {open ? <div className="studio-gen-row">
-      {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => setUi({ lightbox: { assetIds: outputs, index: i } })}>
+      {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => pick ? setPicked(pick === 'info' ? (picked[0] === id ? [] : [id]) : picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]) : setUi({ lightbox: { assetIds: outputs, index: i } })}>
         <KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}
-      </button><AgentAttachToggle assetId={id} /></div>)}
+      </button>{pick ? <span className={`studio-pick-box ${picked.includes(id) ? 'is-on' : ''}`} role="checkbox" aria-checked={picked.includes(id)} aria-label="Select image" onClick={() => setPicked(pick === 'info' ? (picked[0] === id ? [] : [id]) : picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])}>{picked.includes(id) ? picked.indexOf(id) + 1 : null}</span> : <AgentAttachToggle assetId={id} />}</div>)}
     </div> : null}
     </>}
     <div className="studio-gen-actions">
       {g.prompt ? <IconButton icon={Copy} label="Copy prompt" size="sm" onClick={() => void copyText(g.prompt)} /> : null}
       {!g.op && !busy ? <IconButton icon={CopyPlus} label="Reuse: prompt, inputs, model and settings in the composer" size="sm" onClick={() => void editInComposer(g.id)} /> : null}
       {!busy ? <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} /> : null}
-      {first && !busy ? <><FavoriteButton assetId={first} /><DownloadButton assetId={first} /></> : null}
-      <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
+      {first && !multi ? <><FavoriteButton assetId={first} /><DownloadButton assetId={first} /></> : null}
+      {multi ? <><IconButton icon={Star} label="Favorite" size="sm" active={pick === 'fav'} onClick={() => startPick('fav')} />{pickBtn('fav', 'Favorite', 'Favorite')}
+        <IconButton icon={Download} label="Download" size="sm" active={pick === 'dl'} onClick={() => startPick('dl')} />{pickBtn('dl', 'Download', 'Download')}</> : null}
+      <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open || pick === 'info'} onClick={multi ? () => startPick('info') : info.toggle} />{multi ? pickBtn('info', 'Details', 'Details') : null}
       {g.status === 'running' && g.remoteJob ? <IconButton icon={RefreshCw} label="Check status" size="sm" data-tip={`Ask ${g.remoteJob.provider} about this job now`} onClick={() => checkStatusNow(g.id)} /> : null}
       {busy && g.remoteJob ? <IconButton ref={stopFollowing.ref} icon={CircleStop} label="Dejar de seguir" size="sm" tone="danger" active={stopFollowing.open} onClick={stopFollowing.toggle} /> : busy ? <IconButton icon={CircleStop} label="Stop" size="sm" tone="danger" onClick={() => cancelGeneration(g.id)} /> : null}
     </div>
@@ -65,7 +84,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
     <StopFollowingPopover g={g} pop={stopFollowing} />
     <Popover open={info.open} anchor={info.ref} onClose={info.close} width={340} label="Details" className="pop-scroll">
       <PopoverHeader title="Details" sub={g.kind === 'video' ? 'Video' : 'Image'} />
-      <GenerationInfo generation={g} asset={first ? useStore.getState().assets[first] : undefined} />
+      <GenerationInfo generation={g} asset={(multi ? infoId ?? first : first) ? useStore.getState().assets[(multi ? infoId ?? first : first)!] : undefined} />
     </Popover>
   </div>;
 }

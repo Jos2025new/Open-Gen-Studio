@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), checkStatusNow: vi.fn() }));
+vi.mock('../src/engine/actions', async (orig) => ({ ...(await orig<typeof import('../src/engine/actions')>()), downloadAsset: vi.fn() }));
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   cacheDb: { get: async () => undefined, set: async () => undefined },
@@ -20,6 +21,7 @@ import { SpaceBoard } from '../src/components/space/SpaceBoard';
 import { doneExpanded } from '../src/components/space/boardModel';
 import { useStore } from '../src/store/store';
 import { checkStatusNow } from '../src/engine/jobs';
+import { downloadAsset } from '../src/engine/actions';
 import type { Asset, Generation } from '../src/engine/types';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -34,7 +36,7 @@ const q = (s: string) => host.querySelector<HTMLElement>(s);
 const render = (el: ReturnType<typeof createElement>) => act(() => root.render(el));
 const setData = (gens: Generation[], assets: Asset[] = [asset('a1'), asset('a2')]) => act(() => useStore.setState({ generations: Object.fromEntries(gens.map((g) => [g.id, g])), assets: Object.fromEntries(assets.map((a) => [a.id, a])) }));
 
-beforeEach(() => { localStorage.clear(); reloadStudioBoard(); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
+beforeEach(() => { vi.mocked(downloadAsset).mockClear(); localStorage.clear(); reloadStudioBoard(); host = document.createElement('div'); document.body.append(host); root = createRoot(host); });
 afterEach(() => { act(() => root.unmount()); host.remove(); });
 
 describe('Studio board layout state', () => {
@@ -165,6 +167,38 @@ describe('attach checkboxes', () => {
     expect(q('.space-done .attach-toggle')).not.toBeNull();
     act(() => q('.space-ongoing .attach-toggle')!.click());
     expect(useStore.getState().composer.attachments).toEqual(['a1', 'a2']);
+  });
+});
+
+describe('pick mode for per-image actions', () => {
+  const fallback = createElement('div');
+  const btn = (l: string) => host.querySelector<HTMLElement>(`[aria-label="${l}"]`);
+  it('multi-output Download asks to select, ticking two then confirming downloads both; x cancels', () => {
+    setData([gen('g1', 'done', ['a1', 'a2'])]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    act(() => btn('Download')!.click());
+    expect(q('.studio-pick-hint')!.textContent).toContain('Select images first');
+    act(() => host.querySelectorAll<HTMLElement>('.studio-thumb')[0].click());
+    expect(useStore.getState().ui.lightbox).not.toMatchObject({ assetIds: ['a1', 'a2'] });
+    act(() => host.querySelectorAll<HTMLElement>('.studio-pick-box')[1].click());
+    expect(q('.studio-pick-go')!.textContent).toBe('Download 2');
+    act(() => btn('Cancel selection')!.click());
+    expect(q('.studio-pick-hint')).toBeNull();
+    expect(downloadAsset).not.toHaveBeenCalled();
+    act(() => btn('Download')!.click());
+    act(() => host.querySelectorAll<HTMLElement>('.studio-thumb')[0].click());
+    act(() => host.querySelectorAll<HTMLElement>('.studio-thumb')[1].click());
+    act(() => q('.studio-pick-go')!.click());
+    expect(downloadAsset).toHaveBeenCalledWith('a1');
+    expect(downloadAsset).toHaveBeenCalledWith('a2');
+    expect(q('.studio-pick-hint')).toBeNull();
+  });
+  it('single output downloads directly', () => {
+    setData([gen('g1', 'done', ['a1'])]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    act(() => btn('Download')!.click());
+    expect(q('.studio-pick-hint')).toBeNull();
+    expect(downloadAsset).toHaveBeenCalledWith('a1');
   });
 });
 
