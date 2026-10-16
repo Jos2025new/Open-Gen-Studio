@@ -5,6 +5,8 @@
 - [Reglas de trabajo](../AGENTS.md).
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
 - [Pendientes y propuestas](pendientes.md): qué falta decidir, probar o implementar, con su estado.
+- [Pendientes de la interfaz por espacios](pendientes-gui.md): Home, Create, Tools y Studio con tablero (`task/gui-cohesion`): qué queda, por qué y dónde.
+- [Cómo probar la interfaz por espacios](gui-cohesion-pruebas.md): lista para el sandbox, con qué cuesta dinero y qué es gratis.
 - [Capas FX: pruebas pendientes](fx-pruebas.md): validación visual, interfaz, exportación, agente y escala de ADR 0011.
 - [Rendimiento raster y deshacer](raster-pruebas.md): medidas antes/después, exactitud de píxeles y límites.
 - [Depurar y medir](depuracion.md): registro de rendimiento (Ctrl+Alt+P), marcadores, informe, sondas y pruebas de una sola pieza.
@@ -30,8 +32,8 @@
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
 - [home y barra lateral: vista Home, secciones Spaces/Create/Tools](features/home.md).
-- [Create Media: Space Panel + Space Board (ajustes a la izquierda, resultados a la derecha)](features/create-space.md).
-- [Studio: chat a la izquierda y tablero Generations a la derecha (paso 1)](features/studio.md).
+- [Create Media y Tools: Space Panel + Space Board (ajustes a la izquierda, resultados a la derecha)](features/create-space.md).
+- [Studio: chat y tablero Generations, Nodes y Designer (pasos 1 a 3)](features/studio.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
 - [selección y marquee de Edit por modo](features/designer-selection.md).
 - [cuota provisional de trazos raster](raster-limit.md).
@@ -58,6 +60,8 @@
 - [0014 — Guardar cada sesión por separado (aceptado 2026-10-12; implementación parcial 2026-10-13)](decisions/0014-sesiones-separadas.md).
 - [0015 — Píxeles en mosaicos de 256² con copia al escribir (propuesto; el historial en mosaicos de 64² ya está en memoria, sin guardado por mosaicos)](decisions/0015-mosaicos-de-pixeles.md).
 - [0016 — Modo Dibujo y modo Diseño (aceptado 2026-10-13; pendiente la regla de capas con trazos editables)](decisions/0016-dibujo-y-diseno.md).
+- [0017 — Espacios: Space Panel + Space Board, y Studio con tablero (aceptado 2026-10-15; rama sin fusionar)](decisions/0017-espacios-panel-y-tablero.md).
+- [0018 — Canvas efectivo del agente y la herramienta open_board (aceptado 2026-10-15; rama sin fusionar)](decisions/0018-canvas-efectivo-del-agente.md).
 
 ## Propuestas de interfaz
 
@@ -120,6 +124,7 @@
 - [036-2026-10-W42: Align en el panel derecho](history/036-2026-10-W42.md) — Align contextual dentro de Tool cuando Edit está activa.
 - [037-2026-10-W42: roles de referencia, realismo y precios de OpenRouter](history/037-2026-10-W42.md) — cambios de dos ramas, decisiones, bugs y pendientes.
 - [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](history/038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
+- [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia (tests, capturas, sin ver en navegador) y decisiones del usuario.
 
 ## Trazabilidad
 

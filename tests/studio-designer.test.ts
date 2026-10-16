@@ -259,7 +259,7 @@ describe('file menu', () => {
 describe('pending list', () => {
   it('records the keyboard layer delete that never runs, with file and line', async () => {
     const fs = await import('node:fs');
-    const text = fs.readFileSync('docs/pendientes.md', 'utf8');
+    const text = fs.readFileSync('docs/pendientes-gui.md', 'utf8');
     expect(text).toMatch(/designerKeys\.ts:\d+/);
     const line = Number(/designerKeys\.ts:(\d+)/.exec(text)![1]);
     expect(fs.readFileSync('src/components/designer/designerKeys.ts', 'utf8').split('\n')[line - 1]).toContain("e.key === 'Delete'");

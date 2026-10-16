@@ -1,6 +1,6 @@
 # Home y barra lateral
 
-Solo disposición (2026-10-15, `task/gui-cohesion`). Studio abre por ahora el chat; no cambia el chat, los proveedores ni los datos.
+Disposición (2026-10-15/16, `task/gui-cohesion`; historial en [039](../history/039-2026-10-W42.md), decisiones en [0017](../decisions/0017-espacios-panel-y-tablero.md)). Studio abre el chat con su tablero a la derecha (ver studio.md); Home no cambia el chat, los proveedores ni los datos.
 
 | Comportamiento documentado | Código | Test |
 | --- | --- | --- |
@@ -9,5 +9,7 @@ Solo disposición (2026-10-15, `task/gui-cohesion`). Studio abre por ahora el ch
 | Tools: todas las operaciones de imagen, vídeo y audio de `ops.ts` (sin las de Sketch ni las de varios clips), una vez cada una; las principales primero y «More» el resto. Cada una abre el espacio Tools con esa operación (ver create-space.md). | [navModel.ts](../../src/components/shell/navModel.ts), [ops.ts](../../src/engine/ops.ts) | [home-nav.test.ts](../../tests/home-nav.test.ts) |
 | Latest: sesiones y recursos recientes, con «See all» a los paneles Sessions y Library. | [HomeView.tsx](../../src/components/shell/HomeView.tsx) | [home-nav.test.ts](../../tests/home-nav.test.ts) |
 | Barra ancha: Home, Spaces (filas altas), Create (2×2) y Tools (lista) con cabeceras plegables; abajo Sessions, Library y Spending. Barra estrecha: solo iconos, uno por sección, con panel flotante (Popover) al pulsar. | [SidebarNav.tsx](../../src/components/shell/SidebarNav.tsx), [Sidebar.tsx](../../src/components/shell/Sidebar.tsx), [sidebar-nav.css](../../src/styles/sidebar-nav.css), [home.css](../../src/styles/home.css) | [home-nav.test.ts](../../tests/home-nav.test.ts) |
+| Pestañas de Home en forma de píldora (Home, Projects «soon», Sessions, Library): Sessions y Library se muestran como sección bajo las pestañas (sin cajón ni botones de cerrar o expandir) y abrir una sesión deja Home; el icono Library del Space Panel abre Home en su pestaña Library (`ui.homeTab`). | [HomeView.tsx](../../src/components/shell/HomeView.tsx), [panelEmbed.ts](../../src/components/shell/panelEmbed.ts), [SessionsPanel.tsx](../../src/components/shell/SessionsPanel.tsx) | [create-space.test.ts](../../tests/create-space.test.ts) |
+| Los atajos del espacio de trabajo oculto (Ctrl+Z del Designer) no actúan mientras Home o un espacio se muestran; Home se cierra con cualquier cambio de espacio de trabajo, sesión o foco del compositor. | [homeGuard.ts](../../src/components/shell/homeGuard.ts), [App.tsx](../../src/App.tsx) | [home-guard.test.ts](../../tests/home-guard.test.ts) |
 
-Sin probar visualmente en navegador (solo render de servidor y tests). El selector de espacios del TopBar sigue disponible.
+Sin recorrido visual archivado de Home y la barra: solo tests de modelo y render. Lo que queda en [pendientes-gui.md](../pendientes-gui.md). El selector de espacios del TopBar sigue disponible.
