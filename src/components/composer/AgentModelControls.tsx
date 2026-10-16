@@ -151,7 +151,7 @@ export function AgentModelControls() {
 
   return (
     <>
-      <Chip ref={pop.ref} className="models-chip" active={pop.open || manualCount > 0} onClick={pop.toggle} data-tip="Models used by the agent">
+      <Chip ref={pop.ref} className="models-chip" active={pop.open} onClick={pop.toggle} data-tip="Models used by the agent">
         {manualCount ? `Models · ${manualCount}` : 'Models'}
         {pop.open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
       </Chip>

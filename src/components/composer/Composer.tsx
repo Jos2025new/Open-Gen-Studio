@@ -16,6 +16,8 @@ import { Chip, costLabel } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { AgentControls } from './AgentControls';
 import { AgentModelControls } from './AgentModelControls';
+import { StudioReopen } from '../studio/StudioReopen';
+import { useStudioBoard } from '../../lib/studioBoard';
 import { MediaControls } from './MediaControls';
 import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
@@ -236,6 +238,7 @@ export function Composer() {
   const editing = useStore((s) => s.composer.editing);
   const editingPrompt = useStore((s) => (s.composer.editing ? s.generations[s.composer.editing.generationId]?.prompt : undefined));
   const workspace = useStore((s) => s.ui.workspace);
+  const board = useStudioBoard();
   const focusTick = useStore((s) => s.ui.focusComposer);
   const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -486,6 +489,7 @@ export function Composer() {
             {workspace === 'designer' && mode === 'image' ? <DesignerTargetChip /> : null}
           </div>
           <div className="composer-end">
+            {workspace === 'chat' && !board.open ? <StudioReopen /> : null}
             {mode === 'agent' ? <AgentModelControls /> : null}
             {mode === 'agent' ? (
               busy ? (

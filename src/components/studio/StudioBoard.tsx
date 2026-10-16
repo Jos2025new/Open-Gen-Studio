@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent } from 'react';
-import { PanelRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { IconButton } from '../ui/primitives';
 import { SpaceBoard } from '../space/SpaceBoard';
 import { EmbeddedNodeCanvas } from '../node/NodeWorkspace';
@@ -8,12 +8,12 @@ import { BOARD_MAX, BOARD_MIN, setStudioBoard, useStudioBoard, type StudioView }
 
 const VIEWS: Array<{ id: StudioView; label: string }> = [{ id: 'assets', label: 'Generations' }, { id: 'nodes', label: 'Nodes' }, { id: 'designer', label: 'Designer' }];
 
-/** Studio's right column: the Generations board (Done and Ongoing), resizable and closable. Closed, a small control reopens it. */
+/** Studio's right column: the Generations board (Done and Ongoing), resizable and closable. Closed, the composer's Show generations control reopens it. */
 export function StudioBoard() {
   const { open, width, view } = useStudioBoard();
   const [drag, setDrag] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
-  if (!open) return <div className="studio-reopen"><IconButton icon={PanelRight} label="Show generations" size="sm" onClick={() => setStudioBoard({ open: true })} /></div>;
+  if (!open) return null;
   const shown = drag ?? width;
   const move = (e: PointerEvent<HTMLDivElement>) => {
     if (drag == null) return;

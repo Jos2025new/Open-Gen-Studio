@@ -12,9 +12,10 @@ vi.mock('../src/lib/idb', () => ({
   loadAssetUrl: async () => undefined,
 }));
 
-import { act, createElement } from 'react';
+import { Fragment, act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StudioBoard } from '../src/components/studio/StudioBoard';
+import { StudioReopen } from '../src/components/studio/StudioReopen';
 import { BOARD_MAX, BOARD_MIN, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
@@ -51,7 +52,7 @@ describe('Studio board layout state', () => {
   });
   it('the X closes the board, a small control reopens it', () => {
     setData([]);
-    render(createElement(StudioBoard));
+    render(createElement(Fragment, null, createElement(StudioBoard), createElement(StudioReopen)));
     expect(q('.studio-board')).not.toBeNull();
     act(() => q('[aria-label="Close board"]')!.click());
     expect(q('.studio-board')).toBeNull();

@@ -10,7 +10,9 @@
 .composer-bar .segmented button { height: 28px; border-radius: var(--radius-s); padding: 0 10px; }
 .composer-bar .segmented .is-active { background: var(--surface-3); }
 .composer-end { gap: 12px; max-width: 100%; flex-wrap: wrap; }
-.composer-end .models-chip { height: 34px; background: transparent; border: 0; padding: 0 6px; }
+.composer-end .models-chip { height: 34px; background: transparent; padding: 0 8px; color: var(--text-2); }
+.composer-end .models-chip.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); box-shadow: none; }
+.composer-end .models-chip:not(:disabled):hover, .composer-end .models-chip:focus-visible { color: var(--accent); border-color: var(--accent-line); }
 .composer-bar .send-btn.is-agent, .composer-bar .send-btn.is-stop { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
 .composer-bar .send-btn.is-agent svg { width: 19px; height: 19px; }
 .composer-bar .send-btn:disabled { background: var(--surface-3); color: var(--text-3); opacity: 1; }
