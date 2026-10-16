@@ -21,10 +21,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 204 | 133 |
-| [store.ts](../src/store/store.ts) | 131 | 111 |
+| [store.ts](../src/store/store.ts) | 131 | 112 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 59 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 46 | 17 |
-| [media.ts](../src/lib/media.ts) | 45 | 34 |
+| [media.ts](../src/lib/media.ts) | 45 | 35 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 43 | 1 |
 | [doc.ts](../src/engine/design/doc.ts) | 37 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 36 | 16 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 138 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 140 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
@@ -64,8 +64,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 25 | 161 |
-| `src/store` | 4 | 113 |
+| `src/lib` | 25 | 164 |
+| `src/store` | 4 | 114 |
 
 137 de 350 módulos no tienen ningún test que los importe directamente.
 
