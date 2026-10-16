@@ -31,7 +31,8 @@
 @keyframes studio-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .studio-board, .studio-reopen { display: none; } .workspace.ws-chat.has-studio-board { padding-right: 0; } .workspace.ws-chat.has-studio-board .composer-dock { left: 50%; width: calc(100% - 20px); } }
 .studio-thumb .shimmer { position: absolute; inset: 0; }
-.space-board.is-studio .space-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.space-board.is-studio .space-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.space-board.is-studio .space-grid.is-compact { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
 
 /* The tinted kind icon behind a picture (shared by board tiles and chat thumbnails). */
 .kind-backdrop { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); }

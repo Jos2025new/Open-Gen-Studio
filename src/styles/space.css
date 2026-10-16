@@ -110,3 +110,10 @@
 .space-done.is-folded { flex: none; padding-bottom: 0; overflow: visible; }
 .space-done.is-folded .space-fold { margin-bottom: 0; }
 .attach-host > .space-tile, .attach-host > .studio-thumb { width: 100%; display: block; }
+
+/* Board list layout: a small thumbnail, then prompt and model · time · status. */
+.space-list { display: flex; flex-direction: column; gap: var(--sp-1); }
+.space-list-row { position: relative; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); }
+.space-list-row > .space-tile { flex: 0 0 48px; width: 48px; }
+.space-list-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.space-list-body > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

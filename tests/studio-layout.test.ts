@@ -299,3 +299,22 @@ describe('compact generation in Studio chat', () => {
     expect(q('.full-card')).not.toBeNull();
   });
 });
+
+describe('Board View popover', () => {
+  const pick = (label: string) => act(() => [...document.body.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent === label)!.click());
+  it('Small applies is-compact to Done and Ongoing grids; List renders rows', () => {
+    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never })]);
+    render(createElement(SpaceBoard, { studio: true }));
+    act(() => q('[aria-label="View"]')!.click());
+    act(() => q('.space-fold')!.click());
+    pick('Small');
+    expect(host.querySelectorAll('.space-grid.is-compact').length).toBeGreaterThan(0);
+    expect(host.querySelectorAll('.space-grid.is-comfortable')).toHaveLength(0);
+    pick('List');
+    expect(host.querySelectorAll('.space-grid')).toHaveLength(0);
+    expect(host.querySelectorAll('.space-done .space-list-row')).toHaveLength(1);
+    expect(q('.space-done .space-list-row .space-list-body')!.textContent).toContain('prompt g1');
+    expect(host.querySelectorAll('.space-ongoing .space-list-row').length).toBe(2);
+    expect(q('.space-done .space-tile')).not.toBeNull();
+  });
+});
