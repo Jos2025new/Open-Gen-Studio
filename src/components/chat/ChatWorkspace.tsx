@@ -3,6 +3,7 @@ import { ArrowDown } from 'lucide-react';
 import { setComposer, setUi, useStore } from '../../store/store';
 import { nodeWorkNotInChat, nodesToChat } from '../../engine/flow/fromNodes';
 import { ImportFromNodes } from '../ui/ImportFromChat';
+import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
 import { FeedList } from './FeedList';
 import { useShallow } from 'zustand/react/shallow';
 
@@ -19,9 +20,11 @@ export function ChatWorkspace() {
     () => nodeWorkNotInChat(sessionId).map((item) => ({ id: item.nodeId, assetId: item.assetId, label: item.label })),
     [sessionId, session, generations, assets],
   );
-  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => f.workspace === 'chat').length ?? 0);
+  const board = useStudioBoard();
+  const canvases: string[] = studioCanvases(board);
+  const count = useStore((s) => s.sessions[s.activeSessionId]?.feed.filter((f) => canvases.includes(f.workspace)).length ?? 0);
   const lastKey = useStore((s) => {
-    const f = s.sessions[s.activeSessionId]?.feed.filter((x) => x.workspace === 'chat');
+    const f = s.sessions[s.activeSessionId]?.feed.filter((x) => canvases.includes(x.workspace));
     const last = f?.[f.length - 1];
     if (!last) return '';
     if (last.type === 'assistant') return `${last.id}:${last.text.length}`;

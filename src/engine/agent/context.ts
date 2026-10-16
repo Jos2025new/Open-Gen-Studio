@@ -18,7 +18,9 @@ import { nodeOutputAsset } from '../flow/graph';
 import { graphIndex } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
 import { assetContextName } from './attachments';
+import { studioLine, STUDIO_RULE } from './agentCanvas';
 import { viewReferenceLabel } from './assetSearch';
+import { assetShape } from './assetShape';
 
 const get = useStore.getState;
 
@@ -59,6 +61,7 @@ Rules that always hold
 
 Canvases
 - One conversation across the session's canvases (chat, node, designer): each <user_message canvas="…"> says where it was written, and app_context says the canvas you are on now; plans run on the canvas they were proposed on, and only the current canvas's tools and rules apply. Work done on another canvas of this session is yours to build on (its results are listed in plan notes); other sessions are never in this conversation.
+${STUDIO_RULE}
 - "Let's move to / continue on the node canvas" (from any canvas) → call continue_in_canvas once: the app switches the view and the chat's results become connected nodes (nothing reruns); then build on those nodes. Never tell the user to switch canvases by hand.
 - "Let's return to Chat / take these node results to Chat" (from any canvas) → MUST call continue_in_chat once: the app switches the view and shows the same existing node generations with their selected results as Chat cards; pass node_ids when the user chose specific nodes, otherwise omit them for every current node result not already there. Nothing is copied, rerun or charged; this transfer needs no generation plan.
 - "Send it / continue in the Designer" (any canvas) → MUST call continue_in_designer once (the view switches too), even if you believe the images were sent before: images become raster layers of one design; separate designs only when the user asks for them (as "documents"); video, audio and 3D cannot go there yet — say so. For "all images from this chat", omit asset_ids: the app enumerates the full Chat image collection, beyond the recent assets shown in context, and opens an existing design if everything was already imported. Never infer "there are no more images" from the recent list or previous replies. Report only what the tool actually returned; this transfer needs no generation plan.
@@ -216,12 +219,6 @@ function videoRouteLine(): string {
   return `video by purpose (the app picks the cheapest fitting variant): ${list}${guides ? `; before a video prompt, load its guide once: ${guides}` : ''}`;
 }
 
-/** "image 1024×768", "video 1280×720 5.0s", "audio 12.4s". */
-function assetShape(a: { kind: string; width: number; height: number; duration?: number }): string {
-  const secs = a.duration ? ` ${a.duration.toFixed(1)}s` : '';
-  return a.kind === 'audio' ? `audio${secs}` : `${a.kind} ${a.width}×${a.height}${secs}`;
-}
-
 function alternatives(): string {
   const st = get();
   const lines: string[] = [];
@@ -254,6 +251,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const st = get();
   const lines: string[] = [];
   lines.push(`workspace: ${opts.workspace}`);
+  lines.push(...studioLine());
   // State only, no orders: these lines stay in the history.
   lines.push(
     opts.style === 'auto'

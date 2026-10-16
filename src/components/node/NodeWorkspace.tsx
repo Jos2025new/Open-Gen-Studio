@@ -29,6 +29,7 @@ import { GroupNode, Operations, type GroupFlowNode } from './Operations';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
+import { EmbeddedControls } from '../studio/EmbeddedControls';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
@@ -83,7 +84,19 @@ function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
   );
 }
 
-function Canvas() {
+/** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
+function Canvas({ embedded = false }: { embedded?: boolean }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [inside, setInside] = useState(false);
+  const insideRef = useRef(false);
+  insideRef.current = !embedded || inside;
+  useEffect(() => {
+    if (!embedded) return;
+    const h = (e: Event) => setInside(Boolean(canvasRef.current?.contains(e.target as Node)));
+    document.addEventListener('pointerdown', h, true);
+    document.addEventListener('focusin', h);
+    return () => { document.removeEventListener('pointerdown', h, true); document.removeEventListener('focusin', h); };
+  }, [embedded]);
   const sessionId = useStore((s) => s.activeSessionId);
   const graph = useStore((s) => s.sessions[s.activeSessionId].graph);
   const assets = useStore((s) => s.assets);
@@ -302,7 +315,7 @@ function Canvas() {
   );
 
   const addAtCenter = (data: GraphNodeData) => {
-    const el = document.querySelector('.node-canvas');
+    const el = canvasRef.current;
     const r = el?.getBoundingClientRect();
     const center = r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 };
     const id = addNode(sessionId, data, { x: center.x - NODE_WIDTH / 2 + (Math.random() - 0.5) * 40, y: center.y + (Math.random() - 0.5) * 40 });
@@ -320,7 +333,7 @@ function Canvas() {
     }
     const images = ready.filter(f => f.type.startsWith('image/'));
     if (!images.length) return;
-    const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+    const r = canvasRef.current?.getBoundingClientRect();
     const pos = position ?? (r ? rf.screenToFlowPosition({ x: r.left + r.width / 2, y: r.top + r.height / 2.6 }) : { x: 0, y: 0 });
     const ids = await uploadFiles(images);
     const added = ids.map((assetId, i) => addNode(sessionId, { kind: 'asset', title: 'Image', assetId }, { x: pos.x - NODE_WIDTH / 2 + i * (NODE_WIDTH + 30), y: pos.y }));
@@ -328,6 +341,7 @@ function Canvas() {
   }, [sessionId, rf]);
 
   useEffect(() => {
+    if (embedded) return;
     const open = () => fileInput.current?.click();
     window.addEventListener('ogs:upload', open);
     return () => window.removeEventListener('ogs:upload', open);
@@ -335,7 +349,7 @@ function Canvas() {
 
   useEffect(() => {
     const paste = (e: ClipboardEvent) => {
-      if (e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
+      if (!insideRef.current || e.defaultPrevented || (e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]:not([contenteditable="false"])'))) return;
       const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
       if (!files.length) {
         // Nodes copied in the app (Ctrl+C / Cut): pasted with their links.
@@ -355,7 +369,7 @@ function Canvas() {
   // Ctrl+C / Ctrl+X copy or cut the selected nodes; Ctrl+G groups them, Ctrl+Shift+G ungroups. Not inside text fields.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
+      if (!insideRef.current || !(e.ctrlKey || e.metaKey) || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])'))) return;
       const ids = useStore.getState().sessions[sessionId]?.graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id) ?? [];
       const k = e.key.toLowerCase();
       if (!ids.length || window.getSelection()?.toString()) return;
@@ -377,14 +391,15 @@ function Canvas() {
   const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string; from?: string } | null>(null);
   const openMenu = (e: React.MouseEvent | MouseEvent, nodeId?: string) => {
     e.preventDefault();
-    const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+    const r = canvasRef.current?.getBoundingClientRect();
     setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), nodeId });
   };
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
 
   return (
     <div
-      className="node-canvas"
+      ref={canvasRef}
+      className={`node-canvas ${embedded ? 'is-embedded' : ''}`}
       onPointerDownCapture={onBoxDown}
       onMouseDownCapture={(e) => { if (boxing.current) e.stopPropagation(); }}
       onPointerMoveCapture={onBoxMove}
@@ -408,7 +423,7 @@ function Canvas() {
         e.currentTarget.value = '';
         void importImages(files, importPosition.current);
       }} />
-      <TopbarActions>
+      {embedded ? null : <TopbarActions>
         <AddNodeMenu onAdd={addAtCenter} />
         <IconButton icon={LayoutGrid} label="Auto layout" size="sm" disabled={!graph.nodes.length} onClick={() => {
           layoutAll(sessionId);
@@ -416,24 +431,24 @@ function Canvas() {
         }} />
         <IconButton icon={Maximize} label="Fit view" size="sm" disabled={!graph.nodes.length} onClick={() => void rf.fitView({ padding: 0.2, duration: 300 })} />
         <RunAll sessionId={sessionId} ids={runIds} />
-      </TopbarActions>
+      </TopbarActions>}
       <ReactFlow<FlowNode, Edge>
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
-        onPaneContextMenu={(e) => openMenu(e)}
-        onNodeContextMenu={(e, n) => {
+        onPaneContextMenu={embedded ? undefined : (e) => openMenu(e)}
+        onNodeContextMenu={embedded ? undefined : (e, n) => {
           setSelected(new Set([n.id]));
           openMenu(e, n.id);
         }}
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null })}
         onConnectEnd={(e, state) => {
           // Dropped on empty canvas from an output: offer the nodes that take it, at the drop point.
-          if (state.isValid || state.toNode || state.fromHandle?.type !== 'source' || !state.fromNode) return;
+          if (embedded || state.isValid || state.toNode || state.fromHandle?.type !== 'source' || !state.fromNode) return;
           const p = 'changedTouches' in e ? e.changedTouches[0] : e;
-          const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+          const r = canvasRef.current?.getBoundingClientRect();
           setMenu({ x: p.clientX - (r?.left ?? 0), y: p.clientY - (r?.top ?? 0), from: state.fromNode.id });
         }}
         isValidConnection={isValidConnection}
@@ -442,7 +457,7 @@ function Canvas() {
         fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
         minZoom={0.15}
         maxZoom={2}
-        deleteKeyCode={['Backspace', 'Delete']}
+        deleteKeyCode={insideRef.current ? ['Backspace', 'Delete'] : null}
         selectionOnDrag={tool === 'select'}
         panOnDrag={tool === 'select' ? [1, 2] : true}
         panOnScroll
@@ -453,7 +468,7 @@ function Canvas() {
       >
         {box ? <div className="node-box-select" style={{ left: Math.min(box.x0, box.x1), top: Math.min(box.y0, box.y1), width: Math.abs(box.x1 - box.x0), height: Math.abs(box.y1 - box.y0) }} /> : null}
         <Background variant={BackgroundVariant.Dots} gap={20} size={1.2} color="var(--text-4)" />
-        <Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
+        {embedded ? <EmbeddedControls /> : <><Operations sessionId={sessionId} graph={graph} ids={graph.nodes.filter((n) => selected.has(n.id)).map((n) => n.id)} sizes={measured} onSelect={(ids: string[]) => setSelected(new Set(ids))} />
         <CanvasNavigation
           sessionId={sessionId}
           onSelect={(id) => setSelected(new Set([id]))}
@@ -464,7 +479,7 @@ function Canvas() {
             deleteNodes(sessionId, [...selected]);
             setSelected(new Set());
           }}
-        />
+        /></>}
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
       <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
@@ -487,7 +502,7 @@ function Canvas() {
         ) : menu ? (
           <>
           {menu.from ? null : <div className="menu"><MenuItem icon={Upload} label="Import images" onClick={() => {
-            const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+            const r = canvasRef.current?.getBoundingClientRect();
             importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
             fileInput.current?.click();
             setMenu(null);
@@ -495,7 +510,7 @@ function Canvas() {
           <AddNodeItems
             accepts={menu.from ? outputPort(graph.nodes.find((n) => n.id === menu.from)!.data, assets) : undefined}
             onPick={(data) => {
-              const r = document.querySelector('.node-canvas')?.getBoundingClientRect();
+              const r = canvasRef.current?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
               // From a dropped connection: the new node lands there, wired to the port that takes the source.
               const id = menu.from ? addConnected(sessionId, menu.from, data, { x: pos.x, y: pos.y - 40 }) : addNode(sessionId, data, pos);
@@ -510,7 +525,7 @@ function Canvas() {
           </>
         ) : null}
       </Popover>
-      <ImportFromChat
+      {embedded ? null : <ImportFromChat
         sessionId={sessionId}
         canvas="node"
         items={fromChat}
@@ -519,8 +534,8 @@ function Canvas() {
           chatToNodes(sessionId, ids);
           window.setTimeout(() => void rf.fitView({ padding: 0.2, duration: 300 }), 50);
         }}
-      />
-      {!graph.nodes.length ? (
+      />}
+      {!graph.nodes.length && embedded ? <p className="node-empty faint">No nodes yet. Ask the agent to build a flow.</p> : !graph.nodes.length ? (
         <div className="node-empty">
           <h2>Build a flow</h2>
           <p className="faint">Ask the agent in the composer — it creates, connects and lays out the nodes — or add them yourself.</p>
@@ -546,6 +561,16 @@ export function NodeWorkspace() {
   return (
     <ReactFlowProvider key={sessionId}>
       <Canvas />
+    </ReactFlowProvider>
+  );
+}
+
+/** The node canvas inside Studio's board (the workspace itself is not mounted: no double mounting). */
+export function EmbeddedNodeCanvas() {
+  const sessionId = useStore((s) => s.activeSessionId);
+  return (
+    <ReactFlowProvider key={sessionId}>
+      <Canvas embedded />
     </ReactFlowProvider>
   );
 }

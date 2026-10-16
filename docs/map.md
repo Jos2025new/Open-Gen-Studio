@@ -20,9 +20,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 196 | 131 |
-| [store.ts](../src/store/store.ts) | 122 | 107 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 51 | 0 |
+| [types.ts](../src/engine/types.ts) | 199 | 132 |
+| [store.ts](../src/store/store.ts) | 124 | 108 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 52 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 40 | 16 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 39 | 1 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 133 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 134 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
@@ -55,19 +55,19 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/shell` | 19 | 6 |
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 2 | 1 |
-| `src/components/ui` | 12 | 1 |
-| `src/engine` | 38 | 164 |
-| `src/engine/agent` | 20 | 58 |
+| `src/components/ui` | 13 | 1 |
+| `src/engine` | 38 | 165 |
+| `src/engine/agent` | 23 | 59 |
 | `src/engine/design` | 89 | 90 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 24 | 156 |
-| `src/store` | 4 | 109 |
+| `src/lib` | 25 | 157 |
+| `src/store` | 4 | 110 |
 
-129 de 333 módulos no tienen ningún test que los importe directamente.
+133 de 338 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -96,22 +96,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
 - [stageSprites.ts](../src/components/designer/stageSprites.ts)
 - [usePanRequest.ts](../src/components/designer/usePanRequest.ts)
-- [CanvasNavigation.tsx](../src/components/node/CanvasNavigation.tsx)
-- [NodeWorkspace.tsx](../src/components/node/NodeWorkspace.tsx)
-- [Operations.tsx](../src/components/node/Operations.tsx)
-- [nodes.tsx](../src/components/node/nodes.tsx)
-- [GenerationsPanel.tsx](../src/components/shell/GenerationsPanel.tsx)
 - [ProviderPool.tsx](../src/components/shell/ProviderPool.tsx)
-- [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx)
 - [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
 - [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)
-- [TopBar.tsx](../src/components/shell/TopBar.tsx)
 - [TraceControl.tsx](../src/components/shell/TraceControl.tsx)
-- [WorkspaceMenu.tsx](../src/components/shell/WorkspaceMenu.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
-- [ImportFromChat.tsx](../src/components/ui/ImportFromChat.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
 - [gradient.ts](../src/engine/design/gradient.ts)

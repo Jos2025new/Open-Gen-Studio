@@ -6,6 +6,7 @@ import { copyText } from '../../engine/actions';
 import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
+import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
 import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
@@ -187,8 +188,12 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
   const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const canvas = useStore((s) => s.ui.workspace);
   const [everywhere, setEverywhere] = useState(false);
-  const others = useMemo(() => all.filter((f) => f.workspace !== canvas).length, [all, canvas]);
-  const feed = useMemo(() => (everywhere ? all : all.filter((f) => f.workspace === canvas)), [all, canvas, everywhere]);
+  // Studio's chat also shows the canvas its board is showing (the agent works there while it does).
+  const board = useStudioBoard();
+  const shown: string[] = studio ? studioCanvases(board) : [canvas];
+  const shownKey = shown.join();
+  const others = useMemo(() => all.filter((f) => !shownKey.split(',').includes(f.workspace)).length, [all, shownKey]);
+  const feed = useMemo(() => (everywhere ? all : all.filter((f) => shownKey.split(',').includes(f.workspace))), [all, shownKey, everywhere]);
   const phase = useStore((s) => (s.sessions[sessionId]?.agent.busy ? s.sessions[sessionId]?.agent.phase ?? 'working' : null));
   const last = feed[feed.length - 1];
   // While text streams, its caret already shows activity; an open activity block shows its own progress (L3).

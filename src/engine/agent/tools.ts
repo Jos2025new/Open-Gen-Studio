@@ -1,4 +1,5 @@
 import { SETTINGS_POLICY } from '../procedure';
+import { OPEN_BOARD_TOOL } from './agentCanvas';
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
@@ -111,6 +112,7 @@ export const TOOLS: ToolSpec[] = [
       parameters: { type: 'object', properties: {} },
     },
   },
+  OPEN_BOARD_TOOL,
   {
     type: 'function',
     function: {

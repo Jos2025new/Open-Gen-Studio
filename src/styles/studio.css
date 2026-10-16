@@ -37,3 +37,15 @@
 .kind-backdrop { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-3); }
 .kind-backdrop.is-image { color: var(--type-image); }.kind-backdrop.is-video { color: var(--type-video); }.kind-backdrop.is-audio { color: var(--type-audio); }.kind-backdrop.is-model3d { color: var(--warn); }
 .studio-thumb > .media-loading, .studio-thumb > .media-missing { background: transparent; position: relative; }
+
+/* Board view switcher and the embedded node canvas. */
+.studio-board-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.studio-board-main > .space-board, .studio-board-main > .node-canvas { flex: 1; min-height: 0; }
+.studio-views { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); }
+.studio-view { height: 28px; padding: 0 var(--sp-3); border-radius: var(--r-s); color: var(--text-3); font-size: var(--fs-s); font-weight: 500; }
+.studio-view:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+.studio-view.is-active { background: var(--accent-soft); color: var(--accent); }
+.studio-view:disabled { opacity: .45; cursor: default; }
+.studio-views-end { margin-left: auto; }
+.node-canvas.is-embedded { position: relative; }
+.node-canvas.is-embedded .node-empty { position: absolute; left: 0; right: 0; top: 40%; width: auto; transform: none; margin: 0; text-align: center; pointer-events: none; font-size: var(--fs-s); }

@@ -18,7 +18,7 @@ import { TooltipLayer } from './components/ui/TooltipLayer';
 import { HomeView } from './components/shell/HomeView';
 import { ToolsSpace } from './components/space/ToolsSpace';
 import { StudioBoard } from './components/studio/StudioBoard';
-import { useStudioBoard } from './components/studio/studioBoard';
+import { useStudioBoard } from './lib/studioBoard';
 import { CreateSpace } from './components/space/CreateSpace';
 import { TraceControl } from './components/shell/TraceControl';
 

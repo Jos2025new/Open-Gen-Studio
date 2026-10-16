@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StudioBoard } from '../src/components/studio/StudioBoard';
-import { BOARD_MAX, BOARD_MIN, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/components/studio/studioBoard';
+import { BOARD_MAX, BOARD_MIN, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
 import { doneExpanded } from '../src/components/space/boardModel';
@@ -37,13 +37,13 @@ afterEach(() => { act(() => root.unmount()); host.remove(); });
 
 describe('Studio board layout state', () => {
   it('opens by default, closes, clamps its width and keeps both', () => {
-    expect(getStudioBoard()).toEqual({ open: true, width: 400 });
+    expect(getStudioBoard()).toEqual({ open: true, width: 400, view: 'assets' });
     setStudioBoard({ open: false, width: 9999 });
-    expect(getStudioBoard()).toEqual({ open: false, width: BOARD_MAX });
+    expect(getStudioBoard()).toEqual({ open: false, width: BOARD_MAX, view: 'assets' });
     setStudioBoard({ width: 10 });
     expect(getStudioBoard().width).toBe(BOARD_MIN);
     reloadStudioBoard();
-    expect(getStudioBoard()).toEqual({ open: false, width: BOARD_MIN });
+    expect(getStudioBoard()).toEqual({ open: false, width: BOARD_MIN, view: 'assets' });
   });
   it('the X closes the board, a small control reopens it', () => {
     setData([]);
@@ -61,6 +61,38 @@ describe('Studio board layout state', () => {
     expect(q('[aria-label="Done"]')).not.toBeNull();
     expect(q('[aria-label="Ongoing"]')).not.toBeNull();
     expect(q('[aria-label="Actions suggested"]')).toBeNull();
+  });
+});
+
+describe('board views', () => {
+  beforeEach(() => {
+    class RO { observe() {} unobserve() {} disconnect() {} }
+    (globalThis as { ResizeObserver?: unknown }).ResizeObserver = RO;
+    (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly = class { m22 = 1; constructor() {} };
+  });
+  it('has a view switcher; Designer waits for the next step; switching keeps the workspace', () => {
+    setData([]);
+    render(createElement(StudioBoard));
+    const tabs = [...host.querySelectorAll<HTMLButtonElement>('.studio-view')];
+    expect(tabs.map((t) => t.textContent)).toEqual(['Generations', 'Nodes', 'Designer']);
+    expect(tabs[2].disabled).toBe(true);
+    const ws = useStore.getState().ui.workspace;
+    act(() => tabs[1].click());
+    expect(getStudioBoard().view).toBe('nodes');
+    expect(useStore.getState().ui.workspace).toBe(ws);
+    act(() => host.querySelectorAll<HTMLButtonElement>('.studio-view')[0].click());
+    expect(q('[aria-label="Done"]')).not.toBeNull();
+  });
+  it('the Nodes view is the embedded canvas: zoom and fit only, no Add node or Operations', () => {
+    setData([]);
+    setStudioBoard({ view: 'nodes' });
+    render(createElement(StudioBoard));
+    expect(q('.node-canvas.is-embedded')).not.toBeNull();
+    expect(q('[aria-label="Fit view"]')).not.toBeNull();
+    expect(q('[aria-label="Zoom in"]')).not.toBeNull();
+    expect(host.textContent).not.toContain('Add node');
+    expect(q('.node-ops, .operations')).toBeNull();
+    expect(host.textContent).toContain('No nodes yet');
   });
 });
 

@@ -83,6 +83,8 @@ import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
+import { agentCanvas, openBoard } from './agentCanvas';
+import { endedWithoutPlan } from './endedWithoutPlan';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { TOOLS, CAPABILITIES, MUST, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
@@ -234,7 +236,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const st = get();
   const sessionId = st.activeSessionId;
   if (!session(sessionId) || session(sessionId).agent.busy) return;
-  const workspace = st.ui.workspace;
+  // In Studio the board may be showing Nodes: that canvas is the agent's.
+  const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
   const s = session(sessionId);
   // An edited message brings its own attachments and leaves the composer as it is.
@@ -1286,22 +1289,6 @@ function activityLog(sessionId: string, workspace: Workspace) {
   };
 }
 
-/**
- * A failed turn only: in auto, the latest request asked to make something (not a question) and the agent ended
- * with text alone — no plan or questions card after that request.
- */
-const MAKE_WORDS = /\b(crea|cre[aá]me|haz|hazle|hazme|genera|gen[eé]rala|gen[eé]ralo|dibuja|pinta|anima|edita|cambia|a[nñ]ade|agrega|quita|pon|ponle|convierte|mejora|rehaz|redise[nñ]a|render|create|make|generate|draw|paint|animate|edit|change|add|remove|turn|upscale|design)\w*/i;
-
-function endedWithoutPlan(sessionId: string, workspace: Workspace): boolean {
-  if (get().composer.agentStyle !== 'auto') return false;
-  const feed = session(sessionId).feed.filter((f) => f.workspace === workspace);
-  const at = feed.map((f) => f.type).lastIndexOf('user');
-  const request = feed[at];
-  // Only a request to make or change something (not a question, a greeting or "let's move to the canvas").
-  if (request?.type !== 'user' || /[?¿]/.test(request.text) || !MAKE_WORDS.test(request.text)) return false;
-  return !feed.slice(at + 1).some((f) => f.type === 'plan' || f.type === 'questions');
-}
-
 /** Delete under a garbled reply: removes it and the warning. */
 export function deleteGarbled(sessionId: string, noticeId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === noticeId);
@@ -1333,7 +1320,9 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
+async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
+  // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
+  let workspace = startWorkspace;
   const engine = agentEngine();
   if (engine.kind !== 'llm') return;
   void loadLlmCatalog(engine.provider);
@@ -1684,7 +1673,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           else {
             const r = await chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as });
             transferredToDesigner = r.docs.length > 0 || !!r.openedExisting;
-            if (transferredToDesigner) setUi({ workspace: 'designer', panel: null, lightbox: null });
+            if (transferredToDesigner) { setUi({ workspace: 'designer', panel: null, lightbox: null }); workspace = agentCanvas(); }
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
             const lines = [
               r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : r.openedExisting ? `No duplicates added. Chat images are already imported; opened existing design ${r.openedExisting} in the Designer.` : 'No image was sent. Do not claim anything was imported.',
@@ -1700,6 +1689,7 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
             // From any canvas: the chat's work comes to Nodes and the user's view follows ("pasémonos al canvas").
             const { added } = chatToNodes(sessionId);
             if (get().ui.workspace !== 'node') setUi({ workspace: 'node', panel: null, lightbox: null });
+            workspace = agentCanvas();
             log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} chat results to the node canvas` : 'Nothing new from chat' });
             respond(added.length
               ? `Added ${added.length} nodes from the chat (up to date, nothing ran): ${added.map((n) => `${n.id} ${n.data.kind} "${n.data.title}"`).join('; ')}. They are in the node index from now on.`
@@ -1713,11 +1703,19 @@ async function llmTurn(sessionId: string, workspace: Workspace, opts: { textOnly
           else {
             const { added } = nodesToChat(sessionId, v.data.node_ids);
             if (get().ui.workspace !== 'chat') setUi({ workspace: 'chat', panel: null, lightbox: null });
+            workspace = agentCanvas();
             log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} node results to Chat` : 'Nothing new from Nodes' });
             respond(added.length
               ? `Shown in Chat (same generations, selected results, nothing ran): ${added.map((item) => `${item.nodeId} → ${item.generationId} result ${item.outputIndex + 1}`).join('; ')}.`
               : 'No node result was added. The requested results are already in Chat or those nodes have no current file result. The user\'s view is now Chat.');
           }
+          continue;
+        }
+        if (call.name === 'open_board') {
+          const r = openBoard(parsed.value, session(sessionId).graph, sessionId);
+          if (r.canvas) workspace = r.canvas;
+          if (r.label) log.action({ icon: 'guide', label: r.label });
+          respond(r.text);
           continue;
         }
         if (call.name === 'read_graph') {
