@@ -74,6 +74,6 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-pending-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: var(--fs-s); color: var(--text-2); text-align: center; padding: var(--sp-2); }
 .studio-thumb > .space-run-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; }
 .studio-pick-hint { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 var(--sp-2); border: 1px solid var(--border); border-radius: var(--r-full); background: var(--surface-2); font-size: var(--fs-xs); color: var(--text-2); }
-.studio-pick-go { font-size: var(--fs-xs); color: var(--accent); font-weight: 600; }
+.studio-pick-go { font-size: var(--fs-xs); font-weight: 600; margin: -2px 0; }
 .studio-pick-box { position: absolute; top: 8px; left: 8px; z-index: 3; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 5px; background: rgba(6, 6, 8, .4); font-size: 10px; font-weight: 600; color: var(--accent-ink); cursor: pointer; }
 .studio-pick-box.is-on { background: var(--accent); border-color: transparent; }

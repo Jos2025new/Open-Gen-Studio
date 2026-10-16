@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
+import { Check, ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { copyText, downloadAsset, editInComposer, toggleFavorite, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
@@ -7,7 +7,7 @@ import { OPS } from '../../engine/ops';
 import { KindBackdrop } from '../ui/KindBackdrop';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { IconButton } from '../ui/primitives';
+import { Button, IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { DownloadButton, FavoriteButton } from '../assets/AssetActions';
 import { GenerationInfo } from '../assets/GenerationInfo';
@@ -43,7 +43,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
   };
   const pickBtn = (k: 'fav' | 'dl' | 'info', label: string, noun: string) => pick === k
     ? <span className="studio-pick-hint" role="status">
-        {picked.length ? <button type="button" className="studio-pick-go" onClick={confirmPick}>{noun}{k === 'info' ? '' : ` ${picked.length}`}</button> : <span>{k === 'info' ? 'Select an image' : 'Select images first'}</span>}
+        {picked.length ? <Button variant="primary" size="sm" icon={Check} className="studio-pick-go" onClick={confirmPick}>{noun}{k === 'info' ? '' : ` ${picked.length}`}</Button> : <span>{k === 'info' ? 'Select an image' : 'Select images first'}</span>}
         <IconButton icon={X} label="Cancel selection" size="sm" onClick={cancelPick} />
       </span> : null;
   return <div className="studio-gen" id={`gen-${g.id}`} aria-label={busy ? 'Generating' : 'Generated'}>
