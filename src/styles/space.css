@@ -109,3 +109,4 @@
 .space-fold svg.is-closed { transform: rotate(-90deg); }
 .space-done.is-folded { flex: none; padding-bottom: 0; overflow: visible; }
 .space-done.is-folded .space-fold { margin-bottom: 0; }
+.attach-host > .space-tile, .attach-host > .studio-thumb { width: 100%; display: block; }

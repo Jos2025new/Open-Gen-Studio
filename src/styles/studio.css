@@ -70,3 +70,6 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-layer-name { flex: 1; min-width: 0; text-align: left; padding: var(--sp-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-board-main > .studio-designer { flex: 1; min-height: 0; }
 .studio-gen.is-flash { animation: gen-flash 1.6s ease-out; }
+.studio-gen-row > .attach-host { width: 200px; max-width: 100%; }
+.studio-pending-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: var(--fs-s); color: var(--text-2); text-align: center; padding: var(--sp-2); }
+.studio-thumb > .space-run-bar { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 0; }

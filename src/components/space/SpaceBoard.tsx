@@ -13,6 +13,7 @@ import { Chip, IconButton, Segmented } from '../ui/primitives';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
 import { doneExpanded, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { goWithAction } from './actionGo';
 
 type Density = 'compact' | 'comfortable';
@@ -102,14 +103,14 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
         <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
       </button>
       {!doneOpen ? null : rows.done.length ? <div className={`space-grid is-${density}`}>
-        {rows.done.map((c) => <button key={c.assetId} type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
+        {rows.done.map((c) => <div key={c.assetId} className="attach-host"><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
             <KindBackdrop kind={assets[c.assetId]?.kind} />
             <AssetMedia assetId={c.assetId} hoverPlay={false} autoPlay={false} draggable={false} />
             {assets[c.assetId]?.favorite ? <Star size={12} className="space-tile-star" aria-label="Favorite" /> : null}
-          </button>)}
+          </button><AgentAttachToggle assetId={c.assetId} /></div>)}
       </div> : <p className="space-empty">{starred ? 'No favorites yet.' : empty}</p>}
     </div>
 
@@ -153,10 +154,10 @@ function OngoingTiles({ g, density }: { g: Generation; density: Density }) {
   const assets = useStore((s) => s.assets);
   const slots = Math.max(0, (g.op ? 1 : g.settings.count) - g.assetIds.length);
   return <div className={`space-grid is-${density}`} aria-label="Running generation">
-    {g.assetIds.map((id) => <div key={id} className={`space-tile t-${assets[id]?.kind ?? 'image'}`}>
+    {g.assetIds.map((id) => <div key={id} className="attach-host"><div className={`space-tile t-${assets[id]?.kind ?? 'image'}`}>
       <KindBackdrop kind={assets[id]?.kind} />
       <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
-    </div>)}
+    </div><AgentAttachToggle assetId={id} /></div>)}
     {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /></div>)}
   </div>;
 }

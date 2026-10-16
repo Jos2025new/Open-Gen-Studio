@@ -152,6 +152,22 @@ describe('Studio board: Ongoing tiles and default scope', () => {
   });
 });
 
+describe('attach checkboxes', () => {
+  const fallback = createElement('div');
+  it('ticking a chat thumbnail or a board tile (Done and Ongoing) adds it to the composer attachments', () => {
+    useStore.setState({ composer: { ...useStore.getState().composer, attachments: [] } });
+    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never })]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    act(() => q('.studio-gen .attach-toggle')!.click());
+    expect(useStore.getState().composer.attachments).toEqual(['a1']);
+    render(createElement(SpaceBoard, { studio: true }));
+    act(() => q('.space-fold')!.click());
+    expect(q('.space-done .attach-toggle')).not.toBeNull();
+    act(() => q('.space-ongoing .attach-toggle')!.click());
+    expect(useStore.getState().composer.attachments).toEqual(['a1', 'a2']);
+  });
+});
+
 describe('compact generation in Studio chat', () => {
   const fallback = createElement('div', { className: 'full-card' }, 'card');
   it('shows "Created N files" and small thumbnails that open the viewer; the line folds', () => {
@@ -177,9 +193,10 @@ describe('compact generation in Studio chat', () => {
     render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
     expect(q('.studio-thumb-play')).not.toBeNull();
     render(createElement(StudioGeneration, { generationId: 'g2', fallback }));
-    expect(q('.studio-thumb')).toBeNull();
-    expect(q('.studio-gen .space-run')).not.toBeNull();
-    expect(q('.studio-gen .space-run-bar')).not.toBeNull();
+    expect(q('.studio-thumb:not(.is-pending)')).toBeNull();
+    expect(host.querySelectorAll('.studio-thumb.is-pending')).toHaveLength(1);
+    expect(q('.studio-pending-text')!.textContent).toContain('0/1');
+    expect(q('.studio-gen')!.textContent).not.toContain('prompt g2');
     expect(q('.studio-gen-head')).toBeNull();
   });
   it('a followed remote job can be checked or unfollowed (with confirmation); a plain busy one just stops; the card is findable by id', () => {

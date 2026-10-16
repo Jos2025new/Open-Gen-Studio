@@ -11,7 +11,7 @@ import { IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { DownloadButton, FavoriteButton } from '../assets/AssetActions';
 import { GenerationInfo } from '../assets/GenerationInfo';
-import { OngoingRow } from '../space/SpaceBoard';
+import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { StopFollowingPopover } from './StopFollowing';
 
 /**
@@ -30,17 +30,24 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
   const outputs = g.assetIds;
   const first = outputs[0];
   return <div className="studio-gen" id={`gen-${g.id}`} aria-label={busy ? 'Generating' : 'Generated'}>
-    {busy ? <OngoingRow g={g} /> : <>
+    {busy ? (() => {
+      const total = g.op ? 1 : g.settings.count;
+      const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
+      return <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status"><div className="shimmer" />
+        <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{outputs.length}/{total}</span></div>
+        {p != null ? <div className="space-run-bar" role="progressbar" aria-valuenow={Math.round(p * 100)}><span style={{ width: `${p * 100}%` }} /></div> : null}
+      </div></div>;
+    })() : <>
     <button type="button" className="studio-gen-head" aria-expanded={open} onClick={() => setOpen(!open)}>
       Created {outputs.length} file{outputs.length === 1 ? '' : 's'}
       <ChevronDown size={13} className={open ? '' : 'is-closed'} />
     </button>
     {open ? <div className="studio-gen-row">
-      {outputs.map((id, i) => <button key={id} type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => setUi({ lightbox: { assetIds: outputs, index: i } })}>
+      {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => setUi({ lightbox: { assetIds: outputs, index: i } })}>
         <KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}
-      </button>)}
+      </button><AgentAttachToggle assetId={id} /></div>)}
     </div> : null}
     </>}
     <div className="studio-gen-actions">
