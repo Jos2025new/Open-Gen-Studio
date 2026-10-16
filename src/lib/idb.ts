@@ -1,4 +1,4 @@
-import { createStore, del, get, getMany, set, delMany, keys } from 'idb-keyval';
+import { clear, createStore, del, get, getMany, set, delMany, keys } from 'idb-keyval';
 import { assembleText, splitText, type V2Parts } from '../store/formatV2';
 import { disk, diskAvailable, type DiskWriteResult } from './disk';
 import type { StateJson } from '../store/persistJson';
@@ -69,6 +69,31 @@ async function backupLegacy(key: string, legacy: string | undefined): Promise<vo
   if (!legacy) return;
   const backupKey = `${key}:format1-backup-${savedAt(legacy)}`;
   if (!(await get(backupKey, stateStore))) await set(backupKey, legacy, stateStore);
+}
+
+/** Every IndexedDB database the app owns (format 1 state, media, caches, format 2 state). */
+export const ALL_DB_NAMES = ['ogs-state', 'ogs-blobs', 'ogs-cache', 'ogs-store-v2'] as const;
+
+/**
+ * Deletes databases and waits for each request. A blocked delete (another connection is still open, e.g. this page's own
+ * idb-keyval handle) stays queued in the browser and runs when the connection closes, before the reloaded page can open it.
+ */
+export function deleteDatabases(names: readonly string[]): Promise<void> {
+  return Promise.all(names.map((name) => new Promise<void>((resolve) => {
+    const req = indexedDB.deleteDatabase(name);
+    req.onsuccess = () => resolve();
+    req.onerror = () => resolve(); // best effort: a failed delete must not stop the others or the reload
+    req.onblocked = () => resolve();
+  }))).then(() => undefined);
+}
+
+/**
+ * Wipes every local database. The stores are emptied first (deterministic: idb-keyval keeps its connection open, so the
+ * delete itself may stay blocked until the page reloads), then the databases are deleted.
+ */
+export async function wipeLocalDatabases(): Promise<void> {
+  await Promise.all([stateStore, blobStore, cacheStore, v2Store].map((store) => clear(store).catch(() => undefined)));
+  await deleteDatabases(ALL_DB_NAMES);
 }
 
 export const stateDb = {

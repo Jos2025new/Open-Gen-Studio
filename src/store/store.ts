@@ -9,7 +9,7 @@ import { graphEditProblem } from '../engine/flow/locks';
 import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { uid } from '../lib/id';
-import { stateDb } from '../lib/idb';
+import { stateDb, wipeLocalDatabases } from '../lib/idb';
 import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
@@ -625,8 +625,8 @@ export async function wipeAllData(): Promise<void> {
   await stateDb.del('ogs-app').catch(() => undefined);
   // The disk copy moves to data.bak-<date>: otherwise the next load would restore it, and nothing is lost for good.
   await disk.wipe();
-  for (const name of ['ogs-state', 'ogs-blobs', 'ogs-cache']) indexedDB.deleteDatabase(name);
-  window.setTimeout(() => location.reload(), 150);
+  await wipeLocalDatabases();
+  location.reload();
 }
 
 // Another tab (or window) saved newer work after this one loaded: this tab stops saving, its browser copy becomes the
