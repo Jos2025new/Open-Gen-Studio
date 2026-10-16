@@ -13,3 +13,5 @@ Disposición (2026-10-15/16, `task/gui-cohesion`; historial en [039](../history/
 | Los atajos del espacio de trabajo oculto (Ctrl+Z del Designer) no actúan mientras Home o un espacio se muestran; Home se cierra con cualquier cambio de espacio de trabajo, sesión o foco del compositor. | [homeGuard.ts](../../src/components/shell/homeGuard.ts), [App.tsx](../../src/App.tsx) | [home-guard.test.ts](../../tests/home-guard.test.ts) |
 
 Sin recorrido visual archivado de Home y la barra: solo tests de modelo y render. Lo que queda en [pendientes-gui.md](../pendientes-gui.md). El selector de espacios del TopBar sigue disponible.
+
+Selector de sesiones de la barra superior ([SessionSwitcher.tsx](../../src/components/shell/SessionSwitcher.tsx), [TopBar.tsx](../../src/components/shell/TopBar.tsx)): buscar; un botón alterna la selección de varias sesiones; «+» crea una sesión nueva arriba; la papelera junto a «All sessions» borra las sesiones marcadas con la misma confirmación que el panel Sessions ([SessionsPanel.tsx](../../src/components/shell/SessionsPanel.tsx)). Prueba: [session-switcher.test.ts](../../tests/session-switcher.test.ts); sin ver en navegador.
