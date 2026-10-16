@@ -67,7 +67,7 @@ export const OP_ICONS: Record<OpId, LucideIcon> = {
   fx: Sparkle,
 };
 
-const QUICK_LABEL: Partial<Record<OpId, string>> = {
+export const QUICK_LABEL: Partial<Record<OpId, string>> = {
   remove_bg: 'Remove BG',
   angle: 'Angle',
   extract_frame: 'Frame',

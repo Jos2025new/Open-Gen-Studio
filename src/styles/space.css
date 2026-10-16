@@ -98,3 +98,7 @@
 .space-opfields { display: flex; flex-direction: column; gap: var(--sp-2); }
 .space-opfields > .op-field, .space-opfields > .space-card { padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--bg-canvas); }
 .space-card-value { font-size: var(--fs-m); color: var(--text); }
+.space-go { color: var(--accent); border: 1px solid var(--accent-line); }
+.space-hint-note { color: var(--warn); }
+.space-tile.is-selected { box-shadow: none; }
+.space-tile.is-selected::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--accent); pointer-events: none; }

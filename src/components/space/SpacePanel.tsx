@@ -2,7 +2,8 @@ import { useRef } from 'react';
 import { Paperclip } from 'lucide-react';
 import { setComposer, toast, useStore } from '../../store/store';
 import { attachFiles } from '../../engine/actions';
-import { lineRoutes, opModelFromRef } from '../../engine/catalog';
+import { attachProblem } from './actionRoute';
+import { hasImageTwin } from './actionGo';
 import type { ComposerMode, MediaKind } from '../../engine/types';
 import { MODES } from '../composer/ModeMenu';
 import { MediaControls } from '../composer/MediaControls';
@@ -33,11 +34,8 @@ export function SpacePanel() {
   const foot = useRef<HTMLDivElement>(null);
   const live = attachments.filter((id) => assets[id]);
   const ref = useStore((s) => s.composer[mode].modelRef);
-  const direct = mode === 'image' || mode === 'model3d' ? Boolean(slots?.images || slots?.clips) : Boolean(slots?.firstFrame || slots?.images || slots?.mixedRefs || slots?.keyframes);
-  // As in the composer: a text-only variant still takes images when its line has an image route (attaching switches to it).
-  const routes = lineRoutes(ref);
-  const twin = direct || (mode !== 'image' && mode !== 'video') ? undefined : mode === 'image' ? routes.edit ?? routes.reference ?? opModelFromRef(ref, 'image') : routes.image ?? routes.reference;
-  const takesInput = direct || Boolean(twin && twin !== ref);
+  const twin = hasImageTwin(mode, ref);
+  const takesInput = attachProblem('image', mode, slots, twin) === null;
   const takesAudio = Boolean(slots?.audio || slots?.refAudios || (mode === 'video' && slots?.mixedRefs));
   const pick = (m: ComposerMode) => setComposer({ mode: m });
   const onFiles = (files: FileList | null) => {

@@ -52,7 +52,7 @@ export function openCreate(item: CreateItem): void {
 export const ALL_TOOLS: ToolItem[] = [...TOOLS_MAIN, ...TOOLS_MORE];
 /** An operation opens the Tools space with it selected; the input asset is chosen there. */
 export function openTool(item: ToolItem): void {
-  setUi({ workspace: 'chat', home: false, space: 'tools', toolOp: item.id, panel: null });
+  setUi({ workspace: 'chat', home: false, space: 'tools', toolOp: item.id, toolAsset: undefined, panel: null });
 }
 
 /** What the Library lists: sketches, masks and 3D view captures are working copies. */

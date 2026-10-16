@@ -1,14 +1,18 @@
-import { useMemo, useState } from 'react';
-import { ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowRight, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
-import { OpChip } from '../assets/AssetActions';
+import { OP_ICONS, QUICK_LABEL } from '../assets/AssetActions';
+import { OPS } from '../../engine/ops';
+import type { OpId } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
-import { IconButton, Segmented } from '../ui/primitives';
+import { Chip, IconButton, Segmented } from '../ui/primitives';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
 import { splitBoard, suggestedOps, targetAsset } from './boardModel';
+import { nounOf } from './actionRoute';
+import { goWithAction } from './actionGo';
 
 type Density = 'compact' | 'comfortable';
 
@@ -34,6 +38,17 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
   const kind_ = activeKind;
   const target = targetAsset(rows, selected, assets, kind_);
   const ops = suggestedOps(target ? assets[target] : undefined);
+  // Go needs an explicit selection of the active kind; a chosen action only lives while that holds.
+  const picked = [...selected].reverse().find((id) => assets[id]?.kind === kind_);
+  const [chosen, setChosen] = useState<OpId | null>(null);
+  const [hint, setHint] = useState<OpId | null>(null);
+  useEffect(() => { if (!picked) setChosen(null); else setHint(null); }, [picked]);
+  useEffect(() => { setChosen(null); setHint(null); }, [kind_]);
+  useEffect(() => { if (!hint) return; const t = window.setTimeout(() => setHint(null), 6000); return () => window.clearTimeout(t); }, [hint]);
+  const choose = (id: OpId) => {
+    if (!picked) { setHint(id); setChosen(null); return; }
+    setChosen(chosen === id ? null : id);
+  };
   const reset = () => { setKind('all'); setScope('all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
   const filtered = kind !== 'all' || scope !== 'all';
 
@@ -101,7 +116,11 @@ export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' 
       </div>
       <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
-        {ops.length && target ? <div className="space-ops">{ops.map((id) => <OpChip key={`${target}-${id}`} assetId={target} op={id} />)}</div> : <p className="space-empty">No {kind_ === 'model3d' ? '3D model' : kind_} yet: generate one to see its actions.</p>}
+        {ops.length && target ? <div className="space-ops">
+          {ops.map((id) => <Chip key={id} icon={OP_ICONS[id]} active={chosen === id} aria-pressed={chosen === id} data-tip={OPS[id].description} onClick={() => choose(id)}>{QUICK_LABEL[id] ?? OPS[id].label}</Chip>)}
+          {picked && chosen ? <IconButton icon={ArrowRight} label="Go" size="sm" className="space-go" onClick={() => void goWithAction(chosen, picked)} /> : null}
+        </div> : <p className="space-empty">No {kind_ === 'model3d' ? '3D model' : kind_} yet: generate one to see its actions.</p>}
+        {hint ? <p className="space-empty space-hint-note" role="status">Pick {nounOf(kind_)} from your generations first (use Select), then press → to use it here.</p> : null}
       </div>
     </div>
   </section>;

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Zap } from 'lucide-react';
 import { toast, setUi, useStore } from '../../store/store';
 import { uploadFiles } from '../../engine/actions';
@@ -55,7 +55,9 @@ export function ToolsPanel() {
 
 function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
   const def = OPS[op];
-  const [assetId, setAssetId] = useState<string | undefined>();
+  const pre = useStore((s) => s.ui.toolAsset);
+  const [assetId, setAssetId] = useState<string | undefined>(pre);
+  useEffect(() => { if (pre) setAssetId(pre); }, [pre]);
   const exists = useStore((s) => (assetId ? Boolean(s.assets[assetId]) : false));
   const target = assetId && exists ? assetId : undefined;
   const state = useOpRun(op, target ? { kind: 'asset', assetId: target } : null);

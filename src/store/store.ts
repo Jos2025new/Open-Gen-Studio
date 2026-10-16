@@ -113,6 +113,8 @@ export interface UiState {
   space?: 'create' | 'tools';
   /** The operation selected in the Tools space. */
   toolOp?: import('../engine/types').OpId;
+  /** An asset the Tools space starts with as its input (set by "Go" from the board). */
+  toolAsset?: string;
   /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
   homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
   panel: 'gallery' | 'sessions' | 'spending' | null;
