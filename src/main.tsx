@@ -15,6 +15,10 @@ import './styles/designer-connected.css';
 import './styles/sidebar-nav.css';
 import './styles/home.css';
 import { App } from './App';
+import { installHomeAutoClose, installHomeKeyGuard } from './components/shell/homeGuard';
+
+installHomeKeyGuard();
+installHomeAutoClose();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

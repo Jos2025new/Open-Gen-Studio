@@ -10,5 +10,5 @@ export const WORKSPACES: Array<{ id: Workspace; label: string; icon: LucideIcon;
 ];
 
 export function WorkspaceMenuItems({ workspace, onClose }: { workspace: Workspace; onClose: () => void }) {
-  return WORKSPACES.map((w) => <MenuItem key={w.id} icon={w.icon} label={w.label} detail={w.hint} active={w.id === workspace} onClick={() => { setUi({ workspace: w.id }); onClose(); }} />);
+  return WORKSPACES.map((w) => <MenuItem key={w.id} icon={w.icon} label={w.label} detail={w.hint} active={w.id === workspace} onClick={() => { setUi({ workspace: w.id, home: false }); onClose(); }} />);
 }

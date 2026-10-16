@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { setUi, useStore } from './store/store';
+import { useStore } from './store/store';
 import { ensureSchema, loadCatalogs, loadLlmCatalog } from './engine/catalog';
 import { adoptRemoteAssets, resumeInterrupted } from './engine/jobs';
 import { settleInterruptedPlans } from './engine/agent/runtime';
@@ -24,8 +24,6 @@ export function App() {
   const home = useStore((s) => !!s.ui.home);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
 
-  // Reaching a workspace by any route (top bar, session switch) leaves Home.
-  useEffect(() => { setUi({ home: false }); }, [workspace]);
 
   useEffect(() => {
     if (!hydrated) return;
