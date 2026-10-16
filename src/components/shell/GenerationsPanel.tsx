@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
-import { Box, CornerDownRight, FileText, Film, Image as ImageIcon, Music, Search, SlidersHorizontal, X } from 'lucide-react';
+import { CornerDownRight, Image as ImageIcon, Search, SlidersHorizontal, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
+import { generationTitle } from '../assets/GenerationInfo';
 import { formatDateTime, formatUsd } from '../../lib/format';
 import type { Generation } from '../../engine/types';
-import { generationTitle } from '../assets/GenerationInfo';
+import { KINDS, KIND_ICON, STATUSES, STATUS_LABEL, filterGenerations, statusOf, type Kind, type Sort, type Status } from './generationsView';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
@@ -12,28 +13,7 @@ import { generationPlace, goToGeneration } from '../../engine/goTo';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
 
-type Sort = 'newest' | 'oldest' | 'cost';
-type Kind = 'all' | Generation['kind'];
-type Status = 'all' | 'done' | 'error' | 'running';
-
-const KINDS: Array<{ id: Kind; label: string }> = [
-  { id: 'all', label: 'All' },
-  { id: 'image', label: 'Images' },
-  { id: 'video', label: 'Videos' },
-  { id: 'audio', label: 'Audio' },
-  { id: 'model3d', label: '3D' },
-  { id: 'text', label: 'Text' },
-];
-const STATUSES: Array<{ id: Status; label: string }> = [
-  { id: 'all', label: 'Any status' },
-  { id: 'done', label: 'Done' },
-  { id: 'error', label: 'Failed' },
-  { id: 'running', label: 'Running' },
-];
 const CANVAS = { chat: 'Chat', node: 'Nodes', designer: 'Designer' } as const;
-const KIND_ICON = { image: ImageIcon, video: Film, audio: Music, model3d: Box, text: FileText } as const;
-const statusOf = (g: Generation): Status => (g.status === 'done' ? 'done' : g.status === 'error' || g.status === 'canceled' ? 'error' : 'running');
-const STATUS_LABEL: Record<Generation['status'], string> = { done: 'Done', running: 'Generating', queued: 'Queued', error: 'Failed', canceled: 'Canceled', review: 'Needs review' };
 
 /**
  * Every generation as a record: what it was, where and when, what it cost. Filters stay in sight (scope, type,
@@ -59,23 +39,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
     return c;
   }, [inScope, where]);
   const scoped = useMemo(() => inScope.filter((g) => canvas === 'all' || where.generation(g) === canvas), [inScope, canvas, where]);
-  const list = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    const cost = (g: Generation) => g.actualUsd ?? g.estimate.usd;
-    return scoped
-      .filter((g) => kind === 'all' || g.kind === kind)
-      .filter((g) => status === 'all' || statusOf(g) === status)
-      .filter((g) => !needle || `${generationTitle(g)} ${g.modelName} ${PROVIDER_LABELS[g.provider]}`.toLowerCase().includes(needle))
-      .sort((a, b) => {
-        if (sort === 'cost') {
-          const ac = cost(a), bc = cost(b);
-          if (ac == null && bc != null) return 1;
-          if (bc == null && ac != null) return -1;
-          if (ac != null && bc != null && ac !== bc) return bc - ac;
-        }
-        return sort === 'oldest' ? a.createdAt - b.createdAt : b.createdAt - a.createdAt;
-      });
-  }, [scoped, kind, status, q, sort]);
+  const list = useMemo(() => filterGenerations(scoped, { kind, status, q, sort }), [scoped, kind, status, q, sort]);
   const count = (k: Kind) => scoped.filter((g) => k === 'all' || g.kind === k).length;
 
   return (

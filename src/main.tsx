@@ -14,6 +14,7 @@ import './styles/prompt-box.css';
 import './styles/designer-connected.css';
 import './styles/sidebar-nav.css';
 import './styles/home.css';
+import './styles/space.css';
 import { App } from './App';
 import { installHomeAutoClose, installHomeKeyGuard } from './components/shell/homeGuard';
 

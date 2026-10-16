@@ -21,7 +21,7 @@ import { ThreadPeek } from './ThreadPeek';
 import { ComposerOptions } from './ComposerOptions';
 import { ToolRail } from '../designer/ToolRail';
 
-function AttachStrip({ ids }: { ids: string[] }) {
+export function AttachStrip({ ids }: { ids: string[] }) {
   if (!ids.length) return null;
   const remove = (id: string) => setComposer((c) => ({ attachments: c.attachments.filter((a) => a !== id) }));
   return (
@@ -177,7 +177,7 @@ function DesignerTargetChip() {
   );
 }
 
-function SendDirect({ kind }: { kind: MediaKind }) {
+export function SendDirect({ kind }: { kind: MediaKind }) {
   const composer = useStore((s) => s.composer);
   const schema = useStore((s) => s.catalog.schemas[s.composer[kind].modelRef]);
   const assets = useStore((s) => s.assets);

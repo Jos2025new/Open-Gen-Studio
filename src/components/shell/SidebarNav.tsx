@@ -17,11 +17,13 @@ interface Entry { key: string; label: string; hint?: string; icon: LucideIcon; a
 function useEntries(): { spaces: Entry[]; create: Entry[]; tools: Entry[]; moreTools: Entry[] } {
   const workspace = useStore((s) => s.ui.workspace);
   const home = useStore((s) => !!s.ui.home);
+  const space = useStore((s) => s.ui.space);
+  const mode = useStore((s) => s.composer.mode);
   const toTool = (t: (typeof TOOLS_MAIN)[number]): Entry => ({ key: t.id, label: t.label, icon: t.icon, run: () => openTool(t) });
   const all = [...TOOLS_MAIN, ...TOOLS_MORE].map(toTool);
   return {
-    spaces: SPACES.map((s) => ({ key: s.id, label: s.label, hint: s.hint, icon: s.icon, active: !home && s.workspace === workspace, run: () => openSpace(s) })),
-    create: CREATE.map((c) => ({ key: c.id, label: c.label, hint: c.soon ? 'Soon' : c.hint, icon: c.icon, soon: c.soon, run: () => openCreate(c) })),
+    spaces: SPACES.map((s) => ({ key: s.id, label: s.label, hint: s.hint, icon: s.icon, active: !home && !space && s.workspace === workspace, run: () => openSpace(s) })),
+    create: CREATE.map((c) => ({ key: c.id, label: c.label, hint: c.soon ? 'Soon' : c.hint, icon: c.icon, soon: c.soon, active: !home && space === 'create' && mode === c.mode, run: () => openCreate(c) })),
     tools: all.slice(0, TOOLS_FIRST),
     moreTools: all.slice(TOOLS_FIRST),
   };

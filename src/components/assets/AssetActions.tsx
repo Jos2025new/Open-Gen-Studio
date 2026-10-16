@@ -74,7 +74,7 @@ const QUICK_LABEL: Partial<Record<OpId, string>> = {
   continue: 'Continue',
 };
 
-function OpChip({ assetId, op, parentId, compact }: { assetId: string; op: OpId; parentId?: string; compact?: boolean }) {
+export function OpChip({ assetId, op, parentId, compact }: { assetId: string; op: OpId; parentId?: string; compact?: boolean }) {
   const pop = usePopover();
   const Icon = OP_ICONS[op];
   const def = OPS[op];

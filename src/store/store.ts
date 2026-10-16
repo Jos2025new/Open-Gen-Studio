@@ -109,6 +109,8 @@ export interface UiState {
   workspace: Workspace;
   /** The Home view is showing instead of the workspace; any destination clears it. */
   home?: boolean;
+  /** A Space (Panel + Board) shown over the workspace in place of Home; the workspace stays mounted. */
+  space?: 'create';
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */

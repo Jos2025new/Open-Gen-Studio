@@ -35,20 +35,21 @@ const restOf = (kind: AssetKind, main: OpId[]) => opsFor(kind).map((o) => o.id).
 export const TOOLS_MAIN: ToolItem[] = [...MAIN_IMAGE.map(tool('image')), ...MAIN_VIDEO.map(tool('video'))].filter((t) => OPS[t.id]);
 export const TOOLS_MORE: ToolItem[] = [...restOf('image', MAIN_IMAGE), ...restOf('video', MAIN_VIDEO), ...restOf('audio', [])];
 
-/** Every action leaves the Home view and applies on the next render. */
-export function openHome(): void { setUi({ home: true, panel: null }); }
+/** Every action leaves the Home view or the open Space and applies on the next render. */
+export function openHome(): void { setUi({ home: true, space: undefined, panel: null }); }
 export function openSpace(item: SpaceItem): void {
   if (item.id === 'studio') setComposer({ mode: 'agent' });
-  setUi({ workspace: item.workspace, home: false });
+  setUi({ workspace: item.workspace, home: false, space: undefined });
 }
 export function openCreate(item: CreateItem): void {
   if (item.soon) return;
+  // Generating here is the plain chat-workspace path (not Designer layers), so the workspace is the chat one.
   setComposer({ mode: item.mode });
-  setUi({ workspace: 'chat', home: false });
+  setUi({ workspace: 'chat', home: false, space: 'create' });
 }
 /** An operation works on an asset; there is no selection to start from, so the Library opens to pick one. */
 export function openTool(item: ToolItem): void {
-  setUi({ panel: 'gallery', home: false });
+  setUi({ panel: 'gallery', home: false, space: undefined });
   toast(`Pick ${item.kind === 'video' ? 'a video' : item.kind === 'audio' ? 'a clip' : 'an image'} in the Library, then choose "${item.label}" from its actions.`);
 }
 

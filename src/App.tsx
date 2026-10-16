@@ -16,12 +16,14 @@ import { Composer } from './components/composer/Composer';
 import { Toasts } from './components/ui/Toasts';
 import { TooltipLayer } from './components/ui/TooltipLayer';
 import { HomeView } from './components/shell/HomeView';
+import { CreateSpace } from './components/space/CreateSpace';
 import { TraceControl } from './components/shell/TraceControl';
 
 export function App() {
   const hydrated = useStore((s) => s.hydrated);
   const workspace = useStore((s) => s.ui.workspace);
   const home = useStore((s) => !!s.ui.home);
+  const space = useStore((s) => s.ui.space);
   const [slot, setSlot] = useState<HTMLDivElement | null>(null);
 
 
@@ -59,10 +61,10 @@ export function App() {
         <Sidebar />
         <main className="main">
           <TopBar slotRef={setSlot} />
-          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''}`}>
+          <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''}`}>
             {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
             <Composer />
-            {home ? <HomeView /> : null}
+            {home ? <HomeView /> : space === 'create' ? <CreateSpace /> : null}
           </div>
         </main>
         <SidePanel />

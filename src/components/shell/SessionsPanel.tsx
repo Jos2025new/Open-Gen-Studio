@@ -129,7 +129,7 @@ export function SessionsPanel() {
                     onClick={() => {
                       newPop.close();
                       newSession();
-                      setUi({ panel: null, workspace: w, home: false });
+                      setUi({ panel: null, workspace: w, home: false, space: undefined });
                     }}
                   >
                     <Icon size={14} /> {CANVAS[w].label}
@@ -288,7 +288,7 @@ function SessionRow({ session, active, stats, selecting, selected, onToggle }: {
     if (selecting) return onToggle();
     if (editing) return;
     selectSession(session.id);
-    setUi({ panel: null, home: false });
+    setUi({ panel: null, home: false, space: undefined });
   };
 
   return (
