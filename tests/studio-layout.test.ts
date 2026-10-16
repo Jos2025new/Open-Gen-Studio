@@ -26,7 +26,7 @@ import type { Asset, Generation } from '../src/engine/types';
 
 const asset = (id: string, kind: Asset['kind'] = 'image') => ({ id, kind, origin: 'generated', createdAt: 1, favorite: false, width: 10, height: 10 }) as unknown as Asset;
 const gen = (id: string, status: Generation['status'], assetIds: string[] = [], extra: Partial<Generation> = {}) =>
-  ({ id, sessionId: 's', kind: 'image', prompt: `prompt ${id}`, modelName: 'm', provider: 'demo', status, assetIds, settings: { count: 1 }, estimate: { usd: 0 }, createdAt: 1, ...extra }) as unknown as Generation;
+  ({ id, sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: `prompt ${id}`, modelName: 'm', provider: 'demo', status, assetIds, settings: { count: 1 }, estimate: { usd: 0 }, createdAt: 1, ...extra }) as unknown as Generation;
 
 let host: HTMLDivElement;
 let root: Root;
@@ -113,8 +113,8 @@ describe('Done / Ongoing rule', () => {
     expect(host.querySelectorAll('.space-tile')).toHaveLength(1);
     setData([gen('g1', 'done', ['a1']), gen('g2', 'running')]);
     expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
-    expect(host.querySelectorAll('.space-tile')).toHaveLength(0);
-    expect(q('.space-run')).not.toBeNull();
+    expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(0);
+    expect(q('.space-ongoing .space-tile.is-pending')).not.toBeNull();
     setData([gen('g1', 'done', ['a1']), gen('g2', 'done', ['a2'])]);
     expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('true');
   });
@@ -129,6 +129,25 @@ describe('Done / Ongoing rule', () => {
     setData([gen('g1', 'done', ['a1', 'a2']), gen('g2', 'running')]);
     expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
     act(() => q('.space-fold')!.click());
+    expect(host.querySelectorAll('.space-tile')).toHaveLength(2);
+  });
+});
+
+describe('Studio board: Ongoing tiles and default scope', () => {
+  it('a running generation shows arrived outputs as tiles plus shimmer for pending ones; no compact row', () => {
+    setData([gen('g1', 'running', ['a1'], { settings: { count: 3 } as never })]);
+    render(createElement(SpaceBoard, { studio: true }));
+    expect(host.querySelectorAll('.space-ongoing .space-tile')).toHaveLength(3);
+    expect(host.querySelectorAll('.space-ongoing .space-tile.is-pending .shimmer')).toHaveLength(2);
+    expect(q('.space-ongoing .space-run')).toBeNull();
+    render(createElement(SpaceBoard, { kind: 'image' }));
+    expect(q('.space-ongoing .space-run')).not.toBeNull();
+  });
+  it('Studio defaults to This session; the plain board keeps All sessions', () => {
+    setData([gen('g1', 'done', ['a1']), gen('g2', 'done', ['a2'], { sessionId: 'other' })]);
+    render(createElement(SpaceBoard, { key: 'studio', studio: true }));
+    expect(host.querySelectorAll('.space-tile')).toHaveLength(1);
+    render(createElement(SpaceBoard, { key: 'plain', kind: 'image' }));
     expect(host.querySelectorAll('.space-tile')).toHaveLength(2);
   });
 });
@@ -158,8 +177,10 @@ describe('compact generation in Studio chat', () => {
     render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
     expect(q('.studio-thumb-play')).not.toBeNull();
     render(createElement(StudioGeneration, { generationId: 'g2', fallback }));
-    expect(q('.studio-thumb.is-pending')).not.toBeNull();
-    expect(q('.studio-gen-head')!.textContent).toContain('Creating');
+    expect(q('.studio-thumb')).toBeNull();
+    expect(q('.studio-gen .space-run')).not.toBeNull();
+    expect(q('.studio-gen .space-run-bar')).not.toBeNull();
+    expect(q('.studio-gen-head')).toBeNull();
   });
   it('a followed remote job can be checked or unfollowed (with confirmation); a plain busy one just stops; the card is findable by id', () => {
     setData([gen('g1', 'running', [], { remoteJob: { provider: 'demo', id: 'j' } as never }), gen('g2', 'running')]);

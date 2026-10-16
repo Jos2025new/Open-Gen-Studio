@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { ChevronDown, Copy, CopyPlus, Info, LoaderCircle, Play, RefreshCw, CircleStop } from 'lucide-react';
+import { ChevronDown, Copy, CopyPlus, Info, Play, RefreshCw, CircleStop } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import { copyText, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
@@ -11,6 +11,7 @@ import { IconButton } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
 import { DownloadButton, FavoriteButton } from '../assets/AssetActions';
 import { GenerationInfo } from '../assets/GenerationInfo';
+import { OngoingRow } from '../space/SpaceBoard';
 import { StopFollowingPopover } from './StopFollowing';
 
 /**
@@ -27,11 +28,11 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
   if (!g || (g.kind !== 'image' && g.kind !== 'video') || !['done', 'running', 'queued'].includes(g.status)) return <>{fallback}</>;
   const busy = g.status !== 'done';
   const outputs = g.assetIds;
-  const slots = busy ? Math.max(0, (g.op ? 1 : g.settings.count) - outputs.length) : 0;
   const first = outputs[0];
   return <div className="studio-gen" id={`gen-${g.id}`} aria-label={busy ? 'Generating' : 'Generated'}>
+    {busy ? <OngoingRow g={g} /> : <>
     <button type="button" className="studio-gen-head" aria-expanded={open} onClick={() => setOpen(!open)}>
-      {busy ? <><LoaderCircle size={13} className="spin" />{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}…</> : <>Created {outputs.length} file{outputs.length === 1 ? '' : 's'}</>}
+      Created {outputs.length} file{outputs.length === 1 ? '' : 's'}
       <ChevronDown size={13} className={open ? '' : 'is-closed'} />
     </button>
     {open ? <div className="studio-gen-row">
@@ -40,8 +41,8 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}
       </button>)}
-      {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="studio-thumb is-pending"><div className="shimmer" /></div>)}
     </div> : null}
+    </>}
     <div className="studio-gen-actions">
       {g.prompt ? <IconButton icon={Copy} label="Copy prompt" size="sm" onClick={() => void copyText(g.prompt)} /> : null}
       {!g.op && !busy ? <IconButton icon={CopyPlus} label="Reuse: prompt, inputs, model and settings in the composer" size="sm" onClick={() => void editInComposer(g.id)} /> : null}

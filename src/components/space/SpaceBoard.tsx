@@ -23,7 +23,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId);
   const [kind, setKind] = useState<Kind>('all');
-  const [scope, setScope] = useState<'session' | 'all'>('all');
+  const [scope, setScope] = useState<'session' | 'all'>(studio ? 'session' : 'all');
   const [sort, setSort] = useState<Sort>('newest');
   const [density, setDensity] = useState<Density>('comfortable');
   const [starred, setStarred] = useState(false);
@@ -50,8 +50,8 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     if (!picked) { setHint(id); setChosen(null); return; }
     setChosen(chosen === id ? null : id);
   };
-  const reset = () => { setKind('all'); setScope('all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
-  const filtered = kind !== 'all' || scope !== 'all';
+  const reset = () => { setKind('all'); setScope(studio ? 'session' : 'all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
+  const filtered = kind !== 'all' || scope !== (studio ? 'session' : 'all');
   const running = rows.ongoing.length > 0;
   const [userDone, setUserDone] = useState<boolean | null>(null);
   useEffect(() => { if (studio) setUserDone(null); }, [running, studio]);
@@ -121,7 +121,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     <div className="space-lower">
       <div className="space-ongoing" aria-label="Ongoing">
         <div className="space-sub">Ongoing</div>
-        {rows.ongoing.length ? rows.ongoing.map((g) => <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
+        {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} density={density} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
       </div>
       {studio ? null : <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
@@ -135,7 +135,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   </section>;
 }
 
-function OngoingRow({ g }: { g: Generation }) {
+export function OngoingRow({ g }: { g: Generation }) {
   const Icon = KIND_ICON[g.kind];
   const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
   return <div className="space-run">
@@ -145,5 +145,18 @@ function OngoingRow({ g }: { g: Generation }) {
       <div className="space-run-meta faint">{g.statusText || STATUS_LABEL[g.status]}</div>
       <div className="space-run-bar" role="progressbar" aria-valuenow={p == null ? undefined : Math.round(p * 100)}><span style={{ width: p == null ? '30%' : `${p * 100}%` }} className={p == null ? 'is-indeterminate' : ''} /></div>
     </div>
+  </div>;
+}
+
+/** Studio's Ongoing: a running generation as tiles like Done's: arrived outputs as media, shimmer for the pending ones. */
+function OngoingTiles({ g, density }: { g: Generation; density: Density }) {
+  const assets = useStore((s) => s.assets);
+  const slots = Math.max(0, (g.op ? 1 : g.settings.count) - g.assetIds.length);
+  return <div className={`space-grid is-${density}`} aria-label="Running generation">
+    {g.assetIds.map((id) => <div key={id} className={`space-tile t-${assets[id]?.kind ?? 'image'}`}>
+      <KindBackdrop kind={assets[id]?.kind} />
+      <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
+    </div>)}
+    {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /></div>)}
   </div>;
 }
