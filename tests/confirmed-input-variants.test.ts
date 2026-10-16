@@ -50,3 +50,18 @@ describe('confirmed family follows each step input route', () => {
     expect(result.plan?.steps.map(s => (s as ImageStep).modelRef)).toEqual([text, edit]);
   });
 });
+describe('confirmed settings only note a real change', () => {
+  const run = async (confAspect: string) => {
+    const ctx = { ...context(text, false), confirmed: () => ({ modelRef: text, needsImage: false, count: 1, aspect: confAspect }) } as PlanContext;
+    return normalizePlan({ steps: [{ id: 's1', kind: 'image', aspect: '1:1', prompt: 'A mug' }] }, ctx, 'p');
+  };
+  it('2048x2048 is the 1:1 size: applied, not reported', async () => {
+    const r = await run('2048x2048');
+    expect(r.errors).toEqual([]);
+    expect(JSON.stringify(r)).not.toContain('aspect 1:1');
+  });
+  it('a 16:9 size against 1:1 is reported', async () => {
+    const r = await run('2560x1440');
+    expect(JSON.stringify(r)).toContain('aspect 1:1 → 2560x1440 (confirmed)');
+  });
+});

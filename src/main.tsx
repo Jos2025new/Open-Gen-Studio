@@ -17,10 +17,12 @@ import './styles/home.css';
 import './styles/space.css';
 import './styles/studio.css';
 import { App } from './App';
+import { installBoardAutoOpen } from './lib/studioBoard';
 import { installHomeAutoClose, installHomeKeyGuard } from './components/shell/homeGuard';
 
 installHomeKeyGuard();
 installHomeAutoClose();
+installBoardAutoOpen();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

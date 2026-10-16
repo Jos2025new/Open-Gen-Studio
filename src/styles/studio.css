@@ -23,7 +23,7 @@
 .studio-gen-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .studio-thumb { position: relative; width: 200px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); }
 .studio-thumb:hover { border-color: var(--border-strong); }
-.studio-thumb > .media { width: 100%; height: 100%; object-fit: cover; }
+.studio-thumb > .media { position: relative; width: 100%; height: 100%; object-fit: cover; }
 .studio-thumb-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text); pointer-events: none; }
 .studio-thumb.is-pending { cursor: default; }
 .studio-gen-actions { display: flex; align-items: center; gap: var(--sp-1); }

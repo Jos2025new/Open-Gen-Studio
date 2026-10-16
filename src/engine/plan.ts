@@ -8,7 +8,7 @@ import { videoFix } from './planFix';
 import { withRealismSetting, type Realism } from './realism';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
-import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
+import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import { userNamed } from './modelNaming';
 import type {
   AdvancedValue,
@@ -558,10 +558,16 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const wroteModel = wrote?.includes('::') ? (await ctx.getModel(wrote))?.model : undefined;
           const confModel = (await ctx.getModel(conf.modelRef))?.model;
           if (wrote && wroteModel && confModel && lineKey(wroteModel) !== lineKey(confModel)) adjustments.push(`${s.id}: model ${wroteModel.name} → ${confName} (confirmed)`);
+          // Same meaning is not an adjustment: "1:1" and "2048x2048" are one ratio; "1776x2368" and "1776*2368" one size.
+          const norm = (v: unknown) => String(v).toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
+          const sameValue = (field: string, a: unknown, b: unknown) => {
+            if (field === 'aspect') { const ra = ratioOf(String(a)), rb = ratioOf(String(b)); if (ra && rb) return Math.abs(ra / rb - 1) < 0.04; }
+            return norm(a) === norm(b);
+          };
           const keep = (field: 'resolution' | 'aspect' | 'duration' | 'count', value: string | number | undefined) => {
             if (value == null) return;
             const had = (s as Record<string, unknown>)[field];
-            if (had != null && String(had) !== String(value)) adjustments.push(`${s.id}: ${field} ${String(had)} → ${String(value)} (confirmed)`);
+            if (had != null && !sameValue(field, had, value)) adjustments.push(`${s.id}: ${field} ${String(had)} → ${String(value)} (confirmed)`);
             (s as Record<string, unknown>)[field] = value;
           };
           keep('resolution', conf.resolution);

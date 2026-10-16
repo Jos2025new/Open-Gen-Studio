@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { useStore } from '../store/store';
 
 /** Studio's board column: open or closed, and its width. UI preferences kept in the browser, shared by everything that draws Studio. */
 export type StudioView = 'assets' | 'nodes' | 'designer';
@@ -35,3 +36,23 @@ export function useStudioBoard(): StudioBoardPrefs {
 export function studioCanvases(b: StudioBoardPrefs): Array<'chat' | 'node' | 'designer'> {
   return b.open && b.view === 'nodes' ? ['chat', 'node'] : b.open && b.view === 'designer' ? ['chat', 'designer'] : ['chat'];
 }
+
+/** Sessions whose board already opened by itself this run. In memory only: it is once per session of use, and a reload may open it again. */
+const autoOpened = new Set<string>();
+/** In Studio, the first generation to start in a session opens the board on its files; closing it keeps it closed for that session. */
+export function installBoardAutoOpen(): () => void {
+  let seen = useStore.getState().generations;
+  return useStore.subscribe((s) => {
+    if (s.generations === seen) return;
+    const before = seen;
+    seen = s.generations;
+    if (s.ui.workspace !== 'chat' || autoOpened.has(s.activeSessionId)) return;
+    const started = Object.values(s.generations).some((g) => !before[g.id] && g.sessionId === s.activeSessionId && (g.status === 'queued' || g.status === 'running'));
+    if (!started) return;
+    autoOpened.add(s.activeSessionId);
+    // Already open (on Nodes or the Designer, say): leave the user's view alone.
+    if (!getStudioBoard().open) setStudioBoard({ open: true, view: 'assets' });
+  });
+}
+/** Test helper: forget which sessions opened the board. */
+export function resetBoardAutoOpen(): void { autoOpened.clear(); }
