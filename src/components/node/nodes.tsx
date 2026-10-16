@@ -340,7 +340,7 @@ function MoreTools({ node, out, skip }: { node: GraphNode; out: PortType; skip: 
         <div className="menu">
           {out === 'image' ? <MenuItem icon={RectangleHorizontal} label="Panorama" detail="Reframe to 21:9" onClick={() => add('reframe', { title: 'Panorama', params: { aspect: '21:9' } })} /> : null}
           {rest.map((id) => (
-            <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} detail={OPS[id].description} onClick={() => add(id)} />
+            <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} tip={OPS[id].description} onClick={() => add(id)} />
           ))}
         </div>
       </Popover>

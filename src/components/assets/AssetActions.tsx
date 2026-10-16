@@ -151,15 +151,14 @@ export function AssetActions({ assetId, parentId, compact = false, showQuick = t
           <div className="menu">
             {rest.length ? <div className="menu-sep-label">{asset.kind === 'image' ? 'Image operations' : asset.kind === 'audio' ? 'Audio operations' : asset.kind === 'video' ? 'Video operations' : '3D model operations'}</div> : null}
             {rest.map((o) => (
-              // The short "Tools" menu lists names only; the form repeats the description.
-              <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} detail={menuOnly ? undefined : o.description} tip={menuOnly ? o.description : undefined} onClick={() => setView(o.id)} />
+              // Icon and label only; the description is the hover tooltip (the form repeats it).
+              <MenuItem key={o.id} icon={OP_ICONS[o.id]} label={o.label} tip={o.description} onClick={() => setView(o.id)} />
             ))}
             {asset.kind === 'image' ? (
               <MenuItem
                 icon={Brush}
                 label="Edit region / Remove object"
-                detail={menuOnly ? undefined : 'Paint the area in Sketch, then describe the change'}
-                tip={menuOnly ? 'Paint the area in Sketch, then describe the change' : undefined}
+                tip="Paint the area in Sketch, then describe the change"
                 onClick={() => {
                   close();
                   setUi({ sketch: { assetId, mode: 'mask' } });

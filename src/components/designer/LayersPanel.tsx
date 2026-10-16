@@ -301,7 +301,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       </fieldset>
       </details>}
       <Popover open={pop.open && layer.type === 'raster' && !layer.locked} anchor={pop.ref} onClose={pop.close} label="Layer operations" width={320}>
-        {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image' && o.id !== 'fx').map((o) => <MenuItem key={o.id} label={o.label} detail={o.description} onClick={() => setOp(o.id)} />)}
+        {op ? <OpForm key={`${layer.id}:${op}`} op={op} target={{ kind: 'layer', sessionId, docId: doc.id, layerId: layer.id }} onClose={pop.close} onBack={() => setOp(null)} /> : Object.values(OPS).filter((o) => o.input === 'image' && o.output === 'image' && o.id !== 'fx').map((o) => <MenuItem key={o.id} label={o.label} tip={o.description} onClick={() => setOp(o.id)} />)}
       </Popover>
     </>}
     {(() => { const f = doc.layers.find((l) => l.id === fxEdit); return f?.type === 'fx' ? <FxEditorPopover sessionId={sessionId} doc={doc} layer={f} anchor={fxRow} onClose={() => setFxEdit(null)} /> : null; })()}
