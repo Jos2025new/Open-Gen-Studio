@@ -26,7 +26,7 @@ describe('store format 2: migration, commit and reading', () => {
       const bad = { ...commitOf(legacy, 100), version } as never;
       const res = await v2.commit(bad);
       expect(res.status).toBe(400);
-      expect(res.reason).toMatch(/version/);
+      expect((res as { reason?: string }).reason).toMatch(/version/);
     }
     expect(existsSync(join(dir, 'store-v2', 'HEAD.json'))).toBe(false);
   });

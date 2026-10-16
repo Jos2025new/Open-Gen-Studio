@@ -145,6 +145,25 @@ function loadVideo(src: string): Promise<HTMLVideoElement> {
   });
 }
 
+/**
+ * MediaRecorder webm files report Infinity until seeked to the end. Bounded: a stuck or failing video resolves with an
+ * unknown duration (undefined) so an upload batch continues.
+ */
+export function seekToDuration(v: HTMLVideoElement, timeoutMs = 10_000): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const done = (value: number | undefined) => {
+      clearTimeout(timer);
+      v.ontimeupdate = null; v.onerror = null; v.onabort = null;
+      resolve(value);
+    };
+    const timer = setTimeout(() => done(undefined), timeoutMs);
+    v.ontimeupdate = () => done(Number.isFinite(v.duration) ? v.duration : undefined);
+    v.onerror = () => done(undefined);
+    v.onabort = () => done(undefined);
+    v.currentTime = 1e9;
+  });
+}
+
 /** Resolve real dimensions (and duration for video) of a media blob. */
 export async function probeMedia(blob: Blob): Promise<MediaInfo> {
   const url = URL.createObjectURL(blob);
@@ -155,17 +174,8 @@ export async function probeMedia(blob: Blob): Promise<MediaInfo> {
     }
     if (blob.type.startsWith('video/')) {
       const v = await loadVideo(url);
-      let duration = v.duration;
-      if (!Number.isFinite(duration)) {
-        // MediaRecorder webm files report Infinity until seeked to the end.
-        duration = await new Promise<number>((resolve) => {
-          v.ontimeupdate = () => {
-            v.ontimeupdate = null;
-            resolve(Number.isFinite(v.duration) ? v.duration : 0);
-          };
-          v.currentTime = 1e9;
-        });
-      }
+      let duration: number | undefined = v.duration;
+      if (!Number.isFinite(duration)) duration = await seekToDuration(v);
       return { width: v.videoWidth, height: v.videoHeight, duration };
     }
     const img = await loadImage(url);
