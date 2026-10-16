@@ -49,6 +49,12 @@ export function HomeView() {
   const countOf = (c: CreateItem) => (c.soon || !count(c.kind) ? undefined : `${count(c.kind)}`);
 
   return <div className="home" role="region" aria-label="Home"><div className="home-inner">
+    <nav className="home-tabs" aria-label="Home sections">
+      <button type="button" className="home-tab is-active" aria-current="page">Home</button>
+      <button type="button" className="home-tab" disabled title="Coming soon">Projects</button>
+      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'sessions' })}>Sessions</button>
+      <button type="button" className="home-tab" onClick={() => setUi({ panel: 'gallery' })}>Library</button>
+    </nav>
     <section className="home-section" aria-label="Create">
       <Head kicker="Create" title="What do you want to make?" />
       <div className="home-bento">

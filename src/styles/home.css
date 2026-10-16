@@ -53,3 +53,8 @@
 /* Home covers the workspace but leaves it mounted (drafts and canvas state survive); hidden content leaves the tab order. */
 .workspace.is-home > :not(.home) { visibility: hidden; }
 .workspace .home { z-index: 20; background: var(--bg-canvas); }
+.home-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.home-tab { height: 32px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-full); background: var(--surface); color: var(--text-2); font-size: var(--fs-m); font-weight: 500; transition: background .12s, color .12s; }
+.home-tab:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.home-tab.is-active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.home-tab:disabled { opacity: .45; cursor: default; }
