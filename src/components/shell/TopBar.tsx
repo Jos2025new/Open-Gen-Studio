@@ -1,12 +1,11 @@
 import { SaveIndicator } from './SaveIndicator';
-import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Pin, Plus, Search, Settings } from 'lucide-react';
-import { newSession, renameSession, selectSession, setUi, useStore } from '../../store/store';
-import { formatRelative } from '../../lib/format';
+import { ChevronDown, Settings } from 'lucide-react';
+import { renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
-import { useSessionMatcher } from './SessionsPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { SessionSwitcher } from './SessionSwitcher';
 import { GenerationsPanel } from './GenerationsPanel';
 import { REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { ConnectedProviders } from './ConnectedProviders';
@@ -107,55 +106,5 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
         <SettingsPanel />
       </Popover>
     </header>
-  );
-}
-
-/** Quick session switcher: recent first, with search over names, chats and prompts. */
-function SessionSwitcher({ activeId, title, onRename }: { activeId: string; title: string; onRename: () => void }) {
-  const sessions = useStore((s) => s.sessions);
-  const pop = usePopover();
-  const [q, setQ] = useState('');
-  const matches = useSessionMatcher(q);
-  const list = useMemo(
-    () => Object.values(sessions).filter(matches).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt)),
-    [sessions, matches],
-  );
-  const go = (fn: () => void) => {
-    fn();
-    pop.close();
-    setQ('');
-  };
-  return (
-    <>
-      <button type="button" ref={pop.ref} className={`title-btn session-title-btn ${pop.open ? 'is-open' : ''}`} onClick={(e) => { if (e.detail < 2) pop.toggle(); }} onKeyDown={(e) => { if (e.key === 'F2') { e.preventDefault(); pop.close(); onRename(); } }} aria-label="Switch session" aria-haspopup="dialog" aria-expanded={pop.open} data-tip="Switch session · double-click name to rename">
-        <span className="truncate" onDoubleClick={() => { pop.close(); onRename(); }}>{title}</span>
-        <ChevronDown size={14} />
-      </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={320} label="Sessions">
-        <div className="ml-search">
-          <Search size={14} />
-          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search sessions" aria-label="Search sessions" />
-        </div>
-        <div className="switch-list">
-          {list.slice(0, 50).map((s) => (
-            <button key={s.id} type="button" className={`switch-row ${s.id === activeId ? 'is-selected' : ''}`} onClick={() => go(() => selectSession(s.id))}>
-              {s.pinned ? <Pin size={11} className="pin-mark" /> : null}
-              <span className="switch-title">{s.title}</span>
-              <span className="switch-time faint num">{formatRelative(s.updatedAt)}</span>
-              {s.id === activeId ? <Check size={13} className="ml-check" /> : null}
-            </button>
-          ))}
-          {!list.length ? <div className="ml-empty">No sessions match.</div> : null}
-        </div>
-        <div className="ml-foot">
-          <button type="button" className="ml-foot-main" onClick={() => go(() => setUi({ panel: 'sessions' }))}>
-            All sessions ({Object.keys(sessions).length})
-          </button>
-          <button type="button" className="ml-foot-icon session-new" aria-label="New session" data-tip="New session" onClick={() => go(() => newSession())}>
-            <Plus size={14} />
-          </button>
-        </div>
-      </Popover>
-    </>
   );
 }

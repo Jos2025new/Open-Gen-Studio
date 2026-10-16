@@ -34,6 +34,22 @@ function RunningNote({ ids }: { ids: string[] }) {
   return <p className="muted">{n} generation{n === 1 ? ' is' : 's are'} still running: {n === 1 ? 'it' : 'they'} will finish, any charge is recorded in Spending, and the results are discarded.</p>;
 }
 
+/** The confirmation for deleting several sessions at once: shared by the Sessions panel and the top bar's switcher. */
+export function DeleteSessionsConfirm({ ids, onCancel, onDone }: { ids: string[]; onCancel: () => void; onDone: () => void }) {
+  return (
+    <div className="confirm">
+      <p>Delete {ids.length} session{ids.length === 1 ? '' : 's'} with their conversations, nodes, designs and assets? Library items are kept.</p>
+      <RunningNote ids={ids} />
+      <div className="spend-actions">
+        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button variant="danger" onClick={() => { ids.forEach((id) => deleteSession(id)); onDone(); }}>
+          Delete {ids.length}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function SessionsPanel() {
   const sessions = useStore((s) => s.sessions);
   const activeId = useStore((s) => s.activeSessionId);
@@ -224,16 +240,7 @@ export function SessionsPanel() {
           <IconButton ref={bulkDel.ref} icon={Trash} label="Delete" size="sm" tone="danger" onClick={bulkDel.toggle} />
           <IconButton icon={X} label="Cancel selection" size="sm" onClick={stopSelecting} />
           <Popover open={bulkDel.open} anchor={bulkDel.ref} onClose={bulkDel.close} width={300} label="Delete sessions">
-            <div className="confirm">
-              <p>Delete {picked.length} session{picked.length === 1 ? '' : 's'} with their conversations, nodes, designs and assets? Library items are kept.</p>
-              <RunningNote ids={picked.map((x) => x.id)} />
-              <div className="spend-actions">
-                <Button variant="ghost" onClick={bulkDel.close}>Cancel</Button>
-                <Button variant="danger" onClick={() => { bulkDel.close(); picked.forEach((x) => deleteSession(x.id)); stopSelecting(); }}>
-                  Delete {picked.length}
-                </Button>
-              </div>
-            </div>
+            <DeleteSessionsConfirm ids={picked.map((x) => x.id)} onCancel={bulkDel.close} onDone={() => { bulkDel.close(); stopSelecting(); }} />
           </Popover>
         </div>
       ) : null}

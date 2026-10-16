@@ -1,6 +1,6 @@
 .provider-connections-popover, .provider-chooser-popover { padding: 4px; }
 .provider-connections { gap: 8px; padding: 6px; }
-.provider-connections .provider-add { width: max-content; align-self: flex-start; border-color: transparent; color: var(--text-2); padding-left: 0; }
+.provider-connections .provider-add { width: max-content; align-self: flex-end; border-color: transparent; color: var(--text-2); padding-right: 0; }
 .provider-add-mark { display: grid; place-items: center; width: 22px; height: 22px; flex-shrink: 0; border: 1px solid var(--accent); border-radius: var(--radius-s); color: var(--accent); }
 .provider-add:hover .provider-add-mark, .provider-add[aria-expanded="true"] .provider-add-mark { background: var(--accent-soft); }
 .provider-connections .set-section { padding: 0; }

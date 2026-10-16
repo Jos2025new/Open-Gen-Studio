@@ -1,0 +1,4 @@
+.switch-head { display: flex; align-items: center; gap: 6px; margin: 7px; }
+.switch-head .ml-search { flex: 1; min-width: 0; margin: 0; }
+.switch-head .session-new { flex-shrink: 0; }
+.switch-row.is-selecting .session-check { width: 18px; opacity: 1; margin-right: 0; border-width: 1px; }
