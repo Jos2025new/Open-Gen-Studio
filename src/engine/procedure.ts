@@ -8,7 +8,7 @@ export function roundsFor(style: AgentStyle, guidedRounds: number): number {
 }
 
 /** Same boundary used by the runtime and described by both agent-facing contracts. */
-export const SETTINGS_POLICY = 'Outside Nodes, only image/video steps require confirm_settings before prompts. An op step that runs on an image model (edit engine) needs the image kind confirmed and runs on that model; other op steps need no card. A confirmed image/video kind stays confirmed for later requests in this session: a plan reuses it without a new card only when the automation policy allows it (low cost, single image, no named model); otherwise the plan is shown with its choices or the card is asked again. A kind never confirmed needs its own confirmation. Settings confirmation is separate from plan approval and spending authorization.';
+export const SETTINGS_POLICY = 'Outside Nodes, only image/video steps require confirm_settings before prompts. An op step that runs on an image model (edit engine) needs the image kind confirmed and runs on that model; other op steps need no card. A confirmed image/video kind stays confirmed for later requests in this session: a plan reuses it without a new card only when the automation policy allows it (low cost, image steps only, one candidate per step, no named model); otherwise the plan is shown with its choices or the card is asked again. A kind never confirmed needs its own confirmation. Settings confirmation is separate from plan approval and spending authorization.';
 
 export function missingSettingsKind(workspace: Workspace, kinds: string[], settings: Partial<Record<MediaKind, SettingsChoice>> | undefined): 'image' | 'video' | null {
   if (workspace === 'node') return null;
@@ -85,9 +85,9 @@ export function settingsAskReason(estimatedCost: number | null): string {
  * Human-readable policy for agent-facing text. Must describe exactly what needsConfirmation does.
  */
 export const AUTOMATION_POLICY =
-  'The app reuses settings confirmed earlier in this session, without a new card, when the plan is a low-cost ' +
-  'single image and the user did not name a model. It shows the same plan with its model, count and cost on the card ' +
-  '(without asking) when the user named a model, the plan is a video, or it asks for several candidates. ' +
+  'The app reuses settings confirmed earlier in this session, without a new card, when the plan is a low-cost single image per step ' +
+  '(no video step, no step with several candidates) and the user did not name a model. It shows the same plan with its model, count and cost on the card ' +
+  '(without asking) when the user named a model, the plan is a video, or any step asks for several candidates. ' +
   'It asks and blocks when a kind was never confirmed in this session, or (not in Auto) when the plan\'s cost is unknown or above $' +
   LOW_COST_USD.toFixed(2) + '. In Auto a confirmed kind is never asked again for its cost: the plan card shows the price and the user approves the spending there.';
 
