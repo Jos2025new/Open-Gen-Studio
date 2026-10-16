@@ -3,7 +3,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async () => undefined }));
 import { useStore } from '../src/store/store';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
-import { agentCanvas, studioLine } from '../src/engine/agent/agentCanvas';
+import { agentCanvas, moveToCanvas, studioLine } from '../src/engine/agent/agentCanvas';
 import { buildContext } from '../src/engine/agent/context';
 import { CAPABILITIES, TOOLS } from '../src/engine/agent/tools';
 import { openBoardSchema } from '../src/engine/agent/agentCanvas';
@@ -79,6 +79,35 @@ describe('continue_in_chat with a Studio board left on Nodes', () => {
     expect(useStore.getState().ui.workspace).toBe('chat');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'assets' });
     expect(agentCanvas()).toBe('chat');
+  });
+});
+
+describe('continue_in_canvas / continue_in_designer from Studio', () => {
+  it('nodes: the workspace stays chat, the board opens on Nodes and the agent canvas is node', async () => {
+    goLive('chat');
+    setStudioBoard({ open: false, view: 'assets' });
+    script([{ name: 'continue_in_canvas', args: {} }]);
+    await sendAgentMessage('continue on nodes');
+    expect(useStore.getState().ui.workspace).toBe('chat');
+    expect(getStudioBoard()).toMatchObject({ open: true, view: 'nodes' });
+    expect(agentCanvas()).toBe('node');
+  });
+  it('designer: same, on the Designer tab', async () => {
+    goLive('chat');
+    setStudioBoard({ open: false, view: 'assets' });
+    moveToCanvas('designer');
+    expect(useStore.getState().ui.workspace).toBe('chat');
+    expect(getStudioBoard()).toMatchObject({ open: true, view: 'designer' });
+    expect(agentCanvas()).toBe('designer');
+  });
+  it('from the node workspace nothing changes', async () => {
+    goLive('node');
+    setStudioBoard({ open: false, view: 'assets' });
+    script([{ name: 'continue_in_canvas', args: {} }]);
+    await sendAgentMessage('continue on nodes');
+    expect(useStore.getState().ui.workspace).toBe('node');
+    expect(getStudioBoard()).toMatchObject({ open: false, view: 'assets' });
+    expect(agentCanvas()).toBe('node');
   });
 });
 

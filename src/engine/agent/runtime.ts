@@ -83,7 +83,7 @@ import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
 import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
-import { agentCanvas, backToChatCanvas, openBoard } from './agentCanvas';
+import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
 import { endedWithoutPlan } from './endedWithoutPlan';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
@@ -1673,7 +1673,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           else {
             const r = await chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as });
             transferredToDesigner = r.docs.length > 0 || !!r.openedExisting;
-            if (transferredToDesigner) { setUi({ workspace: 'designer', panel: null, lightbox: null }); workspace = agentCanvas(); }
+            if (transferredToDesigner) workspace = moveToCanvas('designer');
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
             const lines = [
               r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : r.openedExisting ? `No duplicates added. Chat images are already imported; opened existing design ${r.openedExisting} in the Designer.` : 'No image was sent. Do not claim anything was imported.',
@@ -1688,8 +1688,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           {
             // From any canvas: the chat's work comes to Nodes and the user's view follows ("pasémonos al canvas").
             const { added } = chatToNodes(sessionId);
-            if (get().ui.workspace !== 'node') setUi({ workspace: 'node', panel: null, lightbox: null });
-            workspace = agentCanvas();
+            workspace = moveToCanvas('nodes');
             log.action({ icon: 'guide', label: added.length ? `Brought ${added.length} chat results to the node canvas` : 'Nothing new from chat' });
             respond(added.length
               ? `Added ${added.length} nodes from the chat (up to date, nothing ran): ${added.map((n) => `${n.id} ${n.data.kind} "${n.data.title}"`).join('; ')}. They are in the node index from now on.`

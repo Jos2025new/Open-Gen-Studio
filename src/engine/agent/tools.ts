@@ -81,7 +81,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'continue_in_designer',
       description:
-        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default all as layers of one design (as "layers"); each image its own design (as "documents") only when the user asks for separate canvases. Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user\'s view switches to the Designer.',
+        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default all as layers of one design (as "layers"); each image its own design (as "documents") only when the user asks for separate canvases. Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user\'s view switches to the Designer (in Studio the board opens on the Designer instead).',
       parameters: {
         type: 'object',
         properties: {
@@ -108,7 +108,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'continue_in_canvas',
       description:
-        'Any canvas. When the user wants to move to or continue on the node canvas ("pasémonos al canvas de nodos", "continuamos en canvas"): the app switches the user\'s view to Nodes and adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
+        'Any canvas. When the user wants to move to or continue on the node canvas ("pasémonos al canvas de nodos", "continuamos en canvas"): the app switches the user\'s view to Nodes (in Studio the board opens on Nodes instead) and adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
       parameters: { type: 'object', properties: {} },
     },
   },

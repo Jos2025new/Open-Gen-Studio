@@ -1,5 +1,5 @@
 import { getStudioBoard } from '../../lib/studioBoard';
-import { useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { readGraph } from '../flow/graphView';
 import { nodeSelection } from '../flow/selection';
@@ -20,6 +20,13 @@ export function agentCanvas(): Workspace {
 /** The agent is back on the chat canvas: the board stops showing Nodes or the Designer (the board stays as open or closed as it was). */
 export function backToChatCanvas(): Workspace {
   if (getStudioBoard().view !== 'assets') setStudioBoard({ view: 'assets' });
+  return agentCanvas();
+}
+
+/** The agent moves work to Nodes or the Designer: in Studio the board opens on that tab and the workspace stays; elsewhere the workspace switches. */
+export function moveToCanvas(view: 'nodes' | 'designer'): Workspace {
+  if (useStore.getState().ui.workspace === 'chat') setStudioBoard({ open: true, view });
+  else if (useStore.getState().ui.workspace !== (view === 'nodes' ? 'node' : 'designer')) setUi({ workspace: view === 'nodes' ? 'node' : 'designer', panel: null, lightbox: null });
   return agentCanvas();
 }
 
