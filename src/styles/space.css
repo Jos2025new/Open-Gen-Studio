@@ -61,3 +61,14 @@
   .space-board { flex: none; min-height: 480px; }
   .space-lower { grid-template-columns: minmax(0, 1fr); max-height: none; }
 }
+
+/* Every settings card: a small label and its current value. */
+.card-value { display: none; }
+.space-controls > .chip[data-card]::before { content: attr(data-card); flex-shrink: 0; min-width: 64px; font-size: var(--fs-xs); color: var(--text-3); }
+.space-controls .card-value { display: inline; }
+.space-controls > .chip .num + .card-value { margin-left: 0; }
+.space-controls > .chip:has(.card-value) > .num { display: none; }
+.space-tile-kind { position: absolute; inset: 0; display: grid; place-items: center; color: var(--tint, var(--text-3)); }
+.space-tile > .media { position: relative; }
+.space-tile.t-image { --tint: var(--type-image); }.space-tile.t-video { --tint: var(--type-video); }.space-tile.t-audio { --tint: var(--type-audio); }.space-tile.t-model3d { --tint: var(--warn); }
+.space-tile > .media-loading, .space-tile > .media-missing { background: transparent; }

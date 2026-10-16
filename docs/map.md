@@ -29,7 +29,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [doc.ts](../src/engine/design/doc.ts) | 33 | 34 |
 | [params.ts](../src/engine/params.ts) | 32 | 17 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
-| [ops.ts](../src/engine/ops.ts) | 29 | 13 |
+| [ops.ts](../src/engine/ops.ts) | 29 | 14 |
 | [catalog.ts](../src/engine/catalog.ts) | 24 | 12 |
 | [format.ts](../src/lib/format.ts) | 24 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 22 | 6 |

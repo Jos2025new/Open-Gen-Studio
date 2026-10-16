@@ -40,14 +40,15 @@ function ToolGrid({ items }: { items: ToolItem[] }) {
   </button>)}</>;
 }
 
-type HomeTab = 'home' | 'projects' | 'sessions' | 'gallery';
+type HomeTab = NonNullable<ReturnType<typeof useStore.getState>['ui']['homeTab']>;
 const TABS: Array<[HomeTab, string]> = [['home', 'Home'], ['projects', 'Projects'], ['sessions', 'Sessions'], ['gallery', 'Library']];
 
 export function HomeView() {
   const assets = useStore((s) => s.assets);
   const sessions = useStore((s) => s.sessions);
   const [more, setMore] = useState(false);
-  const [tab, setTab] = useState<HomeTab>('home');
+  const tab: HomeTab = useStore((s) => s.ui.homeTab) ?? 'home';
+  const setTab = (t: HomeTab) => setUi({ homeTab: t });
   const listed = useMemo(() => Object.values(assets).filter(isListed), [assets]);
   const count = (kind: AssetKind) => listed.filter((a) => a.kind === kind).length;
   const recentSessions = useMemo(() => Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4), [sessions]);

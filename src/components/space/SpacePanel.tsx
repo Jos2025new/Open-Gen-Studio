@@ -1,12 +1,13 @@
 import { useRef } from 'react';
 import { Library, Paperclip } from 'lucide-react';
-import { setComposer, setUi, toast, useStore } from '../../store/store';
+import { setComposer, toast, useStore } from '../../store/store';
 import { attachFiles } from '../../engine/actions';
 import { lineRoutes, opModelFromRef } from '../../engine/catalog';
 import type { ComposerMode, MediaKind } from '../../engine/types';
 import { MODES } from '../composer/ModeMenu';
 import { MediaControls } from '../composer/MediaControls';
 import { AttachStrip, SendDirect } from '../composer/Composer';
+import { openLibrary } from '../shell/navModel';
 import { IconButton } from '../ui/primitives';
 
 const PLACEHOLDER: Record<MediaKind, string> = {
@@ -49,7 +50,7 @@ export function SpacePanel() {
   return <aside className="space-panel" aria-label="Create settings">
     <header className="space-panel-head">
       <h2 className="space-panel-title">Create</h2>
-      <IconButton icon={Library} label="Library" size="sm" onClick={() => setUi((u) => ({ panel: u.panel === 'gallery' ? null : 'gallery' }))} />
+      <IconButton icon={Library} label="Library" size="sm" onClick={openLibrary} />
     </header>
     <div className="space-tabs" role="tablist" aria-label="Media type">
       {CREATE_MODES.map((m) => <button key={m.id} type="button" role="tab" aria-selected={m.id === mode} className={`space-tab ${m.id === mode ? 'is-active' : ''}`} onClick={() => pick(m.id)}>

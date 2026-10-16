@@ -17,7 +17,9 @@ vi.mock('../src/engine/catalog', async (orig) => ({ ...(await orig<typeof import
 
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { CREATE, openCreate, openHome, openSpace, SPACES } from '../src/components/shell/navModel';
+import { OPS } from '../src/engine/ops';
+import { HomeView } from '../src/components/shell/HomeView';
+import { CREATE, openCreate, openHome, openLibrary, openSpace, SPACES } from '../src/components/shell/navModel';
 import { installHomeAutoClose, installHomeKeyGuard } from '../src/components/shell/homeGuard';
 import { SpacePanel } from '../src/components/space/SpacePanel';
 import { splitBoard, suggestedOps, targetAsset, type BoardOptions } from '../src/components/space/boardModel';
@@ -56,6 +58,30 @@ describe('navigation into the Create space', () => {
     openCreate(CREATE[1]);
     setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
     expect(ui().space).toBeUndefined();
+  });
+});
+
+describe('Library from the space', () => {
+  it('leaves the space and opens Home on its Library tab; Home from the sidebar starts on Home', () => {
+    openCreate(CREATE[0]);
+    openLibrary();
+    expect(ui()).toMatchObject({ home: true, space: undefined, homeTab: 'gallery', panel: null });
+    openHome();
+    expect(ui().homeTab).toBe('home');
+    setUi({ home: false });
+  });
+  it('Home draws the tab from the UI state', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    openLibrary();
+    act(() => root.render(createElement(HomeView)));
+    expect(host.querySelector('.home-tab.is-active')?.textContent).toBe('Library');
+    act(() => (host.querySelectorAll('.home-tab')[2] as HTMLButtonElement).click());
+    expect(ui().homeTab).toBe('sessions');
+    act(() => root.unmount());
+    host.remove();
+    setUi({ home: false });
   });
 });
 
@@ -140,9 +166,22 @@ describe('board rows', () => {
   });
   it('suggested actions follow the target asset: the selected one, else the newest', () => {
     const r = splitBoard(generations, assets, opts);
-    expect(targetAsset(r, [])).toBe('a3');
-    expect(targetAsset(r, ['a2', 'zz'])).toBe('a2');
+    expect(targetAsset(r, [], assets, 'image')).toBe('a3');
+    expect(targetAsset(r, ['a2', 'zz'], assets, 'image')).toBe('a2');
     expect(suggestedOps(assets.a1).length).toBeGreaterThan(0);
     expect(suggestedOps(undefined)).toEqual([]);
+  });
+  it('actions follow the mode: image ops only for images, none without an asset of that kind', () => {
+    const withVideo = { ...assets, v1: asset('v1', false, 'video') };
+    const gens = { ...generations, g6: gen('g6', 'done', ['v1'], { kind: 'video', createdAt: 9 }) };
+    const r = splitBoard(gens, withVideo, opts);
+    expect(targetAsset(r, [], withVideo, 'video')).toBe('v1');
+    expect(targetAsset(r, [], withVideo, 'image')).toBe('a3');
+    expect(targetAsset(r, ['v1'], withVideo, 'image')).toBe('a3');
+    expect(targetAsset(r, [], withVideo, 'audio')).toBeUndefined();
+    const imageOps = suggestedOps(withVideo.a1);
+    const videoOps = suggestedOps(withVideo.v1);
+    expect(imageOps.every((id) => OPS[id].input === 'image')).toBe(true);
+    expect(videoOps.some((id) => imageOps.includes(id) && OPS[id].input !== 'video')).toBe(false);
   });
 });

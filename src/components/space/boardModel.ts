@@ -1,4 +1,4 @@
-import type { Asset, Generation, OpId } from '../../engine/types';
+import type { Asset, AssetKind, Generation, OpId } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
 import { filterGenerations, statusOf, type GenerationQuery } from '../shell/generationsView';
 
@@ -39,10 +39,9 @@ export function suggestedOps(asset: Asset | undefined): OpId[] {
   return opsFor(asset.kind).filter((o) => !OPS[o.id].viaSketch && !OPS[o.id].multiInput).map((o) => o.id);
 }
 
-/** Selected assets win (last one picked); otherwise the newest finished asset. */
-export function targetAsset(rows: BoardRows, selected: string[]): string | undefined {
-  const live = selected.filter((id) => rows.done.some((c) => c.type === 'asset' && c.assetId === id));
-  if (live.length) return live[live.length - 1];
-  const first = rows.done.find((c) => c.type === 'asset');
-  return first?.type === 'asset' ? first.assetId : undefined;
+/** Of the active mode's kind only: the last selected asset wins, otherwise the newest finished one. */
+export function targetAsset(rows: BoardRows, selected: string[], assets: Record<string, Asset>, kind: AssetKind): string | undefined {
+  const ids = rows.done.flatMap((c) => (c.type === 'asset' && assets[c.assetId]?.kind === kind ? [c.assetId] : []));
+  const live = selected.filter((id) => ids.includes(id));
+  return live.length ? live[live.length - 1] : ids[0];
 }

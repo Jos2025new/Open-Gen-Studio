@@ -111,6 +111,8 @@ export interface UiState {
   home?: boolean;
   /** A Space (Panel + Board) shown over the workspace in place of Home; the workspace stays mounted. */
   space?: 'create';
+  /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
+  homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */

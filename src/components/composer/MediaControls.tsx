@@ -29,7 +29,7 @@ function ModelChip({ kind }: { kind: MediaKind }) {
   const name = !ref ? (kind === 'model3d' ? 'No 3D model' : 'No audio model') : model?.name ?? (ref.startsWith('local::') ? (kind === 'image' ? 'Local Sketch' : 'Local Motion') : ref.split('::')[1]);
   return (
     <>
-      <Chip ref={pop.ref} icon={Box} active={pop.open} onClick={pop.toggle} data-tip={loading ? 'Loading model parameters…' : `Model${model ? ` · ${priceHint(model)}` : ''}`} className="model-chip">
+      <Chip ref={pop.ref} icon={Box} active={pop.open} onClick={pop.toggle} data-card="Model" data-tip={loading ? 'Loading model parameters…' : `Model${model ? ` · ${priceHint(model)}` : ''}`} className="model-chip">
         <span className="truncate">{name}</span>
         <ChevronDown size={12} />
       </Chip>
@@ -83,7 +83,7 @@ function FormatChip({ kind }: { kind: MediaKind }) {
   ].filter(Boolean);
   return (
     <>
-      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" className="fmt-chip">
+      <Chip ref={pop.ref} active={pop.open} onClick={pop.toggle} data-tip="Format" data-card="Output" className="fmt-chip">
         {aspect?.options?.length ? <AspectGlyph value={pxNow?.ratio ?? settings.aspect ?? ''} /> : <Layers size={14} strokeWidth={1.8} />}
         <span>{summary.join(' · ')}</span>
         <ChevronDown size={12} />
@@ -187,6 +187,7 @@ function AudioChip() {
         const cur = useStore.getState().composer.video.settings;
         setComposerMedia('video', { settings: { ...cur, audio: !cur.audio } });
       }}
+      data-card="Sound"
       data-tip={audio ? 'Audio on (usually costs more)' : 'Audio off'}
       aria-pressed={Boolean(audio)}
     >
@@ -302,8 +303,9 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
   const update = (patch: Partial<typeof settings>) => setComposerMedia(kind, { settings: { ...useStore.getState().composer[kind].settings, ...patch } });
   return (
     <>
-      <Chip ref={pop.ref} icon={SlidersHorizontal} active={pop.open || changed > 0} onClick={pop.toggle} data-tip="Advanced parameters">
+      <Chip ref={pop.ref} icon={SlidersHorizontal} active={pop.open || changed > 0} onClick={pop.toggle} data-card="Settings" data-tip="Advanced parameters">
         {changed ? <span className="num">{changed}</span> : null}
+        <span className="card-value">{changed ? `${changed} changed` : 'Defaults'}</span>
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={340} label="Advanced" className="pop-scroll">
         <PopoverHeader
@@ -387,8 +389,9 @@ function SubjectsChip() {
   const insert = (n: string) => setComposer((c) => ({ text: `${c.text}${c.text && !c.text.endsWith(' ') ? ' ' : ''}@${n} ` }));
   return (
     <>
-      <Chip ref={pop.ref} icon={Users} active={pop.open} onClick={pop.toggle} aria-label="Subjects" data-tip="Subjects: mention them as @Name in the prompt">
+      <Chip ref={pop.ref} icon={Users} active={pop.open} onClick={pop.toggle} aria-label="Subjects" data-card="Subjects" data-tip="Subjects: mention them as @Name in the prompt">
         {subjects.length ? <span className="num">{subjects.length}</span> : null}
+        <span className="card-value">{subjects.length ? `${subjects.length} added` : 'None'}</span>
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={330} label="Subjects" className="pop-scroll">
         <PopoverHeader title="Subjects" sub={slot ? `Mention as @Name · up to ${slot.max} per video` : 'Mention as @Name · sent as reference images'} />
@@ -471,8 +474,9 @@ function ShotsChip() {
   };
   return (
     <>
-      <Chip ref={pop.ref} icon={Clapperboard} active={pop.open || shots.length > 0} onClick={pop.toggle} aria-label="Shots" data-tip="Multi-shot storyboard">
+      <Chip ref={pop.ref} icon={Clapperboard} active={pop.open || shots.length > 0} onClick={pop.toggle} aria-label="Shots" data-card="Shots" data-tip="Multi-shot storyboard">
         {shots.length ? <span className="num">{shots.length}</span> : null}
+        <span className="card-value">{shots.length ? `${shots.length} shots` : 'Single'}</span>
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={360} label="Shots" className="pop-scroll">
         <PopoverHeader
@@ -538,7 +542,7 @@ function LyricsChip({ kind }: { kind: MediaKind }) {
   };
   return (
     <>
-      <Chip ref={pop.ref} icon={FileText} active={pop.open || Boolean(text.trim())} onClick={pop.toggle} data-tip="Song lyrics">
+      <Chip ref={pop.ref} icon={FileText} active={pop.open || Boolean(text.trim())} onClick={pop.toggle} data-card="Lyrics" data-tip="Song lyrics">
         {text.trim() ? `${text.trim().split('\n').filter((l) => l.trim()).length} lines` : 'Lyrics'}
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={420} label="Lyrics">

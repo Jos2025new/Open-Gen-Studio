@@ -31,7 +31,9 @@ export function SpaceBoard() {
 
   const rows = useMemo(() => splitBoard(generations, assets, { kind, status: 'all', q: '', sort, starred, showFailed, scope: scope === 'all' ? 'all' : { sessionId } }), [generations, assets, kind, sort, starred, showFailed, scope, sessionId]);
   const doneAssets = rows.done.flatMap((c) => (c.type === 'asset' ? [c.assetId] : []));
-  const target = targetAsset(rows, selected);
+  const mode = useStore((s) => s.composer.mode);
+  const kind_ = mode === 'agent' ? 'image' : mode;
+  const target = targetAsset(rows, selected, assets, kind_);
   const ops = suggestedOps(target ? assets[target] : undefined);
   const reset = () => { setKind('all'); setScope('all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
   const filtered = kind !== 'all' || scope !== 'all';
@@ -78,10 +80,11 @@ export function SpaceBoard() {
     <div className="space-done" aria-label="Done">
       {rows.done.length ? <div className={`space-grid is-${density}`}>
         {rows.done.map((c) => c.type === 'asset'
-          ? <button key={c.assetId} type="button" className={`space-tile ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
+          ? <button key={c.assetId} type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
+            <span className="space-tile-kind" aria-hidden>{(() => { const K = KIND_ICON[assets[c.assetId]?.kind ?? 'image']; return <K size={26} strokeWidth={1.5} />; })()}</span>
             <AssetMedia assetId={c.assetId} hoverPlay={false} autoPlay={false} draggable={false} />
             {assets[c.assetId]?.favorite ? <Star size={12} className="space-tile-star" aria-label="Favorite" /> : null}
           </button>
@@ -96,7 +99,7 @@ export function SpaceBoard() {
       </div>
       <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
-        {ops.length && target ? <div className="space-ops">{ops.map((id) => <OpChip key={`${target}-${id}`} assetId={target} op={id} />)}</div> : <p className="space-empty">Generate or select an asset to see actions.</p>}
+        {ops.length && target ? <div className="space-ops">{ops.map((id) => <OpChip key={`${target}-${id}`} assetId={target} op={id} />)}</div> : <p className="space-empty">No {kind_ === 'model3d' ? '3D model' : kind_} yet: generate one to see its actions.</p>}
       </div>
     </div>
   </section>;

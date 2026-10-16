@@ -36,7 +36,9 @@ export const TOOLS_MAIN: ToolItem[] = [...MAIN_IMAGE.map(tool('image')), ...MAIN
 export const TOOLS_MORE: ToolItem[] = [...restOf('image', MAIN_IMAGE), ...restOf('video', MAIN_VIDEO), ...restOf('audio', [])];
 
 /** Every action leaves the Home view or the open Space and applies on the next render. */
-export function openHome(): void { setUi({ home: true, space: undefined, panel: null }); }
+export function openHome(): void { setUi({ home: true, space: undefined, panel: null, homeTab: 'home' }); }
+/** The Library as a full page: Home with its Library tab active. */
+export function openLibrary(): void { setUi({ home: true, space: undefined, panel: null, homeTab: 'gallery' }); }
 export function openSpace(item: SpaceItem): void {
   if (item.id === 'studio') setComposer({ mode: 'agent' });
   setUi({ workspace: item.workspace, home: false, space: undefined });
