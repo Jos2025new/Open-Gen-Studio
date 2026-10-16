@@ -70,12 +70,12 @@ describe('board views', () => {
     (globalThis as { ResizeObserver?: unknown }).ResizeObserver = RO;
     (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly = class { m22 = 1; constructor() {} };
   });
-  it('has a view switcher; Designer waits for the next step; switching keeps the workspace', () => {
+  it('has a view switcher (Generations, Nodes, Designer); switching keeps the workspace', () => {
     setData([]);
     render(createElement(StudioBoard));
     const tabs = [...host.querySelectorAll<HTMLButtonElement>('.studio-view')];
     expect(tabs.map((t) => t.textContent)).toEqual(['Generations', 'Nodes', 'Designer']);
-    expect(tabs[2].disabled).toBe(true);
+    expect(tabs.every((t) => !t.disabled)).toBe(true);
     const ws = useStore.getState().ui.workspace;
     act(() => tabs[1].click());
     expect(getStudioBoard().view).toBe('nodes');

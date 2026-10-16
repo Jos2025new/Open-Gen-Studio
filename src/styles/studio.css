@@ -49,3 +49,19 @@
 .studio-views-end { margin-left: auto; }
 .node-canvas.is-embedded { position: relative; }
 .node-canvas.is-embedded .node-empty { position: absolute; left: 0; right: 0; top: 40%; width: auto; transform: none; margin: 0; text-align: center; pointer-events: none; font-size: var(--fs-s); }
+
+/* Studio's board showing the Designer: a column (bar, stage, layers). Provides the variables the full workspace sets on .ws-designer. */
+.designer.studio-designer { flex: 1; height: auto; min-height: 0; --designer-dock-left: var(--sp-3); --layers-w: 0px; --stage-hint-top: var(--sp-2); flex-direction: column; flex-wrap: nowrap; overflow: hidden; padding: 0; outline: none; }
+.studio-designer.is-empty { display: grid; place-items: center; padding: var(--sp-4); text-align: center; flex: 1; font-size: var(--fs-s); }
+.studio-designer-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); flex-shrink: 0; min-width: 0; }
+.studio-designer-bar select, .studio-designer-name { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
+.studio-designer-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
+.studio-designer-zoom { min-width: 3.2em; text-align: center; font-size: var(--fs-s); color: var(--text-2); }
+.designer.studio-designer .stage { flex: 1 1 0; height: auto; min-height: 0; }
+.studio-layers { list-style: none; margin: 0; padding: 0; max-height: 30%; min-height: 0; overflow: auto; border-top: 1px solid var(--border); flex-shrink: 0; }
+p.studio-layers { margin: 0; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-s); }
+.studio-layer { display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-2); border-bottom: 1px solid var(--border); }
+.studio-layer.is-active { background: var(--accent-soft); }
+.studio-layer.is-hidden .studio-layer-name { opacity: .5; }
+.studio-layer-name { flex: 1; min-width: 0; text-align: left; padding: var(--sp-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
+.studio-board-main > .studio-designer { flex: 1; min-height: 0; }

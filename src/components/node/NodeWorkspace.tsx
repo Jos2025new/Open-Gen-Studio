@@ -30,6 +30,7 @@ import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGro
 import { chatToNodes, chatWorkNotInNodes } from '../../engine/flow/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { EmbeddedControls } from '../studio/EmbeddedControls';
+import { useBoardFocus } from '../studio/useBoardFocus';
 
 const nodeTypes = { studio: StudioNode, group: GroupNode };
 
@@ -87,16 +88,7 @@ function RunAll({ sessionId, ids }: { sessionId: string; ids: string[] }) {
 /** `embedded`: Studio's board. A smaller canvas: no Add node, Operations, import from chat or top bar; shortcuts only while focus is inside it. */
 function Canvas({ embedded = false }: { embedded?: boolean }) {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const [inside, setInside] = useState(false);
-  const insideRef = useRef(false);
-  insideRef.current = !embedded || inside;
-  useEffect(() => {
-    if (!embedded) return;
-    const h = (e: Event) => setInside(Boolean(canvasRef.current?.contains(e.target as Node)));
-    document.addEventListener('pointerdown', h, true);
-    document.addEventListener('focusin', h);
-    return () => { document.removeEventListener('pointerdown', h, true); document.removeEventListener('focusin', h); };
-  }, [embedded]);
+  const insideRef = useBoardFocus(embedded ? canvasRef : undefined);
   const sessionId = useStore((s) => s.activeSessionId);
   const graph = useStore((s) => s.sessions[s.activeSessionId].graph);
   const assets = useStore((s) => s.assets);

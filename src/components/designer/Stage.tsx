@@ -1,3 +1,6 @@
+import type { RefObject } from 'react';
+import { useBoardFocus } from '../studio/useBoardFocus';
+import { sameGuides, type GuideLines } from './guideLines';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
 import { bendStroke, nearestPoint, newStroke, nearStroke, strokeHandles } from '../../engine/design/strokes';
@@ -9,8 +12,6 @@ import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, u
 import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
-import type { Measure } from '../../engine/design/snap';
-import type { AlignmentGuide } from '../../engine/design/snapSession';
 import { SnapIndicator } from './SnapIndicator';
 import { layerSelection, pickedLayers, pickLayer, setLayerPicks, useLayerSelection, otherPickedLayers } from '../../engine/design/selection';
 import { beginEditMarquee, drawEditMarquee, finishEditMarquee, updateEditMarquee, type EditMarqueeDrag } from './StageEditMarquee';
@@ -148,7 +149,9 @@ function Ruler({ side, view, size, guides, ...handlers }: { side: 'top' | 'left'
  * Inkscape-style arrows for the rotate set: at a corner a curved two-headed arrow bowing out of the box (turn), on a
  * side a straight two-headed arrow along it (slide = skew). Drawn twice: a dark outline, then the accent.
  */
-export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { sessionId: string; doc: DesignDoc; selectedCurve: CurveSelection; setSelectedCurve: (value: CurveSelection) => void }) {
+/** `board`: Studio's embedded Designer: the box whose focus gates the keys, and the room the fit leaves at the bottom. */
+export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }: { sessionId: string; doc: DesignDoc; selectedCurve: CurveSelection; setSelectedCurve: (value: CurveSelection) => void; board?: { scope: RefObject<HTMLElement | null>; bottom: number } }) {
+  const insideRef = useBoardFocus(board?.scope);
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
@@ -158,13 +161,8 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const picked = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
 
   // Snap guides while moving (screen overlay only).
-  const [guideLines, setGuideLines] = useState<{ x?: number; y?: number; m?: Measure[]; a?: AlignmentGuide[] }>({});
-  const showGuides = (g: { x?: number; y?: number; m?: Measure[]; a?: AlignmentGuide[] }) => setGuideLines((cur) => {
-    const same = <T,>(a?: T[], b?: T[], equal: (x: T, y: T) => boolean = Object.is) => a === b || (!a && !b) || Boolean(a && b && a.length === b.length && a.every((x, i) => equal(x, b[i])));
-    const sameMeasure = (a: Measure, b: Measure) => a.label === b.label && a.a[0] === b.a[0] && a.a[1] === b.a[1] && a.b[0] === b.b[0] && a.b[1] === b.b[1];
-    const sameAlignment = (a: AlignmentGuide, b: AlignmentGuide) => a.a[0] === b.a[0] && a.a[1] === b.a[1] && a.b[0] === b.b[0] && a.b[1] === b.b[1];
-    return cur.x === g.x && cur.y === g.y && same(cur.m, g.m, sameMeasure) && same(cur.a, g.a, sameAlignment) ? cur : g;
-  });
+  const [guideLines, setGuideLines] = useState<GuideLines>({});
+  const showGuides = (g: GuideLines) => setGuideLines((cur) => sameGuides(cur, g) ? cur : g);
   const [editingText, setEditingText] = useState<string | null>(null);
   // Bumped on every brush move: the stroke is painted into the layer's buffer, and this redraws it live.
   const [paintFrame, setPaintFrame] = useState(0);
@@ -204,7 +202,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const textStyle = useStore((s) => s.ui.text);
   const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
   const selVersion = useSelectionVersion();
-  const rulers = useStore((s) => s.ui.rulers ?? false);
+  const rulers = useStore((s) => s.ui.rulers ?? false) && !board;
   // A guide being dragged (from a ruler or an existing guide), shown until pointer up.
   // Edit tool over a guide: the cursor says it can be dragged.
   const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
@@ -262,11 +260,11 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
   const fit = useCallback(() => {
     // Thin margin, as Photoshop or Krita; the bottom clears the toolbar.
     const pad = size.w < 500 ? 12 : 24;
-    const bottom = window.innerWidth < 768 ? 12 : 120; // composer is below the canvas on narrow screens
+    const bottom = board?.bottom ?? (window.innerWidth < 768 ? 12 : 120); // composer is below the canvas on narrow screens
     const zoom = Math.min((size.w - pad * 2) / doc.width, (size.h - pad - bottom) / doc.height, 4);
     const z = Math.max(0.05, zoom);
     setView({ zoom: z, x: (size.w - doc.width * z) / 2, y: Math.max(pad / 2, (size.h - bottom - doc.height * z) / 2) });
-  }, [size, doc.width, doc.height]);
+  }, [size, doc.width, doc.height, board?.bottom]);
 
   useEffect(() => {
     const key = `${doc.id}:${doc.width}x${doc.height}:${size.w}x${size.h}`;
@@ -564,6 +562,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve }: { ses
 
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
+      if (!insideRef.current) return;
       if (e.key === 'Shift') setShiftDown(true);
       if (e.code === 'Space' && !isTyping(e)) {
         setSpaceDown(true);

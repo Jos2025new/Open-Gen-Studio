@@ -102,17 +102,31 @@ describe('open_board', () => {
     expect(getStudioBoard().open).toBe(false);
     expect(toolResults().join('\n')).toContain('chat canvas');
   });
-  it('is refused outside Studio and for the Designer, leaving the board as it was', async () => {
+  it('is refused outside Studio, leaving the board as it was', async () => {
     goLive('node');
     script([{ name: 'open_board', args: { view: 'nodes' } }]);
     await sendAgentMessage('x');
     expect(toolResults().join('\n')).toContain('works only in Studio');
     expect(getStudioBoard().view).toBe('assets');
+  });
+  it('open_board("designer") makes the designer canvas the agent\'s, in the same turn', async () => {
     goLive('chat');
-    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], agent: { ...s.sessions[sid].agent, history: [] } } } }));
-    script([{ name: 'open_board', args: { view: 'designer' } }]);
-    await sendAgentMessage('y');
-    expect(toolResults().join('\n')).toContain('Designer board is not available yet');
-    expect(getStudioBoard().view).toBe('assets');
+    expect(openBoardSchema.safeParse({ view: 'designer' }).success).toBe(true);
+    script([{ name: 'view_canvas', args: {} }]);
+    await sendAgentMessage('look');
+    expect(toolResults().join('\n')).toContain('view_canvas works only in the Designer');
+
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [], agent: { ...s.sessions[sid].agent, history: [] } } } }));
+    script([{ name: 'open_board', args: { view: 'designer' } }, { name: 'view_canvas', args: {} }, { name: 'designer_fx', args: {} }]);
+    await sendAgentMessage('look at the design');
+    expect(getStudioBoard()).toMatchObject({ open: true, view: 'designer' });
+    expect(useStore.getState().ui.workspace).toBe('chat');
+    expect(agentCanvas()).toBe('designer');
+    const results = toolResults().join('\n');
+    expect(results).toContain('designer canvas is your canvas now');
+    expect(results).not.toContain('view_canvas works only in the Designer');
+    expect(results).not.toContain('designer_fx works only in the Designer');
+    expect(buildContext(session(), { workspace: 'designer', style: 'auto', round: 1, maxRounds: 5, attachments: [] })).toContain('The board shows: the Designer');
+    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'designer']);
   });
 });
