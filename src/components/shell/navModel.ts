@@ -1,7 +1,7 @@
 import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from 'lucide-react';
 import type { AssetKind, ComposerMode, OpId, Workspace } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
-import { setComposer, setUi, toast } from '../../store/store';
+import { setComposer, setUi } from '../../store/store';
 
 /** The one description of the app's destinations; the sidebar and the Home view both draw from it. */
 
@@ -49,10 +49,10 @@ export function openCreate(item: CreateItem): void {
   setComposer({ mode: item.mode });
   setUi({ workspace: 'chat', home: false, space: 'create' });
 }
-/** An operation works on an asset; there is no selection to start from, so the Library opens to pick one. */
+export const ALL_TOOLS: ToolItem[] = [...TOOLS_MAIN, ...TOOLS_MORE];
+/** An operation opens the Tools space with it selected; the input asset is chosen there. */
 export function openTool(item: ToolItem): void {
-  setUi({ panel: 'gallery', home: false, space: undefined });
-  toast(`Pick ${item.kind === 'video' ? 'a video' : item.kind === 'audio' ? 'a clip' : 'an image'} in the Library, then choose "${item.label}" from its actions.`);
+  setUi({ workspace: 'chat', home: false, space: 'tools', toolOp: item.id, panel: null });
 }
 
 /** What the Library lists: sketches, masks and 3D view captures are working copies. */

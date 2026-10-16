@@ -110,7 +110,9 @@ export interface UiState {
   /** The Home view is showing instead of the workspace; any destination clears it. */
   home?: boolean;
   /** A Space (Panel + Board) shown over the workspace in place of Home; the workspace stays mounted. */
-  space?: 'create';
+  space?: 'create' | 'tools';
+  /** The operation selected in the Tools space. */
+  toolOp?: import('../engine/types').OpId;
   /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
   homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
   panel: 'gallery' | 'sessions' | 'spending' | null;

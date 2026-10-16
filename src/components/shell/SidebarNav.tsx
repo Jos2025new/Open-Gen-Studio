@@ -19,7 +19,8 @@ function useEntries(): { spaces: Entry[]; create: Entry[]; tools: Entry[]; moreT
   const home = useStore((s) => !!s.ui.home);
   const space = useStore((s) => s.ui.space);
   const mode = useStore((s) => s.composer.mode);
-  const toTool = (t: (typeof TOOLS_MAIN)[number]): Entry => ({ key: t.id, label: t.label, icon: t.icon, run: () => openTool(t) });
+  const toolOp = useStore((s) => s.ui.toolOp);
+  const toTool = (t: (typeof TOOLS_MAIN)[number]): Entry => ({ key: t.id, label: t.label, icon: t.icon, active: !home && space === 'tools' && toolOp === t.id, run: () => openTool(t) });
   const all = [...TOOLS_MAIN, ...TOOLS_MORE].map(toTool);
   return {
     spaces: SPACES.map((s) => ({ key: s.id, label: s.label, hint: s.hint, icon: s.icon, active: !home && !space && s.workspace === workspace, run: () => openSpace(s) })),

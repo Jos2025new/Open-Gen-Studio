@@ -16,6 +16,7 @@ import { Composer } from './components/composer/Composer';
 import { Toasts } from './components/ui/Toasts';
 import { TooltipLayer } from './components/ui/TooltipLayer';
 import { HomeView } from './components/shell/HomeView';
+import { ToolsSpace } from './components/space/ToolsSpace';
 import { CreateSpace } from './components/space/CreateSpace';
 import { TraceControl } from './components/shell/TraceControl';
 
@@ -64,7 +65,7 @@ export function App() {
           <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''}`}>
             {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
             <Composer />
-            {home ? <HomeView /> : space === 'create' ? <CreateSpace /> : null}
+            {home ? <HomeView /> : space === 'create' ? <CreateSpace /> : space === 'tools' ? <ToolsSpace /> : null}
           </div>
         </main>
         <SidePanel />

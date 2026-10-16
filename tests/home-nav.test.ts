@@ -43,12 +43,10 @@ describe('navigation model', () => {
       expect(ui()).toMatchObject({ workspace: 'chat', home: false });
     }
   });
-  it('a tool opens the Library to pick an asset, with a notice naming the operation', () => {
+  it('a tool opens the Tools space with that operation selected', () => {
     openHome();
     openTool(TOOLS_MAIN[0]);
-    expect(ui().panel).toBe('gallery');
-    expect(ui().home).toBe(false);
-    expect(ui().toasts.at(-1)?.text).toContain(OPS[TOOLS_MAIN[0].id].label);
+    expect(ui()).toMatchObject({ space: 'tools', toolOp: TOOLS_MAIN[0].id, home: false, workspace: 'chat' });
   });
   it('working copies are not listed', () => {
     expect(['generated', 'upload', 'design', 'frame'].every((origin) => isListed({ origin }))).toBe(true);
