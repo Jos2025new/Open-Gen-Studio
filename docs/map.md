@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 188 | 127 |
-| [store.ts](../src/store/store.ts) | 114 | 102 |
+| [store.ts](../src/store/store.ts) | 115 | 102 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 46 | 0 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
 | [actions.ts](../src/engine/design/actions.ts) | 40 | 16 |
@@ -52,7 +52,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 40 | 12 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
-| `src/components/shell` | 16 | 2 |
+| `src/components/shell` | 17 | 2 |
 | `src/components/ui` | 12 | 1 |
 | `src/engine` | 38 | 160 |
 | `src/engine/agent` | 20 | 58 |
@@ -65,7 +65,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 24 | 151 |
 | `src/store` | 4 | 104 |
 
-122 de 317 módulos no tienen ningún test que los importe directamente.
+123 de 318 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -94,7 +94,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)
 - [stageSprites.ts](../src/components/designer/stageSprites.ts)
 - [usePanRequest.ts](../src/components/designer/usePanRequest.ts)
-- [GalleryPanel.tsx](../src/components/gallery/GalleryPanel.tsx)
 - [CanvasNavigation.tsx](../src/components/node/CanvasNavigation.tsx)
 - [NodeWorkspace.tsx](../src/components/node/NodeWorkspace.tsx)
 - [Operations.tsx](../src/components/node/Operations.tsx)
@@ -102,14 +101,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [GenerationsPanel.tsx](../src/components/shell/GenerationsPanel.tsx)
 - [ProviderPool.tsx](../src/components/shell/ProviderPool.tsx)
 - [SaveIndicator.tsx](../src/components/shell/SaveIndicator.tsx)
-- [SessionsPanel.tsx](../src/components/shell/SessionsPanel.tsx)
 - [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
 - [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)
 - [TopBar.tsx](../src/components/shell/TopBar.tsx)
 - [TraceControl.tsx](../src/components/shell/TraceControl.tsx)
 - [WorkspaceMenu.tsx](../src/components/shell/WorkspaceMenu.tsx)
-- [CanvasFilter.tsx](../src/components/ui/CanvasFilter.tsx)
 - [ImportFromChat.tsx](../src/components/ui/ImportFromChat.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
