@@ -68,9 +68,7 @@
 .space-controls .card-value { display: inline; }
 .space-controls > .chip .num + .card-value { margin-left: 0; }
 .space-controls > .chip:has(.card-value) > .num { display: none; }
-.space-tile-kind { position: absolute; inset: 0; display: grid; place-items: center; color: var(--tint, var(--text-3)); }
 .space-tile > .media { position: relative; }
-.space-tile.t-image { --tint: var(--type-image); }.space-tile.t-video { --tint: var(--type-video); }.space-tile.t-audio { --tint: var(--type-audio); }.space-tile.t-model3d { --tint: var(--warn); }
 .space-tile > .media-loading, .space-tile > .media-missing { background: transparent; }
 .space-failed { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
 .space-failed-row { display: flex; gap: var(--sp-2); overflow-x: auto; }

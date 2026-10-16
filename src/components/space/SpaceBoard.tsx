@@ -6,6 +6,7 @@ import { generationTitle } from '../assets/GenerationInfo';
 import { OP_ICONS, QUICK_LABEL } from '../assets/AssetActions';
 import { OPS } from '../../engine/ops';
 import type { OpId } from '../../engine/types';
+import { KindBackdrop } from '../ui/KindBackdrop';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, Segmented } from '../ui/primitives';
@@ -105,7 +106,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
-            <span className="space-tile-kind" aria-hidden>{(() => { const K = KIND_ICON[assets[c.assetId]?.kind ?? 'image']; return <K size={26} strokeWidth={1.5} />; })()}</span>
+            <KindBackdrop kind={assets[c.assetId]?.kind} />
             <AssetMedia assetId={c.assetId} hoverPlay={false} autoPlay={false} draggable={false} />
             {assets[c.assetId]?.favorite ? <Star size={12} className="space-tile-star" aria-label="Favorite" /> : null}
           </button>)}

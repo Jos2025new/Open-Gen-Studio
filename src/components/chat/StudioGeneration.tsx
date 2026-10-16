@@ -4,6 +4,7 @@ import { setUi, useStore } from '../../store/store';
 import { copyText, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration } from '../../engine/jobs';
 import { OPS } from '../../engine/ops';
+import { KindBackdrop } from '../ui/KindBackdrop';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
@@ -33,6 +34,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
     </button>
     {open ? <div className="studio-gen-row">
       {outputs.map((id, i) => <button key={id} type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => setUi({ lightbox: { assetIds: outputs, index: i } })}>
+        <KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}
       </button>)}

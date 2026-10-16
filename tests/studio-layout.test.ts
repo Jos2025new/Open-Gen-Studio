@@ -112,6 +112,13 @@ describe('compact generation in Studio chat', () => {
     act(() => q('.studio-gen-head')!.click());
     expect(host.querySelectorAll('.studio-thumb')).toHaveLength(0);
   });
+  it('thumbnails carry the tinted kind icon behind the picture, as the board tiles do', () => {
+    setData([gen('g1', 'done', ['a1'])]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    expect(q('.studio-thumb .kind-backdrop.is-image')).not.toBeNull();
+    render(createElement(SpaceBoard, { studio: true }));
+    expect(q('.space-tile .kind-backdrop.is-image')).not.toBeNull();
+  });
   it('a video shows a play icon; a running generation shows a small placeholder', () => {
     setData([gen('g1', 'done', ['v1'], { kind: 'video' }), gen('g2', 'running')], [asset('v1', 'video')]);
     render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
