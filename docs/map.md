@@ -32,13 +32,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [format.ts](../src/lib/format.ts) | 25 | 1 |
 | [catalog.ts](../src/engine/catalog.ts) | 24 | 13 |
-| [actions.ts](../src/engine/actions.ts) | 23 | 12 |
+| [actions.ts](../src/engine/actions.ts) | 23 | 13 |
 | [types.ts](../src/engine/providers/types.ts) | 22 | 6 |
 | [id.ts](../src/lib/id.ts) | 22 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 135 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 136 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
@@ -46,7 +46,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Área | Archivos | Tests que la importan directamente |
 | --- | --- | --- |
 | `src` | 2 | 0 |
-| `src/components/assets` | 11 | 2 |
+| `src/components/assets` | 11 | 3 |
 | `src/components/chat` | 11 | 4 |
 | `src/components/composer` | 10 | 5 |
 | `src/components/designer` | 44 | 13 |
@@ -56,7 +56,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 7 | 2 |
 | `src/components/ui` | 13 | 1 |
-| `src/engine` | 38 | 166 |
+| `src/engine` | 38 | 167 |
 | `src/engine/agent` | 23 | 59 |
 | `src/engine/design` | 89 | 91 |
 | `src/engine/flow` | 10 | 11 |
@@ -64,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 25 | 158 |
+| `src/lib` | 25 | 159 |
 | `src/store` | 4 | 111 |
 
-138 de 348 módulos no tienen ningún test que los importe directamente.
+137 de 348 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -90,7 +90,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [SidePanel.tsx](../src/components/shell/SidePanel.tsx)
 - [Sidebar.tsx](../src/components/shell/Sidebar.tsx)
 - [SpendingPanel.tsx](../src/components/shell/SpendingPanel.tsx)
-- [TraceControl.tsx](../src/components/shell/TraceControl.tsx)
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)

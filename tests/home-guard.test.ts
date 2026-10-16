@@ -47,8 +47,8 @@ describe('Home over a mounted workspace', () => {
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     const button = document.createElement('button');
-    home.append(button, dialog);
-    document.body.append(home);
+    home.append(button);
+    document.body.append(home, dialog); // dialogs and popovers are portaled outside Home
     setUi({ home: true });
     expect(press(dialog)).toBe(1);
     const seen = vi.fn();
@@ -57,6 +57,33 @@ describe('Home over a mounted workspace', () => {
     window.removeEventListener('keydown', seen);
     expect(seen).toHaveBeenCalledTimes(1);
     setUi({ home: false });
+    home.remove();
+    dialog.remove();
+  });
+
+  it('cuts document listeners too (ReactFlow deletes nodes on document) and Home\'s embedded Library, but Escape still closes a side panel', () => {
+    const home = document.createElement('div');
+    home.className = 'home';
+    const embed = document.createElement('div');
+    embed.className = 'side-panel home-embed';
+    const button = document.createElement('button');
+    embed.append(button);
+    home.append(embed);
+    document.body.append(home);
+    const onDoc = vi.fn();
+    document.addEventListener('keydown', onDoc);
+    setUi({ home: true });
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    expect(onDoc).not.toHaveBeenCalled();
+    expect(press(button)).toBe(0);
+    setUi({ panel: 'gallery' });
+    const esc = vi.fn();
+    window.addEventListener('keydown', esc);
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    window.removeEventListener('keydown', esc);
+    expect(esc).toHaveBeenCalledTimes(1);
+    setUi({ home: false, panel: null });
+    document.removeEventListener('keydown', onDoc);
     home.remove();
   });
 

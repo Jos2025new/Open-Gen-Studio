@@ -46,7 +46,9 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null) {
         setEstimate(r.estimate);
         setVia(r.modelName);
       } else {
-        const e = await layerOpEstimate(target.sessionId, target.docId, target.layerId, op, params);
+        let e: Estimate;
+        try { e = await layerOpEstimate(target.sessionId, target.docId, target.layerId, op, params); }
+        catch (err) { e = { usd: null, approximate: true, note: String((err as Error).message) }; }
         if (alive) setEstimate(e);
       }
       if (alive) setSettled(sig);

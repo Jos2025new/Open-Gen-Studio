@@ -1,4 +1,5 @@
 import { setUi, useStore } from '../../store/store';
+import { isTraceKey } from './TraceControl';
 
 /**
  * While Home or a Space covers the workspace, the workspace stays mounted (drafts survive) but must not
@@ -14,17 +15,17 @@ export function installHomeKeyGuard(): void {
     if (!covered() || target(e)?.closest(`.home, .space, ${OWN}`)) return;
     e.stopImmediatePropagation();
   }, true);
-  // Keys aimed at Home or a Space still bubble to window, where the hidden canvas listens (Ctrl+Z after clicking
-  // "More" would undo in the Designer). Registered first, this one cuts them there, except Ctrl+Alt shortcuts (the trace key) and
-  // Escape while a side panel is open, which rely on window listeners of their own.
+  // Keys aimed at Home or a Space still bubble on, where the hidden canvas listens: ReactFlow on document (Delete would
+  // remove selected nodes), the others on window (Ctrl+Z after clicking "More" would undo in the Designer). Registered
+  // first on document, this one cuts both, even inside Home's embedded Sessions and Library. Only the trace key and
+  // Escape while a side panel is open go on: their window listeners are meant to work from here too.
   const bubble = (e: KeyboardEvent) => {
-    const t = target(e);
-    if (!covered() || !t?.closest('.home, .space') || t.closest(OWN)) return;
-    if (((e.ctrlKey || e.metaKey) && e.altKey) || (e.key === 'Escape' && useStore.getState().ui.panel)) return;
+    if (!covered() || !target(e)?.closest('.home, .space')) return;
+    if (isTraceKey(e) || (e.key === 'Escape' && useStore.getState().ui.panel)) return;
     e.stopImmediatePropagation();
   };
-  window.addEventListener('keydown', bubble);
-  window.addEventListener('keyup', bubble);
+  document.addEventListener('keydown', bubble);
+  document.addEventListener('keyup', bubble);
 }
 
 /** Reaching a workspace or a session by any route, or anything asking for the composer, leaves Home. */
