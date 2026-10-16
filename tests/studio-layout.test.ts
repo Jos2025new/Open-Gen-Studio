@@ -16,7 +16,7 @@ import { Fragment, act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { StudioBoard } from '../src/components/studio/StudioBoard';
 import { StudioReopen } from '../src/components/studio/StudioReopen';
-import { BOARD_MAX, BOARD_MIN, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
+import { BOARD_MAX, BOARD_MIN, boardMax, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
 import { doneExpanded } from '../src/components/space/boardModel';
@@ -49,6 +49,22 @@ describe('Studio board layout state', () => {
     expect(getStudioBoard().width).toBe(BOARD_MIN);
     reloadStudioBoard();
     expect(getStudioBoard()).toEqual({ open: false, width: BOARD_MIN, view: 'assets' });
+  });
+  it('lets the board grow to 60% of a wide window and clamps again when the window shrinks or reloads', () => {
+    const w = window.innerWidth;
+    try {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1500 });
+      expect(boardMax()).toBe(900);
+      setStudioBoard({ open: true, width: 880 });
+      expect(getStudioBoard().width).toBe(880);
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
+      window.dispatchEvent(new Event('resize'));
+      expect(getStudioBoard().width).toBe(BOARD_MAX);
+      reloadStudioBoard();
+      expect(getStudioBoard().width).toBe(BOARD_MAX);
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    }
   });
   it('the X closes the board, a small control reopens it', () => {
     setData([]);

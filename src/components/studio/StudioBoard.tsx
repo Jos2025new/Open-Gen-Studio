@@ -4,7 +4,7 @@ import { IconButton } from '../ui/primitives';
 import { SpaceBoard } from '../space/SpaceBoard';
 import { EmbeddedNodeCanvas } from '../node/NodeWorkspace';
 import { EmbeddedDesigner } from './EmbeddedDesigner';
-import { BOARD_MAX, BOARD_MIN, setStudioBoard, useStudioBoard, type StudioView } from '../../lib/studioBoard';
+import { BOARD_MIN, boardMax, setStudioBoard, useStudioBoard, type StudioView } from '../../lib/studioBoard';
 
 const VIEWS: Array<{ id: StudioView; label: string }> = [{ id: 'assets', label: 'Generations' }, { id: 'nodes', label: 'Nodes' }, { id: 'designer', label: 'Designer' }];
 
@@ -18,11 +18,11 @@ export function StudioBoard() {
   const move = (e: PointerEvent<HTMLDivElement>) => {
     if (drag == null) return;
     const right = root.current?.parentElement?.getBoundingClientRect().right ?? 0;
-    setDrag(Math.min(BOARD_MAX, Math.max(BOARD_MIN, Math.round(right - e.clientX))));
+    setDrag(Math.min(boardMax(), Math.max(BOARD_MIN, Math.round(right - e.clientX))));
   };
   const end = () => { if (drag != null) { setStudioBoard({ width: drag }); setDrag(null); } };
   return <div ref={root} className="studio-board" aria-label="Studio board" style={{ width: shown }}>
-    <div className={`studio-divider ${drag != null ? 'is-dragging' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize board" aria-valuenow={shown} aria-valuemin={BOARD_MIN} aria-valuemax={BOARD_MAX} tabIndex={0}
+    <div className={`studio-divider ${drag != null ? 'is-dragging' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize board" aria-valuenow={shown} aria-valuemin={BOARD_MIN} aria-valuemax={boardMax()} tabIndex={0}
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setDrag(width); }} onPointerMove={move} onPointerUp={end} onPointerCancel={end}
       onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setStudioBoard({ width: width + (e.key === 'ArrowLeft' ? 16 : -16) }); } }} />
     <div className="studio-board-main">

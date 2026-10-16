@@ -5,9 +5,11 @@ import { useStore } from '../store/store';
 export type StudioView = 'assets' | 'nodes' | 'designer';
 export interface StudioBoardPrefs { open: boolean; width: number; view: StudioView }
 export const BOARD_MIN = 300;
+/** Widest the board may be: 640px, or 60% of the window on wide screens (the chat keeps the rest). */
 export const BOARD_MAX = 640;
+export const boardMax = (): number => typeof window === 'undefined' ? BOARD_MAX : Math.max(BOARD_MAX, Math.round(0.6 * window.innerWidth));
 const KEY = 'ogs:studio-board';
-const clamp = (n: number) => Math.min(BOARD_MAX, Math.max(BOARD_MIN, Math.round(n)));
+const clamp = (n: number) => Math.min(boardMax(), Math.max(BOARD_MIN, Math.round(n)));
 
 function read(): StudioBoardPrefs {
   try {
@@ -18,6 +20,11 @@ function read(): StudioBoardPrefs {
 
 let current = read();
 const listeners = new Set<() => void>();
+// Window resized: keep the stored width within the new bounds (the board is shown at the clamped width).
+if (typeof window !== 'undefined') window.addEventListener('resize', () => {
+  const width = clamp(current.width);
+  if (width !== current.width) { current = { ...current, width }; listeners.forEach((l) => l()); }
+});
 
 export const getStudioBoard = (): StudioBoardPrefs => current;
 export function setStudioBoard(patch: Partial<StudioBoardPrefs>): void {
