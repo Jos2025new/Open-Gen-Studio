@@ -21,6 +21,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Por probar
 
+- [ ] Borrar capas con el teclado (Delete o Backspace) no funciona: el bloque que llama a `deleteLayers` está anidado dentro de la rama de las flechas y nunca se alcanza (`src/components/designer/designerKeys.ts:87`, movido sin cambios desde `DesignerWorkspace.tsx`; el mismo código en la Designer completa y en la incrustada de Studio). Lo mismo le pasa a las teclas de herramienta (V, H, B, E…), que van en el `else` de ese bloque (`designerKeys.ts:94`). No se corrige aún por decisión del usuario. **2026-10-15**, código.
 - [ ] Modelos y prompting (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas.md](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer. **2026-10-14**, el usuario.
 - [ ] Tras 038 (**2026-10-15**, propuesta): `triggers.ts` con triggers demasiado amplios (no aprobado); tarjeta de ajustes en vivo (diferida hasta que el usuario pruebe); guías faltantes o sin verificar (Flash Omni 1.1, Kling O3, FLUX 3, MiniMax H3, Grok, HappyHorse); el fallback de realismo elige retrato para cualquier hombre/mujer; `inheritApproved` solo hereda imagen y vídeo. Detalle en [038](history/038-2026-10-W42.md).
 - [ ] `agentMetrics`: añadir fecha, modelo y proveedor por mensaje; `op` del plan con `realism` explícito; decidir UI de esfuerzos no admitidos (5c) y selector de roles. **2026-10-14**, propuesta.

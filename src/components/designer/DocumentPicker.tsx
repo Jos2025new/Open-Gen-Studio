@@ -26,15 +26,20 @@ function Thumbnail({ doc }: { doc: DesignDoc }) {
   return <canvas ref={ref} width={144} height={96} className="document-thumb" aria-hidden="true" />;
 }
 
+/** The thumbnails of the session's designs: click one to open it. */
+export function DocumentChoices({ sessionId, docs, active }: { sessionId: string; docs: DesignDoc[]; active: DesignDoc }) {
+  return <div className="document-thumbnails document-picker-panel" role="listbox" aria-label="Canvases">
+    {docs.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => selectDoc(sessionId, doc.id)}>
+      <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>
+    </button>)}
+  </div>;
+}
+
 export function DocumentPicker({ sessionId, docs, active }: { sessionId: string; docs: DesignDoc[]; active: DesignDoc }) {
   // Stays open until its own button closes it (remembered in this browser), so canvases can be switched freely.
   const [open, setOpen] = usePref('ogs:canvas-picker-open', false);
   return <div className="document-picker">
     <button type="button" className="document-picker-toggle" aria-label="Choose canvas" aria-expanded={open} onClick={() => setOpen(!open)}><span>{active.name}</span>{open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>
-    {open ? <div className="document-thumbnails document-picker-panel" role="listbox" aria-label="Canvases">
-      {docs.map((doc) => <button type="button" key={doc.id} className={`document-choice ${doc.id === active.id ? 'is-active' : ''}`} aria-pressed={doc.id === active.id} onClick={() => selectDoc(sessionId, doc.id)}>
-        <Thumbnail doc={doc} /><span>{doc.name}</span><small>{doc.width} × {doc.height}</small>
-      </button>)}
-    </div> : null}
+    {open ? <DocumentChoices sessionId={sessionId} docs={docs} active={active} /> : null}
   </div>;
 }

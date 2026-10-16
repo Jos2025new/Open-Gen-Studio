@@ -7,7 +7,7 @@ const accepts = (file: string) => ACCEPT.exec(readFileSync(file, 'utf8'))?.[1] ?
 
 describe('import accept lists', () => {
   it('the Designer and the node area take the same EPS and HEIC types', () => {
-    const designer = accepts('src/components/designer/DesignerWorkspace.tsx');
+    const designer = /IMPORT_ACCEPT = '([^']*)'/.exec(readFileSync('src/components/designer/designerFile.ts', 'utf8'))?.[1] ?? '';
     const nodes = accepts('src/components/node/NodeWorkspace.tsx');
     for (const type of ['.eps', 'application/postscript', '.heic', '.heif', 'image/heic']) {
       expect(designer).toContain(type);

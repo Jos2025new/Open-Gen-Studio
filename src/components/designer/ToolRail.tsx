@@ -48,12 +48,15 @@ const FILL_GROUP = { id: 'fill', icon: PaintBucket, label: 'Fill and gradient', 
   { id: 'fill' as DesignTool, icon: PaintBucket, label: 'Fill', key: 'G' }, { id: 'gradient' as DesignTool, icon: Blend, label: 'Gradient', key: 'U' },
 ] };
 const SHAPES_GROUP = { ...GROUPS[0], label: 'Shapes and lines', tools: [...GROUPS[0].tools, ...GROUPS[1].tools] };
+/** The tools in the shapes-and-lines menu. */
+export const SHAPE_TOOL_IDS: DesignTool[] = SHAPES_GROUP.tools.map((t) => t.id);
+export { SHAPES_GROUP };
 /** Every tool the rail offers, directly or inside a group: what the inventory test checks. */
 export function railTools(): DesignTool[] {
   return RAIL.flatMap((f) => f.items).flatMap((i) => (i === 'group:shapes' ? SHAPES_GROUP.tools.map((t) => t.id) : i === 'group:fill' ? FILL_GROUP.tools.map((t) => t.id) : [i]));
 }
 
-function ToolGroup({ group, tool, doc, onSelect }: { doc: DesignDoc; group: { id: string; icon: LucideIcon; label: string; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }; tool: DesignTool; onSelect: (tool: DesignTool) => void }) {
+export function ToolGroup({ group, tool, doc, onSelect }: { doc: DesignDoc; group: { id: string; icon: LucideIcon; label: string; tools: Array<{ id: DesignTool; icon: LucideIcon; label: string; key?: string }> }; tool: DesignTool; onSelect: (tool: DesignTool) => void }) {
   const pop = usePopover();
   const current = group.tools.find((t) => t.id === tool);
   return <>

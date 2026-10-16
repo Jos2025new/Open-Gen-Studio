@@ -318,7 +318,7 @@ export default [
       ['src/engine/design/render.ts', "resolution: 'document'"],
       ['src/engine/design/exportLimits.ts', 'export function checkExportSize'],
       ['src/engine/design/actions.ts', 'downloadBlob(await exportDoc('],
-      ['src/components/designer/DesignerWorkspace.tsx', "toast(err instanceof Error ? err.message : 'Export failed', 'error')"],
+      ['src/components/designer/designerFile.ts', "toast(err instanceof Error ? err.message : 'Export failed', 'error')"],
       ['docs/features/designer.md', '33.554.432'],
     ],
     tests: ['tests/fx-render.test.ts'],

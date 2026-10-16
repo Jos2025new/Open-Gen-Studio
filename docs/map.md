@@ -20,19 +20,19 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 200 | 132 |
-| [store.ts](../src/store/store.ts) | 126 | 109 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 53 | 0 |
+| [types.ts](../src/engine/types.ts) | 203 | 132 |
+| [store.ts](../src/store/store.ts) | 129 | 109 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 56 | 0 |
+| [actions.ts](../src/engine/design/actions.ts) | 46 | 17 |
 | [media.ts](../src/lib/media.ts) | 45 | 34 |
-| [actions.ts](../src/engine/design/actions.ts) | 42 | 17 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 39 | 1 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 41 | 1 |
+| [doc.ts](../src/engine/design/doc.ts) | 37 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 36 | 16 |
-| [doc.ts](../src/engine/design/doc.ts) | 34 | 34 |
 | [params.ts](../src/engine/params.ts) | 32 | 17 |
 | [raster.ts](../src/engine/design/raster.ts) | 30 | 15 |
 | [catalog.ts](../src/engine/catalog.ts) | 24 | 13 |
 | [format.ts](../src/lib/format.ts) | 24 | 1 |
-| [actions.ts](../src/engine/actions.ts) | 22 | 11 |
+| [actions.ts](../src/engine/actions.ts) | 23 | 12 |
 | [types.ts](../src/engine/providers/types.ts) | 22 | 6 |
 | [id.ts](../src/lib/id.ts) | 22 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
@@ -49,14 +49,14 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 11 | 2 |
 | `src/components/chat` | 10 | 4 |
 | `src/components/composer` | 10 | 5 |
-| `src/components/designer` | 42 | 13 |
+| `src/components/designer` | 44 | 13 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 4 | 0 |
 | `src/components/shell` | 19 | 6 |
 | `src/components/space` | 9 | 4 |
-| `src/components/studio` | 4 | 2 |
+| `src/components/studio` | 7 | 2 |
 | `src/components/ui` | 13 | 1 |
-| `src/engine` | 38 | 165 |
+| `src/engine` | 38 | 166 |
 | `src/engine/agent` | 23 | 59 |
 | `src/engine/design` | 89 | 91 |
 | `src/engine/flow` | 10 | 11 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 25 | 158 |
 | `src/store` | 4 | 111 |
 
-134 de 342 módulos no tienen ningún test que los importe directamente.
+137 de 347 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -80,7 +80,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ChatWorkspace.tsx](../src/components/chat/ChatWorkspace.tsx)
 - [CanvasSize.tsx](../src/components/designer/CanvasSize.tsx)
 - [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
-- [DocumentPicker.tsx](../src/components/designer/DocumentPicker.tsx)
 - [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
@@ -96,7 +95,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
 - [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
-- [apply.ts](../src/engine/design/svgImport/apply.ts)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)
 - [designerBenchProfessionalRun.ts](../src/lib/designerBenchProfessionalRun.ts)

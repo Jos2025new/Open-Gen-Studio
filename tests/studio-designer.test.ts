@@ -11,6 +11,10 @@ vi.mock('../src/lib/idb', () => ({
 }));
 const keys = vi.hoisted(() => ({ designerKey: vi.fn() }));
 vi.mock('../src/components/designer/designerKeys', async (orig) => ({ ...(await orig<typeof import('../src/components/designer/designerKeys')>()), designerKey: keys.designerKey }));
+const file = vi.hoisted(() => ({ importDesignFiles: vi.fn(async () => undefined), runDesignOutput: vi.fn(async () => undefined) }));
+vi.mock('../src/components/designer/designerFile', async (orig) => ({ ...(await orig<typeof import('../src/components/designer/designerFile')>()), ...file }));
+const upload = vi.hoisted(() => ({ uploadFiles: vi.fn(async () => [] as string[]) }));
+vi.mock('../src/engine/actions', async (orig) => ({ ...(await orig<typeof import('../src/engine/actions')>()), ...upload }));
 
 import { act, createElement, createRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -50,7 +54,7 @@ beforeEach(() => {
 afterEach(() => { window.removeEventListener('ogs:designer-view', onView); act(() => root.unmount()); host.remove(); vi.restoreAllMocks(); });
 
 describe('the Designer view of the Studio board', () => {
-  it('is enabled, mounts the embedded Designer with only pick/pan, undo and zoom, and keeps the workspace', () => {
+  it('is enabled, mounts the embedded Designer with a top bar and a bottom bar, and keeps the workspace', () => {
     setStudioBoard({ view: 'assets' });
     render(createElement(StudioBoard));
     const tab = [...host.querySelectorAll<HTMLButtonElement>('.studio-view')][2];
@@ -61,23 +65,63 @@ describe('the Designer view of the Studio board', () => {
     expect(getStudioBoard().view).toBe('designer');
     expect(useStore.getState().ui.workspace).toBe(ws);
     expect(q('.studio-designer .stage')).not.toBeNull();
-    for (const label of ['Select and move', 'Pan', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
-    for (const sel of ['.tool-rail', '.designer-palette', '.layers-panel', '.document-picker']) expect(q(sel), sel).toBeNull();
+    for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Line art', 'Size', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
+    expect(q('[aria-label^="Pan"]')).not.toBeNull();
+    expect(q('.studio-palette .tool-rail > [aria-label^="Color"]')).not.toBeNull();
+    expect(q('.studio-palette .tool-group-btn')).not.toBeNull();
+    for (const sel of ['.designer-view', '.layers-panel', '.document-picker', '.studio-layers']) expect(q(sel), sel).toBeNull();
     expect(host.textContent).not.toContain('Export');
-    expect([...EMBEDDED_TOOLS]).toEqual(['move', 'hand']);
+    expect([...EMBEDDED_TOOLS]).toEqual(expect.arrayContaining(['move', 'hand', 'lineart', 'eraser', 'text', 'rect', 'ellipse', 'line']));
+    for (const no of ['brush', 'fill', 'select', 'ruler', 'eyedropper', 'gradient']) expect(EMBEDDED_TOOLS.has(no as never), no).toBe(false);
   });
-  it('lists the layers: the eye hides one, a click makes it the active layer', () => {
+  it('the Layers popover lists the layers: the eye hides one, a click makes it the active layer', () => {
     addEmptyLayer(sid, doc().id, 'raster');
     const second = addEmptyLayer(sid, doc().id, 'raster')!;
     setStudioBoard({ view: 'designer' });
     render(createElement(StudioBoard));
-    const rows = host.querySelectorAll('.studio-layer');
+    expect(document.querySelector('.studio-layers')).toBeNull();
+    act(() => q('[aria-label="Layers"]')!.click());
+    const rows = document.querySelectorAll('.studio-layer');
     expect(rows.length).toBe(doc().layers.length);
     expect(rows.length).toBeGreaterThanOrEqual(2);
-    act(() => q('.studio-layer [aria-label^="Hide"]')!.click());
+    act(() => document.querySelector<HTMLElement>('.studio-layer [aria-label^="Hide"]')!.click());
     expect(doc().layers.filter((l) => !l.visible).length).toBe(1);
-    act(() => host.querySelectorAll<HTMLElement>('.studio-layer-name')[rows.length - 1].click());
+    act(() => document.querySelectorAll<HTMLElement>('.studio-layer-name')[rows.length - 1].click());
     expect(doc().activeLayerId).not.toBe(second);
+  });
+  it('the bottom bar sets the tool and opens the full Designer\'s popovers for color, size and shapes', () => {
+    addEmptyLayer(sid, doc().id, 'raster');
+    setStudioBoard({ view: 'designer' });
+    render(createElement(StudioBoard));
+    const tool = () => useStore.getState().ui.tool;
+    act(() => q('[aria-label="Line art"]')!.click());
+    expect(tool()).toBe('lineart');
+    act(() => q('[aria-label="Eraser"]')!.click());
+    expect(tool()).toBe('eraser');
+    expect(q('.studio-palette .tool-rail > [aria-label="Color"]')!.hasAttribute('disabled')).toBe(true);
+    act(() => q('[aria-label="Text"]')!.click());
+    expect(tool()).toBe('text');
+    act(() => q('[aria-label="Select and move"]')!.click());
+    expect(tool()).toBe('move');
+    act(() => q('[aria-label^="Pan"]')!.click());
+    expect(tool()).toBe('hand');
+    // Size: the same slider the tool uses (line art: its stroke size).
+    act(() => q('[aria-label="Line art"]')!.click());
+    act(() => q('button[aria-label="Size"]')!.click());
+    const slider = document.querySelector<HTMLInputElement>('.popover input[aria-label="Size"]')!;
+    expect(slider).not.toBeNull();
+    expect(Number(slider.value)).toBe(useStore.getState().ui.lineart.size);
+    act(() => q('button[aria-label="Size"]')!.click());
+    // Color: the shared color picker (hex field), editing the line-art color.
+    act(() => q('.studio-palette .tool-rail > [aria-label^="Color"]')!.click());
+    expect(document.querySelector('.popover input[aria-label="Hex"]')).not.toBeNull();
+    act(() => q('.studio-palette .tool-rail > [aria-label^="Color"]')!.click());
+    // Shapes: the rail's own group menu.
+    act(() => q('.studio-palette .tool-group-btn')!.click());
+    const rect = [...document.querySelectorAll<HTMLElement>('.popover [role="menuitem"], .popover button')].find((b) => b.textContent?.startsWith('Rectangle'))!;
+    expect(rect).toBeDefined();
+    act(() => rect.click());
+    expect(tool()).toBe('rect');
   });
   it('a tool left over from the full Designer is replaced by pick and move', () => {
     setUi({ tool: 'brush' });
@@ -115,6 +159,7 @@ describe('keyboard scope', () => {
   });
   it('the embedded key set never opens another tool or the rulers', async () => {
     const real = await vi.importActual<typeof import('../src/components/designer/designerKeys')>('../src/components/designer/designerKeys');
+    addEmptyLayer(sid, doc().id, 'raster');
     setUi({ tool: 'move', rulers: false });
     const d = doc();
     real.designerKey(new KeyboardEvent('keydown', { key: 'b' }), sid, d, EMBEDDED_TOOLS);
@@ -124,6 +169,97 @@ describe('keyboard scope', () => {
     real.designerKey(new KeyboardEvent('keydown', { key: 'R', shiftKey: true }), sid, d);
     expect(useStore.getState().ui.rulers).toBe(true);
     setUi({ rulers: false });
+  });
+});
+
+describe('image paste, copy and cut', () => {
+  const pasteImage = (target: EventTarget) => {
+    const ev = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(ev, 'clipboardData', { value: { files: [new File(['x'], 'a.png', { type: 'image/png' })] } });
+    act(() => { target.dispatchEvent(ev); });
+  };
+  it('paste works with focus inside the board and never from the chat composer or outside it', () => {
+    setStudioBoard({ view: 'designer' });
+    upload.uploadFiles.mockClear();
+    const chat = document.createElement('textarea');
+    document.body.append(chat);
+    render(createElement(StudioBoard));
+    act(() => chat.focus());
+    pasteImage(chat);
+    expect(upload.uploadFiles).not.toHaveBeenCalled();
+    act(() => { chat.blur(); document.body.focus(); });
+    pasteImage(document.body);
+    expect(upload.uploadFiles).not.toHaveBeenCalled();
+    act(() => { q('.studio-designer-bar')!.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    pasteImage(q('.studio-designer')!);
+    expect(upload.uploadFiles).toHaveBeenCalledTimes(1);
+    act(() => { chat.blur(); chat.focus(); });
+    pasteImage(chat);
+    expect(upload.uploadFiles).toHaveBeenCalledTimes(1);
+    chat.remove();
+  });
+  it('copy is handled by the same Designer clipboard code, gated by the focus guard', async () => {
+    const real = await vi.importActual<typeof import('../src/components/designer/designerClipboard')>('../src/components/designer/designerClipboard');
+    const off = real.designerClipboard(sid, doc(), () => false);
+    const ev = new Event('copy', { bubbles: true, cancelable: true });
+    act(() => { document.dispatchEvent(ev); });
+    expect(ev.defaultPrevented).toBe(false);
+    off();
+  });
+});
+
+describe('file menu', () => {
+  const menu = () => [...document.querySelectorAll<HTMLElement>('.popover [role="menuitem"], .popover button')];
+  const item = (text: string) => menu().find((b) => b.textContent?.startsWith(text))!;
+  beforeEach(() => { file.importDesignFiles.mockClear(); file.runDesignOutput.mockClear(); setStudioBoard({ view: 'designer' }); });
+  it('is one icon with New, Open, Import image and Export', () => {
+    render(createElement(StudioBoard));
+    expect(menu().length).toBe(0);
+    act(() => q('[aria-label="File"]')!.click());
+    for (const t of ['New', 'Open', 'Import image', 'Export']) expect(item(t), t).toBeDefined();
+  });
+  it('New uses the presets and creates a design; Open lists the designs and selects one', () => {
+    render(createElement(StudioBoard));
+    act(() => q('[aria-label="File"]')!.click());
+    act(() => item('New')!.click());
+    const before = useStore.getState().sessions[sid].docs.length;
+    act(() => item('Landscape')!.click());
+    expect(useStore.getState().sessions[sid].docs.length).toBe(before + 1);
+    const first = useStore.getState().sessions[sid].docs[0].id;
+    act(() => q('[aria-label="File"]')!.click());
+    act(() => item('Open')!.click());
+    const choices = document.querySelectorAll<HTMLElement>('.popover .document-choice');
+    expect(choices.length).toBe(before + 1);
+    act(() => choices[0].click());
+    expect(useStore.getState().sessions[sid].activeDocId).toBe(first);
+  });
+  it('Export and Save to gallery call the existing action; Import hands the files to the existing import', async () => {
+    render(createElement(StudioBoard));
+    act(() => q('[aria-label="File"]')!.click());
+    act(() => item('Export')!.click());
+    act(() => item('PNG')!.click());
+    expect(file.runDesignOutput).toHaveBeenCalledWith(sid, doc().id, false, 'png');
+    await act(async () => { await Promise.resolve(); });
+    act(() => q('[aria-label="File"]')!.click());
+    act(() => item('Save to gallery')!.click());
+    expect(file.runDesignOutput).toHaveBeenCalledTimes(1);
+    act(() => [...document.querySelectorAll<HTMLElement>('.popover button')].find((b) => b.textContent === 'Save')!.click());
+    expect(file.runDesignOutput).toHaveBeenLastCalledWith(sid, doc().id, true, undefined);
+    const input = q('input[type="file"]') as HTMLInputElement;
+    const f = new File(['x'], 'a.png', { type: 'image/png' });
+    Object.defineProperty(input, 'files', { value: [f], configurable: true });
+    act(() => { input.dispatchEvent(new Event('change', { bubbles: true })); });
+    expect(file.importDesignFiles).toHaveBeenCalledWith(sid, doc().id, [f]);
+  });
+});
+
+describe('pending list', () => {
+  it('records the keyboard layer delete that never runs, with file and line', async () => {
+    const fs = await import('node:fs');
+    const text = fs.readFileSync('docs/pendientes.md', 'utf8');
+    expect(text).toMatch(/designerKeys\.ts:\d+/);
+    const line = Number(/designerKeys\.ts:(\d+)/.exec(text)![1]);
+    expect(fs.readFileSync('src/components/designer/designerKeys.ts', 'utf8').split('\n')[line - 1]).toContain("e.key === 'Delete'");
   });
 });
 

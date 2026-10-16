@@ -52,14 +52,18 @@
 
 /* Studio's board showing the Designer: a column (bar, stage, layers). Provides the variables the full workspace sets on .ws-designer. */
 .designer.studio-designer { flex: 1; height: auto; min-height: 0; --designer-dock-left: var(--sp-3); --layers-w: 0px; --stage-hint-top: var(--sp-2); flex-direction: column; flex-wrap: nowrap; overflow: hidden; padding: 0; outline: none; }
-.studio-designer.is-empty { display: grid; place-items: center; padding: var(--sp-4); text-align: center; flex: 1; font-size: var(--fs-s); }
+/* The bottom bar is the full Designer's palette, docked on the stage's lower edge; its strip opens above it. */
+.studio-designer .studio-palette { position: absolute; top: auto; bottom: var(--sp-3); left: 50%; transform: translateX(-50%); max-width: calc(100% - var(--sp-3) * 2); }
+.studio-designer .studio-palette .context-strip { max-width: 100%; }
+.studio-designer-none { margin: auto; padding: var(--sp-4); text-align: center; font-size: var(--fs-s); }
+.studio-size-pop { padding: var(--sp-2); }
 .studio-designer-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); flex-shrink: 0; min-width: 0; }
 .studio-designer-bar select, .studio-designer-name { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-designer-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }
 .studio-designer-zoom { min-width: 3.2em; text-align: center; font-size: var(--fs-s); color: var(--text-2); }
 .designer.studio-designer .stage { flex: 1 1 0; height: auto; min-height: 0; }
-.studio-layers { list-style: none; margin: 0; padding: 0; max-height: 30%; min-height: 0; overflow: auto; border-top: 1px solid var(--border); flex-shrink: 0; }
-p.studio-layers { margin: 0; padding: var(--sp-2) var(--sp-3); font-size: var(--fs-s); }
+.studio-layers { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow: auto; }
+p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-layer { display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-2); border-bottom: 1px solid var(--border); }
 .studio-layer.is-active { background: var(--accent-soft); }
 .studio-layer.is-hidden .studio-layer-name { opacity: .5; }

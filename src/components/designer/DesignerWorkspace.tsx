@@ -1,42 +1,29 @@
 import { MAX_ZOOM } from '../../engine/design/viewCoordinates';
 import { ToolHelpLine, ViewToggles } from './ToolHelp';
-import { isSvg, prepareImportFile } from '../../lib/imports';
 import { DrawingChoicePrompt } from './DrawingChoice';
-import { importSvgFile } from '../../engine/design/svgImport/apply';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { chatImagesNotInDesigner, chatToDesigner } from '../../engine/design/fromChat';
 import { ImportFromChat } from '../ui/ImportFromChat';
 import { CanvasSize } from './CanvasSize';
 import { AspectGlyph } from '../composer/MediaControls';
-import { clearSelected, getSelection, selectedCrop } from '../../engine/design/pixelSelection';
 import { ArrowUpFromLine, Images, ImagePlus, Maximize, Minus, PanelRight, Plus, Redo2, Undo2 } from 'lucide-react';
-import { toast, useStore } from '../../store/store';
+import { useStore } from '../../store/store';
 import type { ExportFormat } from '../../engine/design/export';
-import { exportDocFile, newBlankDoc, redoDoc, saveDocToGallery, undoDoc } from '../../engine/design/actions';
-import { activeLayer, DOC_PRESETS } from '../../engine/design/doc';
+import { newBlankDoc, redoDoc, undoDoc } from '../../engine/design/actions';
+import { DOC_PRESETS } from '../../engine/design/doc';
 import { canRedo, canUndo, historyDepth, subscribeHistory } from '../../engine/design/history';
 import { designerKey } from './designerKeys';
+import { designerClipboard } from './designerClipboard';
+import { EXPORT_FORMATS, IMPORT_ACCEPT, importDesignFiles, runDesignOutput } from './designerFile';
 import { TopbarActions } from '../shell/TopBar';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { Popover, usePopover } from '../ui/Popover';
 import { Stage } from './Stage';
 import { ToolPalette } from './ToolPalette';
 import { DocumentPicker } from './DocumentPicker';
-import { uploadFiles } from '../../engine/actions';
-import { placeImportedImages } from '../../engine/design/importImages';
-import { getDoc, openAssetInDesigner, placeAsset } from '../../engine/design/actions';
-import { cloneCanvas, getBuffer } from '../../engine/design/raster';
-import { canvasToBlob } from '../../lib/media';
 import { EditOps, SelectionChip } from './ToolSettings';
 import { LayersPanel } from './LayersPanel';
-
-const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string; detail: string }> = [
-  { id: 'png', label: 'PNG', detail: 'Image, keeps transparency' },
-  { id: 'jpg', label: 'JPG', detail: 'Image, white background' },
-  { id: 'svg', label: 'SVG', detail: 'Editable layers, text and shapes' },
-  { id: 'pdf', label: 'PDF', detail: 'Vector; text in standard fonts' },
-];
 
 export function DesignerWorkspace() {
   const session = useStore((s) => s.sessions[s.activeSessionId]);
@@ -64,64 +51,7 @@ export function DesignerWorkspace() {
   // Steps the byte limit dropped (Paso 9): a small note next to undo, only when there are some.
   const trimmed = useSyncExternalStore(subscribeHistory, () => (doc ? historyDepth(doc.id).dropped : 0));
 
-  useEffect(() => {
-    const inField = (e: Event) => e.target instanceof Element && !!e.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
-    const paste = (e: ClipboardEvent) => {
-      if (e.defaultPrevented || inField(e)) return;
-      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith('image/'));
-      if (!files.length) return;
-      e.preventDefault();
-      const targetDocId = doc?.id;
-      void (async () => {
-        const ids = await uploadFiles(files);
-        if (useStore.getState().activeSessionId !== session.id) return;
-        if (!targetDocId) {
-          if (!ids.length) return;
-          await openAssetInDesigner(session.id, ids[0]);
-          const newDocId = useStore.getState().sessions[session.id]?.activeDocId;
-          if (newDocId) for (const id of ids.slice(1)) await placeAsset(session.id, newDocId, id, 'new');
-        } else if (getDoc(session.id, targetDocId)) {
-          for (const id of ids) await placeAsset(session.id, targetDocId, id, 'new');
-        }
-      })().catch((err) => toast(err instanceof Error ? err.message : 'Could not paste image.', 'error'));
-    };
-    const toClipboard = (canvas: HTMLCanvasElement, done: string) => {
-      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') { toast('This browser cannot copy images to the clipboard.', 'error'); return false; }
-      void navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasToBlob(canvas, 'image/png') })])
-        .then(() => toast(done, 'success'))
-        .catch(() => toast('Could not copy image to the clipboard.', 'error'));
-      return true;
-    };
-    const copy = (e: ClipboardEvent) => {
-      if (e.defaultPrevented || inField(e) || window.getSelection()?.toString() || !doc) return;
-      // With a pixel selection: only the selected pixels of the active layer (Ctrl+X also erases them).
-      if (getSelection(doc.id)) {
-        e.preventDefault();
-        const crop = selectedCrop(doc);
-        if (typeof crop === 'string') { toast(crop, 'error'); return; }
-        if (toClipboard(crop, e.type === 'cut' ? 'Selection cut' : 'Selection copied') && e.type === 'cut') {
-          const err = clearSelected(session.id, doc);
-          if (err) toast(err, 'error');
-        }
-        return;
-      }
-      if (e.type === 'cut') return;
-      const layer = activeLayer(doc);
-      if (layer?.type !== 'raster') return;
-      const buffer = getBuffer(layer.id);
-      if (!buffer) { toast('Image pixels are still loading.', 'error'); return; }
-      if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') { toast('This browser cannot copy images to the clipboard.', 'error'); return; }
-      e.preventDefault();
-      const png = canvasToBlob(cloneCanvas(buffer), 'image/png');
-      void navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
-        .then(() => toast('Image copied', 'success'))
-        .catch(() => toast('Could not copy image to the clipboard.', 'error'));
-    };
-    document.addEventListener('paste', paste);
-    document.addEventListener('copy', copy);
-    document.addEventListener('cut', copy);
-    return () => { document.removeEventListener('paste', paste); document.removeEventListener('copy', copy); document.removeEventListener('cut', copy); };
-  }, [doc, session.id]);
+  useEffect(() => designerClipboard(session.id, doc), [doc, session.id]);
 
   useEffect(() => {
     const view = (e: Event) => setZoom((e as CustomEvent<number>).detail);
@@ -138,25 +68,11 @@ export function DesignerWorkspace() {
   const output = async (gallery: boolean, format: ExportFormat = 'png') => {
     if (!doc || busy) return;
     setBusy(true);
-    try { await (gallery ? saveDocToGallery(session.id, doc.id) : exportDocFile(session.id, doc.id, format)); }
-    catch (err) { toast(err instanceof Error ? err.message : 'Export failed', 'error'); }
-    finally { setBusy(false); }
+    try { await runDesignOutput(session.id, doc.id, gallery, format); } finally { setBusy(false); }
   };
 
   const importRef = useRef<HTMLInputElement>(null);
-  const importFiles = async (files: File[]) => {
-    if (!doc) return;
-    // EPS (local Ghostscript) and HEIC (browser decoder) become PNG first; anything that cannot be read says why.
-    const ready: File[] = [];
-    for (const f of files) {
-      // SVG becomes a design of its own: folders, editable shapes, and pictures for what cannot be edited.
-      if (isSvg(f)) { await importSvgFile(session.id, f); continue; }
-      const r = await prepareImportFile(f);
-      if (typeof r === 'string') toast(r, 'error'); else ready.push(r);
-    }
-    const ids = await uploadFiles(ready.filter((f) => f.type.startsWith('image/')));
-    await placeImportedImages(session.id, doc.id, ids);
-  };
+  const importFiles = async (files: File[]) => { if (doc) await importDesignFiles(session.id, doc.id, files); };
   useEffect(() => {
     const open = () => importRef.current?.click();
     window.addEventListener('ogs:upload', open);
@@ -164,7 +80,7 @@ export function DesignerWorkspace() {
   }, []);
 
   return <div className="designer">
-    <input ref={importRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml,.svg,image/heic,image/heif,.heic,.heif,.eps,application/postscript" multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
+    <input ref={importRef} type="file" accept={IMPORT_ACCEPT} multiple hidden onChange={(e) => { const files = [...(e.currentTarget.files ?? [])]; e.currentTarget.value = ''; void importFiles(files); }} />
     <TopbarActions>
       <IconButton ref={presets.ref} className="designer-new-document" icon={Plus} label="New document" size="sm" onClick={presets.toggle} />
       <Popover open={presets.open} anchor={presets.ref} onClose={presets.close} label="Document presets">
