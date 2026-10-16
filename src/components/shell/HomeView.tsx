@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowRight, ChevronDown, ChevronUp, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Minus, Plus, type LucideIcon } from 'lucide-react';
 import { selectSession, setUi, useStore } from '../../store/store';
 import type { AssetKind } from '../../engine/types';
 import { formatRelative } from '../../lib/format';
@@ -63,9 +63,13 @@ export function HomeView() {
     </section>
 
     <section className="home-section" aria-label="Tools">
-      <Head kicker="Tools" title="Work on what you have" action={<button type="button" className="home-link" onClick={() => setMore(!more)} aria-expanded={more}>{more ? 'Less' : 'More'}{more ? <ChevronUp size={14} /> : <ChevronDown size={14} />}</button>} />
+      <Head kicker="Tools" title="Work on what you have" />
       <div className="home-tools">
         <ToolGrid items={more ? [...TOOLS_MAIN, ...TOOLS_MORE] : TOOLS_MAIN} />
+        <button type="button" className="home-tool" onClick={() => setMore(!more)} aria-expanded={more}>
+          <span className="home-tool-icon">{more ? <Minus size={22} strokeWidth={1.6} /> : <Plus size={22} strokeWidth={1.6} />}</span>
+          <span className="home-tool-label">{more ? 'Less' : 'More'}</span>
+        </button>
       </div>
     </section>
 
