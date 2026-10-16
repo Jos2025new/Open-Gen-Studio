@@ -1,4 +1,4 @@
-import { createStore, del, get, getMany, set, setMany, delMany, keys } from 'idb-keyval';
+import { createStore, del, get, getMany, set, delMany, keys } from 'idb-keyval';
 import { assembleText, splitText, type V2Parts } from '../store/formatV2';
 import { disk, diskAvailable, type DiskWriteResult } from './disk';
 import type { StateJson } from '../store/persistJson';
@@ -36,14 +36,23 @@ async function readV2(): Promise<V2Parts | null> {
   return { savedAt: manifest.savedAt, version: manifest.version, globals, order: manifest.order, sessions };
 }
 
-/** Publishes a format-2 state: changed and removed sessions first, the manifest last. */
+/** Publishes a format-2 state atomically: changed and removed sessions, globals and manifest in one transaction. */
 async function commitV2(p: V2Parts): Promise<void> {
   const changed: Array<[string, string]> = [];
   for (const [id, text] of p.sessions) if (committed.get(id) !== text) changed.push([`session:${id}`, text]);
   const removed = [...committed.keys()].filter((id) => !p.sessions.has(id)).map((id) => `session:${id}`);
-  if (changed.length) await setMany(changed, v2Store);
-  if (removed.length) await delMany(removed, v2Store);
-  await setMany([['globals', p.globals], ['manifest', { savedAt: p.savedAt, version: p.version, order: p.order }]], v2Store);
+  // One readwrite transaction: a reader sees the old revision or the new one, never a manifest without its sessions.
+  await v2Store('readwrite', (store) => {
+    for (const [key, text] of changed) store.put(text, key);
+    for (const key of removed) store.delete(key);
+    store.put(p.globals, 'globals');
+    store.put({ savedAt: p.savedAt, version: p.version, order: p.order }, 'manifest');
+    const tx = store.transaction;
+    return new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = tx.onabort = () => reject(tx.error ?? new Error('IndexedDB commit aborted'));
+    });
+  });
   committed.clear();
   for (const [id, text] of p.sessions) committed.set(id, text);
 }

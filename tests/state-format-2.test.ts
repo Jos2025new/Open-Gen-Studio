@@ -11,7 +11,18 @@ const { stores, diskState, diskSetCommit, diskSetState, diskPutState } = vi.hois
 vi.mock('idb-keyval', () => {
   const map = (store: { name: string }) => { let m = stores.get(store.name); if (!m) stores.set(store.name, m = new Map()); return m; };
   return {
-    createStore: (name: string) => ({ name }),
+    createStore: (name: string) => {
+    // idb-keyval's store is a function (mode, callback(IDBObjectStore)); this one applies puts/deletes to the map.
+    const run = async (_mode: string, cb: (store: unknown) => unknown) => {
+      let map = stores.get(name);
+      if (!map) stores.set(name, map = new Map());
+      const tx: { oncomplete?: () => void } = {};
+      const result = cb({ transaction: tx, put: (v: unknown, k: string) => { map!.set(k, v); }, delete: (k: string) => { map!.delete(k); } });
+      queueMicrotask(() => tx.oncomplete?.());
+      return result;
+    };
+    return Object.defineProperty(run, 'name', { value: name });
+  },
     get: async (key: string, store: { name: string }) => map(store).get(key),
     set: async (key: string, value: unknown, store: { name: string }) => { map(store).set(key, value); },
     del: async (key: string, store: { name: string }) => { map(store).delete(key); },
