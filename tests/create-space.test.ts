@@ -155,10 +155,15 @@ describe('board rows', () => {
     expect(r.ongoing.map((g) => g.id).sort()).toEqual(['g2', 'g3']);
   });
   it('failed generations only appear with show failed', () => {
-    expect(splitBoard(generations, assets, { ...opts, showFailed: true }).done.filter((c) => c.type === 'failed')).toHaveLength(1);
+    expect(splitBoard(generations, assets, opts).failed).toEqual([]);
+    const on = splitBoard(generations, assets, { ...opts, showFailed: true });
+    expect(on.failed.map((g) => g.id)).toEqual(['g4']);
+    expect(on.done.every((c) => c.type === 'asset')).toBe(true);
+    expect(on.done).toHaveLength(3);
   });
-  it('favorites only keeps starred assets and hides failed ones', () => {
+  it('favorites only keeps starred assets in Done; the Failed row is independent', () => {
     const r = splitBoard(generations, assets, { ...opts, starred: true, showFailed: true });
+    expect(r.failed).toHaveLength(1);
     expect(r.done).toEqual([{ type: 'asset', assetId: 'a1', generationId: 'g1' }]);
   });
   it('this session limits the board', () => {

@@ -2,8 +2,8 @@ import type { Asset, AssetKind, Generation, OpId } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
 import { filterGenerations, statusOf, type GenerationQuery } from '../shell/generationsView';
 
-/** One cell of the Done row: a finished asset, or (with "show failed") a generation that did not finish. */
-export type DoneCell = { type: 'asset'; assetId: string; generationId: string } | { type: 'failed'; generation: Generation };
+/** One cell of the Done row: a finished asset. */
+export type DoneCell = { type: 'asset'; assetId: string; generationId: string };
 
 export interface BoardOptions extends GenerationQuery {
   /** Favorites only: finished assets the user starred. */
@@ -12,7 +12,8 @@ export interface BoardOptions extends GenerationQuery {
   scope: 'all' | { sessionId: string };
 }
 
-export interface BoardRows { done: DoneCell[]; ongoing: Generation[] }
+/** `failed` is filled only with "show failed" on: its own row, never mixed into Done. */
+export interface BoardRows { done: DoneCell[]; failed: Generation[]; ongoing: Generation[] }
 
 /** Rows of the board: finished results on top, running or queued generations below. */
 export function splitBoard(generations: Record<string, Generation>, assets: Record<string, Asset>, o: BoardOptions): BoardRows {
@@ -20,6 +21,7 @@ export function splitBoard(generations: Record<string, Generation>, assets: Reco
   const list = filterGenerations(inScope, { kind: o.kind, status: o.status, q: o.q, sort: o.sort });
   const done: DoneCell[] = [];
   const ongoing: Generation[] = [];
+  const failed: Generation[] = [];
   for (const g of list) {
     const st = statusOf(g);
     if (st === 'running') ongoing.push(g);
@@ -28,9 +30,9 @@ export function splitBoard(generations: Record<string, Generation>, assets: Reco
         const a = assets[id];
         if (a && (!o.starred || a.favorite)) done.push({ type: 'asset', assetId: id, generationId: g.id });
       }
-    } else if (o.showFailed && !o.starred) done.push({ type: 'failed', generation: g });
+    } else if (o.showFailed) failed.push(g);
   }
-  return { done, ongoing };
+  return { done, failed, ongoing };
 }
 
 /** Operations that can start from one asset with no further input: no Sketch, no several-clip joins. */

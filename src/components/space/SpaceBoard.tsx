@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
-import type { Generation } from '../../engine/types';
+import type { AssetKind, Generation } from '../../engine/types';
 import { generationTitle } from '../assets/GenerationInfo';
 import { OpChip } from '../assets/AssetActions';
 import { AssetMedia } from '../ui/AssetMedia';
@@ -13,7 +13,7 @@ import { splitBoard, suggestedOps, targetAsset } from './boardModel';
 type Density = 'compact' | 'comfortable';
 
 /** Generated Assets: finished results on top; running ones and the actions suggested for the chosen asset below. It cannot be closed. */
-export function SpaceBoard() {
+export function SpaceBoard({ kind: activeKind, empty = 'Nothing generated yet.' }: { kind: AssetKind; empty?: string }) {
   const generations = useStore((s) => s.generations);
   const assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -31,8 +31,7 @@ export function SpaceBoard() {
 
   const rows = useMemo(() => splitBoard(generations, assets, { kind, status: 'all', q: '', sort, starred, showFailed, scope: scope === 'all' ? 'all' : { sessionId } }), [generations, assets, kind, sort, starred, showFailed, scope, sessionId]);
   const doneAssets = rows.done.flatMap((c) => (c.type === 'asset' ? [c.assetId] : []));
-  const mode = useStore((s) => s.composer.mode);
-  const kind_ = mode === 'agent' ? 'image' : mode;
+  const kind_ = activeKind;
   const target = targetAsset(rows, selected, assets, kind_);
   const ops = suggestedOps(target ? assets[target] : undefined);
   const reset = () => { setKind('all'); setScope('all'); setSort('newest'); setDensity('comfortable'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
@@ -79,18 +78,21 @@ export function SpaceBoard() {
 
     <div className="space-done" aria-label="Done">
       {rows.done.length ? <div className={`space-grid is-${density}`}>
-        {rows.done.map((c) => c.type === 'asset'
-          ? <button key={c.assetId} type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
+        {rows.done.map((c) => <button key={c.assetId} type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
             <span className="space-tile-kind" aria-hidden>{(() => { const K = KIND_ICON[assets[c.assetId]?.kind ?? 'image']; return <K size={26} strokeWidth={1.5} />; })()}</span>
             <AssetMedia assetId={c.assetId} hoverPlay={false} autoPlay={false} draggable={false} />
             {assets[c.assetId]?.favorite ? <Star size={12} className="space-tile-star" aria-label="Favorite" /> : null}
-          </button>
-          : <div key={c.generation.id} className="space-tile is-failed" title={c.generation.error}><CircleAlert size={18} /><span>{generationTitle(c.generation)}</span><span className="faint">{STATUS_LABEL[c.generation.status]}</span></div>)}
-      </div> : <p className="space-empty">{starred ? 'No favorites yet.' : 'Nothing generated yet. Describe something and press Generate.'}</p>}
+          </button>)}
+      </div> : <p className="space-empty">{starred ? 'No favorites yet.' : empty}</p>}
     </div>
+
+    {showFailed ? <div className="space-failed" aria-label="Failed">
+      <div className="space-sub">Failed</div>
+      {rows.failed.length ? <div className="space-failed-row">{rows.failed.map((g) => <div key={g.id} className="space-fail" title={g.error}><CircleAlert size={14} /><span className="space-run-title">{generationTitle(g)}</span><span className="faint">{STATUS_LABEL[g.status]}</span></div>)}</div> : <p className="space-empty">Nothing failed.</p>}
+    </div> : null}
 
     <div className="space-lower">
       <div className="space-ongoing" aria-label="Ongoing">

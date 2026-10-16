@@ -72,3 +72,6 @@
 .space-tile > .media { position: relative; }
 .space-tile.t-image { --tint: var(--type-image); }.space-tile.t-video { --tint: var(--type-video); }.space-tile.t-audio { --tint: var(--type-audio); }.space-tile.t-model3d { --tint: var(--warn); }
 .space-tile > .media-loading, .space-tile > .media-missing { background: transparent; }
+.space-failed { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); }
+.space-failed-row { display: flex; gap: var(--sp-2); overflow-x: auto; }
+.space-fail { flex: 0 0 200px; display: flex; align-items: center; gap: var(--sp-2); min-width: 0; padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--danger-soft); color: var(--danger); font-size: var(--fs-xs); }
