@@ -14,6 +14,13 @@ import { DownloadButton, FavoriteButton } from '../assets/AssetActions';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { StopFollowingPopover } from './StopFollowing';
+import { setStudioBoard } from '../../lib/studioBoard';
+
+/** A running placeholder opens the Generations board on Ongoing. */
+function showOngoing() {
+  setStudioBoard({ open: true, view: 'assets' });
+  window.setTimeout(() => document.querySelector('.space-ongoing')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 50);
+}
 
 /**
  * A generation in Studio's chat: a "Created N files" line that folds, the results as small inline thumbnails (click
@@ -58,7 +65,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
     {busy ? (() => {
       const total = g.op ? 1 : g.settings.count;
       const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
-      return <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status"><div className="shimmer" />
+      return <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status" tabIndex={0} aria-label="Show in Ongoing" onClick={showOngoing} onKeyDown={(e) => { if (e.key === 'Enter') showOngoing(); }}><div className="shimmer" />
         <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{outputs.length}/{total}</span>{eta ? <span className="faint">{eta}</span> : null}</div>
         {p != null ? <div className="space-run-bar" role="progressbar" aria-valuenow={Math.round(p * 100)}><span style={{ width: `${p * 100}%` }} /></div> : null}
       </div></div>;

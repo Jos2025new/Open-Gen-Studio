@@ -24,7 +24,7 @@
 .studio-thumb:hover { border-color: var(--border-strong); }
 .studio-thumb > .media { position: relative; width: 100%; height: 100%; object-fit: contain; }
 .studio-thumb-play { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text); pointer-events: none; }
-.studio-thumb.is-pending { cursor: default; }
+.studio-thumb.is-pending { cursor: pointer; }
 .studio-gen-actions { display: flex; align-items: center; gap: var(--sp-1); }
 .studio-gen-head .spin { animation: studio-spin 1s linear infinite; }
 @keyframes studio-spin { to { transform: rotate(360deg); } }
