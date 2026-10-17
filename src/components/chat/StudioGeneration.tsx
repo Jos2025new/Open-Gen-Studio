@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
+import { ImproveShotButton } from './ImproveShotButton';
 import { copyText, downloadAsset, editInComposer, toggleFavorite, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { OPS } from '../../engine/ops';
@@ -82,6 +83,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
       {first && !multi ? <><FavoriteButton assetId={first} /><DownloadButton assetId={first} /></> : null}
       {multi ? <><IconButton icon={Star} label="Favorite" size="sm" active={pick === 'fav'} onClick={() => startPick('fav')} />{pickBtn('fav', 'Favorite')}
         <IconButton icon={Download} label="Download" size="sm" active={pick === 'dl'} onClick={() => startPick('dl')} />{pickBtn('dl', 'Download')}</> : null}
+      {!busy ? <ImproveShotButton g={g} /> : null}
       <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open || pick === 'info'} onClick={multi ? () => startPick('info') : info.toggle} />{multi ? pickBtn('info', 'Details') : null}
       {g.status === 'running' && g.remoteJob ? <IconButton icon={RefreshCw} label="Check status" size="sm" data-tip={`Ask ${g.remoteJob.provider} about this job now`} onClick={() => checkStatusNow(g.id)} /> : null}
       {busy && g.remoteJob ? <IconButton ref={stopFollowing.ref} icon={CircleStop} label="Dejar de seguir" size="sm" tone="danger" active={stopFollowing.open} onClick={stopFollowing.toggle} /> : busy ? <IconButton icon={CircleStop} label="Stop" size="sm" tone="danger" onClick={() => cancelGeneration(g.id)} /> : null}

@@ -1,3 +1,4 @@
+import { draftCanon, draftGate, isDraftCard } from './draftFirst';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
@@ -1547,7 +1548,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const style = get().composer.agentStyle;
           const s = session(sessionId);
           // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
-          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds)) {
+          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds) && !isDraftCard(parsed.value)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
@@ -1565,7 +1566,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             sessionId,
             workspace,
             v.data.intro,
-            v.data.questions.map((q) => ({
+            draftCanon(v.data.questions).map((q) => ({
               id: q.id,
               question: q.question,
               options: q.options,
@@ -1785,6 +1786,12 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
               respond(gate);
               continue;
             }
+          }
+          const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
+          if (draft) {
+            recordMetric(sessionId, { type: 'rejected' });
+            respond(draft);
+            continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
           const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());

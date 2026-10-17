@@ -51,9 +51,9 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { resumePlan, sendAgentMessage, confirmSettings } from '../src/engine/agent/runtime';
+import { resumePlan, sendAgentMessage, confirmSettings, submitAnswers } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
-import type { PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
+import type { PlanFeedItem, QuestionsFeedItem, SettingsFeedItem } from '../src/engine/types';
 
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
@@ -100,8 +100,12 @@ async function sendWithSettings(text: string) {
   replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }, { kind: 'video', start_image: true, model: 'local::studio-video' }] } }];
   await sendAgentMessage(text);
   const card = useStore.getState().sessions[sid()].feed.find((f): f is SettingsFeedItem => f.type === 'settings')!;
-  replies = [ugcPlan];
+  // Every video plan first gets the mandatory draft card (borrador primero); the user picks high quality.
+  replies = [{ name: 'ask_questions', args: { questions: [{ id: 'draft_first', question: 'x', options: ['Borrador', 'Alta calidad directamente'] }] } }];
   await confirmSettings(sid(), card.id, card.sections.map((x) => x.recommended));
+  const draft = useStore.getState().sessions[sid()].feed.find((f): f is QuestionsFeedItem => f.type === 'questions')!;
+  replies = [ugcPlan];
+  await submitAnswers(sid(), draft.id, { draft_first: 'Alta calidad directamente' });
 }
 
 describe('recovering a failed plan', () => {

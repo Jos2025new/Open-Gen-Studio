@@ -109,8 +109,8 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(settings).toMatchObject({ status: 'pending', sections: [{ kind: 'video', count: 3, recommended: { modelRef: 'local::studio-video' } }] });
     expect(feed().some((f) => f.type === 'plan')).toBe(false);
 
-    replies = [
-      {
+    // Every video plan first gets the mandatory draft card; the user picks high quality.
+    const planCall: Call = {
         name: 'propose_plan',
         args: {
           title: 'Turno de guardia',
@@ -119,10 +119,13 @@ describe('story request in Auto mode (F1–F4 together)', () => {
           continuity: [{ source: 'asset:char', preserve: 'Reto identity and appearance', steps: ['s1', 's2', 's3'] }],
           steps: [clip('s1', 'sighs at the door'), clip('s2', 'walks the corridor'), clip('s3', 'faces the open hatch'), { id: 's4', kind: 'op', title: 'Join', op: 'join_clips', input: 's1', more: ['s2', 's3'] }],
         },
-      },
-    ];
+    };
+    replies = [{ name: 'ask_questions', args: { questions: [{ id: 'draft_first', question: 'x', options: ['Borrador', 'Alta calidad directamente'] }] } }];
     await confirmSettings(useStore.getState().activeSessionId, settings!.id, settings!.sections.map((x) => x.recommended));
     expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings confirmed by the user[\s\S]*- video: Local[\s\S]*each clip lasts exactly 8 s/);
+    const draftCard = feed().filter((f): f is QuestionsFeedItem => f.type === 'questions').at(-1)!;
+    replies = [planCall];
+    await submitAnswers(useStore.getState().activeSessionId, draftCard.id, { draft_first: 'Alta calidad directamente' });
     await vi.waitFor(() => expect(feed().find((f): f is PlanFeedItem => f.type === 'plan')?.status).toBe('done'), { timeout: 5000 });
 
     const plan = feed().find((f): f is PlanFeedItem => f.type === 'plan')!;
@@ -133,9 +136,9 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(videos.every((r) => r.subjects.includes('Reto'))).toBe(true);
     const join = runs.find((r) => r.clips)!;
     expect(join.clips!.split(',')).toHaveLength(3);
-    // guide, questions, settings, plan, then the one text-only wrap-up after the plan ran (S4): no other model calls.
-    await vi.waitFor(() => expect(sent).toHaveLength(5));
-    expect(String(sent[4].messages.at(-1)!.content)).toMatch(/^\[app\] Plan "Turno de guardia" finished \(done\)/);
+    // guide, questions, settings, draft card, plan, then the one text-only wrap-up after the plan ran (S4): no other model calls.
+    await vi.waitFor(() => expect(sent).toHaveLength(6));
+    expect(String(sent[5].messages.at(-1)!.content)).toMatch(/^\[app\] Plan "Turno de guardia" finished \(done\)/);
   });
 
   it('a clear request in Auto still goes straight to the plan: a second card is refused', async () => {

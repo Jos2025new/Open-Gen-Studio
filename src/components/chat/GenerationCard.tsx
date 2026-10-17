@@ -4,6 +4,7 @@ import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music,
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { StopFollowingPopover } from './StopFollowing';
+import { ImproveShotButton } from './ImproveShotButton';
 import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
@@ -311,6 +312,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
       <footer className="gen-foot">
         {!g.op ? <IconButton icon={CopyPlus} label="Reuse: prompt, inputs, model and settings in the composer" size="sm" onClick={() => void editInComposer(g.id)} /> : null}
         {!busy ? <IconButton ref={regen.ref} icon={RefreshCw} label="Regenerate" size="sm" active={regen.open} onClick={regen.toggle} /> : null}
+        {!busy ? <ImproveShotButton g={g} /> : null}
         <IconButton ref={info.ref} icon={Info} label="Details" size="sm" active={info.open} onClick={info.toggle} />
         <span className="spacer" />
         {sel && g.status === 'done' ? (

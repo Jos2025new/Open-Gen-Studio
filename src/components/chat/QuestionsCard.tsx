@@ -3,6 +3,7 @@ import { ArrowRight, Check, FastForward } from 'lucide-react';
 import { EditAnswerButton } from './EditAnswerButton';
 import { skipQuestions, submitAnswers } from '../../engine/agent/runtime';
 import type { QuestionsFeedItem } from '../../engine/types';
+import { DRAFT_ID } from '../../engine/agent/draftFirst';
 import { Button } from '../ui/primitives';
 
 export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; sessionId: string }) {
@@ -24,12 +25,14 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
     })),
   );
   const pending = item.status === 'pending';
+  // El borrador primero (todo video) es obligatorio: no se salta y su campo libre es «Otra cosa…».
+  const draft = item.questions.some((q) => q.id === DRAFT_ID);
 
   if (!pending) {
     return (
       <article className="q-card is-done">
         <div className="q-kicker">
-          Questions · round {item.round} of {item.maxRounds} · {item.status === 'skipped' ? 'skipped' : 'answered'}
+          {draft ? 'Borrador primero' : `Questions · round ${item.round} of ${item.maxRounds}`} · {item.status === 'skipped' ? 'skipped' : 'answered'}
           <EditAnswerButton sessionId={sessionId} itemId={item.id} />
         </div>
         {item.answers ? (
@@ -66,7 +69,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
   return (
     <article className="q-card">
       <div className="q-kicker">
-        Round {item.round} of {item.maxRounds}
+        {draft ? 'Borrador primero · obligatorio' : `Round ${item.round} of ${item.maxRounds}`}
       </div>
       {item.intro ? <p className="q-intro">{item.intro}</p> : null}
       {item.questions.map((q) => (
@@ -86,7 +89,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
           {q.allowCustom ? (
             <input
               className="q-custom"
-              placeholder="Or type your own…"
+              placeholder={draft ? 'Otra cosa…' : 'Or type your own…'}
               value={custom[q.id] ?? ''}
               onChange={(e) => {
                 const v = e.target.value;
@@ -101,9 +104,9 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
         </div>
       ))}
       <footer className="q-foot">
-        <Button variant="ghost" size="sm" icon={FastForward} onClick={() => void skipQuestions(sessionId, item.id)} data-tip="Let the agent decide the rest">
+        {draft ? null : <Button variant="ghost" size="sm" icon={FastForward} onClick={() => void skipQuestions(sessionId, item.id)} data-tip="Let the agent decide the rest">
           Skip, plan now
-        </Button>
+        </Button>}
         <Button variant="primary" size="sm" disabled={!answered} onClick={() => void submitAnswers(sessionId, item.id, final())}>
           Continue <ArrowRight size={13} />
         </Button>

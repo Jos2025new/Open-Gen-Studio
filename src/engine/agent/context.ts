@@ -1,5 +1,6 @@
 import { OPS } from '../ops';
 import { captureLines } from './captureContext';
+import { DRAFT_RULE } from './draftFirst';
 import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, CAPTURE_RULE, PEOPLE_RULE, WORK_RULES, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
@@ -105,6 +106,7 @@ Writing prompts
 - Edits (edit op, edit models, a revision of a result): "Change only X; keep A, B and C; match the existing lighting, perspective, texture and depth of field; do not add Z"; repeat what is kept at every iteration (models drift); one change at a time. Upscale never redefines content: only sharpness and detail.
 - ${REALISM_RULE}
 - ${CAPTURE_RULE}
+- ${DRAFT_RULE}
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
 - Several results of one step are numbered as the user sees them (#1, #2… left to right, top to bottom): "la 2", "the second" = #2; an image the user attached is their choice. When the next step depends on a choice the user has not made, ask which one in the questions card.
 - References in a fixed order: place or setting first, then characters, then objects and products, then style; each cited with its role.
