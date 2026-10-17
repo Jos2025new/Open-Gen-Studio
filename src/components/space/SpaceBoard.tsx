@@ -169,18 +169,29 @@ function ListInfo({ g }: { g?: Generation }) {
   </div>;
 }
 
+/** The detailed status of a running generation (phase, N/M, ETA, progress bar), shown on the board's pending tile. */
+export function PendingStatus({ g }: { g: Generation }) {
+  const eta = useEta(g);
+  const total = g.op ? 1 : g.settings.count;
+  const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
+  return <>
+    <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{g.assetIds.length}/{total}</span>{eta ? <span className="faint">{eta}</span> : null}</div>
+    {p != null ? <div className="space-run-bar" role="progressbar" aria-valuenow={Math.round(p * 100)}><span style={{ width: `${p * 100}%` }} /></div> : null}
+  </>;
+}
+
 function OngoingTiles({ g, density, layout }: { g: Generation; density: Density; layout: Layout }) {
   const assets = useStore((s) => s.assets);
   const slots = Math.max(0, (g.op ? 1 : g.settings.count) - g.assetIds.length);
   if (layout === 'list') return <div className="space-list" aria-label="Running generation">
     {g.assetIds.map((id) => <div key={id} className="space-list-row attach-host"><div className={`space-tile t-${assets[id]?.kind ?? 'image'}`}><KindBackdrop kind={assets[id]?.kind} /><AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} /></div><AgentAttachToggle assetId={id} /><ListInfo g={g} /></div>)}
-    {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-list-row"><div className="space-tile is-pending"><div className="shimmer" /></div><ListInfo g={g} /></div>)}
+    {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-list-row"><div className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div><ListInfo g={g} /></div>)}
   </div>;
   return <div className={`space-grid is-${density}`} aria-label="Running generation">
     {g.assetIds.map((id) => <div key={id} className="attach-host"><div className={`space-tile t-${assets[id]?.kind ?? 'image'}`}>
       <KindBackdrop kind={assets[id]?.kind} />
       <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
     </div><AgentAttachToggle assetId={id} /></div>)}
-    {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /></div>)}
+    {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div>)}
   </div>;
 }

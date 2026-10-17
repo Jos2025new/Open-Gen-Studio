@@ -163,6 +163,9 @@ describe('Studio board: Ongoing tiles and default scope', () => {
     expect(host.querySelectorAll('.space-ongoing .space-tile')).toHaveLength(3);
     expect(host.querySelectorAll('.space-ongoing .space-tile.is-pending .shimmer')).toHaveLength(2);
     expect(q('.space-ongoing .space-run')).toBeNull();
+    const t = host.querySelector('.space-ongoing .space-tile.is-pending .studio-pending-text')!;
+    expect(t.textContent).toContain('1/3');
+    expect(t.textContent).not.toContain('Ongoing');
     render(createElement(SpaceBoard, { kind: 'image' }));
     expect(q('.space-ongoing .space-run')).not.toBeNull();
   });
@@ -294,7 +297,9 @@ describe('compact generation in Studio chat', () => {
     render(createElement(StudioGeneration, { generationId: 'g2', fallback }));
     expect(q('.studio-thumb:not(.is-pending)')).toBeNull();
     expect(host.querySelectorAll('.studio-thumb.is-pending')).toHaveLength(1);
-    expect(q('.studio-pending-text')!.textContent).toContain('0/1');
+    expect(q('.studio-pending-text')!.textContent).toContain('Ongoing');
+    expect(q('.studio-pending-text')!.textContent).not.toContain('0/1');
+    expect(q('.studio-thumb .studio-spinner')).not.toBeNull();
     expect(q('.studio-gen')!.textContent).not.toContain('prompt g2');
     expect(q('.studio-gen-head')).toBeNull();
   });

@@ -78,3 +78,11 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-pick-box { position: absolute; top: 8px; left: 8px; z-index: 3; width: 20px; height: 20px; display: grid; place-items: center; border: 1.5px solid rgba(255, 255, 255, .85); border-radius: 5px; background: rgba(6, 6, 8, .4); font-size: 10px; font-weight: 600; color: var(--accent-ink); cursor: pointer; }
 .studio-pick-box.is-on { background: var(--accent); border-color: transparent; }
 .studio-gen-actions { flex-wrap: wrap; }
+.studio-spinner { width: 16px; height: 16px; border: 2px solid var(--border-strong); border-top-color: var(--text-2); border-radius: 50%; animation: studio-spin 0.9s linear infinite; }
+.studio-dots i { font-style: normal; animation: studio-dot 1.2s steps(1, end) infinite; }
+.studio-dots i:nth-child(2) { animation-name: studio-dot2; }
+.studio-dots i:nth-child(3) { animation-name: studio-dot3; }
+@keyframes studio-dot { 0% { opacity: 0; } 25%, 100% { opacity: 1; } }
+@keyframes studio-dot2 { 0%, 25% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes studio-dot3 { 0%, 50% { opacity: 0; } 75%, 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .studio-spinner { animation: none; } .studio-dots i { animation: none; opacity: 1; } }
