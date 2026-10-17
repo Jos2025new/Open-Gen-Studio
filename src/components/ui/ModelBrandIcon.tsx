@@ -28,7 +28,8 @@ const VENDORS: Array<[RegExp, string, string]> = [
 ];
 
 export function vendorOf(m: { id: string; name: string }) {
-  const text = `${m.id} ${m.name}`.toLowerCase();
+  // The provider prefix ("nanogpt::") says who serves the model, not who made it: "nanogpt" must not read as GPT.
+  const text = `${m.id.includes('::') ? m.id.slice(m.id.indexOf('::') + 2) : m.id} ${m.name}`.toLowerCase();
   return VENDORS.find(([re]) => re.test(text));
 }
 
