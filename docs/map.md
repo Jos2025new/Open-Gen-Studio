@@ -56,18 +56,18 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 14 | 1 |
-| `src/engine` | 39 | 171 |
+| `src/engine` | 39 | 172 |
 | `src/engine/agent` | 23 | 59 |
 | `src/engine/design` | 89 | 91 |
 | `src/engine/flow` | 10 | 11 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
-| `src/engine/skills` | 6 | 13 |
+| `src/engine/skills` | 6 | 14 |
 | `src/lib` | 26 | 165 |
 | `src/store` | 4 | 115 |
 
-139 de 354 módulos no tienen ningún test que los importe directamente.
+138 de 354 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
