@@ -56,6 +56,8 @@ export interface Settings {
   budgetOn: boolean;
   /** The limit the user chose to go past ("Continue anyway"); valid while budgetUsd stays the same. */
   budgetAccepted?: number | null;
+  /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */
+  notify?: boolean;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 

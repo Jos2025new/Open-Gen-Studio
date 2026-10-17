@@ -17,12 +17,14 @@ import './styles/home.css';
 import './styles/space.css';
 import './styles/studio.css';
 import { App } from './App';
+import { installDoneNotice } from './lib/doneNotice';
 import { installBoardAutoOpen } from './lib/studioBoard';
 import { installHomeAutoClose, installHomeKeyGuard } from './components/shell/homeGuard';
 
 installHomeKeyGuard();
 installHomeAutoClose();
 installBoardAutoOpen();
+installDoneNotice();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

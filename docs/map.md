@@ -20,8 +20,8 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 204 | 133 |
-| [store.ts](../src/store/store.ts) | 131 | 112 |
+| [types.ts](../src/engine/types.ts) | 208 | 135 |
+| [store.ts](../src/store/store.ts) | 134 | 113 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 59 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 46 | 17 |
 | [media.ts](../src/lib/media.ts) | 45 | 35 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 140 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 141 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
@@ -51,12 +51,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 10 | 5 |
 | `src/components/designer` | 44 | 13 |
 | `src/components/gallery` | 1 | 0 |
-| `src/components/node` | 4 | 0 |
+| `src/components/node` | 5 | 0 |
 | `src/components/shell` | 20 | 7 |
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 8 | 2 |
-| `src/components/ui` | 13 | 1 |
-| `src/engine` | 38 | 169 |
+| `src/components/ui` | 14 | 1 |
+| `src/engine` | 39 | 171 |
 | `src/engine/agent` | 23 | 59 |
 | `src/engine/design` | 89 | 91 |
 | `src/engine/flow` | 10 | 11 |
@@ -64,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 43 |
 | `src/engine/skills` | 6 | 13 |
-| `src/lib` | 25 | 164 |
-| `src/store` | 4 | 114 |
+| `src/lib` | 26 | 165 |
+| `src/store` | 4 | 115 |
 
-137 de 350 módulos no tienen ningún test que los importe directamente.
+139 de 354 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

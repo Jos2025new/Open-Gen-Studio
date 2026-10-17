@@ -1,3 +1,4 @@
+import { askNotifyPermission } from '../../lib/doneNotice';
 import { usePref } from '../ui/hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Eye, EyeOff, ExternalLink, Search, Trash, Check } from 'lucide-react';
@@ -314,6 +315,20 @@ export function SettingsPanel() {
       </div>
 
       {tab === 'providers' ? <section className="set-section">
+        <div className="set-row">
+          <span className="set-label" data-tip="When a generation finishes while this tab is in the background, show a browser notification. The tab title always shows how many finished.">
+            Notify when done
+          </span>
+          <Segmented
+            value={settings.notify ? 'on' : 'off'}
+            options={[{ value: 'on', label: 'On' }, { value: 'off', label: 'Off' }]}
+            onChange={(v) => {
+              if (v === 'off') return setSettings({ notify: false });
+              void askNotifyPermission().then((granted) => setSettings({ notify: granted }));
+            }}
+            size="sm"
+          />
+        </div>
         {REMOTE_PROVIDERS.map((p) => (
           <ProviderRow key={p} id={p} />
         ))}
