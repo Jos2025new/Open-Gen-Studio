@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lucide-react';
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
@@ -8,9 +8,9 @@ import { formatUsd } from '../../lib/format';
 import { requestImagePrice } from '../../engine/priceLoad';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
 import { setUi, useStore } from '../../store/store';
-import { MenuItem, Spinner } from '../ui/primitives';
+import { Spinner } from '../ui/primitives';
+import { FilterMenu } from '../ui/FilterMenu';
 import { ModelBrandIcon, vendorOf } from '../ui/ModelBrandIcon';
-import { Popover, usePopover } from '../ui/Popover';
 import { usePref } from '../ui/hooks';
 
 export function priceHint(m: ModelSummary): string {
@@ -100,27 +100,6 @@ function priceOf(m: ModelSummary): number | undefined {
   return m.provider === 'local' ? 0 : m.price?.skus[0]?.usd;
 }
 
-/** A small "Label ▾" chip in the filter row that opens a menu of choices. */
-function FilterMenu<T extends string>({ label, icon, value, options, onChange, active }: { label: string; icon?: ReactNode; value: T; options: Array<[T, ReactNode]>; onChange: (v: T) => void; active?: boolean }) {
-  const pop = usePopover();
-  return (
-    <>
-      <button ref={pop.ref} type="button" className={`ml-filter ${active ? 'is-active' : ''} ${pop.open ? 'is-open' : ''}`} onClick={pop.toggle} aria-haspopup="menu" aria-expanded={pop.open}>
-        {icon}
-        <span className="ml-filter-label">{label}</span>
-        <ChevronDown size={12} />
-      </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={200} label={label}>
-        <div className="menu">
-          {options.map(([id, text]) => (
-            <MenuItem key={id} label={text} active={id === value} right={id === value ? <Check size={13} /> : null} onClick={() => { onChange(id); pop.close(); }} />
-          ))}
-        </div>
-      </Popover>
-    </>
-  );
-}
-
 /** Model list: recommended models first, the full catalog on demand or when searching; one row per variant across providers. Popover content. */
 export function ModelList({
   kind,
@@ -202,7 +181,7 @@ export function ModelList({
   const groups = useMemo(() => {
     const byFamily = kind === 'image' && !full;
     const g = new Map<string, VariantGroup[]>();
-    for (const e of entries.slice(0, 400)) {
+    for (const e of entries) {
       const m = e.best;
       const key = familyTree ? modelFamily(m).label : byPrice ? 'By price' : m.provider === 'local' ? 'Local demo' : byFamily ? (familyOf(m) ?? 'Selected') : (vendorOf(m)?.[2] ?? 'Other');
       g.set(key, [...(g.get(key) ?? []), e]);

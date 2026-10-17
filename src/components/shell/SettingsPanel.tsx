@@ -6,7 +6,7 @@ import { isConnected, loadCatalogs, loadLlmCatalog, modelSummary, opModelFor, pi
 import { PROVIDER_SITES, REMOTE_PROVIDERS } from '../../engine/providers/registry';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { VisionTag } from '../ui/VisionTag';
-import { LLM_LABELS, LLM_TIERS, filterLlm, limitedLlmFallback, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
+import { LLM_LABELS, LLM_TIERS, filterLlm, limitedLlmFallback, llmMakers, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
 import type { LlmProviderId, ModelSummary, RemoteProviderId } from '../../engine/types';
 import type { OpEngine } from '../../engine/ops';
@@ -85,6 +85,8 @@ function LlmModelPicker() {
   const [browseAll, setBrowseAll] = useState(false);
   const [caps, setCaps] = useState<LlmCapability[]>([]);
   const [sort, setSort] = useState<LlmSort>('recommended');
+  const [maker, setMaker] = useState('');
+  const [shown, setShown] = useState(100);
   useEffect(() => {
     if (provider) void loadLlmCatalog(provider);
   }, [provider]);
@@ -99,8 +101,11 @@ function LlmModelPicker() {
   );
   const needle = q.trim().toLowerCase();
   // Any filter or order shows the whole catalog through it; otherwise the recommended tiers first.
-  const full = browseAll || Boolean(needle) || caps.length > 0 || sort !== 'recommended' || !groups.length;
-  const list = useMemo(() => (full ? filterLlm(models ?? [], { caps, q: needle, sort }).slice(0, 200) : []), [full, models, caps, needle, sort]);
+  const full = browseAll || Boolean(needle) || caps.length > 0 || Boolean(maker) || sort !== 'recommended' || !groups.length;
+  const list = useMemo(() => (full ? filterLlm(models ?? [], { caps, q: needle, sort, maker }) : []), [full, models, caps, needle, sort, maker]);
+  const makers = useMemo(() => llmMakers(models ?? []), [models]);
+  // Long catalogs render in steps of 100; the button says how many remain, nothing is cut silently.
+  useEffect(() => setShown(100), [caps, needle, sort, maker, provider]);
   if (!provider) return null;
   const current = models?.find((m) => m.id === agent.model);
   const row = (m: LlmModel) => (
@@ -126,14 +131,14 @@ function LlmModelPicker() {
         <ChevronDown size={13} />
       </Chip>
       <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={460} label="Agent model">
-        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · models with tool calling`} />
+        <PopoverHeader title="Agent model" sub={`${LLM_LABELS[provider]} · all models, tool calling marked`} />
         <div className="ml-search">
           <Search size={14} />
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models" aria-label="Search agent models" />
         </div>
-        <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} />
+        <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} makers={makers} maker={maker} onMaker={setMaker} />
         <div className="ml-scroll">
-          {full && !list.length && status !== 'loading' ? <div className="ml-empty">No model with tool calling matches these filters.</div> : null}
+          {full && !list.length && status !== 'loading' ? <div className="ml-empty">No model matches these filters.</div> : null}
           {status === 'loading' ? (
             <div className="ml-empty">
               <Spinner /> Loading…
@@ -141,7 +146,7 @@ function LlmModelPicker() {
           ) : null}
           {status === 'error' ? <div className="ml-error">Could not load the model list.</div> : null}
           {full
-            ? list.map(row)
+            ? <>{list.slice(0, shown).map(row)}{list.length > shown ? <button type="button" className="ml-row" onClick={() => setShown((n) => n + 100)}>Show {Math.min(100, list.length - shown)} more · {list.length - shown} hidden</button> : null}</>
             : groups.map((g) => (
                 <div key={g.tier} className="ml-group">
                   <div className="ml-group-head">{g.tier === 'normal' ? 'Recommended' : 'Top tier'}</div>
@@ -152,7 +157,7 @@ function LlmModelPicker() {
         <div className="ml-foot">
           {groups.length && !needle ? (
             <button type="button" className="ml-foot-main" onClick={() => setBrowseAll((v) => !v)}>
-              {browseAll ? 'Show recommended' : `Browse all models (${withTools.length})`}
+              {browseAll ? 'Show recommended' : `Browse all models (${models?.length ?? 0})`}
             </button>
           ) : (
             <span className="ml-foot-main faint">{full ? `${list.length} of ${withTools.length}` : withTools.length} models</span>

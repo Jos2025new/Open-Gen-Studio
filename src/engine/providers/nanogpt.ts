@@ -53,6 +53,27 @@ function takesVideo(m: NanoVideoModel): boolean {
   return Boolean(m.capabilities?.video_to_video && m.architecture?.input_modalities?.includes('video'));
 }
 
+/**
+ * What a /video-models entry takes as input. Explicit capability flags win; when the catalog states none of them
+ * the entry is kept anyway (it came from the video endpoint) and the id or name decides: "image-to-video"/"i2v"
+ * means an image input, "text-to-video"/"t2v" a text one, otherwise text (a plain video model). Only an entry
+ * whose flags are all explicitly false is skipped.
+ */
+export function nanoVideoInputs(m: NanoVideoModel): { text: boolean; image: boolean; unknown: boolean } | null {
+  const c = m.capabilities;
+  const t = c?.text_to_video;
+  const i = c?.image_to_video;
+  if (t !== undefined || i !== undefined || takesVideo(m)) {
+    if (!t && !i && !takesVideo(m)) return null;
+    return { text: Boolean(t), image: Boolean(i), unknown: false };
+  }
+  if (c?.video_to_video === false) return null;
+  const hay = `${m.id} ${m.name ?? ''}`.toLowerCase();
+  const image = /image[-_ ]to[-_ ]video|\bi2v\b/.test(hay);
+  const text = /text[-_ ]to[-_ ]video|\bt2v\b/.test(hay) || !image;
+  return { text, image, unknown: true };
+}
+
 /** Edit/extend endpoints cannot run without a clip; multi-mode models (Seedance 2.5, Wan 3.0 Prime…) only accept one. */
 function needsVideo(m: NanoVideoModel): boolean {
   if (!takesVideo(m)) return false;
@@ -81,10 +102,10 @@ async function fetchImages(): Promise<NanoImageModel[]> {
 }
 
 async function fetchVideos(): Promise<NanoVideoModel[]> {
-  const cached = await cacheDb.get<NanoVideoModel[]>('nano:v2:videos', DAY / 2);
+  const cached = await cacheDb.get<NanoVideoModel[]>('nano:v3:videos', DAY / 2);
   if (cached) return cached;
   const res = await requestJson<{ data: NanoVideoModel[] }>(`${BASE}/v1/video-models?detailed=true`);
-  await cacheDb.set('nano:v2:videos', res.data);
+  await cacheDb.set('nano:v3:videos', res.data);
   return res.data;
 }
 
@@ -381,7 +402,8 @@ export const nanogpt: ProviderAdapter = {
     }
     for (const m of videos) {
       const video = takesVideo(m);
-      if (!m.capabilities?.text_to_video && !m.capabilities?.image_to_video && !video) continue;
+      const inputs = nanoVideoInputs(m);
+      if (!inputs) continue;
       videoRaw.set(m.id, m);
       out.push({
         ref: modelRef('nanogpt', m.id),
@@ -389,8 +411,8 @@ export const nanogpt: ProviderAdapter = {
         id: m.id,
         name: m.name ?? m.id,
         kind: 'video',
-        acceptsText: Boolean(m.capabilities?.text_to_video) || (video && Boolean(m.architecture?.input_modalities?.includes('text'))),
-        acceptsImage: Boolean(m.capabilities?.image_to_video) && !needsVideo(m),
+        acceptsText: inputs.text || (video && Boolean(m.architecture?.input_modalities?.includes('text'))),
+        acceptsImage: inputs.image && !needsVideo(m),
         acceptsVideo: video,
         needsVideo: needsVideo(m),
         tags: video ? (m.tags ?? []) : [],

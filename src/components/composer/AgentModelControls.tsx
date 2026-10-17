@@ -1,7 +1,7 @@
 import { ModelBrandIcon } from '../ui/ModelBrandIcon';
 import { VisionTag } from '../ui/VisionTag';
 import { LlmFilterBar, LlmRowBody } from '../ui/LlmFilters';
-import { filterLlm, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
+import { filterLlm, llmMaker, llmMakers, type LlmCapability, type LlmSort } from '../../engine/providers/llm';
 import { ArrowLeft, Check, ChevronDown, ChevronRight, ChevronUp, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { modelSummary, pickComposerModel, preferredModel, resetAgentModel, resetComposerModel } from '../../engine/catalog';
@@ -33,16 +33,9 @@ function SummaryRow({ id, name, modelId, state, onClick }: { id: PickerId; name:
   );
 }
 
-function directorFamily(id: string, name: string): string {
-  const text = `${id} ${name}`.toLowerCase();
-  if (/deepseek/.test(text)) return 'DeepSeek';
-  if (/\bglm\b|zhipu/.test(text)) return 'GLM';
-  if (/\bgpt\b|openai/.test(text)) return 'GPT';
-  if (/claude/.test(text)) return 'Claude';
-  if (/qwen/.test(text)) return 'Qwen';
-  if (/gemini/.test(text)) return 'Gemini';
-  if (/mistral/.test(text)) return 'Mistral';
-  return name.split(/[\s:/-]+/)[0] || 'Other';
+/** Group label of a Director model: its maker (id prefix first, then name); routers and unknown names go to "Other". */
+export function directorFamily(id: string, name: string): string {
+  return llmMaker(id, name);
 }
 
 function DirectorList({ done }: { done: () => void }) {
@@ -52,9 +45,12 @@ function DirectorList({ done }: { done: () => void }) {
   const [openFamilies, setOpenFamilies] = useState<string[]>([]);
   const [caps, setCaps] = useState<LlmCapability[]>([]);
   const [sort, setSort] = useState<LlmSort>('recommended');
+  const [maker, setMaker] = useState('');
   if (agent.provider === 'offline') return <div className="ml-empty">The local planner is active. Choose an agent provider in Settings to use another Director.</div>;
   const needle = q.trim().toLowerCase();
-  const list = filterLlm(models ?? [], { caps, q: needle, sort });
+  const makers = llmMakers(models ?? []);
+  // The maker filter applies before grouping, so a family never lists models of another maker.
+  const list = filterLlm(models ?? [], { caps, q: needle, sort, maker: makers.some(([n]) => n === maker) ? maker : '' });
   // An order puts every model in one list; otherwise by family.
   const flat = sort !== 'recommended';
   const pick = (id: string) => {
@@ -69,7 +65,7 @@ function DirectorList({ done }: { done: () => void }) {
   return (
     <>
       <div className="ml-search"><input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Director models" aria-label="Search Director models" /></div>
-      <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} />
+      <LlmFilterBar caps={caps} onCaps={setCaps} sort={sort} onSort={setSort} makers={makers} maker={maker} onMaker={setMaker} />
       <div className="ml-scroll agent-director-list">
         <button type="button" className={`ml-row ${agent.modelPinned ? '' : 'is-selected'}`} onClick={() => { void resetAgentModel(); done(); }}>
           <span className="ml-main"><span className="ml-name">Auto</span><span className="ml-sub">{agent.tier === 'top' ? 'Top tier' : 'Normal tier'} · {agent.model || 'No model resolved'} <VisionTag vision={models?.find((m) => m.id === agent.model)?.vision} /></span></span>
@@ -82,7 +78,7 @@ function DirectorList({ done }: { done: () => void }) {
           </button>
         )) : [...families.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([family, entries]) => {
           const selected = entries.some((m) => agent.modelPinned && m.id === agent.model);
-          const open = Boolean(needle) || caps.length > 0 || selected || openFamilies.includes(family);
+          const open = Boolean(needle) || caps.length > 0 || Boolean(maker) || selected || openFamilies.includes(family);
           return (
             <div key={family} className="ml-group is-family">
               <button type="button" className={`ml-family ${open ? 'is-open' : ''}`} onClick={() => setOpenFamilies((xs) => xs.includes(family) ? xs.filter((x) => x !== family) : [...xs, family])} aria-expanded={open}>
@@ -97,7 +93,7 @@ function DirectorList({ done }: { done: () => void }) {
             </div>
           );
         })}
-        {!list.length ? <div className="ml-empty">{models?.length ? 'No model with tool calling matches these filters.' : 'The Director catalog is not loaded. It will remain on the current automatic model.'}</div> : null}
+        {!list.length ? <div className="ml-empty">{models?.length ? 'No model matches these filters.' : 'The Director catalog is not loaded. It will remain on the current automatic model.'}</div> : null}
       </div>
     </>
   );

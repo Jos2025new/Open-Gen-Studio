@@ -99,7 +99,7 @@ function perMillion(v: unknown, unit: 'token' | 'million'): number | undefined {
 }
 
 export async function listLlmModels(provider: LlmProviderId): Promise<LlmModel[]> {
-  const cacheKey = `llm:v3:${provider}`;
+  const cacheKey = `llm:v4:${provider}`;
   const cached = await cacheDb.get<LlmModel[]>(cacheKey, 12 * 3600 * 1000);
   if (cached) return cached;
   const res = await requestJson<{ data: Loose[] }>(ENDPOINTS[provider].models);
@@ -167,19 +167,54 @@ export const capable = (m: LlmModel) => m.tools && m.vision !== false;
 export type LlmCapability = 'vision' | 'reasoning' | 'videoInput' | 'audioInput';
 export type LlmSort = 'recommended' | 'price' | 'context' | 'name';
 
+/** Id prefixes (the part before "/") that name a maker, and the label shown for it. */
+const MAKER_PREFIX: Record<string, string> = {
+  anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google', 'meta-llama': 'Meta', meta: 'Meta', mistralai: 'Mistral', mistral: 'Mistral',
+  deepseek: 'DeepSeek', 'deepseek-ai': 'DeepSeek', qwen: 'Qwen', alibaba: 'Qwen', 'z-ai': 'Z.ai (GLM)', zai: 'Z.ai (GLM)', 'zai-org': 'Z.ai (GLM)', thudm: 'Z.ai (GLM)',
+  moonshotai: 'Moonshot (Kimi)', moonshot: 'Moonshot (Kimi)', minimax: 'MiniMax', 'x-ai': 'xAI', xai: 'xAI', cohere: 'Cohere', nvidia: 'NVIDIA',
+  microsoft: 'Microsoft', amazon: 'Amazon', perplexity: 'Perplexity', ai21: 'AI21', xiaomi: 'Xiaomi', baidu: 'Baidu', tencent: 'Tencent', bytedance: 'ByteDance', 'bytedance-seed': 'ByteDance', stepfun: 'StepFun', 'stepfun-ai': 'StepFun',
+};
+/** Prefixes that are routers or tiers, not makers. */
+const MAKER_JUNK = new Set(['auto', 'free', 'openrouter', 'nanogpt', 'atlas', 'atlascloud', 'router', 'models', 'default', 'other']);
+const MAKER_TEXT: Array<[RegExp, string]> = [
+  [/claude|anthropic/, 'Anthropic'], [/deepseek/, 'DeepSeek'], [/\bglm\b|zhipu|z-ai/, 'Z.ai (GLM)'], [/kimi|moonshot/, 'Moonshot (Kimi)'], [/minimax/, 'MiniMax'],
+  [/\bgpt\b|gpt-|openai|\bo[134]\b|\bo[134]-/, 'OpenAI'], [/gemini|gemma|google/, 'Google'], [/llama|meta-/, 'Meta'], [/mistral|mixtral|codestral|ministral|magistral/, 'Mistral'],
+  [/qwen|qwq/, 'Qwen'], [/grok|\bxai\b/, 'xAI'], [/cohere|command-?[ra]|\bcommand\b/, 'Cohere'], [/nemotron|nvidia/, 'NVIDIA'], [/\bphi-?\d|microsoft/, 'Microsoft'],
+  [/\bnova\b|amazon/, 'Amazon'], [/sonar|perplexity/, 'Perplexity'], [/jamba|ai21/, 'AI21'], [/mimo|xiaomi/, 'Xiaomi'], [/ernie|baidu/, 'Baidu'], [/hunyuan|tencent/, 'Tencent'], [/doubao|seed-|bytedance/, 'ByteDance'], [/step-|stepfun/, 'StepFun'],
+];
+
+/** The maker of an agent model, from the id prefix ("z-ai/…") and then the name. Routers and unknown names are "Other". */
+export function llmMaker(id: string, name = ''): string {
+  const slash = id.indexOf('/');
+  const prefix = (slash > 0 ? id.slice(0, slash) : '').toLowerCase();
+  if (MAKER_PREFIX[prefix]) return MAKER_PREFIX[prefix];
+  const text = `${id.slice(slash + 1)} ${name}`.toLowerCase();
+  for (const [re, label] of MAKER_TEXT) if (re.test(text)) return label;
+  if (prefix && !MAKER_JUNK.has(prefix) && /^[a-z][a-z0-9.-]{1,}$/.test(prefix)) return prefix[0].toUpperCase() + prefix.slice(1);
+  return 'Other';
+}
+
+/** Makers present in a list, A–Z with "Other" last, each with its model count. */
+export function llmMakers(models: LlmModel[]): Array<[string, number]> {
+  const n = new Map<string, number>();
+  for (const m of models) n.set(llmMaker(m.id, m.name), (n.get(llmMaker(m.id, m.name)) ?? 0) + 1);
+  return [...n.entries()].sort(([a], [b]) => (a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b)));
+}
+
 /**
- * The agent model list: tool calling always (the agent needs it), every checked capability confirmed by the
- * catalog, words in the name, id or description; sorted by price (input + output, unpriced last), context
- * (largest first) or name. 'recommended' keeps the given order.
+ * The agent model list: every checked capability confirmed by the catalog, an optional maker, words in the name,
+ * id or description; sorted by price (input + output, unpriced last), context (largest first) or name.
+ * 'recommended' keeps the given order. Models without tool calling are never dropped (the agent needs tools,
+ * so the rows say "no tools"): they go after the rest, in the same order.
  */
-export function filterLlm(models: LlmModel[], opts: { caps?: LlmCapability[]; q?: string; sort?: LlmSort } = {}): LlmModel[] {
+export function filterLlm(models: LlmModel[], opts: { caps?: LlmCapability[]; q?: string; sort?: LlmSort; maker?: string } = {}): LlmModel[] {
   const words = (opts.q ?? '').toLowerCase().split(/\s+/).filter(Boolean);
-  const out = models.filter((m) => m.tools && (opts.caps ?? []).every((c) => m[c] === true) && words.every((w) => `${m.id} ${m.name} ${m.description ?? ''}`.toLowerCase().includes(w)));
+  const out = models.filter((m) => (!opts.maker || llmMaker(m.id, m.name) === opts.maker) && (opts.caps ?? []).every((c) => m[c] === true) && words.every((w) => `${m.id} ${m.name} ${m.description ?? ''}`.toLowerCase().includes(w)));
   const cost = (m: LlmModel) => (m.inputPrice ?? Infinity) + (m.outputPrice ?? Infinity);
   if (opts.sort === 'price') out.sort((a, b) => cost(a) - cost(b));
   else if (opts.sort === 'context') out.sort((a, b) => (b.contextLength ?? 0) - (a.contextLength ?? 0));
   else if (opts.sort === 'name') out.sort((a, b) => a.name.localeCompare(b.name));
-  return out;
+  return [...out.filter((m) => m.tools), ...out.filter((m) => !m.tools)];
 }
 
 /** "128K", "1M": a context window in tokens. */

@@ -1,6 +1,8 @@
+import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 import { contextLabel, type LlmCapability, type LlmModel, type LlmSort } from '../../engine/providers/llm';
 import { formatUsd } from '../../lib/format';
+import { FilterMenu } from './FilterMenu';
 import { VisionTag } from './VisionTag';
 
 const CAPS: Array<{ id: LlmCapability; label: string; tip: string }> = [
@@ -16,8 +18,8 @@ const SORTS: Array<{ id: LlmSort; label: string }> = [
   { id: 'name', label: 'Name A–Z' },
 ];
 
-/** Capability checkboxes and order for agent model lists (tool calling is always required, so it is not a filter). */
-export function LlmFilterBar({ caps, onCaps, sort, onSort }: { caps: LlmCapability[]; onCaps: (c: LlmCapability[]) => void; sort: LlmSort; onSort: (s: LlmSort) => void }) {
+/** Capability checkboxes, an optional "All makers" menu and the order for agent model lists. Models without tool calling stay listed (marked, after the rest). */
+export function LlmFilterBar({ caps, onCaps, sort, onSort, makers, maker = '', onMaker }: { caps: LlmCapability[]; onCaps: (c: LlmCapability[]) => void; sort: LlmSort; onSort: (s: LlmSort) => void; makers?: Array<[string, number]>; maker?: string; onMaker?: (m: string) => void }) {
   return (
     <div className="ml-filters llm-filters">
       {CAPS.map((c) => {
@@ -29,6 +31,15 @@ export function LlmFilterBar({ caps, onCaps, sort, onSort }: { caps: LlmCapabili
           </button>
         );
       })}
+      {makers && onMaker && makers.length > 1 ? (
+        <FilterMenu
+          label={maker || 'All makers'}
+          value={maker}
+          active={Boolean(maker)}
+          onChange={onMaker}
+          options={[['', 'All makers'], ...makers.map(([name, n]): [string, ReactNode] => [name, <span key={name} className="ml-filter-opt">{name} <span className="faint num">{n}</span></span>])]}
+        />
+      ) : null}
       <span className="ml-filters-gap" />
       <select className="ml-filter llm-sort" aria-label="Order" value={sort} onChange={(e) => onSort(e.target.value as LlmSort)}>
         {SORTS.map((s) => (
@@ -45,6 +56,7 @@ export function LlmRowBody({ m }: { m: LlmModel }) {
     <span className="ml-main">
       <span className="llm-line">
         <span className="ml-name">{m.name}</span>
+        {m.tools ? null : <span className="vision-tag" data-tip="No tool calling: the agent cannot use this model for its tools">no tools</span>}
         <VisionTag vision={m.vision} />
         {m.reasoning ? <span className="vision-tag" data-tip="Reasoning">R</span> : null}
         {m.contextLength ? <span className="llm-ctx num" data-tip="Context window (tokens)">{contextLabel(m.contextLength)}</span> : null}
