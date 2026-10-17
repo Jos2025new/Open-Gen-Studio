@@ -10,6 +10,17 @@ Todos los modos reciben instrucciones comunes sobre roles y atributos heredados 
 
 Un beat no implica un corte. Una transición pedida dentro de un clip y un montaje entre clips son operaciones distintas; solo se usan entradas y operaciones disponibles. Los cambios intencionales de propiedades se excluyen de lo que debe preservarse.
 
+## Registros de realismo (imagen y vídeo)
+
+`src/engine/realism.ts` añade cámara, luz y textura a imágenes y vídeos realistas según `settings.realism`; el agente lo elige (`context.ts`). Sin pista, **balanced**.
+
+- **balanced** (por defecto): 35 mm f/4, profundidad moderada, luz disponible suave, textura natural con pequeños defectos, sin retoque ni nitidez excesivos; vídeo: cámara fija o mano ligera, sin glides de gimbal, desenfoque de movimiento natural.
+- **everyday** (móvil, «real», UGC, vlog, found footage): objetivo ancho de móvil, foco profundo, encuadre casual, ruido de sensor pequeño, HDR computacional suave; vídeo: micro-temblor de mano, derivas de reencuadre, 30 fps, cambios leves de exposición y balance, sonido de sala/micrófono del móvil.
+- **cinematic** (cine, anuncio, comercial, tráiler; antes `photographic`): las fichas de toma por escena (retrato 85 mm f/1.8, producto 100 mm…); vídeo: óptica de cine, grano de película, 24 fps con obturador de 180°, cámara lenta motivada.
+- **ugc** (cadena de imagen fija) equivale a everyday en vídeo; **studio** a cinematic en vídeo; **none** no toca el prompt.
+
+Guardas: nunca en JSON, otro medio (anime, ilustración, 3D…), prompts que ya traen cámara (`mm`, `f/`, handheld, fps), referencias de estilo ni ediciones de una fuente (salvo realismo explícito). Con primer fotograma el vídeo solo recibe movimiento, cadencia y audio; con referencias de identidad el ruido pasa a «muy ligero». `VIDEO_REALISM_POLICY` (`procedure.ts`): un sujeto y una acción, cámara lenta motivada, sin primeros planos de manos, sin texto en pantalla (en post), sin salpicaduras, roturas o multitudes salvo petición. Pendiente: QC y regenerar-seleccionar, posproducción (grano, cadencia).
+
 ## Evidencia y límites
 
 Los tests de contratos cubren validación, transporte declarado, aplicación del estilo y llegada de instrucciones al contexto. No demuestran que el generador respete identidad, geometría, física o transiciones. No hay análisis automático de video, nuevas llamadas al modelo ni generaciones preparatorias obligatorias.

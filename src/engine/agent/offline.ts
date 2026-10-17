@@ -265,7 +265,7 @@ export function offlinePlan(input: OfflineInput): OfflineAction {
       id: 's2',
       kind: 'video',
       title: lang === 'es' ? 'Video' : 'Video',
-      prompt: shared ? 'natural motion, smooth cinematic camera movement' : `${prompt}, natural motion, smooth cinematic camera movement`,
+      prompt: shared ? 'natural motion, slow motivated camera' : `${prompt}, natural motion, slow motivated camera`,
       prompt_from: shared,
       first_frame: 's1',
       aspect: aspect ?? '16:9',

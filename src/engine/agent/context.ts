@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, WORKFLOW_CONTRACT } from '../procedure';
+import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
@@ -94,13 +94,14 @@ ${guideIndex()}
 
 Writing prompts
 - ${VIDEO_DIRECTION_POLICY}
+- ${VIDEO_REALISM_POLICY}
 - Step titles say what the step is: a clip that is the whole piece is "UGC video", not "hook"; a test is "5 s test".
 - A prompt carries only what the model must render (what is seen and heard). Rules for you — which claims are allowed, what not to invent, the user's constraints about wording — are applied by what you write, never pasted into the prompt.
 - Never paraphrase a reference: cite it by its role (character, style, setting, product) and what it must not bring (e.g. "not its background"); its look comes from the image, which you can see. A reference sets identity or style; the prompt sets subject, action, composition and pose. When a reference's role is unclear from the image and the message, ask (guided mode) in the one questions card.
 - From text: concrete sentences in this order: purpose (poster, product shot, portrait…) → subject → action → setting → composition (shot size, angle, lens) → lighting (source, direction, softness, color temperature: "soft morning window light from the left") → materials and surfaces → style or medium → palette → mood; must-keep requirements first, preferences after; spatial and physical relations ("the cup sits left of the laptop, steam rising"), not keyword lists; usually 40-120 words. Physical terms instead of empty modifiers ("8k, masterpiece, best quality"). Prompts in English unless the user asks otherwise.
 - Text in an image: short literal text in "double quotes", never translated, with its position and typeface ("the headline "OPEN LATE" in bold condensed sans at the top"). Never bake long text into image prompts. In the Designer, headlines and copy go on text layers.
 - Edits (edit op, edit models, a revision of a result): "Change only X; keep A, B and C; match the existing lighting, perspective, texture and depth of field; do not add Z"; repeat what is kept at every iteration (models drift); one change at a time. Upscale never redefines content: only sharpness and detail.
-- Realism: realistic images get camera and light automatically ("photographic" default, "ugc", "studio"); for illustration, anime, painting, vector or 3D set "realism": "none". Optional "shot" (portrait, street, product, landscape, interior, food, pet, ugc, studio); else the app picks. Order: subject → camera + light → mood.
+- ${REALISM_RULE}
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
 - Several results of one step are numbered as the user sees them (#1, #2… left to right, top to bottom): "la 2", "the second" = #2; an image the user attached is their choice. When the next step depends on a choice the user has not made, ask which one in the questions card.
 - References in a fixed order: place or setting first, then characters, then objects and products, then style; each cited with its role.

@@ -4,12 +4,20 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { buildContext, SYSTEM_PROMPT } from '../src/engine/agent/context';
-import { VIDEO_DIRECTION_POLICY } from '../src/engine/procedure';
+import { VIDEO_DIRECTION_POLICY, VIDEO_REALISM_POLICY } from '../src/engine/procedure';
 import { useStore } from '../src/store/store';
 import type { AgentStyle } from '../src/engine/types';
 
 const initial = useStore.getState();
 afterEach(() => useStore.setState(initial));
+
+describe('realism registers in the agent prompt', () => {
+  it('states the cues, the balanced default and the video realism policy', () => {
+    expect(SYSTEM_PROMPT).toContain(VIDEO_REALISM_POLICY);
+    expect(VIDEO_REALISM_POLICY).toContain('No on-screen text');
+    for (const cue of ['default "balanced"', 'iPhone', 'found footage', 'cinematográfico', 'tráiler']) expect(SYSTEM_PROMPT).toContain(cue);
+  });
+});
 
 describe('shared video direction policy', () => {
   it('is part of the common agent prompt, independent of mode and cinematic selection', () => {
