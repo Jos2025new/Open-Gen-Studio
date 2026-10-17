@@ -30,9 +30,10 @@ describe('people in prompts: age and body', () => {
   it('keeps the adult-only and minor-protection lines', () => {
     expect(PEOPLE_RULE).toMatch(/adult \(18\+\)/);
     expect(PEOPLE_RULE).toMatch(/adults only/);
-    expect(PEOPLE_RULE).toMatch(/reads as a minor is never sexualized/);
-    expect(PEOPLE_RULE).toMatch(/never use teen, schoolgirl or childlike wording/);
-    expect(PEOPLE_RULE).toMatch(/ambiguous in a sensual context go older \(21\+\)/);
+    expect(PEOPLE_RULE).toMatch(/never sexualize anything that reads as a minor/);
+    expect(PEOPLE_RULE).toMatch(/explicit age of 18 or more/);
+    expect(PEOPLE_RULE).toMatch(/school uniforms, teen or childlike wording out of sensual scenes/);
+    expect(PEOPLE_RULE).toMatch(/Students of 18-19/);
   });
   it('is wired into the agent context', () => {
     expect(readFileSync('src/engine/agent/context.ts', 'utf8')).toContain('${PEOPLE_RULE}');
