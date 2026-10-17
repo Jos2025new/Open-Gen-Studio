@@ -115,7 +115,7 @@ export function captureClause(sel: CaptureSel, kind: 'image' | 'video', anchored
   const imp = (sel.imperfect ?? c?.imperfect ?? []).map((i) => IMPERFECTIONS.find((x) => x.id === i)?.[kind]).filter(Boolean) as string[];
   if (!c && !dirs.length && !imp.length) return undefined;
   const mood = c?.tone ? `mood: ${c.tone}` : undefined;
-  const cad = kind === 'video' ? (c as { cadence?: string } | undefined)?.cadence ?? '30 fps' : undefined;
+  const cad = kind === 'video' && c ? (c as { cadence?: string } | undefined)?.cadence ?? '30 fps' : undefined;
   const parts = kind === 'image'
     ? [c?.camera, mood, c?.light, c?.texture, ...imp]
     : anchored ? [...dirs, mood, cad, ...imp] : [c?.camera, ...dirs, mood, c?.light, c?.texture, cad, ...imp];

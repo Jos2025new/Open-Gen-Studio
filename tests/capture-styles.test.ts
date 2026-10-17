@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CAPTURE_PRESETS, DIRECTIVES, TONES, captureClause, cleanCapture, resolveCapture, withCaptureSetting } from '../src/engine/captureStyles';
 import { opRealism, withRealism } from '../src/engine/realism';
-import { CAPTURE_RULE } from '../src/engine/procedure';
+import { CAPTURE_RULE, VIDEO_REALISM_POLICY } from '../src/engine/procedure';
 
 describe('estilos de captura (CTLT)', () => {
   it('cada preset trae cámara, tono, luz y textura', () => {
@@ -53,5 +53,34 @@ describe('estilos de captura (CTLT)', () => {
     for (const p of CAPTURE_PRESETS) expect(CAPTURE_RULE).toContain(p.id);
     for (const d of DIRECTIVES) expect(CAPTURE_RULE).toContain(d.id);
     expect(CAPTURE_RULE).toContain(TONES[0]);
+  });
+});
+
+describe('palancas de imperfección', () => {
+  const clause = (capture: Record<string, unknown>, kind: 'image' | 'video' = 'video') => withRealism('Two friends at a kitchen table', 'balanced', '', undefined, { kind, capture });
+  it('los estilos limpios no llevan fecha, baja resolución ni artefactos', () => {
+    for (const p of CAPTURE_PRESETS.filter((x) => !x.imperfect)) {
+      const out = clause({ style: p.id }, p.only ?? 'video');
+      expect(out, p.id).not.toMatch(/date|time stamp|low resolution|compression/i);
+    }
+  });
+  it('camcorder y desechable las piden por sí solos', () => {
+    const cam = clause({ style: 'camcorder' });
+    expect(cam).toContain('burned-in orange date and time stamp');
+    expect(cam).toContain('intentionally low resolution');
+    expect(cam).toContain('compression artifacts');
+    expect(clause({ style: 'disposable' }, 'image')).toContain('orange date stamp');
+    expect(clause({ style: 'disposable' }, 'image')).not.toContain('low resolution');
+  });
+  it('cualquier otro estilo las admite solo si se piden, y en una tras otra', () => {
+    expect(clause({ style: 'phone', imperfect: ['timestamp'] })).toContain('date and time stamp');
+    expect(clause({ style: 'phone', imperfect: ['timestamp'] })).not.toContain('compression');
+    expect(clause({ style: 'camcorder', imperfect: [] })).not.toMatch(/stamp|low resolution|compression/);
+    expect(clause({ imperfect: ['lowres'] })).toBe('Two friends at a kitchen table intentionally low resolution, soft detail.');
+  });
+  it('el agente tiene la excepción del sello de fecha, solo para eso', () => {
+    expect(VIDEO_REALISM_POLICY).toContain('No on-screen text');
+    expect(VIDEO_REALISM_POLICY).toMatch(/except the burned-in date\/time stamp/);
+    expect(CAPTURE_RULE).toMatch(/ONLY when the user explicitly asks/);
   });
 });
