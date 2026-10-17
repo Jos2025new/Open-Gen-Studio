@@ -1,4 +1,5 @@
 import { REALISM_POLICY } from './modelRules';
+import { captureClause, type CaptureSel } from './captureStyles';
 /** Registers: balanced (default: natural, neither ad-polished nor degraded), everyday (phone / real footage), cinematic (polished lens-and-light sheets; 'photographic' is its old name). */
 export type Realism = 'balanced' | 'everyday' | 'cinematic' | 'photographic' | 'ugc' | 'studio' | 'none';
 export const REALISM_MODES: readonly Realism[] = ['balanced', 'everyday', 'cinematic', 'photographic', 'ugc', 'studio', 'none'];
@@ -54,6 +55,8 @@ export interface RealismCtx {
   anchored?: boolean;
   /** Identity references: noise and blur stay mild. */
   refs?: boolean;
+  /** Capture style, tone, video directives and imperfections chosen for the step (captureStyles). */
+  capture?: CaptureSel;
 }
 
 /** The one place realism enters a prompt. Default balanced; nothing for 'none', another medium, a style reference, JSON or a prompt that is already photographic. */
@@ -64,6 +67,8 @@ export function withRealism(prompt: string, mode: Realism = 'balanced', modelId 
   const policy = REALISM_POLICY.find((x) => x.match.test(modelId))?.policy;
   if (policy === 'none') return prompt;
   const reg = register(mode);
+  const cap = ctx.capture && captureClause(ctx.capture, ctx.kind === 'video' ? 'video' : 'image', ctx.anchored);
+  if (cap) return `${text} ${cap}`;
   const hasCamera = HAS_CAMERA.test(text);
   if (ctx.kind === 'video') {
     if (hasCamera || HAS_PHOTO_VOCAB.test(text) || HAS_VCAM.test(text)) return prompt;
@@ -88,9 +93,9 @@ const REALISM_NEGATIVE = 'cartoon, illustration, painting, 3d render, airbrushed
 export const negFor = <S extends { negative?: string }>(settings: S, applied: unknown): S => (applied && !settings.negative ? { ...settings, negative: REALISM_NEGATIVE } : settings);
 
 /** Realism for a generation request: new images and videos by default; edits of a source only when set explicitly (the source's style rules). */
-export function opRealism(g: { op?: unknown; settings: { realism?: Realism; shot?: string }; inputs?: { refs?: unknown[]; firstFrame?: unknown } }, kind: string, prompt: string, modelId = ''): string {
-  if ((kind !== 'image' && kind !== 'video') || (g.op && !g.settings.realism)) return prompt;
-  return withRealism(prompt, g.settings.realism, modelId, g.settings.shot, { kind, anchored: kind === 'video' && Boolean(g.inputs?.firstFrame), refs: Boolean(g.inputs?.refs?.length) });
+export function opRealism(g: { op?: unknown; settings: { realism?: Realism; shot?: string; capture?: CaptureSel }; inputs?: { refs?: unknown[]; firstFrame?: unknown } }, kind: string, prompt: string, modelId = ''): string {
+  if ((kind !== 'image' && kind !== 'video') || (g.op && !g.settings.realism && !g.settings.capture)) return prompt;
+  return withRealism(prompt, g.settings.realism, modelId, g.settings.shot, { kind, anchored: kind === 'video' && Boolean(g.inputs?.firstFrame), refs: Boolean(g.inputs?.refs?.length), capture: g.settings.capture });
 }
 
 export const withRealismSetting = <S extends object>(settings: S, kind: string, realism?: Realism, shot?: string): S => ((kind === 'image' || kind === 'video') && (realism || shot) ? { ...settings, ...(realism ? { realism } : {}), ...(shot ? { shot } : {}) } : settings);

@@ -6,6 +6,7 @@ import { OPS } from './ops';
 import { normalizeStepRefs, opStepRefs, placeRoles, stepRolesLine, type RefSpec } from './refRoles';
 import { videoFix } from './planFix';
 import { withRealismSetting, type Realism } from './realism';
+import { withCaptureSetting } from './captureStyles';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
@@ -67,6 +68,7 @@ export interface RawStep {
   refs?: RefSpec[];
   realism?: Realism;
   shot?: string;
+  capture?: unknown;
   times?: Array<number | null>;
   shots?: Array<{ prompt: string; duration: number }>;
   first_frame?: string;
@@ -735,7 +737,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else settings.count = variations.length;
         }
         if (kind === 'image' || kind === 'model3d') {
-          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: withRealismSetting(settings, kind, s.realism, s.shot), refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
+          steps.push({ id: s.id!, kind, title, prompt, promptFrom: s.prompt_from, modelRef, settings: withCaptureSetting(withRealismSetting(settings, kind, s.realism, s.shot), kind, s.capture, ctx.librarySubjects?.()), refs, ...(variations.length > 1 && kind === 'image' ? { variations } : {}) } satisfies ImageStep | Model3dStep);
         } else {
           steps.push({
             id: s.id!,

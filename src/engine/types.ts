@@ -203,6 +203,8 @@ export interface GenSettings {
   realism?: 'balanced' | 'everyday' | 'cinematic' | 'photographic' | 'ugc' | 'studio' | 'none';
   /** Shot sheet id (portrait, street, product, landscape, interior, food, pet in cinematic; ugc, studio); chosen from the prompt when absent. */
   shot?: string;
+  /** Capture style (camera, tone, light, texture), video directives and imperfections; see captureStyles. */
+  capture?: import('./captureStyles').CaptureSel;
   aspect?: string;
   resolution?: string;
   count: number;
@@ -991,6 +993,8 @@ export interface Subject {
   videoAssetId?: string;
   /** Provider voice bound to the subject (Kling voice_id). */
   voiceId?: string;
+  /** kind 'style' saved from a result: its CTLT, usable as the capture style "Mis estilos". */
+  capture?: import('./captureStyles').CaptureCustom;
 }
 
 /** A provider style made from reference images (Recraft V4 style_id), kept per session. */

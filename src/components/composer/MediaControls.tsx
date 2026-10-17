@@ -12,6 +12,7 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, IconButton, Segmented, Toggle } from '../ui/primitives';
 import { StyleField, setExtra } from './StyleFields';
 import { ModelList, priceHint } from './ModelList';
+import { CaptureChip } from './CaptureChip';
 
 export function AspectGlyph({ value, size = 14 }: { value: string; size?: number }) {
   const r = ratioOf(value);
@@ -589,6 +590,7 @@ export function MediaControls({ kind }: { kind: MediaKind }) {
     <>
       <ModelChip kind={kind} />
       <FormatChip kind={kind} />
+      {kind === 'image' || kind === 'video' ? <CaptureChip kind={kind} /> : null}
       {kind === 'audio' || kind === 'model3d' ? <LyricsChip kind={kind} /> : null}
       {kind === 'video' ? <AudioChip /> : null}
       {kind === 'video' ? <SubjectsChip /> : null}

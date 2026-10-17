@@ -1,0 +1,9 @@
+# Estilos de captura, borrador primero y estilos propios
+
+| Comportamiento documentado | Código | Test |
+| --- | --- | --- |
+| Un estilo de captura se escribe como CTLT (cámara, tono, luz, textura) y el prompt lo recibe en ese orden. Presets: skate, documental íntimo, foto movida, bordillo bajo, desechable con flash, observación oculta, móvil, camcorder, selfie iPhone; UGC, cotidiano y calle siguen siendo los registros antiguos. Cada preset tiene un tono por defecto que el selector cambia. | [captureStyles.ts](../../src/engine/captureStyles.ts), [realism.ts](../../src/engine/realism.ts) | [capture-styles.test.ts](../../tests/capture-styles.test.ts) |
+| Directivas de cámara de video (micro-temblor, crash zoom, voyeurista, whip pan, caminar hacia atrás, alguien cruza el objetivo, ajuste de exposición, búsqueda de foco) son combinables y solo se aplican a video; un video anclado a una imagen recibe solo movimiento y cadencia. | [captureStyles.ts](../../src/engine/captureStyles.ts) | [capture-styles.test.ts](../../tests/capture-styles.test.ts) |
+| Selector: un icono de cámara junto al formato (imagen y video) abre un popover con el patrón del filtro de Sessions. | [CaptureChip.tsx](../../src/components/composer/CaptureChip.tsx), [MediaControls.tsx](../../src/components/composer/MediaControls.tsx) | sin test (interfaz) |
+| El agente conoce presets, tonos y directivas (generado desde el catálogo), recibe el estilo elegido y los estilos guardados, y los pone en `capture` del paso. | [procedure.ts](../../src/engine/procedure.ts), [captureContext.ts](../../src/engine/agent/captureContext.ts), [plan.ts](../../src/engine/plan.ts) | [capture-styles.test.ts](../../tests/capture-styles.test.ts) |
+| Los estilos limpios (sin captura) producen exactamente el mismo prompt que antes. | [realism.ts](../../src/engine/realism.ts) | [realism-clean-baseline.test.ts](../../tests/realism-clean-baseline.test.ts) |

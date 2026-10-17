@@ -40,6 +40,7 @@
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
 - [proveedores](features/proveedores.md).
+- [captura: estilos de captura (CTLT), borrador primero y estilos propios](features/captura.md).
 - [precio autorizado: decisiones, avisos y coste informado](features/precio-autorizado.md).
 
 ## Decisiones
