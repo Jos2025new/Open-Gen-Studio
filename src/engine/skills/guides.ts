@@ -3,6 +3,7 @@ import { APP_GUIDES } from './app';
 import { MODEL_GUIDES, modelGuide } from '../guides';
 import type { Workspace, LlmMessage } from '../types';
 import stagedGuide from '../guides/staged.md?raw';
+import contrastGuide from '../guides/contrast.md?raw';
 import { SKILLS, skillById } from './catalog';
 import { WORKFLOWS, workflowById, describeWorkflow } from './workflows';
 import type { Workflow } from './types';
@@ -20,6 +21,7 @@ export function guideIndex(): string {
   return [
     ...WORKFLOWS.map((w) => `  workflow:${w.id} — ${w.name}: ${w.description}${w.variants?.length ? ` (variants: ${w.variants.map((v) => v.id).join(', ')})` : ''}${canvasNote(w)}`),
     `  skill:${STAGED_ID} — Staged pieces: the rules for any piece with 2+ results, clips or stages (questions card, look, pre-production, sheets, pilot, one clip or several, sequence). Comes with every workflow; load it yourself only when no workflow fits.`,
+    '  skill:contrast — Contrast levels: during ideation, offer variants one level up (0 none, 1 situation, 2 styling or attitude, 3 feeling) on the subject and action only. Not a setting; load for examples.',
     ...SKILLS.map((k) => `  skill:${k.id} — ${k.name}: ${k.description}`),
     ...MODEL_GUIDES.map((g) => `  model:${g.id} — how to write prompts for ${g.name}${g.optional ? ' (optional)' : ''}`),
     ...APP_GUIDES.map((g) => `  app:${g.id} — ${g.name}: ${g.description}`),
@@ -50,6 +52,7 @@ export function readGuide(id: string): string | undefined {
   if (type === 'model') return modelGuide(rest)?.text;
   if (type === 'skill') {
     if (rest === STAGED_ID) return stagedGuide;
+    if (rest === 'contrast') return contrastGuide;
     const k = skillById(rest);
     return k ? `${k.name}: ${k.guidance}${k.guide ? `\n\n${k.guide}` : ''}` : undefined;
   }

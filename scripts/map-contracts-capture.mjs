@@ -45,4 +45,16 @@ export default [
     ],
     tests: ['tests/capture-library.test.ts', 'tests/library.test.ts'],
   },
+  {
+    id: 'contrast-levels',
+    what: 'Niveles de contraste de la ideación: la regla siempre activa, la guía skill:contrast, el índice y la línea de contexto cuando el usuario pide un nivel dicen lo mismo.',
+    sides: [
+      ['src/engine/contrast.ts', 'export const CONTRAST_RULE'],
+      ['src/engine/agent/context.ts', '${CONTRAST_RULE}'],
+      ['src/engine/agent/contrastContext.ts', 'export function contrastLines'],
+      ['src/engine/skills/guides.ts', "rest === 'contrast'"],
+      ['src/engine/guides/contrast.md', 'Contrast levels'],
+    ],
+    tests: ['tests/contrast-levels.test.ts'],
+  },
 ];

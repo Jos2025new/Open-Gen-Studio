@@ -1,6 +1,8 @@
 import { OPS } from '../ops';
 import { captureLines } from './captureContext';
 import { DRAFT_RULE } from './draftFirst';
+import { contrastLines } from './contrastContext';
+import { CONTRAST_RULE } from '../contrast';
 import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, CAPTURE_RULE, PEOPLE_RULE, WORK_RULES, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
@@ -107,6 +109,7 @@ Writing prompts
 - ${REALISM_RULE}
 - ${CAPTURE_RULE}
 - ${DRAFT_RULE}
+- ${CONTRAST_RULE}
 - Constraints: with a negative_prompt parameter, put them in params.negative_prompt; otherwise state them positively in the prompt ("plain white background, no logos"). Transparent background: params.background "transparent" on models that have it (GPT Image), never as words in the prompt; otherwise the Remove BG op.
 - Several results of one step are numbered as the user sees them (#1, #2… left to right, top to bottom): "la 2", "the second" = #2; an image the user attached is their choice. When the next step depends on a choice the user has not made, ask which one in the questions card.
 - References in a fixed order: place or setting first, then characters, then objects and products, then style; each cited with its role.
@@ -273,7 +276,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const subjects = st.library;
   const named = subjects.filter((s) => !s.capture || s.frontalAssetId);
   if (named.length) lines.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
-  lines.push(...captureLines(subjects, st.composer));
+  lines.push(...captureLines(subjects, st.composer), ...contrastLines(session));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);

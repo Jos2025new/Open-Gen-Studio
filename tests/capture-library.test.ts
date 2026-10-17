@@ -24,13 +24,13 @@ const put = (gen: Partial<Generation>, kind: 'image' | 'video' = 'image') => {
 
 describe('guardar como estilo', () => {
   it('toma el CTLT de la captura del resultado, con el tono elegido', () => {
-    put({ settings: { count: 1, capture: { style: 'skate', tone: 'nostalgic, warm' } } });
+    put({ settings: { count: 1, advanced: {}, capture: { style: 'skate', tone: 'nostalgic, warm' } } });
     const c = captureOfAsset('a1');
     expect(c).toMatchObject({ tone: 'nostalgic, warm' });
     expect(c!.camera).toContain('12 mm fisheye');
   });
   it('sin captura toma la hoja de su registro (cotidiano = móvil)', () => {
-    put({ settings: { count: 1, realism: 'everyday' } });
+    put({ settings: { count: 1, advanced: {}, realism: 'everyday' } });
     expect(captureOfAsset('a1')!.camera).toContain('Phone camera');
   });
   it('una operación o un asset sin generación no tienen estilo que guardar', () => {
@@ -39,7 +39,7 @@ describe('guardar como estilo', () => {
     expect(captureOfAsset('nope')).toBeNull();
   });
   it('se guarda en la biblioteca, sobrevive a la serialización y el agente lo usa por nombre', () => {
-    put({ settings: { count: 1, capture: { style: 'concealed' } } });
+    put({ settings: { count: 1, advanced: {}, capture: { style: 'concealed' } } });
     const s = saveCaptureStyle('a1', 'Tarde oculta', true)!;
     expect(s).toMatchObject({ kind: 'style', name: 'Tarde oculta', frontalAssetId: 'a1' });
     // La misma ruta que el almacén: partialize → JSON → merge.
@@ -49,12 +49,12 @@ describe('guardar como estilo', () => {
     const mine = restored.library.find((x) => x.name === 'Tarde oculta')!;
     expect(mine.capture?.camera).toContain('long lens');
     // "con mi estilo Tarde oculta": el plan lo resuelve por nombre y el prompt recibe su CTLT.
-    const settings = withCaptureSetting({ count: 1 }, 'image', { style: 'Tarde oculta' }, restored.library) as { capture: never };
+    const settings = withCaptureSetting({ count: 1 }, 'image', { style: 'Tarde oculta' }, restored.library) as unknown as { capture: never };
     expect(withRealism('Two friends', 'balanced', '', undefined, { kind: 'image', capture: settings.capture })).toContain('long lens from a distance');
     expect(captureLines(restored.library, restored.composer).join('\n')).toContain('Tarde oculta');
   });
   it('no pisa otro estilo sin replace ni un elemento que no es estilo; sin imagen no guarda referencia', () => {
-    put({ settings: { count: 1, capture: { style: 'phone' } } });
+    put({ settings: { count: 1, advanced: {}, capture: { style: 'phone' } } });
     expect(saveCaptureStyle('a1', 'Tarde oculta', false)).toBeNull();
     const again = saveCaptureStyle('a1', 'Tarde oculta', false, true)!;
     expect(again.frontalAssetId).toBeUndefined();
