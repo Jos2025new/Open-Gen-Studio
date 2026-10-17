@@ -118,12 +118,14 @@ export function findAssets(session: Session, workspace: Workspace, assets: Recor
 
 /** What `view` sends for each match: the asset itself, a 3D model's view image, nothing for audio or text. */
 export function viewTargets(rows: Asset[], assets: Record<string, Asset>): Array<{ show?: string; note: string }> {
-  return rows.slice(0, VIEW_MAX).map((a) => {
-    if (a.kind === 'image' || a.kind === 'video') return { show: a.id, note: `asset:${a.id}` };
+  const shown = rows.slice(0, VIEW_MAX);
+  return shown.map((a, i) => {
+    const n = `Result ${i + 1} of ${shown.length} — `;
+    if (a.kind === 'image' || a.kind === 'video') return { show: a.id, note: `${n}asset:${a.id}` };
     if (a.kind === 'model3d') {
       const view = currentViewImage(a, assets);
-      return view ? { show: view.id, note: `3D model asset:${a.id}, shown by its current view image asset:${view.id}` } : { note: `3D model asset:${a.id}: no valid current view image, cannot be shown` };
+      return view ? { show: view.id, note: `${n}3D model asset:${a.id}, shown by its current view image asset:${view.id}` } : { note: `${n}3D model asset:${a.id}: no valid current view image, cannot be shown` };
     }
-    return { note: `asset:${a.id} (${a.kind}): nothing to show` };
+    return { note: `${n}asset:${a.id} (${a.kind}): nothing to show` };
   });
 }

@@ -37,7 +37,7 @@ describe('find_assets', () => {
   });
 
   it('view shows images as they are and a 3D model by its view image', () => {
-    expect(viewTargets([assets.glb, assets.img], assets)).toEqual([{ show: 'v1', note: '3D model asset:glb, shown by its current view image asset:v1' }, { show: 'img', note: 'asset:img' }]);
+    expect(viewTargets([assets.glb, assets.img], assets)).toEqual([{ show: 'v1', note: 'Result 1 of 2 — 3D model asset:glb, shown by its current view image asset:v1' }, { show: 'img', note: 'Result 2 of 2 — asset:img' }]);
   });
 });
 
