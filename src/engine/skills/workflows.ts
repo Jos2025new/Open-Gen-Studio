@@ -137,7 +137,7 @@ export const WORKFLOWS: Workflow[] = [
     skill: 'ugc',
     needs: [
       'the product (photo, or a description)',
-      'the creator: an attached photo (used as is), or which kind from the user\'s words (influencer → lifestyle, tech, beauty, gaming streamer, cooking, fitness…; age range including 18–24 when they say young or streamer)',
+      'the creator: an attached photo (used as is), or which kind from the user\'s words (influencer → lifestyle, tech, beauty, gaming streamer, cooking, fitness…; age: the user\'s range if given, otherwise by target (social/streamer/young audience 18–22, up to 24; business 24–28; parents 22–32), never a fixed number)',
       'available identity sources; ask only missing user data, and offer an optional test stage only for a concrete scope/cost reason',
       'language of the spoken lines',
       'total duration (one clip with timed shots when it fits the model)',

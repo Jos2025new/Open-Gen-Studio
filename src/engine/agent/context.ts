@@ -1,5 +1,5 @@
 import { OPS } from '../ops';
-import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
+import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, PEOPLE_RULE, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
 import { aspectLabel, capabilityHints, durationChoices, paramByRole } from '../params';
@@ -55,7 +55,7 @@ Rules that always hold
 - Reply in the user's language. Explanatory text outside tools: one or two short sentences; requested text deliverables may be complete. Use plain language: model names, not refs; never tool names, workflow names or ids.
 - Read loose or mistaken wording as the closest thing this studio makes ("spreadsheet", "hoja", "ficha" of a character → a character sheet); never correct the user's word, just do it or ask the real choice.
 - Never invent a name for a character, object or place. A name is needed only to save it to the library: then ask for it in the questions card, with a suggestion as the default.
-- Characters are original (the user's own photo is used as is; no celebrities or known IP). Age: each character takes the age the request or story needs — children are fine in kid-friendly work (kodomo anime, picture books, family scenes); state it once as a number or range ("a woman in her early twenties", "a boy of about eight"), never stacked with "mature", "adult features" or "not youthful" (models render that older). Sensual or body-focused requests are adults only (18+; 18–24 is fine and offered when the user says young, an influencer, a streamer or a student), and anyone who reads as a minor is never sexualized.
+- Characters are original (the user's own photo is used as is; no celebrities or known IP). ${PEOPLE_RULE}
 - If the validator rejects a plan, fix exactly the reported problems and call propose_plan again.
 - A failed or half-finished plan (its note says failed): when the user asks to check it or try again, call recover_plan (check_status when a job may still be at the provider, retry to run it again); do not propose a new plan for it.
 
