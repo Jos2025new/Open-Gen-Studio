@@ -21,6 +21,7 @@ Evidencia: **código** = leído en el código · **test** = cubierto por `npm te
 
 ## Por probar
 
+- [ ] **Persistencia (`task/store-fixes`):** «Delete all» en el sandbox (borrar, recargar, comprobar) y el webm real de H5 en navegador. **2026-10-16**, pendiente; ver [039](history/039-2026-10-W42.md).
 - [ ] Interfaz por espacios (Home, Create, Tools, Studio con tablero, `task/gui-cohesion`): lo que queda, con su porqué y dónde, en [pendientes-gui.md](pendientes-gui.md) (incluye borrar capas y teclas de herramienta del Designer, `designerKeys.ts:87` y `:94`); cómo probarla, en [gui-cohesion-pruebas.md](gui-cohesion-pruebas.md). **2026-10-16**, código.
 - [ ] Modelos y prompting (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas.md](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer. **2026-10-14**, el usuario.
 - [ ] Tras 038 (**2026-10-15**, propuesta): `triggers.ts` con triggers demasiado amplios (no aprobado); tarjeta de ajustes en vivo (diferida hasta que el usuario pruebe); guías faltantes o sin verificar (Flash Omni 1.1, Kling O3, FLUX 3, MiniMax H3, Grok, HappyHorse); el fallback de realismo elige retrato para cualquier hombre/mujer; `inheritApproved` solo hereda imagen y vídeo. Detalle en [038](history/038-2026-10-W42.md).
@@ -83,6 +84,7 @@ Estas son decisiones de diseño propuestas y criterios de cierre; no describen f
 
 ## Calidad del código
 
+- [ ] **Commit del formato 2 del servidor no atómico** (`server/store-v2.js`: sesiones antes que `HEAD.json`). **2026-10-16**, propuesta; ver [039](history/039-2026-10-W42.md).
 - [ ] Partir los 13 archivos de más de 30 KB (`runtime.ts`, 115 KB). Afecta al desarrollo; no pueden crecer (ADR 0008). **2026-10-07**.
 - [ ] Cobertura por riesgo ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): pocas pruebas de recorrido completo en el sandbox, con el LLM y los proveedores simulados (petición → plan → aprobación → resultado; paso a Nodes y Designer). Hoy 129 de 199 módulos no tienen test directo. **2026-10-08**, decidido; sin implementar.
 
