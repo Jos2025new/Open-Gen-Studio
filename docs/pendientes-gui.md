@@ -39,3 +39,8 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
 ## Para fusionar
 
 - [ ] Fusión de `task/gui-cohesion` (1658e00 y, sobre él, `3985e31..e618fae`) en la rama raíz: decide el usuario tras probar. Regla de conflictos: gana lo más nuevo ([fusión](fusion-agent-forcing.md)).
+
+## Prueba GUI 2026-10-16 (pendientes de aprobación)
+
+- **E. Auto: la tarjeta de settings reaparece por un cambio de aspecto.** Causa: `context.ts` («confirm_settings again only to change them») trata el aspecto como cambio. Propuesta: cambio solo de aspecto o cantidad con el kind ya confirmado → `ask_questions` de opción múltiple (formato, una o varias) y `propose_plan` con `aspect`, sin `confirm_settings`. `context.ts` no puede crecer.
+- **F. Tarjeta «Plan … Revised» enorme para cambios pequeños.** `src/components/chat/PlanCard.tsx:153`. Propuesta: variante compacta cuando `item.revised` y hay un paso: «Cambio: título», coste y botones, sin lista de pasos ni la palabra «Plan».
