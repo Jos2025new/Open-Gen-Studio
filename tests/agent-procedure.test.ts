@@ -4,6 +4,7 @@ vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout,
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { SYSTEM_PROMPT } from '../src/engine/agent/context';
+import { CAPABILITIES, MUST } from '../src/engine/agent/tools';
 import { guideIndex, readGuide } from '../src/engine/skills';
 
 describe('one procedure instead of per-case rules', () => {
@@ -26,10 +27,18 @@ describe('one procedure instead of per-case rules', () => {
   it('tells the agent the app\'s order and checks up front, so plans pass the first time', () => {
     const head = SYSTEM_PROMPT.slice(0, 9000);
     expect(head).toContain('How the app works');
-    expect(head).toContain('if the request has a real doubt, ask_questions once; then read_guide for the workflow that fits; then confirm_settings if required; then propose_plan. With no doubt, read_guide and follow it. Each request\'s mode line says which you have.');
+    expect(head).toContain('if the request has a real doubt, ask_questions once; once it is clear, read_guide for the workflow that fits; then confirm_settings if required; then propose_plan. If it is clear already, read_guide and follow it. Each request\'s mode line says which you have.');
     // The fixed prompt names no mode: only each request's mode line does, so the agent does not reason about other modes.
     expect(SYSTEM_PROMPT).not.toMatch(/\b(auto and guided|direct mode|guided only)\b/i);
     expect(head).toContain('candidates end the plan');
+  });
+  it('interpret-first ordering sits at the start and the end of the prompt, not before any question', () => {
+    expect(SYSTEM_PROMPT).not.toContain('before any question');
+    expect(SYSTEM_PROMPT).toContain('2. Interpret the request first. If it is clear, load the fitting workflow (table below) and proceed. If it has open questions, ask_questions / propose settings first; load the workflow once it is clear.');
+    expect(MUST).toContain('Interpret first: a clear request goes straight to its workflow; open questions');
+    const full = `${MUST}\n\n${CAPABILITIES}\n\n${SYSTEM_PROMPT}\n\n${MUST}`;
+    expect(full.indexOf('Interpret first')).toBeLessThan(400);
+    expect(full.lastIndexOf('Interpret first')).toBeGreaterThan(full.length - 700);
   });
   it('staged-piece rules live once, in skill:staged, not in the prompt', () => {
     const staged = readGuide('skill:staged')!;
