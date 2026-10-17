@@ -1,3 +1,4 @@
+import { useEta } from '../ui/useEta';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
@@ -146,12 +147,13 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
 
 export function OngoingRow({ g }: { g: Generation }) {
   const Icon = KIND_ICON[g.kind];
+  const eta = useEta(g);
   const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
   return <div className="space-run">
     <Icon size={14} aria-hidden />
     <div className="space-run-body">
       <div className="space-run-title" title={generationTitle(g)}>{generationTitle(g)}</div>
-      <div className="space-run-meta faint">{g.statusText || STATUS_LABEL[g.status]}</div>
+      <div className="space-run-meta faint">{g.statusText || STATUS_LABEL[g.status]}{eta ? ` · ${eta}` : ''}</div>
       <div className="space-run-bar" role="progressbar" aria-valuenow={p == null ? undefined : Math.round(p * 100)}><span style={{ width: p == null ? '30%' : `${p * 100}%` }} className={p == null ? 'is-indeterminate' : ''} /></div>
     </div>
   </div>;

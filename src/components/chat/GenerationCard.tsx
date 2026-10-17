@@ -1,3 +1,4 @@
+import { useEta } from '../ui/useEta';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
@@ -63,6 +64,7 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
   const ratio = g.kind === 'text' ? 4 : g.kind === 'audio' || g.kind === 'model3d' ? 1 : asked ?? inputRatio ?? (g.kind === 'video' ? 16 / 9 : 1);
   const now = useNow(1000, g.status === 'running' || g.status === 'queued');
   const elapsed = g.startedAt ? formatDuration(now - g.startedAt) : '';
+  const eta = useEta(g);
   return (
     <div className="tile tile-pending" style={{ aspectRatio: `${ratio}`, ['--ratio' as string]: ratio }}>
       <div className="shimmer" />
@@ -70,6 +72,7 @@ function Placeholder({ g, index }: { g: Generation; index: number }) {
         <div className="tile-status">
           <span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Working'}</span>
           {elapsed ? <span className="num faint">{elapsed}</span> : null}
+          {eta ? <span className="faint">{eta}</span> : null}
           {g.progress != null ? (
             <span className="progress">
               <span style={{ width: `${Math.round(g.progress * 100)}%` }} />

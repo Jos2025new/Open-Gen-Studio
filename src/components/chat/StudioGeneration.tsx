@@ -1,3 +1,4 @@
+import { useEta } from '../ui/useEta';
 import { useState, type ReactNode } from 'react';
 import { Check, ChevronDown, Copy, CopyPlus, Download, Info, Star, X, Play, RefreshCw, CircleStop } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
@@ -31,6 +32,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
   const [pick, setPick] = useState<PickKind | null>(null);
   const [picked, setPicked] = useState<string[]>([]);
   const [infoId, setInfoId] = useState<string | null>(null);
+  const eta = useEta(g);
   if (!g || (g.kind !== 'image' && g.kind !== 'video') || !['done', 'running', 'queued'].includes(g.status)) return <>{fallback}</>;
   const busy = g.status !== 'done';
   const outputs = g.assetIds;
@@ -57,7 +59,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
       const total = g.op ? 1 : g.settings.count;
       const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
       return <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status"><div className="shimmer" />
-        <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{outputs.length}/{total}</span></div>
+        <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{outputs.length}/{total}</span>{eta ? <span className="faint">{eta}</span> : null}</div>
         {p != null ? <div className="space-run-bar" role="progressbar" aria-valuenow={Math.round(p * 100)}><span style={{ width: `${p * 100}%` }} /></div> : null}
       </div></div>;
     })() : <>
