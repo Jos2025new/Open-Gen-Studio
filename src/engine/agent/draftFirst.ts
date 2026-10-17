@@ -16,7 +16,7 @@ export const DRAFT_RULE = `Every video plan: after you have settled the video's 
 type RawQuestion = { id: string; question: string; options: string[]; allow_custom?: boolean; multi?: boolean; default?: string };
 
 /** The card the app wants for this question, whatever the agent wrote. */
-export function draftCanon<Q extends RawQuestion>(questions: Q[]): Q[] {
+export function draftCanon<Q extends RawQuestion>(questions: Q[]): Array<Q & RawQuestion> {
   return questions.map((q) => (q.id === DRAFT_ID ? { ...q, question: QUESTION, options: [DRAFT, HQ], allow_custom: true, multi: false, default: DRAFT } : q));
 }
 

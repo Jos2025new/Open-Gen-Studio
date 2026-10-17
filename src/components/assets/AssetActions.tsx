@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
+  Camera,
   AudioLines,
   Image as ImageIcon,
   ChevronDown,
@@ -40,6 +41,8 @@ import { setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, Chip, IconButton, MenuItem, Segmented } from '../ui/primitives';
 import { OpForm } from './OpForm';
+import { SaveStyleForm } from './SaveStyleForm';
+import { captureOfAsset } from '../../engine/captureLibrary';
 
 export const OP_ICONS: Record<OpId, LucideIcon> = {
   relight: Sun,
@@ -180,6 +183,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const sessionId = useStore((s) => s.activeSessionId);
   const pop = usePopover();
   const [subject, setSubject] = useState(false);
+  const [styleForm, setStyleForm] = useState(false);
   const [subjectName, setSubjectName] = useState('');
   const [subjectKind, setSubjectKind] = useState<SubjectKind>('character');
   // A reference sheet can be saved as its four views (Grid-split); on by default for sheets only.
@@ -193,6 +197,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
   const close = () => {
     pop.close();
     setSubject(false);
+    setStyleForm(false);
   };
   return (
     <>
@@ -207,8 +212,10 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
           pop.toggle();
         }}
       />
-      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={subject ? 320 : 240} label="Send to">
-        {subject ? (
+      <Popover open={pop.open} anchor={pop.ref} onClose={close} width={subject || styleForm ? 320 : 240} label="Send to">
+        {styleForm ? (
+          <SaveStyleForm assetId={assetId} onDone={close} />
+        ) : subject ? (
           <form
             className="subject-new"
             onSubmit={(e) => {
@@ -263,6 +270,7 @@ export function SendToMenu({ assetId, size = 'sm' }: { assetId: string; size?: '
                 <MenuItem icon={UserPlus} label="Save to library" tip="Keep this character, object, product or style as @Name" onClick={() => setSubject(true)} />
               </>
             ) : null}
+            {asset.kind !== 'audio' && asset.kind !== 'model3d' && captureOfAsset(assetId) ? <MenuItem icon={Camera} label="Guardar como estilo" tip="Guarda la cámara, el tono, la luz y la textura de este resultado" onClick={() => setStyleForm(true)} /> : null}
             <MenuItem
               icon={Workflow}
               label="Add to Node canvas"

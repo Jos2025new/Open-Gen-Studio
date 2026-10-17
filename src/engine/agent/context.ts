@@ -271,7 +271,8 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const wf = workflowById(st.composer.workflowId);
   if (wf) lines.push(`workflow (${WORKFLOW_CONTRACT}):\n${describeWorkflow(wf)}`);
   const subjects = st.library;
-  if (subjects.length) lines.push(`library (mention as @Name; the app sends its image): ${subjects.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
+  const named = subjects.filter((s) => !s.capture || s.frontalAssetId);
+  if (named.length) lines.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
   lines.push(...captureLines(subjects, st.composer));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).

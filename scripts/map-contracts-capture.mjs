@@ -31,4 +31,18 @@ export default [
     ],
     tests: ['tests/draft-first.test.ts', 'tests/plan-recovery.test.ts', 'tests/story-flow.test.ts'],
   },
+  {
+    id: 'saved-capture-styles',
+    what: 'Guardar como estilo: el CTLT de un resultado se guarda en la biblioteca (Subject kind style con capture), aparece en «Mis estilos» del selector y el agente lo usa por nombre.',
+    sides: [
+      ['src/engine/captureLibrary.ts', 'export function saveCaptureStyle'],
+      ['src/components/assets/SaveStyleForm.tsx', 'saveCaptureStyle('],
+      ['src/components/assets/AssetActions.tsx', '<SaveStyleForm'],
+      ['src/components/composer/CaptureChip.tsx', 'Mis estilos'],
+      ['src/engine/captureStyles.ts', 'export function resolveCapture'],
+      ['src/engine/agent/captureContext.ts', 'saved capture styles'],
+      ['src/engine/types.ts', "import('./captureStyles').CaptureCustom"],
+    ],
+    tests: ['tests/capture-library.test.ts', 'tests/library.test.ts'],
+  },
 ];
