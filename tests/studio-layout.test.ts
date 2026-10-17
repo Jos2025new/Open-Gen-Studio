@@ -156,6 +156,15 @@ describe('Done / Ongoing rule', () => {
   });
 });
 
+describe('Studio board: tile size and new-tile sheen (CSS)', () => {
+  it('Large tiles are at least 200px; the sheen runs 3 passes and is off for reduced motion', async () => {
+    const css = (await import('node:fs')).readFileSync('src/styles/studio.css', 'utf8');
+    expect(css).toMatch(/\.space-board\.is-studio \.space-grid \{[^}]*minmax\(200px/);
+    expect(css).toMatch(/is-pending::after[^}]*animation: tile-sheen [^;]* 3 both/);
+    expect(css).toMatch(/prefers-reduced-motion: reduce\) \{ \.space-board\.is-studio \.space-tile\.is-pending::after \{ animation: none/);
+  });
+});
+
 describe('Studio board: Ongoing tiles and default scope', () => {
   it('a running generation shows arrived outputs as tiles plus shimmer for pending ones; no compact row', () => {
     setData([gen('g1', 'running', ['a1'], { settings: { count: 3 } as never })]);

@@ -30,7 +30,7 @@
 @keyframes studio-spin { to { transform: rotate(360deg); } }
 @media (max-width: 760px) { .studio-board, .studio-reopen-btn { display: none; } .workspace.ws-chat.has-studio-board { padding-right: 0; } .workspace.ws-chat.has-studio-board .composer-dock { left: 50%; width: calc(100% - 20px); } }
 .studio-thumb .shimmer { position: absolute; inset: 0; }
-.space-board.is-studio .space-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+.space-board.is-studio .space-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .space-board.is-studio .space-grid.is-compact { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
 
 /* The tinted kind icon behind a picture (shared by board tiles and chat thumbnails). */
@@ -86,3 +86,7 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 @keyframes studio-dot2 { 0%, 25% { opacity: 0; } 50%, 100% { opacity: 1; } }
 @keyframes studio-dot3 { 0%, 50% { opacity: 0; } 75%, 100% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .studio-spinner { animation: none; } .studio-dots i { animation: none; opacity: 1; } }
+/* A new pending tile gets a light sheen sweeping along its border: 3 passes (~2 s), then stops; plays once per mount. */
+.space-board.is-studio .space-tile.is-pending::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2px; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent) 50%, transparent 65%) 200% 0 / 300% 100% no-repeat; -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0); animation: tile-sheen 0.67s ease-in-out 3 both; }
+@keyframes tile-sheen { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .space-board.is-studio .space-tile.is-pending::after { animation: none; display: none; } }
