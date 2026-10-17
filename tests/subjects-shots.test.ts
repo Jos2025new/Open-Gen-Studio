@@ -118,7 +118,7 @@ describe('subjects and voices end to end (fal)', () => {
     });
     const g = createGeneration({ sessionId: 's', kind: 'video', prompt: '@Mia greets the camera', modelRef: ref, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'composer' });
     await expect(runGeneration(g.id)).rejects.toThrow('stop here');
-    expect(body.prompt).toBe('@Element1 greets the camera');
+    expect(String(body.prompt).startsWith('@Element1 greets the camera ')).toBe(true);
     expect(body.elements).toEqual([{ frontal_image_url: 'data:image/png;base64,mia', reference_image_urls: ['data:image/png;base64,mia2'], voice_id: '829877809978941442' }]);
   });
 

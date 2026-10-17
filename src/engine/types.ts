@@ -199,9 +199,9 @@ export interface ModelSchema {
 export type AdvancedValue = string | number | boolean;
 
 export interface GenSettings {
-  /** Photographic conditions added to realistic image prompts; default 'photographic'. */
-  realism?: 'photographic' | 'ugc' | 'studio' | 'none';
-  /** Shot sheet id (portrait, street, product, landscape, interior, food, pet, ugc, studio); chosen from the prompt when absent. */
+  /** Realism register added to realistic image and video prompts; default 'balanced' ('photographic' = cinematic). */
+  realism?: 'balanced' | 'everyday' | 'cinematic' | 'photographic' | 'ugc' | 'studio' | 'none';
+  /** Shot sheet id (portrait, street, product, landscape, interior, food, pet in cinematic; ugc, studio); chosen from the prompt when absent. */
   shot?: string;
   aspect?: string;
   resolution?: string;
