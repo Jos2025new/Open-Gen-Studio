@@ -1,6 +1,7 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
 import type { SentRequest } from '../lib/debug';
+import type { DraftMode } from './agent/draftFirst';
 import type { FxLayer } from './fx/types';
 
 export type Workspace = 'chat' | 'node' | 'designer';
@@ -563,7 +564,7 @@ export interface SettingsSection {
   recommended: SettingsChoice;
   /** A few other models that take the same inputs. */
   alternatives: string[];
-  /** The selection while the card is open (kept so typing a message confirms it), then the confirmed one. */
+  /** The selection while the card is open (typing confirms it), then the confirmed one. */
   chosen?: SettingsChoice;
 }
 
@@ -574,7 +575,8 @@ export interface SettingsFeedItem extends FeedBase {
   /** Only the kinds of the plan that comes now, images before video. */
   sections: SettingsSection[];
   status: 'pending' | 'confirmed' | 'skipped';
-  /** The agent's call this card answers: lets the user reopen it later and confirm again. */
+  draft?: DraftMode;
+  /** The agent's call this card answers (to reopen and confirm again). */
   toolCallId?: string;
 }
 
@@ -892,6 +894,7 @@ export interface AgentState {
   settings?: Partial<Record<'video' | 'image', SettingsChoice>>;
   /** Every part of the last confirmed card, in order (two image models when the user compares them). */
   settingsParts?: Array<SettingsChoice & { kind: 'video' | 'image' }>;
+  draftMode?: DraftMode;
   questionRound: number;
   /** Facts to hand to the model with the next user turn (e.g. execution results). */
   notes: string[];

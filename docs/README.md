@@ -127,6 +127,7 @@
 - [038-2026-10-W42: modos, Check status, agente y guías (2026-10-14/15)](history/038-2026-10-W42.md) — decisiones del usuario, atribución, límites y pendientes de `task/ref-roles`.
 - [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia (tests, capturas, sin ver en navegador) y decisiones del usuario.
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
+- [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
 
 ## Trazabilidad
 

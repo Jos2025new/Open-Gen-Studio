@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DRAFT_ID, DRAFT, HQ, draftAnswer, draftCanon, draftGate, isDraftCard } from '../src/engine/agent/draftFirst';
+import { DRAFT, HQ, draftAnswer, draftGate, draftMode, highestResolution, lowestResolution, modeResolution, unlockNote } from '../src/engine/agent/draftFirst';
 import { improvePlan } from '../src/engine/improveShot';
 import { useStore } from '../src/store/store';
+import type { DraftMode } from '../src/engine/agent/draftFirst';
 import type { FeedItem, Generation, ModelSchema } from '../src/engine/types';
 
 vi.hoisted(() => {
@@ -14,39 +15,47 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async (id: string) => id,
 }));
 
-const card = (answer: string | undefined, status: 'answered' | 'skipped' | 'pending' = 'answered'): FeedItem => ({ id: 'q', createdAt: 1, workspace: 'chat', type: 'questions', questions: [], round: 1, maxRounds: 1, status, ...(answer ? { answers: { [DRAFT_ID]: answer } } : {}) }) as FeedItem;
+const card = (draft: DraftMode | undefined, status: 'confirmed' | 'skipped' | 'pending' = 'confirmed'): FeedItem => ({ id: 's', createdAt: 1, workspace: 'chat', type: 'settings', sections: [], status, ...(draft ? { draft } : {}) }) as FeedItem;
 const user = { id: 'u', createdAt: 1, workspace: 'chat', type: 'user', text: 'haz un video' } as FeedItem;
-const video = { kind: 'video', purpose: 'draft' };
+const video = { kind: 'video' };
 
-describe('borrador primero (todo video)', () => {
-  it('un plan con video espera la tarjeta; una imagen no', () => {
-    expect(draftGate([video], [user], 'auto', false)).toMatch(/draft_first/);
+describe('borrador primero (todo video), en la tarjeta de ajustes', () => {
+  it('un plan con video espera la tarjeta confirmada; una imagen no', () => {
+    expect(draftGate([video], [user], 'auto', false)).toMatch(/confirm_settings/);
     expect(draftGate([{ kind: 'image' }], [user], 'auto', false)).toBeNull();
   });
   it('omitida o pendiente no cuenta; Direct no tiene tarjetas', () => {
-    expect(draftGate([video], [user, card(undefined, 'skipped')], 'guided', false)).not.toBeNull();
-    expect(draftGate([video], [user, card(DRAFT, 'pending')], 'guided', false)).not.toBeNull();
+    expect(draftGate([video], [user, card(draftMode('draft'), 'skipped')], 'guided', false)).not.toBeNull();
+    expect(draftGate([video], [user, card(draftMode('draft'), 'pending')], 'guided', false)).not.toBeNull();
     expect(draftGate([video], [user], 'direct', false)).toBeNull();
   });
-  it('Borrador exige purpose draft o resolución; Alta calidad y texto libre pasan', () => {
-    expect(draftGate([{ kind: 'video' }], [user, card(DRAFT)], 'auto', false)).toMatch(/lowest resolution/);
-    expect(draftGate([{ kind: 'video', resolution: '480p' }], [user, card(DRAFT)], 'auto', false)).toBeNull();
-    expect(draftGate([{ kind: 'video' }], [user, card(HQ)], 'auto', false)).toBeNull();
-    expect(draftGate([{ kind: 'video' }], [user, card('mejor un plano más largo')], 'auto', false)).toBeNull();
+  it('Borrador, Alta calidad y texto libre pasan; texto libre vacío no', () => {
+    for (const m of [draftMode('draft'), draftMode('hq'), draftMode('other', 'mejor un plano más largo')]) expect(draftGate([video], [user, card(m)], 'auto', false)).toBeNull();
+    expect(draftGate([video], [user, card(draftMode('other', '  '))], 'auto', false)).not.toBeNull();
   });
   it('la respuesta de una petición anterior no vale, salvo en una revisión', () => {
-    const feed = [card(HQ), user];
+    const feed = [card(draftMode('hq')), user];
     expect(draftAnswer(feed)).toBeUndefined();
     expect(draftGate([video], feed, 'auto', false)).not.toBeNull();
     expect(draftGate([video], feed, 'auto', true)).toBeNull();
   });
-  it('la app fija opciones y campo libre; la pregunta no gasta ronda', () => {
-    const [q] = draftCanon([{ id: DRAFT_ID, question: 'x', options: ['a', 'b'] }]);
-    expect(q.options).toEqual([DRAFT, HQ]);
-    expect(q.allow_custom).toBe(true);
-    expect(q.default).toBe(DRAFT);
-    expect(isDraftCard({ questions: [{ id: DRAFT_ID }] })).toBe(true);
-    expect(isDraftCard({ questions: [{ id: 'style' }] })).toBe(false);
+  it('la app fija la resolución: Borrador la más baja (480p) y bloqueada; Alta calidad desbloqueada', () => {
+    expect(draftMode('draft').locked).toBe(true);
+    expect(draftMode('hq').locked).toBe(false);
+    expect(draftMode('other', 'x').locked).toBe(false);
+    expect(lowestResolution(['720p', '480p', '1080p'])).toBe('480p');
+    expect(lowestResolution(['1080p', '720p'])).toBe('720p');
+    expect(highestResolution(['480p', '1080p', '720p'])).toBe('1080p');
+    expect(modeResolution(draftMode('draft'), ['480p', '720p'], '720p')).toBe('480p');
+    expect(modeResolution(draftMode('hq'), ['480p', '720p', '1080p'], '720p')).toBe('720p');
+    expect(modeResolution(draftMode('hq'), ['480p', '720p'], '480p')).toBe('720p');
+    expect(modeResolution(draftMode('other', 'x'), ['480p', '720p'])).toBeUndefined();
+    expect(DRAFT).toBe('Borrador');
+    expect(HQ).toBe('Alta calidad');
+  });
+  it('la nota de desbloqueo es un hecho con la resolución elegida', () => {
+    expect(unlockNote('720p')).toMatch(/desbloqueó la resolución de borrador y eligió 720p/);
+    expect(unlockNote('720p')).toMatch(/no la cuestiones/);
   });
 });
 

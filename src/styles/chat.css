@@ -123,6 +123,8 @@
 .set-model-name { font-weight: 550; }
 .set-model-price { margin-left: auto; }
 .set-more { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; font-size: 12px; color: var(--text-2); padding: 6px 10px; border: 1px dashed var(--border-strong); border-radius: 5px; }
+.set-lock { display: inline-grid; place-items: center; margin-left: 6px; vertical-align: middle; width: 20px; height: 20px; border-radius: 4px; color: var(--accent); }
+.set-lock:hover { background: var(--accent-soft); }
 .set-more:hover { color: var(--text); border-color: var(--text-4); }
 .set-more .is-flipped { transform: rotate(180deg); }
 .set-duration { display: flex; align-items: center; gap: 10px; }

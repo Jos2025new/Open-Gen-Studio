@@ -1,46 +1,69 @@
-import type { AgentStyle, FeedItem } from '../types';
+import type { AgentStyle, FeedItem, SettingsChoice } from '../types';
+
+/** The draft choice every video settings card carries; `locked`: the app fixed the resolution (draft) and only the padlock lifts it; `unlocked`: it was lifted. */
+export interface DraftMode { kind: 'draft' | 'hq' | 'other'; text?: string; locked: boolean; unlocked?: boolean }
 
 /*
- * Draft first (all videos): before a video plan the user always picks "Borrador" (cheap, lowest resolution, to choose
- * the style and the feeling), "Alta calidad directamente" or writes something else. It is the ordinary questions card with
- * one fixed question; the plan is refused until it is answered, and the card cannot be skipped.
+ * Draft first (all videos): the video settings card carries a mandatory choice at its top: "Borrador" (cheap, lowest
+ * resolution, to choose the style and the feeling), "Alta calidad" or the user's own words. The plan is refused until
+ * a settings card with that choice was confirmed. "Borrador" sets the lowest resolution and LOCKS it: the app applies it
+ * at confirmation and over every plan step, so the agent cannot change it. The padlock on the card lifts the lock.
  */
 
-export const DRAFT_ID = 'draft_first';
 export const DRAFT = 'Borrador';
-export const HQ = 'Alta calidad directamente';
-const QUESTION = 'Video: ¿borrador para elegir estilo y sensación, o alta calidad directamente?';
+export const HQ = 'Alta calidad';
 
-export const DRAFT_RULE = `Every video plan: after you have settled the video's model and before propose_plan, call ask_questions once with ONE question whose id is "${DRAFT_ID}" (the app fixes its options: "${DRAFT}", "${HQ}" and a free "Otra cosa…" field; you may leave options as any two strings). The app refuses a video plan until the user answered it. "${DRAFT}": every video step gets purpose "draft" and the lowest resolution its model lists (480p when it exists), so the user picks style and feeling cheaply. "${HQ}": the settings confirmed. Free text: follow it. A finished draft offers "Mejorar esta toma" (same prompt and seed in high quality); never offer it yourself.`;
+export const DRAFT_RULE = `Every video plan: the app puts the draft choice ("${DRAFT}" / "${HQ}" / the user's words) at the top of the video settings card; never ask it yourself and never put a resolution in confirm_settings. "${DRAFT}": the app sets the lowest resolution and locks it; you cannot change or unlock it, and any resolution you write in a step is replaced. If a note says the user unlocked the resolution and chose another, they decided it: acknowledge it briefly, do not question it, and go on with the plan already accepted. Free text: follow it. A finished draft offers "Mejorar esta toma" (same prompt and seed in high quality); never offer it yourself.`;
 
-type RawQuestion = { id: string; question: string; options: string[]; allow_custom?: boolean; multi?: boolean; default?: string };
+const pixels = (r: string): number => Number(/(\d{3,4})/.exec(r)?.[1] ?? NaN);
 
-/** The card the app wants for this question, whatever the agent wrote. */
-export function draftCanon<Q extends RawQuestion>(questions: Q[]): Array<Q & RawQuestion> {
-  return questions.map((q) => (q.id === DRAFT_ID ? { ...q, question: QUESTION, options: [DRAFT, HQ], allow_custom: true, multi: false, default: DRAFT } : q));
+/** 480p when the model has it, else its lowest resolution. */
+export function lowestResolution(list: string[]): string | undefined {
+  if (!list.length) return undefined;
+  if (list.includes('480p')) return '480p';
+  return [...list].sort((a, b) => (pixels(a) || Infinity) - (pixels(b) || Infinity))[0];
 }
 
-/** An ask_questions call that carries the draft question: it does not use up a question round. */
-export const isDraftCard = (raw: unknown): boolean => Array.isArray((raw as { questions?: unknown })?.questions) && (raw as { questions: Array<{ id?: unknown }> }).questions.some((q) => q?.id === DRAFT_ID);
+export function highestResolution(list: string[]): string | undefined {
+  return [...list].sort((a, b) => (pixels(b) || 0) - (pixels(a) || 0))[0];
+}
 
-/** The user's answer to the latest answered draft card of this request: 'draft', 'hq' or their own words. */
+/** The resolution a draft mode gives a video choice: draft the lowest (locked), high quality the recommended unless that is the lowest, else the highest. */
+export function modeResolution(mode: DraftMode | undefined, list: string[], recommended?: string): string | undefined {
+  if (!list.length) return undefined;
+  if (mode?.kind === 'draft') return lowestResolution(list);
+  if (mode?.kind === 'hq') return recommended && list.includes(recommended) && recommended !== lowestResolution(list) ? recommended : highestResolution(list);
+  return undefined;
+}
+
+/** The draft mode for a choice made on the card. */
+export const draftMode = (kind: DraftMode['kind'], text?: string): DraftMode => ({ kind, ...(kind === 'other' ? { text: text ?? '' } : {}), locked: kind === 'draft' });
+
+/** What the agent is told when the user lifts the padlock: a fact, not a request. */
+export const unlockNote = (resolution: string | undefined): string => `El usuario desbloqueó la resolución de borrador y eligió ${resolution ?? 'la predeterminada'}. Es su decisión: no la cuestiones; confírmalo en una frase y sigue con el plan ya aceptado.`;
+
+/** The user's choice on the latest confirmed video settings card of this request: 'draft', 'hq' or their own words. */
 export function draftAnswer(feed: FeedItem[], sinceLastUser = true): 'draft' | 'hq' | 'other' | undefined {
   const from = sinceLastUser ? feed.map((f) => f.type).lastIndexOf('user') : -1;
   for (let i = feed.length - 1; i > from; i--) {
     const f = feed[i];
-    if (f.type !== 'questions' || f.status !== 'answered') continue;
-    const a = f.answers?.[DRAFT_ID];
-    if (a != null) return a === DRAFT ? 'draft' : a === HQ ? 'hq' : 'other';
+    if (f.type !== 'settings' || f.status !== 'confirmed' || !f.draft) continue;
+    if (f.draft.kind === 'other' && !f.draft.text?.trim()) continue;
+    return f.draft.kind;
   }
   return undefined;
 }
 
 /** Why a plan with video cannot be shown yet, or null. Direct mode has no cards, so it never asks. */
-export function draftGate(steps: Array<{ kind?: string; purpose?: string; resolution?: string }>, feed: FeedItem[], style: AgentStyle, revision: boolean): string | null {
-  const videos = steps.filter((s) => s.kind === 'video');
-  if (!videos.length || style === 'direct') return null;
+export function draftGate(steps: Array<{ kind?: string }>, feed: FeedItem[], style: AgentStyle, revision: boolean): string | null {
+  if (!steps.some((s) => s.kind === 'video') || style === 'direct') return null;
   const answer = draftAnswer(feed) ?? (revision ? draftAnswer(feed, false) : undefined);
-  if (!answer) return `Not shown: a video plan needs the draft choice first. Call ask_questions with one question whose id is "${DRAFT_ID}" (the app sets its options) and wait for the answer; then call propose_plan again.`;
-  if (answer === 'draft' && videos.some((s) => s.purpose !== 'draft' && !s.resolution)) return `The user chose "${DRAFT}": every video step needs purpose "draft" and the lowest resolution its model lists (480p when it exists). Fix the video steps and call propose_plan again.`;
-  return null;
+  if (answer) return null;
+  return `Not shown: a video plan needs the draft choice, which is on the video settings card. Call confirm_settings (kind video) and wait for the user to continue; then call propose_plan again.`;
+}
+
+/** The choice with the mode's resolution applied (draft: always the lowest, whatever it held). */
+export function withModeResolution(choice: SettingsChoice, mode: DraftMode | undefined, list: string[], recommended?: string): SettingsChoice {
+  const r = modeResolution(mode, list, recommended);
+  return r ? { ...choice, resolution: r } : choice;
 }

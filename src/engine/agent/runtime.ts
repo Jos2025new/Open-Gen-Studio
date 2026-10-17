@@ -1,4 +1,4 @@
-import { draftCanon, draftGate, isDraftCard } from './draftFirst';
+import { cardDraft, confirmedSections, draftGate, draftLines } from './draftActions';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
@@ -309,7 +309,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   beginJourney(sessionId, 'settings-response');
   // Cost/candidates in presentPlan still gate reuse of confirmed settings; per-request comparison parts are cleared.
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
-  patchAgent(sessionId, { questionRound: 0, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
+  patchAgent(sessionId, { questionRound: 0, draftMode: undefined, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
@@ -441,7 +441,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   const s = session(sessionId);
   const item = s.feed.find((f) => f.id === itemId);
   if (!item || item.type !== 'settings' || item.status !== 'pending') return;
-  const sections = sectionsOf(item).map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended }));
+  const sections = confirmedSections(item, sectionsOf(item).map((x, i) => ({ ...x, chosen: chosen[i] ?? x.chosen ?? x.recommended })));
   updateFeedItem<SettingsFeedItem>(sessionId, itemId, { status: 'confirmed', sections });
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.confirmed', reason: 'user selected and continued', sessionId, approvalId: itemId, before: { status: item.status, choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.recommended.count, duration: x.recommended.duration })) }, after: { status: 'confirmed', choices: sections.map((x) => ({ kind: x.kind, modelRef: x.chosen!.modelRef, needsImage: x.chosen!.needsImage, count: x.chosen!.count, resolution: x.chosen!.resolution, duration: x.chosen!.duration, aspect: x.chosen!.aspect })) } });
   const pending = s.agent.pending;
@@ -450,7 +450,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: sections.map((x) => ({ ...x.chosen!, kind: x.kind })) }));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const name = (ref: string) => modelSummary(ref)?.name ?? ref;
-  const lines: string[] = [];
+  const lines = draftLines(item.draft, sections);
   let guides = '';
   for (const x of sections) {
     const c = x.chosen;
@@ -1537,7 +1537,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, sections, status: 'pending', toolCallId: call.id };
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sections) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
@@ -1548,7 +1548,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const style = get().composer.agentStyle;
           const s = session(sessionId);
           // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
-          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds) && !isDraftCard(parsed.value)) {
+          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
@@ -1566,7 +1566,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             sessionId,
             workspace,
             v.data.intro,
-            draftCanon(v.data.questions).map((q) => ({
+            v.data.questions.map((q) => ({
               id: q.id,
               question: q.question,
               options: q.options,

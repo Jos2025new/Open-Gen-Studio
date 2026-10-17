@@ -1,12 +1,14 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Lock, LockOpen } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
+import { selectDraft, unlockDraft } from '../../engine/agent/draftActions';
 import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
 import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { useStore } from '../../store/store';
 import { Button, Range } from '../ui/primitives';
+import { DRAFT, HQ, lowestResolution, type DraftMode } from '../../engine/agent/draftFirst';
 import { ensureSchema } from '../../engine/catalog';
 import { variantRoute } from '../../engine/variants';
 import { AspectGlyph } from '../composer/MediaControls';
@@ -43,15 +45,16 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     <article className="q-card set-card">
       <div className="q-kicker">Settings · before the plan is written</div>
       {item.summary ? <p className="q-intro">{item.summary}</p> : null}
+      {item.draft ? <DraftChoice item={item} sessionId={sessionId} /> : null}
       {sections.map((x, i) => (
         <div key={`${x.kind}-${i}`} className={titled ? 'set-section' : undefined}>
           {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}{sameKind(i) ? ` · ${name(x.recommended.modelRef)}` : ''}</div> : null}
-          <SettingsSectionBlock section={x} index={i} itemId={item.id} sessionId={sessionId} />
+          <SettingsSectionBlock section={x} index={i} itemId={item.id} sessionId={sessionId} draft={item.draft} />
         </div>
       ))}
       <footer className="q-foot">
         <span className="set-total faint">The exact cost is shown with the plan, once the prompts are written.</span>
-        <Button variant="primary" size="sm" onClick={() => void confirmSettings(sessionId, item.id, sections.map((x) => x.chosen ?? x.recommended))}>
+        <Button variant="primary" size="sm" disabled={item.draft?.kind === 'other' && !item.draft.text?.trim()} onClick={() => void confirmSettings(sessionId, item.id, sections.map((x) => x.chosen ?? x.recommended))}>
           Continue <ArrowRight size={13} />
         </Button>
       </footer>
@@ -59,7 +62,32 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   );
 }
 
-function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { section: SettingsSection; index: number; itemId: string; sessionId: string }) {
+/** Borrador / Alta calidad / Otra cosa…, mandatory on every video card: the draft locks the resolution below. */
+function DraftChoice({ item, sessionId }: { item: SettingsFeedItem; sessionId: string }) {
+  const d = item.draft!;
+  const opt = (kind: 'draft' | 'hq', label: string) => (
+    <button type="button" className={`q-opt ${d.kind === kind ? 'is-on' : ''}`} aria-pressed={d.kind === kind} onClick={() => selectDraft(sessionId, item.id, kind)}>
+      {d.kind === kind ? <Check size={12} /> : null}
+      {label}
+    </button>
+  );
+  return (
+    <div className="q-block">
+      <div className="q-question">Video: ¿borrador para elegir estilo y sensación, o alta calidad?</div>
+      <div className="q-options">{opt('draft', DRAFT)}{opt('hq', HQ)}</div>
+      <input
+        className="q-custom"
+        type="text"
+        placeholder="Otra cosa…"
+        aria-label="Otra cosa…"
+        value={d.kind === 'other' ? d.text ?? '' : ''}
+        onChange={(e) => selectDraft(sessionId, item.id, 'other', e.target.value)}
+      />
+    </div>
+  );
+}
+
+function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }: { section: SettingsSection; index: number; itemId: string; sessionId: string; draft?: DraftMode }) {
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
@@ -67,6 +95,8 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   useEffect(() => {
     for (const ref of [item.recommended.modelRef, ...item.alternatives, item.chosen?.modelRef]) if (ref) void ensureSchema(ref);
   }, [item]);
+  // The draft choice (selectDraft) changes the stored selection from outside: follow it.
+  useEffect(() => { if (item.chosen && item.chosen.resolution !== choice.resolution) setChoice(item.chosen); }, [item.chosen?.resolution]); // eslint-disable-line react-hooks/exhaustive-deps
   const [moreOpen, setMoreOpen] = useState(choice.modelRef !== item.recommended.modelRef);
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
   const provider = (ref: string) => ref.split('::')[0];
@@ -76,6 +106,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
     return e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
   };
 
+  const locked = item.kind === 'video' && Boolean(draft?.locked);
   const update = (next: SettingsChoice) => {
     setChoice(next);
     selectSettings(sessionId, itemId, index, next);
@@ -83,6 +114,12 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
   // Another model keeps the values the user picked when it has them, else its own medium ones.
   const pickModel = (ref: string) => update({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage });
   const opts = settingsOptions(schemas[choice.modelRef], item.kind);
+  // A locked draft keeps the lowest resolution of whichever model is picked (the schema may arrive late).
+  const lockedRes = locked ? lowestResolution(opts.resolutions) : undefined;
+  useEffect(() => {
+    if (lockedRes && choice.resolution !== lockedRes) update({ ...choice, resolution: lockedRes });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockedRes, choice.resolution]);
   // Exact pixel sizes (Seedream): size tier + ratio, as the composer and the nodes show them (params.pixelSizes).
   const px = opts.px;
   const pxNow = px && choice.aspect ? px.of(choice.aspect) : undefined;
@@ -132,8 +169,11 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId }: { sec
 
       {opts.resolutions.length ? (
         <div className="q-block">
-          <div className="q-question">Resolution</div>
-          <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => update({ ...choice, resolution: v }))}</div>
+          <div className="q-question">Resolution
+            {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => unlockDraft(sessionId, itemId)}><Lock size={12} /></button>
+              : draft?.unlocked && item.kind === 'video' ? <LockOpen size={12} className="faint" aria-label="Resolución desbloqueada" /> : null}
+          </div>
+          <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => { if (!locked) update({ ...choice, resolution: v }); })}</div>
         </div>
       ) : px && px.tiers.length > 1 ? (
         <div className="q-block">
