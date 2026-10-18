@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
-import type { ActivityEntry, ActivityFeedItem } from '../../engine/types';
+import type { ActivityEntry, ActivityFeedItem, AgentState } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { useNow } from '../ui/hooks';
 import { seconds, waitDetail } from '../../engine/agent/schemaWait';
 
 const ICONS = { guide: BookOpen, search: Search, questions: MessageCircleQuestion, plan: ClipboardList, fix: Wrench, schema: Braces } as const;
+/** One shared empty list: a selector that returns a fresh [] each time makes the store re-render forever. */
+const NO_WAITS: NonNullable<AgentState['waiting']> = [];
 const PHASE = { working: 'Working', drafting: 'Drafting the plan', checking: 'Checking the plan' } as const;
 
 function Thinking({ entry, live }: { entry: Extract<ActivityEntry, { kind: 'thinking' }>; live: boolean }) {
@@ -29,7 +31,7 @@ function Thinking({ entry, live }: { entry: Extract<ActivityEntry, { kind: 'thin
 export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; sessionId: string }) {
   const busy = useStore((s) => s.sessions[sessionId]?.agent.busy ?? false);
   const phase = useStore((s) => s.sessions[sessionId]?.agent.phase ?? 'working');
-  const waiting = useStore((s) => s.sessions[sessionId]?.agent.waiting ?? []);
+  const waiting = useStore((s) => s.sessions[sessionId]?.agent.waiting ?? NO_WAITS);
   const running = !item.endedAt && busy;
   const now = useNow(1000, running);
   const [open, setOpen] = useState(true);
