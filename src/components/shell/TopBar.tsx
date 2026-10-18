@@ -12,6 +12,8 @@ import { ConnectedProviders } from './ConnectedProviders';
 import type { RemoteProviderId } from '../../engine/types';
 import { IconButton } from '../ui/primitives';
 import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
+import { HomeIcon } from './Sidebar';
+import { openHome } from './navModel';
 import '../../styles/topbar-home.css';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
@@ -63,6 +65,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
     <header className="topbar">
       <div className="topbar-left">
         {!home && <>
+        <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
         <button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
             {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
           </button>

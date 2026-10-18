@@ -5,3 +5,7 @@
 .topbar-pill { border: 1px solid var(--border); border-radius: var(--r-full); }
 .topbar-pill:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .topbar-pill-label { transition: none; } }
+/* Outside Home: the house button before the breadcrumb, muted like the other top-bar icons. */
+.topbar-home { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--text-3); }
+.topbar-home:hover { color: var(--text); background: var(--surface-2); }
+.topbar-home:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

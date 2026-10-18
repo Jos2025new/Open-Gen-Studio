@@ -11,7 +11,7 @@ vi.mock('../src/lib/idb', () => ({
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { TopBar } from '../src/components/shell/TopBar';
-import { setUi } from '../src/store/store';
+import { setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
@@ -49,5 +49,18 @@ describe('top bar on Home', () => {
     expect(host.textContent).toContain('Generations');
     expect(host.querySelector('.topbar-pill')).toBeNull();
     expect(host.querySelector('.topbar-menu')?.textContent).toContain('Connected');
+  });
+  it('outside Home a Home button sits before the breadcrumb and opens Home', () => {
+    const host = mount(false);
+    const btn = host.querySelector('.topbar-home') as HTMLButtonElement;
+    expect(btn.getAttribute('aria-label')).toBe('Home');
+    expect(btn.getAttribute('title')).toBe('Home');
+    expect(btn.compareDocumentPosition(host.querySelector('.ws-tag')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    act(() => btn.click());
+    expect(useStore.getState().ui.home).toBe(true);
+  });
+  it('on Home the Home button is absent', () => {
+    const host = mount(true);
+    expect(host.querySelector('.topbar-home')).toBeNull();
   });
 });
