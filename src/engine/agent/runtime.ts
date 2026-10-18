@@ -36,8 +36,6 @@ import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, re
 import type {
   AgentStyle,
   LlmContentPart,
-  ActivityEntry,
-  ActivityFeedItem,
   AgentQuestion,
   AgentState,
   FeedItem,
@@ -89,6 +87,8 @@ import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
 import { endedWithoutPlan } from './endedWithoutPlan';
+import { checkingPlan, untilStopped, watchModel } from './turnStop';
+import { activityLog } from './activityLog';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { failedStepSummary } from './failureContext';
@@ -97,6 +97,8 @@ import { TOOLS, CAPABILITIES, MUST, continueInChatSchema, continueInDesignerSche
 const get = useStore.getState;
 /** One controller per turn, by session: a turn in one session never stops or clears another's. */
 const controllers = new Map<string, AbortController>();
+/** Ends a turn at once (Stop, the cap), without waiting for what it awaits. */
+const ending = new WeakMap<AbortController, () => void>();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -194,7 +196,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
   const doc = workspace === 'designer' ? activeDoc(sessionId) : null;
   return {
     workspace,
-    getModel: resolveModel,
+    getModel: watchModel(sessionId, resolveModel),
     variantModel: (ref: string, route: import('../variants').VariantRoute) => {
       const routes = lineRoutes(ref);
       return routes[route] ?? (route === 'edit' ? routes.reference : undefined);
@@ -498,7 +500,9 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
 
 /** Stop the agent of the given session (by default the one on screen). */
 export function stopAgent(sessionId: string = get().activeSessionId): void {
-  controllers.get(sessionId)?.abort();
+  const c = controllers.get(sessionId);
+  c?.abort();
+  if (c) ending.get(c)?.();
 }
 
 // ---------------------------------------------------------------------------
@@ -561,10 +565,13 @@ async function presentPlan(
   revision = false,
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
+  /** The turn's signal: a plan checked after Stop is dropped. */
+  signal?: AbortSignal,
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId), planId);
+  if (signal?.aborted) return { errors: [] };
   const journey = revision ? 'plan-revision' : 'settings-correction';
   const summarizeInputs = (step: PlanStep) => step.kind === 'video'
     ? { references: step.refs, firstFrame: step.firstFrame, lastFrame: step.lastFrame }
@@ -1241,57 +1248,6 @@ function guideLabel(id: string): string {
   return id;
 }
 
-/**
- * The turn's activity block (L3): created when the turn starts, it collects the streamed reasoning (store updates
- * throttled) and each action, and records when the turn ended.
- */
-function activityLog(sessionId: string, workspace: Workspace) {
-  const item: ActivityFeedItem = { ...feedBase(workspace), type: 'activity', startedAt: Date.now(), entries: [] };
-  appendFeed(sessionId, item);
-  const patch = (fn: (entries: ActivityEntry[]) => ActivityEntry[]) =>
-    updateFeedItem<ActivityFeedItem>(sessionId, item.id, (it) => ({ ...it, entries: fn(it.entries) }));
-  let thinking = -1;
-  let latest = '';
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const flush = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-    const text = latest.length > 6000 ? `…${latest.slice(-6000)}` : latest;
-    const at = thinking;
-    if (at >= 0) patch((e) => e.map((x, i) => (i === at && x.kind === 'thinking' ? { ...x, text } : x)));
-  };
-  return {
-    id: item.id,
-    thinking(full: string) {
-      if (thinking < 0) {
-        patch((e) => {
-          thinking = e.length;
-          return [...e, { kind: 'thinking', text: '' }];
-        });
-      }
-      latest = full;
-      timer ??= setTimeout(flush, 150);
-    },
-    /** A model call ended: its reasoning (if any) gets its duration; the next call starts a new one. */
-    callEnded(reasoningMs: number | undefined, totalMs: number) {
-      if (thinking < 0) return;
-      flush();
-      const at = thinking;
-      const ms = reasoningMs != null ? totalMs - reasoningMs : undefined;
-      patch((e) => e.map((x, i) => (i === at && x.kind === 'thinking' ? { ...x, ms } : x)));
-      thinking = -1;
-      latest = '';
-    },
-    action(entry: Omit<Extract<ActivityEntry, { kind: 'action' }>, 'kind'>) {
-      patch((e) => [...e, { kind: 'action', ...entry }]);
-    },
-    end() {
-      flush();
-      updateFeedItem<ActivityFeedItem>(sessionId, item.id, { endedAt: Date.now() });
-    },
-  };
-}
-
 /** Delete under a garbled reply: removes it and the warning. */
 export function deleteGarbled(sessionId: string, noticeId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === noticeId);
@@ -1335,6 +1291,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   const controller = new AbortController();
   controllers.set(sessionId, controller);
   const signal = controller.signal;
+  const until = <T,>(work: Promise<T>) => untilStopped(work, signal);
   const clock = turnClock(sessionId);
   const turnStart = Date.now();
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
@@ -1346,26 +1303,44 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
   let armedAt = 0;
   let cutTurn = false;
+  let done = false;
   const armSilence = () => {
     const now = Date.now();
+    if (done) return;
     if (now - armedAt < 5_000) return; // a stream of deltas must not churn timers
     armedAt = now;
     clearTimeout(silenceTimer);
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
+  const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
+  // The end of the turn, once: Stop and the cap call it at once; the turn's own exit finds it done and leaves a newer turn alone.
+  const finish = (say?: () => void) => {
+    if (done) return;
+    done = true;
+    say?.();
+    clearTimeout(silenceTimer);
+    clearTimeout(capTimer);
+    keepCommentedPlan(sessionId);
+    log.end();
+    clock.end();
+    patchAgent(sessionId, { busy: false, phase: undefined });
+    if (controllers.get(sessionId) === controller) controllers.delete(sessionId);
+  };
   const cut = () => {
     cutTurn = true;
     logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: TURN_CAP_MS });
     controller.abort();
+    finish(limitNote);
   };
   const capTimer = setTimeout(cut, TURN_CAP_MS);
+  ending.set(controller, () => finish(() => notice(sessionId, workspace, 'Stopped.', 'info')));
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
       // The cap can also fall between two calls, where there is nothing to abort.
       if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
         if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
-        notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
+        limitNote();
         return;
       }
       let textItemId: string | null = null;
@@ -1377,7 +1352,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           pushHistory(sessionId, { role: 'user', content: HURRY_NOTE });
           hurryNoted = true;
         }
-        result = await chat({
+        result = await until(chat({
           provider: engine.provider,
           apiKey: engine.key,
           model: engine.model,
@@ -1386,15 +1361,17 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           tools: toolsFor(get().composer.agentStyle),
           effort: get().settings.agent.effort,
           showReasoning: showThinking,
-          onNotice: (text) => notice(sessionId, workspace, text, 'info'),
-          onReasoning: showThinking ? (_d, full) => (armSilence(), log.thinking(full)) : undefined,
+          onNotice: (text) => !done && notice(sessionId, workspace, text, 'info'),
+          onReasoning: showThinking ? (_d, full) => !done && (armSilence(), log.thinking(full)) : undefined,
           signal,
           onToolCall: () => {
+            if (done) return;
             firstOutput();
             armSilence();
             patchAgent(sessionId, { phase: 'drafting' });
           },
           onText: (_delta, full) => {
+            if (done) return;
             armSilence();
             if (!textItemId) {
               firstOutput();
@@ -1405,20 +1382,19 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
               updateFeedItem(sessionId, textItemId, { text: full });
             }
           },
-        });
+        }));
       } catch (err) {
         if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
         if (isAbort(err)) {
-          // Cut by the cap, or by the user pressing Stop: they are not the same thing and must not read the same.
-          if (cutTurn) notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
-          else notice(sessionId, workspace, 'Stopped.', 'info');
+          // Stop and the cap already said so and ended the turn; this is an abort from elsewhere.
+          if (!done) (cutTurn ? limitNote : () => notice(sessionId, workspace, 'Stopped.', 'info'))();
           return;
         }
         // No credit for the agent's model: the same model elsewhere (same price or less) takes over and the call runs
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await onAgentCredit()) return llmTurn(sessionId, workspace, { ...opts, creditRetried: true });
+          if (await until(onAgentCredit())) return llmTurn(sessionId, workspace, { ...opts, creditRetried: true });
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
@@ -1528,10 +1504,10 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             // One part per kind, except to compare models: another part of that kind needs a model of its own.
             const seen = parts.slice(0, parts.indexOf(d)).filter((x) => x.kind === d.kind);
             if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
-            const built = await buildSettings(
+            const built = await until(buildSettings(
               { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
               { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
-            );
+            ));
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
           }
@@ -1585,7 +1561,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const v = findModelsSchema.safeParse(parsed.value);
           recordMetric(sessionId, { type: 'findModels' });
           if (v.success) log.action({ icon: 'search', label: 'Explored models', detail: v.data.query });
-          respond(v.success ? await findModelsResult(v.data.query, v.data.kind) : `Invalid find_models input: ${formatZodError(v.error)}`);
+          respond(v.success ? await until(findModelsResult(v.data.query, v.data.kind)) : `Invalid find_models input: ${formatZodError(v.error)}`);
           continue;
         }
         if (call.name === 'recover_plan') {
@@ -1608,7 +1584,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         if (['edit_node', 'connect_nodes', 'disconnect_nodes', 'delete_nodes', 'restore_nodes'].includes(call.name)) {
           if (workspace !== 'node') { respond('Graph actions work only on the node canvas.'); continue; }
           try {
-            const result = await editGraphTool(sessionId, call.name, parsed.value);
+            const result = await until(editGraphTool(sessionId, call.name, parsed.value));
             respond(result.text);
           } catch (error) { respond(`Cannot ${call.name}: ${(error as Error).message}`); }
           continue;
@@ -1617,7 +1593,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const v = nodeIdsSchema.safeParse(parsed.value);
           if (workspace !== 'node') { respond('run_nodes works only on the node canvas.'); continue; }
           if (!v.success) { respond(`Invalid run_nodes: ${v.error.message}`); continue; }
-          const proposed = await presentNodeRun(sessionId, v.data.node_ids, call.id);
+          const proposed = await until(presentNodeRun(sessionId, v.data.node_ids, call.id));
           if (proposed.errors.length) { respond(`Run blocked before spending: ${proposed.errors.join(' ')}`); continue; }
           log.action({ icon: 'plan', label: 'Proposed Run of existing nodes', detail: v.data.node_ids.join(', ') });
           ignoreRest(index); flushToolResults(sessionId, toolResults); return;
@@ -1635,7 +1611,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           else if (workspace !== 'designer') respond('view_canvas works only in the Designer.');
           else if (!agentSeesImages()) respond('The selected agent model cannot see images.');
           else {
-            const view = await canvasParts(sessionId, v.data.layer_id).catch(() => 'The page could not be rendered.');
+            const view = await until(canvasParts(sessionId, v.data.layer_id)).catch((e) => { if (isAbort(e)) throw e; return 'The page could not be rendered.'; });
             if (typeof view === 'string') respond(view);
             else {
               log.action({ icon: 'search', label: 'Looked at the canvas', detail: v.data.layer_id });
@@ -1660,7 +1636,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
                 if (!t.show) parts.push({ type: 'text', text: `${t.note}.` });
                 else {
                   if (t.note !== `asset:${t.show}`) parts.push({ type: 'text', text: `${t.note}:` });
-                  parts.push(...(await attachmentParts([t.show])));
+                  parts.push(...(await until(attachmentParts([t.show]))));
                 }
               }
               const shown = parts.some((p) => p.type === 'image_url');
@@ -1674,7 +1650,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const v = continueInDesignerSchema.safeParse(parsed.value ?? {});
           if (!v.success) respond(`Invalid continue_in_designer input: ${formatZodError(v.error)}`);
           else {
-            const r = await chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as });
+            const r = await until(chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as }));
             transferredToDesigner = r.docs.length > 0 || !!r.openedExisting;
             if (transferredToDesigner) workspace = moveToCanvas('designer');
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
@@ -1796,7 +1772,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
-          const presented = await presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed());
+          const presented = await checkingPlan(sessionId, signal, (label) => log.action({ icon: 'fix', label }), () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal));
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);
@@ -1830,16 +1806,11 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
       }
     }
     notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
+  } catch (err) {
+    if (!isAbort(err)) throw err; // Stop during a tool: finish() already ended the turn
   } finally {
-    clearTimeout(silenceTimer);
-    clearTimeout(capTimer);
-    // No revision came (a text answer, questions, an error or a stop): the commented plan stays as it was, waiting —
-    // the user can still run it or comment again. Only a new plan replaces it.
-    keepCommentedPlan(sessionId);
-    log.end();
-    clock.end();
-    patchAgent(sessionId, { busy: false, phase: undefined });
-    if (controllers.get(sessionId) === controller) controllers.delete(sessionId);
+    // No revision came (text, questions, an error, a stop): the commented plan waits as it was (see finish).
+    finish();
   }
 }
 
