@@ -1,0 +1,7 @@
+/* Top bar on Home: the Connected status as a dot pill. The label sits left of the dot, so it opens leftwards on hover and focus (touch and keyboard included). */
+.topbar-pill { gap: 0; padding: 6px; }
+.topbar-pill-label { display: inline-block; max-width: 0; overflow: hidden; white-space: nowrap; opacity: 0; transition: max-width .18s var(--ease), opacity .12s, margin .18s var(--ease); margin-right: 0; }
+.topbar-pill:hover .topbar-pill-label, .topbar-pill:focus-visible .topbar-pill-label, .topbar-pill:focus .topbar-pill-label, .topbar-pill.is-open .topbar-pill-label { max-width: 120px; opacity: 1; margin-right: 6px; }
+.topbar-pill { border: 1px solid var(--border); border-radius: var(--r-full); }
+.topbar-pill:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .topbar-pill-label { transition: none; } }

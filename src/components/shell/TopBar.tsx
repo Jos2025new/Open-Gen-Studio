@@ -12,6 +12,7 @@ import { ConnectedProviders } from './ConnectedProviders';
 import type { RemoteProviderId } from '../../engine/types';
 import { IconButton } from '../ui/primitives';
 import { WORKSPACES, WorkspaceMenuItems } from './WorkspaceMenu';
+import '../../styles/topbar-home.css';
 
 export const TopbarSlotContext = createContext<HTMLDivElement | null>(null);
 
@@ -30,6 +31,8 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   const sessionId = useStore((s) => s.activeSessionId);
   const title = useStore((s) => s.sessions[s.activeSessionId]?.title ?? '');
   const workspace = useStore((s) => s.ui.workspace);
+  // On Home the top bar keeps only Connected (a status pill) and Settings: no breadcrumb, no Generations.
+  const home = useStore((s) => s.ui.home);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -59,41 +62,49 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   return (
     <header className="topbar">
       <div className="topbar-left">
+        {!home && <>
         <button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
-          {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
-        </button>
-        <Popover open={workspacePop.open} anchor={workspacePop.ref} onClose={workspacePop.close} placement="bottom-start" width={240} label="Canvases">
-          <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={workspacePop.close} /></div>
-        </Popover>
-        <span className="topbar-sep">/</span>
-        {editing ? (
-          <input
-            ref={inputRef}
-            className="title-input"
-            value={draft}
-            maxLength={80}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commit();
-              if (e.key === 'Escape') {
-                setDraft(title);
-                setEditing(false);
-              }
-            }}
-            aria-label="Session title"
-          />
-        ) : (
-          <SessionSwitcher activeId={sessionId} title={title} onRename={() => setEditing(true)} />
-        )}
+            {WORKSPACES.find((w) => w.id === workspace)?.label}<ChevronDown size={12} />
+          </button>
+          <Popover open={workspacePop.open} anchor={workspacePop.ref} onClose={workspacePop.close} placement="bottom-start" width={240} label="Canvases">
+            <div className="menu" role="menu"><WorkspaceMenuItems workspace={workspace} onClose={workspacePop.close} /></div>
+          </Popover>
+          <span className="topbar-sep">/</span>
+          {editing ? (
+            <input
+              ref={inputRef}
+              className="title-input"
+              value={draft}
+              maxLength={80}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commit}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit();
+                if (e.key === 'Escape') {
+                  setDraft(title);
+                  setEditing(false);
+                }
+              }}
+              aria-label="Session title"
+            />
+          ) : (
+            <SessionSwitcher activeId={sessionId} title={title} onRename={() => setEditing(true)} />
+          )}
+        </>}
       </div>
       <div className="topbar-right">
         <div id="workspace-actions" className="topbar-slot" ref={slotRef} />
         {workspace === 'designer' && <SaveIndicator />}
-        <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
-          <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
-        </button>
-        <button type="button" ref={generationsPop.ref} className={`topbar-menu ${generationsPop.open ? 'is-open' : ''}`} aria-expanded={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }}>Generations</button>
+        {home ? (
+          <button type="button" ref={connectedPop.ref} className={`topbar-menu topbar-pill ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
+            <span className="topbar-pill-label">Connected</span><span className={`pool-dot ${connected.length ? 'is-on' : ''}`} />
+          </button>
+        ) : <>
+          <button type="button" ref={connectedPop.ref} className={`topbar-menu ${connectedPop.open ? 'is-open' : ''}`} aria-expanded={connectedPop.open} onClick={() => { generationsPop.close(); setUi({ settingsOpen: false }); connectedPop.toggle(); }}>
+            <span className={`pool-dot ${connected.length ? 'is-on' : ''}`} /> Connected
+          </button>
+          <button type="button" ref={generationsPop.ref} className={`topbar-menu ${generationsPop.open ? 'is-open' : ''}`} aria-expanded={generationsPop.open} onClick={() => { connectedPop.close(); setUi({ settingsOpen: false }); generationsPop.toggle(); }}>Generations</button>
+        </>}
         <IconButton ref={settingsRef} icon={Settings} label="Settings" active={settingsOpen} aria-expanded={settingsOpen} onClick={() => { connectedPop.close(); generationsPop.close(); setUi((u) => ({ settingsOpen: !u.settingsOpen })); }} />
       </div>
       <Popover open={connectedPop.open} anchor={connectedPop.ref} onClose={connectedPop.close} width={shownProviders.length ? 340 : 180} label="Connected providers" className="provider-connections-popover">
