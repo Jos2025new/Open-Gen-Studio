@@ -15,6 +15,7 @@ import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEven
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
+import { variantPrompt } from './variantPrompt';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { deliveryNotes } from './delivery';
 import { isCreditError, onGenerationCredit } from './credit';
@@ -545,7 +546,7 @@ async function execute(id: string): Promise<string[]> {
       refVideos = [];
     }
 
-    // Candidates with their own variation: one request each, the variation appended to the shared prompt.
+    // Candidates with their own variation: one request each (variantPrompt).
     const variants = g.variants?.length ? g.variants : undefined;
     const total = variants ? variants.length : Math.max(1, g.settings.count);
     const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
@@ -562,7 +563,7 @@ async function execute(id: string): Promise<string[]> {
     let providerReportedCost = 0;
     let providerReportedCostKnown = true;
     let done = 0;
-    // Which request this is, counting from 1: the retry the app makes on its own and each candidate count too (T5).
+    // Request number from 1; the app's own retries and each candidate count (T5).
     let requests = 0;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
@@ -575,7 +576,7 @@ async function execute(id: string): Promise<string[]> {
         kind,
         model,
         schema,
-        prompt: variants ? `${shown}\n${variants[done]}` : shown,
+        prompt: variants ? variantPrompt(shown, variants[done]) : shown,
         settings,
         count: n,
         refs,

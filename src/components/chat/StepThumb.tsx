@@ -31,3 +31,16 @@ export function StepThumb({ genId, count }: { genId?: string; count: number }) {
     </span>
   );
 }
+
+/** One result's thumbnail (running rows): the pending placeholder until that result exists, then the real media, live. */
+export function ResultThumb({ genId, index }: { genId?: string; index: number }) {
+  const id = useStore((s) => (genId ? s.generations[genId]?.assetIds[index] : undefined));
+  const failed = useStore((s) => (genId ? s.generations[genId]?.status === 'error' : false));
+  return id ? (
+    <button type="button" className="cc-rthumb" data-thumb={id} aria-label="Open result" onClick={() => setUi({ lightbox: { assetIds: useStore.getState().generations[genId!]?.assetIds ?? [id], index } })}>
+      <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
+    </button>
+  ) : (
+    <span className={`cc-rthumb tile-pending${failed ? ' is-failed' : ''}`} data-pending=""><span className="shimmer" /></span>
+  );
+}

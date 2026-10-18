@@ -1,21 +1,23 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, Palette, Pencil } from 'lucide-react';
-import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound } from 'lucide-react';
+import { approvePlan, cancelPlan, resolveStepCostReview } from '../../engine/agent/runtime';
+import { cancelGeneration } from '../../engine/jobs';
+import { variantPrompt } from '../../engine/variantPrompt';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
 import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
-import type { Estimate, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
+import type { Estimate, Generation, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
 import { PlanRecoveryChips } from './RecoveryActions';
 import { Button, costLabel } from '../ui/primitives';
 import { AspectShape } from './aspectShape';
-import { CardIcon, SparkIcon } from './cardIcons';
-import { StepThumb } from './StepThumb';
+import { Collapsible, EditLine, RefThumb, SuggestBox, SuggestButton } from './PlanParts';
+import { ResultThumb, StepThumb } from './StepThumb';
 
 function stepIcon(s: PlanStep) {
   switch (s.kind) {
@@ -52,7 +54,7 @@ function stepDetail(s: PlanStep, modelName: (ref: string) => string, refName: Re
     case 'model3d':
       return [modelName(s.modelRef), s.refs.length ? `${s.refs.length} ref` : 'from text'].join(' · ');
     case 'video':
-      return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${refName(s.firstFrame)}` : ''].filter(Boolean).join(' · ');
+      return [modelName(s.modelRef), s.settings.duration ? durationLabel(s.settings.duration) : '', s.firstFrame ? `from ${refName(s.firstFrame)}` : '', s.refs?.length ? `${s.refs.length} ref` : ''].filter(Boolean).join(' · ');
     case 'audio':
       return [modelName(s.modelRef), s.lyricsFrom ? `lyrics from ${refName(s.lyricsFrom)}` : s.settings.extras?.lyrics ? 'with lyrics' : s.settings.advanced.is_instrumental ? 'instrumental' : ''].filter(Boolean).join(' · ');
     case 'op':
@@ -158,94 +160,133 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
     const st = plan.steps.find((x) => x.id === ref.split('#')[0]);
     return st ? `“${st.title}”` : ref;
   };
-  const doneCount = Object.values(item.stepStates).filter((s) => s === 'done').length;
   const over = awaiting && overLimit(total);
-  // Scripts open while the plan waits for approval, so the user reads what each clip does before paying.
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [showAdj, setShowAdj] = useState(false);
-  const flip = (id: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const [suggest, setSuggest] = useState(false);
+  const generations = useStore((s) => s.generations);
   const free = !needsSpendCheck(total);
+  const running = item.status === 'running';
+  const results = running ? resultRows(plan.steps, item, generations) : [];
+  const resultsDone = results.filter((r) => r.done).length;
+  const refIds = [...new Set(plan.steps.flatMap(refAssets))];
+  const spent = Object.values(item.stepGenerations).reduce((n, id) => n + (generations[id]?.actualUsd ?? 0), 0);
+  const stopRun = () => { for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
+  /** Only a waiting plan can be edited: the other states show the same lines without the Edit button. */
+  const editable = (label: string, node: React.ReactNode) => (awaiting ? <EditLine label={label}>{node}</EditLine> : node);
 
   return (
-    <article className={`plan-card status-${item.status}`}>
+    <article className={`plan-card cc-w status-${item.status}`}>
       <header className="plan-head cc-head">
         <div className="cc-head-main">
           <div className="cc-headline">
-            <CardIcon />
             <h4 className="plan-title cc-title">{plan.title}</h4>
             {item.revised || revising ? <span className="cc-state faint">{revising ? 'Revising…' : 'Revised'}</span> : null}
+            {running ? <span className="cc-run num"><LoaderCircle size={14} className="spin accent" />{resultsDone} of {results.length}</span> : null}
           </div>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
           {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
       </header>
+      {running ? (
+        <ol className="plan-steps cc-results">
+          {refIds.length ? (
+            <li className="plan-step cc-result">
+              <RefThumb assetId={refIds[0]} />
+              <span className="step-text"><span className="step-title">Reference</span><span className="step-detail faint">{refIds.length} ref</span></span>
+            </li>
+          ) : null}
+          {results.map((r) => (
+            <li key={r.key} className={`plan-step cc-result st-${r.status}`}>
+              {r.thumb ?? <ResultThumb genId={r.genId} index={r.index} />}
+              <span className="step-text">
+                <span className={`step-title${r.status === 'waiting' ? ' faint' : ''}`}>{r.name}</span>
+                <span className="step-detail faint">{[r.sub, r.status].filter(Boolean).join(' · ')}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      ) : (
       <ol className="plan-steps">
         {plan.steps.map((s) => {
           const genId = item.stepGenerations[s.id];
           const state = item.stepStates[s.id] ?? 'pending';
           const script = stepScript(s);
           const detail = stepDetail(s, name, refName, live?.authorizations[s.id] ?? item.stepAuthorizations?.[s.id]);
-          const shown = open.has(s.id);
+          const ref = refAssets(s)[0];
+          const variations = s.kind === 'image' && s.variations?.length ? s.variations : undefined;
           return (
             <li key={s.id} className={`plan-step st-${state}${awaiting && off.has(s.id) ? ' is-off' : ''}`}>
               {selectable ? (
                 <input type="checkbox" className="step-check" checked={!off.has(s.id)} onChange={() => toggle(s.id)} aria-label={`Run ${s.id} · ${s.title}`} />
               ) : null}
-              {thumbed(s) ? (
+              {ref ? (
+                <RefThumb assetId={ref} />
+              ) : thumbed(s) ? (
                 <StepThumb genId={genId} count={s.kind === 'image' ? s.settings.count : 1} />
               ) : (
                 <span className={`kind-icon k-${s.kind}`}>{stepIcon(s)}</span>
               )}
               <span className="step-text">
-                <span className="step-title" title={s.id.replace(/^pln_[A-Za-z0-9]+_/, '')}>{s.title}</span>
+                <span className="cc-step-line">
+                  <span className="step-title" title={s.id.replace(/^pln_[A-Za-z0-9]+_/, '')}>{s.title}</span>
+                  {plan.steps.length > 1 && perStep && perStep[s.id] && (perStep[s.id].usd ?? 1) > 0 ? <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span> : null}
+                  {!awaiting ? <StateIcon state={state} /> : null}
+                </span>
                 <DetailLine step={s} detail={detail} />
+                {variations ? (
+                  <>
+                    <span className="cc-lab">Prompts · base + variation</span>
+                    {variations.map((v, i) => {
+                      const full = variantPrompt(s.kind === 'image' ? s.prompt : '', v);
+                      return (
+                        <span key={i} className="cc-var">
+                          {editable(`"${s.title}", option ${i + 1}`, (
+                            <Collapsible name={`variation ${i + 1} of ${s.title}`} head={<>Variation {i + 1}<span className="cc-vd"> · {v}</span></>}>
+                              {full.slice(0, full.length - v.length)}<u className="cc-delta">{v}</u>
+                            </Collapsible>
+                          ))}
+                        </span>
+                      );
+                    })}
+                  </>
+                ) : script ? (
+                  <>
+                    <span className="cc-lab">Prompt</span>
+                    {editable(`"${s.title}"`, <Collapsible name={`the prompt of ${s.title}`}>{script}</Collapsible>)}
+                  </>
+                ) : null}
+                {state === 'review' && item.stepCostReviews?.[s.id] ? (
+                  <span className="step-script">
+                    <p>{item.stepCostReviews[s.id].message}</p>
+                    <Button size="sm" variant="primary" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'continue'); }}>Continuar</Button>
+                    <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
+                  </span>
+                ) : null}
+                {item.stepVariantNotes?.[s.id] ? <span className="step-script faint">{item.stepVariantNotes[s.id]}</span> : null}
               </span>
-              {awaiting && (s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d') ? <SuggestChange label={`"${s.title}"`} /> : null}
-              {plan.steps.length > 1 && perStep && perStep[s.id] && (perStep[s.id].usd ?? 1) > 0 ? <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span> : null}
-              {script ? (
-                <button type="button" className="cc-step-chev" onClick={() => flip(s.id)} aria-expanded={shown} aria-label={`${shown ? 'Hide' : 'Show'} the prompt of ${s.title}`}>
-                  {shown ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                </button>
-              ) : null}
-              <StateIcon state={state} />
-              {script && shown ? <p className="step-script">{script}</p> : null}
-              {state === 'review' && item.stepCostReviews?.[s.id] ? (
-                <div className="step-script">
-                  <p>{item.stepCostReviews[s.id].message}</p>
-                  <Button size="sm" variant="primary" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'continue'); }}>Continuar</Button>
-                  <Button size="sm" variant="ghost" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'cancel'); }}>Cancelar paso</Button>
-                </div>
-              ) : null}
-              {item.stepVariantNotes?.[s.id] ? <p className="step-script faint">{item.stepVariantNotes[s.id]}</p> : null}
-              {s.kind === 'image' && s.variations?.length ? <Variations title={s.title} variations={s.variations} editable={awaiting} /> : null}
             </li>
           );
         })}
       </ol>
-      {plan.subjects?.length ? (
+      )}
+      {!running && plan.subjects?.length ? (
         <p className="plan-subjects">
           <UserRound size={12} />
           {plan.subjects.map((x) => `@${x.name} ← ${x.from.startsWith('asset:') ? 'your image (saved to your library when you run it)' : `${x.from} (this plan only)`}`).join(' · ')}
           <span className="faint"> — kept identical in every step that mentions it</span>
         </p>
       ) : null}
-      {plan.style ? (
-        <p className="plan-subjects">
-          <Palette size={12} />
-          <span>Style: {plan.style}</span>
-        </p>
+      {!running && plan.style ? (
+        <div className="cc-style">
+          <span className="cc-lab">Style</span>
+          {editable('Style', <Collapsible name="the style">{plan.style}</Collapsible>)}
+        </div>
       ) : null}
       {/* Changes to a model the user picked, and results short of what was asked, are never folded away. */}
       {plan.adjustments.filter(neverFolded).map((a, i) => (
         <p key={`u${i}`} className="plan-user-model"><CircleAlert size={12} /> {shortOfRequest(a) ? a.replace(/^[\w-]+: /, '') : a}</p>
       ))}
-      {plan.adjustments.length ? (
+      {!running && plan.adjustments.length ? (
         <div className="plan-note faint">
           <button type="button" className="plan-adj-toggle" onClick={() => setShowAdj((v) => !v)} aria-expanded={showAdj}>
             {showAdj ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {plan.adjustments.length} adjustment{plan.adjustments.length === 1 ? '' : 's'} to the plan
@@ -255,12 +296,14 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
       ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
       {item.status === 'error' || item.status === 'partial' ? <PlanRecoveryChips sessionId={sessionId} item={item} /> : null}
+      {awaiting && suggest ? <SuggestBox onDone={() => setSuggest(false)} /> : null}
       <footer className="plan-foot">
         {item.status === 'awaiting' ? (
           <>
             <span className="plan-budget faint num">
               {total.usd == null ? 'Price not published — billed at actual cost' : free ? 'Nothing to pay' : remaining == null ? 'No spending limit' : `Budget left ${formatUsd(Math.max(0, remaining))}`}
             </span>
+            <SuggestButton open={suggest} onClick={() => setSuggest((v) => !v)} />
             <Button variant="ghost" onClick={() => cancelPlan(sessionId, item.id)}>
               Cancel
             </Button>
@@ -274,13 +317,15 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               }}
               data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : costTip(total)}
             >
-              {free ? 'Approve' : <>{over ? 'Approve anyway' : 'Approve'}<span className="cc-ap-sep" aria-hidden>|</span><SparkIcon /><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
+              {free ? 'Approve' : <>{over ? 'Approve anyway' : 'Approve'}<span className="cc-ap-sep" aria-hidden>·</span><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
             </Button>
           </>
-        ) : item.status === 'running' ? (
-          <span className="plan-progress faint num">
-            <LoaderCircle size={13} className="spin" /> Running {doneCount}/{plan.steps.length}
-          </span>
+        ) : running ? (
+          <>
+            <span className="cc-bar" role="progressbar" aria-valuemin={0} aria-valuemax={results.length} aria-valuenow={resultsDone}><i style={{ width: `${results.length ? (100 * resultsDone) / results.length : 0}%` }} /></span>
+            <span className="plan-progress faint num">{resultsDone} of {results.length} · spent {formatUsd(spent)}</span>
+            <Button variant="ghost" onClick={stopRun}>Cancel</Button>
+          </>
         ) : (
           <>
             <span className={`plan-final st-${item.status} num`}>
@@ -298,50 +343,35 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   );
 }
 
-/**
- * A pencil that opens a short field: what the user writes goes to the agent as a comment on the waiting plan, which
- * revises only that step or option (the existing revision path).
- */
-function SuggestChange({ label }: { label: string }) {
-  const [open, setOpen] = useState(false);
-  const [text, setText] = useState('');
-  const send = () => {
-    const t = text.trim();
-    if (!t) return;
-    void sendAgentMessage(`${label}: ${t}`, { attachments: [] });
-    setOpen(false);
-    setText('');
-  };
-  return (
-    <>
-      <button type="button" className="icon-btn step-variation-edit" aria-label={`Suggest changes to ${label}`} data-tip="Suggest changes" onClick={() => { setOpen((o) => !o); setText(''); }}>
-        <Pencil size={12} />
-      </button>
-      {open ? (
-        <input
-          autoFocus
-          className="q-custom step-variation-input"
-          placeholder="What should change here?"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
-        />
-      ) : null}
-    </>
-  );
+/** The reference assets a step uses (an input that is a stored asset; step outputs have no image yet). */
+function refAssets(s: PlanStep): string[] {
+  const refs = 'refs' in s && Array.isArray(s.refs) ? s.refs : [];
+  return refs.map((r) => (typeof r === 'string' ? r : r.ref)).filter((r) => r.startsWith('asset:')).map((r) => r.slice(6));
 }
 
-/** The candidates of a step, each a slight variation of the shared prompt, each with its own pencil. */
-function Variations({ title, variations, editable }: { title: string; variations: string[]; editable: boolean }) {
-  return (
-    <ol className="step-variations">
-      {variations.map((v, i) => (
-        <li key={i}>
-          <span className="num faint">{i + 1}</span>
-          <span className="step-variation">{v}</span>
-          {editable ? <SuggestChange label={`"${title}", option ${i + 1}`} /> : null}
-        </li>
-      ))}
-    </ol>
-  );
+interface ResultRow { key: string; name: string; sub: string; status: 'done' | 'waiting' | 'generating' | 'failed'; done: boolean; genId?: string; index: number; thumb?: React.ReactNode }
+
+/** One row per result the plan will produce (a variation, an image of a count, a clip), with where it stands. */
+function resultRows(steps: PlanStep[], item: PlanFeedItem, generations: Record<string, Generation>): ResultRow[] {
+  return steps.flatMap((s) => {
+    const state = item.stepStates[s.id] ?? 'pending';
+    if (state === 'skipped' || (item.skipped ?? []).includes(s.id)) return [];
+    const genId = item.stepGenerations[s.id];
+    const g = genId ? generations[genId] : undefined;
+    if (!thumbed(s)) {
+      return [{ key: s.id, name: s.title, sub: '', done: state === 'done', status: state === 'done' ? 'done' : state === 'error' ? 'failed' : state === 'running' ? 'generating' : 'waiting', index: 0, thumb: <span className={`kind-icon k-${s.kind}`}>{stepIcon(s)}</span> } satisfies ResultRow];
+    }
+    const variations = s.kind === 'image' ? s.variations : undefined;
+    const n = Math.max(1, variations?.length ?? (s.kind === 'image' ? s.settings.count : 1), g?.assetIds.length ?? 0);
+    return Array.from({ length: n }, (_, i): ResultRow => {
+      const done = Boolean(g?.assetIds[i]);
+      const failed = g?.status === 'error' || state === 'error';
+      return {
+        key: `${s.id}:${i}`, genId, index: i, done,
+        name: variations ? `Variation ${i + 1}` : n > 1 ? `${s.title} ${i + 1}` : s.title,
+        sub: variations?.[i] ?? '',
+        status: done ? 'done' : failed ? 'failed' : state === 'running' && i === (g?.assetIds.length ?? 0) ? 'generating' : 'waiting',
+      };
+    });
+  });
 }

@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown, Lock, LockOpen } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { selectDraft, unlockDraft } from '../../engine/agent/draftActions';
-import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, describeChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, settingsOptions } from '../../engine/agent/settingsCard';
 import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
@@ -31,21 +31,31 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   const sameKind = (i: number) => sections.filter((y) => y.kind === sections[i].kind).length > 1;
   if (item.status !== 'pending') {
     return (
-      <article className="q-card is-done">
-        <div className="q-kicker">Settings · {item.status === 'confirmed' ? 'confirmed' : 'skipped'}<EditAnswerButton sessionId={sessionId} itemId={item.id} /></div>
+      <article className="q-card is-done cc-w cc-set-done">
+        <Check size={16} className="cc-ok" aria-hidden />
+        <b className="cc-set-name">{item.status === 'confirmed' ? 'Settings' : 'Settings skipped'}</b>
         {item.status === 'confirmed' ? (
-          <ul className="q-summary">
-            {sections.map((x, i) => {
+          <span className="cc-set-chips">
+            {sections.flatMap((x, i) => {
               const c = x.chosen ?? x.recommended;
-              return <li key={`${x.kind}-${i}`}>{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{describeChoice(name(c.modelRef), c)}</li>;
+              const chips: ReactNode[] = [
+                <span key={`${i}m`} className="cc-mini">{titled ? <span className="faint">{x.kind === 'image' ? 'Images' : 'Video'} </span> : null}{name(c.modelRef)}</span>,
+              ];
+              if (c.count && c.count > 1) chips.push(<span key={`${i}n`} className="cc-mini">×{c.count}</span>);
+              if (c.resolution) chips.push(<span key={`${i}r`} className="cc-mini">{c.resolution}</span>);
+              if (c.duration) chips.push(<span key={`${i}d`} className="cc-mini">{c.duration} s</span>);
+              if (c.aspect) chips.push(<span key={`${i}a`} className="cc-mini"><AspectShape value={c.aspect} max={11} />{aspectLabel(c.aspect)}</span>);
+              else if (c.needsImage) chips.push(<span key={`${i}a`} className="cc-mini">shape of the image</span>);
+              return chips;
             })}
-          </ul>
+          </span>
         ) : null}
+        <EditAnswerButton sessionId={sessionId} itemId={item.id} />
       </article>
     );
   }
   return (
-    <article className="q-card set-card cc-card">
+    <article className="q-card set-card cc-card cc-w">
       <header className="cc-head"><CardIcon /><h4 className="cc-title">Confirm settings</h4></header>
       {item.summary ? <ClampedText text={item.summary} /> : null}
       {item.draft ? <DraftChoice item={item} sessionId={sessionId} /> : null}

@@ -15,6 +15,8 @@ vi.mock('../../src/lib/idb', () => ({
   blobDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
   getAssetBlob: async () => new Blob([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], { type: 'image/png' }),
   putAssetBlob: async () => undefined,
+  peekAssetUrl: () => undefined,
+  loadAssetUrl: async () => undefined,
 }));
 
 import { withRealism } from '../../src/engine/realism';

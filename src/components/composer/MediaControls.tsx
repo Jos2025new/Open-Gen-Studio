@@ -3,6 +3,8 @@ import { Box, ChevronDown, Clapperboard, Dices, FileText, Layers, Plus, SlidersH
 import { ensureSchema, modelSummary, pickComposerModel } from '../../engine/catalog';
 import { aspectLabel, durationChoices, durationLabel, lyricsParam, paramByRole, pixelSizes, ratioOf, maxCountPerRequest, STRUCTURED_TYPES } from '../../engine/params';
 import { randomSeed } from '../../lib/rng';
+import type { ProviderId } from '../../engine/types';
+import { PROVIDER_LABELS } from '../../engine/providers/types';
 import type { AdvancedValue, MediaKind, ParamDef } from '../../engine/types';
 import { createSubjectVoice, deleteSubject, saveSubject, subjectFromAttachments } from '../../engine/actions';
 import { SpendConfirm } from '../ui/SpendConfirm';
@@ -300,7 +302,7 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
   const seed = paramByRole(schema, 'seed');
   const negative = paramByRole(schema, 'negative');
   const changed = Object.keys(settings.advanced).length + Object.keys(settings.extras ?? {}).length + (settings.seed != null ? 1 : 0) + (settings.negative ? 1 : 0);
-  if (!others.length && !seed && !negative) return null;
+  if (!others.length && !seed && !negative && schema.source !== 'derived') return null;
   const update = (patch: Partial<typeof settings>) => setComposerMedia(kind, { settings: { ...useStore.getState().composer[kind].settings, ...patch } });
   return (
     <>
@@ -363,7 +365,12 @@ function AdvancedChip({ kind }: { kind: MediaKind }) {
               }}
             />
           ))}
-          {schema.source === 'derived' ? <p className="set-note">Parameters for this model could not be loaded; it runs with provider defaults.</p> : null}
+          {schema.source === 'derived' ? (
+            <p className="set-note is-warn" data-testid="schema-note">
+              Parameters for this model couldn't be loaded from {PROVIDER_LABELS[ref.split('::')[0] as ProviderId] ?? ref.split('::')[0]}. It can't be sent until they load.{' '}
+              <button type="button" className="link-btn" onClick={() => { void ensureSchema(ref); }}>Retry</button>
+            </p>
+          ) : null}
         </div>
       </Popover>
     </>
