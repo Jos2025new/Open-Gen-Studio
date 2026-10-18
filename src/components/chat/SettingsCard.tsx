@@ -100,6 +100,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   }, [item]);
   // The draft choice (selectDraft) changes the stored selection from outside: follow it.
   useEffect(() => { if (item.chosen && item.chosen.resolution !== choice.resolution) setChoice(item.chosen); }, [item.chosen?.resolution]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [aspectOpen, setAspectOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(choice.modelRef !== item.recommended.modelRef);
   const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
   const provider = (ref: string) => ref.split('::')[0];
@@ -163,6 +164,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   const first = item.recommended.modelRef;
 
   return (
+    <>
     <div className="cc-chips">
       <ChipPop icon={<ModelIcon />} label={name(choice.modelRef)} tip="Model" width={480}>
         <div className="set-models">
@@ -177,21 +179,11 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
       </ChipPop>
 
       {opts.aspects.length || px ? (
-        <ChipPop
-          icon={aspectNow ? <AspectShape value={aspectNow} /> : null}
-          label={aspectNow ? aspectLabel(aspectNow) : item.recommended.needsImage ? 'Like the image' : 'Auto'}
-          tip="Aspect ratio"
-          width={460}
-        >
-          <AspectPicker
-            values={aspectValues}
-            value={aspectNow}
-            onPick={pickAspect}
-            extra={item.recommended.needsImage ? (
-              <button type="button" className={`q-opt cc-like ${choice.aspect == null ? 'is-on' : ''}`} aria-pressed={choice.aspect == null} onClick={() => update({ ...choice, aspect: undefined })}>Like the image</button>
-            ) : null}
-          />
-        </ChipPop>
+        <button type="button" className={`cc-chip${aspectOpen ? ' is-open' : ''}`} aria-expanded={aspectOpen} aria-label="Aspect ratio" data-tip={aspectOpen ? undefined : 'Aspect ratio'} onClick={() => setAspectOpen((o) => !o)}>
+          {aspectNow ? <AspectShape value={aspectNow} /> : null}
+          <span className="cc-chip-label">{aspectNow ? aspectLabel(aspectNow) : item.recommended.needsImage ? 'Like the image' : 'Auto'}</span>
+          <ChevronDown size={11} className="cc-chip-chev" aria-hidden />
+        </button>
       ) : null}
 
       {resShown ? (
@@ -222,6 +214,17 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
         </ChipPop>
       ) : null}
     </div>
+    {aspectOpen && (opts.aspects.length || px) ? (
+      <AspectPicker
+        values={aspectValues}
+        value={aspectNow}
+        onPick={pickAspect}
+        extra={item.recommended.needsImage ? (
+          <button type="button" className={`q-opt cc-like ${choice.aspect == null ? 'is-on' : ''}`} aria-pressed={choice.aspect == null} onClick={() => update({ ...choice, aspect: undefined })}>Like the image</button>
+        ) : null}
+      />
+    ) : null}
+    </>
   );
 }
 

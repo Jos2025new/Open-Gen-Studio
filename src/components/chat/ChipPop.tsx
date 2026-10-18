@@ -7,7 +7,7 @@ export function ChipPop({ icon, label, tip, width = 320, children }: { icon: Rea
   const pop = usePopover();
   return (
     <>
-      <button ref={pop.ref} type="button" className={`cc-chip${pop.open ? ' is-open' : ''}`} aria-haspopup="dialog" aria-expanded={pop.open} aria-label={tip} data-tip={tip} onClick={pop.toggle}>
+      <button ref={pop.ref} type="button" className={`cc-chip${pop.open ? ' is-open' : ''}`} aria-haspopup="dialog" aria-expanded={pop.open} aria-label={tip} data-tip={pop.open ? undefined : tip} onClick={pop.toggle}>
         {icon}
         <span className="cc-chip-label">{label}</span>
         <ChevronDown size={11} className="cc-chip-chev" aria-hidden />

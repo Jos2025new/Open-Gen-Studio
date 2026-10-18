@@ -44,16 +44,16 @@
 .plan-card .step-title { font-size: var(--fs-m); color: var(--text); overflow-wrap: anywhere; }
 .plan-card .step-detail { font-size: var(--fs-s); color: var(--text-4); margin-top: 1px; }
 .plan-card .step-cost { font-size: var(--fs-s); color: var(--text-3); white-space: nowrap; }
-.plan-card .kind-icon { width: 42px; height: 42px; display: grid; place-items: center; margin: 0; border-radius: 9px; background: var(--surface); flex: none; }
+.plan-card .kind-icon { width: 40px; height: 40px; display: grid; place-items: center; margin: 0; border-radius: 9px; background: var(--surface); flex: none; }
 .plan-card .step-script, .plan-card .step-variations { flex: 1 0 100%; margin: 0; padding-left: 56px; }
 .cc-step-chev { color: var(--text-4); width: 20px; height: 24px; display: grid; place-items: center; flex: none; }
 .cc-step-chev:hover { color: var(--text); }
-.cc-thumbs { display: inline-flex; align-items: center; flex: none; padding-right: 2px; }
-.cc-thumbs .cc-thumb { position: relative; display: block; width: 42px; height: 42px; min-height: 0; max-height: 42px; aspect-ratio: auto; flex: none; overflow: hidden; border-radius: 9px; border: 2px solid var(--surface-2); background: var(--surface); padding: 0; }
+.cc-thumbs { position: relative; display: block; width: 40px; height: 40px; flex: none; }
+.cc-thumbs .cc-thumb { position: absolute; display: block; min-height: 0; max-height: none; aspect-ratio: auto; overflow: hidden; border-radius: 8px; border: 2px solid var(--surface-2); background: var(--surface); padding: 0; box-shadow: 0 1px 4px #0008; }
 .cc-thumb .media { width: 100%; height: 100%; object-fit: cover; }
 .cc-thumb .shimmer { position: absolute; inset: 0; }
 .cc-thumb.is-failed .shimmer { animation: none; opacity: .4; }
-.cc-thumb-more { margin-left: 6px; font-size: var(--fs-xs); }
+.cc-thumb-more { position: absolute; right: -4px; bottom: -4px; z-index: 9; min-width: 18px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--surface-3); color: var(--text-2); font-size: 10px; display: grid; place-items: center; }
 
 .plan-card .plan-foot, .cc-card .q-foot { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding: 8px 8px 8px 18px; background: var(--bg); border-radius: 20px; border: 0; }
 .plan-card .plan-budget { margin-right: auto; font-size: var(--fs-s); color: var(--text-4); }
@@ -63,3 +63,5 @@
 .cc-ap-cost { font-weight: 700; }
 .cc-card .set-section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
 .cc-card .set-section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+
+.cc-card .cc-aspect-pop { margin: 4px 0 8px; padding: 14px; background: var(--surface-3); border-radius: 16px; }

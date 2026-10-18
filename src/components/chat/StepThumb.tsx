@@ -1,7 +1,7 @@
 import { setUi, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 
-const MAX_SHOWN = 4;
+const MAX_SHOWN = 3;
 
 /**
  * The thumbnails of one plan step: the app's own pending placeholder (the shimmer tile of a running generation) for every
@@ -17,7 +17,8 @@ export function StepThumb({ genId, count }: { genId?: string; count: number }) {
     <span className="cc-thumbs" data-slots={shown}>
       {Array.from({ length: shown }, (_, i) => {
         const id = assetIds?.[i];
-        const style = { zIndex: shown - i, marginLeft: i === 0 ? 0 : -14 } as const;
+        const size = shown === 1 ? 40 : 30;
+        const style = { zIndex: shown - i, width: size, height: size, left: shown === 1 ? 0 : (i * (40 - size)) / (shown - 1), top: shown === 1 ? 0 : (i * (40 - size)) / (shown - 1) } as const;
         return id ? (
           <button key={`a${id}`} type="button" className="cc-thumb" data-thumb={id} style={style} aria-label="Open result" onClick={() => setUi({ lightbox: { assetIds: assetIds ?? [], index: i } })}>
             <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
@@ -26,7 +27,7 @@ export function StepThumb({ genId, count }: { genId?: string; count: number }) {
           <span key={`p${i}`} className={`cc-thumb tile-pending${failed ? ' is-failed' : ''}`} data-pending="" style={style}><span className="shimmer" /></span>
         );
       })}
-      {total > shown ? <span className="cc-thumb-more num faint">+{total - shown}</span> : null}
+      {total > shown ? <span className="cc-thumb-more num">+{total - shown}</span> : null}
     </span>
   );
 }
