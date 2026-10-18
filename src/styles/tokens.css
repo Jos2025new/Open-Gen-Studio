@@ -69,7 +69,9 @@
   --shadow-pop: 0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
   --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.02) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
 
-  --font: 'Inter Variable', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* DM Sans for UI and body text; Outfit for headings (see base.css). */
+  --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-head: 'Outfit', var(--font);
   --font-mono: var(--mono);
   --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 

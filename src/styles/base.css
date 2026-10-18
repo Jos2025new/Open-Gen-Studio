@@ -137,3 +137,5 @@ a {
     transition-duration: 0.001ms !important;
   }
 }
+
+h1, h2, h3 { font-family: var(--font-head); }

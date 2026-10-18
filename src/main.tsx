@@ -1,6 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource-variable/inter';
+import '@fontsource/dm-sans/400.css';
+import '@fontsource/dm-sans/500.css';
+import '@fontsource/dm-sans/600.css';
+import '@fontsource/outfit/600.css';
+import '@fontsource/outfit/700.css';
 import '@xyflow/react/dist/style.css';
 import './styles/tokens.css';
 import './styles/base.css';
