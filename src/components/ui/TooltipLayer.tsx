@@ -26,7 +26,11 @@ export function TooltipLayer() {
       current.current = el;
       window.clearTimeout(timer.current);
       setTip(null);
-      if (el) timer.current = window.setTimeout(() => show(el), e.type === 'focusin' ? 0 : 380);
+      if (el) {
+        const requested = Number(el.getAttribute('data-tip-delay'));
+        const delay = Number.isFinite(requested) && el.hasAttribute('data-tip-delay') ? requested : e.type === 'focusin' ? 0 : 380;
+        timer.current = window.setTimeout(() => show(el), Math.max(0, delay));
+      }
     };
     const hide = () => {
       window.clearTimeout(timer.current);

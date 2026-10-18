@@ -133,6 +133,7 @@ export function MenuItem({
   disabled,
   onClick,
   tip,
+  tipDelay,
 }: {
   icon?: LucideIcon;
   label: ReactNode;
@@ -143,9 +144,10 @@ export function MenuItem({
   disabled?: boolean;
   onClick?: () => void;
   tip?: string;
+  tipDelay?: number;
 }) {
   return (
-    <button type="button" className={`menu-item ${active ? 'is-active' : ''} ${danger ? 'is-danger' : ''}`} disabled={disabled} onClick={onClick} data-tip={tip}>
+    <button type="button" className={`menu-item ${active ? 'is-active' : ''} ${danger ? 'is-danger' : ''}`} disabled={disabled} onClick={onClick} data-tip={tip} data-tip-delay={tipDelay}>
       {Icon ? <Icon size={15} strokeWidth={1.8} className="menu-icon" /> : null}
       <span className="menu-text">
         <span className="menu-label">{label}</span>

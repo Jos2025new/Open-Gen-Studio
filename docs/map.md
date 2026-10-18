@@ -51,11 +51,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/composer` | 11 | 6 |
 | `src/components/designer` | 44 | 13 |
 | `src/components/gallery` | 1 | 0 |
-| `src/components/node` | 8 | 2 |
+| `src/components/node` | 8 | 3 |
 | `src/components/shell` | 22 | 11 |
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 8 | 2 |
-| `src/components/ui` | 15 | 2 |
+| `src/components/ui` | 15 | 3 |
 | `src/engine` | 47 | 190 |
 | `src/engine/agent` | 29 | 70 |
 | `src/engine/design` | 89 | 92 |
@@ -64,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 49 |
 | `src/engine/skills` | 6 | 15 |
-| `src/lib` | 26 | 185 |
+| `src/lib` | 26 | 186 |
 | `src/store` | 5 | 132 |
 
-146 de 386 módulos no tienen ningún test que los importe directamente.
+144 de 386 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -90,7 +90,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [CreateSpace.tsx](../src/components/space/CreateSpace.tsx)
 - [ToolsSpace.tsx](../src/components/space/ToolsSpace.tsx)
 - [Toasts.tsx](../src/components/ui/Toasts.tsx)
-- [TooltipLayer.tsx](../src/components/ui/TooltipLayer.tsx)
 - [canvasPng.worker.ts](../src/lib/canvasPng.worker.ts)
 - [designerBench.ts](../src/lib/designerBench.ts)
 - [designerBenchProfessionalRun.ts](../src/lib/designerBenchProfessionalRun.ts)
