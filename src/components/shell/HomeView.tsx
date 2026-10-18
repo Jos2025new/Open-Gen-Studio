@@ -3,7 +3,8 @@ import { ArrowRight, Folder, Minus, Plus, type LucideIcon } from 'lucide-react';
 import { selectSession, setUi, useStore } from '../../store/store';
 import type { AssetKind } from '../../engine/types';
 import { formatRelative } from '../../lib/format';
-import { modelsOf } from '../../engine/catalog';
+import { connectedProviders, modelsOf } from '../../engine/catalog';
+import { groupVariants } from '../../engine/variants';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, isListed, openCreate, openSpace, openTool, type CreateItem, type ToolItem } from './navModel';
 import { PanelEmbed } from './panelEmbed';
@@ -18,15 +19,17 @@ function Head({ kicker, title, action }: { kicker: string; title: string; action
   </header>;
 }
 
-/** An app: a 76 px tinted icon box, its name, a hint and the number of models the user's keys reach (none shown when zero). */
-function AppCard({ item, models }: { item: CreateItem; models: number }) {
+const APP_BLURB: Record<CreateItem['id'], string> = { image: 'Generate and edit', video: 'Text or image to clip', audio: 'Voice, music, effects', model3d: 'Models from images' };
+
+/** An app: a 76 px tinted icon box, its name and one line on the right; a muted count of model families the user's keys reach (none when zero). */
+function AppCard({ item, families }: { item: CreateItem; families: number }) {
   return <button type="button" className={`home-app t-${item.id}`} disabled={item.soon} onClick={() => openCreate(item)} aria-label={item.soon ? `${item.label} — soon` : item.label} title={item.hint}>
     <span className="home-app-icon"><item.icon size={34} strokeWidth={1.6} aria-hidden /></span>
     <span className="home-app-text">
       <span className="home-app-title">{item.label}{item.soon ? <span className="home-pill">Soon</span> : null}</span>
-      <span className="home-app-hint">{item.hint}</span>
+      <span className="home-app-hint">{APP_BLURB[item.id]}</span>
     </span>
-    {!item.soon && models > 0 && <span className="home-pill home-app-count">{models} model{models === 1 ? '' : 's'}</span>}
+    {!item.soon && families > 0 && <span className="home-app-count" title="Models you can use">{families}</span>}
   </button>;
 }
 
@@ -69,7 +72,8 @@ export function HomeView() {
   const listed = useMemo(() => Object.values(assets).filter(isListed), [assets]);
   const recentSessions = useMemo(() => Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4), [sessions]);
   const recentAssets = useMemo(() => [...listed].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4), [listed]);
-  const modelCount = useMemo(() => Object.fromEntries(CREATE.map((c) => [c.kind as AssetKind, modelsOf(c.kind).length])) as Record<AssetKind, number>, [catalog, keys]);
+  // Families, as the model picker groups its variants: one entry per model the user's keys reach.
+  const families = useMemo(() => Object.fromEntries(CREATE.map((c) => [c.kind as AssetKind, groupVariants(modelsOf(c.kind), connectedProviders()).length])) as Record<AssetKind, number>, [catalog, keys]);
 
   return <div className="home" role="region" aria-label="Home"><div className="home-inner">
     <nav className="home-tabs" aria-label="Home sections">
@@ -81,7 +85,7 @@ export function HomeView() {
     <section className="home-section" aria-label="Apps">
       <Head kicker="Apps" title="Apps ready to go" />
       <div className="home-apps">
-        {CREATE.map((c) => <AppCard key={c.id} item={c} models={modelCount[c.kind] ?? 0} />)}
+        {CREATE.map((c) => <AppCard key={c.id} item={c} families={families[c.kind] ?? 0} />)}
       </div>
     </section>
 

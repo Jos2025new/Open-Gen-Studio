@@ -10,7 +10,7 @@
 
 /* Apps: four cards, 76 px tinted icon box. */
 .home-apps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
-.home-app { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4); text-align: left; border: 1px solid var(--border); border-radius: var(--r-m); background: linear-gradient(145deg, var(--surface-2), var(--surface)); color: var(--text); transition: border-color .12s, background .12s; }
+.home-app { position: relative; display: flex; flex-direction: row; align-items: center; gap: var(--sp-4); min-height: 100px; padding: var(--sp-4); text-align: left; border: 1px solid var(--border); border-radius: var(--r-m); background: linear-gradient(145deg, var(--surface-2), var(--surface)); color: var(--text); transition: border-color .12s, background .12s; }
 .home-app.t-image { --tint: var(--type-image); }
 .home-app.t-video { --tint: var(--type-video); }
 .home-app.t-audio { --tint: var(--type-audio); }
@@ -18,10 +18,10 @@
 .home-app:hover:not(:disabled) { border-color: var(--border-strong); }
 .home-app:disabled { opacity: .55; cursor: default; }
 .home-app-icon { display: grid; place-items: center; width: 76px; height: 76px; border-radius: var(--r-m); background: color-mix(in srgb, var(--tint, var(--text-2)) 14%, transparent); color: var(--tint, var(--text-2)); }
-.home-app-text { display: flex; flex-direction: column; gap: 2px; }
+.home-app-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
 .home-app-title { display: flex; align-items: center; gap: var(--sp-2); font-family: var(--font-head); font-size: var(--fs-l); font-weight: 600; }
 .home-app-hint { font-size: var(--fs-s); color: var(--text-2); line-height: 1.4; }
-.home-app-count { position: absolute; top: var(--sp-3); right: var(--sp-3); }
+.home-app-count { position: absolute; top: var(--sp-3); right: var(--sp-4); font-size: var(--fs-s); color: var(--text-4); }
 
 /* Tools: 58 px circles; the expanded row grows downward. */
 .home-tools { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-4); }

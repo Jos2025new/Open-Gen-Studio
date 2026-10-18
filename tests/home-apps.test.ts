@@ -26,8 +26,8 @@ beforeEach(() => {
   // Two image models: one from a provider with a key, one from a provider with no key. Only the first counts.
   useStore.setState((s) => ({
     catalog: { ...s.catalog, models: {
-      'fal::img-a': { ref: 'fal::img-a', provider: 'fal', kind: 'image', needsVideo: false, name: 'A' },
-      'replicate::img-b': { ref: 'replicate::img-b', provider: 'replicate', kind: 'image', needsVideo: false, name: 'B' },
+      'fal::img-a': { ref: 'fal::img-a', id: 'img-a', provider: 'fal', kind: 'image', needsVideo: false, name: 'A' },
+      'replicate::img-b': { ref: 'replicate::img-b', id: 'img-b', provider: 'replicate', kind: 'image', needsVideo: false, name: 'B' },
     } as never },
     settings: { ...s.settings, keys: { fal: 'test-key' } as never },
   }));
@@ -38,7 +38,7 @@ afterEach(() => { act(() => root?.unmount()); root = undefined; host?.remove(); 
 describe('app cards', () => {
   it('count only the models the connected keys reach, and show nothing when there are none', () => {
     mount();
-    expect(card('t-image').querySelector('.home-app-count')?.textContent).toBe('1 model');
+    expect(card('t-image').querySelector('.home-app-count')?.textContent).toBe('1');
     expect(card('t-video').querySelector('.home-app-count')).toBeNull();
   });
   it('an app card opens Create with its mode', () => {
