@@ -1,4 +1,5 @@
 import { cardDraft, confirmedSections, draftGate, draftLines } from './draftActions';
+import { agentAccepts } from './sendGate';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
@@ -236,12 +237,12 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
 export async function sendAgentMessage(text: string, opts: { attachments?: string[] } = {}): Promise<void> {
   const st = get();
   const sessionId = st.activeSessionId;
-  if (!session(sessionId) || session(sessionId).agent.busy) return;
-  // In Studio the board may be showing Nodes: that canvas is the agent's.
+  if (!agentAccepts()) return;
+  // In Studio the board may show Nodes: that canvas is the agent's.
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
   const s = session(sessionId);
-  // An edited message brings its own attachments and leaves the composer as it is.
+  // An edited message brings its own attachments and leaves the composer alone.
   const attachments = [...(opts.attachments ?? st.composer.attachments)];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
