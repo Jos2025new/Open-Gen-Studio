@@ -133,6 +133,9 @@ export function ctltFromSettings(s: { capture?: CaptureSel }, sheet?: { camera: 
 /** The step's selection with its saved style resolved, for the realism setting. */
 export function withCaptureSetting<S extends object>(settings: S, kind: string, raw: unknown, mine: ReadonlyArray<{ name: string; kind?: string; capture?: CaptureCustom }> = []): S {
   if (kind !== 'image' && kind !== 'video') return settings;
-  const capture = resolveCapture(cleanCapture(raw), mine);
+  let capture = resolveCapture(cleanCapture(raw), mine);
+  // A preset made for the other kind is not applied (disposable is image-only); the rest of the selection stays.
+  const only = presetById(capture?.style)?.only;
+  if (capture && only && only !== kind) capture = cleanCapture({ ...capture, style: undefined });
   return capture ? { ...settings, capture } : settings;
 }

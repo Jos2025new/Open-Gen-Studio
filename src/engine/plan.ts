@@ -746,7 +746,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             prompt,
             promptFrom: s.prompt_from,
             modelRef,
-            settings: { ...settings, count: Math.min(settings.count, 2) },
+            settings: withCaptureSetting({ ...settings, count: Math.min(settings.count, 2) }, kind, s.capture, ctx.librarySubjects?.()),
             firstFrame: s.first_frame,
             lastFrame: s.last_frame,
             refs: refs.length ? refs : undefined,
