@@ -49,7 +49,7 @@ Se conservan `baseAt`, la serialización de escrituras, las copias (snapshots), 
 - Un guardado rechazado no bloquea la edición, pero queda pendiente hasta que el usuario decide.
 - En navegadores sin Web Locks, la pestaña es de solo lectura.
 - La guarda lee y parsea la sesión en el servidor. Su coste no está medido todavía con la sonda ([protocolo](../depuracion.md#protocolo)).
-- Comportamiento, código y tests en [persistencia](../features/persistencia.md).
+- Comportamiento, código y tests en [persistencia](../features/persistencia.md). Implementación, flujos y mantenimiento en [arquitectura del guardado](../arquitectura-guardado.md).
 
 ## Límites aceptados en la fase 1
 
