@@ -59,11 +59,19 @@ export function createStoreV2(dir) {
     return assembleText({ savedAt: head.savedAt, version: head.version, globals, order: head.order, sessions });
   }
 
+  // A refused session is resent by every autosave until the user decides; one copy per kind and minute keeps the newest
+  // attempt without filling backups/ (each attempt is also in the browser's IndexedDB).
+  const lastRejected = new Map();
+  const REJECTED_EVERY_MS = 60_000;
+
   /** Keeps a refused payload aside; returns the file name (the 409 body names it). */
   async function keepRejected(kind, payload) {
     await mkdir(backups, { recursive: true });
-    const file = `${kind}-${Date.now()}.json`;
-    await writeFile(join(backups, file), payload, { mode: 0o600 });
+    const recent = kind.startsWith('rejected') ? lastRejected.get(kind) : undefined;
+    const file = recent && Date.now() - recent.at < REJECTED_EVERY_MS ? recent.file : `${kind}-${Date.now()}.json`;
+    if (recent?.file === file) await writeAtomic(join(backups, file), payload);
+    else await writeFile(join(backups, file), payload, { mode: 0o600 });
+    if (kind.startsWith('rejected') && recent?.file !== file) lastRejected.set(kind, { file, at: Date.now() });
     return file;
   }
 

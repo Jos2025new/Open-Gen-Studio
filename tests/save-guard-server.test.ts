@@ -120,6 +120,17 @@ describe('save guard: what counts as a loss', () => {
     expect(r.sessionId).toBeUndefined();
     expect(r.rejectedFile).toMatch(/^rejected-/);
   });
+  it('a rejected session resent by autosave keeps one copy per minute, the newest attempt', async () => {
+    const s = setup();
+    await seed(s, ses({ feed: 10, pad: 1500 }));
+    const first = await s.send({ ses_a: ses({ feed: 1, pad: 1500 }) });
+    const second = await s.send({ ses_a: ses({ feed: 2, pad: 1500 }) });
+    expect(first.status).toBe(409);
+    expect(second.rejectedFile).toBe(first.rejectedFile);
+    const copies = readdirSync(join(s.dir, 'backups')).filter((f) => f.startsWith('rejected-session-ses_a-'));
+    expect(copies).toHaveLength(1);
+    expect(JSON.parse(readFileSync(join(s.dir, 'backups', copies[0]), 'utf8')).feed).toHaveLength(2);
+  });
 });
 
 describe('save guard: keep this version', () => {
