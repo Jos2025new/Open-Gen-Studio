@@ -79,7 +79,7 @@
 .cc-coll-row .cc-ctext { color: var(--text-2); font-size: 13.5px; }
 .cc-ctext.is-clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cc-delta { text-decoration: none; color: var(--accent); border-bottom: 1.5px solid rgba(216, 255, 58, .45); }
-.cc-ctext.is-clamped .cc-delta { color: var(--text-2); }
+.cc-base { color: var(--text-3); }
 .cc-chev { color: var(--text-4); width: 22px; height: 22px; display: grid; place-items: center; flex: none; }
 .cc-chev:hover { color: var(--text); }
 .cc-var { display: block; margin-top: 6px; }

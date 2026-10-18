@@ -7,8 +7,9 @@ import { Button } from '../ui/primitives';
 /**
  * A prompt (or a variation of one) clamped to two lines with a chevron that opens the whole text. The chevron shows only
  * when the text is really cut; with `head` (a variation's title) the title itself is the toggle and always shows.
+ * `preview` replaces the children only while collapsed; the expanded text is always the children.
  */
-export function Collapsible({ head, name, children }: { head?: ReactNode; name: string; children: ReactNode }) {
+export function Collapsible({ head, name, children, preview }: { head?: ReactNode; name: string; children: ReactNode; preview?: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [cut, setCut] = useState(false);
@@ -30,7 +31,7 @@ export function Collapsible({ head, name, children }: { head?: ReactNode; name: 
         </button>
       ) : null}
       <div className={head ? 'cc-coll-body' : 'cc-coll-row'}>
-        <div ref={ref} className={`cc-ctext${open ? '' : ' is-clamped'}`}>{children}</div>
+        <div ref={ref} className={`cc-ctext${open ? '' : ' is-clamped'}`}>{open ? children : (preview ?? children)}</div>
         {!head && (cut || open) ? toggle : null}
       </div>
     </div>

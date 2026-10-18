@@ -81,6 +81,7 @@ describe('C7b plan card (awaiting)', () => {
   it('shows each variation as the exact prompt the app sends (base + variation), delta highlighted, no separate base block', async () => {
     setup();
     await mount(createElement(PlanCard, { item: plan(), sessionId: sid() }));
+    for (const c of host.querySelectorAll('.cc-var .cc-coll')) await click(c.querySelector('.cc-coll-head'));
     const texts = [...host.querySelectorAll('.cc-var .cc-ctext')].map((e) => e.textContent);
     expect(texts).toEqual(VARS.map((v) => variantPrompt(BASE, v)));
     expect([...host.querySelectorAll('.cc-delta')].map((e) => e.textContent)).toEqual(VARS);
@@ -154,6 +155,27 @@ describe('C7b plan card (awaiting)', () => {
     expect(host.querySelector('.cc-ref-badge')?.textContent).toBe('REF');
     expect(host.querySelector('.step-detail')?.textContent).toMatch(/· 1 ref$/);
     expect(host.querySelector('.plan-step [data-pending]')).toBeNull();
+  });
+});
+
+describe('C7b collapsed variation preview', () => {
+  it('shows the delta first, highlighted, then the start of the base, clamped to two lines; the expanded text stays the full prompt', async () => {
+    setup();
+    await mount(createElement(PlanCard, { item: plan(), sessionId: sid() }));
+    const items = [...host.querySelectorAll('.cc-var .cc-coll')];
+    const previews = items.map((c) => c.querySelector('.cc-ctext.is-clamped') as HTMLElement);
+    previews.forEach((p, i) => {
+      expect(p.querySelector('.cc-delta')?.textContent).toBe(VARS[i]);
+      expect(p.textContent?.startsWith(`${VARS[i]} · `)).toBe(true);
+      expect(p.textContent).toContain(BASE.slice(0, 20));
+    });
+    expect(previews[0].textContent).not.toBe(previews[1].textContent);
+    for (const [i, c] of items.entries()) {
+      await click(c.querySelector('.cc-coll-head'));
+      expect(c.querySelector('.cc-ctext')?.textContent).toBe(variantPrompt(BASE, VARS[i]));
+      expect(c.querySelector('.cc-ctext .cc-delta')?.textContent).toBe(VARS[i]);
+      await click(c.querySelector('.cc-coll-head'));
+    }
   });
 });
 

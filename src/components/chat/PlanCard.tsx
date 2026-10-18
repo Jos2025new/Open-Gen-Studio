@@ -241,7 +241,11 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                       return (
                         <span key={i} className="cc-var">
                           {editable(`"${s.title}", option ${i + 1}`, (
-                            <Collapsible name={`variation ${i + 1} of ${s.title}`} head={<>Variation {i + 1}<span className="cc-vd"> · {v}</span></>}>
+                            <Collapsible
+                              name={`variation ${i + 1} of ${s.title}`}
+                              head={<>Variation {i + 1}<span className="cc-vd"> · {v}</span></>}
+                              preview={<><u className="cc-delta">{v}</u><span className="cc-base"> · {(s.kind === 'image' ? s.prompt : '').replace(/\s+/g, ' ')}</span></>}
+                            >
                               {full.slice(0, full.length - v.length)}<u className="cc-delta">{v}</u>
                             </Collapsible>
                           ))}
