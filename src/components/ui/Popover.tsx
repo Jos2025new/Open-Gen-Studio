@@ -11,6 +11,13 @@ export type Placement = 'top-start' | 'top-center' | 'bottom-start' | 'bottom-ce
 const GAP = 8;
 const MARGIN = 8;
 
+/** Choose the side that fits the whole panel; if neither fits, give it the larger scrollable area. */
+export function openPopoverAbove(placement: Placement, above: number, below: number, contentH: number): boolean {
+  const prefersBelow = placement === 'bottom-start' || placement === 'bottom-center';
+  if (prefersBelow) return below < contentH && above > below;
+  return above >= contentH || (below < contentH && above >= below);
+}
+
 // Open popovers, oldest first. Lets nested popovers keep their parents open.
 const stack: Array<{ id: number; el: () => HTMLElement | null; anchor: () => HTMLElement | null }> = [];
 let seq = 0;
@@ -56,9 +63,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
-      const openAbove = placement === 'bottom-start' || placement === 'bottom-center'
-        ? below < contentH && above > below
-        : above >= Math.min(contentH, 240) || above >= below;
+      const openAbove = openPopoverAbove(placement, above, below, contentH);
       if (openAbove) {
         next.bottom = vh - r.top + GAP;
         next.maxHeight = above;
