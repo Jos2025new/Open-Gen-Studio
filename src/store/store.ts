@@ -1,4 +1,5 @@
-import { markStateDirty, beginStateSave, confirmStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
+import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
+import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
 import { keptDrafts } from './homeDrafts';
 import { historyDepth } from '../engine/design/history';
@@ -338,7 +339,7 @@ function flushWrite(): Promise<void> {
   clearTimeout(gestureTimer);
   if (idleHandle !== undefined && typeof window !== 'undefined') window.cancelIdleCallback?.(idleHandle);
   writeTimer = maxWaitTimer = idleHandle = gestureTimer = undefined;
-  if (!pendingWrite || wiping || saveStatus.getState().conflict) return writesRunning;
+  if (!pendingWrite || wiping) return writesRunning;
   const next = pendingWrite;
   pendingWrite = null;
   lastWrite = next;
@@ -347,9 +348,7 @@ function flushWrite(): Promise<void> {
   const operation = (async () => {
     try {
       const result = await stateDb.set(next.name, persistState(next.value));
-      if (result === 'conflict' || result === 'fail') {
-        failSave(result === 'conflict' ? 'Another tab saved changes · reload' : 'Disk copy pending', result === 'conflict', next.version);
-      } else confirmStateSave(next.version, result === 'browser-only');
+      reportSave(next.version, result);
     } catch (err) {
       console.error('Could not save state', err);
       failSave('Could not save to browser storage', false, next.version);
@@ -361,7 +360,6 @@ function flushWrite(): Promise<void> {
 
 /** Explicit save: the latest state and every pending raster write must both finish. */
 export async function saveNow(): Promise<void> {
-  if (saveStatus.getState().conflict) return;
   if (!pendingWrite && lastWrite && saveStatus.getState().phase === 'error') pendingWrite = lastWrite;
   const state = flushWrite();
   const { flushRaster } = await import('../engine/design/raster');

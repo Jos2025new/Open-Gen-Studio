@@ -6,6 +6,7 @@ import { settleInterruptedPlans } from './engine/agent/runtime';
 import { syncBlobsToDisk } from './lib/idb';
 import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
+import { SaveGuardBanner } from './components/shell/SaveGuardBanner';
 import { SidePanel } from './components/shell/SidePanel';
 import { Lightbox } from './components/assets/Lightbox';
 import { SketchEditor } from './components/assets/SketchEditor';
@@ -65,6 +66,7 @@ export function App() {
         <Sidebar />
         <main className="main">
           <TopBar slotRef={setSlot} />
+          <SaveGuardBanner />
           <div className={`workspace ws-${workspace} ${home ? 'is-home' : ''} ${space && !home ? 'is-space' : ''} ${workspace === 'chat' && board.open ? 'has-studio-board' : ''}`} style={workspace === 'chat' ? ({ ['--studio-w' as string]: `${board.open ? board.width : 0}px` }) : undefined}>
             {workspace === 'chat' ? <ChatWorkspace /> : workspace === 'node' ? <NodeWorkspace /> : <DesignerWorkspace />}
             <Composer />

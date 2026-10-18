@@ -107,7 +107,7 @@ const BACKUPS_KEPT = 20;
 
 /** @param {string} [root] project folder (default: where Vite runs, i.e. the project root) */
 /** The body of a 409: why it was refused ('conflict' or 'possible-loss'), the current savedAt and, for a loss, the kept copy. */
-const conflictBody = ({ reason = 'conflict', savedAt, sessionId, rejectedFile }) => JSON.stringify({ reason, ...(sessionId ? { sessionId } : {}), ...(rejectedFile ? { rejectedFile } : {}), savedAt });
+const conflictBody = ({ reason = 'conflict', savedAt, sessionId, diskHash, rejectedFile }) => JSON.stringify({ reason, ...(sessionId ? { sessionId } : {}), ...(diskHash ? { diskHash } : {}), ...(rejectedFile ? { rejectedFile } : {}), savedAt });
 
 export function localStore(root = process.cwd(), dataDir = 'data') {
   const dir = resolve(root, dataDir);

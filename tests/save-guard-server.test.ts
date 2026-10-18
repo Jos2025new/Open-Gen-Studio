@@ -197,6 +197,8 @@ describe('save guard: the 409 bodies through the HTTP layer', () => {
     expect(loss.status).toBe(409);
     expect(JSON.parse(loss.body)).toMatchObject({ reason: 'possible-loss', sessionId: 'ses_a', savedAt: 1000 });
     expect(JSON.parse(loss.body).rejectedFile).toMatch(/^rejected-session-ses_a-\d+\.json$/);
+    // The body carries the hash of the disk text, so the client can build `keep` without hashing a copy it may not have.
+    expect(JSON.parse(loss.body).diskHash).toBe(sha(big));
   });
 
   it('14: the legacy PUT /state path gives the same reasons', async () => {

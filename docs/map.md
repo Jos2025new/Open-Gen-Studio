@@ -21,11 +21,11 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 225 | 149 |
-| [store.ts](../src/store/store.ts) | 146 | 132 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 65 | 0 |
+| [store.ts](../src/store/store.ts) | 148 | 133 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 66 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 47 | 2 |
 | [actions.ts](../src/engine/design/actions.ts) | 47 | 18 |
-| [media.ts](../src/lib/media.ts) | 45 | 35 |
+| [media.ts](../src/lib/media.ts) | 46 | 35 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 34 |
 | [ops.ts](../src/engine/ops.ts) | 37 | 16 |
 | [params.ts](../src/engine/params.ts) | 35 | 17 |
@@ -37,9 +37,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 24 | 6 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
+| [idb.ts](../src/lib/idb.ts) | 18 | 167 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [http.ts](../src/lib/http.ts) | 17 | 6 |
 
 ## Por área
 
@@ -52,7 +52,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/designer` | 44 | 13 |
 | `src/components/gallery` | 1 | 0 |
 | `src/components/node` | 8 | 4 |
-| `src/components/shell` | 22 | 11 |
+| `src/components/shell` | 23 | 12 |
 | `src/components/space` | 9 | 4 |
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 15 | 3 |
@@ -64,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 50 |
 | `src/engine/skills` | 6 | 15 |
-| `src/lib` | 26 | 189 |
-| `src/store` | 5 | 134 |
+| `src/lib` | 27 | 191 |
+| `src/store` | 7 | 135 |
 
-144 de 387 módulos no tienen ningún test que los importe directamente.
+144 de 391 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

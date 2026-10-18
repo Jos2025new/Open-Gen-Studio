@@ -4,6 +4,7 @@ import videoContracts from './map-contracts-video.mjs';
 import providerContracts from './map-contracts-providers.mjs';
 import captureContracts from './map-contracts-capture.mjs';
 import nodeContracts from './map-contracts-nodes.mjs';
+import sg from './map-contracts-saveguard.mjs';
 
 export default [
   ...videoContracts,
@@ -11,6 +12,7 @@ export default [
   ...providerContracts,
   ...captureContracts,
   ...nodeContracts,
+  ...sg,
   {
     id: 'snap-controls',
     what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
@@ -465,7 +467,7 @@ export default [
   },
   {
     id: 'state-format-2',
-    what: 'ADR 0014 (aprobado por el usuario, 2026-10-12): el estado se guarda en formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica un manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2.',
+    what: 'ADR 0014: formato 2, un registro global y uno por sesión; un cambio escribe solo las sesiones cambiadas. El disco publica el manifiesto (HEAD) al final; el formato 1 (state.json, ogs-app) no se escribe ni se borra: se copia íntegro antes de la primera escritura en formato 2.',
     sides: [
       ['server/store-v2.js', 'export function createStoreV2('],
       ['server/store-v2.d.ts', 'export function createStoreV2('],

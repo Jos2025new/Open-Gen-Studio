@@ -22,6 +22,7 @@ import './styles/designer-connected.css';
 import './styles/sidebar-nav.css';
 import './styles/home.css';
 import './styles/space.css';
+import './styles/save-guard.css';
 import './styles/studio.css';
 import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';

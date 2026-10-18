@@ -38,7 +38,8 @@ describe('explicit state and raster save', () => {
     await saveNow();
     expect(saveStatus.getState().phase).toBe('saved');
   });
-  it('never retries a 409, including with Ctrl+S action', async () => {
+  // A 409 no longer stops the local save: stateDb.set keeps writing IndexedDB and holds the disk sends (save-guard-client.test.ts).
+  it('keeps saving locally after a 409, including with the Ctrl+S action; the conflict stays shown', async () => {
     vi.useFakeTimers();
     mocks.write.mockResolvedValueOnce('conflict');
     setUi({ brush: { ...useStore.getState().ui.brush, size: 44 } });
@@ -46,6 +47,7 @@ describe('explicit state and raster save', () => {
     expect(saveStatus.getState().conflict).toBe(true);
     const n = mocks.write.mock.calls.length;
     await saveNow();
-    expect(mocks.write.mock.calls.length).toBe(n);
+    expect(mocks.write.mock.calls.length).toBe(n + 1);
+    expect(saveStatus.getState().conflict).toBe(true);
   });
 });

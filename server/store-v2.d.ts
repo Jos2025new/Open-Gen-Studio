@@ -19,6 +19,8 @@ export interface V2Result {
   savedAt?: number;
   reason?: 'conflict' | 'possible-loss' | string;
   sessionId?: string;
+  /** sha256 of the on-disk text of the refused session (possible-loss of one session): the client's `keep.diskHash`. */
+  diskHash?: string;
   rejectedFile?: string;
 }
 export function assembleText(p: { savedAt: number; version: number; globals: string; order: string[]; sessions: Record<string, string> }): string;

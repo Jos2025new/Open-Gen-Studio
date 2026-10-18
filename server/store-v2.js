@@ -121,7 +121,7 @@ export function createStoreV2(dir) {
       const prev = await readFile(file, 'utf8').catch(() => null);
       if (prev == null || !looksLost(prev, text)) continue;
       if (keep?.sessionId === id && keep.diskHash === sha256(prev) && keep.candidateHash === sha256(text)) { kept.push([id, prev]); continue; }
-      return { status: 409, reason: 'possible-loss', sessionId: id, rejectedFile: await keepRejected(`rejected-session-${id}`, text), savedAt: current };
+      return { status: 409, reason: 'possible-loss', sessionId: id, diskHash: sha256(prev), rejectedFile: await keepRejected(`rejected-session-${id}`, text), savedAt: current };
     }
     for (const [id, prev] of kept) await keepRejected(`kept-before-${id}`, prev);
     await migrate();
