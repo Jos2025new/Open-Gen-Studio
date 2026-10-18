@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Wand } from 'lucide-react';
+import { Box, ChevronRight, FileImage, Film, Image as ImageIcon, Music, Search, Type, Upload, Wand } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { newNodeData } from '../../engine/flow/actions';
 import { inputPorts, portFits } from '../../engine/flow/graph';
@@ -10,7 +10,7 @@ import { MenuItem } from '../ui/primitives';
 const MENU_TIP_DELAY = 2500;
 
 /** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
-export function AddNodeItems({ accepts, onPick, onAsset, searchable = false }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void; searchable?: boolean }) {
+export function AddNodeItems({ accepts, onPick, onAsset, onImport, searchable = false }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void; onImport?: () => void; searchable?: boolean }) {
   const [tools, setTools] = useState(false);
   const [query, setQuery] = useState('');
   const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
@@ -31,6 +31,7 @@ export function AddNodeItems({ accepts, onPick, onAsset, searchable = false }: {
   return (
     <div className="menu">
       {searchable ? <label className="node-add-search"><Search size={14} aria-hidden /><input autoFocus type="search" aria-label="Search compatible nodes" placeholder="Search nodes and tools…" value={query} onChange={(e) => setQuery(e.target.value)} /></label> : null}
+      {onImport ? <MenuItem icon={Upload} label="Import images" onClick={onImport} /> : null}
       {!accepts && matches('Text prompt copy') ? <MenuItem icon={Type} label="Text" tip="Prompt or copy that feeds other nodes" tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('text'))} /> : null}
       {takes('image') && matches('Image generation reference') ? <MenuItem icon={ImageIcon} label="Image" tip={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('image'))} /> : null}
       {takes('video') && matches('Video generation first frame motion') ? <MenuItem icon={Film} label="Video" tip={accepts === 'image' ? 'Use it as the first frame' : accepts === 'audio' ? 'Use it as speech or soundtrack' : 'Generate video'} tipDelay={MENU_TIP_DELAY} onClick={() => onPick(newNodeData('video'))} /> : null}

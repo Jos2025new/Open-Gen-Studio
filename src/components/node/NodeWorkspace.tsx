@@ -11,7 +11,7 @@ import {
   type NodeChange,
   type EdgeChange,
 } from '@xyflow/react';
-import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type, Upload } from 'lucide-react';
+import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
 import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
@@ -501,15 +501,15 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           </div>
         ) : menu ? (
           <>
-          {menu.from ? null : <div className="menu"><MenuItem icon={Upload} label="Import images" onClick={() => {
-            const r = canvasRef.current?.getBoundingClientRect();
-            importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
-            fileInput.current?.click();
-            setMenu(null);
-          }} /></div>}
           <AddNodeItems
             searchable={Boolean(menu.from)}
             accepts={menuSource ? outputPort(menuSource.data, assets) : undefined}
+            onImport={menu.from ? undefined : () => {
+              const r = canvasRef.current?.getBoundingClientRect();
+              importPosition.current = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
+              fileInput.current?.click();
+              setMenu(null);
+            }}
             onPick={(data) => {
               const r = canvasRef.current?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
