@@ -1,6 +1,15 @@
 /** Provider and plan-card contracts, split from map-contracts.mjs to keep that file under 30 KB (AGENTS.md). Checked by map.mjs. */
 export default [
   {
+    id: 'failed-step-partial-context',
+    what: 'El contexto del fallo conserva N/M salidas, IDs, faltantes y error literal; los bloqueos de contenido aconsejan revisar prompt o referencias antes de otro intento.',
+    sides: [
+      ['src/engine/agent/failureContext.ts', 'export function failedStepSummary'],
+      ['src/engine/agent/runtime.ts', 'failedStepSummary('],
+    ],
+    tests: ['tests/failure-context.test.ts', 'tests/schema-guard.test.ts'],
+  },
+  {
     id: 'openrouter-reasoning-details',
     what: 'OpenRouter reasoning_details se guardan tal cual en el mensaje assistant y se reenvían; ningún otro proveedor los recibe. Cambiar el lado de llm.ts exige revisar runtime.ts y el tipo LlmMessage.',
     sides: [

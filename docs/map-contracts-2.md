@@ -4,6 +4,7 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **user-model-notes** — Los cambios sobre un modelo elegido por el usuario («your … model») se ven siempre en la tarjeta y como aviso. | [plan.ts](../src/engine/plan.ts), [PlanCard.tsx](../src/components/chat/PlanCard.tsx), [runtime.ts](../src/engine/agent/runtime.ts) | [routing.test.ts](../tests/routing.test.ts) |
 | **reference-sheet-subject** — Una hoja de referencia solo se rechaza si el lugar es su sujeto; la descripción de la operación dice lo mismo. | [fit.ts](../src/engine/agent/fit.ts), [ops.ts](../src/engine/ops.ts) | [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |
 | **keyword-route** — Las palabras clave señalan una operación y su encaje; la señal va antes del mensaje del usuario. | [triggers.ts](../src/engine/agent/triggers.ts), [force.ts](../src/engine/agent/force.ts), [fit.ts](../src/engine/agent/fit.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-force.test.ts](../tests/agent-force.test.ts), [agent-fit.test.ts](../tests/agent-fit.test.ts) |
 | **ops-in-prompt** — Las operaciones que conoce el agente salen del registro OPS, no de una segunda lista. | [ops.ts](../src/engine/ops.ts), [procedure.ts](../src/engine/procedure.ts), [context.ts](../src/engine/agent/context.ts) | [agent-procedure.test.ts](../tests/agent-procedure.test.ts) |
