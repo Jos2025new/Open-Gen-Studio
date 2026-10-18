@@ -12,12 +12,13 @@ export default [
   },
   {
     id: 'variant-prompt',
-    what: 'El prompt de cada variación que muestra la tarjeta del plan es el que se envía: una sola función los combina.',
+    what: 'El prompt que muestra la tarjeta del plan (estilo de captura o realismo, y variación) es el que se envía: sentPrompt.ts lo construye para el envío y para la tarjeta.',
     sides: [
       ['src/engine/variantPrompt.ts', 'export function variantPrompt'],
-      ['src/engine/jobs.ts', 'variantPrompt(shown, variants[done])'],
-      ['src/components/chat/PlanCard.tsx', 'variantPrompt('],
+      ['src/engine/sentPrompt.ts', 'export function stepSentPrompt'],
+      ['src/engine/jobs.ts', 'withVariation(shown, variants?.[done])'],
+      ['src/components/chat/PlanCard.tsx', 'stepSentPrompt('],
     ],
-    tests: ['tests/chat-cards-c7b.test.ts'],
+    tests: ['tests/chat-cards-c7b.test.ts', 'tests/sent-prompt.test.ts'],
   },
 ];

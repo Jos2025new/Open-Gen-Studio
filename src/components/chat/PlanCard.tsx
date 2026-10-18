@@ -5,7 +5,7 @@ import { approvePlan, cancelPlan, resolveStepCostReview } from '../../engine/age
 import { cancelGeneration } from '../../engine/jobs';
 import { plannedSpend, spentLabel } from './planSpent';
 import { stopPlanRun } from '../../engine/planStop';
-import { variantPrompt } from '../../engine/variantPrompt';
+import { stepSentPrompt } from '../../engine/sentPrompt';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
@@ -153,6 +153,8 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const total = live?.total ?? item.estimate;
   const perStep = live?.perStep;
   const name = (ref: string) => models[ref]?.name ?? (ref.startsWith('local::') ? (ref.endsWith('video') ? 'Local Motion' : 'Local Sketch') : ref.split('::')[1] ?? ref);
+  /** The catalog id of the model, as the send path sees it (some realism clauses depend on it). */
+  const modelIdOf = (ref: string) => models[ref]?.id ?? ref.split('::')[1] ?? '';
   const refName: RefName = (ref) => {
     if (ref.startsWith('asset:')) {
       const a = assets[ref.slice(6)];
@@ -212,7 +214,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         {plan.steps.map((s) => {
           const genId = item.stepGenerations[s.id];
           const state = item.stepStates[s.id] ?? 'pending';
-          const script = stepScript(s);
+          const script = s.kind === 'image' || s.kind === 'video' ? stepSentPrompt(s, modelIdOf(s.modelRef)) : stepScript(s);
           const detail = stepDetail(s, name, refName, live?.authorizations[s.id] ?? item.stepAuthorizations?.[s.id]);
           const ref = refAssets(s)[0];
           const variations = s.kind === 'image' && s.variations?.length ? s.variations : undefined;
@@ -239,7 +241,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   <>
                     <span className="cc-lab">Prompts · base + variation</span>
                     {variations.map((v, i) => {
-                      const full = variantPrompt(s.kind === 'image' ? s.prompt : '', v);
+                      const full = stepSentPrompt(s, modelIdOf('modelRef' in s ? s.modelRef : ''), v);
                       return (
                         <span key={i} className="cc-var">
                           {editable(`"${s.title}", option ${i + 1}`, (

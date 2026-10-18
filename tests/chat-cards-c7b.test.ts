@@ -88,8 +88,8 @@ describe('C7b plan card (awaiting)', () => {
     expect(texts).toEqual(VARS.map((v) => variantPrompt(BASE, v)));
     expect([...host.querySelectorAll('.cc-delta')].map((e) => e.textContent)).toEqual(VARS);
     expect(host.querySelectorAll('.cc-coll-row')).toHaveLength(1); // only the style line; no base-prompt block
-    // The request builder uses the same function.
-    expect(readFileSync('src/engine/jobs.ts', 'utf8')).toContain('variantPrompt(shown, variants[done])');
+    // The request builder uses the same function (sent-prompt.test.ts compares the two with a capture style).
+    expect(readFileSync('src/engine/jobs.ts', 'utf8')).toContain('withVariation(shown, variants?.[done])');
   });
 
   it('a single prompt gets its chevron only when the text is really cut', async () => {

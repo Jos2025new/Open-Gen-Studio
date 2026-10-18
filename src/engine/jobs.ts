@@ -15,7 +15,7 @@ import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEven
 import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
-import { variantPrompt } from './variantPrompt';
+import { withVariation } from './sentPrompt';
 import { atlasQuoteBody, fetchAtlasQuote } from './quotes';
 import { deliveryNotes } from './delivery';
 import { isCreditError, onGenerationCredit } from './credit';
@@ -576,7 +576,7 @@ async function execute(id: string): Promise<string[]> {
         kind,
         model,
         schema,
-        prompt: variants ? variantPrompt(shown, variants[done]) : shown,
+        prompt: withVariation(shown, variants?.[done]),
         settings,
         count: n,
         refs,
