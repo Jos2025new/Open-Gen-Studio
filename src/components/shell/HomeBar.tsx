@@ -1,13 +1,14 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, type FormEvent } from 'react';
 import { ArrowRight, Paperclip, X } from 'lucide-react';
-import { setComposer, useStore } from '../../store/store';
+import { setComposer, setUi, useStore } from '../../store/store';
 import { attachFiles } from '../../engine/actions';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { SPACES, openSpace } from './navModel';
 
 /** The Home prompt: submitting opens Studio and sends the message there. Same guard as the Composer: not while the agent is busy. */
 export function HomeBar() {
-  const [text, setText] = useState('');
+  const text = useStore((s) => s.ui.homeDraft) ?? '';
+  const setText = (homeDraft: string) => setUi({ homeDraft });
   const fileRef = useRef<HTMLInputElement>(null);
   const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
   const attachments = useStore((s) => s.composer.attachments);

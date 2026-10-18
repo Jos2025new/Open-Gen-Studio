@@ -119,6 +119,8 @@ export interface UiState {
   toolAsset?: string;
   /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
   homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
+  /** Unsent text in the Home prompt; survives switching Home tabs, not persisted. */
+  homeDraft?: string;
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
