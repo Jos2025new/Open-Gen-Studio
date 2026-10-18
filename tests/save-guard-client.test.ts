@@ -154,7 +154,8 @@ describe('pending revisions', () => {
     const fresh = await page();
     const text = await fresh.db.get(KEY);
     expect(text).toContain('"v":3');
-    const put = net.reqs.find((r) => r.method === 'PUT');
+    // The reloaded page's resend (the old page's queued send of B, still alive in this test, goes to the v2 commit).
+    const put = net.reqs.find((r) => r.method === 'PUT' && r.url === '/x/store/state');
     expect(JSON.stringify(put?.body)).toContain(`"baseAt":${atA}`);
     expect(JSON.stringify(put?.body)).toContain('"v":3');
     expect(fresh.guard.problem).toBeNull();
@@ -228,10 +229,10 @@ describe('keep this version', () => {
     const { db } = await boot({ ses_a: a1 });
     net.handle = (_r, n) => (n === 1 ? loss(sha256(a1)) : { status: 204 });
     expect(await db.set(KEY, val({ ses_a: a2 }))).toBe('rejected');
-    expect(await db.set(KEY, val({ ses_a: a2 }), { keep: 'ses_a' })).toBe('ok');
+    expect(await db.set(KEY, val({ ses_a: a2 }), { keep: true })).toBe('ok');
     const sent = commits()[1].body;
     expect(sent.sessions.ses_a).toBe(a2);
-    expect(sent.keep).toEqual({ sessionId: 'ses_a', diskHash: sha256(a1), candidateHash: sha256(a2) });
+    expect(sent.keep).toEqual({ sessions: [{ sessionId: 'ses_a', diskHash: sha256(a1), candidateHash: sha256(a2) }] });
   });
 
   it('11: without a diskHash in the 409 it hashes the text the disk last acknowledged', async () => {
@@ -239,8 +240,8 @@ describe('keep this version', () => {
     const { db } = await boot({ ses_a: a1 });
     net.handle = (_r, n) => (n === 1 ? loss() : { status: 204 });
     await db.set(KEY, val({ ses_a: a2 }));
-    await db.set(KEY, val({ ses_a: a2 }), { keep: 'ses_a' });
-    expect(commits()[1].body.keep).toEqual({ sessionId: 'ses_a', diskHash: sha256(a1), candidateHash: sha256(a2) });
+    await db.set(KEY, val({ ses_a: a2 }), { keep: true });
+    expect(commits()[1].body.keep).toEqual({ sessions: [{ sessionId: 'ses_a', diskHash: sha256(a1), candidateHash: sha256(a2) }] });
   });
 
   it('11: an ordinary save never carries keep', async () => {

@@ -2,14 +2,14 @@
 export default [
   {
     id: 'save-guard-409',
-    what: 'Un 409 dice por qué: conflict (baseAt: la pestaña pasa a stale y no envía más al disco) o possible-loss (el servidor aparta la copia y devuelve sessionId, rejectedFile, diskHash; la pestaña NO es stale y reintenta). IndexedDB se escribe siempre. "Mantener esta versión" envía keep {sessionId, diskHash, candidateHash} (sha256 de los textos exactos); no salta baseAt ni la pérdida total.',
+    what: 'Un 409 dice por qué: conflict (baseAt: la pestaña pasa a stale y no envía más al disco) o possible-loss (el servidor aparta la copia y devuelve TODAS las pérdidas del commit: losses [{sessionId, diskHash}] y, si se borran la mayoría de sesiones, total {diskOrderHash}; la pestaña NO es stale y reintenta). IndexedDB se escribe siempre. "Mantener esta versión" envía keep {sessions: [{sessionId, diskHash, candidateHash}], total?: {diskOrderHash, candidateOrderHash}} calculado al enviar sobre los textos exactos; debe aprobar todas las pérdidas o se rechaza entero; no salta baseAt.',
     sides: [
-      ['server/store-v2.js', "reason: 'possible-loss', sessionId: id, diskHash: sha256(prev)"],
+      ['server/store-v2.js', "losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash }))"],
       ['server/store-v2.d.ts', 'diskHash?: string;'],
       ['server/local-store.js', 'const conflictBody = ({ reason'],
       ['src/lib/disk.ts', "if (body?.reason !== 'possible-loss') return 'conflict';"],
       ['src/lib/disk.ts', 'export interface KeepVersion'],
-      ['src/lib/idb.ts', 'const keep = keepId ? {'],
+      ['src/lib/idb.ts', 'async function approvalFor(parts: V2Parts)'],
       ['src/lib/saveGuard.ts', 'export async function sha256Hex'],
       ['src/store/saveReport.ts', "result === 'rejected'"],
       ['src/store/saveRecovery.ts', 'export async function keepThisVersion'],
@@ -19,7 +19,7 @@ export default [
   },
   {
     id: 'save-pending-revisions',
-    what: 'Lo no confirmado por el disco se conserva: acked (texto confirmado por un 204) decide qué se envía; pending {rev, baseAt} se escribe en la misma transacción que el commit local y solo lo borra el ack de su revisión (una revisión más nueva queda y su base pasa al savedAt del ack). Al arrancar con pending no se adopta la copia del disco: se reenvía con la base conservada o se avisa de conflicto.',
+    what: 'Lo no confirmado por el disco se conserva: acked (texto confirmado por un 204) decide qué se envía, calculado AL ENVIAR (cola sendChain: cada envío espera al ack del anterior, así volver al texto del disco también se envía); pending {rev, baseAt} se escribe en la misma transacción que el commit local y solo lo borra el ack de su revisión (una revisión más nueva queda y su base pasa al savedAt del ack). Al arrancar con pending no se adopta la copia del disco: se reenvía con la base conservada o se avisa de conflicto.',
     sides: [
       ['src/lib/saveGuard.ts', 'export interface Pending'],
       ['src/lib/idb.ts', 'async function commitV2(p: V2Parts, pend?: Pending | null)'],
@@ -53,7 +53,7 @@ export default [
   },
   {
     id: 'writer-handoff-abort',
-    what: 'Al entregar el candado, las generaciones con remoteJob se cortan con abort(WRITER_HANDOFF), que se trata exactamente como CHECK_RESTART (isRestart): salen sin tocar la generación, que sigue running con su remoteJob (ni canceled ni cobro parcial) para que resumeInterrupted de la pestaña nueva la reanude. Orden: cortar, saveNow (estado y raster diferido), soltar. Sin remoteJob o con el agente ocupado: aviso con la lista, esperar o tomar ahora; si la pestaña pierde el candado (steal) corta todo con el mismo motivo. El texto de resumeInterrupted nombra el cambio de pestaña.',
+    what: 'Al entregar el candado, las generaciones con remoteJob se cortan con abort(WRITER_HANDOFF), que se trata exactamente como CHECK_RESTART (isRestart): salen sin tocar la generación, que sigue running con su remoteJob (ni canceled ni cobro parcial) para que resumeInterrupted de la pestaña nueva la reanude. Orden: cortar, saveNow (estado y raster diferido), soltar. Sin remoteJob o con el agente ocupado: aviso con la lista, esperar o tomar ahora. El candado solo se suelta si saveNow escribió el estado en IndexedDB (un fallo del disco no lo impide; uno de IndexedDB sí: la pestaña lo conserva y responde kept). No hay steal: una pestaña que no responde se cierra o recarga. disk.ts vuelve a preguntar holdsWriterLock() al ejecutar cada envío en cola. El texto de resumeInterrupted nombra el cambio de pestaña.',
     sides: [
       ['src/engine/checkStatus.ts', 'export const WRITER_HANDOFF'],
       ['src/engine/checkStatus.ts', 'export const isRestart'],

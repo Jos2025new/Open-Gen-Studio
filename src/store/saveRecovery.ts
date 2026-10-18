@@ -25,14 +25,13 @@ let keeping = false;
  * exact text sent, by hash). One use at a time; the server refuses a second use because the disk has moved on.
  */
 export async function keepThisVersion(): Promise<void> {
-  const sessionId = saveStatus.getState().rejected?.sessionId;
-  if (!sessionId || keeping || !holdsWriterLock()) return;
+  if (!saveStatus.getState().rejected || keeping || !holdsWriterLock()) return;
   keeping = true;
   const version = markStateDirty();
   beginStateSave(version);
   try {
     const opts = useStore.persist.getOptions();
-    reportSave(version, await stateDb.set(opts.name!, persistState({ state: opts.partialize!(useStore.getState()), version: opts.version }), { keep: sessionId }));
+    reportSave(version, await stateDb.set(opts.name!, persistState({ state: opts.partialize!(useStore.getState()), version: opts.version }), { keep: true }));
   } catch (err) {
     console.error('Could not keep this version', err);
     failSave('Could not save to browser storage', false, version);
@@ -48,7 +47,9 @@ export const page = { reload: () => window.location.reload() };
  */
 export async function revertToDisk(): Promise<void> {
   if (!holdsWriterLock()) return; // the reload below drops the lock and this tab takes it again on load
-  await stateDb.revertToDisk(useStore.persist.getOptions().name!);
+  const opts = useStore.persist.getOptions();
+  // The conflict copy is the memory state, so edits the debounce has not written yet are kept too.
+  await stateDb.revertToDisk(opts.name!, persistState({ state: opts.partialize!(useStore.getState()), version: opts.version }).text());
   resetSaveStatus(); // the reload must not ask to confirm leaving: the memory state is given up on purpose
   page.reload();
 }

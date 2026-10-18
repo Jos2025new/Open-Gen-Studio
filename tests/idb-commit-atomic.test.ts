@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/disk', () => ({
-  disk: { isStale: () => false, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe: async () => undefined },
+  disk: { isStale: () => false, reset: () => undefined, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe: async () => undefined },
   diskAvailable: async () => false,
 }));
 

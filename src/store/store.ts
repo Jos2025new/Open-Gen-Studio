@@ -332,6 +332,9 @@ function released(e: { pointerId?: number; type: string }): void {
   flushWhenIdle();
 }
 
+/** The last browser write of the state failed (IndexedDB full or broken): what is in memory is not safe anywhere. */
+let localFailed = false;
+
 function flushWrite(): Promise<void> {
   clearTimeout(writeTimer);
   clearTimeout(maxWaitTimer);
@@ -348,8 +351,10 @@ function flushWrite(): Promise<void> {
   const operation = (async () => {
     try {
       const result = await stateDb.set(next.name, persistState(next.value));
+      localFailed = false;
       reportSave(next.version, result);
     } catch (err) {
+      localFailed = true;
       console.error('Could not save state', err);
       failSave('Could not save to browser storage', false, next.version);
     }
@@ -358,12 +363,16 @@ function flushWrite(): Promise<void> {
   return writesRunning;
 }
 
-/** Explicit save: the latest state and every pending raster write must both finish. */
+/**
+ * Explicit save: the latest state and every pending raster write must both finish. Throws when the BROWSER copy could
+ * not be written (the handover of the writer lock stops on it); a disk that is down does not throw.
+ */
 export async function saveNow(): Promise<void> {
   if (!pendingWrite && lastWrite && saveStatus.getState().phase === 'error') pendingWrite = lastWrite;
   const state = flushWrite();
   const { flushRaster } = await import('../engine/design/raster');
   await Promise.all([state, flushRaster()]);
+  if (localFailed) throw new Error('Could not save to browser storage');
 }
 
 const idbStorage: PersistStorage<Persisted> = {

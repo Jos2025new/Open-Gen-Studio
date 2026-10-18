@@ -1,6 +1,6 @@
 # Arquitectura del guardado protegido (fase 1, 2026-10-18)
 
-Cómo está implementada la fase 1 de [ADR 0022](decisions/0022-guardado-local-first-sin-bloqueo.md) y qué hay que tocar cuando la app crece. Leído en el código de `task/save-guard` (`7621c03`).
+Cómo está implementada la fase 1 de [ADR 0022](decisions/0022-guardado-local-first-sin-bloqueo.md) y qué hay que tocar cuando la app crece. Leído en el código de `task/save-guard` (`7621c03`), con las correcciones de la revisión externa del 2026-10-18.
 
 - **Qué hace cada comportamiento y qué test lo comprueba:** [persistencia](features/persistencia.md).
 - **El incidente que lo motivó:** [043](history/043-2026-10-W42.md).
@@ -28,14 +28,14 @@ Cómo está implementada la fase 1 de [ADR 0022](decisions/0022-guardado-local-f
 ### Guardado normal
 1. `idbStorage.setItem` (debounce) → `flushWrite` → `stateDb.set`.
 2. `rev + 1`. `pending = { rev, baseAt }` se escribe en la misma transacción que el commit local (`commitV2`).
-3. Se envían las sesiones que difieren de `acked`, más el orden y los globales.
-4. Con el 204, `settle` avanza `acked` y `diskAt`. Si llegó una revisión más nueva mientras tanto, `pending` sigue con la base nueva (rebase); si no, se borra.
+3. El envío espera su turno en la cola `sendChain`. Al llegarle, vuelve a preguntar por el candado y calcula entonces qué sesiones difieren de `acked`, más el orden y los globales. Así, volver al texto del disco durante un envío también se envía.
+4. Con el 204, `settle` avanza `acked` y `diskAt` antes de que empiece el siguiente envío. Si llegó una revisión más nueva mientras tanto, `pending` sigue con la base nueva (rebase); si no, se borra. Sin candado al llegar el turno, no se envía nada y `pending` queda para la pestaña siguiente.
 
 ### El servidor rechaza
 | Respuesta | Cliente | Usuario |
 |---|---|---|
 | 409 `conflict` (otra pestaña o copia guardó) | `stale = true`. Lo local se sigue guardando y no se envía nada más. Una copia `:conflict-<at>` por episodio. | Aviso «Another tab saved more recent changes»: descargar o volver a la del disco. |
-| 409 `possible-loss` | No marca `stale`. `problem` guarda `sessionId`, `rejectedFile` y `diskHash`. Cada guardado siguiente reenvía todo lo que difiere de `acked`. | Aviso con el título de la sesión: descargar, mantener esta versión o volver. |
+| 409 `possible-loss` | No marca `stale`. `problem` guarda `losses` (todas las sesiones que encogen, con su `diskHash`), `total` si se borran la mayoría de sesiones, y `rejectedFile`. Cada guardado siguiente reenvía todo lo que difiere de `acked`. | Aviso con el título de la sesión: descargar, mantener esta versión o volver. |
 | Fallo de red | Ni `acked` ni `pending` cambian; el siguiente guardado lo reenvía. | El indicador de guardado. |
 
 Mientras dura el rechazo, el servidor guarda como mucho una copia por minuto del intento (`rejected-session-<id>-<ts>.json`, la más reciente).
@@ -50,14 +50,14 @@ Mientras dura el rechazo, el servidor guarda como mucho una copia por minuto del
 | Copia local más nueva y sin `pending` | La reenvía con la base del disco. |
 
 ### «Mantener esta versión»
-`keepThisVersion` guarda con `keep: { sessionId, diskHash, candidateHash }`:
-- `diskHash` sale del 409; si no, del texto en `acked`.
-- `candidateHash` es el del texto exacto enviado.
+`keepThisVersion` guarda con `keep: true`. Al enviar, `approvalFor` construye la aprobación de **todas** las pérdidas que listó el 409:
+- por sesión: `{ sessionId, diskHash, candidateHash }`. `diskHash` sale del 409 (si no, del texto en `acked`); `candidateHash` es el del texto exacto enviado;
+- si hay borrado masivo: `total: { diskOrderHash, candidateOrderHash }`, los hashes de los dos órdenes de sesiones.
 
-El servidor exige que los dos coincidan y guarda `backups/kept-before-<id>-<ts>.json` antes de escribir. Nunca salta un `baseAt` ni la pérdida total.
+El servidor exige que se aprueben todas las pérdidas. Si falta una, rechaza el commit entero. Guarda `backups/kept-before-<id>-<ts>.json` (y `kept-before-order-*`) antes de escribir y nunca salta un `baseAt`.
 
 ### «Volver a la del disco»
-Pide confirmación en el propio aviso. Guarda la copia local en `:conflict-<at>`, adopta el disco (`guard.discarding` descarta escrituras tardías) y recarga la página.
+Pide confirmación en el propio aviso. Guarda en `:conflict-<at>` el estado en memoria (incluido lo que aún no se había escrito); si esa copia falla, no adopta nada y el guardado sigue. Después pone `guard.discarding`, adopta el disco (una escritura tardía responde `fail`) y recarga la página. Si la adopción falla, `discarding` vuelve a falso.
 
 ### Pestañas
 1. **Al cargar el módulo,** `writerLock.ts` pide el candado. La persistencia usa `skipHydration`, y `onWriterLockGranted` llama a `persist.rehydrate()`. Todo lo que `App.tsx` lanza con `hydrated` corre después.
@@ -66,8 +66,10 @@ Pide confirmación en el propio aviso. Guarda la copia local en `:conflict-<at>`
    - Si nada se perdería, entrega en el acto.
    - Si algo se perdería, la nueva ofrece «Wait for them to finish» (sondeo cada 500 ms) o «Take over now».
 4. **La entrega,** en este orden: corta las consultas con `remoteJob` con `WRITER_HANDOFF` (siguen `running`, sin cobro parcial); `saveNow()` (estado y raster diferido); suelta el candado. La anterior queda tapada y vuelve a la cola.
-5. **Sin respuesta en 5 s:** «Take over anyway» pide el candado con `steal`. La anterior recibe `AbortError`, corta todo con `WRITER_HANDOFF` y queda tapada.
+   - Si `saveNow()` lanza porque IndexedDB falló, no se suelta nada: la pestaña conserva el candado y responde `kept`. Un disco caído no lanza.
+5. **Sin respuesta en 5 s:** el panel pide cerrar o recargar la otra pestaña y ofrece «Ask again». No hay `steal`: no cortaría las peticiones que la otra ya envió.
 6. **La nueva hidrata sin recargar,** y `resumeInterrupted()` reanuda las generaciones con `remoteJob`.
+7. **Al recuperar el candado,** `stateDb.get` empieza de cero: `disk.reset()` (sin `stale` ni el último rechazo), `acked`, `held`, `problem` y el estado del aviso. Después lo reconstruye desde las copias actuales y solo mantiene un conflicto si sigue siéndolo.
 
 ## 3. Qué queda guardado y dónde
 
@@ -102,6 +104,7 @@ Ninguno tiene retención todavía; es la fase 3.
 
 ## 6. Límites conocidos
 
+- Revisión externa del 2026-10-18: seis fallos corregidos, cada uno con su test (`tests/save-guard-review.test.ts`, el traspaso en `writer-lock-handoff.test.ts` y el servidor en `save-guard-server.test.ts`). Se comprobó que los tests fallan con el código anterior.
 - Para un conflicto real solo hay descargar o volver a la del disco. «Mantener mi versión» frente a un conflicto, y la lectura de las copias `:conflict-`, son de la fase 3.
 - Los tests del candado se escribieron después del código: no consta que fallaran antes.
 - Sin prueba visual en el navegador todavía.

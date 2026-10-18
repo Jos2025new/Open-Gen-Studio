@@ -1,6 +1,6 @@
 import { clear, createStore, del, get, getMany, set, delMany, keys } from 'idb-keyval';
 import { assembleText, splitText, type V2Parts } from '../store/formatV2';
-import { disk, diskAvailable, type DiskWriteResult } from './disk';
+import { disk, diskAvailable, type DiskWriteResult, type KeepVersion } from './disk';
 import { guard, setProblem, sha256Hex, type Pending } from './saveGuard';
 import { holdsWriterLock } from './writerLock';
 import type { StateJson } from '../store/persistJson';
@@ -147,6 +147,53 @@ async function hold(key: string, local: string): Promise<void> {
   setProblem({ reason: 'conflict' });
 }
 
+
+// Disk sends of the state, one at a time: each computes its diff and settles its ack before the next one starts.
+let sendChain: Promise<void> = Promise.resolve();
+
+async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, keep: boolean): Promise<DiskWriteResult> {
+  // The lock is asked again at send time: a tab that lost it while this send waited sends nothing (pending stays, so
+  // the next holder resends it from IndexedDB).
+  if (!holdsWriterLock()) return 'browser-only';
+  if (guard.held) return 'conflict';
+  const differs = (id: string) => guard.acked.get(id) !== parts.sessions.get(id);
+  const changed = parts.order.filter(differs).map((id) => [id, parts.sessions.get(id)!] as [string, string]);
+  const all = parts.order.map((id) => [id, parts.sessions.get(id)!] as [string, string]);
+  const approval = keep ? await approvalFor(parts) : undefined;
+  const result = await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed, all, keep: approval });
+  if (result === 'ok') {
+    await settle(rev, at, parts, true);
+    setProblem(null);
+  } else if (result === 'browser-only' && holdsWriterLock()) await settle(rev, at, parts, false);
+  else if (result === 'rejected') setProblem({ reason: 'possible-loss', ...disk.rejection() });
+  else if (result === 'conflict') {
+    // The first refusal keeps a dated copy of this tab's state; later saves of the same episode do not pile up copies.
+    if (guard.problem?.reason !== 'conflict') {
+      await set(`${key}:conflict-${at}`, assembleText(parts), stateStore);
+      setProblem({ reason: 'conflict' });
+    }
+  }
+  return result;
+}
+
+/**
+ * "Keep this version": approves EVERY loss the server listed for this exact candidate (each shrinking session by the
+ * hashes of the disk text and of the text sent, and a large removal of sessions by the hashes of both orders).
+ */
+async function approvalFor(parts: V2Parts): Promise<KeepVersion | undefined> {
+  const p = guard.problem;
+  if (p?.reason !== 'possible-loss') return undefined;
+  const losses = p.losses ?? (p.sessionId ? [{ sessionId: p.sessionId, diskHash: p.diskHash }] : []);
+  const sessions = [];
+  for (const l of losses) {
+    const text = parts.sessions.get(l.sessionId);
+    if (text == null) continue;
+    sessions.push({ sessionId: l.sessionId, diskHash: l.diskHash ?? await sha256Hex(guard.acked.get(l.sessionId) ?? ''), candidateHash: await sha256Hex(text) });
+  }
+  const total = p.total ? { diskOrderHash: p.total.diskOrderHash, candidateOrderHash: await sha256Hex(JSON.stringify(parts.order)) } : undefined;
+  return sessions.length || total ? { sessions, ...(total ? { total } : {}) } : undefined;
+}
+
 export const stateDb = {
   /**
    * The state text: format 2 when it exists, else format 1, which is migrated on this load. A disk copy that is newer
@@ -154,6 +201,11 @@ export const stateDb = {
    */
   async get(key: string): Promise<string | undefined> {
     if (!holdsWriterLock()) return undefined; // a tab without the lock loads nothing and adopts or pushes nothing
+    // Each load (the first one, or taking the lock back) starts clean: nothing of an earlier holding period is kept.
+    disk.reset();
+    Object.assign(guard, { acked: new Map(), ackedRev: 0, held: false, discarding: false });
+    setProblem(null);
+    committed.clear();
     const v2 = await readV2();
     const legacy = v2 ? undefined : await readLegacy(key);
     const onDisk = await disk.getState();
@@ -193,8 +245,9 @@ export const stateDb = {
    * what the disk has not confirmed. A refusal keeps this copy; nothing is adopted from the disk. `opts.keep` is
    * "Keep this version" for one session (single use: the server also binds it to the disk and candidate hashes).
    */
-  async set(key: string, value: string | StateJson, opts: { keep?: string } = {}): Promise<DiskWriteResult> {
-    if (guard.discarding) return 'ok';
+  async set(key: string, value: string | StateJson, opts: { keep?: boolean } = {}): Promise<DiskWriteResult> {
+    // Never 'ok' for a write that went nowhere: while the disk version is adopted, late writes are dropped on purpose.
+    if (guard.discarding) return 'fail';
     if (!holdsWriterLock()) return 'browser-only'; // no state of its own to save: the guard of every write path
     const at = Date.now();
     const parts: V2Parts = typeof value === 'string'
@@ -207,41 +260,32 @@ export const stateDb = {
     const pend: Pending = { rev, baseAt: guard.pending?.baseAt ?? guard.diskAt };
     guard.pending = pend;
     await commitV2(parts, pend);
-    const differs = (id: string) => guard.acked.get(id) !== parts.sessions.get(id);
-    const changed = parts.order.filter(differs).map((id) => [id, parts.sessions.get(id)!] as [string, string]);
-    const all = parts.order.map((id) => [id, parts.sessions.get(id)!] as [string, string]);
-    const keepId = opts.keep && changed.some(([id]) => id === opts.keep) ? opts.keep : undefined;
-    const keep = keepId ? {
-      sessionId: keepId,
-      diskHash: (guard.problem?.sessionId === keepId ? guard.problem.diskHash : undefined) ?? await sha256Hex(guard.acked.get(keepId) ?? ''),
-      candidateHash: await sha256Hex(parts.sessions.get(keepId)!),
-    } : undefined;
-    const result = guard.held ? 'conflict' : await disk.setCommit({ savedAt: at, version: parts.version, globals: parts.globals, order: parts.order, changed, all, keep });
-    if (result === 'ok' || result === 'browser-only') {
-      await settle(rev, at, parts, result === 'ok');
-      if (result === 'ok') setProblem(null);
-    } else if (result === 'rejected') setProblem({ reason: 'possible-loss', ...disk.rejection() });
-    else if (result === 'conflict') {
-      // The first refusal keeps a dated copy of this tab's state; later saves of the same episode do not pile up copies.
-      if (guard.problem?.reason !== 'conflict') {
-        await set(`${key}:conflict-${at}`, assembleText(parts), stateStore);
-        setProblem({ reason: 'conflict' });
-      }
-    }
-    return result;
+    // The disk send waits its turn; what to send is decided THEN, against what the disk confirmed by that time (an
+    // earlier send may have been acked meanwhile: going back to an older text must still be sent).
+    const turn = sendChain.then(() => sendCommit(key, rev, at, parts, opts.keep === true));
+    sendChain = turn.then(() => undefined, () => undefined);
+    return turn;
   },
   /**
    * "Revert to the disk version": this tab's state goes to a `:conflict-<at>` copy, then the disk's replaces it as the
    * active copy. The page must reload afterwards (late writes of the old memory state are discarded meanwhile).
    */
-  async revertToDisk(key: string): Promise<void> {
+  async revertToDisk(key: string, current?: string): Promise<void> {
     if (!holdsWriterLock()) return;
     const onDisk = await disk.getState();
     if (!onDisk) throw new Error('The disk copy is not available');
-    const v2 = await readV2();
+    // The copy of this tab's version comes first (`current`: the memory state, with edits not saved yet): if it cannot be
+    // written, nothing is adopted and saving goes on.
+    const v2 = current ? null : await readV2();
+    const mine = current ?? (v2 ? assembleText(v2) : undefined);
+    if (mine) await set(`${key}:conflict-${Date.now()}`, mine, stateStore);
     guard.discarding = true;
-    if (v2) await set(`${key}:conflict-${Date.now()}`, assembleText(v2), stateStore);
-    await commitV2(splitText(onDisk), null);
+    try {
+      await commitV2(splitText(onDisk), null);
+    } catch (err) {
+      guard.discarding = false;
+      throw err;
+    }
     guard.pending = undefined;
   },
   del: async (key: string) => { if (holdsWriterLock()) await del(`${key}:b`, stateStore); },

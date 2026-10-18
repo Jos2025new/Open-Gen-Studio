@@ -16,7 +16,8 @@ export function SaveGuardBanner() {
   const [failed, setFailed] = useState(false);
   if (reason !== 'conflict' && reason !== 'possible-loss') return null;
   const loss = reason === 'possible-loss';
-  const what = rejected?.sessionId ? `"${title ?? rejected.sessionId}"` : 'your sessions';
+  const many = (rejected?.losses?.length ?? 0) > 1 || rejected?.total;
+  const what = rejected?.sessionId && !many ? `"${title ?? rejected.sessionId}"` : 'your sessions';
   return (
     <div className="save-guard" role="alert">
       <p className="save-guard-text">
@@ -35,7 +36,7 @@ export function SaveGuardBanner() {
       ) : (
         <div className="save-guard-actions">
           <Button size="sm" onClick={downloadCopy}>Download copy</Button>
-          {loss && rejected?.sessionId && <Button size="sm" onClick={() => void keepThisVersion()}>Keep this version</Button>}
+          {loss && rejected && <Button size="sm" onClick={() => void keepThisVersion()}>{rejected.total ? 'Keep this version (sessions removed)' : 'Keep this version'}</Button>}
           <Button size="sm" variant="ghost" onClick={() => setConfirming(true)}>Revert to disk version</Button>
         </div>
       )}

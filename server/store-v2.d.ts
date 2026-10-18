@@ -7,11 +7,12 @@ export interface V2Commit {
   order: string[];
   sessions: Record<string, string>;
   /**
-   * "Keep this version": lifts the possible-loss guard for ONE session when sha256(on-disk session text) === diskHash
-   * and sha256(sent text) === candidateHash (hex of the exact UTF-8 texts). The disk version is copied to
-   * backups/kept-before-<id>-<ts>.json first. Never lifts a baseAt conflict or the total-loss rule.
+   * "Keep this version": approves EVERY loss of this exact commit — each shrinking session when sha256(on-disk text) ===
+   * diskHash and sha256(sent text) === candidateHash, and a total loss when both session orders hash as given. Missing
+   * one approval refuses the whole commit again. The disk versions are copied to backups/kept-before-* first. Never
+   * lifts a baseAt conflict.
    */
-  keep?: { sessionId: string; diskHash: string; candidateHash: string };
+  keep?: { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string } };
 }
 /** Result of a commit. 409 carries reason 'conflict' (baseAt) or 'possible-loss' (sessionId only for a single session). */
 export interface V2Result {
@@ -21,6 +22,10 @@ export interface V2Result {
   sessionId?: string;
   /** sha256 of the on-disk text of the refused session (possible-loss of one session): the client's `keep.diskHash`. */
   diskHash?: string;
+  /** Every shrinking session of the refused commit, with its disk hash. */
+  losses?: Array<{ sessionId: string; diskHash: string }>;
+  /** The commit removes most sessions: sha256 of the disk's session order (JSON). */
+  total?: { diskOrderHash: string };
   rejectedFile?: string;
 }
 export function assembleText(p: { savedAt: number; version: number; globals: string; order: string[]; sessions: Record<string, string> }): string;

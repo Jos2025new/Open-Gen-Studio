@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 const wipe = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock('../src/lib/disk', async (orig) => ({
   ...(await orig<typeof import('../src/lib/disk')>()),
-  disk: { isStale: () => false, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe, onStateConflict: () => undefined },
+  disk: { isStale: () => false, reset: () => undefined, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe, onStateConflict: () => undefined },
   diskAvailable: async () => false,
 }));
 

@@ -2,8 +2,9 @@
  * One active tab (plan: save protection, phase 1.4). Only the tab that holds the Web Lock 'ogs-writer' writes to
  * IndexedDB and the disk, hydrates the store, or starts work that costs money. Every write path asks
  * `holdsWriterLock()`: zustand calls setItem on every setState, hydrated or not, so not hydrating is not enough.
- * Handover between tabs travels on BroadcastChannel('ogs-writer'); a tab that does not answer in 5 s can be taken from
- * (`steal`). This module imports nothing from the store: the store and the handoff hooks register themselves here.
+ * Handover between tabs travels on BroadcastChannel('ogs-writer'). A tab that does not answer in 5 s is not taken from:
+ * stealing the lock would not stop the requests it already sent, so the user closes or reloads that tab instead.
+ * This module imports nothing from the store: the store and the handoff hooks register themselves here.
  */
 export const LOCK_NAME = 'ogs-writer';
 export const SILENCE_MS = 5000;
@@ -106,7 +107,16 @@ async function handOver(force: boolean): Promise<void> {
   clearInterval(pollTimer);
   hooks.abortTransferable();
   if (force) hooks.abortAll();
-  try { await hooks.flush(); } catch (err) { console.error('Could not save before handing over', err); }
+  // The lock moves only once this tab's work is safe in the browser. A failed browser write keeps the lock here (the
+  // requester is told the tab stays); a failed DISK write does not throw, since IndexedDB keeps everything.
+  try { await hooks.flush(); } catch (err) {
+    console.error('Could not save before handing over: this tab keeps the lock', err);
+    handing = false;
+    setState({ requested: false });
+    send({ type: 'kept' });
+    return;
+  }
+  if (state.phase !== 'held') { handing = false; return; }
   const release = releaseHeld;
   releaseHeld = null;
   stoppedHolding();
@@ -160,10 +170,6 @@ export function takeNow(): void {
   send({ type: 'now' });
   setState({ asking: 'asking' });
   armSilence();
-}
-/** Requester: no answer in 5 s. Steals the lock; the old tab stops writing and following jobs. */
-export function takeOver(): void {
-  if (state.phase === 'waiting') request(true);
 }
 /** Holder: "Keep using here" after a request. */
 export function keepHere(): void {

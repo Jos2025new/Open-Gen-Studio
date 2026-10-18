@@ -50,6 +50,7 @@ vi.mock('../src/lib/disk', () => ({
     listBlobs: async () => [],
     delBlobs: vi.fn(),
     isStale: () => false,
+    reset: () => undefined,
   },
   diskAvailable: async () => true,
 }));

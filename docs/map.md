@@ -37,7 +37,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [types.ts](../src/engine/providers/types.ts) | 24 | 6 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
-| [idb.ts](../src/lib/idb.ts) | 18 | 168 |
+| [idb.ts](../src/lib/idb.ts) | 18 | 169 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
 
@@ -64,7 +64,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 51 |
 | `src/engine/skills` | 6 | 15 |
-| `src/lib` | 28 | 195 |
+| `src/lib` | 28 | 196 |
 | `src/store` | 8 | 139 |
 
 144 de 394 módulos no tienen ningún test que los importe directamente.

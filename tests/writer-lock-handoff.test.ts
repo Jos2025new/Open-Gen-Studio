@@ -42,8 +42,7 @@ function generation(t: Tab, remote: boolean) {
   return g.id;
 }
 
-let world: ReturnType<typeof resetWorld>;
-beforeEach(() => { world = resetWorld(); polls.length = 0; vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined })); });
+beforeEach(() => { resetWorld(); polls.length = 0; vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined })); });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('test 15f: handing over work in flight', () => {
@@ -74,23 +73,6 @@ describe('test 15f: handing over work in flight', () => {
     expect(polls[1].job).toBe(`job_${id}`);
     expect(b.state().generations[id].status).toBe('running');
     expect(b.state().spentUsd).toBe(1);
-  });
-
-  it('after a steal the old tab stops following its jobs (and the generation is not canceled there either)', async () => {
-    const a = await openTab();
-    await hydrated(a);
-    const id = generation(a, true);
-    await a.jobs.resumeInterrupted();
-    await until(() => polls.length === 1);
-    const b = await openTab();
-    await settle();
-    world.bus.deaf.add(1);
-    b.lock.takeOver();
-    await hydrated(b);
-    await until(() => polls[0].reason !== undefined);
-    expect(polls[0].reason).toBe('writer-handoff');
-    expect(a.state().generations[id].status).toBe('running');
-    expect(a.lock.holdsWriterLock()).toBe(false);
   });
 
   it('after the request the old tab starts no new work, the user\'s or the agent\'s; the list is shown and "wait" releases when the work ends', async () => {
@@ -149,5 +131,19 @@ describe('test 15f: handing over work in flight', () => {
     expect(b.lock.getWriterState().work).toEqual({ transferable: 0, generations: 0, agent: 1 });
     // The agent turn already running may still start its generations; nobody else may.
     expect(a.lock.mayStartWork()).toBe(true);
+  });
+
+  it('review 4: a handover whose browser save fails keeps the lock in the old tab and tells the new one', async () => {
+    const a = await openTab();
+    await hydrated(a);
+    a.lock.setWriterHooks({ report: () => ({ transferable: 0, generations: 0, agent: 0 }), agentBusy: () => false, abortTransferable() {}, abortAll() {}, flush: async () => { throw new Error('quota'); } });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const b = await openTab();
+    await settle();
+    b.lock.useHere();
+    await settle();
+    expect(a.lock.holdsWriterLock()).toBe(true);
+    expect(b.lock.holdsWriterLock()).toBe(false);
+    expect(b.lock.getWriterState().asking).toBe('idle'); // told "kept": not left waiting
   });
 });

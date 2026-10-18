@@ -139,7 +139,8 @@ describe('save guard: keep this version', () => {
     await seed(s, ses({ feed: 10, nodes: 5, docs: [doc('d1', 5, 1500)] }));
     return { s, cand: ses() };
   };
-  const keepOf = (s: ReturnType<typeof setup>, cand: string) => ({ sessionId: 'ses_a', diskHash: sha(s.onDisk()), candidateHash: sha(cand) });
+  const entry = (s: ReturnType<typeof setup>, cand: string) => ({ sessionId: 'ses_a', diskHash: sha(s.onDisk()), candidateHash: sha(cand) });
+  const keepOf = (s: ReturnType<typeof setup>, cand: string) => ({ sessions: [entry(s, cand)] });
 
   it('11: correct hashes back up the disk version and write the candidate', async () => {
     const { s, cand } = await lossSetup();
@@ -156,7 +157,7 @@ describe('save guard: keep this version', () => {
     const { s, cand } = await lossSetup();
     const disk = s.onDisk();
     for (const bad of [{ diskHash: 'a'.repeat(64) }, { candidateHash: 'b'.repeat(64) }, { sessionId: 'ses_zzz' }]) {
-      const r = await s.send({ ses_a: cand }, { keep: { ...keepOf(s, cand), ...bad } });
+      const r = await s.send({ ses_a: cand }, { keep: { sessions: [{ ...entry(s, cand), ...bad }] } });
       expect(r).toMatchObject({ status: 409, reason: 'possible-loss' });
     }
     expect(s.onDisk()).toBe(disk);
@@ -172,12 +173,35 @@ describe('save guard: keep this version', () => {
     expect(r).toMatchObject({ status: 409, reason: 'possible-loss' });
   });
 
-  it('a keep never lifts the total-loss rule', async () => {
+  it('a keep of the sessions alone never lifts the total-loss rule', async () => {
     const s = setup();
     const a = ses({ feed: 3 });
     await s.send({ ses_a: a, ses_b: a, ses_c: a, ses_d: a }, {}, 0);
-    const r = await s.send({ ses_a: a }, { keep: { sessionId: 'ses_a', diskHash: sha(a), candidateHash: sha(a) } });
-    expect(r.status).toBe(409);
+    const r = await s.send({ ses_a: a }, { keep: { sessions: [{ sessionId: 'ses_a', diskHash: sha(a), candidateHash: sha(a) }] } });
+    expect(r).toMatchObject({ status: 409, reason: 'possible-loss', total: { diskOrderHash: sha(JSON.stringify(['ses_a', 'ses_b', 'ses_c', 'ses_d'])) } });
+  });
+
+  it('review 5: a removal of most sessions is kept when both orders are approved by hash (and only then)', async () => {
+    const s = setup();
+    const a = ses({ feed: 3 });
+    await s.send({ ses_a: a, ses_b: a, ses_c: a, ses_d: a }, {}, 0);
+    const total = { diskOrderHash: sha(JSON.stringify(['ses_a', 'ses_b', 'ses_c', 'ses_d'])), candidateOrderHash: sha(JSON.stringify(['ses_a'])) };
+    expect((await s.send({ ses_a: a }, { keep: { sessions: [], total: { ...total, candidateOrderHash: sha('["ses_b"]') } } })).status).toBe(409);
+    expect((await s.send({ ses_a: a }, { keep: { sessions: [], total } })).status).toBe(204);
+    expect(readdirSync(join(s.dir, 'backups')).some((f) => f.startsWith('kept-before-order-'))).toBe(true);
+  });
+
+  it('review 5: two shrinking sessions are listed together and kept together (no A → B → A loop)', async () => {
+    const s = setup();
+    const big = ses({ feed: 10, nodes: 5, docs: [doc('d1', 5, 1500)] });
+    await s.send({ ses_a: big, ses_b: big }, {}, 0);
+    const small = ses();
+    const r = await s.send({ ses_a: small, ses_b: small });
+    expect(r).toMatchObject({ status: 409, losses: [{ sessionId: 'ses_a', diskHash: sha(big) }, { sessionId: 'ses_b', diskHash: sha(big) }] });
+    const one = { sessionId: 'ses_a', diskHash: sha(big), candidateHash: sha(small) };
+    expect((await s.send({ ses_a: small, ses_b: small }, { keep: { sessions: [one] } })).status).toBe(409);
+    expect((await s.send({ ses_a: small, ses_b: small }, { keep: { sessions: [one, { ...one, sessionId: 'ses_b' }] } })).status).toBe(204);
+    expect(s.onDisk()).toBe(small);
   });
 });
 

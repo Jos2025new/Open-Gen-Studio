@@ -83,7 +83,7 @@ describe('13: the save notice', () => {
     await render();
     await click('Keep this version');
     expect(mocks.set).toHaveBeenCalledTimes(1);
-    expect(mocks.set.mock.calls[0][2]).toEqual({ keep: sid() });
+    expect(mocks.set.mock.calls[0][2]).toEqual({ keep: true });
   });
 
   it('Revert asks first in the page (no native confirm) and Cancel changes nothing', async () => {

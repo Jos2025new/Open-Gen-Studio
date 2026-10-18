@@ -109,7 +109,7 @@ describe('test 15c: "Use here" hands the work over completely', () => {
     expect(snapshotDbs()).not.toBe(before);
   });
 
-  it('a tab that does not answer in 5 s can be taken from: the old tab stops writing and the new one has its IndexedDB state', async () => {
+  it('a tab that does not answer in 5 s is not taken from: the new tab waits, and takes over with the IndexedDB state once the old one closes', async () => {
     const a = await openTab();
     await hydrated(a);
     a.set({ spentUsd: 3 });
@@ -124,15 +124,13 @@ describe('test 15c: "Use here" hands the work over completely', () => {
     await vi.advanceTimersByTimeAsync(5000);
     expect(b.lock.getWriterState().asking).toBe('silent');
     vi.useRealTimers();
-    b.lock.takeOver();
+    expect('takeOver' in b.lock).toBe(false); // no steal: it would not stop the requests the old tab already sent
+    await settle();
+    expect(b.lock.holdsWriterLock()).toBe(false);
+    expect(a.lock.holdsWriterLock()).toBe(true);
+    world.locks.terminate(); // the user closes the frozen tab
     await hydrated(b);
     expect(b.state().spentUsd).toBe(3);
-    expect(a.lock.holdsWriterLock()).toBe(false);
-    const before = snapshotDbs();
-    a.set({ spentUsd: 4 });
-    await a.store.saveNow();
-    await settle();
-    expect(snapshotDbs()).toBe(before);
   });
 
   it('a tab waiting in the queue takes the lock by itself when the holder tab closes, and hydrates', async () => {

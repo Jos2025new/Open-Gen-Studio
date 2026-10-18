@@ -1,7 +1,8 @@
 import { WRITER_HANDOFF } from '../engine/checkStatus';
 import { controllers } from '../engine/jobs';
 import { stopAgent } from '../engine/agent/runtime';
-import { onWriterLockLost, setWriterHooks, type WorkReport } from '../lib/writerLock';
+import { onWriterLockGranted, onWriterLockLost, setWriterHooks, type WorkReport } from '../lib/writerLock';
+import { resetSaveStatus } from './saveStatus';
 import { saveNow, useStore } from './store';
 
 /*
@@ -34,3 +35,5 @@ setWriterHooks({
 
 // Without the lock this tab has no state of its own: the memory copy is stale, so the next grant loads the state again.
 onWriterLockLost(() => useStore.setState({ hydrated: false }));
+// Taking the lock (again) starts the save status clean; a problem the new load finds (stateDb.get) shows up again.
+onWriterLockGranted(resetSaveStatus);

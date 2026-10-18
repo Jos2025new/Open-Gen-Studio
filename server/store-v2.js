@@ -11,7 +11,6 @@ import { looksLost, sha256 } from './save-guard.js';
 export const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 const SNAPSHOT_EVERY_MS = 10 * 60_000;
 const KEPT = 20;
-// A session that loses more than half of its user content (bytes and elements) is refused, like a total loss of sessions.
 
 const json = (v) => JSON.stringify(v);
 
@@ -118,19 +117,30 @@ export function createStoreV2(dir) {
     const legacy = head ? null : await readFile(stateFile, 'utf8').catch(() => null);
     const current = head ? head.savedAt : Number(/^\{"savedAt":(\d+)/.exec(legacy ?? '')?.[1] ?? 0);
     if (current && current !== baseAt) return { status: 409, reason: 'conflict', savedAt: current };
-    // Total loss: fewer sessions than half of the previous ones (two or more before).
+    // Every loss of this commit is found first and refused together: a total loss (fewer sessions than half of the
+    // previous ones, two or more before) and each session that loses most of its user content (not its agent cache).
+    // "Keep this version" lifts them only when it approves ALL of them for these exact texts (hashes), so approving one
+    // never just reveals the next. It never skips baseAt (checked above).
     const had = head ? head.order.length : (legacy ? (legacy.match(/"id":"ses_/g) ?? []).length : 0), has = order.length;
-    if (had >= 2 && has < had / 2) return { status: 409, reason: 'possible-loss', rejectedFile: await keepRejected('rejected', json(body)), savedAt: current };
-    // Per session: a session that loses most of its user content (not its agent cache) is refused. "Keep this version"
-    // lifts it for one session only, when the disk and the candidate are exactly the texts the user saw (hashes).
-    const kept = [];
+    const prevOrder = head ? head.order : [];
+    const total = had >= 2 && has < had / 2 ? { diskOrderHash: sha256(json(prevOrder)) } : null;
+    const totalOk = total && keep?.total?.diskOrderHash === total.diskOrderHash && keep.total.candidateOrderHash === sha256(json(order));
+    const approved = new Map((Array.isArray(keep?.sessions) ? keep.sessions : []).map((k) => [k.sessionId, k]));
+    const losses = [], kept = [];
     for (const [id, text] of Object.entries(sessions)) {
-      const file = join(sessionsDir, `${id}.json`);
-      const prev = await readFile(file, 'utf8').catch(() => null);
+      const prev = await readFile(join(sessionsDir, `${id}.json`), 'utf8').catch(() => null);
       if (prev == null || !looksLost(prev, text)) continue;
-      if (keep?.sessionId === id && keep.diskHash === sha256(prev) && keep.candidateHash === sha256(text)) { kept.push([id, prev]); continue; }
-      return { status: 409, reason: 'possible-loss', sessionId: id, diskHash: sha256(prev), rejectedFile: await keepRejected(`rejected-session-${id}`, text), savedAt: current };
+      const diskHash = sha256(prev), k = approved.get(id);
+      if (k && k.diskHash === diskHash && k.candidateHash === sha256(text)) kept.push([id, prev]);
+      else losses.push({ sessionId: id, diskHash, text });
     }
+    if ((total && !totalOk) || losses.length) {
+      const first = losses[0];
+      const rejectedFile = first ? await keepRejected(`rejected-session-${first.sessionId}`, first.text) : await keepRejected('rejected', json(body));
+      for (const l of losses.slice(1)) await keepRejected(`rejected-session-${l.sessionId}`, l.text);
+      return { status: 409, reason: 'possible-loss', ...(first ? { sessionId: first.sessionId, diskHash: first.diskHash } : {}), losses: losses.map(({ sessionId, diskHash }) => ({ sessionId, diskHash })), ...(total ? { total } : {}), rejectedFile, savedAt: current };
+    }
+    if (totalOk) await keepRejected('kept-before-order', json(head ?? {}));
     for (const [id, prev] of kept) await keepRejected(`kept-before-${id}`, prev);
     await migrate();
     await mkdir(sessionsDir, { recursive: true });

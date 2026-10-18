@@ -266,7 +266,7 @@ export default [
     what: 'Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista.',
     sides: [
       ['src/engine/shortcuts.ts', "{ keys: 'Mod + S'"],
-      ['src/components/designer/designerKeys.ts', 'void saveNow(); return;'],
+      ['src/components/designer/designerKeys.ts', 'void saveNow().catch'],
       ['src/components/shell/SettingsPanel.tsx', 'Save (Mod+S) also works while typing'],
       ['src/engine/shortcuts.ts', 'export function shortcutGroups'],
       ['src/components/designer/designerKeys.ts', 'DESIGN_TOOL_KEYS[e.key.toLowerCase()]'],

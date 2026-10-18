@@ -58,6 +58,16 @@ Se conservan `baseAt`, la serialización de escrituras, las copias (snapshots), 
 - Si se pierde la respuesta 204 y la pestaña se recarga antes de reconocerla, el arranque puede mostrar un conflicto falso. No pierde datos, pero pide una decisión.
 - Un error de lógica que borra poco en memoria no se puede impedir, solo recuperar. Ninguna de las apps de referencia lo impide. En la fase 1 la red son los snapshots `v2-*` (como mucho uno cada 10 minutos, los 20 últimos).
 
+## Revisión externa (2026-10-18)
+
+Seis fallos de la fase 1, corregidos sin cambiar la arquitectura. Cada uno tiene un test que falla con el código anterior.
+1. El diff se calculaba al encolar: volver al texto del disco durante un envío no se enviaba. Ahora se calcula al enviar (`sendChain`) y el ack se asienta antes del siguiente envío.
+2. Un envío en cola salía tras perder el candado. Ahora `holdsWriterLock()` se comprueba también al ejecutar.
+3. «Volver al disco» con la copia fallida dejaba los guardados descartados con `ok`. Ahora la copia va primero; si falla, no se adopta nada; una escritura descartada responde `fail`.
+4. El traspaso soltaba el candado aunque fallara IndexedDB. Ahora solo lo suelta con el estado escrito. Se retira `steal` («Take over anyway»): decisión del usuario.
+5. «Mantener» aprobaba una pérdida por petición (bucle A → B → A) y no cubría el borrado masivo. Ahora aprueba todas las del commit, por hashes de los textos y de los órdenes.
+6. Al recuperar el candado se arrastraba `stale`. Ahora la carga reinicia el estado con el disco.
+
 ## Pendiente
 
 **Fase 2: atomicidad, borrados explícitos e historial.**

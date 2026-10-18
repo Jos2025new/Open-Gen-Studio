@@ -29,7 +29,7 @@ function pickedHere(doc: DesignDoc): boolean {
  * may switch to (and no ruler toggle), so a key never opens a tool its board does not show.
  */
 export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc | undefined, tools?: ReadonlySet<DesignTool>): void {
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); void saveNow(); return; }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') { e.preventDefault(); void saveNow().catch(() => undefined); return; }
   if (!doc || (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) || document.querySelector('.popover:not(.designer-context), .lightbox')) return;
   const layer = activeLayer(doc);
   const k = e.key.toLowerCase();

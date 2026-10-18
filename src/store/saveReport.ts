@@ -11,7 +11,7 @@ export function reportSave(version: number, result: DiskWriteResult): void {
   else confirmStateSave(version, result === 'browser-only');
 }
 
-const rejection = (p: SaveProblem) => ({ sessionId: p.sessionId, rejectedFile: p.rejectedFile, diskHash: p.diskHash });
+const rejection = (p: SaveProblem) => ({ sessionId: p.sessionId, rejectedFile: p.rejectedFile, diskHash: p.diskHash, losses: p.losses?.map(({ sessionId }) => ({ sessionId })), total: Boolean(p.total) });
 const problemText = (p: SaveProblem) => (p.reason === 'conflict' ? 'Another tab saved changes' : 'A save was set aside as a possible loss');
 
 // A problem found while loading (before any save) shows up in the status at once.

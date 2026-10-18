@@ -11,9 +11,14 @@ let unavailable = false;
 /** 'conflict': another tab saved first (this tab goes stale). 'rejected': the server kept a shrinking save aside (possible-loss); not stale. */
 export type DiskWriteResult = 'ok' | 'conflict' | 'rejected' | 'fail' | 'browser-only';
 /** The body of a possible-loss 409 (see server/local-store.js `conflictBody`). */
-export interface Rejection { sessionId?: string; rejectedFile?: string; diskHash?: string; savedAt?: number }
-/** "Keep this version" (ADR 0014 save guard): lifts the possible-loss rule for one session, bound to the exact texts by hash. */
-export interface KeepVersion { sessionId: string; diskHash: string; candidateHash: string }
+export interface Loss { sessionId: string; diskHash?: string }
+/** `losses`: every shrinking session of the refused commit; `total`: the commit removes most sessions (hash of the disk order). */
+export interface Rejection { sessionId?: string; rejectedFile?: string; diskHash?: string; savedAt?: number; losses?: Loss[]; total?: { diskOrderHash: string } }
+/**
+ * "Keep this version" (ADR 0022): approves every loss of one exact commit, each bound to the disk text and the text sent by
+ * hash (sessions), and a large removal bound to both session orders by hash (total).
+ */
+export interface KeepVersion { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string } }
 
 /** True when the local store answers. A static host's SPA fallback returns HTML, not "ok", so it counts as absent. */
 /**
@@ -53,7 +58,7 @@ let lastRejection: Rejection | null = null;
 async function refusal(res: Response): Promise<'conflict' | 'rejected'> {
   const body = await (async () => JSON.parse(await res.text()) as Rejection & { reason?: string })().catch(() => null);
   if (body?.reason !== 'possible-loss') return 'conflict';
-  lastRejection = { sessionId: body.sessionId, rejectedFile: body.rejectedFile, diskHash: body.diskHash, savedAt: body.savedAt };
+  lastRejection = { sessionId: body.sessionId, rejectedFile: body.rejectedFile, diskHash: body.diskHash, savedAt: body.savedAt, losses: body.losses, total: body.total };
   return 'rejected';
 }
 /** Bytes on the wire: the browser's keepalive limit (64 KiB) counts bytes, not string length. */
@@ -87,6 +92,16 @@ export const disk = {
     return 'ok';
   },
 
+  /**
+   * A fresh start with the disk when this tab takes the lock again: the conflict of an earlier holding period is not
+   * carried over (stateDb.get then rebuilds acked, revisions and base from the copies as they are now).
+   */
+  reset(): void {
+    stale = false;
+    lastRejection = null;
+    available = null;
+  },
+
   /** True once another tab saved newer work: this tab stops sending to the disk (it keeps saving in the browser). */
   isStale: () => stale,
 
@@ -116,6 +131,8 @@ export const disk = {
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        // Asked again at send time: the lock may have been handed over while this commit waited in the chain.
+        else if (!holdsWriterLock()) result = 'browser-only';
         else {
           let res = await send(c.changed);
           // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session.
@@ -145,6 +162,7 @@ export const disk = {
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        else if (!holdsWriterLock()) result = 'browser-only';
         else {
           const [body, at] = typeof next === 'string'
             ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
@@ -173,6 +191,7 @@ export const disk = {
     if (!holdsWriterLock()) return 'browser-only';
     if (stale) return 'conflict';
     if (!(await diskAvailable())) return unavailable ? 'fail' : 'browser-only';
+    if (!holdsWriterLock()) return 'browser-only';
     try {
       const res = await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream', ...LOCAL_WRITE } });
       if (res.status === 409) { stale = true; onStale?.(); return 'conflict'; }

@@ -15,7 +15,7 @@ export function SaveIndicator() {
     : browserOnly ? 'Saved in this browser' : 'Saved';
   return <button type="button" className={`topbar-menu save-indicator is-${phase}`} aria-label={text}
     title={phase === 'error' ? 'Retry saving' : 'Save now (Ctrl+S)'}
-    onClick={() => void saveNow()}>
+    onClick={() => void saveNow().catch(() => undefined)}>
     <span className={`pool-dot ${phase === 'saved' ? 'is-on' : ''}`} aria-hidden="true" />
     <span role="status" aria-live="polite">{text}</span>
   </button>;

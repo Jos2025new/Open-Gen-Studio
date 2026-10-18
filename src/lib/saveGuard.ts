@@ -13,6 +13,10 @@ export interface SaveProblem {
   rejectedFile?: string;
   /** sha256 of the session text on disk, from the 409: the `keep` payload's diskHash. */
   diskHash?: string;
+  /** Every shrinking session of the refused commit (the first one is also in sessionId/diskHash). */
+  losses?: Array<{ sessionId: string; diskHash?: string }>;
+  /** The commit removes most sessions: the disk order's hash, approved together with the candidate order. */
+  total?: { diskOrderHash: string };
 }
 
 export const guard = {

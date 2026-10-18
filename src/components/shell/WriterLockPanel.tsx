@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../ui/primitives';
-import { getWriterState, handOverNow, keepHere, subscribeWriter, takeNow, takeOver, useHere, waitForThem, type WorkReport } from '../../lib/writerLock';
+import { getWriterState, handOverNow, keepHere, subscribeWriter, takeNow, useHere, waitForThem, type WorkReport } from '../../lib/writerLock';
 
 /*
  * Covers the whole app while this tab is not the one that may write (plan 1.4): waiting for the lock, handed over,
@@ -43,7 +43,6 @@ function Content() {
       {list && <p className="muted">Handing over now loses {list}.</p>}
     </>);
   }
-  const lost = s.work && (s.work.generations + s.work.agent > 0) ? `${list} would be lost.` : '';
   return (<>
     <h2>Open Gen Studio is open in another tab</h2>
     {s.asking === 'idle' && (<><p>Only one tab works at a time, so nothing is overwritten.</p><div className="writer-lock-actions"><Button variant="primary" onClick={useHere}>Use here</Button></div></>)}
@@ -62,8 +61,8 @@ function Content() {
     </>)}
     {s.asking === 'silent' && (<>
       <p>The other tab does not answer. It may be frozen.</p>
-      <div className="writer-lock-actions"><Button variant="danger" onClick={takeOver}>Take over anyway</Button></div>
-      <p className="muted">{lost || 'Work that is only in that tab’s memory may be lost.'}</p>
+      <p className="muted">Close or reload that tab: this one takes over by itself once it is gone.</p>
+      <div className="writer-lock-actions"><Button variant="ghost" onClick={useHere}>Ask again</Button></div>
     </>)}
   </>);
 }
