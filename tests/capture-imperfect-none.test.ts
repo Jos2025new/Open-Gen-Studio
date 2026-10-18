@@ -8,24 +8,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { captureLines } from '../src/engine/agent/captureContext';
 import { captureClause, cleanCapture } from '../src/engine/captureStyles';
-import { normalizePlan, type PlanContext } from '../src/engine/plan';
-import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
-import type { GenSettings, MediaKind, Subject } from '../src/engine/types';
-
-const models = await local.listModels(undefined);
-const ctx = (): PlanContext => ({
-  workspace: 'chat',
-  getModel: async (ref) => {
-    const model = models.find((m) => m.ref === ref);
-    return model ? { model, schema: await local.loadSchema(model, undefined) } : null;
-  },
-  defaultModel: (kind: MediaKind) => (kind === 'image' ? LOCAL_IMAGE_REF : LOCAL_VIDEO_REF),
-  defaultSettings: () => ({}),
-  asset: () => undefined,
-  layer: () => undefined,
-});
 
 describe('an explicit empty imperfect list means none', () => {
   it('survives cleanCapture and removes the preset timestamp', () => {

@@ -8,11 +8,9 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { captureLines } from '../src/engine/agent/captureContext';
-import { captureClause, cleanCapture } from '../src/engine/captureStyles';
 import { normalizePlan, type PlanContext } from '../src/engine/plan';
 import { local, LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../src/engine/providers/demo';
-import type { GenSettings, MediaKind, Subject } from '../src/engine/types';
+import type { MediaKind, PlanStep, VideoStep } from '../src/engine/types';
 
 const models = await local.listModels(undefined);
 const ctx = (): PlanContext => ({
@@ -27,15 +25,20 @@ const ctx = (): PlanContext => ({
   layer: () => undefined,
 });
 
+const videoStep = (s: PlanStep): VideoStep => {
+  if (s.kind !== 'video') throw new Error('expected a video step');
+  return s;
+};
+
 describe('video steps keep their capture (plan validation path)', () => {
   it('a video step with capture keeps style and directives', async () => {
     const { plan, errors } = await normalizePlan({ title: 'T', steps: [{ id: 's1', kind: 'video', prompt: 'a walk', capture: { style: 'camcorder', directives: ['backwards'] } }] }, ctx(), 'p');
     expect(errors).toEqual([]);
-    expect((plan!.steps[0].settings as GenSettings).capture).toMatchObject({ style: 'camcorder', directives: ['backwards'] });
+    expect(videoStep(plan!.steps[0]).settings.capture).toMatchObject({ style: 'camcorder', directives: ['backwards'] });
   });
   it('an image-only preset is dropped on a video step', async () => {
     const { plan } = await normalizePlan({ title: 'T', steps: [{ id: 's1', kind: 'video', prompt: 'a walk', capture: { style: 'disposable', directives: ['backwards'] } }] }, ctx(), 'p');
-    expect((plan!.steps[0].settings as GenSettings).capture?.style).toBeUndefined();
+    expect(videoStep(plan!.steps[0]).settings.capture?.style).toBeUndefined();
   });
 });
 
