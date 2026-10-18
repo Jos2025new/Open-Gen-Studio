@@ -15,5 +15,5 @@
 .topbar-back span { overflow: hidden; text-overflow: ellipsis; }
 .topbar-back:hover { color: var(--text); background: var(--surface-2); }
 .topbar-back:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
-/* The sidebar's 6px margin would drop the brand row below the topbar's centre line; lift it by the same amount. */
-.brand { top: -6px; }
+/* The open sidebar's 6px margin would drop the brand row below the topbar's centre line; lift it by the same amount (the folded one has no margin). */
+.sidebar:not(.is-folded) .brand { top: -6px; }
