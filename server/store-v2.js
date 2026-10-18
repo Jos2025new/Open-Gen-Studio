@@ -6,12 +6,12 @@
 // state.json (format 1) is never written again once format 2 exists: it is copied to backups/ first and stays readable.
 import { copyFile, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { looksLost, sha256 } from './save-guard.js';
 
 export const SAFE_ID = /^[A-Za-z0-9_-]+$/;
 const SNAPSHOT_EVERY_MS = 10 * 60_000;
 const KEPT = 20;
-// A session that loses more than half of its bytes (when it was over 4 KB) is refused, like a total loss of sessions.
-const SHRINK_CHECK_BYTES = 4096;
+// A session that loses more than half of its user content (bytes and elements) is refused, like a total loss of sessions.
 
 const json = (v) => JSON.stringify(v);
 
@@ -59,9 +59,12 @@ export function createStoreV2(dir) {
     return assembleText({ savedAt: head.savedAt, version: head.version, globals, order: head.order, sessions });
   }
 
+  /** Keeps a refused payload aside; returns the file name (the 409 body names it). */
   async function keepRejected(kind, payload) {
     await mkdir(backups, { recursive: true });
-    await writeFile(join(backups, `${kind}-${Date.now()}.json`), payload, { mode: 0o600 });
+    const file = `${kind}-${Date.now()}.json`;
+    await writeFile(join(backups, file), payload, { mode: 0o600 });
+    return file;
   }
 
   /** Copies the format-1 file once, before the first format-2 write. Never deletes state.json. */
@@ -89,7 +92,7 @@ export function createStoreV2(dir) {
    * { id: JSON text } for the changed sessions only }. Returns { status, savedAt } (409 carries the current savedAt).
    */
   async function commit(body) {
-    const { savedAt, baseAt, version, globals, order, sessions = {} } = body;
+    const { savedAt, baseAt, version, globals, order, sessions = {}, keep } = body;
     // Every 400 says why (the body), so a refused save is never a silent 400.
     if (!Number.isFinite(savedAt) || !Array.isArray(order)) return { status: 400, reason: 'savedAt and order are required' };
     if (!Number.isInteger(version) || version < 1) return { status: 400, reason: 'version is required (a positive integer)' };
@@ -106,15 +109,21 @@ export function createStoreV2(dir) {
     const head = await readHead();
     const legacy = head ? null : await readFile(stateFile, 'utf8').catch(() => null);
     const current = head ? head.savedAt : Number(/^\{"savedAt":(\d+)/.exec(legacy ?? '')?.[1] ?? 0);
-    if (current && current !== baseAt) return { status: 409, savedAt: current };
+    if (current && current !== baseAt) return { status: 409, reason: 'conflict', savedAt: current };
     // Total loss: fewer sessions than half of the previous ones (two or more before).
     const had = head ? head.order.length : (legacy ? (legacy.match(/"id":"ses_/g) ?? []).length : 0), has = order.length;
-    if (had >= 2 && has < had / 2) { await keepRejected('rejected', json(body)); return { status: 409, savedAt: current }; }
-    // Per session: a large session may not shrink to less than half of its bytes.
+    if (had >= 2 && has < had / 2) return { status: 409, reason: 'possible-loss', rejectedFile: await keepRejected('rejected', json(body)), savedAt: current };
+    // Per session: a session that loses most of its user content (not its agent cache) is refused. "Keep this version"
+    // lifts it for one session only, when the disk and the candidate are exactly the texts the user saw (hashes).
+    const kept = [];
     for (const [id, text] of Object.entries(sessions)) {
-      const prev = await stat(join(sessionsDir, `${id}.json`)).then((s) => s.size, () => 0);
-      if (prev > SHRINK_CHECK_BYTES && text.length < prev / 2) { await keepRejected(`rejected-session-${id}`, text); return { status: 409, savedAt: current }; }
+      const file = join(sessionsDir, `${id}.json`);
+      const prev = await readFile(file, 'utf8').catch(() => null);
+      if (prev == null || !looksLost(prev, text)) continue;
+      if (keep?.sessionId === id && keep.diskHash === sha256(prev) && keep.candidateHash === sha256(text)) { kept.push([id, prev]); continue; }
+      return { status: 409, reason: 'possible-loss', sessionId: id, rejectedFile: await keepRejected(`rejected-session-${id}`, text), savedAt: current };
     }
+    for (const [id, prev] of kept) await keepRejected(`kept-before-${id}`, prev);
     await migrate();
     await mkdir(sessionsDir, { recursive: true });
     for (const [id, text] of Object.entries(sessions)) await writeAtomic(join(sessionsDir, `${id}.json`), text);

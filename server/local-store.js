@@ -106,6 +106,9 @@ const BACKUP_EVERY_MS = 10 * 60_000;
 const BACKUPS_KEPT = 20;
 
 /** @param {string} [root] project folder (default: where Vite runs, i.e. the project root) */
+/** The body of a 409: why it was refused ('conflict' or 'possible-loss'), the current savedAt and, for a loss, the kept copy. */
+const conflictBody = ({ reason = 'conflict', savedAt, sessionId, rejectedFile }) => JSON.stringify({ reason, ...(sessionId ? { sessionId } : {}), ...(rejectedFile ? { rejectedFile } : {}), savedAt });
+
 export function localStore(root = process.cwd(), dataDir = 'data') {
   const dir = resolve(root, dataDir);
   const stateFile = join(dir, 'state.json');
@@ -192,7 +195,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       let payload;
       try { payload = JSON.parse((await body(req)).toString('utf8')); } catch { return send(400, 'not a commit'); }
       const r = await serialState(() => v2.commit(payload));
-      if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
+      if (r.status === 409) return send(409, conflictBody(r), 'application/json');
       return send(r.status, r.reason ?? '');
     }
 
@@ -209,7 +212,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
       if (req.method === 'PUT' && (await v2.readHead())) {
         const text = (await body(req)).toString('utf8');
         const r = await serialState(() => v2.commitLegacy(text));
-        if (r.status === 409) return send(409, JSON.stringify({ savedAt: r.savedAt }), 'application/json');
+        if (r.status === 409) return send(409, conflictBody(r), 'application/json');
         return send(r.status === 204 ? 204 : r.status);
       }
       if (req.method === 'PUT') {
@@ -234,8 +237,9 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
           const had = old ? sessions(old) : 0;
           const has = sessions(next);
           if (had >= 2 && has < had / 2) {
-            await atomic(join(dir, 'backups', `rejected-${Date.now()}.json`), next, 0o600);
-            return Number(current);
+            const rejectedFile = `rejected-${Date.now()}.json`;
+            await atomic(join(dir, 'backups', rejectedFile), next, 0o600);
+            return { reason: 'possible-loss', rejectedFile, savedAt: Number(current) };
           }
           if (old && (has < had || Date.now() - lastBackup > BACKUP_EVERY_MS)) {
             await mkdir(join(dir, 'backups'), { recursive: true });
@@ -247,7 +251,7 @@ export function localStore(root = process.cwd(), dataDir = 'data') {
           await atomic(stateFile, next, 0o600);
           return null;
         });
-        if (conflict != null) return send(409, JSON.stringify({ savedAt: conflict }), 'application/json');
+        if (conflict != null) return send(409, conflictBody(typeof conflict === 'object' ? conflict : { reason: 'conflict', savedAt: conflict }), 'application/json');
         return send(204);
       }
     }
