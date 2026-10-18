@@ -10,7 +10,7 @@ export function captureLines(library: Subject[], composer: { image: { settings: 
     const c = composer[k].settings.capture;
     if (!c) continue;
     const base = ctltOf(c);
-    out.push(`selected ${k} capture style: ${c.style && presetById(c.style) ? c.style : base ? 'a saved style' : 'none'}${c.tone ? `, tone "${c.tone}"` : ''}${c.directives?.length ? `, directives ${c.directives.join('+')}` : ''}${c.imperfect?.length ? `, imperfections ${c.imperfect.join('+')}` : ''} (put it in the step's capture)`);
+    out.push(`selected ${k} capture style: ${c.style && presetById(c.style) ? c.style : base ? (c.style ? `saved style "${c.style}"` : 'a custom style') : 'none'}${c.tone ? `, tone "${c.tone}"` : ''}${c.directives?.length ? `, directives ${c.directives.join('+')}` : ''}${c.imperfect?.length ? `, imperfections ${c.imperfect.join('+')}` : ''} (put it in the step's capture)`);
   }
   return out;
 }
