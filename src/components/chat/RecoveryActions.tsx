@@ -2,6 +2,7 @@ import { RefreshCw, RotateCw } from 'lucide-react';
 import { planRecovery, planRecoveryProblem, resumePlan, type PlanRecoveryMode } from '../../engine/agent/runtime';
 import { acceptOverLimit, overLimit, overLimitText } from '../../engine/budget';
 import { canRecheck, recheckGeneration, retryGeneration } from '../../engine/jobs';
+import { estimateForRetry } from '../../engine/retryPartial';
 import type { Generation, PlanFeedItem } from '../../engine/types';
 import { toast, useStore } from '../../store/store';
 import { Button, costLabel } from '../ui/primitives';
@@ -49,7 +50,8 @@ export function GenerationRecovery({ g }: { g: Generation }) {
   useStore((s) => s.spentUsd);
   if (planItem && planRecovery(planItem)) return <PlanRecoveryChips sessionId={g.sessionId} item={planItem} />;
   const checkable = canRecheck(g);
-  const over = overLimit(g.estimate);
+  const estimate = estimateForRetry(g);
+  const over = overLimit(estimate);
   return (
     <div className="recover-chips">
       {checkable ? (
@@ -67,7 +69,7 @@ export function GenerationRecovery({ g }: { g: Generation }) {
           void retryGeneration(g.id);
         }}
       >
-        {over ? 'Retry anyway' : 'Retry'} · {costLabel(g.estimate, { short: true })}
+        {over ? 'Retry anyway' : 'Retry'} · {costLabel(estimate, { short: true })}
       </Button>
     </div>
   );

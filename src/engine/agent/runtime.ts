@@ -26,6 +26,7 @@ import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
+import { planRetryEstimate } from '../retryPartial';
 import { focusNodes } from '../flow/selection';
 import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, runsGeneration } from '../flow/graph';
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
@@ -1112,7 +1113,7 @@ ${WRAPUP_RULE}`, []));
 
 export type PlanRecoveryMode = 'check' | 'retry';
 
-/** The steps a plan card would run again, as approved (unchecked steps and the joins they dropped stay out). */
+/** Selected plan steps eligible for recovery. */
 function approvedSteps(item: PlanFeedItem): { chosen: PlanStep[]; off: Set<string> } {
   const off = new Set(item.skipped ?? []);
   const pruned = pruneJoins(item.plan.steps.filter((st) => !off.has(st.id)), off);
@@ -1120,10 +1121,7 @@ function approvedSteps(item: PlanFeedItem): { chosen: PlanStep[]; off: Set<strin
   return { chosen: pruned.steps, off };
 }
 
-/**
- * What a failed plan can do now: failed steps whose submitted job can still be fetched (Check status), and the
- * price of running the failed steps and the ones that waited for them again (Retry failed). Null when nothing applies.
- */
+/** Failed plan recovery options and the remaining retry price. */
 export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: PlanStep[]; estimate: Estimate } | null {
   if ((item.status !== 'error' && item.status !== 'partial') || item.plan.workspace === 'node') return null;
   const gens = get().generations;
@@ -1134,7 +1132,8 @@ export function planRecovery(item: PlanFeedItem): { checkable: string[]; retry: 
     const g = gens[item.stepGenerations[st.id] ?? ''];
     return item.stepStates[st.id] === 'error' && g && canRecheck(g);
   }).map((st) => st.id);
-  return { checkable, retry, estimate: estimateSteps(retry).total };
+  const price = estimateSteps(retry);
+  return { checkable, retry, estimate: planRetryEstimate(retry, price.perStep, item, gens) };
 }
 
 /** Why a recovery cannot start, in words for the user or the agent; null when it can. */

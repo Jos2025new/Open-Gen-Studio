@@ -1,6 +1,18 @@
 /** Provider and plan-card contracts, split from map-contracts.mjs to keep that file under 30 KB (AGENTS.md). Checked by map.mjs. */
 export default [
   {
+    id: 'partial-generation-retry',
+    what: 'Retry conserva assets, pide solo resultados o variantes pendientes con nueva semilla y muestra presupuesto de lo pendiente en recuperación directa y de plan.',
+    sides: [
+      ['src/engine/retryPartial.ts', 'export function estimateForRetry'],
+      ['src/engine/jobs.ts', 'export function retryGeneration'],
+      ['src/engine/agent/runtime.ts', 'planRetryEstimate('],
+      ['src/components/chat/RecoveryActions.tsx', 'estimateForRetry(g)'],
+      ['src/engine/types.ts', 'export interface Generation'],
+    ],
+    tests: ['tests/retry-partial.test.ts'],
+  },
+  {
     id: 'failed-step-partial-context',
     what: 'El contexto del fallo conserva N/M salidas, IDs, faltantes y error literal; los bloqueos de contenido aconsejan revisar prompt o referencias antes de otro intento.',
     sides: [

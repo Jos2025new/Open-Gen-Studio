@@ -27,6 +27,7 @@ import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem,
 import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
 import { resolveSendable } from './schemaGuard';
+import { partialRetryCharge, retrySpec } from './retryPartial';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
@@ -38,6 +39,7 @@ import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedI
 const get = useStore.getState;
 const controllers = new Map<string, AbortController>();
 const running = new Map<string, Promise<string[]>>();
+const retrying = new Map<string, Promise<string[]>>();
 
 export interface GenerationSpec {
   sessionId: string;
@@ -91,6 +93,7 @@ function requestEstimate(spec: GenerationSpec): Estimate {
 
 export function createGeneration(spec: GenerationSpec): Generation {
   const parsed = parseModelRef(spec.modelRef);
+  const estimate = spec.estimate ?? estimateSpec(spec);
   const g: Generation = {
     id: uid('gen'),
     sessionId: spec.sessionId,
@@ -105,7 +108,9 @@ export function createGeneration(spec: GenerationSpec): Generation {
     origin: spec.origin,
     status: 'queued',
     assetIds: [],
-    estimate: spec.estimate ?? estimateSpec(spec),
+    estimate,
+    retryBaseEstimate: estimate,
+    retryTotal: spec.variants?.length ?? spec.settings.count,
     parentId: spec.parentId,
     operationId: spec.operationId,
     planId: spec.planId,
@@ -340,7 +345,7 @@ async function execute(id: string): Promise<string[]> {
   const controller = new AbortController();
   controllers.set(id, controller);
   const signal = controller.signal;
-  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, assetIds: [], remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
+  patchGeneration(id, { status: 'running', startedAt: Date.now(), error: undefined, statusText: 'Starting', progress: undefined, remoteJob: undefined, lostJob: undefined, delivery: undefined, sent: undefined, providerReportedUsd: undefined });
   let g = get().generations[id];
   try {
     if (g.op && OPS[g.op.id].engine === 'local') {
@@ -548,7 +553,9 @@ async function execute(id: string): Promise<string[]> {
 
     // Candidates with their own variation: one request each (variantPrompt).
     const variants = g.variants?.length ? g.variants : undefined;
-    const total = variants ? variants.length : Math.max(1, g.settings.count);
+    const priorCount = g.assetIds.length;
+    const total = variants ? variants.length : Math.max(0, g.settings.count - priorCount);
+    const progressTotal = priorCount + total;
     const perRequest = variants ? 1 : Math.max(1, Math.min(total, maxCountPerRequest(schema)));
     const approvalSettings = { ...genSettings, count: total };
     const proposed = g.planId ? costAuthorization(g.modelRef, approvalSettings, requestEstimate({ ...g, settings: approvalSettings }), g.op?.id === 'upscale' ? Number(g.op.params.factor) || 2 : undefined) : undefined;
@@ -556,7 +563,7 @@ async function execute(id: string): Promise<string[]> {
     const shown = opRealism(g, kind, prompt, model.id);
     genSettings = negFor(genSettings, shown !== prompt && paramByRole(schema, 'negative'));
     const fallback = expectedDims(kind, g.settings);
-    const assetIds: string[] = [];
+    const assetIds: string[] = [...g.assetIds];
     const delivered: Asset[] = [];
     let cost = 0;
     let costKnown = true;
@@ -567,7 +574,7 @@ async function execute(id: string): Promise<string[]> {
     let requests = 0;
     while (done < total) {
       const n = Math.min(perRequest, total - done);
-      const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + done : undefined };
+      const settings = { ...genSettings, seed: genSettings.seed != null ? genSettings.seed + priorCount + done : undefined };
       // Preserve Atlas quote accounting; a quote is not a provider-reported charge in the agent notice.
       const quote = model.provider === 'atlas' ? await fetchAtlasQuote(atlasQuoteBody(model.id, schema, settings, n), 3000) : null;
       const send = () => {
@@ -593,7 +600,7 @@ async function execute(id: string): Promise<string[]> {
         op: g.op ? { id: g.op.id, params: g.op.params } : undefined,
         apiKey,
         signal,
-        onStatus: (text, progress) => patchGeneration(id, { statusText: total > 1 ? `${text} · ${done + 1}/${total}` : text, progress }),
+        onStatus: (text, progress) => patchGeneration(id, { statusText: progressTotal > 1 ? `${text} · ${priorCount + done + 1}/${progressTotal}` : text, progress }),
         onRemoteJob: (job) => {
           const sent = get().generations[id]?.sent;
           patchGeneration(id, total === perRequest ? { remoteJob: job, jobId: job.id, sent: sent ? { ...sent, jobId: job.id } : undefined } : { remoteJob: undefined });
@@ -644,8 +651,8 @@ async function execute(id: string): Promise<string[]> {
       addAssets(assets);
       delivered.push(...assets);
       assetIds.push(...assets.map((a) => a.id));
-      patchGeneration(id, { assetIds: [...assetIds] });
       done += Math.max(1, Math.min(n, result.outputs.length));
+      patchGeneration(id, { assetIds: [...assetIds], ...(variants ? { variants: variants.slice(done) } : {}) });
       if (!result.outputs.length) break;
     }
     finish(id, assetIds, costKnown ? cost : undefined, await checkDelivery(id, delivered), providerReportedCostKnown ? providerReportedCost : undefined);
@@ -769,8 +776,8 @@ function finish(id: string, assetIds: string[], actualUsd: number | undefined, d
 }
 
 function chargePartial(g: Generation): void {
-  const per = g.estimate.usd != null ? g.estimate.usd / Math.max(1, g.settings.count) : 0;
-  addSpend(per * g.assetIds.length, spendEntry(g, true));
+  const cost = partialRetryCharge(g, g.parentId ? get().generations[g.parentId] : undefined);
+  if (cost) addSpend(cost, spendEntry(g, true));
 }
 
 /** How a generation shows in the Spending panel. */
@@ -825,41 +832,21 @@ export async function resumeInterrupted(): Promise<void> {
   }
 }
 
-/**
- * Run a failed or canceled generation again as a new attempt linked to the same operation.
- * The original record stays intact (failed/canceled); the new attempt gets its own id.
- * A job that was submitted may still finish at the provider: Check status is the way to fetch it;
- * Retry submits again (and is charged again).
- */
 export function retryGeneration(id: string): Promise<string[]> {
+  const ongoing = retrying.get(id);
+  if (ongoing) return ongoing;
   const g = get().generations[id];
   if (!g || (g.status !== 'error' && g.status !== 'canceled')) return Promise.resolve(g?.assetIds ?? []);
   // Create a new Generation as another attempt of the same operation.
-  const newG = createGeneration({
-    sessionId: g.sessionId,
-    kind: g.kind,
-    prompt: g.prompt,
-    modelRef: g.modelRef,
-    settings: { ...g.settings, seed: g.settings.seed },
-    inputs: g.inputs,
-    op: g.op,
-    origin: g.origin,
-    parentId: g.id,
-    operationId: g.operationId ?? g.id,
-    planId: g.planId,
-    stepId: g.stepId,
-    estimate: g.estimate,
-    variants: g.variants,
-  });
+  const newG = createGeneration({ sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, ...retrySpec(g) });
+  patchGeneration(newG.id, { assetIds: g.assetIds, retryBaseEstimate: g.retryBaseEstimate ?? g.estimate, retryTotal: g.retryTotal ?? (g.variants?.length ?? g.settings.count) });
   // The failed attempt's card now shows this one, so the retry's result is seen.
   relinkAttempt(g.id, newG.id);
-  return runGeneration(newG.id);
+  const retry = runGeneration(newG.id).finally(() => retrying.delete(id));
+  retrying.set(id, retry);
+  return retry;
 }
 
-/**
- * Point every reference to a previous attempt at the new one: a node's generationId, a chat generation card,
- * the step → generation map of a plan. The previous record stays in the store as history.
- */
 function relinkAttempt(oldId: string, newId: string): void {
   for (const [sessionId, session] of Object.entries(useStore.getState().sessions)) {
     const nodes = session.graph?.nodes ?? [];

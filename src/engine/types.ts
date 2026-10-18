@@ -327,8 +327,10 @@ export interface Generation {
   /** Text result (transcription). */
   text?: string;
   estimate: Estimate;
+  retryBaseEstimate?: Estimate;
+  retryTotal?: number;
   actualUsd?: number;
-  /** Only cost reported in the provider result; never a quote or catalog estimate. */
+  /** Reported cost. */
   providerReportedUsd?: number;
   parentId?: string;
   /** Links attempts of the same operation: regenerate/retry share this id.  Phase 2 of the General Model. */

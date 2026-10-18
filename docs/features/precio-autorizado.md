@@ -46,3 +46,7 @@ aporta evidencia separada del proveedor: USD 0.0040175744 informados, 44–51 to
 extra por aviso y caché utilizada en las tres peticiones con aviso. No se observó
 un retraso consistente del primer texto; el tiempo total fue mayor en las tres
 parejas, con salidas más largas. n=3 no permite generalizar latencia, p90 o caché.
+
+## Reintentos de lotes parciales
+
+Retry conserva las salidas entregadas y pide solo las pendientes, con una semilla nueva. La tarjeta, el paso del plan y el board siguen enlazados al intento que contiene esas salidas. Las variantes entregadas no se vuelven a enviar. El precio mostrado y la recuperación del plan se calculan solo sobre lo pendiente; una cotización prorrateada se considera estimación, no factura. Código: [retryPartial.ts](../../src/engine/retryPartial.ts), [jobs.ts](../../src/engine/jobs.ts), [RecoveryActions.tsx](../../src/components/chat/RecoveryActions.tsx), [runtime.ts](../../src/engine/agent/runtime.ts). Prueba: [retry-partial.test.ts](../../tests/retry-partial.test.ts), con adaptador simulado; sin proveedor real.
