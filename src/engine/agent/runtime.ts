@@ -89,6 +89,7 @@ import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentC
 import { endedWithoutPlan } from './endedWithoutPlan';
 import { checkingPlan, untilStopped, watchModel } from './turnStop';
 import { activityLog } from './activityLog';
+import { waitHooks } from './schemaWait';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
 import { failedStepSummary } from './failureContext';
@@ -1323,7 +1324,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
     keepCommentedPlan(sessionId);
     log.end();
     clock.end();
-    patchAgent(sessionId, { busy: false, phase: undefined });
+    patchAgent(sessionId, { busy: false, phase: undefined, waiting: undefined });
     if (controllers.get(sessionId) === controller) controllers.delete(sessionId);
   };
   const cut = () => {
@@ -1772,7 +1773,8 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
-          const presented = await checkingPlan(sessionId, signal, (label) => log.action({ icon: 'fix', label }), () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal));
+          const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });
+          const presented = await checkingPlan(sessionId, signal, (label) => log.action({ icon: 'fix', label }), () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);

@@ -666,7 +666,7 @@ export interface NoticeFeedItem extends FeedBase {
 /** One thing the agent did during a turn, shown in its activity block (L3). */
 export type ActivityEntry =
   | { kind: 'thinking'; text: string; ms?: number }
-  | { kind: 'action'; icon: 'guide' | 'search' | 'questions' | 'plan' | 'fix'; label: string; detail?: string };
+  | { kind: 'action'; icon: 'guide' | 'search' | 'questions' | 'plan' | 'fix' | 'schema'; label: string; detail?: string };
 
 /** What the agent is doing in one turn: its reasoning (when streamed) and its actions, with the time it took. */
 export interface ActivityFeedItem extends FeedBase {
@@ -905,6 +905,8 @@ export interface AgentState {
   busy: boolean;
   /** What the agent is doing while busy, for the chat's status row (no model output is shown). */
   phase?: 'working' | 'drafting' | 'checking';
+  /** Schema loads the plan check is waiting for now (the activity block shows each one, ticking). */
+  waiting?: Array<{ key: string; name: string; since: number }>;
   /** Plan card the user commented on instead of approving; replaced by a revision or closed at the end of the turn. */
   revising?: string;
   /** Offline planner memory for the request being clarified. */

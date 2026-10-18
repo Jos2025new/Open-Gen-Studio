@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import { BookOpen, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
+import { BookOpen, Braces, ChevronDown, Clock, ChevronRight, ClipboardList, LoaderCircle, MessageCircleQuestion, MessageSquare, Search, Wrench } from 'lucide-react';
 import type { ActivityEntry, ActivityFeedItem } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { useNow } from '../ui/hooks';
+import { seconds, waitDetail } from '../../engine/agent/schemaWait';
 
-const ICONS = { guide: BookOpen, search: Search, questions: MessageCircleQuestion, plan: ClipboardList, fix: Wrench } as const;
+const ICONS = { guide: BookOpen, search: Search, questions: MessageCircleQuestion, plan: ClipboardList, fix: Wrench, schema: Braces } as const;
 const PHASE = { working: 'Working', drafting: 'Drafting the plan', checking: 'Checking the plan' } as const;
-
-const seconds = (ms: number) => `${Math.max(1, Math.round(ms / 1000))}s`;
 
 function Thinking({ entry, live }: { entry: Extract<ActivityEntry, { kind: 'thinking' }>; live: boolean }) {
   const [open, setOpen] = useState(false);
@@ -30,6 +29,7 @@ function Thinking({ entry, live }: { entry: Extract<ActivityEntry, { kind: 'thin
 export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; sessionId: string }) {
   const busy = useStore((s) => s.sessions[sessionId]?.agent.busy ?? false);
   const phase = useStore((s) => s.sessions[sessionId]?.agent.phase ?? 'working');
+  const waiting = useStore((s) => s.sessions[sessionId]?.agent.waiting ?? []);
   const running = !item.endedAt && busy;
   const now = useNow(1000, running);
   const [open, setOpen] = useState(true);
@@ -40,7 +40,7 @@ export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; ses
         {running ? <LoaderCircle size={13} className="spin" /> : !item.entries.length ? <Clock size={13} /> : open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <span>{running ? `${PHASE[phase]}… ${seconds(elapsed)}` : item.endedAt ? `Worked for ${seconds(elapsed)}` : 'Worked'}</span>
       </button>
-      {open && item.entries.length ? (
+      {open && (item.entries.length || (running && waiting.length)) ? (
         <ol className="act-list">
           {item.entries.map((e, i) =>
             e.kind === 'thinking' ? (
@@ -58,6 +58,15 @@ export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; ses
               </li>
             ),
           )}
+          {running ? waiting.map((w) => (
+            <li key={`${w.key}-${w.since}`} className="act-entry">
+              <span className="act-line">
+                <LoaderCircle size={13} className="spin" />
+                <span>Loading schema</span>
+                <span className="act-detail faint">{waitDetail(w.name, now - w.since)}</span>
+              </span>
+            </li>
+          )) : null}
         </ol>
       ) : null}
     </section>
