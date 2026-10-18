@@ -44,7 +44,10 @@ function typeInto(el: HTMLInputElement, value: string): void {
   act(() => { set.call(el, value); el.dispatchEvent(new Event('input', { bubbles: true })); });
 }
 
-beforeEach(() => { vi.useFakeTimers(); setReducedMotion(false); setUi({ home: true, space: undefined }); sendAgentMessage.mockClear(); });
+function setBusy(busy: boolean): void {
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy } } } }));
+}
+beforeEach(() => { vi.useFakeTimers(); setReducedMotion(false); setBusy(false); useStore.setState((s) => ({ composer: { ...s.composer, attachments: [] } })); setUi({ home: true, space: undefined }); sendAgentMessage.mockClear(); });
 afterEach(() => { act(() => root?.unmount()); root = undefined; host?.remove(); vi.useRealTimers(); });
 
 describe('hero carousel', () => {
@@ -124,14 +127,23 @@ describe('Home prompt bar', () => {
   });
   it('is blocked while the agent is busy', () => {
     mount();
-    const s = useStore.getState();
-    useStore.setState({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy: true } } } });
+    setBusy(true);
     typeInto(host.querySelector('.home-bar-input') as HTMLInputElement, 'hello');
     const go = host.querySelector('.home-bar-go') as HTMLButtonElement;
     expect(go.disabled).toBe(true);
     act(() => go.click());
     expect(sendAgentMessage).not.toHaveBeenCalled();
     expect(ui().home).toBe(true);
+    expect((host.querySelector('.home-bar-input') as HTMLInputElement).value).toBe('hello');
+  });
+  it('attachments alone can send, and the attachment goes with the message', () => {
+    mount();
+    act(() => useStore.setState((s) => ({ assets: { ...s.assets, a1: { id: 'a1', kind: 'image', name: 'ref.png' } as never }, composer: { ...s.composer, attachments: ['a1'] } })));
+    expect(host.querySelector('.home-bar-files')?.textContent).toContain('ref.png');
+    const go = host.querySelector('.home-bar-go') as HTMLButtonElement;
+    expect(go.disabled).toBe(false);
+    act(() => go.click());
+    expect(sendAgentMessage).toHaveBeenCalledWith('');
   });
   it('an empty bar does not send', () => {
     mount();

@@ -13,7 +13,8 @@ export function HomeBar() {
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const live = attachments.filter((id) => assets[id]);
-  const canSend = !busy && text.trim().length > 0;
+  // The Composer's rule: not busy, and text or attachments. The draft is cleared only when the send goes ahead.
+  const canSend = !busy && (text.trim().length > 0 || live.length > 0);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
