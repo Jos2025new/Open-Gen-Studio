@@ -1,25 +1,27 @@
 import { useRef, type FormEvent } from 'react';
 import { ArrowRight, Paperclip, X } from 'lucide-react';
 import { setComposer, setUi, useStore } from '../../store/store';
+import { agentAccepts } from '../../engine/agent/sendGate';
 import { attachFiles } from '../../engine/actions';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { SPACES, openSpace } from './navModel';
 
 /** The Home prompt: submitting opens Studio and sends the message there. Same guard as the Composer: not while the agent is busy. */
 export function HomeBar() {
-  const text = useStore((s) => s.ui.homeDraft) ?? '';
-  const setText = (homeDraft: string) => setUi({ homeDraft });
+  const sessionId = useStore((s) => s.activeSessionId);
+  const text = useStore((s) => s.ui.homeDrafts?.[s.activeSessionId]) ?? '';
+  const setText = (value: string) => setUi((u) => ({ homeDrafts: { ...u.homeDrafts, [sessionId]: value } }));
   const fileRef = useRef<HTMLInputElement>(null);
   const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const live = attachments.filter((id) => assets[id]);
-  // The Composer's rule: not busy, and text or attachments. The draft is cleared only when the send goes ahead.
+  // The Composer's rule: not busy, and text or attachments. The draft is cleared only when the send is accepted (checked fresh, not from the render).
   const canSend = !busy && (text.trim().length > 0 || live.length > 0);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!canSend) return;
+    if (!canSend || !agentAccepts()) return;
     const message = text.trim();
     setText('');
     openSpace(SPACES[0]);

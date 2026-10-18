@@ -33,6 +33,7 @@ import {
   toast,
   useStore,
 } from '../store/store';
+import { keptDrafts } from '../store/homeDrafts';
 
 const get = useStore.getState;
 
@@ -779,7 +780,7 @@ export function deleteSession(sessionId: string): void {
       const next = Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt)[0];
       if (next) activeSessionId = next.id;
     }
-    return { sessions, assets, generations, activeSessionId };
+    return { sessions, assets, generations, activeSessionId, ui: { ...cur.ui, homeDrafts: keptDrafts(cur.ui.homeDrafts, sessions) } };
   });
   // Always keep one session.
   if (!Object.keys(get().sessions).length) newSession();

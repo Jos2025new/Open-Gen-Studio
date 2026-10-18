@@ -47,7 +47,7 @@ function typeInto(el: HTMLInputElement, value: string): void {
 function setBusy(busy: boolean): void {
   useStore.setState((s) => ({ sessions: { ...s.sessions, [s.activeSessionId]: { ...s.sessions[s.activeSessionId], agent: { ...s.sessions[s.activeSessionId].agent, busy } } } }));
 }
-beforeEach(() => { vi.useFakeTimers(); setReducedMotion(false); setBusy(false); useStore.setState((s) => ({ composer: { ...s.composer, attachments: [] } })); setUi({ home: true, space: undefined, homeDraft: '' }); sendAgentMessage.mockClear(); });
+beforeEach(() => { vi.useFakeTimers(); setReducedMotion(false); setBusy(false); useStore.setState((s) => ({ composer: { ...s.composer, attachments: [] } })); setUi({ home: true, space: undefined, homeDrafts: {} }); sendAgentMessage.mockClear(); });
 afterEach(() => { act(() => root?.unmount()); root = undefined; host?.remove(); vi.useRealTimers(); });
 
 describe('hero carousel', () => {

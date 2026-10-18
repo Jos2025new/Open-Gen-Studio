@@ -1,5 +1,6 @@
 import { markStateDirty, beginStateSave, confirmStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
 import { persistState } from './persistJson';
+import { keptDrafts } from './homeDrafts';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
@@ -119,8 +120,8 @@ export interface UiState {
   toolAsset?: string;
   /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
   homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
-  /** Unsent text in the Home prompt; survives switching Home tabs, not persisted. */
-  homeDraft?: string;
+  /** Unsent text in the Home prompt, per session (keyed by session id); kept across tabs and reloads, pruned of deleted sessions. */
+  homeDrafts?: Record<string, string>;
   panel: 'gallery' | 'sessions' | 'spending' | null;
   panelExpanded: boolean;
   /** `back`: the view to return to on close (a reference opened from inside the viewer). */
@@ -403,7 +404,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind' | 'toolHelp' | 'drawingChoice' | 'autoSelect'>;
+  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind' | 'toolHelp' | 'drawingChoice' | 'autoSelect' | 'homeDrafts'>;
 };
 
 export const useStore = create<AppState>()(
@@ -421,7 +422,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind, toolHelp: s.ui.toolHelp, drawingChoice: s.ui.drawingChoice, autoSelect: s.ui.autoSelect },
+      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind, toolHelp: s.ui.toolHelp, drawingChoice: s.ui.drawingChoice, autoSelect: s.ui.autoSelect, homeDrafts: s.ui.homeDrafts },
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;
@@ -446,7 +447,7 @@ export const useStore = create<AppState>()(
         assets: p.assets ?? {},
         library: p.library ?? legacySubjects(restored),
         composer: { ...current.composer, ...p.composer, editing: null },
-        ui: { ...current.ui, ...p.ui },
+        ui: { ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) },
       };
     },
     onRehydrateStorage: () => (_state, error) => {
