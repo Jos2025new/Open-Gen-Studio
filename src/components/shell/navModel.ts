@@ -1,7 +1,9 @@
 import { Box, Film, Image as ImageIcon, MessageSquare, PenTool, Workflow, AudioLines, Wand2, Eraser, ZoomIn, Sun, Crop, Copy, Rotate3d, ImagePlus, Clapperboard, FastForward, Frame, Mic, Grid2x2, type LucideIcon } from 'lucide-react';
 import type { AssetKind, ComposerMode, OpId, Workspace } from '../../engine/types';
 import { OPS, opsFor } from '../../engine/ops';
-import { setComposer, setUi } from '../../store/store';
+import { newSession, setComposer, setUi } from '../../store/store';
+import { newBlankDoc } from '../../engine/design/actions';
+import { DOC_PRESETS } from '../../engine/design/doc';
 
 /** The one description of the app's destinations; the sidebar and the Home view both draw from it. */
 
@@ -48,6 +50,17 @@ export function openCreate(item: CreateItem): void {
   // Generating here is the plain chat-workspace path (not Designer layers), so the workspace is the chat one.
   setComposer({ mode: item.mode });
   setUi({ workspace: 'chat', home: false, space: 'create' });
+}
+/** "+ New canvas" on Home: always a new session. Home closes in the same tick as the session change. */
+export function newCanvas(): void {
+  newSession();
+  setUi({ workspace: 'node', home: false, space: undefined });
+}
+/** "+ New design": a new session with one square document, opened in Designer. */
+export function newDesign(): void {
+  const id = newSession();
+  newBlankDoc(id, DOC_PRESETS[0]);
+  setUi({ workspace: 'designer', home: false, space: undefined });
 }
 export const ALL_TOOLS: ToolItem[] = [...TOOLS_MAIN, ...TOOLS_MORE];
 /** An operation opens the Tools space with it selected; the input asset is chosen there. */

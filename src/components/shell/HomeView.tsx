@@ -6,6 +6,7 @@ import { formatRelative } from '../../lib/format';
 import { AssetMedia } from '../ui/AssetMedia';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, isListed, openCreate, openSpace, openTool, type CreateItem, type ToolItem } from './navModel';
 import { PanelEmbed } from './panelEmbed';
+import { HomeHero } from './HomeHero';
 import { SessionsPanel } from './SessionsPanel';
 import { GalleryPanel } from '../gallery/GalleryPanel';
 
@@ -61,6 +62,7 @@ export function HomeView() {
       {TABS.map(([id, label]) => <button key={id} type="button" className={`home-tab ${tab === id ? 'is-active' : ''}`} aria-current={tab === id ? 'page' : undefined} disabled={id === 'projects'} title={id === 'projects' ? 'Coming soon' : undefined} onClick={() => setTab(id)}>{label}</button>)}
     </nav>
     {tab === 'sessions' || tab === 'gallery' ? <PanelEmbed.Provider value><div className={`side-panel is-expanded home-embed panel-${tab}`}>{tab === 'sessions' ? <SessionsPanel /> : <GalleryPanel />}</div></PanelEmbed.Provider> : <>
+    <HomeHero />
     <section className="home-section" aria-label="Create">
       <Head kicker="Create" title="What do you want to make?" />
       <div className="home-bento">
