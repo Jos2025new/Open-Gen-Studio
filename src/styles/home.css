@@ -78,7 +78,7 @@
 .home-hero-slide { grid-area: 1 / 1; position: relative; opacity: 0; visibility: hidden; transform: translateX(24px); transition: opacity .6s ease, transform .6s ease, visibility 0s .6s; }
 .home-hero-slide.is-on { opacity: 1; visibility: visible; transform: none; transition: opacity .6s ease, transform .6s ease, visibility 0s; }
 .home-hero-word { margin: 0 0 var(--sp-5); position: relative; font-family: var(--font-head); font-size: 68px; font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--text); }
-.home-hero-mi { position: absolute; right: 0; top: -6px; opacity: .09; color: var(--text); pointer-events: none; }
+.home-hero-mi { position: absolute; right: 0; top: -6px; width: 72px; height: 72px; opacity: .08; color: var(--text); pointer-events: none; }
 .home-newbox { width: 100%; height: 72px; display: flex; align-items: center; justify-content: center; gap: var(--sp-2); border: 1.5px dashed var(--border-strong); border-radius: 24px; background: transparent; color: var(--text-3); font-size: var(--fs-m); transition: border-color .2s, background .2s, color .2s; }
 .home-newbox:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
 .home-newbox:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
