@@ -61,3 +61,15 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
   - Bloque 3, operaciones en contexto: Upscale, Relight y Angle en la tarjeta del resultado (`suggestedOps()`), sin recargar la tarjeta para el usuario profesional.
 - [ ] **Cola de agentes («cuando X termine, haz Y»), acordada el 2026-10-16, sin empezar.** Debe proponer arreglos ante fallo o coste. ¿Antes o después de los bloques? Pregunta abierta.
 - [ ] **Evidencia de Reddit incompleta** (bloqueado; Manus parcial): faltan comparar, iterar, descubrir operaciones, abandono y jerga.
+
+## Tarjetas del chat, guarda de esquema y borrador (2026-10-18, [042](history/042-2026-10-W42.md) sección 6)
+
+Revisados los pendientes anteriores: estos commits no cierran ninguno. «F. Tarjeta Plan … Revised» sigue abierto: C7b no añadió la variante compacta.
+
+- [ ] **C7b: Editar al pasar el ratón** sobre prompts, variaciones y estilo sin ver en navegador. `PlanParts.tsx`, `chat-cards.css`.
+- [ ] **C7b: estados hecho y fallido de las filas** sin ver en navegador. `PlanCard.tsx`, `chat-cards.css`.
+- [ ] **C7b en la app real.** La única prueba visual es una vista previa del sandbox con datos falsos. Un plan real cuesta dinero: pedir coste máximo y aprobación antes ([AGENTS.md](../AGENTS.md)).
+- [ ] **Búsqueda de modelos y `confirm_settings` no marcan los modelos con esquema derivado.** El plan y los nodos sí. Sin test. [guarda](features/guarda-esquema.md).
+- [ ] **Reintentar un fallo mientras el esquema sigue derivado.** La guarda lo rechaza en `jobs.ts`, pero falta una prueba del botón de la tarjeta. `RecoveryActions.tsx`.
+- [ ] **Borrador de la barra de Home en el navegador.** Solo pruebas con `HomeView` (tabs, envío, ocupado).
+- [ ] **Ongoing con salidas clicables** (`9c2add7`) sin ver. Puede cubrir parte de «un error al seleccionar varias», sin reproducir. `SpaceBoard.tsx`.

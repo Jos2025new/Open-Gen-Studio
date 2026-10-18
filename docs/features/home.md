@@ -20,3 +20,10 @@ Tipografía: DM Sans en la app, Outfit en títulos, Inter en el Designer ([fonts
 Sin recorrido visual archivado de Home y la barra: solo tests de modelo y render. Lo que queda en [pendientes-gui.md](../pendientes-gui.md). El selector de espacios del TopBar sigue disponible.
 
 Selector de sesiones de la barra superior ([SessionSwitcher.tsx](../../src/components/shell/SessionSwitcher.tsx), [TopBar.tsx](../../src/components/shell/TopBar.tsx)): buscar; un botón alterna la selección de varias sesiones; «+» crea una sesión nueva arriba; la papelera junto a «All sessions» borra las sesiones marcadas con la misma confirmación que el panel Sessions ([SessionsPanel.tsx](../../src/components/shell/SessionsPanel.tsx)). Prueba: [session-switcher.test.ts](../../tests/session-switcher.test.ts); sin ver en navegador.
+
+## Borrador y envío de la barra de Home (2026-10-18)
+
+| Comportamiento documentado | Código | Test |
+| --- | --- | --- |
+| El borrador de la barra de Home es por sesión (`ui.homeDrafts`), se guarda y sobrevive a cambiar de pestaña de Home (Sessions, Library, volver). Al cargar y al borrar la sesión se poda; un borrador de sesión borrada no vuelve. | [HomeBar.tsx](../../src/components/shell/HomeBar.tsx), [homeDrafts.ts](../../src/store/homeDrafts.ts), [store.ts](../../src/store/store.ts), [actions.ts](../../src/engine/actions.ts) | [home-bar-draft.test.ts](../../tests/home-bar-draft.test.ts), [home-drafts.test.ts](../../tests/home-drafts.test.ts); sin recorrido en navegador |
+| La barra borra el texto solo si el envío procede: `agentAccepts()` lee el estado en el momento, así que un cambio a ocupado tras el render mantiene el texto. El mismo control rige el envío del agente. | [sendGate.ts](../../src/engine/agent/sendGate.ts), [runtime.ts](../../src/engine/agent/runtime.ts), [HomeBar.tsx](../../src/components/shell/HomeBar.tsx) | [send-gate.test.ts](../../tests/send-gate.test.ts), [home-bar-draft.test.ts](../../tests/home-bar-draft.test.ts) |

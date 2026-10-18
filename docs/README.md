@@ -42,6 +42,8 @@
 - [proveedores](features/proveedores.md).
 - [captura: estilos de captura (CTLT), borrador primero y estilos propios](features/captura.md).
 - [precio autorizado: decisiones, avisos y coste informado](features/precio-autorizado.md).
+- [tarjetas del chat: ajustes, plan y variaciones (C5 a C7b)](features/chat-cards.md).
+- [guarda de esquema derivado: nada pagado se envía sin esquema real](features/guarda-esquema.md).
 
 ## Decisiones
 
@@ -65,6 +67,7 @@
 - [0018 — Canvas efectivo del agente y la herramienta open_board (aceptado 2026-10-15; rama sin fusionar)](decisions/0018-canvas-efectivo-del-agente.md).
 - [0019 — Tipografía: DM Sans y Outfit en la app, Inter en el Designer (aceptado 2026-10-17)](decisions/0019-tipografia-app-y-designer.md).
 - [0020 — Estructura de Home: hero, Apps, Tools y For deeper work (aceptado 2026-10-17)](decisions/0020-estructura-de-home.md).
+- [0021 — Nunca enviar una petición de pago con esquema derivado (aceptado 2026-10-18)](decisions/0021-esquema-derivado-sin-envio.md).
 
 ## Propuestas de interfaz
 
@@ -130,7 +133,7 @@
 - [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia (tests, capturas, sin ver en navegador) y decisiones del usuario.
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
 - [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
-- [042-2026-10-W42: investigación de la persona entusiasta y rediseño de Home (2026-10-16/17)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas A a A15, decisiones del usuario, commits, fallos de verificación y arreglos.
+- [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas, decisiones, commits, fallos de verificación, arreglos y la guarda de esquema.
 
 ## Trazabilidad
 
