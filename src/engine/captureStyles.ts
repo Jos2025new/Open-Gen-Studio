@@ -82,12 +82,12 @@ export function cleanCapture(raw: unknown): CaptureSel | undefined {
   const r = raw as Record<string, unknown>;
   const style = str(r.style, 60);
   const c = r.custom as Record<string, unknown> | undefined;
-  const custom = c && str(c.camera, 300) ? { camera: str(c.camera, 300)!, tone: str(c.tone, 120) ?? '', light: str(c.light, 200) ?? '', texture: str(c.texture, 200) ?? '', ...(ids(c.imperfect, IMPERFECTIONS)?.length ? { imperfect: ids(c.imperfect, IMPERFECTIONS) } : {}) } : undefined;
+  const custom = c && str(c.camera, 300) ? { camera: str(c.camera, 300)!, tone: str(c.tone, 120) ?? '', light: str(c.light, 200) ?? '', texture: str(c.texture, 200) ?? '', ...(ids(c.imperfect, IMPERFECTIONS) ? { imperfect: ids(c.imperfect, IMPERFECTIONS) } : {}) } : undefined;
   const directives = ids(r.directives, DIRECTIVES);
   const imperfect = ids(r.imperfect, IMPERFECTIONS);
   const out: CaptureSel = {
     ...(style ? { style } : {}), ...(str(r.tone, 120) ? { tone: str(r.tone, 120) } : {}),
-    ...(directives?.length ? { directives } : {}), ...(imperfect?.length ? { imperfect } : {}), ...(custom ? { custom } : {}),
+    ...(directives?.length ? { directives } : {}), ...(imperfect ? { imperfect } : {}), ...(custom ? { custom } : {}),
   };
   return Object.keys(out).length ? out : undefined;
 }
