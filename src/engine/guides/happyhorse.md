@@ -1,6 +1,8 @@
 HappyHorse 1.0 / 1.1 (Alibaba) — prompting guide
 Source: production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / fal / NanoGPT; routes, limits and audio checked against the Atlas and fal schemas (2026-09-25).
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
+
 CONTRACT ON OUR PROVIDERS (differs from other platforms; the app reads it from each variant's schema)
 - Routes: text-to-video, image-to-video (one opening image), and reference-to-video with 1–9 reference images for subject consistency (Atlas 1.1, fal). Atlas 1.0 also has a video-edit route (the app's Edit video operation). No end frame, no reference videos or audios.
 - Duration 3–15 s. Resolution 480p / 720p / 1080p (fal and NanoGPT: 720p / 1080p): medium by default, 1080p only if the user asks. Ratios 16:9, 9:16, 1:1, 4:3, 3:4.

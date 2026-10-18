@@ -1,6 +1,7 @@
 Qwen-Image (Alibaba / QwenLM) — image prompting guide (optional)
 Source: QwenLM/Qwen-Image official README, adapted to this app.
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
 - Strong at text rendering (English and Chinese) and at following detailed prose. Write one paragraph: subject → aspect or composition → setting → light → mood or camera, in concrete visual terms.
 - Text in the image: the exact words in "double quotes", with their position and style ("the headline "OPEN LATE" in bold white sans-serif across the top third"). Keep each text short; one block per sentence.
 - State what you want, not what to avoid: "plain white background" instead of "no clutter". Constraints are positive sentences in the prompt.

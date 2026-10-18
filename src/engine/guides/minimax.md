@@ -1,6 +1,8 @@
 MiniMax H3 (standard, Max, Fast, Developer) — prompting guide
 Source: high-end production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / NanoGPT; tiers, resolutions and durations checked against the Atlas schemas (2026-09-25). Reference labels: MiniMax official video prompt guide (VIDEO_PROMPT_WRITING_GUIDE_ref_en).
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
+
 WHAT H3 IS GOOD AT
 - The strongest model in the stack for motion: action, acrobatics, dance, physical comedy, bodies interacting. Pick it for motion-led shots, not for fine texture.
 - Native audio, dialogue in many languages (write the line in the language wanted).

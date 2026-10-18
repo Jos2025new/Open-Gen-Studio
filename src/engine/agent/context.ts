@@ -3,6 +3,7 @@ import { captureLines } from './captureContext';
 import { DRAFT_RULE } from './draftFirst';
 import { contrastLines } from './contrastContext';
 import { CONTRAST_RULE } from '../contrast';
+import { LOOK_RULE, peopleLookLine } from '../peopleLook';
 import { AUDIO_STEP, AUTOMATION_POLICY, CONTINUITY_POLICY, OP_LINES, OP_RESOLUTION, SETTINGS_POLICY, VIDEO_DIRECTION_POLICY, REALISM_RULE, CAPTURE_RULE, PEOPLE_RULE, WORK_RULES, VIDEO_REALISM_POLICY, WORKFLOW_CONTRACT } from '../procedure';
 import { canvasIndex } from '../canvas';
 import { formatUsd, truncate } from '../../lib/format';
@@ -59,7 +60,7 @@ Rules that always hold
 - Reply in the user's language. Text outside tools: one or two short sentences; requested text deliverables may be complete. Use plain language: model names, not refs; never tool names, workflow names or ids.
 - Read loose or mistaken wording as the closest thing this studio makes ("spreadsheet", "hoja", "ficha" of a character → a character sheet); never correct the user's word, just do it or ask the real choice.
 - Never invent a name for a character, object or place. A name is needed only to save it to the library: then ask for it in the questions card, with a suggestion as the default.
-- Characters are original (the user's own photo is used as is; no celebrities or known IP). ${PEOPLE_RULE}
+- Characters are original (the user's own photo is used as is; no celebrities or known IP). ${PEOPLE_RULE} ${LOOK_RULE}
 ${WORK_RULES}
 - If the validator rejects a plan, fix exactly the reported problems and call propose_plan again.
 - A failed or half-finished plan (its note says failed): when the user asks to check it or try again, call recover_plan (check_status when a job may still be at the provider, retry to run it again); do not propose a new plan for it.
@@ -276,7 +277,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   const subjects = st.library;
   const named = subjects.filter((s) => !s.capture || s.frontalAssetId);
   if (named.length) lines.push(`library (mention as @Name; the app sends its image): ${named.map((s) => `@${s.name} (${s.kind ?? 'character'})${s.description ? ` — ${s.description}` : ''}`).join(', ')}`);
-  lines.push(...captureLines(subjects, st.composer), ...contrastLines(session));
+  lines.push(...captureLines(subjects, st.composer), ...contrastLines(session), peopleLookLine(st.settings));
   lines.push(composerChosen('image') ? `image model (picked by the user): ${describeModel('image')}` : `image model (app default, not picked by the user): ${describeModel('image')}`);
   // An unpicked video model is only an app default: steps follow the purpose table (C2).
   lines.push(composerChosen('video') ? `video model (picked by the user): ${describeModel('video')}` : `video model: none picked by the user; ${videoRouteLine()}`);

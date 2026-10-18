@@ -1,6 +1,8 @@
 Seedance 2.0 / 2.5 (ByteDance) — prompting guide
 Source: high-end production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / NanoGPT; limits checked against Atlas seedance-2.5/reference-to-video docs.
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
+
 WRITING STYLE (both versions)
 - Cinematic prose, present tense, physical verbs, concrete nouns. Nothing the camera cannot see or the mic cannot hear.
 - Aspect, resolution, fps and audio on/off are request parameters, never prompt text. The only thing the prompt needs to know about time is the clip duration.

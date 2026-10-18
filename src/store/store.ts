@@ -61,6 +61,7 @@ export interface Settings {
   notify?: boolean;
   /** Tab title while hidden when a generation finishes. */
   notifications: { tabTitle: boolean };
+  peopleLook?: string;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 

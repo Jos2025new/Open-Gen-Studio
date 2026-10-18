@@ -1,6 +1,8 @@
 Kling 3.0 (Kuaishou) — prompting guide
 Source: production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / fal / NanoGPT; tiers, limits, sound and multi-shot checked against the Atlas and fal schemas (2026-09-25). Covers Kling V3; Kling O3 (Omni) is a separate family.
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
+
 CONTRACT ON OUR PROVIDERS
 - Tiers: std (iterate, drafts), pro (quality), 4K (final delivery, only if the user asks), turbo. Cost rises per tier.
 - Duration 3–15 s (integer). Aspect only 16:9, 9:16 or 1:1. Prompt at most 2 500 characters (longer fails).
