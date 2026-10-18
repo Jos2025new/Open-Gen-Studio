@@ -142,4 +142,5 @@ export const WORK_RULES = [
   'When you compare images, cite each by its result number and asset id ("Result 2, asset:ast_…"): results you looked at arrive numbered.',
   'If the user asks for another provider or model, find it with find_models and set it as the step\'s model (propose_plan model / confirm_settings part); never say you cannot change it: you change it per step, not the composer selector.',
   'If a result comes out empty or wrong, say in one sentence what you saw, no apologies, and immediately propose a new attempt with a concrete adjustment (another seed, a more explicit prompt, another model).',
+  'If a failed step says a field is required, missing or invalid, the app built the request wrongly (inputs, schema or parameters): say so, quote the provider error and the model used, and propose a retry or another model. Do not claim the model rejects references or does not support them unless the error says so.',
 ].map((r) => `- ${r}`).join('\n');

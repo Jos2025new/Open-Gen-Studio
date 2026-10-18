@@ -63,7 +63,7 @@ beforeEach(() => {
   useStore.setState({
     spendLog: [],
     settings: { ...st.settings, keys: { ...st.settings.keys, atlas: 'k' } },
-    catalog: { ...st.catalog, models: { [REF]: model }, schemas: { [REF]: { ref: REF, params: [], slots: {}, source: 'derived' } } },
+    catalog: { ...st.catalog, models: { [REF]: model }, schemas: { [REF]: { ref: REF, params: [], slots: {}, source: 'catalog' } } },
   });
 });
 afterEach(() => vi.unstubAllGlobals());

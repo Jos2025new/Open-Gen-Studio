@@ -65,9 +65,20 @@ export function extractErrorMessage(body: unknown, fallback: string): string {
   for (const c of candidates) {
     if (typeof c === 'string' && c.trim()) return c.trim().slice(0, 400);
     if (Array.isArray(c) && c.length) {
-      const first = c[0] as Record<string, unknown>;
-      if (typeof first?.msg === 'string') return first.msg;
+      // A validation list: every field with its message (FastAPI style), not only the first.
+      const items = c.slice(0, 5).flatMap((x) => {
+        const it = x as Record<string, unknown>;
+        if (typeof it?.msg !== 'string') return [];
+        const where = Array.isArray(it.loc) ? it.loc.filter((p) => p !== 'body').join('.') : '';
+        return [where ? `${where}: ${it.msg}` : it.msg];
+      });
+      if (items.length) return items.join('; ').slice(0, 400);
     }
+  }
+  // An error object with no `message`: its text fields (reason, description…), not a generic line.
+  for (const c of candidates) {
+    const texts = c && typeof c === 'object' && !Array.isArray(c) ? Object.values(c).filter((v): v is string => typeof v === 'string' && Boolean(v.trim())) : [];
+    if (texts.length) return texts.join('; ').slice(0, 400);
   }
   return fallback;
 }

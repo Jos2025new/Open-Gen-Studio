@@ -25,6 +25,7 @@ import { OPS, opCount } from './ops';
 import { audioInputProblem, songProblem, clipTrim, coerceSettings, shotsProblem, routeAudio, dimsFor, durationChoices, isAutoOption, longEdgeFor, matchInputOption, preferredResolution, placeKeyframes, maxCountPerRequest, nearestAspect, paramByRole, ratioOf, routeVideoInputs, videoInputProblem } from './params';
 import { mapSubjectPrompts } from './subjectPrompts';
 import { ADAPTERS } from './providers/registry';
+import { resolveSendable } from './schemaGuard';
 import { cellRects, gridShape } from './sheet';
 import { checkJobsNow } from './providers/shared';
 import { PROVIDER_LABELS, parseModelRef, type GenOutput, type MediaInput } from './providers/types';
@@ -372,7 +373,7 @@ async function execute(id: string): Promise<string[]> {
         recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'variant-inputs', event: 'generation.variant_resolved', reason: 'late variant resolution', sessionId: g.sessionId, planId: g.planId, stepId: g.stepId, generationId: g.id, before, after: { modelRef: g.modelRef, variant: modelSummary(g.modelRef) ? variantRoute(modelSummary(g.modelRef)!) : 'unknown', inputRoles: before.inputRoles } });
       }
     }
-    const resolved = await resolveModel(g.modelRef);
+    const resolved = await resolveSendable(g.modelRef);
     if (!resolved) {
       const parsed = parseModelRef(g.modelRef);
       const prov = parsed ? PROVIDER_LABELS[parsed.provider] : 'its provider';
@@ -849,7 +850,7 @@ export function retryGeneration(id: string): Promise<string[]> {
     estimate: g.estimate,
     variants: g.variants,
   });
-  // Whoever showed the failed attempt now shows this one: otherwise the retry is charged and its result is never seen.
+  // The failed attempt's card now shows this one, so the retry's result is seen.
   relinkAttempt(g.id, newG.id);
   return runGeneration(newG.id);
 }

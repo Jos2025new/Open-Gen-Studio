@@ -1,6 +1,7 @@
 import { videoOpSettings } from '../jobs';
 import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
+import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
 import { isAutoOption, matchInputOption, nearestAspect, paramByRole, routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
@@ -83,7 +84,7 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   if (missing) return `No such node: ${missing}.`;
   const drop = new Set(ids);
   const deleted = { nodes: structuredClone(graph.nodes.filter(n => drop.has(n.id))), edges: structuredClone(graph.edges.filter(e => drop.has(e.source) || drop.has(e.target))) };
-  // Deleted nodes leave their group; a detached output set keeps its restore snapshot until its last card is removed.
+  // Deleted nodes leave their group; a detached output set keeps its restore snapshot.
   const groups = (g0: import('../types').Graph) => g0.groups?.map(gr => ({ ...gr, nodeIds: gr.nodeIds.filter(id => !drop.has(id)) })).filter(gr => gr.nodeIds.length > 1 || (gr.nodeIds.length > 0 && 'detachedOutputs' in gr));
   const error = editGraph(sessionId, g => ({ ...g, nodes: g.nodes.filter(n => !drop.has(n.id)), edges: g.edges.filter(e => !drop.has(e.source) && !drop.has(e.target)), ...(g.groups ? { groups: groups(g) } : {}) }));
   if (!error && deleted.nodes.length) appendFeed(sessionId, { id: uid('fd'), createdAt: Date.now(), workspace: 'node', type: 'notice', level: 'info', text: `Deleted nodes: ${deleted.nodes.map(n => n.data.title).join(', ')}. Results remain in the gallery.`, undoNodes: deleted });
@@ -99,7 +100,7 @@ export function addConnected(sessionId: string, fromId: string, data: GraphNodeD
   if (!from) return null;
   const type = outputPort(from.data, st.assets);
   const port = inputPorts(data).find((p) => p.type === type) ?? inputPorts(data).find((p) => portFits(type, p.type));
-  // A node of the same kind keeps the model the source has *now* (and its settings), not the composer's default.
+  // A node of the same kind keeps the source's current model and settings.
   if ('modelRef' in data && 'modelRef' in from.data && from.data.kind === data.kind) {
     data = { ...data, modelRef: from.data.modelRef, settings: { ...structuredClone(from.data.settings), seed: undefined } } as GraphNodeData;
   }
@@ -282,13 +283,13 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
   for (const id of inputs) {
     const n = graph.nodes.find(n => n.id === id);
     if (!n) { errors.push(`Missing input node: ${id}.`); continue; }
-    // A node this run writes must be free; an input only needs not to be generating (other runs may read it too).
+    // A node this run writes must be free; an input only must not be generating.
     const busyGen = runsGeneration(n.data) && n.data.generationId && ['queued', 'running'].includes(st.generations[n.data.generationId]?.status);
     if ((run.runIds.includes(id) ? lockedNodes(sessionId) : writingNodes(sessionId)).has(id) || busyGen) errors.push(`“${n.data.title}” is already running.`);
     if (n.data.kind === 'tool' && n.data.op === 'video_upscale') {
       const ref = typeof n.data.params._modelRef === 'string' ? n.data.params._modelRef : opModelFor('video_upscale').ref;
       if (!st.catalog.models[ref] || !isVideoUpscaler(st.catalog.models[ref]) || !isConnected(st.catalog.models[ref].provider)) errors.push(`“${n.data.title}”: choose an available dedicated video upscaler.`);
-      if (st.catalog.schemas[ref]?.source === 'derived') errors.push(`“${n.data.title}”: the provider parameter schema is unavailable.`);
+      errors.push(...derivedRefErrors([ref]));
     }
     if (n.data.kind === 'asset' && (!n.data.assetId || !st.assets[n.data.sketchAssetId ?? n.data.assetId])) errors.push(`“${n.data.title}” needs an available asset.`);
     if (n.data.kind !== 'text' && n.data.sketchAssetId && !st.assets[n.data.sketchAssetId]) errors.push(`“${n.data.title}”: the Sketch asset is missing.`);
@@ -317,6 +318,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
     }
     if (step.kind === 'audio' && step.lyricsFrom && !schema.params.some(p => /lyrics/i.test(p.key))) errors.push(`${step.title}: the model takes no lyrics.`);
   }
+  errors.push(...derivedRefErrors(run.steps.flatMap(s => 'modelRef' in s ? [s.modelRef] : s.kind === 'op' && typeof s.params._modelRef === 'string' ? [s.params._modelRef] : [])));
   const { total } = estimateSteps(run.steps);
   const requests = [...inputs].map(id => {
     const n = graph.nodes.find(n => n.id === id)!;
@@ -381,7 +383,7 @@ export async function runNodes(sessionId: string, targets: string[], approved?: 
           const completed = { ...node, data: { ...node.data, generationId } } as GraphNode;
           const snapshot = { ...graph, nodes: graph.nodes.map(n => n.id === stepId ? completed : n) };
           patchGeneration(generationId, { nodeRequest: stable(nodeRequest(snapshot, completed, st.generations, library, { ...context, schemas: st.catalog.schemas })) });
-          // Keep whatever the user edited meanwhile; only the result changes (an edited node then shows as outdated).
+          // Keep what the user edited meanwhile; only the result changes.
           setGraph(sessionId, g => ({ ...g, nodes: g.nodes.map(n => n.id === stepId ? { ...n, data: { ...n.data, generationId } } as GraphNode : n) }));
         }
         onState?.(stepId, state, info);

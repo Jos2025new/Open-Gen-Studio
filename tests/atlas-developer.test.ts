@@ -64,7 +64,7 @@ const DEV = 'atlas::google/nano-banana-2-lite/text-to-image-developer';
 const NORMAL = 'atlas::google/nano-banana-2-lite/text-to-image';
 
 const model = (id: string): ModelSummary => ({ id, name: id.split('/').pop()!, provider: 'atlas', kind: 'image', acceptsImage: false, tags: [], price: undefined } as unknown as ModelSummary);
-const schema = (ref: string) => ({ ref, params: [], slots: {}, source: 'derived' as const });
+const schema = (ref: string) => ({ ref, params: [], slots: {}, source: 'catalog' as const });
 const gen = (modelRef: string) =>
   createGeneration({ sessionId: useStore.getState().activeSessionId, kind: 'image', prompt: 'chica', modelRef, settings: { count: 1, advanced: {} }, inputs: { refs: [] }, origin: 'agent' });
 const order = () => events.map((e) => `${e.at}:${e.model.replace(/^.*\//, '')}`);

@@ -6,7 +6,7 @@ import type { FxLayer } from './fx/types';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
-/** Agent mode: auto (one card when something that changes the result is missing), guided (asks), direct (no card). */
+/** Agent mode: auto (a card only when something is missing), guided (asks), direct (no card). */
 export type AgentStyle = 'auto' | 'guided' | 'direct';
 /** Every generated media type is also a persistable asset type. */
 export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
@@ -36,7 +36,7 @@ export interface ParamDef {
   pattern?: string;
   /** 'text': long free text edited in a text area (song lyrics). */
   multiline?: boolean;
-  /** 'text': tags the editor offers to insert on their own line (lyrics sections: [Verse], [Chorus]…). */
+  /** 'text': tags the editor inserts on their own line ([Verse], [Chorus]…). */
   tags?: string[];
   options?: Array<string | number>;
   min?: number;
@@ -56,11 +56,11 @@ export interface InputSlots {
   promptRequired?: boolean;
   /** Longest prompt the provider takes, in characters (schema maxLength or "up to N characters"). */
   promptMax?: number;
-  /** How the prompt field says to cite the references ("@Image1", "<IMAGE_0>", "Image 1"…), from the provider's schema. */
+  /** How the prompt cites references ("@Image1", "<IMAGE_0>"…), from the provider's schema. */
   promptRefs?: string;
   /** Reference / source images. */
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
-  /** Image models with a source image and a separate reference list (Ideogram Character remix): the first input image. */
+  /** Models with a source image and a separate reference list (Ideogram Character remix). */
   source?: { key: string; format: ImageInputFormat };
   /** `required`: the model cannot run without it (talking avatars, lip-sync). */
   firstFrame?: { key: string; format: ImageInputFormat; required?: boolean };
@@ -192,6 +192,8 @@ export interface ModelSchema {
   price?: PriceRule;
   /** Where the schema came from; 'derived' means reconstructed from catalog metadata. */
   source: 'catalog' | 'openapi' | 'derived' | 'builtin';
+  /** 'derived' only: why the real schema failed to load. */
+  loadError?: string;
 }
 
 // ---------------------------------------------------------------------------

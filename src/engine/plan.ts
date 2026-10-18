@@ -40,6 +40,7 @@ import type {
   SettingsChoice,
   Subject,
 } from './types';
+import { derivedSchemaErrors } from './schemaGuard';
 
 /** Largest plan the agent may propose (tool schema, zod and normalizer share it). */
 export const MAX_PLAN_STEPS = 16;
@@ -943,10 +944,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   if (style) {
     for (const st of steps) applyPlanStyle(st, style);
   }
-  // Candidates end a plan: a step that makes several results for the user to choose from cannot feed another step of
-  // the same plan (it would silently take #1 before the user picks). The node canvas picks per node, so not there.
+  // Candidates end a plan: no later step may take one of several results the user has not picked (not in Nodes).
   if (ctx.workspace !== 'node') {
-    // Image/video steps with count > 1, and ops that make several (reference_sheet candidates, variations).
+    // Steps with count > 1, and ops that make several.
     const several = (st: PlanStep) => ((st.kind === 'image' || st.kind === 'video') && (st.settings.count ?? 1) > 1) || (st.kind === 'op' && Number(st.params.count ?? 1) > 1);
     const candidates = new Set(steps.filter(several).map((st) => st.id));
     for (const st of steps) {
@@ -956,6 +956,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       }
     }
   }
+  if (!errors.length) errors.push(...await derivedSchemaErrors(steps, ctx.getModel));
   if (!errors.length) {
     try {
       topoOrder(steps);

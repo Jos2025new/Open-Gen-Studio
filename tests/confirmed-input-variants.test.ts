@@ -11,7 +11,7 @@ const initial = useStore.getState().catalog;
 afterEach(() => useStore.setState({ catalog: initial }));
 function context(confirmedRef = edit, needsImage = true): PlanContext {
   const models = Object.fromEntries([text, edit].map(ref => [ref, { ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name: ref === edit ? 'Nano Banana 2 Edit Developer' : 'Nano Banana 2 Text-to-Image Developer', acceptsText: true, acceptsImage: ref === edit, tags: [] } as ModelSummary]));
-  const schemas = Object.fromEntries([text, edit].map(ref => [ref, { ref, source: 'derived', params: [], slots: { prompt: 'prompt', ...(ref === edit ? { images: { key: 'image_urls', min: 1, max: 4, multiple: true, format: 'url' } } : {}) } } as ModelSchema]));
+  const schemas = Object.fromEntries([text, edit].map(ref => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt', ...(ref === edit ? { images: { key: 'image_urls', min: 1, max: 4, multiple: true, format: 'url' } } : {}) } } as ModelSchema]));
   useStore.setState({ catalog: { ...initial, models, schemas } });
   return {
     workspace: 'chat', getModel: async ref => models[ref] ? { model: models[ref], schema: schemas[ref] } : null,

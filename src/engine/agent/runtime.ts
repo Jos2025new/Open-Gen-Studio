@@ -89,6 +89,7 @@ import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentC
 import { endedWithoutPlan } from './endedWithoutPlan';
 import { canvasParts } from './canvasView';
 import { nodeSelection } from '../flow/selection';
+import { failedStepSummary } from './failureContext';
 import { TOOLS, CAPABILITIES, MUST, continueInChatSchema, continueInDesignerSchema, findAssetsSchema, findModelsSchema, readGraphSchema, viewCanvasSchema, readGuideSchema, recoverPlanSchema, askQuestionsSchema, confirmSettingsSchema, formatZodError, parseToolArgs, proposePlanSchema, toRawPlan } from './tools';
 
 const get = useStore.getState;
@@ -1017,7 +1018,7 @@ async function executePlanItem(
       const key = workspace === 'node' ? nodeOf(st.id) : st.id;
       const out = result.outputs.get(key);
       const fail = result.failed.find((f) => f.stepId === key);
-      if (fail) return `${st.id} failed (${fail.error})`;
+      if (fail) return failedStepSummary(sessionId, itemId, st.id, fail.error);
       if (off.has(st.id)) return `${st.id} not run (unchecked by the user)`;
       if (result.waiting.includes(key)) {
         const current = session(sessionId).feed.find((f): f is PlanFeedItem => f.type === 'plan' && f.id === itemId);
@@ -1027,11 +1028,11 @@ async function executePlanItem(
       // O3: what came back different from what was asked, for the closing message.
       const genId = session(sessionId).feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan')?.stepGenerations?.[st.id];
       const delivery = genId ? get().generations[genId]?.delivery : undefined;
-      // The model that really ran, so the closing message never names one that was only asked for.
+      // The model that really ran, not one only asked for.
       const ran = genId ? get().generations[genId]?.modelRef : undefined;
-      // …and what came out (read from the files: size, length), a few words in the message that already goes.
+      // …and what came out (size, length).
       const first = out.assetIds[0] ? get().assets[out.assetIds[0]] : undefined;
-      // The confirmed model's own variant for these inputs (edit, image-to-video) is the same choice, said so.
+      // The confirmed model's own variant for these inputs is the same choice.
       const conf = Object.values(session(sessionId).agent.settings ?? {}).find((c) => c && c.modelRef !== ran && modelSummary(c.modelRef) && modelSummary(ran ?? '') && lineKey(modelSummary(c.modelRef)!) === lineKey(modelSummary(ran!)!));
       const facts = [ran ? `made with ${modelSummary(ran)?.name ?? ran}${conf ? ` (the ${variantRoute(modelSummary(ran!)!)} variant of the confirmed ${modelSummary(conf.modelRef)!.name}: the same model, not a change)` : ''}` : '', first?.width && first.height ? `${shapeLabel(first.width, first.height)}, ${first.width}×${first.height}` : '', first?.duration ? `${Math.round(first.duration)}s` : ''].filter(Boolean);
       const by = facts.length ? ` (${facts.join(', ')})` : '';

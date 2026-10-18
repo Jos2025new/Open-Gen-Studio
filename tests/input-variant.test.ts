@@ -10,7 +10,7 @@ const initial = useStore.getState();
 const mk = (ref: string, kind: 'image' | 'video', acceptsImage: boolean): ModelSummary =>
   ({ ref, id: ref.split('::')[1], provider: 'atlas', kind, name: ref.split('/').slice(-2, -1)[0], acceptsText: true, acceptsImage, tags: [] }) as ModelSummary;
 const schema = (ref: string, acceptsImage: boolean, kind: 'image' | 'video'): ModelSchema =>
-  ({ ref, source: 'derived', params: [], slots: { prompt: 'prompt', ...(acceptsImage ? (kind === 'image' ? { images: { key: 'images', min: 1, max: 4, multiple: true, format: 'url' } } : { firstFrame: { key: 'image' } }) : {}) } }) as unknown as ModelSchema;
+  ({ ref, source: 'catalog', params: [], slots: { prompt: 'prompt', ...(acceptsImage ? (kind === 'image' ? { images: { key: 'images', min: 1, max: 4, multiple: true, format: 'url' } } : { firstFrame: { key: 'image' } }) : {}) } }) as unknown as ModelSchema;
 function load(list: Array<[string, 'image' | 'video', boolean]>) {
   const models = Object.fromEntries(list.map(([r, k, a]) => [r, mk(r, k, a)]));
   const schemas = Object.fromEntries(list.map(([r, k, a]) => [r, schema(r, a, k)]));

@@ -115,10 +115,10 @@ export function modelSummary(ref: string): ModelSummary | undefined {
 
 const schemaInflight = new Map<string, Promise<ModelSchema | null>>();
 
-/** Load (and cache) a model's parameter schema. Falls back to a prompt-only schema. */
+/** Load (and cache) a model's parameter schema. When the provider cannot give it, a prompt-only 'derived' schema stands in for display only: it is never cached for good (every call tries the real load again) and schemaGuard refuses to send with it. */
 export function ensureSchema(ref: string): Promise<ModelSchema | null> {
   const cached = get().catalog.schemas[ref];
-  if (cached) return Promise.resolve(cached);
+  if (cached && cached.source !== 'derived') return Promise.resolve(cached);
   const existing = schemaInflight.get(ref);
   if (existing) return existing;
   const p = (async () => {
@@ -146,9 +146,12 @@ export function ensureSchema(ref: string): Promise<ModelSchema | null> {
         },
         price: model.price,
         source: 'derived',
+        loadError: err instanceof Error ? err.message : String(err),
       };
     }
     if (!schema.price && model.price) schema = { ...schema, price: model.price };
+    // Still derived: keep the object already shown, so views do not re-render into a loop of retries.
+    if (schema.source === 'derived' && cached?.source === 'derived') return cached.loadError === schema.loadError ? cached : (setCatalog((c) => ({ schemas: { ...c.schemas, [ref]: schema } })), schema);
     setCatalog((c) => ({ schemas: { ...c.schemas, [ref]: schema } }));
     return schema;
   })().finally(() => schemaInflight.delete(ref));
