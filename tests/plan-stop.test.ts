@@ -47,6 +47,7 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PlanCard } from '../src/components/chat/PlanCard';
+import { resolveStepCostReview } from '../src/engine/agent/runtime';
 import { executeSteps } from '../src/engine/executor';
 import { finalPlanStatus, isPlanStopped, stopPlanRun } from '../src/engine/planStop';
 import { useStore } from '../src/store/store';
@@ -102,5 +103,49 @@ describe('Cancel on a running plan stops the whole run', () => {
     stopPlanRun('pl_again');
     for (const g of Object.values(useStore.getState().generations)) if (g.stepId === 'a') useStore.setState((st) => ({ generations: { ...st.generations, [g.id]: { ...g, status: 'canceled' } } }));
     await run;
+  });
+});
+
+describe('a step waiting for price review does not spend after Cancel', () => {
+  const auth = { maxUsd: 0.1 } as never;
+  const review = { approved: auth, proposed: auth, message: 'The price went up.' };
+  const reviewItem = (status: PlanFeedItem['status']) => ({ id: 'rv1', createdAt: 0, workspace: 'chat', type: 'plan', style: 'auto', status, stepStates: { a: 'review' }, stepGenerations: { a: 'gen_rv' }, stepCostReviews: { a: review }, estimate: { usd: 0.1 }, plan: { id: 'pl_rv', title: 'T', workspace: 'chat', adjustments: [], steps: [step('a')] } } as unknown as PlanFeedItem);
+  const put = (item: PlanFeedItem) => {
+    useStore.setState((st) => ({
+      generations: { ...st.generations, gen_rv: { id: 'gen_rv', sessionId: sid(), kind: 'image', status: 'queued', assetIds: [], stepId: 'a', settings: { count: 1, advanced: {} } } as never },
+      sessions: { ...st.sessions, [sid()]: { ...st.sessions[sid()], feed: [...st.sessions[sid()].feed.filter((f) => f.id !== 'rv1'), item] } },
+    }));
+  };
+  const mountCard = async (item: PlanFeedItem) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    await act(async () => { createRoot(host).render(createElement(PlanCard, { item, sessionId: sid() })); });
+    return host;
+  };
+
+  it('a canceled plan shows no "Continuar" and Continuar from an old click is refused: nothing is sent', async () => {
+    const item = reviewItem('canceled');
+    put(item);
+    expect((await mountCard(item)).textContent).not.toContain('Continuar');
+    await resolveStepCostReview(sid(), 'rv1', 'a', 'continue');
+    expect(started).toEqual([]);
+    expect(useStore.getState().generations.gen_rv.status).toBe('queued');
+    expect((useStore.getState().sessions[sid()].feed.find((f) => f.id === 'rv1') as PlanFeedItem).stepStates.a).toBe('review');
+  });
+
+  it('a plan whose run was stopped refuses the review decision even before its status settles', async () => {
+    put(reviewItem('running'));
+    stopPlanRun('pl_rv');
+    await resolveStepCostReview(sid(), 'rv1', 'a', 'continue');
+    expect(started).toEqual([]);
+    expect(useStore.getState().generations.gen_rv.status).toBe('queued');
+  });
+
+  it('stopping a run turns the steps waiting for review into skipped ones', async () => {
+    const states: Record<string, string> = {};
+    const result = await executeSteps([step('a'), step('b')], { sessionId: sid(), planId: 'pl_rv2', workspace: 'chat', origin: 'agent', waiting: new Set(['a']), onState: (id, st) => { states[id] = st; if (st === 'running') stopPlanRun('pl_rv2'); } });
+    expect(result.waiting).toEqual([]);
+    expect(states.a).toBe('skipped');
+    expect(result.skipped).toContain('a');
   });
 });

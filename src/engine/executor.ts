@@ -394,7 +394,9 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   });
 
   for (const [id, st] of state) if (st === 'pending') { waiting.push(id); ctx.onState(id, 'pending'); }
-  return { outputs, failed, skipped, waiting, ...(isPlanStopped(ctx.planId) ? { stopped: true } : {}) };
+  const stopped = isPlanStopped(ctx.planId);
+  if (stopped) for (const id of waiting.splice(0)) { skipped.push(id); ctx.onState(id, 'skipped'); } // a step waiting for review does not continue after Cancel
+  return { outputs, failed, skipped, waiting, ...(stopped ? { stopped: true } : {}) };
 }
 
 /** Save a plan subject in the library, unless one with that name exists (it is reused, as the plan card said). */

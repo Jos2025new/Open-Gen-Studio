@@ -23,7 +23,7 @@ import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
-import { finalPlanStatus } from '../planStop';
+import { finalPlanStatus, reviewOpen } from '../planStop';
 import { patchGeneration } from '../../store/store';
 import { generationInFlight, canRecheck, recheckGeneration, retryGeneration } from '../jobs';
 import { focusNodes } from '../flow/selection';
@@ -1055,7 +1055,7 @@ export async function resolveStepCostReview(sessionId: string, itemId: string, s
   const item = session(sessionId)?.feed.find((f): f is PlanFeedItem => f.id === itemId && f.type === 'plan');
   const review = item?.stepCostReviews?.[stepId];
   const generationId = item?.stepGenerations[stepId];
-  if (!item || !review || item.stepStates[stepId] !== 'review' || !generationId) return;
+  if (!item || !review || !generationId || !reviewOpen(item, stepId)) return;
   const record = priceDecision(review, generationId, decision);
   updateFeedItem<PlanFeedItem>(sessionId, itemId, it => ({
     ...it,

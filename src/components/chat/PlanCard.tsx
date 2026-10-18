@@ -263,7 +263,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                     {editable(`"${s.title}"`, <Collapsible name={`the prompt of ${s.title}`}>{script}</Collapsible>)}
                   </>
                 ) : null}
-                {state === 'review' && item.stepCostReviews?.[s.id] ? (
+                {state === 'review' && item.status !== 'canceled' && item.stepCostReviews?.[s.id] ? (
                   <span className="step-script">
                     <p>{item.stepCostReviews[s.id].message}</p>
                     <Button size="sm" variant="primary" onClick={() => { void resolveStepCostReview(sessionId, item.id, s.id, 'continue'); }}>Continuar</Button>
