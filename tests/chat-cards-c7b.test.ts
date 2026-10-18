@@ -157,7 +157,11 @@ describe('C7b plan card (awaiting)', () => {
       expect(getComputedStyle(btn).opacity).toBe('0');
       await act(async () => { btn.focus(); });
       expect(document.activeElement).toBe(btn);
-      expect(getComputedStyle(btn).opacity).toBe('1');
+      // jsdom does not evaluate :focus rules in computed style, so the reveal rule is read from the stylesheet.
+      const reveal = readFileSync('src/styles/chat-cards.css', 'utf8').split('\n').find((l) => l.startsWith('.cc-edit:hover > .cc-edit-btn')) ?? '';
+      expect(reveal).toMatch(/:focus-within > \.cc-edit-btn/);
+      expect(reveal).toMatch(/\.cc-edit-btn:focus-visible/);
+      expect(reveal).toMatch(/opacity: 1/);
     } finally {
       style.remove();
     }
