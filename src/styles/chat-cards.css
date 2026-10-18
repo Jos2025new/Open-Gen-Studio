@@ -85,8 +85,8 @@
 .cc-var { display: block; margin-top: 6px; }
 .cc-edit { position: relative; border-radius: 8px; padding: 4px 8px; margin: 0 -8px; }
 .cc-edit:hover, .cc-edit:focus-within { background: var(--surface-2); }
-.cc-edit-btn { position: absolute; right: 6px; top: 5px; display: none; font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--surface-3); padding: 2px 8px; border-radius: 6px; }
-.cc-edit:hover > .cc-edit-btn, .cc-edit:focus-within > .cc-edit-btn, .cc-edit-btn:focus-visible { display: block; }
+.cc-edit-btn { position: absolute; right: 6px; top: 5px; opacity: 0; pointer-events: none; font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--surface-3); padding: 2px 8px; border-radius: 6px; }
+.cc-edit:hover > .cc-edit-btn, .cc-edit:focus-within > .cc-edit-btn, .cc-edit-btn:focus, .cc-edit-btn:focus-visible { opacity: 1; pointer-events: auto; }
 .cc-edit-input { display: block; width: 100%; margin-top: 6px; }
 .cc-style { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 .cc-style .cc-lab { margin-top: 0; }

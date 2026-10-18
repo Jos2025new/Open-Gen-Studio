@@ -141,6 +141,28 @@ describe('C7b plan card (awaiting)', () => {
     expect(sent.messages).toEqual([['"Retrato", option 2: night', { attachments: [] }]]);
   });
 
+  it('Edit is reachable by keyboard: hidden visually until hover/focus, but never display:none', async () => {
+    setup();
+    const style = document.createElement('style');
+    style.textContent = readFileSync('src/styles/chat-cards.css', 'utf8');
+    document.head.append(style);
+    try {
+      // A short prompt has no chevron: the Edit button is the only focusable element of its line.
+      await mount(createElement(PlanCard, { item: plan({ variations: undefined, settings: { aspect: '3:4', count: 1, advanced: {} } }), sessionId: sid() }));
+      const btn = host.querySelector('.cc-edit-btn') as HTMLButtonElement;
+      expect(btn.getAttribute('aria-label')).toMatch(/^Edit /);
+      expect(getComputedStyle(btn).display).not.toBe('none');
+      expect(getComputedStyle(btn).visibility).not.toBe('hidden');
+      expect(btn.tabIndex).toBeGreaterThanOrEqual(0);
+      expect(getComputedStyle(btn).opacity).toBe('0');
+      await act(async () => { btn.focus(); });
+      expect(document.activeElement).toBe(btn);
+      expect(getComputedStyle(btn).opacity).toBe('1');
+    } finally {
+      style.remove();
+    }
+  });
+
   it('footer is plain: budget left, Suggest changes, Cancel, Approve · $X', async () => {
     setup();
     await mount(createElement(PlanCard, { item: plan(), sessionId: sid() }));
