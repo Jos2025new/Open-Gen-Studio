@@ -66,13 +66,13 @@ describe('rendering', () => {
     expect(html).toMatch(/<button type="button" class="home-space" disabled="" aria-label="Projects — soon">/);
     expect(html).not.toContain('grid-area');
   });
-  it('Tools show 58 px circles with "+ More"; expanded, the same row ends in "− Less"', () => {
+  it('Tools show 58 px circles with a last "More"; expanded, the same row ends in "Less"', () => {
     const collapsed = renderToStaticMarkup(createElement(ToolsRow));
     expect(collapsed.match(/class="home-tool[ "]/g)).toHaveLength(TOOLS_MAIN.length + 1);
-    expect(collapsed).toMatch(/aria-expanded="false"[^>]*>.*\+ More/);
+    expect(collapsed).toMatch(/aria-expanded="false"[^>]*>.*>More</);
     const expanded = renderToStaticMarkup(createElement(ToolsRow, { defaultMore: true }));
     expect(expanded.match(/class="home-tool[ "]/g)).toHaveLength(TOOLS_MAIN.length + TOOLS_MORE.length + 1);
-    expect(expanded).toMatch(/aria-expanded="true"[^>]*>.*− Less/);
+    expect(expanded).toMatch(/aria-expanded="true"[^>]*>.*>Less</);
   });
   it('the wide bar has collapsible Spaces, Create and Tools sections with text', () => {
     const html = renderToStaticMarkup(createElement(SidebarNav, { wide: true }));

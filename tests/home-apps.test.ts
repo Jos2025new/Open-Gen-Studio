@@ -50,14 +50,14 @@ describe('app cards', () => {
 });
 
 describe('tools More / Less', () => {
-  it('"+ More" expands the row in place and "− Less" collapses it', () => {
+  it('"More" expands the row in place and "Less" collapses it', () => {
     mount();
     const before = tools().length;
     const more = tools().at(-1)!;
-    expect(more.textContent).toContain('+ More');
+    expect(more.textContent).toBe('More');
     act(() => more.click());
     expect(tools().length).toBeGreaterThan(before);
-    expect(tools().at(-1)!.textContent).toContain('− Less');
+    expect(tools().at(-1)!.textContent).toBe('Less');
     expect(tools().at(-1)!.getAttribute('aria-expanded')).toBe('true');
     act(() => tools().at(-1)!.click());
     expect(tools().length).toBe(before);

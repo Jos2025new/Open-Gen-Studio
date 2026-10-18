@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, Folder, Minus, Plus, type LucideIcon } from 'lucide-react';
 import { selectSession, setUi, useStore } from '../../store/store';
 import type { AssetKind } from '../../engine/types';
@@ -42,18 +42,32 @@ function SpaceCard({ icon: Icon, title, hint, disabled, onClick }: { icon: Lucid
   </button>;
 }
 
-/** The tools as 58 px circles. "+ More" expands the row downward into "− Less"; the list is local state. */
+const TOOL_SLOT = 88; // matches .home-tool width
+const TOOL_GAP = 16; // matches the row's column gap
+
+/** The tools as 58 px circles in one row: as many main tools as fit, with "More" always last. "More" expands the row downward, with the rest, into "Less". */
 export function ToolsRow({ defaultMore = false }: { defaultMore?: boolean }) {
   const [more, setMore] = useState(defaultMore);
-  const items: ToolItem[] = more ? [...TOOLS_MAIN, ...TOOLS_MORE] : TOOLS_MAIN;
-  return <div className="home-tools">
+  const [width, setWidth] = useState<number | undefined>(undefined);
+  const row = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = row.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // Slots for main tools beside "More": before the first measurement, all of them.
+  const fit = width === undefined ? TOOLS_MAIN.length : Math.max(0, Math.min(TOOLS_MAIN.length, Math.floor((width + TOOL_GAP) / (TOOL_SLOT + TOOL_GAP)) - 1));
+  const items: ToolItem[] = more ? [...TOOLS_MAIN, ...TOOLS_MORE] : TOOLS_MAIN.slice(0, fit);
+  return <div ref={row} className={`home-tools ${more ? 'is-expanded' : ''}`}>
     {items.map((t) => <button key={t.id} type="button" className="home-tool" onClick={() => openTool(t)}>
       <span className="home-tool-icon"><t.icon size={22} strokeWidth={1.6} /></span>
       <span className="home-tool-label">{t.label}</span>
     </button>)}
     <button type="button" className="home-tool home-tool-more" onClick={() => setMore(!more)} aria-expanded={more}>
       <span className="home-tool-icon">{more ? <Minus size={22} strokeWidth={1.6} /> : <Plus size={22} strokeWidth={1.6} />}</span>
-      <span className="home-tool-label">{more ? '− Less' : '+ More'}</span>
+      <span className="home-tool-label">{more ? 'Less' : 'More'}</span>
     </button>
   </div>;
 }

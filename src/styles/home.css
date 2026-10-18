@@ -24,7 +24,8 @@
 .home-app-count { position: absolute; top: var(--sp-3); right: var(--sp-4); font-size: var(--fs-s); color: var(--text-4); }
 
 /* Tools: 58 px circles; the expanded row grows downward. */
-.home-tools { display: flex; flex-wrap: wrap; gap: var(--sp-3) var(--sp-4); }
+.home-tools { display: flex; flex-wrap: nowrap; gap: var(--sp-3) var(--sp-4); overflow: hidden; }
+.home-tools.is-expanded { flex-wrap: wrap; overflow: visible; }
 .home-tool { display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); width: 88px; color: var(--text-2); }
 .home-tool-icon { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); transition: background .12s, border-color .12s, color .12s; }
 .home-tool:hover .home-tool-icon { border-color: var(--border-strong); background: var(--surface-2); color: var(--text); }
