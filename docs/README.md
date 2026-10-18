@@ -135,7 +135,7 @@
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
 - [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
 - [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas, decisiones, commits, fallos de verificación, arreglos y la guarda de esquema.
-- [043-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/043-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
+- [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
 
 ## Trazabilidad
 
