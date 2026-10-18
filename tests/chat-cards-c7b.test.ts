@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 vi.mock('../src/lib/idb', () => ({
@@ -37,6 +37,8 @@ beforeEach(() => {
   sent.messages.length = 0;
   sent.ensured.length = 0;
 });
+// Unmount between tests: a card left mounted would re-render outside act() when the next test sets the store.
+afterEach(async () => { await act(async () => { root.unmount(); }); host.remove(); });
 const mount = async (el: ReturnType<typeof createElement>) => { await act(async () => { root.render(el); }); };
 const click = async (el: Element | null) => { await act(async () => { (el as HTMLElement).click(); }); };
 const type = async (el: HTMLTextAreaElement | HTMLInputElement, value: string) => {
@@ -180,7 +182,7 @@ describe('C7b collapsed variation preview', () => {
 });
 
 describe('C7b plan card (running)', () => {
-  const gen = (assetIds: string[]): Generation => ({ id: 'g1', sessionId: 's', kind: 'image', status: 'running', assetIds, actualUsd: 0.041, settings: { count: 2, advanced: {} } } as unknown as Generation);
+  const gen = (assetIds: string[], actualUsd?: number): Generation => ({ id: 'g1', sessionId: 's', kind: 'image', status: 'running', assetIds, ...(actualUsd != null ? { actualUsd } : {}), settings: { count: 2, advanced: {} } } as unknown as Generation);
   it('counts results ("1 of 2"), one row per result with the live thumbnail, and a progress footer with Cancel', async () => {
     setup();
     useStore.setState({ assets: { a1: asset('a1'), r1: asset('r1') }, generations: { g1: gen(['a1']) } });
@@ -196,12 +198,25 @@ describe('C7b plan card (running)', () => {
     expect(rows[1].textContent).toContain('done');
     expect(rows[2].querySelector('[data-pending]')).not.toBeNull();
     expect(rows[2].textContent).toContain('generating');
-    expect(host.querySelector('.plan-progress')?.textContent).toMatch(/^1 of 2 · spent \$0\.04/);
+    // A multi-output generation stores its cost only at the end: while it runs, the spend is unknown, never "$0".
+    expect(host.querySelector('.plan-progress')?.textContent).toBe('1 of 2');
     expect([...host.querySelectorAll('.plan-foot button')].map((b) => b.textContent)).toEqual(['Cancel']);
     // The second result arrives: its placeholder turns into the image live.
     await act(async () => { useStore.setState({ assets: { a1: asset('a1'), a2: asset('a2'), r1: asset('r1') }, generations: { g1: gen(['a1', 'a2']) } }); });
     expect(host.querySelector('.cc-run')?.textContent).toBe('2 of 2');
     expect(host.querySelectorAll('.cc-result [data-pending]')).toHaveLength(0);
+  });
+
+  it('spent shows only known costs: "at least" when another generation is still running without a cost, exact once all are known', async () => {
+    setup();
+    const second = { ...gen(['b1']), id: 'g2', status: 'done', actualUsd: 0.04 } as unknown as Generation;
+    useStore.setState({ assets: { a1: asset('a1'), b1: asset('b1') }, generations: { g1: gen(['a1']), g2: second } });
+    const item = plan({ variations: undefined, settings: { aspect: '3:4', count: 1, advanced: {} } }, 'running', { stepStates: { s1: 'running', s2: 'done' }, stepGenerations: { s1: 'g1', s2: 'g2' } });
+    await mount(createElement(PlanCard, { item, sessionId: sid() }));
+    expect(host.querySelector('.plan-progress')?.textContent).toMatch(/spent ≥\$0\.04/);
+    await act(async () => { useStore.setState({ generations: { g1: gen(['a1'], 0.041), g2: second } }); });
+    expect(host.querySelector('.plan-progress')?.textContent).toMatch(/spent \$0\.08/);
+    expect(host.querySelector('.plan-progress')?.textContent).not.toContain('≥');
   });
 });
 
