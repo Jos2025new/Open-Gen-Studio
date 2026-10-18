@@ -9,3 +9,5 @@
 .topbar-home { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; color: var(--text-3); }
 .topbar-home:hover { color: var(--text); background: var(--surface-2); }
 .topbar-home:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+/* On Home the top bar takes the Home page's background, so the two read as one surface; its bottom border stays as it is. */
+.topbar.is-home { background: var(--bg-canvas); }

@@ -62,7 +62,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   };
 
   return (
-    <header className="topbar">
+    <header className={`topbar ${home ? 'is-home' : ''}`}>
       <div className="topbar-left">
         {!home && <>
         <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
