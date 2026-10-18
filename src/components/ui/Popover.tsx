@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom';
  * flipping above when needed. Other panels retain their explicit placement.
  */
 
-export type Placement = 'top-start' | 'bottom-start' | 'bottom-center' | 'right-start' | 'right-end';
+export type Placement = 'top-start' | 'top-center' | 'bottom-start' | 'bottom-center' | 'right-start' | 'right-end';
 
 const GAP = 8;
 const MARGIN = 8;
@@ -52,7 +52,7 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.bottom = Math.max(MARGIN, vh - r.bottom);
       next.maxHeight = r.bottom - MARGIN;
     } else {
-      const left = placement === 'bottom-center' ? r.left + (r.width - w) / 2 : r.right - w;
+      const left = placement === 'bottom-center' || placement === 'top-center' ? r.left + (r.width - w) / 2 : r.right - w;
       next.left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;

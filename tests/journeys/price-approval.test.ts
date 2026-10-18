@@ -189,7 +189,7 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     useStore.setState(s => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [TEXT]: imageModel(TEXT, true, 0.4) } } }));
     expect(run.item?.estimate.usd).toBe(0.2);
     const html = renderToStaticMarkup(createElement(PlanCard, { item: run.item!, sessionId: run.sessionId }));
-    expect(html).toContain('Run · $0.4</button>');
+    expect(html).toContain('cc-ap-cost num">$0.4</span></button>');
     await approvePlan(run.sessionId, run.item!.id);
     expect(lastJourneyTrace().find(e => e.event === 'plan.approved')?.prices).toMatchObject({ storedEstimateUsd: 0.2, liveEstimateUsd: 0.4, acceptedEstimateUsd: 0.4 });
   });

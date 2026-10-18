@@ -14,6 +14,7 @@ import './styles/ui.css';
 import './styles/shell.css';
 import './styles/composer.css';
 import './styles/chat.css';
+import './styles/chat-cards.css';
 import './styles/node.css';
 import './styles/designer.css';
 import './styles/prompt-box.css';

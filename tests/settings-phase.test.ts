@@ -192,15 +192,16 @@ describe('the settings card renders', () => {
       sessionId: useStore.getState().activeSessionId,
       item: { id: 'x', createdAt: 0, workspace: 'chat', type: 'settings', summary: '3 clips', sections: [{ kind: 'image', count: 2, recommended: { modelRef: LOCAL_IMAGE_REF, needsImage: false }, alternatives: [] }, { kind: 'video', count: 3, recommended: { modelRef: LOCAL_VIDEO_REF, duration: 5, needsImage: false }, alternatives: [LOCAL_IMAGE_REF] }], status: 'pending' },
     }))).replace(/<!-- -->/g, '');
-    expect(html).toContain('Settings · before the plan is written');
-    expect(html).toContain('recommended');
-    expect(html).toContain('Show 1 other model');
+    expect(html).toContain('Confirm settings');
+    expect(html).not.toContain('before the plan is written');
+    // The models list lives in the model chip's popover (opened in chat-cards-c5.test.ts); the chip names the chosen one.
+    expect(html).toContain('aria-label="Model"');
     expect(html).toContain('The exact cost is shown with the plan');
-    expect(html).toContain('from ');
     expect(html).toContain('3 clips');
     // Images before video, each in its own section.
     expect(html.indexOf('Images · 2')).toBeGreaterThan(-1);
     expect(html.indexOf('Images · 2')).toBeLessThan(html.indexOf('Video · 3 clips'));
+    expect(html).toContain('1 image');
   });
 });
 

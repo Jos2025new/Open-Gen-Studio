@@ -1,6 +1,6 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, Zap, ArrowRight, UserRound, Palette, Pencil } from 'lucide-react';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, Palette, Pencil } from 'lucide-react';
 import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
@@ -8,12 +8,14 @@ import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
 import { needsSpendCheck } from '../../engine/pricing';
 import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../../engine/budget';
-import type { PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
+import type { Estimate, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
-import { AssetMedia } from '../ui/AssetMedia';
 import { PlanRecoveryChips } from './RecoveryActions';
-import { Button, CostTag, costLabel } from '../ui/primitives';
+import { Button, costLabel } from '../ui/primitives';
+import { AspectShape } from './aspectShape';
+import { CardIcon, SparkIcon } from './cardIcons';
+import { StepThumb } from './StepThumb';
 
 function stepIcon(s: PlanStep) {
   switch (s.kind) {
@@ -87,6 +89,32 @@ function StateIcon({ state }: { state: StepState }) {
   return <span className="state-dot" />;
 }
 
+/** Steps that make media get thumbnails (the app's pending placeholder until the result arrives); text and layers keep their icon. */
+const thumbed = (s: PlanStep) => s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d' || s.kind === 'op';
+
+/** The estimate-versus-minimum distinction the label's symbol carries, said in words on the approve button. */
+function costTip(e: Estimate): string | undefined {
+  if (e.note) return e.note;
+  if (e.lowerBound) return 'Minimum: the final price can be higher.';
+  if (e.approximate) return 'Estimate: the final price may differ.';
+  return undefined;
+}
+
+/** "model · shape ratio · rest": the aspect ratio drawn at its real proportion, tight to its label. */
+function DetailLine({ step, detail }: { step: PlanStep; detail: string }) {
+  const aspect = step.kind === 'image' || step.kind === 'video' ? step.settings.aspect : undefined;
+  const parts = detail.split(' · ');
+  let at = aspect ? parts.indexOf(aspectLabel(aspect)) : -1;
+  if (aspect && at < 0 && step.kind === 'video') { parts.splice(1, 0, aspectLabel(aspect)); at = 1; }
+  return (
+    <span className="step-detail faint">
+      {parts.map((p, i) => (
+        <span key={i} className="cc-dpart">{i > 0 ? ' · ' : ''}{i === at && aspect ? <span className="cc-inline"><AspectShape value={aspect} max={12} />{p}</span> : p}</span>
+      ))}
+    </span>
+  );
+}
+
 const WS_NAMES = { chat: 'Chat', node: 'Node', designer: 'Designer' } as const;
 
 export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: string }) {
@@ -95,7 +123,6 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const composer = useStore(s => s.composer);
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
-  const generations = useStore((s) => s.generations);
   const assets = useStore((s) => s.assets);
   useStore((s) => s.spentUsd);
   useStore((s) => s.settings);
@@ -147,21 +174,20 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
 
   return (
     <article className={`plan-card status-${item.status}`}>
-      <header className="plan-head">
-        <div>
-          <div className="plan-kicker">
-            Plan · {WS_NAMES[plan.workspace]} · {item.style === 'auto' ? 'Auto' : 'Guided'}{item.revised ? ' · Revised' : ''}{revising ? ' · Revising…' : ''}
+      <header className="plan-head cc-head">
+        <div className="cc-head-main">
+          <div className="cc-headline">
+            <CardIcon />
+            <h4 className="plan-title cc-title">{plan.title}</h4>
+            {item.revised || revising ? <span className="cc-state faint">{revising ? 'Revising…' : 'Revised'}</span> : null}
           </div>
-          <h4 className="plan-title">{plan.title}</h4>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
           {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
-        <CostTag estimate={total} />
       </header>
       <ol className="plan-steps">
         {plan.steps.map((s) => {
           const genId = item.stepGenerations[s.id];
-          const gen = genId ? generations[genId] : undefined;
           const state = item.stepStates[s.id] ?? 'pending';
           const script = stepScript(s);
           const detail = stepDetail(s, name, refName, live?.authorizations[s.id] ?? item.stepAuthorizations?.[s.id]);
@@ -171,28 +197,21 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               {selectable ? (
                 <input type="checkbox" className="step-check" checked={!off.has(s.id)} onChange={() => toggle(s.id)} aria-label={`Run ${s.id} · ${s.title}`} />
               ) : null}
-              <span className="step-id num">{s.id.replace(/^pln_[A-Za-z0-9]+_/, "")}</span>
-              <span className={`kind-icon k-${s.kind === 'op' ? OPS[s.op].output : s.kind}`}>{stepIcon(s)}</span>
-              {script ? (
-                <button type="button" className="step-text step-toggle" onClick={() => flip(s.id)} aria-expanded={shown}>
-                  <span className="step-title">
-                    {shown ? <ChevronDown size={12} /> : <ChevronRight size={12} />} {s.title}
-                  </span>
-                  <span className="step-detail faint">{detail}</span>
-                </button>
+              {thumbed(s) ? (
+                <StepThumb genId={genId} count={s.kind === 'image' ? s.settings.count : 1} />
               ) : (
-                <span className="step-text">
-                  <span className="step-title">{s.title}</span>
-                  <span className="step-detail faint">{detail}</span>
-                </span>
+                <span className={`kind-icon k-${s.kind}`}>{stepIcon(s)}</span>
               )}
+              <span className="step-text">
+                <span className="step-title" title={s.id.replace(/^pln_[A-Za-z0-9]+_/, '')}>{s.title}</span>
+                <DetailLine step={s} detail={detail} />
+              </span>
               {awaiting && (s.kind === 'image' || s.kind === 'video' || s.kind === 'audio' || s.kind === 'model3d') ? <SuggestChange label={`"${s.title}"`} /> : null}
-              {gen?.assetIds.length ? (
-                <button type="button" className="step-thumb" onClick={() => setUi({ lightbox: { assetIds: gen.assetIds, index: 0 } })} aria-label="Open result">
-                  <AssetMedia assetId={gen.assetIds[0]} hoverPlay={false} draggable={false} />
+              {plan.steps.length > 1 && perStep && perStep[s.id] && (perStep[s.id].usd ?? 1) > 0 ? <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span> : null}
+              {script ? (
+                <button type="button" className="cc-step-chev" onClick={() => flip(s.id)} aria-expanded={shown} aria-label={`${shown ? 'Hide' : 'Show'} the prompt of ${s.title}`}>
+                  {shown ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                 </button>
-              ) : perStep && perStep[s.id] && (perStep[s.id].usd ?? 1) > 0 ? (
-                <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span>
               ) : null}
               <StateIcon state={state} />
               {script && shown ? <p className="step-script">{script}</p> : null}
@@ -247,15 +266,15 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             </Button>
             <Button
               variant="primary"
-              icon={Zap}
+              className="cc-approve"
               disabled={revising || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
                 if (over) acceptOverLimit();
                 void approvePlan(sessionId, item.id);
               }}
-              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : undefined}
+              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : costTip(total)}
             >
-              {free ? 'Run' : `${over ? 'Run anyway' : 'Run'} · ${costLabel(total, { short: true })}`}
+              {free ? 'Approve' : <>{over ? 'Approve anyway' : 'Approve'}<span className="cc-ap-sep" aria-hidden>|</span><SparkIcon /><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
             </Button>
           </>
         ) : item.status === 'running' ? (

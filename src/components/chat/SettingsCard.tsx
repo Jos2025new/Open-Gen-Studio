@@ -11,8 +11,11 @@ import { Button, Range } from '../ui/primitives';
 import { DRAFT, HQ, lowestResolution, type DraftMode } from '../../engine/agent/draftFirst';
 import { ensureSchema } from '../../engine/catalog';
 import { variantRoute } from '../../engine/variants';
-import { AspectGlyph } from '../composer/MediaControls';
 import { EditAnswerButton } from './EditAnswerButton';
+import { AspectPicker, AspectShape } from './aspectShape';
+import { CardIcon, CountIcon, DurationIcon, ModelIcon, ResolutionIcon } from './cardIcons';
+import { ChipPop } from './ChipPop';
+import { ClampedText } from './ClampedText';
 
 /**
  * Phase 2: the model and its main values, preselected by the app, confirmed before the agent writes any prompt.
@@ -42,9 +45,9 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     );
   }
   return (
-    <article className="q-card set-card">
-      <div className="q-kicker">Settings · before the plan is written</div>
-      {item.summary ? <p className="q-intro">{item.summary}</p> : null}
+    <article className="q-card set-card cc-card">
+      <header className="cc-head"><CardIcon /><h4 className="cc-title">Confirm settings</h4></header>
+      {item.summary ? <ClampedText text={item.summary} /> : null}
       {item.draft ? <DraftChoice item={item} sessionId={sessionId} /> : null}
       {sections.map((x, i) => (
         <div key={`${x.kind}-${i}`} className={titled ? 'set-section' : undefined}>
@@ -151,53 +154,19 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
       );
     });
 
+  const aspectValues = px ? px.ratios : opts.aspects;
+  const aspectNow = px ? pxNow?.ratio : choice.aspect;
+  const pickAspect = (v: string) => update({ ...choice, aspect: px ? px.pick(pxNow?.tier, v) : v });
+  const resNow = opts.resolutions.length ? choice.resolution : pxNow?.tier;
+  const resShown = opts.resolutions.length > 0 || Boolean(px && px.tiers.length > 1);
+  const count = choice.count ?? 1;
+  const first = item.recommended.modelRef;
+
   return (
-    <>
-      {item.kind === 'video' && allSecs.length ? (
-        <div className="q-block">
-          <div className="q-question">Duration{item.count > 1 ? ' per clip' : ''}</div>
-          <StepSlider values={allSecs} value={choice.duration ?? allSecs[0]} unit="s" label="Duration" onChange={(n) => update({ ...choice, duration: n })} />
-        </div>
-      ) : null}
-
-      {item.kind === 'image' ? (
-        <div className="q-block">
-          <div className="q-question">Images per step</div>
-          <StepSlider values={IMAGE_COUNTS} value={choice.count ?? 1} label="Images per step" onChange={(n) => update({ ...choice, count: n })} />
-        </div>
-      ) : null}
-
-      {opts.resolutions.length ? (
-        <div className="q-block">
-          <div className="q-question">Resolution
-            {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => unlockDraft(sessionId, itemId)}><Lock size={12} /></button>
-              : draft?.unlocked && item.kind === 'video' ? <LockOpen size={12} className="faint" aria-label="Resolución desbloqueada" /> : null}
-          </div>
-          <div className="q-options">{chips(opts.resolutions, choice.resolution, (v) => v, (v) => { if (!locked) update({ ...choice, resolution: v }); })}</div>
-        </div>
-      ) : px && px.tiers.length > 1 ? (
-        <div className="q-block">
-          <div className="q-question">Resolution</div>
-          <div className="q-options">{chips(px.tiers, pxNow?.tier, (v) => v, (t) => update({ ...choice, aspect: px.pick(t, pxNow?.ratio) }))}</div>
-        </div>
-      ) : null}
-
-      {opts.aspects.length ? (
-        <div className="q-block">
-          <div className="q-question">Aspect ratio</div>
-          <div className="q-options">
-            {item.recommended.needsImage ? chips<string>(['__image'], choice.aspect ?? '__image', () => 'Like the image', () => update({ ...choice, aspect: undefined })) : null}
-            {px
-              ? chips(px.ratios, pxNow?.ratio, (r) => r, (r) => update({ ...choice, aspect: px.pick(pxNow?.tier, r) }), (r) => <AspectGlyph value={r} />)
-              : chips(opts.aspects, choice.aspect, (v) => aspectLabel(v), (v) => update({ ...choice, aspect: v }), (v) => <AspectGlyph value={v} />)}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="q-block">
-        <div className="q-question">Model</div>
+    <div className="cc-chips">
+      <ChipPop icon={<ModelIcon />} label={name(choice.modelRef)} tip="Model" width={480}>
         <div className="set-models">
-          {modelRow(item.recommended.modelRef, [item.recommended.needsImage && models[item.recommended.modelRef] && ['edit', 'image', 'reference'].includes(variantRoute(models[item.recommended.modelRef])) ? variantRoute(models[item.recommended.modelRef]) : '', 'recommended'].filter(Boolean).join(' · '))}
+          {modelRow(first, [item.recommended.needsImage && models[first] && ['edit', 'image', 'reference'].includes(variantRoute(models[first])) ? variantRoute(models[first]) : '', 'recommended'].filter(Boolean).join(' · '))}
           {item.alternatives.length ? (
             <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
               {moreOpen ? 'Hide other models' : `Show ${item.alternatives.length} other model${item.alternatives.length === 1 ? '' : 's'}`} <ChevronDown size={13} className={moreOpen ? 'is-flipped' : ''} />
@@ -205,9 +174,54 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
           ) : null}
           {moreOpen ? [...item.alternatives].sort((a, b) => usdOf(a) - usdOf(b)).map((ref) => modelRow(ref)) : null}
         </div>
-      </div>
+      </ChipPop>
 
-    </>
+      {opts.aspects.length || px ? (
+        <ChipPop
+          icon={aspectNow ? <AspectShape value={aspectNow} /> : null}
+          label={aspectNow ? aspectLabel(aspectNow) : item.recommended.needsImage ? 'Like the image' : 'Auto'}
+          tip="Aspect ratio"
+          width={460}
+        >
+          <AspectPicker
+            values={aspectValues}
+            value={aspectNow}
+            onPick={pickAspect}
+            extra={item.recommended.needsImage ? (
+              <button type="button" className={`q-opt cc-like ${choice.aspect == null ? 'is-on' : ''}`} aria-pressed={choice.aspect == null} onClick={() => update({ ...choice, aspect: undefined })}>Like the image</button>
+            ) : null}
+          />
+        </ChipPop>
+      ) : null}
+
+      {resShown ? (
+        <ChipPop icon={<ResolutionIcon />} label={locked ? <>{resNow ?? 'Auto'}<Lock size={11} aria-label="Locked by the draft" /></> : resNow ?? 'Auto'} tip="Resolution">
+          <div className="q-question">Resolution
+            {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => unlockDraft(sessionId, itemId)}><Lock size={12} /></button>
+              : draft?.unlocked && item.kind === 'video' ? <LockOpen size={12} className="faint" aria-label="Resolución desbloqueada" /> : null}
+          </div>
+          <div className="q-options">
+            {opts.resolutions.length
+              ? chips(opts.resolutions, choice.resolution, (v) => v, (v) => { if (!locked) update({ ...choice, resolution: v }); })
+              : chips(px!.tiers, pxNow?.tier, (v) => v, (t) => update({ ...choice, aspect: px!.pick(t, pxNow?.ratio) }))}
+          </div>
+        </ChipPop>
+      ) : null}
+
+      {item.kind === 'image' ? (
+        <ChipPop icon={<CountIcon />} label={`${count} image${count === 1 ? '' : 's'}`} tip="Images per step">
+          <div className="q-question">Images per step</div>
+          <StepSlider values={IMAGE_COUNTS} value={count} label="Images per step" onChange={(n) => update({ ...choice, count: n })} />
+        </ChipPop>
+      ) : null}
+
+      {item.kind === 'video' && allSecs.length ? (
+        <ChipPop icon={<DurationIcon />} label={`${choice.duration ?? allSecs[0]}s`} tip={`Duration${item.count > 1 ? ' per clip' : ''}`}>
+          <div className="q-question">Duration{item.count > 1 ? ' per clip' : ''}</div>
+          <StepSlider values={allSecs} value={choice.duration ?? allSecs[0]} unit="s" label="Duration" onChange={(n) => update({ ...choice, duration: n })} />
+        </ChipPop>
+      ) : null}
+    </div>
   );
 }
 

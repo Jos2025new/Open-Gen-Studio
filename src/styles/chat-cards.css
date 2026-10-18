@@ -1,0 +1,65 @@
+/* C5: the settings and plan-approval cards as one rounded container, chip row, shape glyphs, thumbnails, one cost on the primary button. */
+.cc-card, .plan-card { background: var(--surface-2); padding: 20px 18px 14px; }
+.plan-card .plan-head { padding: 0; border: 0; }
+.cc-headline { display: flex; align-items: center; gap: 10px; }
+.cc-headline > svg, .cc-head > svg { color: var(--text-3); flex: none; }
+.cc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.cc-title, .plan-card .plan-title { font: 600 16px/1.3 var(--font-head); margin: 0; }
+.cc-state { font-size: var(--fs-xs); }
+.plan-card .plan-summary { margin: 8px 0 0 30px; }
+
+.cc-prompt { margin: 0 0 6px; }
+.cc-prompt-text { margin: 0; color: var(--text-2); font-size: 14px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
+.cc-prompt-text.is-clamped { display: -webkit-box; -webkit-line-clamp: var(--lines, 3); -webkit-box-orient: vertical; overflow: hidden; }
+.cc-prompt-more { margin-top: 4px; font-size: var(--fs-s); color: var(--text-3); padding: 2px 0; }
+.cc-prompt-more:hover { color: var(--text); }
+
+.cc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 6px; }
+.cc-chip { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; background: var(--surface); color: var(--text-2); padding: 8px 12px; border-radius: 10px; font-size: var(--fs-m); font-weight: 500; }
+.cc-chip > svg { color: var(--text-3); flex: none; }
+.cc-chip:hover { color: var(--text); background: var(--surface-hover); }
+.cc-chip.is-open { background: var(--surface-3); color: var(--text); box-shadow: inset 0 -2px 0 var(--accent); }
+.cc-chip-label { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cc-chip-chev { opacity: .55; }
+.cc-shape { display: inline-block; flex: none; box-sizing: border-box; border: 1.5px solid currentColor; border-radius: 2.5px; color: var(--text-3); vertical-align: middle; }
+.cc-shape.is-auto { border-style: dashed; }
+.cc-chip.is-open .cc-shape { color: var(--text-2); }
+.cc-inline { display: inline-flex; align-items: center; gap: 4px; vertical-align: middle; }
+
+.cc-pop { background: var(--surface-3); border-radius: 16px; padding: 14px; box-shadow: var(--shadow-pop); }
+.cc-cap { font-size: var(--fs-s); color: var(--text-3); margin-bottom: 10px; }
+.cc-ratios { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.cc-ratios-more { margin-top: 8px; }
+.cc-ratio { height: 64px; border-radius: 12px; background: var(--surface-2); color: var(--text-3); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: var(--fs-s); font-weight: 500; }
+.cc-ratio:hover { color: var(--text); }
+.cc-ratio-box { display: grid; place-items: center; width: 28px; height: 28px; }
+.cc-ratio.is-on { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.cc-ratio.is-on .cc-shape { color: var(--accent-ink); }
+.cc-more { border: 1px dashed var(--text-4); background: none; flex-direction: row; gap: 4px; }
+.cc-like { margin-top: 10px; }
+
+.plan-card .plan-steps { list-style: none; margin: 14px 0 0; padding: 0; }
+.plan-card .plan-step { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 12px 4px; border-top: 1px solid var(--border); }
+.plan-card .plan-step .step-text { flex: 1; min-width: 0; font: inherit; }
+.plan-card .step-title { font-size: var(--fs-m); color: var(--text); overflow-wrap: anywhere; }
+.plan-card .step-detail { font-size: var(--fs-s); color: var(--text-4); margin-top: 1px; }
+.plan-card .step-cost { font-size: var(--fs-s); color: var(--text-3); white-space: nowrap; }
+.plan-card .kind-icon { width: 42px; height: 42px; display: grid; place-items: center; margin: 0; border-radius: 9px; background: var(--surface); flex: none; }
+.plan-card .step-script, .plan-card .step-variations { flex: 1 0 100%; margin: 0; padding-left: 56px; }
+.cc-step-chev { color: var(--text-4); width: 20px; height: 24px; display: grid; place-items: center; flex: none; }
+.cc-step-chev:hover { color: var(--text); }
+.cc-thumbs { display: inline-flex; align-items: center; flex: none; padding-right: 2px; }
+.cc-thumbs .cc-thumb { position: relative; display: block; width: 42px; height: 42px; min-height: 0; max-height: 42px; aspect-ratio: auto; flex: none; overflow: hidden; border-radius: 9px; border: 2px solid var(--surface-2); background: var(--surface); padding: 0; }
+.cc-thumb .media { width: 100%; height: 100%; object-fit: cover; }
+.cc-thumb .shimmer { position: absolute; inset: 0; }
+.cc-thumb.is-failed .shimmer { animation: none; opacity: .4; }
+.cc-thumb-more { margin-left: 6px; font-size: var(--fs-xs); }
+
+.plan-card .plan-foot, .cc-card .q-foot { display: flex; align-items: center; gap: 6px; margin-top: 14px; padding: 8px 8px 8px 18px; background: var(--bg); border-radius: 20px; border: 0; }
+.plan-card .plan-budget { margin-right: auto; font-size: var(--fs-s); color: var(--text-4); }
+.cc-card .set-total { color: var(--text-4); }
+.cc-approve { gap: 8px; border-radius: 12px; font-weight: 700; padding: 10px 16px; }
+.cc-ap-sep { opacity: .35; }
+.cc-ap-cost { font-weight: 700; }
+.cc-card .set-section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }
+.cc-card .set-section:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
