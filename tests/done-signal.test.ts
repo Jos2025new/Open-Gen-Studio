@@ -39,7 +39,7 @@ describe('done signal', () => {
   it('shows the result in the title while hidden and restores the original when visible', () => {
     hide(true);
     setGens(gen('a', 'done'));
-    expect(document.title).toBe('✓ Done · Open Gen Studio');
+    expect(document.title).toBe('(1) ✓ Done · Open Gen Studio');
     hide(false);
     expect(document.title).toBe('Open Gen Studio');
   });
@@ -47,7 +47,7 @@ describe('done signal', () => {
   it('a failure shows in the title', () => {
     hide(true);
     setGens(gen('a', 'error', { error: 'quota' }));
-    expect(document.title).toBe('! Failed · Open Gen Studio');
+    expect(document.title).toBe('(1) ! Failed · Open Gen Studio');
   });
 
   it('while running in the background the title counts them', () => {
@@ -79,12 +79,19 @@ describe('done signal', () => {
     expect(toasts().map((t) => [t.text, t.level])).toEqual([['Image failed · Model X · quota exceeded', 'error']]);
   });
 
-  it('the setting off leaves the title alone; the toast still shows', () => {
+  it('the setting off leaves the title alone and shows no toast', () => {
     setTabTitle(false);
     hide(true);
     setGens(gen('a', 'done', { startedAt: T0, finishedAt: T0 + 1000 }));
     expect(document.title).toBe('Open Gen Studio');
-    expect(toasts()).toHaveLength(1);
+    expect(toasts()).toHaveLength(0);
+  });
+
+  it('the title counts what finished while hidden', () => {
+    hide(true);
+    setGens(gen('a', 'running'), gen('b', 'running'));
+    setGens(gen('a', 'done'), gen('b', 'done'));
+    expect(document.title).toBe('(2) ✓ Done · Open Gen Studio');
   });
 
   it('generations restored at startup never announce, even when they finish later', () => {

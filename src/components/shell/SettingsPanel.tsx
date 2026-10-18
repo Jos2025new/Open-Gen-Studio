@@ -335,10 +335,10 @@ export function SettingsPanel() {
           />
         </div>
         <div className="set-row">
-          <span className="set-label" data-tip="While this tab is in the background, its title shows the result of a finished generation (or how many are running) until you come back. Finished generations always show a short notice.">
-            Tab title when done
+          <span className="set-label" data-tip="When a generation finishes, show a short notice. While this tab is in the background, its title also shows the result and how many finished until you come back.">
+            Notice when a generation finishes
           </span>
-          <Toggle checked={settings.notifications.tabTitle} onChange={(v) => setSettings({ notifications: { ...settings.notifications, tabTitle: v } })} label="Tab title when done" />
+          <Toggle checked={settings.notifications.tabTitle} onChange={(v) => setSettings({ notifications: { ...settings.notifications, tabTitle: v } })} label="Notice when a generation finishes" />
         </div>
         {REMOTE_PROVIDERS.map((p) => (
           <ProviderRow key={p} id={p} />

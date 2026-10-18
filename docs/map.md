@@ -34,7 +34,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [actions.ts](../src/engine/actions.ts) | 27 | 16 |
 | [format.ts](../src/lib/format.ts) | 27 | 1 |
 | [id.ts](../src/lib/id.ts) | 26 | 0 |
-| [types.ts](../src/engine/providers/types.ts) | 25 | 6 |
+| [types.ts](../src/engine/providers/types.ts) | 24 | 6 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |

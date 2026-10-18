@@ -1774,7 +1774,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           }
           patchAgent(sessionId, { phase: 'checking' });
           const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });
-          const presented = await checkingPlan(sessionId, signal, (label) => log.action({ icon: 'fix', label }), () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal), waits);
+          const presented = await checkingPlan(sessionId, signal, () => presentPlan(sessionId, workspace, toRawPlan(v.data), call.id, v.data.revision === true, clock.elapsed(), signal), waits);
           if (presented.settingsNeeded) {
             // Same as a blocked plan: what the agent wrote before it is dropped; the user sees no card.
             if (textItemId) removeFeedItem(sessionId, textItemId);

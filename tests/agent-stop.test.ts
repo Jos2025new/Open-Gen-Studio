@@ -116,14 +116,11 @@ describe('Stop frees a turn stuck in "Checking the plan…"', () => {
     expect(sess().feed.some((f) => f.type === 'plan')).toBe(false);
   });
 
-  it('(d) after about 3 s the activity block says what the check waits for', async () => {
+  it('(d) while the check waits for a schema, the activity block names the model', async () => {
     vi.useFakeTimers();
     const turn = sendAgentMessage('switch to the new model');
-    await vi.advanceTimersByTimeAsync(1000);
-    const labels = () => sess().feed.flatMap((f) => (f.type === 'activity' ? f.entries.flatMap((e) => (e.kind === 'action' ? [e.label] : [])) : []));
-    expect(labels().some((l) => /Waiting/.test(l))).toBe(false);
-    await vi.advanceTimersByTimeAsync(3000);
-    expect(labels()).toContain('Waiting for Atlas Cloud to send the parameters of Grok Imagine Video 1.5 Lite…');
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(sess().agent.waiting?.some((w) => /Grok Imagine Video 1.5 Lite/.test(w.name))).toBe(true);
     stopAgent();
     await turn;
   });

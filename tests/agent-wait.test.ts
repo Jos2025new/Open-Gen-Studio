@@ -59,7 +59,7 @@ describe('the waiting state around a schema load', () => {
     let finish!: (v: unknown) => void;
     const lookup = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
     const ctrl = new AbortController();
-    const turn = checkingPlan('w1', ctrl.signal, () => undefined, async () => watchModel('w1', lookup as never)(REF), hooks);
+    const turn = checkingPlan('w1', ctrl.signal, async () => watchModel('w1', lookup as never)(REF), hooks);
 
     expect(state.waiting).toHaveLength(1);
     expect(state.waiting?.[0]).toMatchObject({ key: REF, name: 'grok-video' });
@@ -75,7 +75,7 @@ describe('the waiting state around a schema load', () => {
   it('a schema that comes back derived is reported as unavailable and is not a sample', async () => {
     const { state, actions, hooks } = harness();
     const ctrl = new AbortController();
-    const turn = checkingPlan('w2', ctrl.signal, () => undefined, async () => watchModel('w2', async () => ({ model: { name: 'Grok' } as never, schema: { source: 'derived' } as never }))(REF), hooks);
+    const turn = checkingPlan('w2', ctrl.signal, async () => watchModel('w2', async () => ({ model: { name: 'Grok' } as never, schema: { source: 'derived' } as never }))(REF), hooks);
     await turn;
     expect(state.waiting).toEqual([]);
     expect(actions.map((a) => a.label)).toEqual(['Schema unavailable']);
@@ -87,7 +87,7 @@ describe('the waiting state around a schema load', () => {
     useStore.setState((s) => ({ catalog: { ...s.catalog, schemas: { [REF]: { source: 'nanogpt' } as never } } }) as never);
     const { state, actions, hooks } = harness();
     const ctrl = new AbortController();
-    await checkingPlan('w3', ctrl.signal, () => undefined, async () => watchModel('w3', async () => ({ model: { name: 'Grok' } as never, schema: { source: 'nanogpt' } as never }))(REF), hooks);
+    await checkingPlan('w3', ctrl.signal, async () => watchModel('w3', async () => ({ model: { name: 'Grok' } as never, schema: { source: 'nanogpt' } as never }))(REF), hooks);
     expect(state.waiting).toBeUndefined();
     expect(actions).toEqual([]);
   });
@@ -97,7 +97,7 @@ describe('the waiting state around a schema load', () => {
     let finish!: (v: unknown) => void;
     const lookup = () => new Promise((resolve) => { finish = resolve; });
     const ctrl = new AbortController();
-    const turn = checkingPlan('w4', ctrl.signal, () => undefined, async () => watchModel('w4', lookup as never)(REF), hooks);
+    const turn = checkingPlan('w4', ctrl.signal, async () => watchModel('w4', lookup as never)(REF), hooks);
     ctrl.abort();
     await expect(turn).rejects.toThrow();
     finish({ model: { name: 'Grok' }, schema: { source: 'loaded' } });

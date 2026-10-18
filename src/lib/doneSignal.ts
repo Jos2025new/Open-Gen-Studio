@@ -24,7 +24,7 @@ export function failedText(g: Generation): string {
  * Tells the user a generation finished while they are elsewhere. Only live transitions count: a generation restored at
  * startup, or one that was discarded with its session, never does. While the tab is hidden the title shows the result
  * ("✓ Done · Open Gen Studio", "! Failed · …") or how many are running, and the original title returns when the tab
- * is visible again. Each finish also shows a toast. Nothing is polled; it only watches the store.
+ * is visible again. Each finish also shows a toast. One setting (Settings → Notifications) turns both off. Nothing is polled; it only watches the store.
  */
 export function installDoneSignal(): () => void {
   let prev: Map<string, GenerationStatus> | null = null;
@@ -32,10 +32,12 @@ export function installDoneSignal(): () => void {
   let startup = new Set<string>();
   let original: string | null = null;
   let result: 'done' | 'failed' | null = null;
+  /** How many finished while the tab was hidden (the old "(N)" counter). */
+  let finished = 0;
 
   const titleFor = (): string | null => {
     if (!document.hidden || !useStore.getState().settings.notifications?.tabTitle) return null;
-    if (result) return result === 'done' ? `✓ Done · ${APP}` : `! Failed · ${APP}`;
+    if (result) return `(${finished}) ${result === 'done' ? '✓ Done' : '! Failed'} · ${APP}`;
     const running = Object.values(useStore.getState().generations).filter((g) => ACTIVE.has(g.status) && !g.discard).length;
     return running ? `${APP} · ${running} running` : null;
   };
@@ -50,7 +52,7 @@ export function installDoneSignal(): () => void {
     }
   };
   const onVisibility = () => {
-    if (!document.hidden) result = null;
+    if (!document.hidden) { result = null; finished = 0; }
     applyTitle();
   };
   const snapshot = () => {
@@ -76,11 +78,13 @@ export function installDoneSignal(): () => void {
       prev.set(g.id, g.status);
       if (startup.has(g.id) || g.discard || !before || !ACTIVE.has(before) || !FINISHED.has(g.status)) continue;
       finishedNow = true;
-      if (g.status === 'error') { failed = true; toast(failedText(g), 'error'); } else toast(doneText(g), 'success');
+      finished++;
+      if (g.status === 'error') failed = true;
+      if (s.settings.notifications?.tabTitle) toast(g.status === 'error' ? failedText(g) : doneText(g), g.status === 'error' ? 'error' : 'success');
     }
     // Only a finish that happens while the tab is hidden is shown in its title; it stays until the tab is visible.
     if (finishedNow && document.hidden) result = failed ? 'failed' : 'done';
     applyTitle();
   });
-  return () => { unsub(); document.removeEventListener('visibilitychange', onVisibility); if (original != null) document.title = original; original = null; result = null; };
+  return () => { unsub(); document.removeEventListener('visibilitychange', onVisibility); if (original != null) document.title = original; original = null; result = null; finished = 0; };
 }
