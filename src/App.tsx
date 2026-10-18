@@ -22,6 +22,8 @@ import { StudioBoard } from './components/studio/StudioBoard';
 import { useStudioBoard } from './lib/studioBoard';
 import { CreateSpace } from './components/space/CreateSpace';
 import { TraceControl } from './components/shell/TraceControl';
+import { WriterLockPanel } from './components/shell/WriterLockPanel';
+import './store/writerHandoff';
 
 export function App() {
   const hydrated = useStore((s) => s.hydrated);
@@ -50,12 +52,13 @@ export function App() {
     // Disk copy: bring older blobs over, and ask the browser not to evict its own copy under storage pressure.
     void syncBlobsToDisk();
     void navigator.storage?.persist?.().catch(() => false);
-  }, [hydrated]);
+  }, [hydrated]); // hydrated is true only after this tab took the writer lock (store.ts), so none of this runs without it
 
   if (!hydrated) {
     return (
       <div className="boot">
         <div className="boot-mark" />
+        <WriterLockPanel />
       </div>
     );
   }
@@ -80,6 +83,7 @@ export function App() {
         <TraceControl />
         <Toasts />
         <TooltipLayer />
+        <WriterLockPanel />
       </div>
     </TopbarSlotContext.Provider>
   );

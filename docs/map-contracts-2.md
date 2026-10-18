@@ -4,6 +4,7 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **spend-approval** — Todo plan con coste mayor que cero o desconocido espera aprobación, también en Auto. | [pricing.ts](../src/engine/pricing.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [engine.test.ts](../tests/engine.test.ts) |
 | **upscale-note** — El aviso de upscale se calcula del factor que se ejecuta; si no llega a lo pedido, la tarjeta lo muestra sin plegar. | [fit.ts](../src/engine/agent/fit.ts), [PlanCard.tsx](../src/components/chat/PlanCard.tsx) | [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |
 | **user-model-notes** — Los cambios sobre un modelo elegido por el usuario («your … model») se ven siempre en la tarjeta y como aviso. | [plan.ts](../src/engine/plan.ts), [PlanCard.tsx](../src/components/chat/PlanCard.tsx), [runtime.ts](../src/engine/agent/runtime.ts) | [routing.test.ts](../tests/routing.test.ts) |
 | **reference-sheet-subject** — Una hoja de referencia solo se rechaza si el lugar es su sujeto; la descripción de la operación dice lo mismo. | [fit.ts](../src/engine/agent/fit.ts), [ops.ts](../src/engine/ops.ts) | [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |

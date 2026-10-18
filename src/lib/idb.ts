@@ -2,6 +2,7 @@ import { clear, createStore, del, get, getMany, set, delMany, keys } from 'idb-k
 import { assembleText, splitText, type V2Parts } from '../store/formatV2';
 import { disk, diskAvailable, type DiskWriteResult } from './disk';
 import { guard, setProblem, sha256Hex, type Pending } from './saveGuard';
+import { holdsWriterLock } from './writerLock';
 import type { StateJson } from '../store/persistJson';
 
 /**
@@ -110,6 +111,7 @@ export const ALL_DB_NAMES = ['ogs-state', 'ogs-blobs', 'ogs-cache', 'ogs-store-v
  * idb-keyval handle) stays queued in the browser and runs when the connection closes, before the reloaded page can open it.
  */
 export function deleteDatabases(names: readonly string[]): Promise<void> {
+  if (!holdsWriterLock()) return Promise.resolve(); // only the tab that holds the writer lock changes storage (writerLock.ts)
   return Promise.all(names.map((name) => new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase(name);
     req.onsuccess = () => resolve();
@@ -123,6 +125,7 @@ export function deleteDatabases(names: readonly string[]): Promise<void> {
  * delete itself may stay blocked until the page reloads), then the databases are deleted.
  */
 export async function wipeLocalDatabases(): Promise<void> {
+  if (!holdsWriterLock()) return;
   await Promise.all([stateStore, blobStore, cacheStore, v2Store].map((store) => clear(store).catch(() => undefined)));
   await deleteDatabases(ALL_DB_NAMES);
 }
@@ -150,6 +153,7 @@ export const stateDb = {
    * is adopted (it becomes format 2 too); a newer local copy is pushed to the disk.
    */
   async get(key: string): Promise<string | undefined> {
+    if (!holdsWriterLock()) return undefined; // a tab without the lock loads nothing and adopts or pushes nothing
     const v2 = await readV2();
     const legacy = v2 ? undefined : await readLegacy(key);
     const onDisk = await disk.getState();
@@ -191,6 +195,7 @@ export const stateDb = {
    */
   async set(key: string, value: string | StateJson, opts: { keep?: string } = {}): Promise<DiskWriteResult> {
     if (guard.discarding) return 'ok';
+    if (!holdsWriterLock()) return 'browser-only'; // no state of its own to save: the guard of every write path
     const at = Date.now();
     const parts: V2Parts = typeof value === 'string'
       ? { ...splitText(value), savedAt: at }
@@ -230,6 +235,7 @@ export const stateDb = {
    * active copy. The page must reload afterwards (late writes of the old memory state are discarded meanwhile).
    */
   async revertToDisk(key: string): Promise<void> {
+    if (!holdsWriterLock()) return;
     const onDisk = await disk.getState();
     if (!onDisk) throw new Error('The disk copy is not available');
     const v2 = await readV2();
@@ -238,7 +244,7 @@ export const stateDb = {
     await commitV2(splitText(onDisk), null);
     guard.pending = undefined;
   },
-  del: (key: string) => del(`${key}:b`, stateStore),
+  del: async (key: string) => { if (holdsWriterLock()) await del(`${key}:b`, stateStore); },
 };
 
 export const blobDb = {
@@ -247,20 +253,23 @@ export const blobDb = {
     const local = await get<Blob>(key, blobStore);
     if (local) return local;
     const onDisk = await disk.getBlob(key);
-    if (onDisk) await set(key, onDisk, blobStore).catch(() => undefined);
+    if (onDisk && holdsWriterLock()) await set(key, onDisk, blobStore).catch(() => undefined);
     return onDisk;
   },
   async set(key: string, value: Blob): Promise<void> {
+    if (!holdsWriterLock()) return;
     const receipt = disk.setBlob(key, value);
     await set(key, value, blobStore);
     const result = await receipt;
     if (result === 'fail' || result === 'conflict') throw new Error(result === 'conflict' ? 'Another tab saved newer work' : 'Disk copy pending');
   },
   async del(key: string): Promise<void> {
+    if (!holdsWriterLock()) return;
     disk.delBlobs([key]);
     await del(key, blobStore);
   },
   async delMany(list: string[]): Promise<void> {
+    if (!holdsWriterLock()) return;
     disk.delBlobs(list);
     await delMany(list, blobStore);
   },
@@ -268,6 +277,7 @@ export const blobDb = {
 
 /** Copy to disk the blobs saved before the disk copy existed (or while the server was down). Best effort. */
 export async function syncBlobsToDisk(): Promise<void> {
+  if (!holdsWriterLock()) return;
   if (!(await diskAvailable())) return;
   const onDisk = new Set(await disk.listBlobs());
   for (const key of await keys(blobStore).catch(() => [])) {

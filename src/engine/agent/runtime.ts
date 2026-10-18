@@ -1,5 +1,6 @@
 import { cardDraft, confirmedSections, draftGate, draftLines } from './draftActions';
 import { agentAccepts } from './sendGate';
+import { mayStartWork } from '../../lib/writerLock';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
 import { shapeLabel } from '../delivery';
 import { editGraphTool } from './nodeTools';
@@ -245,7 +246,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
   const s = session(sessionId);
-  // An edited message brings its own attachments and leaves the composer alone.
+  // An edited message brings its own attachments.
   const attachments = [...(opts.attachments ?? st.composer.attachments)];
   const clean = text.trim();
   if (!clean && !attachments.length) return;
@@ -255,7 +256,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   if (!opts.attachments) setComposer({ text: '', attachments: [] });
 
   const pending = s.agent.pending;
-  // A card waiting on another canvas is not what the user is answering here: it closes as superseded.
+  // A card waiting on another canvas closes as superseded.
   const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && f.workspace === workspace) : undefined;
 
   // Typing while questions are open answers them.
@@ -1327,7 +1328,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   const engine = agentEngine();
-  if (engine.kind !== 'llm') return;
+  if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
   patchAgent(sessionId, { busy: true, phase: 'working' });
   const log = activityLog(sessionId, workspace);
@@ -1341,8 +1342,8 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   let planFailures = 0;
   let hurryNoted = false;
   let transferredToDesigner = false;
-  // The turn is not mute: if nothing comes out for a minute the activity block says so, and Stop is in the composer.
-  // Every piece of output re-arms it. The five-minute cap is the only thing that ends a turn by force (T3).
+  // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
+  // The five-minute cap is the only thing that ends a turn by force (T3).
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
   let armedAt = 0;
   let cutTurn = false;

@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import { persist, type PersistStorage, type StorageValue } from 'zustand/middleware';
 import { uid } from '../lib/id';
 import { stateDb, wipeLocalDatabases } from '../lib/idb';
+import { holdsWriterLock, onWriterLockGranted } from '../lib/writerLock';
 import { disk } from '../lib/disk';
 import { logEvent } from '../lib/log';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from '../engine/providers/demo';
@@ -290,20 +291,19 @@ const initial: AppState = {
 
 let writeTimer: ReturnType<typeof setTimeout> | undefined;
 // The debounce restarts with every change; this one does not: a long stream of changes (an agent turn, a job's
-// progress) still starts a save every MAX_WRITE_WAIT_MS instead of waiting for a quiet moment that may not come.
+// progress) still starts a save every MAX_WRITE_WAIT_MS.
 let maxWaitTimer: ReturnType<typeof setTimeout> | undefined;
 const MAX_WRITE_WAIT_MS = 2000;
-// The latest state to save. Held as the (immutable) object and turned into JSON only when the debounced write runs:
-// stringifying the whole state on every change cost a full serialization per store update, which grows with the
-// history and piled up where many updates come together (the end of an agent turn, when its card appears).
+// The latest state to save, held as the (immutable) object and turned into JSON only when the debounced write runs:
+// serializing the whole state on every change cost a full pass per update and piled up at the end of an agent turn.
 type PendingWrite = { name: string; value: StorageValue<Persisted>; version: number };
 let pendingWrite: PendingWrite | null = null;
 let lastWrite: PendingWrite | null = null;
 let writesRunning: Promise<void> = Promise.resolve();
 let wiping = false;
 
-// The write runs when the browser is idle (not mid-stroke or mid-drag), within IDLE_TIMEOUT_MS at the latest, so
-// saving never shows as a hitch while the user works. Closing or hiding the page still writes at once (flushWrite).
+// The write runs when the browser is idle (not mid-stroke), within IDLE_TIMEOUT_MS at the latest. Closing or hiding
+// the page still writes at once (flushWrite).
 const IDLE_TIMEOUT_MS = 1000;
 let idleHandle: number | undefined;
 function flushWhenIdle(): void {
@@ -312,9 +312,8 @@ function flushWhenIdle(): void {
   if (idleHandle === undefined) idleHandle = ric(() => { idleHandle = undefined; writeUnlessPressed(); }, { timeout: IDLE_TIMEOUT_MS });
 }
 
-// Idle time also comes between the frames of a stroke, and a save cannot be interrupted once it starts: while a
-// pointer is pressed the write waits for its release, MAX_GESTURE_WAIT_MS at most (a lost pointerup must not stop
-// saving). Hiding or closing the page still writes at once.
+// Idle time also comes between stroke frames and a save cannot be interrupted: while a pointer is pressed the write
+// waits for its release, MAX_GESTURE_WAIT_MS at most (a lost pointerup must not stop saving).
 export const MAX_GESTURE_WAIT_MS = 10_000;
 const pressed = new Set<number>();
 let pressedSince = 0;
@@ -339,6 +338,7 @@ function flushWrite(): Promise<void> {
   clearTimeout(gestureTimer);
   if (idleHandle !== undefined && typeof window !== 'undefined') window.cancelIdleCallback?.(idleHandle);
   writeTimer = maxWaitTimer = idleHandle = gestureTimer = undefined;
+  if (!holdsWriterLock()) pendingWrite = null;
   if (!pendingWrite || wiping) return writesRunning;
   const next = pendingWrite;
   pendingWrite = null;
@@ -372,7 +372,7 @@ const idbStorage: PersistStorage<Persisted> = {
     return raw ? (JSON.parse(raw) as StorageValue<Persisted>) : null;
   },
   setItem: (name, value) => {
-    if (wiping) return;
+    if (wiping || !holdsWriterLock()) return; // no lock: no state of its own to save
     pendingWrite = { name, value, version: markStateDirty() };
     // The global timers, not window's: tests (Node) write state too.
     clearTimeout(writeTimer);
@@ -410,6 +410,7 @@ export const useStore = create<AppState>()(
     name: 'ogs-app',
     version: 1,
     storage: idbStorage,
+    skipHydration: true, // hydrates when this tab holds the writer lock
     partialize: (s): Persisted => ({
       settings: s.settings,
       spentUsd: s.spentUsd,
@@ -454,6 +455,8 @@ export const useStore = create<AppState>()(
     },
   }),
 );
+
+onWriterLockGranted(() => void useStore.persist.rehydrate());
 
 /** Before the global library, subjects lived in each session: copied once (first name wins); sessions keep theirs. */
 export function legacySubjects(sessions: Record<string, Session>): Subject[] {
@@ -621,6 +624,7 @@ export function autoTitleSession(id: string, text: string): void {
 
 /** Delete every local database (state, media, caches) and reload. */
 export async function wipeAllData(): Promise<void> {
+  if (!holdsWriterLock()) return;
   wiping = true;
   pendingWrite = null;
   clearTimeout(writeTimer);
@@ -632,12 +636,10 @@ export async function wipeAllData(): Promise<void> {
   location.reload();
 }
 
-// Another tab (or window) saved newer work after this one loaded: this tab stops saving, its browser copy becomes the
-// disk's again, and it says so. Its browser copy is kept, never replaced.
+// Another tab saved newer work after this one loaded: this tab stops sending to the disk and says so; its browser copy stays.
 disk.onStateConflict(() => {
-  // A tab that saves an older state over a newer one loses work (seen 2026-10-03): the trail says when it happened (T5).
+  // The trail says when a tab saved an older state over a newer one (seen 2026-10-03, T5).
   logEvent('save-conflict', { at: new Date().toISOString(), sessions: Object.keys(get().sessions).length });
-  // This tab keeps its own browser copy (closing it loses nothing); the disk keeps the other work.
   toast('Another tab saved newer work. This tab is out of date and no longer saves: reload it to continue.', 'error', 24 * 3600_000);
 });
 

@@ -1,5 +1,6 @@
 import { downloadBlob } from '../lib/media';
 import { stateDb } from '../lib/idb';
+import { holdsWriterLock } from '../lib/writerLock';
 import { persistState } from './persistJson';
 import { beginStateSave, failSave, markStateDirty, resetSaveStatus, saveStatus } from './saveStatus';
 import { reportSave } from './saveReport';
@@ -25,7 +26,7 @@ let keeping = false;
  */
 export async function keepThisVersion(): Promise<void> {
   const sessionId = saveStatus.getState().rejected?.sessionId;
-  if (!sessionId || keeping) return;
+  if (!sessionId || keeping || !holdsWriterLock()) return;
   keeping = true;
   const version = markStateDirty();
   beginStateSave(version);
@@ -46,6 +47,7 @@ export const page = { reload: () => window.location.reload() };
  * the page reloads. The caller asks for confirmation first (RevertConfirm in SaveGuardBanner).
  */
 export async function revertToDisk(): Promise<void> {
+  if (!holdsWriterLock()) return; // the reload below drops the lock and this tab takes it again on load
   await stateDb.revertToDisk(useStore.persist.getOptions().name!);
   resetSaveStatus(); // the reload must not ask to confirm leaving: the memory state is given up on purpose
   page.reload();

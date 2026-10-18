@@ -3,6 +3,9 @@
  * The app has no backend: when it is served without that server the copy is simply off and IndexedDB is the only store.
  */
 
+import { holdsWriterLock } from './writerLock';
+
+// Every function here that writes (PUT, DELETE, POST) first asks holdsWriterLock(): only the active tab changes the disk.
 let available: Promise<boolean> | null = null;
 let unavailable = false;
 /** 'conflict': another tab saved first (this tab goes stale). 'rejected': the server kept a shrinking save aside (possible-loss); not stale. */
@@ -75,7 +78,7 @@ export const disk = {
    * Used at load time for a browser copy newer than the disk's.
    */
   async putState(value: string, base: number): Promise<'ok' | 'conflict' | 'rejected' | 'fail'> {
-    if (!(await diskAvailable())) return 'fail';
+    if (!holdsWriterLock() || !(await diskAvailable())) return 'fail';
     const body = withBase(value, base);
     const res = await fetch('/x/store/state', { method: 'PUT', body, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(() => null);
     if (res?.status === 409) return refusal(res);
@@ -100,6 +103,7 @@ export const disk = {
    * writes those files and publishes the new manifest; a stale baseAt is refused (409) like a whole-state write.
    */
   setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]>; keep?: KeepVersion }): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
     // The body carries JSON TEXT as strings: globals and each session are strings the server stores as they are.
     const send = async (list: Array<[string, string]>): Promise<Response> => {
@@ -128,6 +132,7 @@ export const disk = {
   },
 
   setState(value: string | StateBody): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
     latestState = value;
     const receipt = new Promise<DiskWriteResult>((resolve) => receipts.push(resolve));
@@ -165,6 +170,7 @@ export const disk = {
 
   /** Resolves when written (callers that do not need to wait use `void`). */
   async setBlob(key: string, blob: Blob): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return 'browser-only';
     if (stale) return 'conflict';
     if (!(await diskAvailable())) return unavailable ? 'fail' : 'browser-only';
     try {
@@ -175,6 +181,7 @@ export const disk = {
   },
 
   delBlobs(keys: string[]): void {
+    if (!holdsWriterLock()) return;
     void diskAvailable().then((ok) => {
       if (ok) for (const k of keys) fetch(`/x/store/blob/${encodeURIComponent(k)}`, { method: 'DELETE', headers: LOCAL_WRITE }).catch(report(`delete ${k}`));
     });
@@ -188,6 +195,6 @@ export const disk = {
 
   /** Move the disk copy aside (data.bak-<date>) so a wipe does not come back on reload. */
   async wipe(): Promise<void> {
-    if (await diskAvailable()) await fetch('/x/store/wipe', { method: 'POST', headers: LOCAL_WRITE }).catch(report('wipe'));
+    if (holdsWriterLock() && (await diskAvailable())) await fetch('/x/store/wipe', { method: 'POST', headers: LOCAL_WRITE }).catch(report('wipe'));
   },
 };

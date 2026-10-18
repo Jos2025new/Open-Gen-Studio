@@ -1,5 +1,8 @@
 /** Abort reason of a follower that Check status restarts: it is not a user Stop and must not mark the job canceled. */
 export const CHECK_RESTART = 'check-restart';
+/** Abort reason of a follower stopped because the tab hands the lock over (or lost it): same exit as CHECK_RESTART, the generation stays running with its remoteJob for the next tab to resume. */
+export const WRITER_HANDOFF = 'writer-handoff';
+export const isRestart = (reason: unknown): boolean => reason === CHECK_RESTART || reason === WRITER_HANDOFF;
 
 /** Restart only the local follower of an existing remote job; never submit another generation. */
 export function statusChecker(deps: {
