@@ -15,6 +15,7 @@ const SUGGESTIONS = [
 
 export function ChatWorkspace() {
   const sessionId = useStore((s) => s.activeSessionId);
+  const home = useStore((s) => s.ui.home);
   const [session, generations, assets] = useStore(useShallow((s) => [s.sessions[s.activeSessionId], s.generations, s.assets]));
   const fromNodes = useMemo(
     () => nodeWorkNotInChat(sessionId).map((item) => ({ id: item.nodeId, assetId: item.assetId, label: item.label })),
@@ -56,7 +57,8 @@ export function ChatWorkspace() {
   };
 
   return <>
-    <ImportFromNodes sessionId={sessionId} items={fromNodes} noun="result" onImport={(ids) => nodesToChat(sessionId, ids)} />
+    {/* On Home the import does nothing, so its button is not shown. */}
+    {!home && <ImportFromNodes sessionId={sessionId} items={fromNodes} noun="result" onImport={(ids) => nodesToChat(sessionId, ids)} />}
     <div className="chat" ref={scrollRef} onScroll={onScroll}>
       {count ? (
         <div className="chat-column">

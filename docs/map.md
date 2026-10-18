@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 216 | 139 |
-| [store.ts](../src/store/store.ts) | 140 | 119 |
+| [store.ts](../src/store/store.ts) | 140 | 120 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 63 | 0 |
 | [actions.ts](../src/engine/design/actions.ts) | 47 | 18 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 45 | 1 |
@@ -38,7 +38,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 6 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 3 |
-| [idb.ts](../src/lib/idb.ts) | 17 | 147 |
+| [idb.ts](../src/lib/idb.ts) | 17 | 148 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 16 | 0 |
 
 ## Por área
@@ -47,7 +47,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | --- | --- | --- |
 | `src` | 2 | 0 |
 | `src/components/assets` | 12 | 3 |
-| `src/components/chat` | 12 | 4 |
+| `src/components/chat` | 12 | 5 |
 | `src/components/composer` | 11 | 5 |
 | `src/components/designer` | 44 | 13 |
 | `src/components/gallery` | 1 | 0 |
@@ -64,10 +64,10 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 13 | 44 |
 | `src/engine/skills` | 6 | 15 |
-| `src/lib` | 26 | 171 |
-| `src/store` | 4 | 121 |
+| `src/lib` | 26 | 172 |
+| `src/store` | 4 | 122 |
 
-141 de 368 módulos no tienen ningún test que los importe directamente.
+140 de 368 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -77,7 +77,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [SketchEditor.tsx](../src/components/assets/SketchEditor.tsx)
 - [Viewer3DControls.tsx](../src/components/assets/Viewer3DControls.tsx)
 - [viewer3d.ts](../src/components/assets/viewer3d.ts)
-- [ChatWorkspace.tsx](../src/components/chat/ChatWorkspace.tsx)
 - [CanvasSize.tsx](../src/components/designer/CanvasSize.tsx)
 - [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
 - [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
