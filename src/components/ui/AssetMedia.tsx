@@ -1,6 +1,6 @@
 import { ensureModelThumbnail, thumbStale } from '../../lib/model3dThumb';
 import { useRef, useState } from 'react';
-import { AudioLines, ImageOff, Box } from 'lucide-react';
+import { AudioLines, ImageOff, Box, Play } from 'lucide-react';
 import { useStore } from '../../store/store';
 import { formatDuration } from '../../lib/format';
 import { useAssetUrl } from './hooks';
@@ -66,7 +66,8 @@ export function AssetMedia({
     );
   }
   if (asset.kind === 'video') {
-    return (
+    // A thumbnail marks itself as a video (a small play mark over the corner; it never blocks clicks or drags).
+    return (<>
       <video
         ref={videoRef}
         className={`media media-${fit} ${className ?? ''}`}
@@ -93,7 +94,8 @@ export function AssetMedia({
             : undefined
         }
       />
-    );
+      {!controls && <span className="media-video-mark" aria-hidden="true"><Play size={10} fill="currentColor" /></span>}
+    </>);
   }
   return (
     <img

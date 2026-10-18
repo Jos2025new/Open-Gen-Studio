@@ -1,3 +1,4 @@
+import { wrongRef } from './wrongRef';
 import { assetsInUse } from './flow/locks';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
@@ -204,7 +205,7 @@ export interface DirectCheck {
   overLimit?: boolean;
 }
 
-/** Validate the composer for image/video mode (used for the button state and before running). */
+/** Validates the composer for any media kind (button state, and before running). */
 export function checkDirect(kind: MediaKind): DirectCheck {
   const st = get();
   const { modelRef, settings } = st.composer[kind];
@@ -235,14 +236,14 @@ export function checkDirect(kind: MediaKind): DirectCheck {
     if (slot && imageAtt.length < slot.min + extra) return { ok: false, reason: extra ? 'This model needs a source image first, then reference images.' : 'This model needs an input image.', estimate };
     if (!text && schema.slots.promptRequired !== false && !imageAtt.length) return { ok: false, reason: 'Write a prompt.', estimate };
   } else if (kind === 'model3d') {
-    if (attachments.length > imageAtt.length) return { ok: false, reason: '3D models take only reference images.', estimate };
+    const odd = wrongRef(attachments, st.assets, 'image'); if (odd) return { ok: false, reason: odd, estimate };
     const model = st.catalog.models[modelRef];
     const problem = model ? model3dProblem(model.id, model, text, imageAtt.map((id) => ({ size: 0, width: st.assets[id].width, height: st.assets[id].height }))) : null;
     if (problem) return { ok: false, reason: `This model ${problem.message}`, estimate };
     const slot = schema.slots.images;
     if (slot && imageAtt.length > slot.max) return { ok: false, reason: `This model accepts up to ${slot.max} image${slot.max > 1 ? 's' : ''}.`, estimate };
   } else if (kind === 'audio') {
-    if (attachments.length > audioAtt.length) return { ok: false, reason: 'Music models take no images or videos.', estimate };
+    const odd = wrongRef(attachments, st.assets, 'audio'); if (odd) return { ok: false, reason: odd, estimate };
     const audioProblem = audioInputProblem(schema.slots, audioAtt.length);
     if (audioProblem) return { ok: false, reason: `This model ${audioProblem}`, estimate };
     if (!text && schema.slots.promptRequired) return { ok: false, reason: 'Write a prompt.', estimate };
