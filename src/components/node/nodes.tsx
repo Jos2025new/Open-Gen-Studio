@@ -1,15 +1,15 @@
 import { memo, useEffect, useState } from 'react';
 import { Handle, NodeToolbar, Position, useConnection, type Node, type NodeProps } from '@xyflow/react';
-import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, ChevronRight, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
+import { Box, Brush, Info, ChevronDown, Ellipsis, RectangleHorizontal, RotateCcw, CircleAlert, Copy, Download, Film, Image as ImageIcon, LoaderCircle, Maximize2, Music, Play, Plus, SlidersHorizontal, Trash, Type, Wand, FileImage, Check, X, Paperclip } from 'lucide-react';
 import { OPS, OP_IDS } from '../../engine/ops';
 import { aspectLabel, coerceSettings, durationChoices, durationLabel, lyricsParam, normalizeStructured, paramByRole, pixelSizes, ratioOf } from '../../engine/params';
 import { ensureSchema, modelSummary } from '../../engine/catalog';
 import { addConnected, addNode, disconnectEdges, setNodeOp, deleteNodes, duplicateNode, newNodeData, patchNodeData, prepareNodeRun, previewRun, runNodes, setNodeModel, restoreNodeGeneration, renameNode, setSketch, tryConnect } from '../../engine/flow/actions';
-import { nodeAttempt, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, portFits, runsGeneration } from '../../engine/flow/graph';
+import { nodeAttempt, inputPorts, NODE_WIDTH, nodeOutputAsset, outputPort, runsGeneration } from '../../engine/flow/graph';
 import { detachOutputs, detachedOutputGroup, reattachOutputs } from '../../engine/flow/arrange';
 import { extensionForMime } from '../../lib/media';
 import { deleteAssets, downloadAsset, useAsReference } from '../../engine/actions';
-import type { Generation, GenNodeData, GraphNode, GraphNodeData, OpId, PortType, ToolNodeData } from '../../engine/types';
+import type { Generation, GenNodeData, GraphNode, OpId, PortType, ToolNodeData } from '../../engine/types';
 import { setUi, toast, useStore } from '../../store/store';
 import { AssetMedia } from '../ui/AssetMedia';
 import { GenerationProgress } from './GenerationProgress';
@@ -21,6 +21,7 @@ import { AspectGlyph } from '../composer/MediaControls';
 import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
+import { AddNext } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
@@ -45,36 +46,6 @@ function PortHandle({ id, type, side, top, label, portType, quiet }: { id: strin
 
 function useSessionId() {
   return useStore((s) => s.activeSessionId);
-}
-
-/** Node kinds (and tools) to add; with `accepts`, only those that take that port type as input. */
-export function AddNodeItems({ accepts, onPick, onAsset }: { accepts?: PortType | null; onPick: (data: GraphNodeData) => void; onAsset?: () => void }) {
-  const [tools, setTools] = useState(false);
-  const takes = (kind: 'image' | 'video' | 'audio' | 'model3d') => !accepts || inputPorts(newNodeData(kind)).some((p) => portFits(accepts, p.type));
-  const toolIds = OP_IDS.filter((id) => !OPS[id].multiInput && (!accepts || portFits(accepts, OPS[id].input)));
-  if (tools) {
-    return (
-      <div className="menu">
-        <button type="button" className="menu-back" onClick={() => setTools(false)}>
-          ‹ Tools
-        </button>
-        {toolIds.map((id) => (
-          <MenuItem key={id} icon={OP_ICONS[id]} label={OPS[id].label} detail={`${OPS[id].input} → ${OPS[id].output}`} onClick={() => onPick(newNodeData('tool', { op: id as OpId }))} />
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div className="menu">
-      {!accepts ? <MenuItem icon={Type} label="Text" detail="Prompt or copy that feeds other nodes" onClick={() => onPick(newNodeData('text'))} /> : null}
-      {takes('image') ? <MenuItem icon={ImageIcon} label="Image" detail={accepts === 'image' ? 'Use it as a reference' : 'Generate images'} onClick={() => onPick(newNodeData('image'))} /> : null}
-      {takes('video') ? <MenuItem icon={Film} label="Video" detail={accepts === 'image' ? 'Use it as the first frame' : accepts === 'audio' ? 'Use it as speech or soundtrack' : 'Generate video'} onClick={() => onPick(newNodeData('video'))} /> : null}
-      {takes('audio') ? <MenuItem icon={Music} label="Audio" detail={accepts === 'text' ? 'Use it as the prompt of a song' : 'Generate music or song lyrics'} onClick={() => onPick(newNodeData('audio'))} /> : null}
-      {takes('model3d') ? <MenuItem icon={Box} label="3D model" detail="Generate a GLB model from text or image" onClick={() => onPick(newNodeData('model3d'))} /> : null}
-      {toolIds.length ? <MenuItem icon={Wand} label="Tool" detail="Relight, angle, upscale, animate…" right={<ChevronRight size={14} />} onClick={() => setTools(true)} /> : null}
-      {onAsset ? <MenuItem icon={FileImage} label="Asset" detail="Drag one from the gallery onto the canvas" onClick={onAsset} /> : null}
-    </div>
-  );
 }
 
 /** Run with spend confirmation. `primary` is the panel's big button and shows the estimated cost. */
@@ -286,28 +257,6 @@ function Preview({ node }: { node: GraphNode }) {
           ))}
         </div>
       ) : null}
-    </>
-  );
-}
-
-/** "+" next to the output port: add a node that takes this output, already connected. */
-function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
-  const sessionId = useSessionId();
-  const pop = usePopover();
-  return (
-    <>
-      <button ref={pop.ref} type="button" className="nc-next nodrag" aria-label="Add connected node" data-tip="Add a connected node" onClick={pop.toggle}>
-        <Plus size={13} />
-      </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={250} label="Add connected node">
-        <AddNodeItems
-          accepts={out}
-          onPick={(data) => {
-            pop.close();
-            addConnected(sessionId, node.id, data);
-          }}
-        />
-      </Popover>
     </>
   );
 }
@@ -865,7 +814,6 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
           </div>
         )}
       </div>
-      {out ? <PortHandle id="out" type="source" side={Position.Right} top="50%" portType={out} /> : null}
       {out ? <AddNext node={node} out={out} /> : null}
     </>
   );

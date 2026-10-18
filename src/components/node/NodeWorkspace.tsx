@@ -23,7 +23,10 @@ import { TopbarActions } from '../shell/TopBar';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, MenuItem } from '../ui/primitives';
 import { SpendConfirm } from '../ui/SpendConfirm';
-import { AddNodeItems, StudioNode, type FlowNode } from './nodes';
+import { StudioNode, type FlowNode } from './nodes';
+import { AddNodeItems } from './AddNodeItems';
+import { ConnectionPreview } from './ConnectedNodeMenu';
+import { connectionDrop } from './connectionDrop';
 import { CanvasNavigation } from './CanvasNavigation';
 import { GroupNode, Operations, type GroupFlowNode } from './Operations';
 import { copyNodes, cutNodes, groupBounds, groupNodes, hasNodeClipboard, moveGroup, pasteNodes, ungroup, wholeGroup } from '../../engine/flow/arrange';
@@ -380,12 +383,16 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
 
   // Right-click menu, anchored to an invisible point at the cursor.
   const menuAnchor = useRef<HTMLDivElement>(null);
+  const connectionMenu = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; nodeId?: string; from?: string } | null>(null);
   const openMenu = (e: React.MouseEvent | MouseEvent, nodeId?: string) => {
     e.preventDefault();
     const r = canvasRef.current?.getBoundingClientRect();
     setMenu({ x: e.clientX - (r?.left ?? 0), y: e.clientY - (r?.top ?? 0), nodeId });
   };
+  useEffect(() => { setMenu(null); }, [sessionId]);
+  const menuSource = menu?.from ? graph.nodes.find((n) => n.id === menu.from) : undefined;
+  const menuOpen = Boolean(menu) && (!menu?.from || Boolean(menuSource && outputPort(menuSource.data, assets)));
   const menuNode = menu?.nodeId ? graph.nodes.find((n) => n.id === menu.nodeId) : undefined;
 
   return (
@@ -437,12 +444,12 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         }}
         onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null })}
         onConnectEnd={(e, state) => {
-          // Dropped on empty canvas from an output: offer the nodes that take it, at the drop point.
-          if (embedded || state.isValid || state.toNode || state.fromHandle?.type !== 'source' || !state.fromNode) return;
-          const p = 'changedTouches' in e ? e.changedTouches[0] : e;
-          const r = canvasRef.current?.getBoundingClientRect();
-          setMenu({ x: p.clientX - (r?.left ?? 0), y: p.clientY - (r?.top ?? 0), from: state.fromNode.id });
+          if (embedded) return;
+          const dropped = connectionDrop(e, state, canvasRef.current);
+          if (dropped) setMenu(dropped);
         }}
+        connectOnClick={false}
+        connectionLineStyle={{ stroke: 'var(--text-2)', strokeWidth: 2, strokeDasharray: '6 6' }}
         isValidConnection={isValidConnection}
         colorMode="dark"
         fitView
@@ -474,8 +481,9 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
         /></>}
       </ReactFlow>
       <div ref={menuAnchor} className="ctx-anchor" style={menu ? { left: menu.x, top: menu.y } : undefined} />
-      <Popover open={Boolean(menu)} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
-        {menu?.from ? <div className="menu-sep-label">Add node</div> : null}
+      <Popover open={menuOpen} placement={menu?.from ? 'right-start' : 'top-start'} anchor={menuAnchor} onClose={() => setMenu(null)} width={240} label={menuNode ? 'Node' : 'Add node'}>
+        <div ref={connectionMenu}>
+        {menu?.from ? <div className="menu-sep-label">Add connected node</div> : null}
         {menuNode ? (
           <div className="menu">
             <MenuItem icon={Copy} label="Duplicate" onClick={() => (duplicateNode(sessionId, menuNode), setMenu(null))} />
@@ -500,7 +508,8 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
             setMenu(null);
           }} /></div>}
           <AddNodeItems
-            accepts={menu.from ? outputPort(graph.nodes.find((n) => n.id === menu.from)!.data, assets) : undefined}
+            searchable={Boolean(menu.from)}
+            accepts={menuSource ? outputPort(menuSource.data, assets) : undefined}
             onPick={(data) => {
               const r = canvasRef.current?.getBoundingClientRect();
               const pos = rf.screenToFlowPosition({ x: menu.x + (r?.left ?? 0), y: menu.y + (r?.top ?? 0) });
@@ -516,7 +525,9 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           />
           </>
         ) : null}
+        </div>
       </Popover>
+      {menuOpen && menu?.from ? <ConnectionPreview from={menu.from} menu={connectionMenu} /> : null}
       {embedded ? null : <ImportFromChat
         sessionId={sessionId}
         canvas="node"

@@ -3,7 +3,7 @@ import { parseRef } from '../plan';
 import { mentionSubjects } from '../params';
 import { derivedRefErrors } from '../schemaGuard';
 import { ensureSchema, isConnected, PICKABLE_VIDEO_OPS, isVideoUpscaler, opModelFor, opModelForAsset, opFollowsSource, opModelFromRef } from '../catalog';
-import { isAutoOption, matchInputOption, nearestAspect, paramByRole, routeVideoInputs, videoInputProblem } from '../params';
+import { routeVideoInputs, videoInputProblem } from '../params';
 import { nodeRequest, stable } from './freshness';
 import { graphEditProblem, lockedNodes, lockNodes, lockAssets, writingNodes } from './locks';
 import { uid } from '../../lib/id';
@@ -12,7 +12,7 @@ import { executeSteps, estimateSteps } from '../executor';
 import { defaultOpParams, OPS } from '../ops';
 import type { Estimate, GenNodeData, GraphNode, GraphNodeData, MediaKind, OpId } from '../types';
 import { appendFeed, updateFeedItem, patchGeneration, setGraph, toast, useStore } from '../../store/store';
-import { autoLayout, connect, connectionError, estimatedHeight, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
+import { autoLayout, connect, connectionError, graphToSteps, inputPorts, NODE_WIDTH, outputPort, portFits, runsGeneration, nodeOutputAsset } from './graph';
 import { budgetProblem, deleteAssets } from '../actions';
 
 const get = useStore.getState;
@@ -91,34 +91,7 @@ export function deleteNodes(sessionId: string, ids: string[]): string | null {
   return error;
 }
 
-/** Add a node to the right of `fromId`, wired to its first input that accepts the source's output. */
-/** `at`: where to put it (a connection dropped on empty canvas); otherwise to the right of the source, below its other children. */
-export function addConnected(sessionId: string, fromId: string, data: GraphNodeData, at?: { x: number; y: number }): string | null {
-  const st = get();
-  const graph = st.sessions[sessionId].graph;
-  const from = graph.nodes.find((n) => n.id === fromId);
-  if (!from) return null;
-  const type = outputPort(from.data, st.assets);
-  const port = inputPorts(data).find((p) => p.type === type) ?? inputPorts(data).find((p) => portFits(type, p.type));
-  // A node of the same kind keeps the source's current model and settings.
-  if ('modelRef' in data && 'modelRef' in from.data && from.data.kind === data.kind) {
-    data = { ...data, modelRef: from.data.modelRef, settings: { ...structuredClone(from.data.settings), seed: undefined } } as GraphNodeData;
-  }
-  // A node made from an image keeps that image's shape, not the composer's format.
-  const src = st.assets[nodeOutputAsset(from, st.generations) ?? ''];
-  const view = src?.kind === 'model3d' ? st.assets[src.viewImageId ?? ''] : src;
-  if ((data.kind === 'image' || data.kind === 'video') && view?.kind === 'image' && view.width && view.height) {
-    const options = paramByRole(st.catalog.schemas[data.modelRef], 'aspect')?.options ?? [];
-    const aspect = matchInputOption(options) ?? nearestAspect(options.filter((o) => !isAutoOption(o)), `${view.width}:${view.height}`);
-    if (aspect) data = { ...data, settings: { ...data.settings, aspect } };
-  }
-  // Stack below the nodes this one already feeds, so new cards never land on top of them.
-  const children = graph.edges.filter((e) => e.source === fromId).map((e) => graph.nodes.find((n) => n.id === e.target)).filter((n): n is GraphNode => Boolean(n));
-  const y = children.length ? Math.max(...children.map((n) => n.position.y + estimatedHeight(n.data))) + 60 : from.position.y;
-  const id = addNode(sessionId, data, at ?? { x: from.position.x + NODE_WIDTH + 100, y });
-  if (port) tryConnect(sessionId, { source: fromId, target: id, targetHandle: port.id });
-  return id;
-}
+export { addConnected } from './addConnected';
 
 /**
  * Change a generation node's model. Audio nodes follow the model's output (lyrics models answer with text), and

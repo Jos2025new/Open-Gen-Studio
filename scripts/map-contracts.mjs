@@ -3,12 +3,14 @@ import designerSelection from './map-contracts-designer.mjs';
 import videoContracts from './map-contracts-video.mjs';
 import providerContracts from './map-contracts-providers.mjs';
 import captureContracts from './map-contracts-capture.mjs';
+import nodeContracts from './map-contracts-nodes.mjs';
 
 export default [
   ...videoContracts,
   ...designerSelection,
   ...providerContracts,
   ...captureContracts,
+  ...nodeContracts,
   {
     id: 'snap-controls',
     what: 'Snap por modo; alinea cajas con objetivos visibles y compara huecos entre ejes.',
