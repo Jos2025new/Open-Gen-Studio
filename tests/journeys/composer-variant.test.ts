@@ -119,7 +119,7 @@ describe('characterization of the current Composer React variant effect', { time
     expect(retained?.after).toMatchObject({ inputFunctions: { references: 2 } });
   });
 
-  it('keeps an incompatible manual image model selected when images are already attached', async () => {
+  it('keeps a text-only manual pick shown, and Generate checks it as its edit variant (always routed)', async () => {
     const { useStore } = await mountComposer('image', true);
     const { checkDirect } = await import('../../src/engine/actions');
     const modelChip = dom!.window.document.querySelector('.model-chip') as HTMLButtonElement;
@@ -133,6 +133,6 @@ describe('characterization of the current Composer React variant effect', { time
     await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     expect(useStore.getState().composer.attachments).toEqual(['a', 'b']);
     expect(useStore.getState().composer.image.modelRef).toBe(IMAGE_TEXT);
-    expect(checkDirect('image')).toMatchObject({ ok: false, reason: expect.stringMatching(/accept|input|image|reference|needs/i) });
+    expect(checkDirect('image').reason ?? '').not.toMatch(/does not accept reference images/);
   });
 });

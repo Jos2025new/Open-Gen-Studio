@@ -180,7 +180,8 @@ function DesignerTargetChip() {
 
 export function SendDirect({ kind }: { kind: MediaKind }) {
   const composer = useStore((s) => s.composer);
-  const schema = useStore((s) => s.catalog.schemas[s.composer[kind].modelRef]);
+  // All schemas: the check may use the family's edit variant (directModelRef), whose schema loads later.
+  const schema = useStore((s) => s.catalog.schemas);
   const assets = useStore((s) => s.assets);
   const spent = useStore((s) => s.spentUsd);
   const budget = useStore((s) => `${s.settings.budgetOn}|${s.settings.budgetUsd}|${s.settings.budgetAccepted}`);

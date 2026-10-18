@@ -1,4 +1,5 @@
 import { wrongRef } from './wrongRef';
+import { directModelRef } from './directModel';
 import { assetsInUse } from './flow/locks';
 import { model3dProblem } from './modelRules';
 import { GLB_MIME, validateGlb } from '../lib/model3d';
@@ -208,11 +209,12 @@ export interface DirectCheck {
 /** Validates the composer for any media kind (button state, and before running). */
 export function checkDirect(kind: MediaKind): DirectCheck {
   const st = get();
-  const { modelRef, settings } = st.composer[kind];
-  const schema = st.catalog.schemas[modelRef];
+  const { settings } = st.composer[kind];
   const attachments = st.composer.attachments.filter((id) => st.assets[id]);
   const text = st.composer.text.trim();
   const imageAtt = attachments.filter((id) => st.assets[id]?.kind === 'image');
+  const modelRef = directModelRef(kind, st.composer[kind].modelRef, imageAtt.length > 0);
+  const schema = st.catalog.schemas[modelRef];
   const estimate = estimateMedia(modelRef, kind, settings, imageAtt.length > 0, false, text.length);
   if (kind === 'audio' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud in Settings to generate music.', estimate };
   if (kind === 'model3d' && !modelRef) return { ok: false, reason: 'Connect Atlas Cloud or NanoGPT in Settings to generate 3D models.', estimate };
