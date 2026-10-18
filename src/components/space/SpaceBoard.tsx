@@ -131,7 +131,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     <div className="space-lower">
       <div className="space-ongoing" aria-label="Ongoing">
         <div className="space-sub">Ongoing</div>
-        {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} density={density} layout={layout} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
+        {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} density={density} layout={layout} selecting={selecting} selected={selected} setSelected={setSelected} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
       </div>
       {studio ? null : <div className="space-actions" aria-label="Actions suggested">
         <div className="space-sub">Actions suggested</div>
@@ -180,18 +180,23 @@ export function PendingStatus({ g }: { g: Generation }) {
   </>;
 }
 
-function OngoingTiles({ g, density, layout }: { g: Generation; density: Density; layout: Layout }) {
+function OngoingTiles({ g, density, layout, selecting, selected, setSelected }: { g: Generation; density: Density; layout: Layout; selecting: boolean; selected: string[]; setSelected: (fn: (s: string[]) => string[]) => void }) {
   const assets = useStore((s) => s.assets);
   const slots = Math.max(0, (g.op ? 1 : g.settings.count) - g.assetIds.length);
+  /** An arrived output: a button like Done's tile (select in select mode, else open the lightbox over this generation's outputs). */
+  const arrived = (id: string) => <button type="button" className={`space-tile t-${assets[id]?.kind ?? 'image'} ${selected.includes(id) ? 'is-selected' : ''}`} aria-label={assets[id]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(id) : undefined}
+    onClick={() => selecting
+      ? setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]))
+      : setUi({ lightbox: { assetIds: g.assetIds, index: g.assetIds.indexOf(id) } })}>
+    <KindBackdrop kind={assets[id]?.kind} />
+    <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
+  </button>;
   if (layout === 'list') return <div className="space-list" aria-label="Running generation">
-    {g.assetIds.map((id) => <div key={id} className="space-list-row attach-host"><div className={`space-tile t-${assets[id]?.kind ?? 'image'}`}><KindBackdrop kind={assets[id]?.kind} /><AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} /></div><AgentAttachToggle assetId={id} /><ListInfo g={g} /></div>)}
+    {g.assetIds.map((id) => <div key={id} className="space-list-row attach-host">{arrived(id)}<AgentAttachToggle assetId={id} /><ListInfo g={g} /></div>)}
     {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-list-row"><div className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div><ListInfo g={g} /></div>)}
   </div>;
   return <div className={`space-grid is-${density}`} aria-label="Running generation">
-    {g.assetIds.map((id) => <div key={id} className="attach-host"><div className={`space-tile t-${assets[id]?.kind ?? 'image'}`}>
-      <KindBackdrop kind={assets[id]?.kind} />
-      <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
-    </div><AgentAttachToggle assetId={id} /></div>)}
+    {g.assetIds.map((id) => <div key={id} className="attach-host">{arrived(id)}<AgentAttachToggle assetId={id} /></div>)}
     {Array.from({ length: slots }, (_, i) => <div key={`p${i}`} className="space-tile is-pending"><div className="shimmer" /><PendingStatus g={g} /></div>)}
   </div>;
 }

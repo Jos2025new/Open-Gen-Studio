@@ -353,3 +353,42 @@ describe('Board View popover', () => {
     expect(q('.space-done .space-tile')).not.toBeNull();
   });
 });
+
+describe('Studio board: an arrived output of a running generation opens like a Done tile', () => {
+  const pickView = (label: string) => act(() => [...document.body.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent === label)!.click());
+  const ongoingTiles = () => [...host.querySelectorAll<HTMLElement>('.space-ongoing button.space-tile')];
+  beforeEach(() => { act(() => useStore.setState({ ui: { ...useStore.getState().ui, lightbox: null } })); });
+  it('grid: clicking the arrived tile opens the lightbox on the generation outputs; the pending slot is not a button', () => {
+    setData([gen('g1', 'running', ['a1'], { settings: { count: 2 } as never })]);
+    render(createElement(SpaceBoard, { studio: true }));
+    expect(ongoingTiles()).toHaveLength(1);
+    expect(host.querySelectorAll('.space-ongoing .space-tile.is-pending')[0].tagName).toBe('DIV');
+    act(() => ongoingTiles()[0].click());
+    expect(useStore.getState().ui.lightbox).toEqual({ assetIds: ['a1'], index: 0 });
+    expect(q('.space-ongoing button.space-tile .attach-toggle')).toBeNull();
+    expect(q('.space-ongoing .attach-host .attach-toggle')).not.toBeNull();
+  });
+  it('grid: with several arrived outputs, the lightbox gets the generation list and the clicked index', () => {
+    setData([gen('g1', 'running', ['a1', 'a2'], { settings: { count: 3 } as never })], [asset('a1'), asset('a2')]);
+    render(createElement(SpaceBoard, { studio: true }));
+    act(() => ongoingTiles()[1].click());
+    expect(useStore.getState().ui.lightbox).toEqual({ assetIds: ['a1', 'a2'], index: 1 });
+  });
+  it('list: the arrived tile is a button and opens the lightbox', () => {
+    setData([gen('g1', 'running', ['a1'], { settings: { count: 2 } as never })]);
+    render(createElement(SpaceBoard, { studio: true }));
+    act(() => q('[aria-label="View"]')!.click());
+    pickView('List');
+    expect(ongoingTiles()).toHaveLength(1);
+    act(() => ongoingTiles()[0].click());
+    expect(useStore.getState().ui.lightbox).toEqual({ assetIds: ['a1'], index: 0 });
+  });
+  it('select mode: the arrived tile toggles selection instead of opening the lightbox', () => {
+    setData([gen('g1', 'running', ['a1'], { settings: { count: 2 } as never })]);
+    render(createElement(SpaceBoard, { studio: true }));
+    act(() => q('[aria-label="Select"]')!.click());
+    act(() => ongoingTiles()[0].click());
+    expect(ongoingTiles()[0].getAttribute('aria-pressed')).toBe('true');
+    expect(useStore.getState().ui.lightbox).toBeNull();
+  });
+});
