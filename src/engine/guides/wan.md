@@ -1,6 +1,8 @@
 Wan 3.0 / Wan 3.0 Prime (Alibaba) — prompting guide
 Source: high-end production practice supplied by the user (2026-09-26), adapted to Atlas Cloud / fal / NanoGPT; limits and syntax checked against the Atlas and fal schemas.
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
+
 WAN 3.0 vs PRIME
 - Same public contract: same parameters, reference limits, resolutions, durations and modes. The prompt that works on one works identically on the other.
 - Prime is the premium route and costs more (Atlas base price about 1.5× per second: 0.061 vs 0.04 USD). It adds no capability. Use Wan 3.0 unless the user asks for Prime.

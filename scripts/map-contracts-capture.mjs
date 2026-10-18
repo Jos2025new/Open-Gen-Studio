@@ -58,4 +58,19 @@ export default [
     ],
     tests: ['tests/contrast-levels.test.ts'],
   },
+  {
+    id: 'people-look',
+    what: 'Aspecto de las personas no descritas (2026-10-18): la regla del agente, la línea de contexto con el ajuste (occidental por defecto, asiático solo si se pide), el campo de Ajustes y el aviso en las guías de los modelos chinos dicen lo mismo; una referencia de la persona manda.',
+    sides: [
+      ['src/engine/peopleLook.ts', 'export const LOOK_RULE'],
+      ['src/engine/agent/context.ts', '${LOOK_RULE}'],
+      ['src/engine/agent/context.ts', 'peopleLookLine(st.settings)'],
+      ['src/store/store.ts', 'peopleLook?: string'],
+      ['src/components/shell/PeopleLookRow.tsx', 'export function PeopleLookRow'],
+      ['src/components/shell/SettingsPanel.tsx', '<PeopleLookRow />'],
+      ['src/engine/guides/seedream.md', 'default look for people'],
+      ['src/engine/guides/seedance.md', 'default look for people'],
+    ],
+    tests: ['tests/people-look.test.ts'],
+  },
 ];

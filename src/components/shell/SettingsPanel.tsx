@@ -17,6 +17,7 @@ import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
+import { PeopleLookRow } from './PeopleLookRow';
 import { shortcutGroups } from '../../engine/shortcuts';
 
 export function ProviderRow({ id, autoFocus = false }: { id: RemoteProviderId; autoFocus?: boolean }) {
@@ -421,6 +422,7 @@ export function SettingsPanel() {
             size="sm"
           />
         </div>
+        <PeopleLookRow />
       </section> : null}
 
       {tab === 'ops' ? <section className="set-section">

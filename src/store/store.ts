@@ -59,6 +59,8 @@ export interface Settings {
   budgetAccepted?: number | null;
   /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */
   notify?: boolean;
+  /** Look of people the user does not describe (peopleLook.ts); empty = the default. */
+  peopleLook?: string;
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 

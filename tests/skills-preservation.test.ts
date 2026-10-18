@@ -14,6 +14,8 @@ const SEEDANCE_PATTERNS = [
   '- Image to video: the opening image (first frame) is not the identity or design image (reference); do not fix pose or background from an identity reference.'
 ].join('\n');
 
+const PEOPLE_LOOK_LINE = '- People: a person the prompt does not describe comes out East Asian. State each new person\'s look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).';
+
 // Historical fixture stays unchanged; only the explicitly reviewed contract corrections are substituted.
 it.each(Object.entries(beforeSplit))('read_guide preserves the exact pre-split text for %s', (id, text) => {
   let expected = text
@@ -23,6 +25,10 @@ it.each(Object.entries(beforeSplit))('read_guide preserves the exact pre-split t
     .replace('Establish the character once (a clear front view) and pass that output as a reference to every later image step. Repeat identity anchors (face, hair, outfit, palette) in each prompt.', 'Use the provided character image as the identity source in every consuming step. If no image exists, establish one source first and use text to establish that source, not as a substitute for passing it to related outputs. View changes preserve the source pose and outfit unless requested otherwise.');
   if (id === 'model:seedance') {
     expected = expected.replace('Cinematic prose in English,', 'Cinematic prose,').replace('EDIT AND EXTEND (2.5', `GENRE PATTERNS (source: https://github.com/LearnPrompt/awesome-seedance; a case library, not a ranking)\n${SEEDANCE_PATTERNS}\n\nEDIT AND EXTEND (2.5`);
+    // 2026-10-18: the people-look line (peopleLook.ts) after the source line.
+    const lines = expected.split('\n');
+    lines.splice(3, 0, PEOPLE_LOOK_LINE, '');
+    expected = lines.join('\n');
   }
   if (id.startsWith('workflow:')) {
     const lines = expected.split('\n');

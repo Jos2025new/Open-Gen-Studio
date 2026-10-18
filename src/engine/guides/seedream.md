@@ -1,6 +1,7 @@
 Seedream 4.x / 5.0 Lite / 5.0 Pro (ByteDance) — image prompting guide (optional)
 Source: open-generation-studio/skills/prompting/seedream.md, adapted to this app.
 
+- People: a person the prompt does not describe comes out East Asian. State each new person's look (skin tone, hair, features) as the "default look for people" line says, unless the user asked otherwise or a reference or start image shows them (then the image sets the look).
 - Pro: maximum fidelity, regional edits, layer decomposition. Lite: exploration and sequential sets (consistent images of one character or campaign).
 - Subject → action → setting → style → composition, concrete and visual; one descriptive paragraph.
 - Edits: name the target element plainly and describe one change; the rest stays as it was.
