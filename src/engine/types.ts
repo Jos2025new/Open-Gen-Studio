@@ -204,7 +204,7 @@ export type AdvancedValue = string | number | boolean;
 export interface GenSettings {
   /** Realism register added to realistic image and video prompts; default 'balanced' ('photographic' = cinematic). */
   realism?: 'balanced' | 'everyday' | 'cinematic' | 'photographic' | 'ugc' | 'studio' | 'none';
-  /** Shot sheet id (portrait, street, product, landscape, interior, food, pet in cinematic; ugc, studio); chosen from the prompt when absent. */
+  /** Shot sheet id (cinematic or ugc families); chosen from the prompt when absent. */
   shot?: string;
   /** Capture style (camera, tone, light, texture), video directives and imperfections; see captureStyles. */
   capture?: import('./captureStyles').CaptureSel;
@@ -340,7 +340,7 @@ export interface Generation {
   remoteJob?: RemoteJob;
   /** The provider's job id, kept after the job ends, so a recovered run is never adopted twice. */
   jobId?: string;
-  /** The connection failed before a job id came back: the provider may have the job anyway (Check status looks it up). */
+  /** The connection failed before a job id came back: the provider may still have the job (Check status). */
   lostJob?: boolean;
   createdAt: number;
   startedAt?: number;
@@ -349,7 +349,7 @@ export interface Generation {
   delivery?: string[];
   /** What the app did about this request on its own (a retry it made), kept after it ends (T4). */
   notes?: string[];
-  /** The last request to the provider: endpoint, mapped parameters, which try and job id (T5). Never a key, never the media. */
+  /** The last request to the provider: endpoint, mapped parameters, try and job id (T5). Never a key or media. */
   sent?: SentRequest;
 }
 
@@ -655,9 +655,9 @@ export interface NoticeFeedItem extends FeedBase {
   type: 'notice';
   level: 'info' | 'error';
   text: string;
-  /** A transient agent failure (connection lost, provider busy): Retry runs the turn again from the last completed step. */
+  /** A transient agent failure (connection lost, provider busy): Retry reruns the turn from the last completed step. */
   retry?: { partialItemId?: string };
-  /** The agent answered a request to make something with text only (no plan, no questions): offer to ask it for the plan. */
+  /** The agent answered a make-something request with text only (no plan, no questions): offer to ask for the plan. */
   proposePlan?: boolean;
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
@@ -710,7 +710,7 @@ export interface GenNodeData {
   outputIndex: number;
   /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
   sketchAssetId?: string;
-  /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept in step with `modelRef`. */
+  /** Audio nodes whose model answers with text (MiniMax Lyrics): the output port is text. Kept with `modelRef`. */
   textOutput?: boolean;
 }
 
@@ -854,7 +854,7 @@ export interface LayerGroup {
   id: string;
   name: string;
   collapsed?: boolean;
-  /** Layers that were already hidden / locked when the group was hidden / locked: showing or unlocking it keeps them so. */
+  /** Layers already hidden or locked when the group was hidden or locked: showing or unlocking the group keeps them so. */
   keptHidden?: string[];
   keptLocked?: string[];
 }
@@ -905,8 +905,8 @@ export interface AgentState {
   busy: boolean;
   /** What the agent is doing while busy, for the chat's status row (no model output is shown). */
   phase?: 'working' | 'drafting' | 'checking';
-  /** Schema loads the plan check is waiting for now (the activity block shows each one, ticking). */
-  waiting?: Array<{ key: string; name: string; since: number }>;
+  /** Schema loads the plan check awaits now. */
+  waiting?: { key: string; name: string; since: number }[];
   /** Plan card the user commented on instead of approving; replaced by a revision or closed at the end of the turn. */
   revising?: string;
   /** Offline planner memory for the request being clarified. */

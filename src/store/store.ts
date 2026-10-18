@@ -59,6 +59,8 @@ export interface Settings {
   budgetAccepted?: number | null;
   /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */
   notify?: boolean;
+  /** Tab title while hidden when a generation finishes. */
+  notifications: { tabTitle: boolean };
   ops: { edit: string | null; upscale: string | null; removeBg: string | null; video: string | null; videoUpscale: string | null; videoEdit: string | null; videoExtend: string | null; transcribe: string | null; editRegion: string | null; removeObject: string | null };
 }
 
@@ -228,6 +230,7 @@ export const DEFAULT_UI: Pick<UiState, 'tool' | 'brush' | 'lineart' | 'shape' | 
 
 export const DEFAULT_SETTINGS: Settings = {
   keys: { openrouter: '', fal: '', nanogpt: '', atlas: '' },
+  notifications: { tabTitle: true },
   agent: { provider: 'offline', model: '', tier: 'normal', effort: 'medium' },
   guidedRounds: 2,
   budgetUsd: 25,
@@ -438,6 +441,7 @@ export const useStore = create<AppState>()(
           keys: { ...DEFAULT_SETTINGS.keys, ...p.settings?.keys },
           agent: { ...DEFAULT_SETTINGS.agent, ...p.settings?.agent },
           ops: { ...DEFAULT_SETTINGS.ops, ...p.settings?.ops },
+          notifications: { ...DEFAULT_SETTINGS.notifications, ...p.settings?.notifications },
         },
         spentUsd: p.spentUsd ?? 0,
         spendLog: p.spendLog ?? [],

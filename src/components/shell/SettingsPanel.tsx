@@ -14,7 +14,7 @@ import { formatUsd } from '../../lib/format';
 import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Settings } from '../../store/store';
 import { setDrawingPreference } from '../../engine/design/drawingChoice';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
-import { Button, Chip, Segmented, Spinner } from '../ui/primitives';
+import { Button, Chip, Segmented, Spinner, Toggle } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
 import { shortcutGroups } from '../../engine/shortcuts';
@@ -321,7 +321,7 @@ export function SettingsPanel() {
 
       {tab === 'providers' ? <section className="set-section">
         <div className="set-row">
-          <span className="set-label" data-tip="When a generation finishes while this tab is in the background, show a browser notification. The tab title always shows how many finished.">
+          <span className="set-label" data-tip="When a generation finishes while this tab is in the background, show a browser notification.">
             Notify when done
           </span>
           <Segmented
@@ -333,6 +333,12 @@ export function SettingsPanel() {
             }}
             size="sm"
           />
+        </div>
+        <div className="set-row">
+          <span className="set-label" data-tip="While this tab is in the background, its title shows the result of a finished generation (or how many are running) until you come back. Finished generations always show a short notice.">
+            Tab title when done
+          </span>
+          <Toggle checked={settings.notifications.tabTitle} onChange={(v) => setSettings({ notifications: { ...settings.notifications, tabTitle: v } })} label="Tab title when done" />
         </div>
         {REMOTE_PROVIDERS.map((p) => (
           <ProviderRow key={p} id={p} />

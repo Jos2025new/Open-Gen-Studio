@@ -24,7 +24,6 @@ describe('done notice', () => {
   let off: () => void;
   beforeEach(() => {
     vi.useFakeTimers();
-    document.title = 'OGS';
     Notif.mockClear();
     (Notif as unknown as { permission: string }).permission = 'granted';
     vi.stubGlobal('Notification', Notif);
@@ -34,19 +33,6 @@ describe('done notice', () => {
   });
   afterEach(() => { off(); hide(false); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-  it('counts finishes while hidden and resets when visible', () => {
-    hide(true);
-    setGens(gen('a', 'done'), gen('b', 'running'), gen('c', 'running'));
-    expect(document.title).toBe('(1) OGS');
-    setGens(gen('a', 'done'), gen('b', 'error'), gen('c', 'running'));
-    expect(document.title).toBe('(2) OGS');
-    hide(false);
-    expect(document.title).toBe('OGS');
-  });
-  it('does nothing while visible', () => {
-    setGens(gen('a', 'done'), gen('b', 'running'), gen('c', 'running'));
-    expect(document.title).toBe('OGS');
-  });
   it('notifies once per batch only when enabled and granted', () => {
     hide(true);
     setGens(gen('a', 'done'), gen('b', 'running'), gen('c', 'running'));

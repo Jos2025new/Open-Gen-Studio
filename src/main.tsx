@@ -25,6 +25,7 @@ import './styles/space.css';
 import './styles/studio.css';
 import { App } from './App';
 import { installDoneNotice } from './lib/doneNotice';
+import { installDoneSignal } from './lib/doneSignal';
 import { installBoardAutoOpen } from './lib/studioBoard';
 import { installHomeAutoClose, installHomeKeyGuard } from './components/shell/homeGuard';
 
@@ -32,6 +33,7 @@ installHomeKeyGuard();
 installHomeAutoClose();
 installBoardAutoOpen();
 installDoneNotice();
+installDoneSignal();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
