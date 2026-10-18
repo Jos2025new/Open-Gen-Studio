@@ -12,9 +12,9 @@ import { SessionsPanel } from './SessionsPanel';
 import { GalleryPanel } from '../gallery/GalleryPanel';
 import { HomeHero } from './HomeHero';
 
-function Head({ kicker, title, action }: { kicker: string; title: string; action?: ReactNode }) {
+function Head({ kicker, title, action }: { kicker?: string; title: string; action?: ReactNode }) {
   return <header className="home-head">
-    <div><div className="plan-kicker">{kicker}</div><h2 className="home-title">{title}</h2></div>
+    <div>{kicker && <div className="home-kicker">{kicker}</div>}<h2 className="home-title">{title}</h2></div>
     {action}
   </header>;
 }
@@ -97,14 +97,14 @@ export function HomeView() {
     <HomeHero />
 
     <section className="home-section" aria-label="Apps">
-      <Head kicker="Apps" title="Apps ready to go" />
+      <Head title="Apps ready to go" />
       <div className="home-apps">
         {CREATE.map((c) => <AppCard key={c.id} item={c} families={families[c.kind] ?? 0} />)}
       </div>
     </section>
 
     <section className="home-section" aria-label="Tools">
-      <Head kicker="Tools" title="Work on what you have" />
+      <Head kicker="Tools" title="Make more with AI tools" />
       <ToolsRow />
     </section>
 

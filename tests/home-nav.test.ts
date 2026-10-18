@@ -65,6 +65,10 @@ describe('rendering', () => {
     for (const t of ['Canvas', 'Designer']) expect(html).toContain(`<span class="home-space-title">${t}</span>`);
     expect(html).toMatch(/<button type="button" class="home-space" disabled="" aria-label="Projects — soon">/);
     expect(html).not.toContain('grid-area');
+    expect(html).toContain('Make more with AI tools');
+    expect(html).toContain('class="home-kicker">Tools</div>');
+    expect(html).not.toContain('plan-kicker');
+    expect(html).not.toContain('>Apps</div>');
   });
   it('Tools show 58 px circles with a last "More"; expanded, the same row ends in "Less"', () => {
     const collapsed = renderToStaticMarkup(createElement(ToolsRow));
