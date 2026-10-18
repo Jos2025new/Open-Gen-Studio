@@ -1,5 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+// Inter stays for the Designer's text (engine/design/doc.ts uses 'Inter Variable'); the app UI uses DM Sans.
+import '@fontsource-variable/inter';
 import '@fontsource/dm-sans/400.css';
 import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
