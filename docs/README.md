@@ -31,7 +31,7 @@
 - [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
-- [home y barra lateral: vista Home, secciones Spaces/Create/Tools](features/home.md).
+- [home y barra lateral: vista Home (hero, Apps, Tools, barra superior), secciones Spaces/Create/Tools](features/home.md).
 - [Create Media y Tools: Space Panel + Space Board (ajustes a la izquierda, resultados a la derecha)](features/create-space.md).
 - [Studio: chat y tablero Generations, Nodes y Designer (pasos 1 a 3)](features/studio.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
@@ -63,6 +63,8 @@
 - [0016 — Modo Dibujo y modo Diseño (aceptado 2026-10-13; pendiente la regla de capas con trazos editables)](decisions/0016-dibujo-y-diseno.md).
 - [0017 — Espacios: Space Panel + Space Board, y Studio con tablero (aceptado 2026-10-15; rama sin fusionar)](decisions/0017-espacios-panel-y-tablero.md).
 - [0018 — Canvas efectivo del agente y la herramienta open_board (aceptado 2026-10-15; rama sin fusionar)](decisions/0018-canvas-efectivo-del-agente.md).
+- [0019 — Tipografía: DM Sans y Outfit en la app, Inter en el Designer (aceptado 2026-10-17)](decisions/0019-tipografia-app-y-designer.md).
+- [0020 — Estructura de Home: hero, Apps, Tools y For deeper work (aceptado 2026-10-17)](decisions/0020-estructura-de-home.md).
 
 ## Propuestas de interfaz
 
@@ -128,6 +130,7 @@
 - [039-2026-10-W42: cohesión de la interfaz, Home, espacios Create y Tools, Studio con tablero (2026-10-15/16)](history/039-2026-10-W42.md) — por commit: qué, dónde, evidencia (tests, capturas, sin ver en navegador) y decisiones del usuario.
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
 - [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
+- [042-2026-10-W42: investigación de la persona entusiasta y rediseño de Home (2026-10-16/17)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas A a A15, decisiones del usuario, commits, fallos de verificación y arreglos.
 
 ## Trazabilidad
 

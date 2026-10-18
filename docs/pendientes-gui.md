@@ -45,3 +45,19 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
 - **E. Auto: la tarjeta de settings reaparece por un cambio de aspecto.** Causa: `context.ts` («confirm_settings again only to change them») trata el aspecto como cambio. Propuesta: cambio solo de aspecto o cantidad con el kind ya confirmado → `ask_questions` de opción múltiple (formato, una o varias) y `propose_plan` con `aspect`, sin `confirm_settings`. `context.ts` no puede crecer.
 - **F. Tarjeta «Plan … Revised» enorme para cambios pequeños.** `src/components/chat/PlanCard.tsx:153`. Propuesta: variante compacta cuando `item.revised` y hay un paso: «Cambio: título», coste y botones, sin lista de pasos ni la palabra «Plan».
 - [ ] **Recortes ocultos del catálogo, lo que queda.** Hecho 2026-10-16: topes 200/400, filtro `tools` del Director, vídeo NanoGPT sin flags (`nano:v3:videos`, `nanoVideoInputs`). Queda: la lista blanca `NANO_3D_MODELS` (`nanogpt.ts` ~296) oculta a propósito los demás modelos 3D del catálogo; la de audio es decisión documentada y no se toca.
+
+## Home rediseñado y persona entusiasta (2026-10-17, [042](history/042-2026-10-W42.md))
+
+- [ ] **Miniaturas de Spaces en Home: son marcadores de posición.** Faltan contenido real. `HomeView.tsx`, `home.css`.
+- [ ] **Ancho de 390 px:** la barra superior se trunca, las pestañas pasan a dos filas y la píldora de «Connected» no tiene hover en táctil. `topbar-home.css`, `home.css`.
+- [ ] **Attach en la barra de Home sin restricciones por modelo.** Acepta lo que acepta el compositor; no avisa de adjuntos no admitidos. `HomeBar.tsx`.
+- [ ] **Sin ejercitar a mano:** autoplay del carrusel y «+ New canvas / New design». Solo tests (`home-hero.test.ts`).
+- [ ] **Un Space abierto no se restaura con la píldora de volver.** Vuelve al espacio de trabajo y la sesión, no al Space. `TopBar.tsx`.
+- [ ] **Cifras de modelos en Apps:** son familias de los proveedores conectados, locales incluidos; no modelos individuales. Decidir si se explica en la interfaz.
+- [ ] **Plan de 4 bloques de la persona entusiasta** (propuesta, nada implementado; orden propuesto 1, 4, 2, 3):
+  - Bloque 1, primer uso: tarjeta «Paste your API key» con prueba barata de la clave, errores en lenguaje claro, que el agente pase al proveedor de la clave guardada, y comprobar en el sandbox un posible callejón con el planificador local.
+  - Bloque 4, coste visible: estimado, máximo y cobrado por separado, validar referencias antes de enviar, evitar duplicados por doble clic, menos jerga, aviso de cambio de modelo por defecto.
+  - Bloque 2, comparar modelos: etiqueta «New», «Try in another model», mismo prompt en N modelos con tope, vista lado a lado, recomendaciones por tarea.
+  - Bloque 3, operaciones en contexto: Upscale, Relight y Angle en la tarjeta del resultado (`suggestedOps()`), sin recargar la tarjeta para el usuario profesional.
+- [ ] **Cola de agentes («cuando X termine, haz Y»), acordada el 2026-10-16, sin empezar.** Debe proponer arreglos ante fallo o coste. ¿Antes o después de los bloques? Pregunta abierta.
+- [ ] **Evidencia de Reddit incompleta** (bloqueado; Manus parcial): faltan comparar, iterar, descubrir operaciones, abandono y jerga.
