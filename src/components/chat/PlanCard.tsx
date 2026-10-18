@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound } from 'lucide-react';
 import { approvePlan, cancelPlan, resolveStepCostReview } from '../../engine/agent/runtime';
 import { cancelGeneration } from '../../engine/jobs';
+import { stopPlanRun } from '../../engine/planStop';
 import { variantPrompt } from '../../engine/variantPrompt';
 import { toggleStep } from '../../engine/plan';
 import { estimateSteps } from '../../engine/executor';
@@ -170,7 +171,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const resultsDone = results.filter((r) => r.done).length;
   const refIds = [...new Set(plan.steps.flatMap(refAssets))];
   const spent = Object.values(item.stepGenerations).reduce((n, id) => n + (generations[id]?.actualUsd ?? 0), 0);
-  const stopRun = () => { for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
+  const stopRun = () => { stopPlanRun(plan.id); for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
   /** Only a waiting plan can be edited: the other states show the same lines without the Edit button. */
   const editable = (label: string, node: React.ReactNode) => (awaiting ? <EditLine label={label}>{node}</EditLine> : node);
 

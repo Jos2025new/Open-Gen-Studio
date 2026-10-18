@@ -3,7 +3,7 @@ import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
 import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
 import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
-import { createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
+import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
 import { OPS, opCount } from './ops';
 import { parseRef, stepDeps, topoOrder } from './plan';
@@ -12,6 +12,7 @@ import { uid } from '../lib/id';
 import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, StepAuthorization, Subject, Workspace } from './types';
 import { costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { useStore } from '../store/store';
+import { clearPlanStop, isPlanStopped, stoppedError } from './planStop';
 
 const get = useStore.getState;
 
@@ -47,6 +48,8 @@ export interface ExecResult {
   failed: Array<{ stepId: string; error: string }>;
   skipped: string[];
   waiting: string[];
+  /** The user pressed Cancel: nothing new was started and the pending steps were not run. */
+  stopped?: boolean;
 }
 
 export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Record<string, Estimate>; authorizations: Record<string, StepAuthorization> } {
@@ -108,6 +111,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   const waiting: string[] = [];
   const state = new Map<string, StepState>(order.map((id) => [id, 'pending']));
   const limit = Math.max(1, ctx.concurrency ?? 2);
+  clearPlanStop(ctx.planId);
 
   // The same inputs the plan card uses (plan.stepDeps: refs as `step:` refs, `after` as plain ids), computed once.
   const depsOf = new Map<string, string[]>();
@@ -153,6 +157,8 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
    */
   // A run that returns before its job is over (Check status took over the follower) waits for the follower.
   const runSettled = async (id: string) => {
+    // Cancel arrived while this step prepared its request: it is not sent.
+    if (isPlanStopped(ctx.planId)) { cancelGeneration(id); throw stoppedError(); }
     const assetIds = await runGeneration(id);
     await settleGeneration(id);
     return assetIds;
@@ -326,6 +332,12 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
     let active = 0;
     const pump = () => {
       let progressed = false;
+      if (isPlanStopped(ctx.planId)) {
+        // Cancel: nothing else starts. Pending steps are not run; the running ones end by their own cancellation.
+        for (const id of order) if (state.get(id) === 'pending') { state.set(id, 'skipped'); skipped.push(id); ctx.onState(id, 'skipped'); }
+        if (active === 0) resolve();
+        return;
+      }
       for (const id of order) {
         if (state.get(id) !== 'pending') continue;
         const s = byId.get(id)!;
@@ -382,7 +394,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
   });
 
   for (const [id, st] of state) if (st === 'pending') { waiting.push(id); ctx.onState(id, 'pending'); }
-  return { outputs, failed, skipped, waiting };
+  return { outputs, failed, skipped, waiting, ...(isPlanStopped(ctx.planId) ? { stopped: true } : {}) };
 }
 
 /** Save a plan subject in the library, unless one with that name exists (it is reused, as the plan card said). */
