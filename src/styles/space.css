@@ -44,7 +44,7 @@
 .space-empty { margin: 0; font-size: var(--fs-s); color: var(--text-3); }
 .space-board.is-done-folded .space-lower { flex: 1; max-height: none; }
 .space-board.is-done-folded .space-ongoing { min-height: 0; flex: 1; }
-.space-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); max-height: 38%; min-height: 150px; }
+.space-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 340px); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); max-height: 38%; min-height: 150px; }
 .space-ongoing, .space-actions { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0; overflow-y: auto; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); }
 .space-sub { font-size: var(--fs-xs); color: var(--text-3); }
 .space-ops { display: flex; flex-wrap: wrap; gap: var(--sp-1); }
