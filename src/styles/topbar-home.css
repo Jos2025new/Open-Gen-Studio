@@ -11,3 +11,7 @@
 .topbar-home:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 /* On Home the top bar takes the Home page's background, so the two read as one surface; its bottom border stays as it is. */
 .topbar.is-home { background: var(--bg-canvas); }
+.topbar-back { display: inline-flex; align-items: center; gap: 6px; max-width: 240px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--r-full); color: var(--text-3); font-size: 12px; white-space: nowrap; }
+.topbar-back span { overflow: hidden; text-overflow: ellipsis; }
+.topbar-back:hover { color: var(--text); background: var(--surface-2); }
+.topbar-back:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }

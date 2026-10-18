@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -16,7 +17,8 @@ import { setUi, useStore } from '../src/store/store';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { ResizeObserver?: unknown }).ResizeObserver ??= class { observe() {} unobserve() {} disconnect() {} };
 let root: Root | undefined;
-afterEach(() => { act(() => root?.unmount()); root = undefined; document.body.innerHTML = ''; });
+const firstSession = useStore.getState().activeSessionId;
+afterEach(() => { act(() => root?.unmount()); root = undefined; document.body.innerHTML = ''; useStore.setState({ activeSessionId: firstSession }); });
 
 /** Mounts the bar and returns its markup. Zustand reads the live state only on the client, so SSR would show the initial state. */
 function mount(home: boolean): HTMLElement {
@@ -63,4 +65,46 @@ describe('top bar on Home', () => {
     const host = mount(true);
     expect(host.querySelector('.topbar-home')).toBeNull();
   });
+  it('on Home a back pill names the workspace and the session', () => {
+    const id = useStore.getState().activeSessionId;
+    setUi({ workspace: 'chat' });
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [id]: { ...st.sessions[id], title: 'Logo ideas' } } }));
+    const host = mount(true);
+    const back = host.querySelector('.topbar-back') as HTMLButtonElement;
+    expect(back.textContent).toContain('Logo ideas');
+    expect(back.getAttribute('aria-label')).toBe('Back to Chat · Logo ideas');
+    expect(back.getAttribute('title')).toBe('Back to Chat · Logo ideas');
+  });
+  it('clicking the back pill closes Home and keeps the workspace and session', () => {
+    const id = useStore.getState().activeSessionId;
+    setUi({ workspace: 'designer' });
+    const host = mount(true);
+    act(() => (host.querySelector('.topbar-back') as HTMLButtonElement).click());
+    expect(useStore.getState().ui).toMatchObject({ home: false, workspace: 'designer' });
+    expect(useStore.getState().activeSessionId).toBe(id);
+  });
+  it('the back pill is hidden with no active session', () => {
+    useStore.setState({ activeSessionId: 'no-such-session' });
+    const host = mount(true);
+    expect(host.querySelector('.topbar-back')).toBeNull();
+  });
+  it('Escape on Home goes back, unless a field has focus', () => {
+    const host = mount(true);
+    const field = document.createElement('input');
+    host.append(field);
+    field.focus();
+    act(() => { field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(useStore.getState().ui.home).toBe(true);
+    const pill = host.querySelector('.topbar-back') as HTMLButtonElement;
+    pill.focus();
+    act(() => { pill.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); });
+    expect(useStore.getState().ui.home).toBe(false);
+  });
+  it('the Home background rules exist', () => {
+    const topbar = readFileSync('src/styles/topbar-home.css', 'utf8');
+    const home = readFileSync('src/styles/home.css', 'utf8');
+    expect(topbar).toMatch(/\.topbar\.is-home\s*\{\s*background:\s*var\(--bg-canvas\)/);
+    expect(home).toMatch(/\.workspace \.home \{[^}]*background: var\(--bg-canvas\)/);
+  });
 });
+

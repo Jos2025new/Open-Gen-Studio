@@ -1,7 +1,7 @@
 import { SaveIndicator } from './SaveIndicator';
 import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Settings } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Settings } from 'lucide-react';
 import { renameSession, setUi, useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
 import { SettingsPanel } from './SettingsPanel';
@@ -29,9 +29,19 @@ export function TopbarActions({ children }: { children: ReactNode }) {
   return target ? createPortal(children, target) : null;
 }
 
+/** On Home: the place the user came from (Home is an overlay, so the workspace and session are still there). */
+function BackToWorkspace({ workspace, title }: { workspace: string; title: string }) {
+  const label = `${WORKSPACES.find((w) => w.id === workspace)?.label ?? ''} · ${title || 'Untitled'}`;
+  const short = label.length > 28 ? `${label.slice(0, 27)}…` : label;
+  return <button type="button" className="topbar-back" aria-label={`Back to ${label}`} title={`Back to ${label}`} onClick={() => setUi({ home: false })}>
+    <ArrowLeft size={14} /><span>{short}</span>
+  </button>;
+}
+
 export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => void }) {
   const sessionId = useStore((s) => s.activeSessionId);
   const title = useStore((s) => s.sessions[s.activeSessionId]?.title ?? '');
+  const hasSession = useStore((s) => Boolean(s.sessions[s.activeSessionId]));
   const workspace = useStore((s) => s.ui.workspace);
   // On Home the top bar keeps only Connected (a status pill) and Settings: no breadcrumb, no Generations.
   const home = useStore((s) => s.ui.home);
@@ -52,6 +62,22 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
     if (!editing) setDraft(title);
   }, [title, editing]);
 
+  // Escape on Home goes back to where the user was, unless a field has focus or a popover, panel or lightbox is open.
+  // The keyboard guard passes keys aimed at Home, so this window capture listener sees them.
+  useEffect(() => {
+    if (!home || !hasSession) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.matches('input, textarea, select') || el.isContentEditable)) return;
+      const ui = useStore.getState().ui;
+      if (document.querySelector('.popover') || ui.panel || ui.lightbox || ui.sketch || ui.settingsOpen) return;
+      setUi({ home: false });
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [home, hasSession]);
+
   useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
@@ -64,6 +90,7 @@ export function TopBar({ slotRef }: { slotRef: (el: HTMLDivElement | null) => vo
   return (
     <header className={`topbar ${home ? 'is-home' : ''}`}>
       <div className="topbar-left">
+        {home && hasSession && <BackToWorkspace workspace={workspace} title={title} />}
         {!home && <>
         <button type="button" className="topbar-home" aria-label="Home" title="Home" onClick={openHome}><HomeIcon size={16} /></button>
         <button type="button" ref={workspacePop.ref} className="ws-tag title-btn" aria-label="Switch workspace" aria-haspopup="menu" aria-expanded={workspacePop.open} onClick={workspacePop.toggle}>
