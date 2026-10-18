@@ -6,7 +6,7 @@ vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: a
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { CREATE, SPACES, TOOLS_MAIN, TOOLS_MORE, openCreate, openHome, openSpace, openTool, isListed } from '../src/components/shell/navModel';
-import { HomeView } from '../src/components/shell/HomeView';
+import { HomeView, ToolsRow } from '../src/components/shell/HomeView';
 import { SidebarNav } from '../src/components/shell/SidebarNav';
 import { OPS, opsFor } from '../src/engine/ops';
 import { useStore } from '../src/store/store';
@@ -55,12 +55,24 @@ describe('navigation model', () => {
 });
 
 describe('rendering', () => {
-  it('Home has its three sections, the bento cards and an enabled 3D', () => {
+  it('Home has the hero, then Apps, Tools, For deeper work and Latest', () => {
     const html = renderToStaticMarkup(createElement(HomeView));
-    for (const label of ['Create', 'Tools', 'Latest']) expect(html).toContain(`aria-label="${label}"`);
-    for (const t of ['Studio', 'Node Canvas', 'Designer']) expect(html).toContain(`<span class="home-card-title">${t}</span>`);
-    for (const t of ['image', 'video', 'audio', 'model3d']) expect(html).toContain(`style="grid-area:${t}"`);
-    expect(html).toMatch(/<button type="button" class="home-tile t-model3d" style="grid-area:model3d" aria-label="3D"/);
+    for (const label of ['Apps', 'Tools', 'For deeper work', 'Latest']) expect(html).toContain(`aria-label="${label}"`);
+    expect(html).toContain('class="home-hero"');
+    for (const t of ['Image', 'Video', 'Audio', '3D']) expect(html).toMatch(new RegExp(`<span class="home-app-title">${t}</span>`));
+    expect(html).toMatch(/<button type="button" class="home-app t-model3d" aria-label="3D"/);
+    expect(html).toMatch(/<span class="home-app-icon">/);
+    for (const t of ['Canvas', 'Designer']) expect(html).toContain(`<span class="home-space-title">${t}</span>`);
+    expect(html).toMatch(/<button type="button" class="home-space" disabled="" aria-label="Projects — soon">/);
+    expect(html).not.toContain('grid-area');
+  });
+  it('Tools show 58 px circles with "+ More"; expanded, the same row ends in "− Less"', () => {
+    const collapsed = renderToStaticMarkup(createElement(ToolsRow));
+    expect(collapsed.match(/class="home-tool[ "]/g)).toHaveLength(TOOLS_MAIN.length + 1);
+    expect(collapsed).toMatch(/aria-expanded="false"[^>]*>.*\+ More/);
+    const expanded = renderToStaticMarkup(createElement(ToolsRow, { defaultMore: true }));
+    expect(expanded.match(/class="home-tool[ "]/g)).toHaveLength(TOOLS_MAIN.length + TOOLS_MORE.length + 1);
+    expect(expanded).toMatch(/aria-expanded="true"[^>]*>.*− Less/);
   });
   it('the wide bar has collapsible Spaces, Create and Tools sections with text', () => {
     const html = renderToStaticMarkup(createElement(SidebarNav, { wide: true }));
