@@ -58,8 +58,9 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const filtered = kind !== 'all' || scope !== (studio ? 'session' : 'all');
   const running = rows.ongoing.length > 0;
   const [userDone, setUserDone] = useState<boolean | null>(null);
-  useEffect(() => { if (studio) setUserDone(null); }, [running, studio]);
-  const doneOpen = doneExpanded({ running, override: userDone, auto: studio });
+  // Every board folds Done while something runs, so a launch is seen at once (as in Studio).
+  useEffect(() => { setUserDone(null); }, [running]);
+  const doneOpen = doneExpanded({ running, override: userDone, auto: true });
 
   return <section className={`space-board ${studio ? 'is-studio' : ''} ${doneOpen ? '' : 'is-done-folded'}`} aria-label="Generated assets">
     <header className="space-board-head">

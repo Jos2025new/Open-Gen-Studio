@@ -4,14 +4,17 @@ import { usePref } from '../ui/hooks';
 import { IconButton } from '../ui/primitives';
 import { openLibrary } from '../shell/navModel';
 
-const MIN = 320, MAX = 560;
-const clamp = (n: number) => Math.min(MAX, Math.max(MIN, Math.round(n)));
+// The panel can go from narrow to most of the window; the board always keeps BOARD_MIN px.
+const MIN = 260, BOARD_MIN = 320;
+const maxFor = (frame: number) => Math.max(MIN, frame - BOARD_MIN);
 
 /** The Space layout shared by Create and Tools: panel | draggable divider | board. The width is one UI preference. */
 export function SpaceFrame({ label, panel, board }: { label: string; panel: ReactNode; board: ReactNode }) {
   const [saved, save] = usePref('ogs:space-panel-w', 400);
   const [drag, setDrag] = useState<number | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const MAX = maxFor(root.current?.getBoundingClientRect().width ?? window.innerWidth);
+  const clamp = (n: number) => Math.min(MAX, Math.max(MIN, Math.round(n)));
   const width = clamp(drag ?? saved);
   const move = (e: PointerEvent<HTMLDivElement>) => {
     if (drag == null) return;

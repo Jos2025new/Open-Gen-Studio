@@ -42,6 +42,8 @@
 .space-tile-star { position: absolute; top: var(--sp-2); right: var(--sp-2); color: var(--warn); fill: var(--warn); }
 .space-tile.is-failed { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-1); padding: var(--sp-2); text-align: center; color: var(--danger); font-size: var(--fs-xs); background: var(--danger-soft); }
 .space-empty { margin: 0; font-size: var(--fs-s); color: var(--text-3); }
+.space-board.is-done-folded .space-lower { flex: 1; max-height: none; }
+.space-board.is-done-folded .space-ongoing { min-height: 0; flex: 1; }
 .space-lower { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) var(--sp-4); border-top: 1px solid var(--border); max-height: 38%; min-height: 150px; }
 .space-ongoing, .space-actions { display: flex; flex-direction: column; gap: var(--sp-2); min-height: 0; overflow-y: auto; padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-m); background: var(--surface); }
 .space-sub { font-size: var(--fs-xs); color: var(--text-3); }
