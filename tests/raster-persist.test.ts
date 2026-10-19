@@ -178,6 +178,19 @@ describe('raster saving (D1–D3)', () => {
     await expect(flushRaster()).resolves.toBeUndefined();
   });
 
+  it('review: a browser failure that lands while its layer is being deleted does not block flushRaster afterwards', async () => {
+    setBuffer('r', canvas('p1'));
+    encoding.deferNext = true; // the write is still encoding when the layer is deleted
+    failNext = 1; // and then fails in IndexedDB
+    const flushing = flushRaster().catch(() => undefined);
+    await vi.waitFor(() => expect(encoding.resolve).toBeDefined());
+    const deleting = deleteBuffers(['r']);
+    encoding.resolve!();
+    await deleting;
+    await flushing;
+    await expect(flushRaster()).resolves.toBeUndefined();
+  });
+
   it('deleting a layer waits for its write, so its pixels do not come back', async () => {
     setBuffer('e', canvas('gone'));
     const writing = flushRaster();
