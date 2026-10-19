@@ -34,7 +34,7 @@ El guardado protegido ([ADR 0022](decisions/0022-guardado-local-first-sin-bloque
 | GPT | `7d153fd` | 3 | `bb58598` |
 | GPT | `bb58598` | 1 | `9f11649` |
 | GPT | `9f11649` | 0; sugiere un test de la carrera del borrado | `71b9636` |
-| Spaces, 2026-10-19 (revisión independiente local) | Solo añadir `ogs-prompts` a `ALL_DB_NAMES` en `idb.ts`, autorización explícita del usuario | Ampliar el test al borrado bloqueado por una conexión abierta | Test ampliado: cierra la conexión, espera el borrado y reabre sin la clave; test de borrado bloqueado y revisión independiente |
+| Spaces, 2026-10-19 (revisión independiente: GPT, aprobado 2026-10-19, con IndexedDB simulada, sin navegador) | Solo añadir `ogs-prompts` a `ALL_DB_NAMES` en `idb.ts`, autorización explícita del usuario | Ampliar el test al borrado bloqueado por una conexión abierta | Test ampliado: cierra la conexión, espera el borrado y reabre sin la clave; test de borrado bloqueado y revisión independiente |
 
 El detalle está en [043](history/043-2026-10-W42.md). Cada cambio futuro añade una fila.
 
