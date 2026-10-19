@@ -567,7 +567,8 @@ export async function deleteBuffers(layerIds: string[]): Promise<void> {
   }
   // Let writes already running finish first, so they cannot bring a deleted layer's pixels back.
   await Promise.all(layerIds.map((id) => chains.get(id)));
-  layerIds.forEach((id) => chains.delete(id));
+  // After those writes: a deleted layer that failed in the browser no longer blocks flushRaster (and a handover).
+  layerIds.forEach((id) => { chains.delete(id); localFailed.delete(id); });
   if (layerIds.length) await blobDb.delMany(layerIds.map(keyFor)).catch(() => undefined);
   notify();
 }

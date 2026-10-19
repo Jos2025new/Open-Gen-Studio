@@ -70,7 +70,7 @@ Seis fallos de la fase 1, corregidos sin cambiar la arquitectura. Cada uno tiene
 
 **Segunda revisión (2026-10-18), sobre `7d153fd`.** Encontró tres huecos en los puntos 3 y 4, también corregidos con tests que fallan con el código anterior:
 - un `ok` tardío de una versión anterior borraba el fallo local de una más nueva. Ahora el fallo va ligado a la versión: solo lo borra una posterior escrita con éxito;
-- un fallo de IndexedDB al guardar píxeles no detenía el traspaso. Ahora `flushRaster()` rechaza si una capa no llegó ni al navegador; un fallo solo del disco (`DiskPendingError`) no rechaza;
+- un fallo de IndexedDB al guardar píxeles no detenía el traspaso. Ahora `flushRaster()` rechaza si una capa no llegó ni al navegador; un fallo solo del disco (`DiskPendingError`) no rechaza. Borrar la capa (`deleteBuffers`) quita su marca de fallo cuando terminan sus escrituras (tercera revisión);
 - «Volver al disco» no cancelaba los envíos en cola. Ahora deja de empezar envíos, espera al que está en vuelo y lee el disco después.
 
 Límite: la garantía del traspaso cubre el estado y los píxeles que pasan por `saveNow()`. Otras escrituras de medios (`putAssetBlob` de resultados descargados) no forman parte del traspaso.

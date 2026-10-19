@@ -169,6 +169,15 @@ describe('raster saving (D1–D3)', () => {
     expect(pendingRaster()).toEqual([]);
   });
 
+  it('review: a layer that failed in the browser and is then deleted no longer makes flushRaster reject', async () => {
+    setBuffer('z', canvas('p1'));
+    failNext = 1;
+    await expect(flushRaster()).rejects.toThrow(/browser storage/);
+    await deleteBuffers(['z']);
+    expect(pendingRaster()).toEqual([]);
+    await expect(flushRaster()).resolves.toBeUndefined();
+  });
+
   it('deleting a layer waits for its write, so its pixels do not come back', async () => {
     setBuffer('e', canvas('gone'));
     const writing = flushRaster();
