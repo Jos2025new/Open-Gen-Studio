@@ -77,6 +77,7 @@
 - [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
 - [Plan: Designer fluido](plan-fluidez.md) (2026-10-12): objetivo, umbrales, etapas y autorizaciones; las revisiones lo enmiendan, no lo reabren.
 - [Arquitectura del guardado protegido](arquitectura-guardado.md) (2026-10-18, fase 1): piezas, flujos (guardado, rechazo, arranque, pestañas), qué se guarda dónde, qué tocar cuando la app crece y diagnóstico.
+- [Propuesta: zonas protegidas](propuesta-zonas-protegidas.md) (2026-10-18), sin implementar: regla, pruebas y evidencia que protegen la persistencia.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
