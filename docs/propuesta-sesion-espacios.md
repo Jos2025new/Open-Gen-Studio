@@ -56,12 +56,15 @@ Se escriben al crear la generación y no cambian después. No se cambia el forma
 **4. «Reusar».** Es un botón en cada resultado de los Spaces, del tablero y de Library.
 - Carga en el panel del Space correspondiente el prompt, el modelo, los parámetros, las referencias y el modo de esa generación.
 - Si el modelo ya no existe o un parámetro cambió, carga lo que sigue siendo válido y avisa de qué quedó fuera.
+- **En Studio** también aparece, pero no rellena el chat: abre Create en el modo de esa generación con sus ajustes cargados. Así el chat del agente no se mezcla con generaciones directas. Muchos prompts de Studio los escribió el agente: se cargan tal cual y el usuario los edita.
 
 **5. Historial de prompts de texto.**
-- Hasta 200 prompts, sin repetidos; se descartan los más antiguos.
+- Hasta 200 prompts recientes, sin repetidos; se descartan los más antiguos.
+- **Favoritos con estrella:** un prompt marcado no se borra nunca de forma automática. Hay un tope blando de 1000: al llegar, se avisa y no se descarta nada.
 - Solo texto, sin ajustes asociados, para evitar conflictos (los ajustes completos se recuperan con «Reusar»).
-- Se recorre con ↑/↓ en el campo de prompt y con un desplegable.
-- Es uno por Space, Create y Tools, y se guarda como el resto del estado de UI.
+- Se recorre con ↑/↓ en el campo de prompt y con un desplegable que tiene una pestaña de favoritos.
+- Es uno por Space, Create y Tools.
+- **Se guarda en su propia clave de IndexedDB y disco, no en el estado principal.** Mil prompts largos pueden ocupar entre 0,3 y 1 MB, y el estado principal se serializa en cada guardado: meterlos ahí haría más lento cada guardado (ver la prioridad de velocidad).
 
 **6. Recordar el espacio al recargar.** Se guardan `space`, `toolOp`, `homeTab` y el modo del compositor, y la app vuelve donde estabas.
 
@@ -86,15 +89,16 @@ Se hace en un worktree propio, `task/space-session`, que sale de `task/agent-sto
    - las listas de sesiones ocultan `ui.spaceSession`.
 6. **Filtros** Lugar y Modo en `generationsView.ts` y en su interfaz, reutilizando el patrón del filtro de Sessions.
 7. **«Reusar»**: una acción en el resultado que rellena `composer` (Create) o `toolOp` y sus campos (Tools), y avisa de lo descartado.
-8. **Historial de prompts**: `src/store/promptHistory.ts`, con 200 entradas como tope, sin duplicados, persistido en `ui`; ↑/↓ y un desplegable en el panel.
-9. **Persistencia del UI**: añadir `space`, `toolOp`, `homeTab`, `spaceSession` y el historial a `partialize`, fuera de las funciones protegidas. Al cargar, se valida que `spaceSession` exista.
+8. **Historial de prompts**: `src/store/promptHistory.ts`, con 200 recientes como tope, sin duplicados, favoritos con estrella (tope blando de 1000, con aviso y sin borrar), en su propia clave persistida fuera del estado principal; ↑/↓ y un desplegable con pestaña de favoritos. Si guardar fuera del estado principal exige tocar `idb.ts` o `disk.ts` (zona protegida), parar y pedir autorización.
+9. **Persistencia del UI**: añadir `space`, `toolOp`, `homeTab` y `spaceSession` a `partialize`, fuera de las funciones protegidas. Al cargar, se valida que `spaceSession` exista.
 10. **Tests**: cada uno debe fallar con el código de ahora.
     - Una generación de Create lleva `place: space-create` y su modo, y no aparece en el chat de Studio.
     - Una operación de Tools sobre un activo de Studio lleva `place: space-tools` y va al contenedor.
     - Las generaciones de Studio, Canvas y Designer llevan su `place`.
     - Los filtros Lugar y Modo funcionan; una generación sin `place` sale como «Sin lugar».
     - «Reusar» carga los ajustes y avisa de un parámetro que ya no existe.
-    - El historial respeta el tope de 200 y no guarda repetidos.
+    - El historial respeta el tope de 200, no guarda repetidos y nunca descarta un favorito.
+    - «Reusar» en Studio abre Create con los ajustes y no escribe en el chat.
     - Al recargar se restaura el espacio; un `spaceSession` inválido se descarta.
 11. **Docs**:
     - `features/create-space.md` y `studio.md`;
@@ -111,5 +115,4 @@ Se hace en un worktree propio, `task/space-session`, que sale de `task/agent-sto
 - **Datos:** no se migra ni se borra nada existente.
 - **Proveedores de pago:** no se usan. La prueba visual no necesita generar de verdad, salvo que el usuario lo apruebe con un coste máximo.
 - **Decisiones abiertas para el usuario:**
-  - el tope del historial (se proponen 200);
-  - si «Reusar» se ofrece también en los resultados de Studio.
+  - ninguna: el usuario fijó el tope de favoritos (1000) y se propone «Reusar» en Studio abriendo Create.
