@@ -4,6 +4,8 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **no-forced-tool-choice** — Decisión del usuario (2026-10-08): las palabras clave dirigen al agente con una señal en el mensaje; nunca se envía al proveedor un tool_choice con nombre. | [llm.ts](../src/engine/providers/llm.ts), [force.ts](../src/engine/agent/force.ts) | [agent-force.test.ts](../tests/agent-force.test.ts) |
+| **ops-confirm-model** — Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor). | [procedure.ts](../src/engine/procedure.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-force.test.ts](../tests/agent-force.test.ts), [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |
 | **cost-recheck** — Un plan caro se muestra tras confirmar su tarjeta en la misma petición; el mensaje de coste nombra cada tipo una vez (la tarjeta admite 4 partes). | [runtime.ts](../src/engine/agent/runtime.ts), [tools.ts](../src/engine/agent/tools.ts) | [general-model-gate.test.ts](../tests/general-model-gate.test.ts) |
 | **spend-approval** — Todo plan con coste mayor que cero o desconocido espera aprobación, también en Auto. | [pricing.ts](../src/engine/pricing.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [engine.test.ts](../tests/engine.test.ts) |
 | **upscale-note** — El aviso de upscale se calcula del factor que se ejecuta; si no llega a lo pedido, la tarjeta lo muestra sin plegar. | [fit.ts](../src/engine/agent/fit.ts), [PlanCard.tsx](../src/components/chat/PlanCard.tsx) | [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { opFollowsSource } from '../../engine/catalog';
 import { OPS, defaultOpParams } from '../../engine/ops';
 import { layerOpEstimate, opEstimate, runAssetOp, runLayerOp } from '../../engine/actions';
 import type { AdvancedValue, Estimate, OpId } from '../../engine/types';
+import type { ToolSeed } from '../../store/spaceUi';
 import { useStore } from '../../store/store';
 import { ModelList } from '../composer/ModelList';
 import { Popover, usePopover } from '../ui/Popover';
@@ -15,7 +16,7 @@ export type OpTarget = { kind: 'asset'; assetId: string; parentId?: string } | {
 const CALCULATING: Estimate = { usd: null, approximate: true, note: 'Calculating…' };
 
 /** The state of one operation run: its fields, the cost check and the launch. Shared by the op popover and the Tools space. */
-export function useOpRun(op: OpId, targetProp: OpTarget | null) {
+export function useOpRun(op: OpId, targetProp: OpTarget | null, seed?: ToolSeed) {
   const def = OPS[op];
   // Callers pass a fresh object each render; key the estimate on its value.
   const targetKey = JSON.stringify(targetProp);
@@ -23,6 +24,13 @@ export function useOpRun(op: OpId, targetProp: OpTarget | null) {
   const [params, setParams] = useState<Record<string, AdvancedValue>>(() => defaultOpParams(def));
   // Model for this run only; null = the model that made the source (or the Settings default).
   const [picked, setPicked] = useState<string | null>(null);
+  const applied = useRef<ToolSeed | undefined>(undefined);
+  useEffect(() => {
+    if (!seed || seed === applied.current || seed.op !== op) return;
+    applied.current = seed;
+    setParams({ ...defaultOpParams(def), ...seed.params });
+    setPicked(seed.modelRef ?? null);
+  }, [seed, op]);
   const opsSettings = useStore((s) => s.settings.ops);
   const videoSettings = useStore((s) => s.composer.video.settings);
   const [estimate, setEstimate] = useState<Estimate>(CALCULATING);

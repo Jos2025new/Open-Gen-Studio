@@ -1,5 +1,8 @@
+import spaceContracts from './map-contracts-spaces.mjs';
+
 /** Registered by map-contracts.mjs; server, client and banner must agree on the 409 reasons and the keep payload. */
 export default [
+  ...spaceContracts,
   {
     id: 'save-guard-409',
     what: 'Un 409 dice por qué: conflict (baseAt: la pestaña pasa a stale y no envía más al disco) o possible-loss (el servidor aparta la copia y devuelve TODAS las pérdidas del commit: losses [{sessionId, diskHash}] y, si se borran la mayoría de sesiones, total {diskOrderHash}; la pestaña NO es stale y reintenta). IndexedDB se escribe siempre. "Mantener esta versión" envía keep {sessions: [{sessionId, diskHash, candidateHash}], total?: {diskOrderHash, candidateOrderHash}} calculado al enviar sobre los textos exactos; debe aprobar todas las pérdidas o se rechaza entero; no salta baseAt.',

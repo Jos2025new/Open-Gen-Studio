@@ -68,7 +68,7 @@ async function render(assetId: string): Promise<void> {
     if (!now || keyOf(now) !== key) return; // the view changed meanwhile; the next render takes it
     const id = uid('ast');
     await putAssetBlob(id, shot);
-    addAssets([{ id, kind: 'image', mime: 'image/jpeg', width: SIDE, height: SIDE, sessionId: now.sessionId, origin: 'view3d', stored: true, favorite: false, createdAt: Date.now() }]);
+    addAssets([{ id, kind: 'image', mime: 'image/jpeg', width: SIDE, height: SIDE, sessionId: now.sessionId, origin: 'view3d', place: now.place, mode: now.mode, stored: true, favorite: false, createdAt: Date.now() }]);
     patchAsset(assetId, { thumbnailUrl: thumb, thumbKey: key, viewImageId: id });
     // The old view image stays: a finished generation may still point at it as its input.
   } finally {

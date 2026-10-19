@@ -1,0 +1,6 @@
+.text-result-tile { min-width: 0; overflow: hidden; }
+.gen-text.is-compact > p { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.gen-text-actions { flex-wrap: wrap; }
+.text-lightbox { margin: auto; width: min(720px, 90vw); max-height: 90vh; overflow: auto; padding: 20px; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--radius-s); }
+.text-lightbox::backdrop { background: var(--overlay); }
+.text-lightbox .gen-text > p { white-space: pre-wrap; overflow-wrap: anywhere; }

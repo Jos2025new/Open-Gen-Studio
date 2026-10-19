@@ -9,7 +9,9 @@ import { KINDS, KIND_ICON, STATUSES, STATUS_LABEL, filterGenerations, statusOf, 
 import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Button, IconButton, Segmented, Toggle } from '../ui/primitives';
-import { generationPlace, goToGeneration } from '../../engine/goTo';
+import { generationPlace, goToGeneration, openGeneration, placeLabel } from '../../engine/goTo';
+import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
+import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
 import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/CanvasFilter';
 import { canvasLookup } from '../../engine/canvas';
 
@@ -22,8 +24,10 @@ const CANVAS = { chat: 'Chat', node: 'Nodes', designer: 'Designer' } as const;
 export function GenerationsPanel({ onClose }: { onClose: () => void }) {
   const generations = useStore((s) => s.generations);
   const sessionId = useStore((s) => s.activeSessionId);
-  const [scope, setScope] = useState<'session' | 'all'>('session');
+  const [scope, setScope] = useState<'session' | 'all'>(() => (useStore.getState().ui.home || useStore.getState().ui.space ? 'all' : 'session'));
   const [kind, setKind] = useState<Kind>('all');
+  const [place, setPlace] = useState<PlaceFilter>('all');
+  const [mode, setMode] = useState<ModeFilter>('all');
   const [status, setStatus] = useState<Status>('all');
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('newest');
@@ -39,8 +43,18 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
     return c;
   }, [inScope, where]);
   const scoped = useMemo(() => inScope.filter((g) => canvas === 'all' || where.generation(g) === canvas), [inScope, canvas, where]);
-  const list = useMemo(() => filterGenerations(scoped, { kind, status, q, sort }), [scoped, kind, status, q, sort]);
-  const count = (k: Kind) => scoped.filter((g) => k === 'all' || g.kind === k).length;
+  const faceted = useMemo(() => scoped.filter((g) => matchesPlace(g.place, place) && matchesMode(g.mode, mode)), [scoped, place, mode]);
+  const list = useMemo(() => filterGenerations(faceted, { kind, status, q, sort }), [faceted, kind, status, q, sort]);
+  const count = (k: Kind) => faceted.filter((g) => k === 'all' || g.kind === k).length;
+  const facets = useMemo(() => {
+    const places: Record<string, number> = { all: scoped.length, none: 0 };
+    const modes: Record<string, number> = { all: scoped.length, none: 0 };
+    for (const g of scoped) {
+      if (g.place) places[g.place] = (places[g.place] ?? 0) + 1; else places.none++;
+      if (g.mode) modes[g.mode] = (modes[g.mode] ?? 0) + 1; else modes.none++;
+    }
+    return { places, modes };
+  }, [scoped]);
 
   return (
     <div className={`generations-panel ${view === 'list' ? 'is-compact' : ''}`}>
@@ -59,7 +73,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
           ) : null}
           <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
             <SlidersHorizontal size={14} />
-            {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
+            {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || place !== 'all' || mode !== 'all' || sort !== 'newest' || view !== 'thumbs' ? <span className="dot" /> : null}
           </button>
         </div>
         <Popover open={filters.open} anchor={filters.ref} onClose={filters.close} width={300} label="Filter, sort and view">
@@ -72,6 +86,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
               <span className="sv-label">Canvas</span>
               <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
             </div>
+            <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
             <div className="sv-row">
               <span className="sv-label">Type</span>
               <div className="sv-canvas">
@@ -98,12 +113,14 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
             <label className="sv-switch"><span>Thumbnails</span><Toggle checked={view === 'thumbs'} onChange={(v) => setView(v ? 'thumbs' : 'list')} label="Thumbnails" /></label>
           </div>
         </Popover>
-        {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' ? (
+        {scope !== 'session' || canvas !== 'all' || kind !== 'all' || status !== 'all' || place !== 'all' || mode !== 'all' ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
             {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
             {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{KINDS.find((k) => k.id === kind)?.label} <X size={11} /></button> : null}
             {status !== 'all' ? <button type="button" className="active-chip" onClick={() => setStatus('all')}>{STATUSES.find((x) => x.id === status)?.label} <X size={11} /></button> : null}
+            {place !== 'all' ? <button type="button" className="active-chip" onClick={() => setPlace('all')}>{place === 'none' ? 'No place' : PLACE_LABEL[place]} <X size={11} /></button> : null}
+            {mode !== 'all' ? <button type="button" className="active-chip" onClick={() => setMode('all')}>{mode === 'none' ? 'No mode' : MODE_LABEL[mode]} <X size={11} /></button> : null}
           </div>
         ) : null}
       </div>
@@ -118,6 +135,7 @@ export function GenerationsPanel({ onClose }: { onClose: () => void }) {
 function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs: boolean; showSession: boolean; onGo: () => void }) {
   const jump = usePopover();
   const place = generationPlace(g);
+  const space = g.place === 'space-create' || g.place === 'space-tools';
   const sessions = useStore((s) => s.sessions);
   const asset = g.assetIds[0];
   const cost = g.actualUsd ?? g.estimate.usd;
@@ -129,6 +147,8 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
           <AssetMedia assetId={asset} hoverPlay={false} />
           {g.assetIds.length > 1 ? <span className="gen-row-count num">{g.assetIds.length}</span> : null}
         </button>
+      ) : thumbs && g.kind === 'text' && g.status === 'done' ? (
+        <button type="button" className="gen-row-thumb" aria-label="Open text" onClick={() => openGeneration(g)}><Icon size={18} /></button>
       ) : thumbs ? (
         <span className="gen-row-thumb is-empty" aria-hidden="true"><Icon size={18} /></span>
       ) : null}
@@ -138,12 +158,12 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
           <span className={`gen-row-status status-${statusOf(g)}`}>{STATUS_LABEL[g.status]}</span>
           <span>{g.modelName} · {PROVIDER_LABELS[g.provider]}</span>
           <span className="num">{formatDateTime(g.createdAt)}</span>
-          {place ? <span>{CANVAS[place.canvas]}{showSession ? ` · ${sessions[place.sessionId]?.title ?? ''}` : ''}</span> : null}
+          {space ? <span>{placeLabel(g)}</span> : place ? <span>{CANVAS[place.canvas]}{showSession ? ` · ${sessions[place.sessionId]?.title ?? ''}` : ''}</span> : null}
           {cost != null ? <span className="num">{g.actualUsd == null ? '≈' : ''}{formatUsd(cost)}</span> : null}
         </div>
         {g.status === 'error' && g.error ? <div className="gen-row-error" title={g.error}>{g.error}</div> : null}
       </div>
-      {place ? (
+      {g.kind === 'text' && g.status === 'done' ? <IconButton icon={CornerDownRight} label="Open text" size="sm" onClick={() => openGeneration(g)} /> : space ? (asset ? <IconButton icon={CornerDownRight} label="Open result" size="sm" className="gen-row-go" onClick={() => openGeneration(g, asset)} /> : null) : place ? (
         <>
           <IconButton ref={jump.ref} icon={CornerDownRight} label="Go to where it was made" size="sm" className="gen-row-go" active={jump.open} onClick={jump.toggle} />
           <Popover open={jump.open} anchor={jump.ref} onClose={jump.close} width={260} label="Go to generation">

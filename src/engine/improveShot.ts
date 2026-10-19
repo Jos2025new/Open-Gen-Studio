@@ -42,9 +42,9 @@ export async function improveShot(generationId: string): Promise<void> {
   const estimate = await improveEstimate(g, plan);
   const problem = budgetProblem(estimate);
   if (problem) { toast(problem, 'error'); return; }
-  if (plan.mode === 'upscale') { await runAssetOp(g.assetIds[0], 'video_upscale', {}); return; }
+  if (plan.mode === 'upscale') { await runAssetOp(g.assetIds[0], 'video_upscale', {}, undefined, undefined, g.place, g.mode); return; }
   const next = createGeneration({
-    sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, origin: g.origin,
+    sessionId: g.sessionId, kind: g.kind, prompt: g.prompt, modelRef: g.modelRef, inputs: g.inputs, origin: g.origin, place: g.place, mode: g.mode,
     settings: { ...g.settings, resolution: plan.resolution },
     parentId: g.id, operationId: g.operationId ?? g.id, estimate,
   });

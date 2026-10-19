@@ -1,0 +1,68 @@
+// @vitest-environment jsdom
+import { act, createElement } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterAll, expect, it, vi } from 'vitest';
+vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, peekAssetUrl: () => undefined, loadAssetUrl: async () => undefined }));
+import { splitBoard } from '../src/components/space/boardModel';
+import { GenerationsPanel } from '../src/components/shell/GenerationsPanel';
+import { GalleryPanel } from '../src/components/gallery/GalleryPanel';
+import { TextLightbox } from '../src/components/assets/TextLightbox';
+import { openGeneration } from '../src/engine/goTo';
+import { setUi, useStore } from '../src/store/store';
+import type { Generation } from '../src/engine/types';
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+afterAll(() => vi.unstubAllGlobals());
+const g: Generation = { id: 'txt', kind: 'text', status: 'done', place: 'space-tools', mode: 'audio', sessionId: 'hidden', text: 'Transcription here', modelName: 'Transcriber', prompt: '', modelRef: 'demo/test', provider: 'local', origin: 'op', createdAt: 3, assetIds: [], settings: { count: 1, advanced: {} }, inputs: { refs: [] }, estimate: { usd: 0, approximate: false }, op: { id: 'transcribe', sourceAssetId: 'gone', params: {} } };
+it('text fills Done and respects place and favorites', () => {
+  const opts = { kind: 'all', status: 'all', q: '', sort: 'newest', starred: false, showFailed: false, scope: 'all', place: 'space-tools' } as const;
+  expect(splitBoard({ txt: g }, {}, opts).done).toEqual([{ type: 'text', generationId: 'txt' }]);
+  expect(splitBoard({ txt: g }, {}, { ...opts, starred: true }).done).toEqual([]);
+  expect(splitBoard({ txt: g }, {}, { ...opts, place: 'space-create' }).done).toEqual([]);
+});
+it('Library opens text without changing session; viewer closes with Escape', () => {
+  useStore.setState((s) => ({ assets: {}, generations: { txt: g }, ui: { ...s.ui, home: true, textView: null } }));
+  const session = useStore.getState().activeSessionId;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  act(() => root.render(createElement(GalleryPanel)));
+  expect(host.textContent).toContain('Transcription here');
+  expect(host.querySelector('.g-check')).toBeNull();
+  act(() => [...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Open text'))!.click());
+  expect(useStore.getState().ui.textView).toBe(g.id);
+  expect(useStore.getState().activeSessionId).toBe(session);
+  act(() => root.render(createElement(TextLightbox)));
+  expect(host.querySelector('dialog')?.textContent).toContain('Transcription here');
+  act(() => host.querySelector('dialog')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(useStore.getState().ui.textView).toBeNull();
+  act(() => root.render(createElement(GenerationsPanel, { onClose: () => undefined })));
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Open text"]')!.click());
+  expect(useStore.getState().ui.textView).toBe(g.id);
+  expect(useStore.getState().activeSessionId).toBe(session);
+  act(() => openGeneration(g));
+  expect(useStore.getState().ui.textView).toBe(g.id);
+  act(() => root.unmount()); host.remove();
+});
+
+it('Library counts text in Place/Mode and its Text filter excludes images; viewers are exclusive', () => {
+  useStore.setState((s) => ({ generations: { txt: g }, assets: { pic: { id: 'pic', kind: 'image', place: 'space-create', mode: 'image', createdAt: 5, sessionId: 'hidden', origin: 'generated', stored: true } as import('../src/engine/types').Asset }, ui: { ...s.ui, home: true, space: undefined, lightbox: null, textView: null } }));
+  const host = document.createElement('div'); document.body.append(host); const root = createRoot(host);
+  act(() => root.render(createElement(GalleryPanel)));
+  expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(2);
+  expect(host.querySelector('.gallery-grid > :first-child')?.classList.contains('g-tile')).toBe(true);
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="Filter, sort and view"]')!.click());
+  const rows = [...document.querySelectorAll('.sv-row')];
+  const place = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Place')!;
+  const mode = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Mode')!;
+  expect([...place.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Tools'))?.textContent).toBe('Tools1');
+  expect([...mode.querySelectorAll('button')].find((b) => b.textContent?.startsWith('Audio'))?.textContent).toBe('Audio1');
+  const type = rows.find((r) => r.querySelector('.sv-label')?.textContent === 'Type')!;
+  act(() => [...type.querySelectorAll('button')].find((b) => b.textContent === 'Text')!.click());
+  expect(host.querySelectorAll('.gallery-grid > *')).toHaveLength(1);
+  expect(host.querySelector('.gallery-scroll')?.textContent).toContain('Transcription here');
+  act(() => { setUi({ textView: g.id }); setUi({ lightbox: { assetIds: ['pic'], index: 0 } }); });
+  expect(useStore.getState().ui.textView).toBeNull();
+  act(() => setUi({ textView: g.id }));
+  expect(useStore.getState().ui.lightbox).toBeNull();
+  act(() => root.unmount()); host.remove();
+});

@@ -1,3 +1,4 @@
+import { reusedOpChoice, transcriberForRun } from './opRunModel';
 import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
@@ -13,7 +14,7 @@ import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
@@ -51,8 +52,10 @@ export interface GenerationSpec {
   inputs?: Generation['inputs'];
   op?: Generation['op'];
   origin: GenerationOrigin;
+  place?: Generation['place'];
+  mode?: Generation['mode'];
   parentId?: string;
-  /** When present, links this attempt to its parent operation (regenerate/retry share the same operationId). */
+  /** Links this attempt to its parent operation (regenerate/retry share it). */
   operationId?: string;
   planId?: string;
   stepId?: string;
@@ -107,6 +110,8 @@ export function createGeneration(spec: GenerationSpec): Generation {
     inputs: spec.inputs ?? { refs: [] },
     op: spec.op,
     origin: spec.origin,
+    place: spec.place,
+    mode: spec.mode,
     status: 'queued',
     assetIds: [],
     estimate,
@@ -123,7 +128,7 @@ export function createGeneration(spec: GenerationSpec): Generation {
   return g;
 }
 
-/** An asset's bytes. A result that still lives only at the provider is downloaded and kept, since provider links expire. */
+/** An asset's bytes; a result still only at the provider is downloaded and kept (links expire). */
 async function ensureAssetBlob(assetId: string): Promise<Blob> {
   const asset = get().assets[assetId];
   if (!asset) throw new Error('An input asset was deleted.');
@@ -191,6 +196,8 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
     sessionId: g.sessionId,
     generationId: g.id,
     origin: 'generated',
+    place: g.place,
+    mode: g.mode,
     remoteUrl: blob ? undefined : o.url,
     stored: Boolean(blob),
     favorite: false,
@@ -198,11 +205,7 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
   };
 }
 
-/**
- * A 3D result is a set of files: the model (GLB, a ZIP with it, FBX with quads…) and often a preview render.
- * The bytes are downloaded right away (Atlas links expire in 24 h) and typed by content; each model file
- * becomes an asset and the render becomes their small thumbnail, never a separate model or image.
- */
+/** A 3D result is model files plus often a render: each model is an asset, the render their thumbnail. */
 export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Promise<Asset[]> {
   const files = await Promise.all(
     outputs.map(async (o) => {
@@ -257,10 +260,7 @@ async function runLocalOp(g: Generation, signal: AbortSignal): Promise<string[]>
   return assets.map((a) => a.id);
 }
 
-/**
- * join_clips: the local server joins the clips with ffmpeg (server/local-store.js). The clips are written to
- * its data folder first; the result is a new video asset. Without that server (static hosting) it cannot run.
- */
+/** join_clips: the local server joins the clips with ffmpeg; no server, no join. */
 async function joinClips(g: Generation, ids: string[], signal: AbortSignal, music?: string, loudnorm = false): Promise<string[]> {
   if (ids.length < 2) throw new InputError('JOIN_CLIPS', 'Join clips needs at least two clips.');
   if (!(await diskAvailable())) throw new InputError('JOIN_UNAVAILABLE', 'Joining clips needs the local app server (npm run dev or npm run preview).');
@@ -679,12 +679,12 @@ async function execute(id: string): Promise<string[]> {
   }
 }
 
-/** What a piece of media looked like, so the debug record can say "<image 1024×1024>" instead of its bytes (T5). */
+/** What a media input looked like, for the debug record. */
 function mediaInfo(input: MediaInput | undefined): MediaInfoLite[] | undefined {
   return input ? [{ mime: input.mime, width: input.width, height: input.height }] : undefined;
 }
 
-/** A submitted job ends only when the provider says it failed; a local stop keeps it for "Check again". */
+/** A submitted job is kept for "Check again" after a local stop. */
 function keptJob(err: unknown, job: RemoteJob | undefined): RemoteJob | undefined {
   return err instanceof JobFailedError ? undefined : job;
 }
@@ -787,10 +787,7 @@ function spendEntry(g: Generation, estimated: boolean) {
   return { category: g.kind, provider: g.modelRef.split('::')[0], model: g.modelRef, sessionId: g.sessionId, estimated };
 }
 
-/**
- * A generation whose session was deleted while it ran, now ended (done, error or canceled): its charge is already in
- * Spending (finish / chargePartial), so remove it and every result it stored, including those saved after the delete.
- */
+/** An ended generation of a deleted session: already charged, so remove it and its results. */
 export function purgeDiscarded(id: string): void {
   const g = get().generations[id];
   if (!g?.discard || running.has(id) || g.status === 'running' || g.status === 'queued') return;
@@ -1000,12 +997,14 @@ export interface OpSpecInput {
   op: OpId;
   params: Record<string, AdvancedValue>;
   origin: GenerationOrigin;
+  place?: Generation['place'];
+  mode?: Generation['mode'];
   parentId?: string;
   planId?: string;
   stepId?: string;
   /** Dimensions of the source when it is not an asset yet (designer layers). */
   sourceDims?: { width: number; height: number };
-  /** Model picked for this run (edit / video engines); by default the source's model or the engine's. */
+  /** Model picked for this run (replay, edit / video / transcribe engines); by default the source's model or the engine's. */
   modelRef?: string;
   /** Model and composer settings reviewed by the Node Run confirmation. */
   nodeChoice?: { ref: string; viaEdit: boolean; settings?: GenSettings };
@@ -1048,7 +1047,7 @@ export function videoOpSeconds(engine: VideoOpEngine, settings: GenSettings, cli
 
 export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const def = OPS[input.op];
-  const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
+  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   if (input.op === 'join_clips') {
     const n = 1 + String(input.params.clips ?? '').split(',').filter(Boolean).length;
@@ -1063,7 +1062,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: 'fal bills the voice when it is created' } };
   }
   if (def.engine === 'transcribe') {
-    const t = transcriberFor();
+    const t = transcriberForRun(input.modelRef);
     if (!t) throw new Error('No connected provider offers Transcribe. Connect NanoGPT.');
     const clip = get().assets[input.sourceAssetId];
     const language = String(input.params.language ?? 'auto');
@@ -1072,7 +1071,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
   const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
-  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
+  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;
@@ -1085,7 +1084,7 @@ export function opSpecForModel(input: OpSpecInput, modelRef: string, viaEdit: bo
   const def = OPS[input.op];
   const source = get().assets[input.sourceAssetId] ?? input.sourceDims;
   const prompt = def.instruction ? opRolesLine(input.params, input.sourceAssetId, modelRef, schema) + def.instruction(input.params) : def.label;
-  const base = { sessionId: input.sessionId, origin: input.origin, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
+  const base = { sessionId: input.sessionId, origin: input.origin, place: input.place, mode: input.mode, parentId: input.parentId, planId: input.planId, stepId: input.stepId };
   const op = { id: input.op, params: input.params, sourceAssetId: input.sourceAssetId };
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string';
   if (def.engine === 'video_upscale' || def.engine === 'video_edit' || def.engine === 'video_extend') {

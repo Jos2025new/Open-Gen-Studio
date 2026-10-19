@@ -1,6 +1,7 @@
 /* Domain model shared by the store, engine, agent and UI. */
 
 import type { SentRequest } from '../lib/debug';
+import type { Mode, Place } from './placeTypes';
 import type { DraftMode } from './agent/draftFirst';
 import type { FxLayer } from './fx/types';
 
@@ -26,11 +27,7 @@ export interface ParamDef {
   key: string;
   label: string;
   role: ParamRole;
-  /**
-   * Structured types keep their value in `settings.extras`: 'multi' (several of `options`), 'color' ({r,g,b}),
-   * 'colors' (list of {r,g,b}), 'palette' (Ideogram: preset name or weighted colors), 'text' (free id),
-   * 'textList' (list of strings matching `pattern`).
-   */
+  /** Structured values live in `settings.extras`; 'text' has a free id, 'textList' strings matching `pattern`. */
   type: 'enum' | 'integer' | 'number' | 'boolean' | 'string' | 'multi' | 'color' | 'colors' | 'palette' | 'text' | 'textList';
   /** 'textList' / 'text': what each value must look like (regex source). */
   pattern?: string;
@@ -101,10 +98,7 @@ export interface InputSlots {
     /** The top-level prompt and the shots are mutually exclusive (fal). */
     exclusivePrompt: boolean;
   };
-  /**
-   * Inpainting mask, same size as the source image. `white`: white = area to change (Ideogram, Qwen, Z-Image);
-   * `alpha`: transparent = area to change (OpenAI GPT Image).
-   */
+  /** Inpainting mask: `white` marks the area to change, `alpha` makes it transparent. */
   mask?: { key: string; required: boolean; convention: 'white' | 'alpha'; format: ImageInputFormat };
   /** Trimmed reference clips (`video_clips: { url, start, ends[, fps] }`). Takes the input videos. */
   clips?: {
@@ -247,9 +241,11 @@ export interface Asset {
   duration?: number;
   sessionId: string;
   generationId?: string;
-  /** 'sketch': painted-over copy owned by a node; not listed in the gallery. */
-  /** 'mask': drawn in Sketch for Edit region / Remove object; hidden from the gallery like 'sketch'. */
+  /** 'sketch' and 'mask' are working copies hidden from the gallery. */
   origin: 'generated' | 'upload' | 'design' | 'frame' | 'sketch' | 'mask' | 'view3d';
+  /** Where it was created and in what mode (see placeTypes.ts); absent in older data. */
+  place?: Place;
+  mode?: Mode;
   /** Provider URL kept when the bytes could not be stored locally. */
   remoteUrl?: string;
   thumbnailUrl?: string;
@@ -319,6 +315,9 @@ export interface Generation {
   };
   op?: { id: OpId; params: Record<string, AdvancedValue>; sourceAssetId: string };
   origin: GenerationOrigin;
+  /** Where it was launched and in what mode (see placeTypes.ts); absent in older data. */
+  place?: Place;
+  mode?: Mode;
   status: GenerationStatus;
   statusText?: string;
   progress?: number;
@@ -333,12 +332,12 @@ export interface Generation {
   /** Reported cost. */
   providerReportedUsd?: number;
   parentId?: string;
-  /** Links attempts of the same operation: regenerate/retry share this id.  Phase 2 of the General Model. */
+  /** Regenerate/retry attempts of the same operation share this id. */
   operationId?: string;
   planId?: string;
   stepId?: string;
   remoteJob?: RemoteJob;
-  /** The provider's job id, kept after the job ends, so a recovered run is never adopted twice. */
+  /** The provider job id, kept after it ends so a recovered run is not adopted twice. */
   jobId?: string;
   /** The connection failed before a job id came back: the provider may still have the job (Check status). */
   lostJob?: boolean;
@@ -347,9 +346,9 @@ export interface Generation {
   finishedAt?: number;
   /** What came back different from what was asked (O3: "asked 9:16, got 1:1 (640×640)"). */
   delivery?: string[];
-  /** What the app did about this request on its own (a retry it made), kept after it ends (T4). */
+  /** What the app did on its own (a retry it made), kept after it ends. */
   notes?: string[];
-  /** The last request to the provider: endpoint, mapped parameters, try and job id (T5). Never a key or media. */
+  /** The last provider request (endpoint, params, try, job id). Never a key or media. */
   sent?: SentRequest;
 }
 
@@ -1022,6 +1021,8 @@ export interface Session {
   createdAt: number;
   updatedAt: number;
   pinned: boolean;
+  /** Internal Space container: hidden from every session list, Home and the search. */
+  hidden?: boolean;
   feed: FeedItem[];
   graph: Graph;
   docs: DesignDoc[];

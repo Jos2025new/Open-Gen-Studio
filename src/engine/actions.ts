@@ -15,6 +15,9 @@ import { createGeneration, isRunning, opSpec, runGeneration, type GenerationSpec
 import { OPS } from './ops';
 import { audioInputProblem, lyricsBody, lyricsParam, songProblem, mentionSubjects, paramByRole, routeVideoInputs, shotsProblem, videoInputProblem } from './params';
 import { needsSpendCheck } from './pricing';
+import { modeFor, placeFor } from './place';
+import { ensureSpaceSession } from '../store/spaceSession';
+import type { Mode, Place } from './placeTypes';
 import { overLimit, overLimitText } from './budget';
 import { ensureDoc, placeAsset, placeAboveLayer, layerToAsset, getDoc } from './design/actions';
 import { deleteBuffers, rasterBufferIds } from './design/raster';
@@ -88,10 +91,7 @@ export function libraryItem(name: string): Subject | undefined {
   return get().library.find((x) => x.name.toLowerCase() === clean);
 }
 
-/**
- * "Save to library" on an image: that image is the frontal view of a library item. A taken name is refused unless
- * `replace` (the library is shared by every session, so the UI confirms first); the item keeps its id and @Name.
- */
+/** Save to library: a taken name is refused unless `replace`; the item keeps its id and @Name. */
 export function subjectFromAsset(assetId: string, name: string, kind: SubjectKind = 'character', opts: { replace?: boolean; views?: string[] } = {}): Subject | null {
   const clean = name.trim().replace(/^@/, '');
   if (!clean || get().assets[assetId]?.kind !== 'image') return null;
@@ -138,7 +138,7 @@ export function subjectFromAttachments(name: string): Subject | null {
   return subject;
 }
 
-/** Create a Recraft V4 style (fal) from the attached images, save it in the session and select it. Call after cost confirmation. */
+/** Create a Recraft V4 style from the attached images and select it (after cost confirmation). */
 export async function createRecraftStyle(sessionId: string, name: string): Promise<void> {
   const st = get();
   const images = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image').slice(0, 10);
@@ -161,7 +161,7 @@ export async function createRecraftStyle(sessionId: string, name: string): Promi
   }
 }
 
-/** Create a Kling voice (fal) from the attached audio and bind it to the subject when it is ready. Call after cost confirmation. */
+/** Create a Kling voice and bind it to the subject when ready (after cost confirmation). */
 export async function createSubjectVoice(sessionId: string, subjectId: string): Promise<void> {
   const st = get();
   const audio = st.composer.attachments.find((id) => st.assets[id]?.kind === 'audio');
@@ -188,7 +188,7 @@ export async function createSubjectVoice(sessionId: string, subjectId: string): 
 // ---------------------------------------------------------------------------
 // Budget
 
-/** Why a run cannot start without asking: it goes over a limit the user has not accepted going past. */
+/** Why a run needs confirmation: it goes over a limit not yet accepted. */
 export function budgetProblem(e: Estimate): string | null {
   return overLimit(e) ? overLimitText(e) : null;
 }
@@ -282,8 +282,8 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
     return;
   }
   const st = get();
-  const sessionId = st.activeSessionId;
   const workspace = st.ui.workspace;
+  const sessionId = st.ui.space ? ensureSpaceSession() : st.activeSessionId;
   const { modelRef, settings } = st.composer[kind];
   const text = st.composer.text.trim();
   const attachments = st.composer.attachments.filter((id) => st.assets[id]?.kind === 'image');
@@ -313,6 +313,8 @@ export async function generateDirect(kind: MediaKind): Promise<void> {
       trims: pick(st.composer.trims, videoAttachments),
     },
     origin: workspace === 'node' ? 'node' : workspace === 'designer' ? 'designer' : 'composer',
+    place: placeFor(st.ui, workspace),
+    mode: kind,
     parentId,
     estimate: check.estimate,
   };
@@ -460,11 +462,7 @@ export async function regenerate(generationId: string): Promise<void> {
   });
 }
 
-/**
- * Put song lyrics (a MiniMax Lyrics result, a transcription…) into Audio mode on a music model: the selected one,
- * or the preferred music model when a lyrics model is selected. "Write lyrics for me" is turned off, since the
- * model rejects it together with given lyrics.
- */
+/** Put lyrics into Audio on a music model and turn off "Write lyrics for me". */
 export async function applyLyrics(text: string): Promise<void> {
   const st = get();
   const current = st.composer.audio.modelRef;
@@ -594,7 +592,7 @@ export function useAsReference(assetId: string): void {
   setUi((u) => ({ focusComposer: u.focusComposer + 1, lightbox: null }));
 }
 
-/** Kinds the agent-context checkbox can name: images and videos are shown to the agent, a 3D model by its view image, audio as text. */
+/** Kinds the agent-context checkbox can name. */
 export const AGENT_ATTACHABLE: readonly string[] = ['image', 'video', 'audio', 'model3d'];
 
 /** Toggle an existing asset in the agent's attachment list. No asset is created or copied. */
@@ -639,6 +637,8 @@ export async function uploadFiles(files: File[]): Promise<string[]> {
         duration: info.duration,
         sessionId,
         origin: 'upload',
+        place: placeFor(st.ui, st.ui.workspace),
+        mode: is3d ? 'model3d' : f.type.startsWith('video/') ? 'video' : f.type.startsWith('audio/') ? 'audio' : 'image',
         stored: true,
         favorite: false,
         createdAt: Date.now(),
@@ -674,7 +674,7 @@ export async function opEstimate(assetId: string, op: OpId, params: Record<strin
 }
 
 /** Apply an operation to an asset. The result appears as a new generation. Call after cost confirmation. */
-export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string): Promise<string[]> {
+export async function runAssetOp(assetId: string, op: OpId, params: Record<string, AdvancedValue>, parentId?: string, modelRef?: string, place?: Place, mode?: Mode): Promise<string[]> {
   const st = get();
   const asset = st.assets[assetId];
   if (!asset) return [];
@@ -683,8 +683,8 @@ export async function runAssetOp(assetId: string, op: OpId, params: Record<strin
     toast(`${def.label} needs an ${def.input}.`, 'error');
     return [];
   }
-  const sessionId = asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
-  const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef });
+  const sessionId = st.ui.space ? ensureSpaceSession() : asset.sessionId && st.sessions[asset.sessionId] ? asset.sessionId : st.activeSessionId;
+  const spec = await opSpec({ sessionId, sourceAssetId: assetId, op, params, origin: 'op', parentId, modelRef, place: place ?? placeFor(st.ui, st.ui.workspace), mode: mode ?? modeFor(st.composer.mode, op) });
   const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true });
   if (problem) {
     toast(problem, 'error');
@@ -709,7 +709,7 @@ export async function runLayerOp(sessionId: string, docId: string, layerId: stri
   }
   try {
     const source = await layerToAsset(sessionId, docId, layerId);
-    const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer' });
+    const spec = await opSpec({ sessionId, sourceAssetId: source.id, op, params, origin: 'designer', place: 'designer', mode: 'image' });
     const problem = budgetProblem(spec.estimate ?? { usd: null, approximate: true });
     if (problem) {
       toast(problem, 'error');
@@ -780,7 +780,7 @@ export function deleteSession(sessionId: string): void {
     active.forEach((id) => { if (generations[id]) generations[id] = { ...generations[id], discard: true }; });
     let activeSessionId = cur.activeSessionId;
     if (activeSessionId === sessionId || !sessions[activeSessionId]) {
-      const next = Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      const next = Object.values(sessions).filter((x) => !x.hidden).sort((a, b) => b.updatedAt - a.updatedAt)[0];
       if (next) activeSessionId = next.id;
     }
     return { sessions, assets, generations, activeSessionId, ui: { ...cur.ui, homeDrafts: keptDrafts(cur.ui.homeDrafts, sessions) } };

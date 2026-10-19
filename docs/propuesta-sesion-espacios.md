@@ -1,6 +1,6 @@
 # Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación
 
-Fecha: 2026-10-18. Estado: **sustituida por la v5**, en la rama `task/space-plan` (`docs/propuesta-spaces-v5.md`). Se conserva como historial.
+Fecha: 2026-10-18. Estado: **sustituida por la v5** ([propuesta-spaces-v5.md](propuesta-spaces-v5.md)). Se conserva como historial.
 
 Cuarta versión del día. Incorpora dos revisiones de otro agente, sobre `53bf4a3` y `cd38d75`, comprobadas contra el código, y las respuestas del usuario a las decisiones abiertas.
 

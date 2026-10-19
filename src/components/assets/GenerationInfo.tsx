@@ -7,6 +7,7 @@ import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { copyText } from '../../engine/actions';
 import { formatDateTime, formatDuration, formatUsd } from '../../lib/format';
 import { setUi, useStore } from '../../store/store';
+import { PLACE_LABEL } from '../../engine/placeTypes';
 import type { Asset, Generation } from '../../engine/types';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button, CostTag } from '../ui/primitives';
@@ -48,7 +49,10 @@ export function openInputs(ids: string[], index: number): void {
 }
 
 export function GenerationInfo({ generation: g, asset }: { generation?: Generation; asset?: Asset }) {
-  const session = useStore((s) => (g ? s.sessions[g.sessionId]?.title : asset ? s.sessions[asset.sessionId]?.title : undefined));
+  const title = useStore((s) => (g ? s.sessions[g.sessionId]?.title : asset ? s.sessions[asset.sessionId]?.title : undefined));
+  const place = g?.place ?? asset?.place;
+  // A Space result names its Space, never the hidden container.
+  const session = place === 'space-create' || place === 'space-tools' ? PLACE_LABEL[place] : title;
   const [open, setOpen] = useState(false);
   const rows: Array<[string, React.ReactNode]> = [];
   // What went in: the operation's source, the start frame and the references, shown above the prompt.

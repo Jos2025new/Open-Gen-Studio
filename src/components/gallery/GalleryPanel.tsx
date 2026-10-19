@@ -1,3 +1,5 @@
+import { ReuseButton } from '../assets/ReuseButton';
+import { TextTile } from '../assets/TextTile';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AudioLines, Box, CheckSquare, Clock, Download, Film, Maximize2, Minimize2, Paperclip, Search, SlidersHorizontal, Star, Trash, X } from 'lucide-react';
@@ -11,8 +13,10 @@ import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/Canvas
 import { canvasLookup } from '../../engine/canvas';
 import type { Asset, Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
+import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
+import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 
-type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
+type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d' | 'text';
 type Scope = 'session' | 'all';
 
 /** Assets: every generation and upload, and the library of saved characters, objects, products and styles. */
@@ -109,7 +113,9 @@ function GeneratedAssets() {
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
-  const [scope, setScope] = useState<Scope>('session');
+  const [scope, setScope] = useState<Scope>(() => (useStore.getState().ui.home || useStore.getState().ui.space ? 'all' : 'session'));
+  const [place, setPlace] = useState<PlaceFilter>('all');
+  const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
   const [newest, setNewest] = useState(true);
   const [cols, setCols] = useState(3);
@@ -124,16 +130,12 @@ function GeneratedAssets() {
   const [canvas, setCanvas] = useState<CanvasFilterValue>('all');
   const where = useMemo(() => canvasLookup(sessions, generations), [sessions, generations]);
   const inScope = useMemo(() => Object.values(assets).filter((a) => a.origin !== 'sketch' && a.origin !== 'mask' && a.origin !== 'view3d' && (scope === 'session' ? a.sessionId === sessionId : true)), [assets, scope, sessionId]);
-  const canvasCounts = useMemo(() => {
-    const c = { all: inScope.length, chat: 0, node: 0, designer: 0 };
-    for (const a of inScope) c[where.asset(a)]++;
-    return c;
-  }, [inScope, where]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return inScope
       .filter((a) => canvas === 'all' || where.asset(a) === canvas)
       .filter((a) => kind === 'all' || a.kind === kind)
+      .filter((a) => matchesPlace(a.place, place) && matchesMode(a.mode, mode))
       .filter((a) => !favOnly || a.favorite)
       .filter((a) => {
         if (!needle) return true;
@@ -141,7 +143,31 @@ function GeneratedAssets() {
         return (g?.prompt ?? '').toLowerCase().includes(needle) || (g?.modelName ?? '').toLowerCase().includes(needle) || a.origin.includes(needle);
       })
       .sort((a, b) => (newest ? b.createdAt - a.createdAt : a.createdAt - b.createdAt));
-  }, [inScope, canvas, where, generations, q, kind, favOnly, newest]);
+  }, [inScope, canvas, where, generations, q, kind, favOnly, newest, place, mode]);
+  const texts = useMemo(() => Object.values(generations).filter((g) => g.kind === 'text' && g.status === 'done' && !g.discard
+    && (scope === 'all' || g.sessionId === sessionId)), [generations, scope, sessionId]);
+  const canvasCounts = useMemo(() => {
+    const c = { all: inScope.length + texts.length, chat: 0, node: 0, designer: 0 };
+    for (const a of inScope) c[where.asset(a)]++;
+    for (const g of texts) c[where.generation(g) ?? 'chat']++;
+    return c;
+  }, [inScope, texts, where]);
+  const textBase = texts.filter((g) => canvas === 'all' || where.generation(g) === canvas);
+  const results = [...list.map((a) => ({ type: 'asset' as const, id: a.id, createdAt: a.createdAt, asset: a })),
+    ...textBase.filter((g) => !favOnly && (kind === 'all' || kind === 'text') && matchesPlace(g.place, place) && matchesMode(g.mode, mode)
+      && `${g.prompt} ${g.modelName} ${g.text ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()))
+      .map((g) => ({ type: 'text' as const, id: g.id, createdAt: g.createdAt, generation: g }))]
+    .sort((a, b) => newest ? b.createdAt - a.createdAt : a.createdAt - b.createdAt);
+  const facets = useMemo(() => {
+    const base = [...inScope.filter((a) => canvas === 'all' || where.asset(a) === canvas), ...texts.filter((g) => canvas === 'all' || where.generation(g) === canvas)];
+    const places: Record<string, number> = { all: base.length, none: 0 };
+    const modes: Record<string, number> = { all: base.length, none: 0 };
+    for (const a of base) {
+      if (a.place) places[a.place] = (places[a.place] ?? 0) + 1; else places.none++;
+      if (a.mode) modes[a.mode] = (modes[a.mode] ?? 0) + 1; else modes.none++;
+    }
+    return { places, modes };
+  }, [inScope, texts, canvas, where]);
 
   const open = (a: Asset) => {
     if (selecting) {
@@ -162,7 +188,7 @@ function GeneratedAssets() {
     <>
       <div className="gallery-controls">
         <div className="gallery-count faint num">
-          {list.length} {list.length === 1 ? 'asset' : 'assets'}
+          {results.length} {results.length === 1 ? 'result' : 'results'}
           {running ? <span className="running-pill num">{running} running</span> : null}
         </div>
         <div className="gallery-search-row">
@@ -176,7 +202,7 @@ function GeneratedAssets() {
           ) : null}
           <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
             <SlidersHorizontal size={14} />
-            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly || !newest ? <span className="dot" /> : null}
+            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly || !newest ? <span className="dot" /> : null}
           </button>
         </div>
         <IconButton
@@ -200,9 +226,10 @@ function GeneratedAssets() {
               <span className="sv-label">Canvas</span>
               <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
             </div>
+            <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
             <div className="sv-row">
               <span className="sv-label">Type</span>
-              <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }]} />
+              <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }, { value: 'text', label: 'Text' }]} />
             </div>
             <div className="sv-row">
               <span className="sv-label">Sort</span>
@@ -215,11 +242,13 @@ function GeneratedAssets() {
             </div>
           </div>
         </Popover>
-        {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly ? (
+        {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
             {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
-            {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{({ image: 'Images', video: 'Videos', audio: 'Audio', model3d: '3D' } as Record<string, string>)[kind]} <X size={11} /></button> : null}
+            {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{({ image: 'Images', video: 'Videos', audio: 'Audio', model3d: '3D', text: 'Text' } as Record<string, string>)[kind]} <X size={11} /></button> : null}
+            {place !== 'all' ? <button type="button" className="active-chip" onClick={() => setPlace('all')}>{place === 'none' ? 'No place' : PLACE_LABEL[place]} <X size={11} /></button> : null}
+            {mode !== 'all' ? <button type="button" className="active-chip" onClick={() => setMode('all')}>{mode === 'none' ? 'No mode' : MODE_LABEL[mode]} <X size={11} /></button> : null}
             {favOnly ? <button type="button" className="active-chip" onClick={() => setFavOnly(false)}>Favorites <X size={11} /></button> : null}
           </div>
         ) : null}
@@ -260,15 +289,15 @@ function GeneratedAssets() {
         ) : null}
       </div>
       <div className="gallery-scroll">
-        {list.length ? (
-          groupByDate(list, (a) => a.createdAt).map((g) => (
+        {results.length ? (
+          groupByDate(results, (a) => a.createdAt).map((g) => (
             <section key={g.label} className="date-group">
               <h4 className="date-head">
                 {g.label} <span className="faint num">{g.items.length}</span>
               </h4>
               <div className="gallery-grid" style={{ ['--cols' as string]: cols }}>
                 {g.items.map((a) => (
-                  <GalleryTile key={a.id} asset={a} selected={selected.has(a.id)} selecting={selecting} onOpen={() => open(a)} />
+                  a.type === 'text' ? <TextTile key={a.id} g={a.generation} /> : <GalleryTile key={a.id} asset={a.asset} selected={selected.has(a.id)} selecting={selecting} onOpen={() => open(a.asset)} />
                 ))}
               </div>
             </section>
@@ -285,6 +314,7 @@ function GeneratedAssets() {
 
 function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; selected: boolean; selecting: boolean; onOpen: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const g = useStore((s) => asset.generationId ? s.generations[asset.generationId] : undefined);
   return (
     <div className={`g-tile ${selected ? 'is-selected' : ''}`}>
       <button ref={ref} type="button" className="g-open" onClick={onOpen} aria-label="Open">
@@ -298,6 +328,7 @@ function GalleryTile({ asset, selected, selecting, onOpen }: { asset: Asset; sel
       ) : null}
       {asset.favorite ? <Star size={12} className="g-fav" fill="currentColor" /> : null}
       {selecting ? <span className={`g-check ${selected ? 'is-on' : ''}`} /> : <AgentAttachToggle assetId={asset.id} />}
+      {!selecting ? <ReuseButton g={g} /> : null}
       {!asset.stored ? (
         <span className="g-remote" data-tip="Stored at the provider only; it may expire">
           <Clock size={11} />

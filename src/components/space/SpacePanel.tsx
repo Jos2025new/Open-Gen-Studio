@@ -1,3 +1,4 @@
+import { PromptHistory, recordCreatePrompt, usePromptHistory } from './PromptHistory';
 import { useRef } from 'react';
 import { Paperclip } from 'lucide-react';
 import { setComposer, toast, useStore } from '../../store/store';
@@ -27,6 +28,7 @@ export function SpacePanel() {
   const stored = useStore((s) => s.composer.mode);
   const mode: MediaKind = stored === 'agent' ? 'image' : stored;
   const text = useStore((s) => s.composer.text);
+  const history = usePromptHistory(text);
   const attachments = useStore((s) => s.composer.attachments);
   const assets = useStore((s) => s.assets);
   const slots = useStore((s) => s.catalog.schemas[s.composer[mode].modelRef]?.slots);
@@ -56,11 +58,13 @@ export function SpacePanel() {
         <span className="space-card-label">Prompt</span>
         <textarea className="space-prompt" rows={4} value={text} placeholder={PLACEHOLDER[mode]} aria-label="Prompt" onChange={(e) => setComposer({ text: e.target.value })}
           onKeyDown={(e) => {
+            history.onKeyDown(e);
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               foot.current?.querySelector<HTMLButtonElement>('.send-btn.is-generate')?.click();
             }
           }} />
+        <PromptHistory history={history.history} onChoose={history.choose} />
       </div>
       <div className="space-card">
         <span className="space-card-label">References</span>
@@ -72,6 +76,6 @@ export function SpacePanel() {
       </div>
       <div className="space-controls" aria-label="Model and settings"><MediaControls kind={mode} /></div>
     </div>
-    <footer ref={foot} className="space-panel-foot"><SendDirect kind={mode} /></footer>
+    <footer ref={foot} className="space-panel-foot"><SendDirect kind={mode} onLaunch={recordCreatePrompt} /></footer>
   </aside>;
 }

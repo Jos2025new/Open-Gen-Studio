@@ -29,6 +29,7 @@ import type { Asset, Generation } from '../src/engine/types';
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 installHomeKeyGuard();
 installHomeAutoClose();
+useStore.setState({ hydrated: true });
 const ui = () => useStore.getState().ui;
 
 describe('navigation into the Create space', () => {
@@ -168,6 +169,14 @@ describe('board rows', () => {
     const r = splitBoard(generations, assets, { ...opts, starred: true, showFailed: true });
     expect(r.failed).toHaveLength(1);
     expect(r.done).toEqual([{ type: 'asset', assetId: 'a1', generationId: 'g1' }]);
+  });
+  it('a Space board shows only its place; a workspace board excludes both Spaces', () => {
+    const own = { ...assets, sp1: asset('sp1'), sp2: asset('sp2'), old1: asset('old1') };
+    const gens = { ...generations, c: gen('c', 'done', ['sp1'], { place: 'space-create' }), t: gen('t', 'done', ['sp2'], { place: 'space-tools' }), old: gen('old', 'done', ['old1']) };
+    const ids = (place: BoardOptions['place']) => splitBoard(gens, own, { ...opts, place }).done.map((x) => (x.type === 'asset' ? x.assetId : ''));
+    expect(ids('space-create')).toEqual(['sp1']);
+    expect(ids('space-tools')).toEqual(['sp2']);
+    expect(ids('workspace').sort()).toEqual(['a1', 'a2', 'a3', 'old1']);
   });
   it('this session limits the board', () => {
     expect(splitBoard(generations, assets, { ...opts, scope: { sessionId: 's2' } }).done).toHaveLength(1);

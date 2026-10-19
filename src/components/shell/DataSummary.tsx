@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import { diskAvailable } from '../../lib/disk';
 import { useStore } from '../../store/store';
+import { visibleSessions } from '../../store/spaceSession';
 import { Button } from '../ui/primitives';
 
 interface DiskInfo { path: string; parts: Record<string, { files: number; bytes: number }> }
@@ -27,7 +28,7 @@ export function DataSummary() {
     return () => { live = false; };
   }, []);
 
-  const list = Object.values(sessions);
+  const list = visibleSessions(sessions);
   const messages = list.reduce((n, s) => n + s.feed.filter((f) => f.type === 'user').length, 0);
   const designs = list.reduce((n, s) => n + s.docs.length, 0);
   const nodes = list.reduce((n, s) => n + s.graph.nodes.length, 0);

@@ -178,7 +178,7 @@ function DesignerTargetChip() {
   );
 }
 
-export function SendDirect({ kind }: { kind: MediaKind }) {
+export function SendDirect({ kind, onLaunch }: { kind: MediaKind; onLaunch?: (text: string) => void }) {
   const composer = useStore((s) => s.composer);
   // All schemas: the check may use the family's edit variant (directModelRef), whose schema loads later.
   const schema = useStore((s) => s.catalog.schemas);
@@ -192,6 +192,7 @@ export function SendDirect({ kind }: { kind: MediaKind }) {
   const check = useMemo(() => checkDirect(kind), [kind, composer, schema, assets, spent, budget, workspace, models, quotes]);
   const pop = usePopover();
   const unknown = check.estimate.usd == null;
+  const launch = () => { onLaunch?.(useStore.getState().composer.text); void generateDirect(kind); };
   const onClick = () => {
     if (!check.ok) {
       toast(check.reason ?? 'Not ready', 'error');
@@ -199,7 +200,7 @@ export function SendDirect({ kind }: { kind: MediaKind }) {
     }
     // Unknown price or over the spending limit: confirm in the cost popover first.
     if (unknown || check.overLimit) pop.toggle();
-    else void generateDirect(kind);
+    else launch();
   };
   return (
     <>
@@ -222,7 +223,7 @@ export function SendDirect({ kind }: { kind: MediaKind }) {
           confirmLabel="Generate"
           onConfirm={() => {
             pop.close();
-            void generateDirect(kind);
+            launch();
           }}
           onCancel={pop.close}
         />

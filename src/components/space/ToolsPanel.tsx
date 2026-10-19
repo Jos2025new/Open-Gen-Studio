@@ -55,13 +55,25 @@ export function ToolsPanel() {
 
 function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
   const def = OPS[op];
+  const seed = useStore((s) => s.ui.toolSeed);
+  const parent = useRef<string | undefined>(undefined);
   const pre = useStore((s) => s.ui.toolAsset);
   const [assetId, setAssetId] = useState<string | undefined>(pre);
-  useEffect(() => { if (pre) setAssetId(pre); }, [pre]);
+  useEffect(() => { if (pre) { if (!seed) parent.current = undefined; setAssetId(pre); } }, [pre]);
   // Only an asset of the kind this tool takes: switching kind tabs drops an incompatible input.
   const fits = useStore((s) => (assetId ? s.assets[assetId]?.kind === def.input : false));
   const target = assetId && fits ? assetId : undefined;
-  const state = useOpRun(op, target ? { kind: 'asset', assetId: target } : null);
+  const state = useOpRun(op, target ? { kind: 'asset', assetId: target, parentId: parent.current } : null, seed);
+  useEffect(() => {
+    if (!seed || seed.op !== op) return;
+    parent.current = seed.parentId;
+    setAssetId(seed.assetId);
+    setUi({ toolSeed: undefined });
+  }, [seed, op]);
+  useEffect(() => () => {
+    // An operation switch unmounts this body too: leave a seed addressed to the new operation intact.
+    if (useStore.getState().ui.toolSeed?.op === op) setUi({ toolSeed: undefined });
+  }, [op]);
   const pop = usePopover();
   const unknown = state.estimate.usd == null;
   const generate = () => {
@@ -73,7 +85,7 @@ function ToolBody({ op, header }: { op: OpId; header: React.ReactNode }) {
   return <>
     <div className="space-panel-body">
       {header}
-      <InputSlot kind={def.input} verb={def.label.toLowerCase()} value={target} onChange={setAssetId} />
+      <InputSlot kind={def.input} verb={def.label.toLowerCase()} value={target} onChange={(id) => { parent.current = undefined; setAssetId(id); }} />
       <div className="space-opfields"><OpFields op={op} state={state} className="space-card" /></div>
       {target && state.via ? <div className="space-card"><span className="space-card-label">Model</span><span className="space-card-value"><ViaPick op={op} state={state} /></span></div> : null}
     </div>
