@@ -80,7 +80,7 @@
 - [Arquitectura del guardado protegido](arquitectura-guardado.md) (2026-10-18, fase 1): piezas, flujos (guardado, rechazo, arranque, pestañas), qué se guarda dónde, qué tocar cuando la app crece y diagnóstico.
 - [Persistencia protegida](persistencia-protegida.md) (2026-10-18): archivos y tests protegidos por la regla 5 de AGENTS.md, revisiones y evidencia por tipo de cambio; lo comprueba `scripts/check-protected.mjs`.
 - [Propuesta: persistencia protegida](propuesta-zonas-protegidas.md) (2026-10-18), implementada: documento, regla y comprobación; SQLite como dirección de la fase 2.
-- [Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación](propuesta-sesion-espacios.md) (2026-10-18), sin implementar: campos place y mode, Reusar, historial de prompts y espacio recordado; plan para otro agente.
+- [Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación](propuesta-sesion-espacios.md) (2026-10-18), sustituida por la v5 en `task/space-plan`: campos place y mode, Reusar, historial de prompts y espacio recordado; plan para otro agente.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
