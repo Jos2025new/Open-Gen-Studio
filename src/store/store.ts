@@ -446,7 +446,7 @@ export const useStore = create<AppState>()(
       const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
       // A reload interrupts any agent call in flight.
       const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
-      const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] ? p.activeSessionId : Object.keys(sessions)[0];
+      const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
       const assets = p.assets ?? {};
       const ui = { ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) };
       // Home and a Space are never shown together; a tool input that no longer exists is dropped.
