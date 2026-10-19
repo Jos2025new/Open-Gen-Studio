@@ -53,10 +53,9 @@ Se escriben al crear la generación y no cambian después. No se cambia el forma
 - Su id se guarda en `ui.spaceSession`.
 - Las generaciones de los Spaces nunca se borran solas.
 
-**4. «Reusar».** Es un botón en cada resultado de los Spaces, del tablero y de Library.
+**4. «Reusar».** Es un botón en cada resultado de los Spaces (su tablero y Library). En Studio no, por decisión del usuario.
 - Carga en el panel del Space correspondiente el prompt, el modelo, los parámetros, las referencias y el modo de esa generación.
 - Si el modelo ya no existe o un parámetro cambió, carga lo que sigue siendo válido y avisa de qué quedó fuera.
-- **En Studio** también aparece, pero no rellena el chat: abre Create en el modo de esa generación con sus ajustes cargados. Así el chat del agente no se mezcla con generaciones directas. Muchos prompts de Studio los escribió el agente: se cargan tal cual y el usuario los edita.
 
 **5. Historial de prompts de texto.**
 - Hasta 200 prompts recientes, sin repetidos; se descartan los más antiguos.
@@ -98,7 +97,6 @@ Se hace en un worktree propio, `task/space-session`, que sale de `task/agent-sto
     - Los filtros Lugar y Modo funcionan; una generación sin `place` sale como «Sin lugar».
     - «Reusar» carga los ajustes y avisa de un parámetro que ya no existe.
     - El historial respeta el tope de 200, no guarda repetidos y nunca descarta un favorito.
-    - «Reusar» en Studio abre Create con los ajustes y no escribe en el chat.
     - Al recargar se restaura el espacio; un `spaceSession` inválido se descarta.
 11. **Docs**:
     - `features/create-space.md` y `studio.md`;
@@ -115,4 +113,4 @@ Se hace en un worktree propio, `task/space-session`, que sale de `task/agent-sto
 - **Datos:** no se migra ni se borra nada existente.
 - **Proveedores de pago:** no se usan. La prueba visual no necesita generar de verdad, salvo que el usuario lo apruebe con un coste máximo.
 - **Decisiones abiertas para el usuario:**
-  - ninguna: el usuario fijó el tope de favoritos (1000) y se propone «Reusar» en Studio abriendo Create.
+  - ninguna: el usuario fijó el tope de favoritos (1000) y dejó «Reusar» en Studio fuera por ahora.
