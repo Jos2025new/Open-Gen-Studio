@@ -1,116 +1,150 @@
 # Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación
 
-Fecha: 2026-10-18. Estado: **propuesta y plan, sin implementar**. La ejecutará otro agente. Sustituye a la versión anterior del mismo día, que daba a Create y Tools una «sesión de espacios».
+Fecha: 2026-10-18. Estado: **propuesta y plan, sin implementar**. La ejecutará otro agente.
+
+Tercera versión del día: incorpora la revisión de otro agente sobre `53bf4a3` (comprobada contra el código) y las respuestas del usuario a las decisiones abiertas.
 
 ## Qué pidió el usuario
 
 El usuario creó un modelo 3D en el espacio Image, recargó la app y lo vio en el chat de Studio. Además, la app abrió en Studio y no en la última pestaña. Lo calificó de «crítico» y «grave».
 
-En la conversación que siguió, el usuario definió el enfoque:
-- **Workspaces** (Studio, Canvas, Designer) y **Spaces** (Create y Tools) son dos grupos distintos.
-- Quien va a un Space quiere generar muchas veces «y que no se pierda nada». No le interesan las sesiones: quiere ver lo que creó en la galería, con sus datos, y poder reutilizarlo.
-- Un historial de prompts de texto, con tope.
-- Cada generación lleva **el lugar y el modo** en que se creó, para filtrar y contar (por ejemplo, cuántas imágenes se hicieron en Create en modo Image). El tipo se escribe como `image`, `video`… y nunca se deduce de la extensión.
+En la conversación que siguió, el usuario fijó el enfoque:
+- **Workspaces** (Studio, Canvas, Designer) y **Spaces** (Create y Tools) son grupos distintos.
+- En un Space se genera muchas veces «y que no se pierda nada». No hacen falta sesiones: basta con ver lo creado en la galería, con sus datos, y reutilizarlo.
+- Cada generación lleva **lugar y modo**, para filtrar y contar. El tipo se escribe (`image`, `video`…) y no se deduce de la extensión.
+- Un historial de prompts de texto, con favoritos que no se borran.
+- **Library muestra todo y puede filtrar por lugar y modo.**
+- **Abrir un resultado muestra solo el resultado**, sin cargar ninguna sesión.
 
 ## La causa
 
-Se comprobó leyendo el código de `task/agent-stop` en `550eb56`.
+Se comprobó leyendo el código de `task/agent-stop` (`550eb56`; hasta `53bf4a3` solo cambiaron documentos).
 
 1. **Create y Tools escriben en la sesión del chat.**
-   - Create se dibuja encima del chat (`ui.space = 'create'`, workspace `chat`).
-   - Generate llama a `generateDirect`, que usa `st.activeSessionId` (`src/engine/actions.ts:285`).
-   - El tablero muestra esa misma sesión (`SpaceBoard.tsx:27`).
-   - Tools usa `runAssetOp`, que guarda en la sesión del activo de origen (`actions.ts:686`).
-2. **Ninguna generación dice dónde se creó.** Hoy cada generación guarda:
-   - `kind`, el tipo de resultado;
-   - `origin`, cómo se lanzó: `composer`, `agent`, `op`, `node` o `designer` (`src/engine/types.ts:281`);
-   - `op`, la operación si la hubo; además del modelo, el prompt, los parámetros, el coste y las fechas.
+   - `generateDirect` usa `st.activeSessionId` (`src/engine/actions.ts:285`).
+   - `runAssetOp` usa la sesión del activo de origen (`actions.ts:686`).
+2. **El tablero de los Spaces no separa nada.** En Studio su alcance por defecto es la sesión; en Create y Tools es `'all'`, todo (`src/components/space/SpaceBoard.tsx`).
+3. **Ninguna generación dice dónde se creó.**
+   - `origin` dice cómo se lanzó (`composer`, `agent`, `op`, `node`, `designer`), no dónde.
+   - Ya existe una noción de lugar para navegar: `canvasIndex` (`src/engine/canvas.ts`) y `generationPlace`/`goToGeneration` (`src/engine/goTo.ts`). Deduce el workspace (chat, nodo, designer) de la sesión, y `goToGeneration` **cambia la sesión activa**.
+4. **El espacio abierto no se guarda.** `ui.space`, `toolOp`, `homeTab` y `home` no están en `partialize` (`src/store/store.ts:422`, `:441`). `composer.mode` sí se guarda.
 
-   Una imagen de Create y una del chat de Studio quedan con los mismos datos. La galería filtra por `kind` (`generationsView.ts:36`), no por extensión.
-3. **El espacio abierto no se guarda.** `ui.space`, `toolOp` y `homeTab` no están en la lista de `partialize` (`src/store/store.ts:422` y `:441`).
+No hay pérdida de datos ni mezcla entre sesiones distintas.
 
-No hay pérdida de datos ni mezcla entre sesiones distintas. Es consecuencia del diseño de la [ADR 0017](decisions/0017-espacios-panel-y-tablero.md).
+## Comportamiento acordado
 
-## Comportamiento propuesto
+### 1. Dos campos nuevos: `place` y `mode`
 
-**1. Dos campos nuevos en cada generación,** que su activo hereda:
-- `place`: `studio`, `canvas`, `designer`, `space-create` o `space-tools`.
-- `mode`: el modo en que se lanzó.
-  - En Create y en el compositor de Studio: `image`, `video`, `audio`, `model3d` o `agent`.
-  - En Tools: el tipo de la pestaña (`image`, `video` o `audio`), con la operación en el `op` que ya existe.
+- **Valores de `place`:** `studio`, `canvas`, `designer`, `space-create` o `space-tools`.
+- **Valores de `mode`:**
+  - en Create y en el compositor: `image`, `video`, `audio`, `model3d` o `agent`;
+  - en Tools: el tipo de la pestaña, con la operación en el `op` que ya existe.
+- **Dónde se guardan:** en `Generation` y en `Asset`. Son opcionales, porque lo anterior no los tiene.
+- **Cuándo se fijan:** al crear la generación o el activo, y no cambian después.
+- **Generaciones derivadas** (reintento, variantes, «mejorar plano», pasos de un plan del agente, cola): copian `place` y `mode` de la generación o del plan de origen. **No** se deducen de la pantalla abierta en ese momento.
+- **Activos sin generación** (subidas, frames, exportaciones): llevan el lugar donde se crearon. Los antiguos quedan «Sin lugar».
 
-Se escriben al crear la generación y no cambian después. No se cambia el formato de los ids ni se deduce nada de la extensión.
+### 2. Qué se ve en cada sitio
 
-**2. Separación por lugar.**
-- Studio solo muestra en el chat y en su tablero lo suyo.
-- Los Spaces muestran lo de `space-create` y `space-tools`.
-- Library y Generations lo muestran todo y ganan dos filtros, Lugar y Modo, junto al de tipo que ya existe.
-- Ejemplos: `place: space-create` + `mode: image`; `place: space-tools` + `op: upscale`.
+| Sitio | Muestra |
+|---|---|
+| Chat y tablero de Studio | Lo de Studio y lo antiguo (sin `place`), como hoy; nunca lo de los Spaces |
+| Tablero de Create y de Tools | Lo creado en los Spaces (`space-create` y `space-tools`) |
+| Library y Generations | **Todo**, con filtros Lugar y Modo con contadores (como el filtro Canvas que ya existe) junto al de tipo. Lo antiguo sale en «Sin lugar» |
 
-**3. Sin sesiones visibles en los Spaces.**
-- Por dentro, sus generaciones cuelgan de un contenedor interno, porque el resto de la app espera una sesión.
-- Ese contenedor no aparece en las listas de sesiones de los Workspaces, ni en Home, ni en el buscador.
-- Su id se guarda en `ui.spaceSession`.
-- Las generaciones de los Spaces nunca se borran solas.
+Ejemplos de filtro: `place: space-create` + `mode: image`; `place: space-tools` + `op: upscale`.
 
-**4. «Reusar».** Es un botón en cada resultado de los Spaces (su tablero y Library). En Studio no, por decisión del usuario.
-- Carga en el panel del Space correspondiente el prompt, el modelo, los parámetros, las referencias y el modo de esa generación.
-- Si el modelo ya no existe o un parámetro cambió, carga lo que sigue siendo válido y avisa de qué quedó fuera.
+### 3. Contenedor interno, sin sesiones visibles
 
-**5. Historial de prompts de texto.**
-- Hasta 200 prompts recientes, sin repetidos; se descartan los más antiguos.
-- **Favoritos con estrella:** un prompt marcado no se borra nunca de forma automática. Hay un tope blando de 1000: al llegar, se avisa y no se descarta nada.
-- Solo texto, sin ajustes asociados, para evitar conflictos (los ajustes completos se recuperan con «Reusar»).
-- Se recorre con ↑/↓ en el campo de prompt y con un desplegable que tiene una pestaña de favoritos.
-- Es uno por Space, Create y Tools.
-- **Se guarda en su propia clave de IndexedDB y disco, no en el estado principal.** Mil prompts largos pueden ocupar entre 0,3 y 1 MB, y el estado principal se serializa en cada guardado: meterlos ahí haría más lento cada guardado (ver la prioridad de velocidad).
+- Un solo contenedor para Create y Tools, que es una sesión marcada con `hidden: true` o una marca equivalente. Se filtra por esa marca, no comparando ids.
+- No aparece en las listas de sesiones, ni en Home, ni en el buscador.
+- No se crea con `newSession()`, porque esa función cambia la sesión activa y cerraría el Space (`homeAutoClose`).
+- Lo que contiene nunca se borra solo.
 
-**6. Recordar el espacio al recargar.** Se guardan `space`, `toolOp`, `homeTab` y el modo del compositor, y la app vuelve donde estabas.
+### 4. Abrir un resultado
 
-**7. Generaciones antiguas.** Se quedan como están, sin migración. Como no tienen `place`, los filtros las muestran como «Sin lugar» y siguen visibles donde hoy se ven. Moverlas o etiquetarlas sería una migración y necesita una aprobación aparte.
+- Desde Library, Generations o el tablero, un resultado de un Space **abre solo el visor** de ese resultado.
+- No cambia la sesión activa, no abre el contenedor ni cambia de espacio.
+- Hoy `goToGeneration` selecciona la sesión. Para lo creado en Spaces se usa el visor directamente. Lo de los Workspaces sigue como hoy.
+
+### 5. «Reusar»
+
+- Está en los resultados creados en Spaces: en su tablero y en Library. En Studio no.
+- Abre el Space correspondiente con prompt, modelo, parámetros, referencias y modo cargados.
+- Si algo ya no es válido, carga el resto y avisa de qué quedó fuera.
+- **En Tools**, los parámetros viven en estado local (`useOpRun`, `src/components/assets/opRun.tsx`). Se añade `ui.toolSeed`, un valor de un solo uso que `ToolsPanel` lee al montarse y borra.
+
+### 6. Historial de prompts (solo Create en esta versión)
+
+- Dos listas: **200 recientes** sin repetidos, que descartan los más antiguos, y **favoritos con estrella**, que nunca se borran solos. Al llegar a 1000 favoritos se avisa y no se borra nada.
+- Solo texto, sin ajustes asociados (para los ajustes completos está «Reusar»).
+- Se recorre con ↑/↓ solo cuando el cursor está en la primera o la última línea, para no estorbar al escribir, y con un desplegable que tiene una pestaña de favoritos.
+- **Almacenamiento:** una base IndexedDB propia, `ogs-prompts`, solo en el navegador, sin copia en disco. Se puede borrar sin afectar a nada más. Para que «borrar todos los datos» también la borre, se añade su nombre a `ALL_DB_NAMES` (`src/lib/idb.ts:107`).
+  - **El usuario autorizó este cambio en la zona protegida el 2026-10-18.** Solo ese cambio: añadir el nombre a la lista y su test. Cualquier otro cambio en la zona protegida requiere una autorización nueva.
+- Tools no tiene historial en esta versión: no tiene un único campo de prompt.
+
+### 7. Recordar el espacio al recargar
+
+Se guardan `home`, `homeTab`, `space` y `toolOp`. `composer.mode` ya se guardaba.
+
+### 8. Sin migración
+
+Lo existente no se mueve ni se etiqueta.
 
 ## Plan previsto
 
 Se hace en un worktree propio, `task/space-session`, que sale de `task/agent-stop`.
 
-1. **Antes de empezar, confirmar en el código:**
-   - todos los sitios que crean generaciones (`createGeneration` y quién la llama: compositor, agente, operaciones, nodos, Designer);
-   - quién llama a `homeAutoClose` (`src/components/shell/homeGuard.ts:44`);
-   - de dónde sacan su sesión `opRun.tsx`, `ToolsPanel.tsx` y `actionGo.ts`;
-   - las listas de sesiones del sidebar, de Home y del buscador.
-2. **Tipos**: añadir `place?` y `mode?` a `Generation` y a `Asset` en `src/engine/types.ts`. Son opcionales, porque las generaciones antiguas no los tienen. Como el estado guardado cambia, revisar el esquema y los tests de formato.
-3. **Escritura de los campos**: cada sitio de creación del paso 1 pasa `place` y `mode`. Lo hace una sola función (`src/engine/place.ts`) que los deduce de `ui.space`, del workspace y del modo del compositor.
-4. **Contenedor interno**: `src/store/spaceSession.ts` con `ensureSpaceSession()`. `generateDirect` y `runAssetOp` usan ese contenedor cuando se lanzan desde un Space.
-   - Ojo: `store.ts` está en 29 955 bytes y no puede pasar de 30 000, así que el código nuevo va fuera.
-5. **Vistas**:
-   - el chat y el tablero de Studio filtran por `place`;
-   - el `SpaceBoard` muestra los Spaces;
-   - las listas de sesiones ocultan `ui.spaceSession`.
-6. **Filtros** Lugar y Modo en `generationsView.ts` y en su interfaz, reutilizando el patrón del filtro de Sessions.
-7. **«Reusar»**: una acción en el resultado que rellena `composer` (Create) o `toolOp` y sus campos (Tools), y avisa de lo descartado.
-8. **Historial de prompts**: `src/store/promptHistory.ts`, con 200 recientes como tope, sin duplicados, favoritos con estrella (tope blando de 1000, con aviso y sin borrar), en su propia clave persistida fuera del estado principal; ↑/↓ y un desplegable con pestaña de favoritos. Si guardar fuera del estado principal exige tocar `idb.ts` o `disk.ts` (zona protegida), parar y pedir autorización.
-9. **Persistencia del UI**: añadir `space`, `toolOp`, `homeTab` y `spaceSession` a `partialize`, fuera de las funciones protegidas. Al cargar, se valida que `spaceSession` exista.
-10. **Tests**: cada uno debe fallar con el código de ahora.
-    - Una generación de Create lleva `place: space-create` y su modo, y no aparece en el chat de Studio.
-    - Una operación de Tools sobre un activo de Studio lleva `place: space-tools` y va al contenedor.
-    - Las generaciones de Studio, Canvas y Designer llevan su `place`.
-    - Los filtros Lugar y Modo funcionan; una generación sin `place` sale como «Sin lugar».
-    - «Reusar» carga los ajustes y avisa de un parámetro que ya no existe.
-    - El historial respeta el tope de 200, no guarda repetidos y nunca descarta un favorito.
-    - Al recargar se restaura el espacio; un `spaceSession` inválido se descarta.
-11. **Docs**:
-    - `features/create-space.md` y `studio.md`;
+1. **Presupuesto de tamaño, antes que nada.** `check-sizes` impide que estos archivos crezcan:
+   - `store.ts`: 29 955 bytes de un límite de 30 000;
+   - `types.ts`: 37 280 de 37 306 (su línea base);
+   - `actions.ts`: 40 520 de 40 714.
+
+   Primero hay que hacer sitio sin cambiar el comportamiento: mover la proyección de `ui` de `partialize` a un módulo propio (`pickUi(s.ui)`, por ejemplo en `src/store/persistUi.ts`), y los tipos nuevos a un archivo propio (`src/engine/placeTypes.ts`) importado desde `types.ts`. Medir con `node scripts/check-sizes.mjs` después de cada paso.
+2. **Confirmar en el código:**
+   - todos los sitios que llaman a `createGeneration`, incluidos `jobs.ts:843` (reintento), `retryPartial.ts`, el ejecutor del agente, la cola, las variantes e `improveShot`;
+   - los sitios que crean activos sin generación;
+   - quién llama a `homeAutoClose` (`src/components/shell/homeGuard.ts`, hacia la línea 41);
+   - las listas de sesiones (sidebar, Home, buscador).
+3. **Tipos:** `place?` y `mode?` en `Generation` y `Asset`, y la marca del contenedor en `Session`. Revisar el esquema guardado y los tests de formato.
+4. **Escritura:** una función única (`src/engine/place.ts`) calcula `place` y `mode` en el punto de lanzamiento: compositor, Create, Tools, nodo, Designer o plan del agente. Las derivadas los copian (paso 2).
+5. **Contenedor:** `src/store/spaceSession.ts` con `ensureSpaceSession()`. Crea la sesión marcada sin cambiar la sesión activa. `generateDirect` y `runAssetOp` la usan cuando se lanzan desde un Space.
+6. **Vistas:**
+   - Studio filtra para quitar `space-*`;
+   - el `SpaceBoard` de Create y Tools muestra `space-*`;
+   - las listas de sesiones ocultan el contenedor marcado.
+7. **Filtros Lugar y Modo con contadores** en `src/components/shell/generationsView.ts` y en Library, reutilizando el patrón del filtro Canvas y del de Sessions.
+8. **Abrir:** para resultados con `place: space-*`, Library, Generations y el tablero abren el visor (`lightbox`) sin `selectSession`.
+9. **«Reusar»:**
+   - en Create, rellena `composer`;
+   - en Tools, fija `toolOp` y `ui.toolSeed`, y `ToolsPanel`/`useOpRun` lo consume una vez.
+10. **Historial:** `src/lib/promptHistory.ts`, sobre la base `ogs-prompts` (idb-keyval con su propio store), con las dos listas, su tope y el aviso. Añadir `'ogs-prompts'` a `ALL_DB_NAMES` (autorizado). Interfaz: ↑/↓ en los extremos y el desplegable.
+11. **Persistir el UI:** `home`, `homeTab`, `space` y `toolOp` en `pickUi`. Al cargar, si el contenedor guardado no existe, se descarta.
+12. **Contrato:** `place` y `mode` conectan a quien los escribe, los filtros, el visor y «Reusar». Añadirlo a `scripts/map-contracts.mjs` y regenerar con `node scripts/map.mjs --write`.
+13. **Tests,** cada uno fallando con el código de ahora:
+    - Create escribe `place: space-create` y su modo, y Studio no lo muestra.
+    - Tools sobre un activo de Studio escribe `space-tools` y va al contenedor.
+    - Un reintento y un paso del agente conservan el `place` de origen aunque la pantalla abierta sea otra.
+    - Studio sigue mostrando lo antiguo (sin `place`).
+    - Library muestra todo; los filtros Lugar y Modo filtran y cuentan; lo antiguo sale en «Sin lugar».
+    - Abrir un resultado de un Space no cambia `activeSessionId`.
+    - «Reusar» rellena Create, y en Tools se consume una sola vez; avisa de un parámetro que ya no existe.
+    - Historial: tope de 200, sin repetidos, favoritos que nunca se descartan, aviso a 1000, y borrado con «borrar todos los datos».
+    - Al recargar se restauran `home`, `homeTab`, `space` y `toolOp`; un contenedor inválido se descarta.
+    - El contenedor no aparece en las listas de sesiones y crearlo no cierra el Space.
+14. **Docs:**
+    - `features/create-space.md`, `studio.md` y la feature de Library;
     - una ADR nueva que enmiende la 0017;
     - una entrada de historial;
-    - `node scripts/map.mjs --write`.
-12. **Verificar**:
-    - `npm run test:related`, y después `npm test -- --maxWorkers=2`;
-    - prueba visual en el sandbox (generar en Image, recargar, comprobar que sigue en Image y que Studio no muestra el resultado, probar «Reusar» y los filtros); después detener el sandbox.
+    - `docs/persistencia-protegida.md`: una fila con el cambio autorizado en `idb.ts`.
+15. **Verificar:**
+    - `npm run test:related` tras cada cambio;
+    - al final, `npm run typecheck`, `node scripts/check-sizes.mjs` y `npm test -- --maxWorkers=2`;
+    - prueba visual en el sandbox: una generación real en Image, recargar, comprobar que sigue en Image y que Studio no la muestra, y verla en Library con los filtros; probar «Reusar», el visor y los favoritos; después detener el sandbox.
 
-## Límites y riesgos
+## Límites
 
-- **Persistencia protegida:** no cambian `flushWrite`, `saveNow`, el disco ni el candado. Solo se añaden campos opcionales al estado. Si hiciera falta tocar la zona protegida, el agente se para y pide autorización (regla 5 de AGENTS.md).
-- **Datos:** no se migra ni se borra nada existente.
-- **Proveedores de pago:** no se usan. La prueba visual no necesita generar de verdad, salvo que el usuario lo apruebe con un coste máximo.
-- **Decisiones abiertas para el usuario:**
-  - ninguna: el usuario fijó el tope de favoritos (1000) y dejó «Reusar» en Studio fuera por ahora.
+- **Zona protegida:** solo el cambio autorizado en `ALL_DB_NAMES`. Si hace falta cualquier otro cambio en `idb.ts`, `disk.ts`, `writerLock.ts`, el servidor o `flushWrite`/`saveNow`, el agente se para y pregunta.
+- **Coste:** la prueba visual hace una generación real. Antes de lanzarla, el agente propone al usuario un modelo concreto barato y su coste máximo, y espera su aprobación explícita (regla de AGENTS.md). Si el usuario no aprueba, la prueba se hace sin esa generación y se dice así.
+- **Datos:** nada se migra ni se borra.
+- **Repositorio:** ni fusión ni push. La rama se entrega con `npm test` en verde.
