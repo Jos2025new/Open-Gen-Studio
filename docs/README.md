@@ -70,6 +70,7 @@
 - [0020 — Estructura de Home: hero, Apps, Tools y For deeper work (aceptado 2026-10-17)](decisions/0020-estructura-de-home.md).
 - [0021 — Nunca enviar una petición de pago con esquema derivado (aceptado 2026-10-18)](decisions/0021-esquema-derivado-sin-envio.md).
 - [0022 — Guardado local-first sin bloqueo: una pestaña activa, guarda por contenido y avisos persistentes (aceptado 2026-10-18; fase 1 en `task/save-guard`)](decisions/0022-guardado-local-first-sin-bloqueo.md).
+- [0023 — Spaces separados de los Workspaces (etapa 1)](decisions/0023-spaces-separados-etapa-1.md).
 
 ## Propuestas de interfaz
 
@@ -143,6 +144,7 @@
 - [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas, decisiones, commits, fallos de verificación, arreglos y la guarda de esquema.
 - [043-2026-10-W42: incidente de guardado, plan y fase 1 de la protección (2026-10-18)](history/043-2026-10-W42.md) — incidente, diagnóstico, commits de `task/save-guard`, pruebas y pendientes.
 - [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
+- [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
 
 ## Trazabilidad
 

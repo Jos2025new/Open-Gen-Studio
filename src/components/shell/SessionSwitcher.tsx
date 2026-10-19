@@ -5,6 +5,7 @@ import { formatRelative } from '../../lib/format';
 import { Popover, usePopover } from '../ui/Popover';
 import { IconButton } from '../ui/primitives';
 import { DeleteSessionsConfirm, useSessionMatcher } from './SessionsPanel';
+import { visibleSessions } from '../../store/spaceSession';
 import './SessionSwitcher.css';
 
 /**
@@ -21,7 +22,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const matches = useSessionMatcher(q);
   const list = useMemo(
-    () => Object.values(sessions).filter(matches).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt)),
+    () => visibleSessions(sessions).filter(matches).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.updatedAt - a.updatedAt)),
     [sessions, matches],
   );
   const picked = [...selected].filter((id) => sessions[id]);
@@ -72,7 +73,7 @@ export function SessionSwitcher({ activeId, title, onRename }: { activeId: strin
         </div>
         <div className="ml-foot">
           <button type="button" className="ml-foot-main" onClick={() => go(() => setUi({ panel: 'sessions' }))}>
-            All sessions ({Object.keys(sessions).length})
+            All sessions ({visibleSessions(sessions).length})
           </button>
           {selecting && picked.length ? <IconButton ref={del.ref} icon={Trash} label={`Delete ${picked.length} selected`} size="sm" tone="danger" active={del.open} onClick={del.toggle} /> : null}
         </div>

@@ -11,6 +11,8 @@ import { CanvasFilter, CANVAS_LABEL, type CanvasFilterValue } from '../ui/Canvas
 import { canvasLookup } from '../../engine/canvas';
 import type { Asset, Subject, SubjectKind } from '../../engine/types';
 import { usePanelExpanded } from '../shell/panelEmbed';
+import { PlaceModeFilter, matchesMode, matchesPlace, type ModeFilter, type PlaceFilter } from '../ui/PlaceModeFilter';
+import { MODE_LABEL, PLACE_LABEL } from '../../engine/placeTypes';
 
 type KindFilter = 'all' | 'image' | 'video' | 'audio' | 'model3d';
 type Scope = 'session' | 'all';
@@ -109,7 +111,9 @@ function GeneratedAssets() {
   const running = useStore((s) => Object.values(s.generations).filter((g) => g.status === 'running' || g.status === 'queued').length);
   const [q, setQ] = useState('');
   const [kind, setKind] = useState<KindFilter>('all');
-  const [scope, setScope] = useState<Scope>('session');
+  const [scope, setScope] = useState<Scope>(() => (useStore.getState().ui.home || useStore.getState().ui.space ? 'all' : 'session'));
+  const [place, setPlace] = useState<PlaceFilter>('all');
+  const [mode, setMode] = useState<ModeFilter>('all');
   const [favOnly, setFavOnly] = useState(false);
   const [newest, setNewest] = useState(true);
   const [cols, setCols] = useState(3);
@@ -134,6 +138,7 @@ function GeneratedAssets() {
     return inScope
       .filter((a) => canvas === 'all' || where.asset(a) === canvas)
       .filter((a) => kind === 'all' || a.kind === kind)
+      .filter((a) => matchesPlace(a.place, place) && matchesMode(a.mode, mode))
       .filter((a) => !favOnly || a.favorite)
       .filter((a) => {
         if (!needle) return true;
@@ -141,7 +146,17 @@ function GeneratedAssets() {
         return (g?.prompt ?? '').toLowerCase().includes(needle) || (g?.modelName ?? '').toLowerCase().includes(needle) || a.origin.includes(needle);
       })
       .sort((a, b) => (newest ? b.createdAt - a.createdAt : a.createdAt - b.createdAt));
-  }, [inScope, canvas, where, generations, q, kind, favOnly, newest]);
+  }, [inScope, canvas, where, generations, q, kind, favOnly, newest, place, mode]);
+  const facets = useMemo(() => {
+    const base = inScope.filter((a) => canvas === 'all' || where.asset(a) === canvas);
+    const places: Record<string, number> = { all: base.length, none: 0 };
+    const modes: Record<string, number> = { all: base.length, none: 0 };
+    for (const a of base) {
+      if (a.place) places[a.place] = (places[a.place] ?? 0) + 1; else places.none++;
+      if (a.mode) modes[a.mode] = (modes[a.mode] ?? 0) + 1; else modes.none++;
+    }
+    return { places, modes };
+  }, [inScope, canvas, where]);
 
   const open = (a: Asset) => {
     if (selecting) {
@@ -176,7 +191,7 @@ function GeneratedAssets() {
           ) : null}
           <button ref={filters.ref} type="button" className={`search-view ${filters.open ? 'is-open' : ''}`} onClick={filters.toggle} aria-label="Filter, sort and view" data-tip="Filter, sort and view">
             <SlidersHorizontal size={14} />
-            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly || !newest ? <span className="dot" /> : null}
+            {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly || !newest ? <span className="dot" /> : null}
           </button>
         </div>
         <IconButton
@@ -200,6 +215,7 @@ function GeneratedAssets() {
               <span className="sv-label">Canvas</span>
               <CanvasFilter value={canvas} counts={canvasCounts} onChange={setCanvas} />
             </div>
+            <PlaceModeFilter place={place} mode={mode} placeCounts={facets.places} modeCounts={facets.modes} onPlace={setPlace} onMode={setMode} />
             <div className="sv-row">
               <span className="sv-label">Type</span>
               <Segmented value={kind} size="sm" onChange={setKind} options={[{ value: 'all', label: 'All' }, { value: 'image', label: 'Images' }, { value: 'video', label: 'Videos' }, { value: 'audio', label: 'Audio' }, { value: 'model3d', label: '3D' }]} />
@@ -215,11 +231,13 @@ function GeneratedAssets() {
             </div>
           </div>
         </Popover>
-        {kind !== 'all' || canvas !== 'all' || scope !== 'session' || favOnly ? (
+        {kind !== 'all' || canvas !== 'all' || scope !== 'session' || place !== 'all' || mode !== 'all' || favOnly ? (
           <div className="sessions-active">
             {canvas !== 'all' ? <button type="button" className="active-chip" onClick={() => setCanvas('all')}>{CANVAS_LABEL[canvas]} <X size={11} /></button> : null}
             {scope !== 'session' ? <button type="button" className="active-chip" onClick={() => setScope('session')}>All sessions <X size={11} /></button> : null}
             {kind !== 'all' ? <button type="button" className="active-chip" onClick={() => setKind('all')}>{({ image: 'Images', video: 'Videos', audio: 'Audio', model3d: '3D' } as Record<string, string>)[kind]} <X size={11} /></button> : null}
+            {place !== 'all' ? <button type="button" className="active-chip" onClick={() => setPlace('all')}>{place === 'none' ? 'No place' : PLACE_LABEL[place]} <X size={11} /></button> : null}
+            {mode !== 'all' ? <button type="button" className="active-chip" onClick={() => setMode('all')}>{mode === 'none' ? 'No mode' : MODE_LABEL[mode]} <X size={11} /></button> : null}
             {favOnly ? <button type="button" className="active-chip" onClick={() => setFavOnly(false)}>Favorites <X size={11} /></button> : null}
           </div>
         ) : null}

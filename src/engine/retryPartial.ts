@@ -14,7 +14,7 @@ export function estimateForRetry(g: Generation): Estimate {
 }
 
 export function retrySpec(g: Generation) {
-  return { settings: { ...g.settings, seed: (g.settings.seed ?? 0) + 1 }, inputs: g.inputs, op: g.op, origin: g.origin, parentId: g.id, operationId: g.operationId ?? g.id, planId: g.planId, stepId: g.stepId, estimate: estimateForRetry(g), variants: g.variants };
+  return { settings: { ...g.settings, seed: (g.settings.seed ?? 0) + 1 }, inputs: g.inputs, op: g.op, origin: g.origin, place: g.place, mode: g.mode, parentId: g.id, operationId: g.operationId ?? g.id, planId: g.planId, stepId: g.stepId, estimate: estimateForRetry(g), variants: g.variants };
 }
 
 export function planRetryEstimate(steps: PlanStep[], perStep: Record<string, Estimate>, item: PlanFeedItem, generations: Record<string, Generation>): Estimate {

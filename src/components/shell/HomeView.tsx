@@ -11,6 +11,7 @@ import { PanelEmbed } from './panelEmbed';
 import { SessionsPanel } from './SessionsPanel';
 import { GalleryPanel } from '../gallery/GalleryPanel';
 import { HomeHero } from './HomeHero';
+import { visibleSessions } from '../../store/spaceSession';
 
 function Head({ kicker, title, action }: { kicker?: string; title: string; action?: ReactNode }) {
   return <header className="home-head">
@@ -84,7 +85,7 @@ export function HomeView() {
   const tab: HomeTab = useStore((s) => s.ui.homeTab) ?? 'home';
   const setTab = (t: HomeTab) => setUi({ homeTab: t });
   const listed = useMemo(() => Object.values(assets).filter(isListed), [assets]);
-  const recentSessions = useMemo(() => Object.values(sessions).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4), [sessions]);
+  const recentSessions = useMemo(() => visibleSessions(sessions).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 4), [sessions]);
   const recentAssets = useMemo(() => [...listed].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4), [listed]);
   // Families, as the model picker groups its variants: one entry per model the user's keys reach.
   const families = useMemo(() => Object.fromEntries(CREATE.map((c) => [c.kind as AssetKind, groupVariants(modelsOf(c.kind), connectedProviders()).length])) as Record<AssetKind, number>, [catalog, keys]);

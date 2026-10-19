@@ -9,6 +9,7 @@ import { useLayerSelection } from './selection';
 import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from './objectSelection';
 import { layerObjects } from './objectOps';
 import { nodeSegs, pageSegs } from './pathNodes';
+import { placeFor } from '../place';
 import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer} from './raster';
 import {composeRaster} from './rasterCompose';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
@@ -366,7 +367,8 @@ export function prunePicks(doc: DesignDoc): void {
 async function storeDesignAsset(sessionId: string, blob: Blob, width: number, height: number, origin: Asset['origin']): Promise<Asset> {
   const id = uid('ast');
   await putAssetBlob(id, blob);
-  const asset: Asset = { id, kind: 'image', mime: blob.type || 'image/png', width, height, sessionId, origin, stored: true, favorite: false, createdAt: Date.now() };
+  const ui = useStore.getState().ui;
+  const asset: Asset = { id, kind: 'image', mime: blob.type || 'image/png', width, height, sessionId, origin, place: ui.space ? placeFor(ui, ui.workspace) : 'designer', mode: 'image', stored: true, favorite: false, createdAt: Date.now() };
   addAssets([asset]);
   return asset;
 }

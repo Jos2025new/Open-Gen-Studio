@@ -2,6 +2,7 @@ import { canvasIndex } from './canvas';
 import { focusNodes } from './flow/selection';
 import { selectDoc, setActiveLayer } from './design/actions';
 import type { Generation, Workspace } from './types';
+import { placeLabel } from './place';
 import { selectSession, setUi, useStore } from '../store/store';
 
 /*
@@ -36,6 +37,18 @@ export function generationPlace(g: Generation): GenerationPlace | null {
   const card = s.feed.some((f) => f.type === 'generation' && f.generationId === g.id);
   return { sessionId: s.id, sessionTitle: s.title, canvas, target: card ? { kind: 'card' } : { kind: 'none' } };
 }
+
+/** A Space result opens only its viewer: no session change, no container on screen. */
+export function openGeneration(g: Generation, assetId?: string): void {
+  if (g.place === 'space-create' || g.place === 'space-tools') {
+    const ids = assetId ? [assetId] : g.assetIds;
+    if (ids.length) setUi({ lightbox: { assetIds: ids, index: 0 } });
+    return;
+  }
+  goToGeneration(g);
+}
+
+export { placeLabel };
 
 /** Switch to the generation's session and canvas and put the focus on it. */
 export function goToGeneration(g: Generation): void {

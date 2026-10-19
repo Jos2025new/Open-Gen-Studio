@@ -21,7 +21,7 @@ type Density = 'compact' | 'comfortable';
 type Layout = 'grid' | 'list';
 
 /** Generated Assets: finished results on top; running ones and the actions suggested for the chosen asset below. It cannot be closed. */
-export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing generated yet.', studio = false, onClose }: { kind?: AssetKind; empty?: string; /** Studio's board: Done and Ongoing only, Done folds while something runs, closable. */ studio?: boolean; onClose?: () => void }) {
+export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing generated yet.', studio = false, place, onClose }: { kind?: AssetKind; empty?: string; /** Studio's board: Done and Ongoing only, Done folds while something runs, closable. */ studio?: boolean; /** The Space this board belongs to; Studio has none and excludes both. */ place?: 'space-create' | 'space-tools'; onClose?: () => void }) {
   const generations = useStore((s) => s.generations);
   const assets = useStore((s) => s.assets);
   const sessionId = useStore((s) => s.activeSessionId);
@@ -38,7 +38,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const order = usePopover();
   const view = usePopover();
 
-  const rows = useMemo(() => splitBoard(generations, assets, { kind, status: 'all', q: '', sort, starred, showFailed, scope: scope === 'all' ? 'all' : { sessionId } }), [generations, assets, kind, sort, starred, showFailed, scope, sessionId]);
+  const rows = useMemo(() => splitBoard(generations, assets, { kind, status: 'all', q: '', sort, starred, showFailed, place: place ?? 'workspace', scope: scope === 'all' ? 'all' : { sessionId } }), [generations, assets, kind, sort, starred, showFailed, place, scope, sessionId]);
   const doneAssets = rows.done.flatMap((c) => (c.type === 'asset' ? [c.assetId] : []));
   const kind_ = activeKind;
   const target = targetAsset(rows, selected, assets, kind_);

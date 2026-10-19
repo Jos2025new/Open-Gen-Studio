@@ -8,6 +8,8 @@ import { newSession, setUi, useStore } from '../src/store/store';
 
 installHomeKeyGuard();
 installHomeAutoClose();
+// The guard rebases on the first hydrated state and then closes what a session change hides.
+useStore.setState({ hydrated: true });
 
 const press = (target: EventTarget) => {
   const seen = vi.fn();
@@ -91,6 +93,12 @@ describe('Home over a mounted workspace', () => {
     setUi({ home: true });
     newSession();
     expect(useStore.getState().ui.home).toBe(false);
+  });
+
+  it('after restoring a Space, a later session change still closes it', () => {
+    setUi({ home: false, space: 'create' });
+    newSession();
+    expect(useStore.getState().ui.space).toBeUndefined();
   });
 
   it('closes when something asks for the composer (Use as reference)', () => {

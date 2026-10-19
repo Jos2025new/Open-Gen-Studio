@@ -2,6 +2,7 @@
 
 | Comportamiento documentado | Código | Test |
 | --- | --- | --- |
+| Filtros Lugar y Modo con contadores (2026-10-19, etapa 1): Library y Generations muestran todo, de Spaces y de workspaces; lo antiguo cae en «Sin lugar»/«Sin modo». Abiertos desde Home o un Space empiezan en «All sessions»; en Studio, en «This session». Un resultado de Space abre solo el visor: no cambia `activeSessionId`. | [GalleryPanel.tsx](../../src/components/gallery/GalleryPanel.tsx), [GenerationsPanel.tsx](../../src/components/shell/GenerationsPanel.tsx), [PlaceModeFilter.tsx](../../src/components/ui/PlaceModeFilter.tsx), [goTo.ts](../../src/engine/goTo.ts) | [space-place.test.ts](../../tests/space-place.test.ts) |
 | La migración de sujetos antiguos conserva una entrada por nombre, sin distinguir mayúsculas; gana la primera. | [src/store/store.ts](../../src/store/store.ts) | [tests/library.test.ts](../../tests/library.test.ts) |
 | La biblioteca comparte sujetos entre sesiones y conserva sus imágenes al borrar la sesión de origen. | [src/engine/actions.ts](../../src/engine/actions.ts) | [tests/library.test.ts](../../tests/library.test.ts) |
 | Normalizar un plan rechaza nombres de sujetos ausentes de la biblioteca y del propio plan. | [src/engine/plan.ts](../../src/engine/plan.ts) | [tests/library.test.ts](../../tests/library.test.ts) |

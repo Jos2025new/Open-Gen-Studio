@@ -33,8 +33,16 @@ export function installHomeAutoClose(): () => void {
   const key = (s: ReturnType<typeof useStore.getState>) => `${s.ui.workspace}|${s.activeSessionId}|${s.ui.focusComposer}`;
   let last = key(useStore.getState());
   let spaceWas = useStore.getState().ui.space;
+  let hydrated = false;
   return useStore.subscribe((s) => {
     const k = key(s);
+    // Hydration replaces the session and would close what was restored: take the restored state as the reference.
+    if (!s.hydrated || !hydrated) {
+      hydrated = s.hydrated;
+      last = k;
+      spaceWas = s.ui.space;
+      return;
+    }
     const spaceBefore = spaceWas;
     spaceWas = s.ui.space;
     if (k === last) return;

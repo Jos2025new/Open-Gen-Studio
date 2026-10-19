@@ -1,4 +1,5 @@
 import type { Asset, AssetKind, Generation, OpId } from '../../engine/types';
+import type { Place } from '../../engine/placeTypes';
 import { OPS, opsFor } from '../../engine/ops';
 import { filterGenerations, statusOf, type GenerationQuery } from '../shell/generationsView';
 
@@ -10,6 +11,8 @@ export interface BoardOptions extends GenerationQuery {
   starred: boolean;
   showFailed: boolean;
   scope: 'all' | { sessionId: string };
+  /** A Space shows its own place; a workspace board (`workspace`) never shows what a Space made. */
+  place?: Place | 'workspace';
 }
 
 /** `failed` is filled only with "show failed" on: its own row, never mixed into Done. */
@@ -17,7 +20,8 @@ export interface BoardRows { done: DoneCell[]; failed: Generation[]; ongoing: Ge
 
 /** Rows of the board: finished results on top, running or queued generations below. */
 export function splitBoard(generations: Record<string, Generation>, assets: Record<string, Asset>, o: BoardOptions): BoardRows {
-  const inScope = Object.values(generations).filter((g) => !g.discard && (o.scope === 'all' || g.sessionId === o.scope.sessionId));
+  const inPlace = (g: Generation) => !o.place || o.place === 'workspace' ? g.place !== 'space-create' && g.place !== 'space-tools' : g.place === o.place;
+  const inScope = Object.values(generations).filter((g) => !g.discard && inPlace(g) && (o.scope === 'all' || g.sessionId === o.scope.sessionId));
   const list = filterGenerations(inScope, { kind: o.kind, status: o.status, q: o.q, sort: o.sort });
   const done: DoneCell[] = [];
   const ongoing: Generation[] = [];

@@ -2,6 +2,7 @@ import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } 
 import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
 import { keptDrafts } from './homeDrafts';
+import { pickUi, type PersistedUi } from './persistUi';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
@@ -419,7 +420,7 @@ if (typeof window !== 'undefined') {
 
 type Persisted = Pick<AppState, 'settings' | 'spentUsd' | 'spendLog' | 'sessions' | 'activeSessionId' | 'generations' | 'assets' | 'library'> & {
   composer: Omit<ComposerState, 'editing'>;
-  ui: Pick<UiState, 'workspace' | 'brush' | 'lineart' | 'shape' | 'text' | 'tool' | 'swatches' | 'gradient' | 'rulers' | 'selectShape' | 'wand' | 'strokeRuler' | 'strokeRulerKind' | 'toolHelp' | 'drawingChoice' | 'autoSelect' | 'homeDrafts'>;
+  ui: PersistedUi;
 };
 
 export const useStore = create<AppState>()(
@@ -438,7 +439,7 @@ export const useStore = create<AppState>()(
       assets: s.assets,
       library: s.library,
       composer: { ...s.composer, editing: undefined } as Omit<ComposerState, 'editing'>,
-      ui: { workspace: s.ui.workspace, brush: s.ui.brush, lineart: s.ui.lineart, shape: s.ui.shape, text: s.ui.text, tool: s.ui.tool, swatches: s.ui.swatches, gradient: s.ui.gradient, rulers: s.ui.rulers, selectShape: s.ui.selectShape, wand: s.ui.wand, strokeRuler: s.ui.strokeRuler, strokeRulerKind: s.ui.strokeRulerKind, toolHelp: s.ui.toolHelp, drawingChoice: s.ui.drawingChoice, autoSelect: s.ui.autoSelect, homeDrafts: s.ui.homeDrafts },
+      ui: pickUi(s.ui),
     }),
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;
@@ -446,6 +447,11 @@ export const useStore = create<AppState>()(
       // A reload interrupts any agent call in flight.
       const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
       const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] ? p.activeSessionId : Object.keys(sessions)[0];
+      const assets = p.assets ?? {};
+      const ui = { ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) };
+      // Home and a Space are never shown together; a tool input that no longer exists is dropped.
+      if (ui.home && ui.space) ui.home = false;
+      if (ui.toolAsset && !assets[ui.toolAsset]) ui.toolAsset = undefined;
       return {
         ...current,
         settings: {
@@ -461,10 +467,10 @@ export const useStore = create<AppState>()(
         sessions,
         activeSessionId,
         generations: p.generations ?? {},
-        assets: p.assets ?? {},
+        assets,
         library: p.library ?? legacySubjects(restored),
         composer: { ...current.composer, ...p.composer, editing: null },
-        ui: { ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) },
+        ui,
       };
     },
     onRehydrateStorage: () => (_state, error) => {

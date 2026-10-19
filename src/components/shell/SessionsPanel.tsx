@@ -9,6 +9,7 @@ import { Popover, usePopover } from '../ui/Popover';
 import { AssetMedia } from '../ui/AssetMedia';
 import type { Session, Workspace } from '../../engine/types';
 import { usePanelExpanded } from './panelEmbed';
+import { visibleSessions } from '../../store/spaceSession';
 
 type CanvasFilter = 'all' | Workspace;
 
@@ -86,7 +87,7 @@ export function SessionsPanel() {
   const matches = useSessionMatcher(q);
 
   const list = useMemo(() => {
-    const arr = Object.values(sessions).filter((s) => (!pinnedOnly || s.pinned) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && matches(s));
+    const arr = visibleSessions(sessions).filter((s) => (!pinnedOnly || s.pinned) && (canvas === 'all' || sessionCanvases(s).includes(canvas)) && matches(s));
     const dir = reversed ? -1 : 1;
     arr.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -99,7 +100,7 @@ export function SessionsPanel() {
 
   const counts = useMemo(() => {
     const c: Record<CanvasFilter, number> = { all: 0, chat: 0, node: 0, designer: 0 };
-    for (const sess of Object.values(sessions)) {
+    for (const sess of visibleSessions(sessions)) {
       c.all++;
       for (const w of sessionCanvases(sess)) c[w]++;
     }
@@ -128,7 +129,7 @@ export function SessionsPanel() {
     <div className={`sessions ${compact ? 'is-compact' : ''}`}>
       <div className="panel-head">
         <div className="panel-title">
-          Sessions <span className="faint num">{Object.keys(sessions).length}</span>
+          Sessions <span className="faint num">{visibleSessions(sessions).length}</span>
         </div>
         <div className="panel-head-actions">
           <Button ref={newPop.ref} size="sm" variant="secondary" icon={Plus} onClick={newPop.toggle}>

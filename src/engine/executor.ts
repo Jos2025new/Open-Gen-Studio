@@ -13,6 +13,7 @@ import type { Estimate, GenerationOrigin, PlanStep, PlanSubject, StepState, Step
 import { costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { useStore } from '../store/store';
 import { clearPlanStop, isPlanStopped, stoppedError } from './planStop';
+import { placeFor } from './place';
 
 const get = useStore.getState;
 
@@ -198,7 +199,7 @@ export async function executeSteps(steps: PlanStep[], ctx: ExecContext): Promise
       nodeSubjects.push({ id: subject.name, name: subject.name, description: subject.description ?? '', kind: subject.kind ?? 'character', frontalAssetId: asset, refAssetIds: [] });
     }
     const inputsFor = <T extends object>(inputs: T) => ({ ...withLocal(inputs), ...(nodeSubjects.length ? { subjects: nodeSubjects } : {}) });
-    const base = { sessionId: ctx.sessionId, origin: ctx.origin, planId: ctx.planId, stepId: s.id };
+    const base = { sessionId: ctx.sessionId, origin: ctx.origin, place: placeFor({}, ctx.workspace), mode: 'agent' as const, planId: ctx.planId, stepId: s.id };
     switch (s.kind) {
       case 'text':
         return { assetIds: [], text: s.text };
