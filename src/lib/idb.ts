@@ -104,7 +104,7 @@ async function backupLegacy(key: string, legacy: string | undefined): Promise<vo
 }
 
 /** Every IndexedDB database the app owns (format 1 state, media, caches, format 2 state). */
-export const ALL_DB_NAMES = ['ogs-state', 'ogs-blobs', 'ogs-cache', 'ogs-store-v2'] as const;
+export const ALL_DB_NAMES = ['ogs-state', 'ogs-blobs', 'ogs-cache', 'ogs-store-v2', 'ogs-prompts'] as const;
 
 /**
  * Deletes databases and waits for each request. A blocked delete (another connection is still open, e.g. this page's own
