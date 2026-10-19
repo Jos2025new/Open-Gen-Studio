@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
 import { installHomeAutoClose, installHomeKeyGuard } from '../src/components/shell/homeGuard';
-import { newSession, setUi, useStore } from '../src/store/store';
+import { createSession, newSession, setUi, useStore } from '../src/store/store';
 
 installHomeKeyGuard();
-installHomeAutoClose();
+let stopAutoClose = installHomeAutoClose();
 // The guard rebases on the first hydrated state and then closes what a session change hides.
 useStore.setState({ hydrated: true });
 
@@ -112,5 +112,37 @@ describe('Home over a mounted workspace', () => {
     setUi({ panel: 'sessions' });
     expect(useStore.getState().ui.home).toBe(true);
     setUi({ home: false, panel: null });
+  });
+});
+
+describe('Hydration while Home or a Space is restored', () => {
+  const start = useStore.getState();
+  const stored = [createSession('Stored A'), createSession('Stored B')];
+  useStore.setState({ sessions: { ...start.sessions, ...Object.fromEntries(stored.map((s) => [s.id, s])) } });
+
+  // The subscription keeps its own reference; each case needs one that saw the not-yet-hydrated state.
+  const reinstallAt = (patch: Partial<ReturnType<typeof useStore.getState>>) => {
+    useStore.setState(patch);
+    stopAutoClose();
+    stopAutoClose = installHomeAutoClose();
+  };
+
+  afterEach(() => {
+    useStore.setState({ hydrated: true, activeSessionId: start.activeSessionId, ui: { ...useStore.getState().ui, home: false, space: undefined } });
+    stopAutoClose();
+    stopAutoClose = installHomeAutoClose();
+  });
+
+  it('keeps a restored Space when the stored session replaces the active one before hydrated flips', () => {
+    reinstallAt({ hydrated: false, ui: { ...useStore.getState().ui, home: false, space: 'create' } });
+    useStore.setState({ activeSessionId: stored[0].id }); // what rehydrate's merge writes first
+    useStore.setState({ hydrated: true });
+    expect(useStore.getState().ui.space).toBe('create');
+  });
+
+  it('keeps restored Home when hydration arrives in the same update as another active session', () => {
+    reinstallAt({ hydrated: false, ui: { ...useStore.getState().ui, home: true, space: undefined } });
+    useStore.setState({ hydrated: true, activeSessionId: stored[1].id });
+    expect(useStore.getState().ui.home).toBe(true);
   });
 });
