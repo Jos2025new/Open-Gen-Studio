@@ -1,75 +1,71 @@
-# Propuesta: zonas protegidas (empezando por la persistencia)
+# Propuesta: persistencia protegida
 
-Fecha: 2026-10-18. Estado: **propuesta, sin implementar**.
+Fecha: 2026-10-18. Estado: **propuesta recortada, lista para implementar**. No toca el guardado.
 
-La pidió el usuario después de cuatro revisiones externas del guardado protegido. Sus palabras: que quede «claro y permanente como algo que ha pasado por varias iteraciones, referenciando todas las pruebas que lo avalan», que «no se toque en un futuro a menos que se encuentren bugs evidentes» y que sea «una regla».
+El usuario la pidió para que el guardado protegido, corregido después de cuatro revisiones externas, quede «claro y permanente» y «no se toque en un futuro a menos que se encuentren bugs evidentes». La versión anterior traía huellas, conteos, futuras zonas y extracciones. Se recortó con la revisión de GPT y el acuerdo del usuario: un documento corto, una regla y una comprobación obligatoria.
 
-La primera versión de Claude (huellas de archivos, cuenta de `expect` y extracción de módulos) se corrigió con la revisión de GPT del mismo día. Esta es la versión corregida.
+## Qué se implementa
 
-## Lo que esta propuesta puede y no puede garantizar
+1. **`docs/persistencia-protegida.md`**, enlazado desde el README. Contiene:
+   - los archivos protegidos;
+   - los tests que los avalan, cada uno con lo que demuestra;
+   - las revisiones y los commits que las corrigieron;
+   - la evidencia necesaria según el tipo de cambio.
+2. **La regla en AGENTS.md**, en una línea:
+   > **Persistencia protegida:** antes de modificar las zonas o pruebas de [docs/persistencia-protegida.md](docs/persistencia-protegida.md), obtener autorización explícita para ese cambio; conservar sus contratos y aportar pruebas y revisión independiente.
+3. **`scripts/check-protected.mjs`, dentro de `npm test`:** falla si falta alguno de los tests listados o si alguno usa `.skip`, `.only` o `.todo`.
 
-- **Puede:** que cualquier cambio en la zona o en sus pruebas sea **visible, pedido y revisable**, y que los tests que la avalan no desaparezcan ni se salten sin que `npm test` falle.
-- **No puede:** impedirlo. Un agente que puede cambiar el código también puede cambiar la regla, la comprobación y el manifiesto.
-- **La única barrera independiente** está fuera del repositorio: la protección de rama en GitHub, que exige revisión antes de fusionar en `main`. Solo la puede activar el usuario.
-- **La seguridad real** viene de comprobar los escenarios de fallo, no de inmovilizar archivos.
+## Alcance de la comprobación
 
-## Zona 1: persistencia protegida
+- **Detecta:** archivos de test ausentes y tests marcados para saltarse.
+- **No detecta:** casos borrados dentro de un archivo ni aserciones debilitadas. Eso solo lo frena la revisión, que la regla exige.
+- **No impide nada:** lo hace visible. La única barrera independiente es la protección de rama de `main` en GitHub, que solo puede activar el usuario.
 
-**Por qué:** el incidente de las 09:19:30 ([043](history/043-2026-10-W42.md)), la [ADR 0022](decisions/0022-guardado-local-first-sin-bloqueo.md) y cuatro revisiones independientes:
+## Archivos protegidos
 
-| Revisión | Sobre | Hallazgos | Corrección |
-|---|---|---|---|
-| 1 (Astra) | `90eebc8` | 6: diff al encolar, envío tras perder el candado, reversión fallida, traspaso con IndexedDB caído, «Mantener» de una pérdida cada vez, `stale` arrastrado | `7d153fd` |
-| 2 (GPT) | `7d153fd` | 3: `ok` tardío que oculta un fallo local, píxeles con IndexedDB caído, envíos en cola durante la reversión | `bb58598` |
-| 3 (GPT) | `bb58598` | 1: marca de fallo de una capa borrada | `9f11649` |
-| 4 (GPT) | `9f11649` | 0. Sugiere fijar en un test la carrera del borrado | `71b9636` |
-
-**Archivos de la zona:**
-- Servidor: `server/save-guard.js` y `server/store-v2.js` (comprobaciones, copias y rechazos), además de `server/local-store.js` (el cuerpo del 409).
+- Servidor: `server/save-guard.js`, `server/store-v2.js` y el cuerpo del 409 en `server/local-store.js`.
 - Cliente: `src/lib/idb.ts`, `disk.ts`, `saveGuard.ts` y `writerLock.ts`; en `src/store/`, `writerHandoff.ts`, `saveRecovery.ts`, `saveReport.ts` y `saveStatus.ts`.
-- Las funciones de guardado de `src/store/store.ts` (`flushWrite`, `saveNow`) y de `src/engine/design/raster.ts` (`writeLayer`, `flushRaster`, `deleteBuffers`). El resto de esos dos archivos **no** es zona protegida.
+- Solo estas funciones de dos archivos más grandes: `flushWrite` y `saveNow` de `src/store/store.ts`; `writeLayer`, `flushRaster` y `deleteBuffers` de `src/engine/design/raster.ts`.
 
-**Pruebas que la avalan.** Las marcadas **(R)** reproducen un hallazgo de revisión y se comprobó que fallan con el código anterior al arreglo:
+## Tests que lo avalan
 
 | Test | Qué demuestra |
 |---|---|
-| [save-guard-review.test.ts](../tests/save-guard-review.test.ts) **(R)** | Los hallazgos 1, 2, 3, 5 y 6 de la revisión 1, y la reversión con envíos en cola de la revisión 2 |
-| [save-guard-server.test.ts](../tests/save-guard-server.test.ts) | Regla de pérdida, UTF-8, `baseAt`, rechazo completo, hashes de «Mantener», varias sesiones y borrado masivo **(R)** |
-| [save-guard-client.test.ts](../tests/save-guard-client.test.ts) | Revisiones pendientes, rebase tras el ack, arranque con `pending`, payload de «Mantener» |
-| [save-guard-banner.test.ts](../tests/save-guard-banner.test.ts) | El aviso y sus tres salidas |
-| [save-now.test.ts](../tests/save-now.test.ts) | Un `ok` tardío no oculta un fallo local **(R)**; recibos y reintentos |
-| [raster-persist.test.ts](../tests/raster-persist.test.ts) | Píxeles: fallo local que detiene el traspaso **(R)**, capa borrada tras fallar **(R)**, carrera del borrado **(R)** |
-| [writer-lock.test.ts](../tests/writer-lock.test.ts), [writer-lock-handoff.test.ts](../tests/writer-lock-handoff.test.ts) | Una pestaña activa, traspaso, IndexedDB caído conserva el candado **(R)**, sin `steal` |
-| [writer-lock-panel.test.ts](../tests/writer-lock-panel.test.ts), [writer-lock-raster.test.ts](../tests/writer-lock-raster.test.ts) | Panel de la pestaña tapada; píxeles en el traspaso |
-| [state-conflict.test.ts](../tests/state-conflict.test.ts), [state-copies.test.ts](../tests/state-copies.test.ts) | Conflictos y elección de copias al arrancar |
+| `save-guard-review` | Los hallazgos de la revisión 1 y la reversión con envíos en cola |
+| `save-guard-server` | Regla de pérdida, `baseAt`, rechazo completo, «Mantener», borrado masivo |
+| `save-guard-client` | Revisiones pendientes, rebase, arranque con `pending` |
+| `save-guard-banner` | El aviso y sus tres salidas |
+| `save-now` | Un `ok` tardío no oculta un fallo local |
+| `raster-persist` | Píxeles: fallo local, capa borrada, carrera del borrado |
+| `writer-lock`, `writer-lock-handoff`, `writer-lock-panel`, `writer-lock-raster` | Una pestaña activa, traspaso seguro, sin `steal` |
+| `state-conflict`, `state-copies` | Conflictos y copias al arrancar |
 
-**Evidencia, separada por quién la obtuvo:**
-- *Ejecutada por Claude:* `npm test` completo en `9f11649` (2042 tests); los tests (R) fallan con el commit anterior a su arreglo; prueba visual en el sandbox con dos pestañas («Use here», traspaso y guardado en disco sin rechazos).
-- *Comunicada por los revisores:* reproducciones aisladas con módulos reales (55, 89, 26 y 16 tests en sus pasadas). No repitieron la suite completa.
-- *Sin verificar:* los casos de fallo en el navegador (cuota, pestaña congelada) y cualquier proveedor real.
+**Revisiones:**
+- Astra, sobre `90eebc8`: 6 hallazgos, corregidos en `7d153fd`.
+- GPT, sobre `7d153fd`: 3 hallazgos, corregidos en `bb58598`.
+- GPT, sobre `bb58598`: 1 hallazgo, corregido en `9f11649`.
+- GPT, sobre `9f11649`: ningún hallazgo; el test de la carrera que sugirió está en `71b9636`.
 
-**Garantías y límites:** los de [arquitectura-guardado.md](arquitectura-guardado.md#6-límites-conocidos) y la ADR 0022. En resumen, el traspaso cubre el estado y los píxeles que pasan por `saveNow()`, pero no los medios guardados por otro camino. Las fases 2 y 3 están pendientes.
+El detalle está en [043](history/043-2026-10-W42.md) y en la [ADR 0022](decisions/0022-guardado-local-first-sin-bloqueo.md).
 
-## Qué se implementaría
+## Evidencia según el tipo de cambio
 
-1. **`docs/zonas-protegidas.md`** con la zona 1 tal como está arriba (tabla de revisiones, archivos, pruebas y evidencia), y un índice para futuras zonas. Se enlaza desde el README.
-2. **`scripts/check-protected.mjs`, dentro de `npm test`:** los tests listados deben existir y no contener `.skip`, `.only`, `it.todo` ni `describe.skip`. Nada más. No cuenta `expect` ni exige nombres de casos, porque un test puede conservar ambos y dejar de comprobar lo importante.
-3. **La regla en AGENTS.md** (una línea, dentro de los 3 KB):
-   > **Persistencia protegida:** antes de modificar las zonas o pruebas de [docs/zonas-protegidas.md](docs/zonas-protegidas.md), obtener autorización explícita para ese cambio; conservar sus contratos y aportar pruebas y revisión independiente.
-4. **Evidencia según el tipo de cambio**, escrita en el documento:
-   - *bug:* una reproducción que falle antes y pase después;
-   - *fase 2 o 3 de la ADR 0022:* tests de los contratos nuevos, conservación de los anteriores y revisión independiente;
-   - *cualquier cambio en sus tests:* se revisa junto con el código.
+- **Bug:** una reproducción que falle antes del arreglo y pase después.
+- **Fase 2 o 3:** tests de los contratos nuevos, los anteriores conservados y una revisión independiente.
+- **Cambio en estos tests:** se revisa junto con el código.
 
-   Cada cambio en la zona añade una fila a la tabla de revisiones.
+## Dirección propuesta para la fase 2: SQLite
 
-## Qué no se haría ahora
+No se implementa ahora.
+- Sustituiría los JSON del servidor, no se añadiría a ellos.
+- Sesiones, orden, globales y revisión se guardarían en una sola transacción.
+- Se mantienen `baseAt`, las comprobaciones de pérdida y las copias recuperables.
+- Los archivos multimedia siguen fuera, con su propio contrato.
 
-- **Extraer el guardado de `raster.ts` y `store.ts` a módulos propios.** Acabamos de corregir carreras entre esos módulos: separarlos es un cambio con su propio riesgo. Se hará cuando un cambio concreto lo pida.
-- **Huellas sha256 como barrera.** Si se añaden más adelante, solo como alarma de cambio y sobre un conjunto pequeño.
-- **Contar `expect` o fijar nombres de casos.** Da sensación de control sin protegerlo.
+Antes de sustituir los JSON hay que verificar la migración y la recuperación: interrumpir una escritura, reabrir y comprobar que aparece una versión completa, y restaurar una copia.
 
-## Decisiones del usuario
+SQLite no sustituye la coordinación entre pestañas ni sus tests.
 
-- Si se aprueba la propuesta y su nombre («zonas protegidas»).
-- Si se activa la protección de rama en GitHub para `main`. Lo hace el usuario en la configuración del repositorio.
+## Fuera de alcance
+
+Huellas, conteo de `expect`, futuras zonas y extraer módulos de `store.ts` o `raster.ts`.
