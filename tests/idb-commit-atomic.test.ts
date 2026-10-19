@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/lib/disk', () => ({
-  disk: { isStale: () => false, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe: async () => undefined },
+  disk: { isStale: () => false, reset: () => undefined, getState: async () => null, setState: async () => 'ok', putState: async () => 'ok', setCommit: async () => 'ok', wipe: async () => undefined },
   diskAvailable: async () => false,
 }));
 
@@ -18,7 +18,9 @@ describe('format 2 commit is one IndexedDB transaction', () => {
     await stateDb.set('ogs-app', text(2, ['ses_a', 'ses_c']));
     const writes = spy.mock.calls.filter(([, mode]) => mode === 'readwrite');
     spy.mockRestore();
-    expect(writes).toHaveLength(1);
+    // The commit is ONE transaction (sessions, removals, globals, manifest and the unsent-work record); the disk's receipt
+    // then clears that record in a second, small one.
+    expect(writes).toHaveLength(2);
     const back = JSON.parse((await stateDb.get('ogs-app'))!);
     expect(Object.keys(back.state.sessions).sort()).toEqual(['ses_a', 'ses_c']);
   });

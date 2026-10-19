@@ -50,6 +50,7 @@ vi.mock('../src/lib/disk', () => ({
     listBlobs: async () => [],
     delBlobs: vi.fn(),
     isStale: () => false,
+    reset: () => undefined,
   },
   diskAvailable: async () => true,
 }));
@@ -139,7 +140,7 @@ describe('state copy recovery', () => {
     expect(await db.get('ogs-app')).toBe(newest);
   });
 
-  it('preserves a rejected newer local copy under a conflict key', async () => {
+  it('keeps a rejected newer local copy active and under a conflict key (the disk copy is not adopted)', async () => {
     const db = await freshDb();
     const local = json(50, 'local work');
     const disk = json(40, 'disk work');
@@ -147,13 +148,13 @@ describe('state copy recovery', () => {
     diskState.value = disk;
     diskPutState.mockResolvedValueOnce('conflict');
 
-    expect(await db.get('ogs-app')).toBe(disk);
+    expect(await db.get('ogs-app')).toBe(local);
     const kept = [...stateStore().entries()].filter(([key]) => String(key).startsWith('ogs-app:conflict-'));
     expect(kept).toHaveLength(1);
     expect(kept[0][1]).toBe(local);
   });
 
-  it('keeps a refused write separately and restores the confirmed disk copy', async () => {
+  it('keeps a refused write in the browser and as a conflict copy; the disk copy is not adopted', async () => {
     const db = await freshDb();
     diskState.value = json(80, 'newer disk work');
     diskSetCommit.mockResolvedValueOnce('conflict');
@@ -162,9 +163,10 @@ describe('state copy recovery', () => {
     const kept = [...stateStore()].filter(([key]) => String(key).startsWith('ogs-app:conflict-'));
     expect(kept).toHaveLength(1);
     expect(String(kept[0][1])).toContain('ses_mine');
-    // The disk's state is adopted in the format-2 store; the format-1 keys are left alone.
+    // The refused state stays the active format-2 copy (a stale disk never replaces it); the format-1 keys are left alone.
     const v2 = stores.get('ogs-store-v2')!;
-    expect(v2.get('manifest')).toEqual(expect.objectContaining({ savedAt: 80 }));
+    expect(v2.get('session:ses_mine')).toBe('{"id":"ses_mine"}');
+    expect(v2.get('manifest')).toEqual(expect.objectContaining({ savedAt: expect.any(Number) }));
     expect(stateStore().has('ogs-app')).toBe(false);
   });
 

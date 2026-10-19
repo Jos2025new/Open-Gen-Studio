@@ -3,9 +3,22 @@
  * The app has no backend: when it is served without that server the copy is simply off and IndexedDB is the only store.
  */
 
+import { holdsWriterLock } from './writerLock';
+
+// Every function here that writes (PUT, DELETE, POST) first asks holdsWriterLock(): only the active tab changes the disk.
 let available: Promise<boolean> | null = null;
 let unavailable = false;
-export type DiskWriteResult = 'ok' | 'conflict' | 'fail' | 'browser-only';
+/** 'conflict': another tab saved first (this tab goes stale). 'rejected': the server kept a shrinking save aside (possible-loss); not stale. */
+export type DiskWriteResult = 'ok' | 'conflict' | 'rejected' | 'fail' | 'browser-only';
+/** The body of a possible-loss 409 (see server/local-store.js `conflictBody`). */
+export interface Loss { sessionId: string; diskHash?: string }
+/** `losses`: every shrinking session of the refused commit; `total`: the commit removes most sessions (hash of the disk order). */
+export interface Rejection { sessionId?: string; rejectedFile?: string; diskHash?: string; savedAt?: number; losses?: Loss[]; total?: { diskOrderHash: string } }
+/**
+ * "Keep this version" (ADR 0022): approves every loss of one exact commit, each bound to the disk text and the text sent by
+ * hash (sessions), and a large removal bound to both session orders by hash (total).
+ */
+export interface KeepVersion { sessions: Array<{ sessionId: string; diskHash: string; candidateHash: string }>; total?: { diskOrderHash: string; candidateOrderHash: string } }
 
 /** True when the local store answers. A static host's SPA fallback returns HTML, not "ok", so it counts as absent. */
 /**
@@ -40,6 +53,14 @@ let receipts: Array<(result: DiskWriteResult) => void> = [];
 let baseAt = 0;
 let stale = false;
 let onStale: (() => void) | null = null;
+let lastRejection: Rejection | null = null;
+/** Why a 409 was sent: 'rejected' for a possible-loss (kept in `lastRejection`), else 'conflict' (also a 409 with no reason). */
+async function refusal(res: Response): Promise<'conflict' | 'rejected'> {
+  const body = await (async () => JSON.parse(await res.text()) as Rejection & { reason?: string })().catch(() => null);
+  if (body?.reason !== 'possible-loss') return 'conflict';
+  lastRejection = { sessionId: body.sessionId, rejectedFile: body.rejectedFile, diskHash: body.diskHash, savedAt: body.savedAt, losses: body.losses, total: body.total };
+  return 'rejected';
+}
 /** Bytes on the wire: the browser's keepalive limit (64 KiB) counts bytes, not string length. */
 const byteLength = (text: string): number => new TextEncoder().encode(text).length;
 const savedAtOf = (v: string | null) => Number(/^\{"savedAt":(\d+)/.exec(v ?? '')?.[1] ?? 0);
@@ -61,18 +82,31 @@ export const disk = {
    * One write that says it was built on the disk state `base`; 'conflict' when the disk holds another one.
    * Used at load time for a browser copy newer than the disk's.
    */
-  async putState(value: string, base: number): Promise<'ok' | 'conflict' | 'fail'> {
-    if (!(await diskAvailable())) return 'fail';
+  async putState(value: string, base: number): Promise<'ok' | 'conflict' | 'rejected' | 'fail'> {
+    if (!holdsWriterLock() || !(await diskAvailable())) return 'fail';
     const body = withBase(value, base);
     const res = await fetch('/x/store/state', { method: 'PUT', body, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } }).catch(() => null);
-    if (res?.status === 409) return 'conflict';
+    if (res?.status === 409) return refusal(res);
     if (!res?.ok) return 'fail';
     baseAt = savedAtOf(body);
     return 'ok';
   },
 
-  /** True once another tab saved newer work: this tab stops saving (see onStateConflict). */
+  /**
+   * A fresh start with the disk when this tab takes the lock again: the conflict of an earlier holding period is not
+   * carried over (stateDb.get then rebuilds acked, revisions and base from the copies as they are now).
+   */
+  reset(): void {
+    stale = false;
+    lastRejection = null;
+    available = null;
+  },
+
+  /** True once another tab saved newer work: this tab stops sending to the disk (it keeps saving in the browser). */
   isStale: () => stale,
+
+  /** The details of the last possible-loss refusal (result 'rejected'). */
+  rejection: (): Rejection | null => lastRejection,
 
   /** Called once when the disk refuses this tab's state because another tab saved after it loaded. */
   onStateConflict(cb: () => void): void {
@@ -83,12 +117,13 @@ export const disk = {
    * Format-2 commit (ADR 0014): the global record, the session order and only the sessions that changed. The server
    * writes those files and publishes the new manifest; a stale baseAt is refused (409) like a whole-state write.
    */
-  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]> }): Promise<DiskWriteResult> {
+  setCommit(c: { savedAt: number; version: number; globals: string; order: string[]; changed: Array<[string, string]>; all?: Array<[string, string]>; keep?: KeepVersion }): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
     // The body carries JSON TEXT as strings: globals and each session are strings the server stores as they are.
     const send = async (list: Array<[string, string]>): Promise<Response> => {
       const sessions = list.map(([id, text]) => `${JSON.stringify(id)}:${JSON.stringify(text)}`).join(',');
-      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${JSON.stringify(c.globals)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}}`;
+      const body = `{"savedAt":${c.savedAt},"baseAt":${baseAt},"version":${c.version},"globals":${JSON.stringify(c.globals)},"order":${JSON.stringify(c.order)},"sessions":{${sessions}}${c.keep ? `,"keep":${JSON.stringify(c.keep)}` : ''}}`;
       return fetch('/x/store/v2/commit', { method: 'PUT', body, keepalive: byteLength(body) < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
     };
     const receipt = new Promise<DiskWriteResult>((resolve) => { commitChain = commitChain.then(async () => {
@@ -96,12 +131,16 @@ export const disk = {
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        // Asked again at send time: the lock may have been handed over while this commit waited in the chain.
+        else if (!holdsWriterLock()) result = 'browser-only';
         else {
           let res = await send(c.changed);
           // The disk has no copy of an unchanged session yet (the state is still format 1): one retry with every session.
           if (res.status === 400 && c.all && (await res.clone().text()).startsWith('missing session')) res = await send(c.all);
-          if (res.status === 409) { stale = true; onStale?.(); result = 'conflict'; }
-          else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
+          if (res.status === 409) {
+            result = await refusal(res);
+            if (result === 'conflict') { stale = true; onStale?.(); }
+          } else if (res.ok) { baseAt = c.savedAt; result = 'ok'; }
         }
       } catch (err) { report('save state')(err); }
       resolve(result);
@@ -110,6 +149,7 @@ export const disk = {
   },
 
   setState(value: string | StateBody): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return Promise.resolve('browser-only');
     if (stale) return Promise.resolve('conflict');
     latestState = value;
     const receipt = new Promise<DiskWriteResult>((resolve) => receipts.push(resolve));
@@ -122,6 +162,7 @@ export const disk = {
       try {
         if (stale) result = 'conflict';
         else if (!(await diskAvailable())) result = unavailable ? 'fail' : 'browser-only';
+        else if (!holdsWriterLock()) result = 'browser-only';
         else {
           const [body, at] = typeof next === 'string'
             ? [savedAtOf(next) ? withBase(next, baseAt) : next, savedAtOf(next)]
@@ -129,9 +170,8 @@ export const disk = {
           const size = typeof body === 'string' ? byteLength(body) : body.size;
           const res = await fetch('/x/store/state', { method: 'PUT', body, keepalive: size < 60_000, headers: { 'Content-Type': 'application/json', ...LOCAL_WRITE } });
           if (res.status === 409) {
-            stale = true;
-            onStale?.();
-            result = 'conflict';
+            result = await refusal(res);
+            if (result === 'conflict') { stale = true; onStale?.(); }
           } else if (res.ok) { baseAt = at; result = 'ok'; }
         }
       } catch (err) { report('save state')(err); }
@@ -148,8 +188,10 @@ export const disk = {
 
   /** Resolves when written (callers that do not need to wait use `void`). */
   async setBlob(key: string, blob: Blob): Promise<DiskWriteResult> {
+    if (!holdsWriterLock()) return 'browser-only';
     if (stale) return 'conflict';
     if (!(await diskAvailable())) return unavailable ? 'fail' : 'browser-only';
+    if (!holdsWriterLock()) return 'browser-only';
     try {
       const res = await fetch(`/x/store/blob/${encodeURIComponent(key)}`, { method: 'PUT', body: blob, headers: { 'Content-Type': blob.type || 'application/octet-stream', ...LOCAL_WRITE } });
       if (res.status === 409) { stale = true; onStale?.(); return 'conflict'; }
@@ -158,6 +200,7 @@ export const disk = {
   },
 
   delBlobs(keys: string[]): void {
+    if (!holdsWriterLock()) return;
     void diskAvailable().then((ok) => {
       if (ok) for (const k of keys) fetch(`/x/store/blob/${encodeURIComponent(k)}`, { method: 'DELETE', headers: LOCAL_WRITE }).catch(report(`delete ${k}`));
     });
@@ -171,6 +214,6 @@ export const disk = {
 
   /** Move the disk copy aside (data.bak-<date>) so a wipe does not come back on reload. */
   async wipe(): Promise<void> {
-    if (await diskAvailable()) await fetch('/x/store/wipe', { method: 'POST', headers: LOCAL_WRITE }).catch(report('wipe'));
+    if (holdsWriterLock() && (await diskAvailable())) await fetch('/x/store/wipe', { method: 'POST', headers: LOCAL_WRITE }).catch(report('wipe'));
   },
 };

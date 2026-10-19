@@ -1,4 +1,5 @@
-import { CHECK_RESTART, statusChecker } from './checkStatus';
+import { isRestart, statusChecker } from './checkStatus';
+import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
 import { uid } from '../lib/id';
@@ -37,7 +38,7 @@ import type { AdvancedValue, Asset, AssetKind, Estimate, GenSettings, Generation
 import { addAssets, addSpend, patchAsset, patchGeneration, setGraph, updateFeedItem, upsertGeneration, useStore } from '../store/store';
 
 const get = useStore.getState;
-const controllers = new Map<string, AbortController>();
+export const controllers = new Map<string, AbortController>();
 const running = new Map<string, Promise<string[]>>();
 const retrying = new Map<string, Promise<string[]>>();
 
@@ -71,7 +72,7 @@ export function estimateSpec(spec: GenerationSpec, memoryOnly = false): Estimate
     return estimateOp(spec.op.id, spec.op.params, src, spec.settings, spec.modelRef);
   }
   if (spec.kind === 'text') {
-    // Text from a model (MiniMax Lyrics) is priced like its media kind; other text results are not predictable.
+    // Model text (MiniMax Lyrics) is priced like its media kind; other text is not predictable.
     const m = get().catalog.models[spec.modelRef];
     return m?.textOutput ? estimateMedia(spec.modelRef, m.kind, spec.settings, false, memoryOnly) : { usd: null, approximate: true };
   }
@@ -308,6 +309,7 @@ export function generationInFlight(id: string): boolean { return running.has(id)
 export function runGeneration(id: string): Promise<string[]> {
   const existing = running.get(id);
   if (existing) return existing;
+  if (!mayStartWork()) return Promise.reject(new Error('Open Gen Studio is open in another tab'));
   const generation = get().generations[id];
   if (generation?.status === 'review') return Promise.reject(new PriceReviewRequired('Necesita revisión'));
   const p = attempt(id).finally(() => {
@@ -503,8 +505,8 @@ async function execute(id: string): Promise<string[]> {
         });
       }
     }
-    // Subjects on models without elements (R10): their images join the references and the mention becomes the
-    // model's own syntax, numbered by the app from the step's real references (frontal views first, extra views after).
+    // Models without elements (R10): subject images join the references; the mention becomes the model's own
+    // syntax, numbered from the step's real references (frontal views first).
     const subjectImages = mappedSubjects.subjectImages;
     if (subjectImages) {
       if (mentioned.ids.length) {
@@ -619,8 +621,8 @@ async function execute(id: string): Promise<string[]> {
       };
       const serial = seriesKey(model);
       const once = () => (serial ? oneAtATime(serial, send) : send());
-      // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts the very same one
-      // later: only that request is tried again, spaced out; the images already made are kept and not paid again.
+      // Atlas sometimes refuses one request of a batch ("Upstream access denied") and accepts it later: only that
+      // request is retried, spaced out; finished images are kept and not paid again.
       let result: Awaited<ReturnType<typeof send>> | undefined;
       for (let retry = 0; ; retry++) {
         try {
@@ -660,7 +662,7 @@ async function execute(id: string): Promise<string[]> {
   } catch (err) {
     if (err instanceof PriceReviewRequired) throw err;
     const cur = get().generations[id];
-    if (signal.reason === CHECK_RESTART) return [];
+    if (isRestart(signal.reason)) return [];
     const remoteJob = keptJob(err, cur?.remoteJob);
     if (isAbort(err) || signal.aborted) {
       patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
@@ -802,7 +804,7 @@ export function purgeDiscarded(id: string): void {
     ids.forEach((a) => delete assets[a]);
     return { generations, assets };
   });
-  // Loaded here, only when there is something to delete: the runner itself never touches stored files otherwise.
+  // Loaded only when there is something to delete.
   if (ids.length) void import('../lib/idb').then((m) => m.deleteAssetBlobs(ids));
 }
 
@@ -822,7 +824,7 @@ export async function resumeInterrupted(): Promise<void> {
   for (const g of gens) {
     const job = g.remoteJob;
     if (!job || !ADAPTERS[job.provider]?.resume || !isConnected(job.provider)) {
-      const error = job ? `Interrupted by a page reload. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload. Regenerate to try again.';
+      const error = job ? `Interrupted by a page reload or tab change. Connect ${PROVIDER_LABELS[job.provider]} and use Check again.` : 'Interrupted by a page reload or tab change. Regenerate to try again.';
       patchGeneration(g.id, { status: 'error', error, statusText: undefined, finishedAt: Date.now() });
       purgeDiscarded(g.id);
       continue;
@@ -906,7 +908,7 @@ export function recheckGeneration(id: string): Promise<string[]> {
   const pending = running.get(id);
   if (pending) return pending;
   const g = get().generations[id];
-  if (!g || !canRecheck(g)) return Promise.resolve([]);
+  if (!g || !canRecheck(g) || !mayStartWork()) return Promise.resolve([]);
   if (!g.remoteJob) return recoverThenFollow(id);
   const job = g.remoteJob;
   if (!isConnected(job.provider)) {
@@ -969,13 +971,12 @@ function followRemote(id: string, job: RemoteJob): Promise<string[]> {
       finish(id, assets.map((a) => a.id), result.costUsd, await checkDelivery(id, assets), result.costUsd);
       return assets.map((a) => a.id);
     } catch (err) {
-      if (controller.signal.reason === CHECK_RESTART) return [];
+      if (isRestart(controller.signal.reason)) return [];
       const remoteJob = keptJob(err, job);
       if (isAbort(err)) patchGeneration(id, { status: 'canceled', statusText: undefined, finishedAt: Date.now(), remoteJob });
       else {
         patchGeneration(id, { status: 'error', error: (err as Error).message, statusText: undefined, finishedAt: Date.now(), remoteJob });
-        // A job that was sent and then failed while being followed (after a reload or Check status): same trail as
-        // a failure on the first run (T5).
+        // A sent job that failed while followed (reload, Check status): same trail as a first-run failure (T5).
         const cur = get().generations[id];
         logEvent('provider-error', { generation: id, model: cur?.modelName, provider: job.provider, jobId: job.id, message: (err as Error).message, sent: cur?.sent, resumed: true });
       }

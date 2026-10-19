@@ -69,6 +69,7 @@
 - [0019 — Tipografía: DM Sans y Outfit en la app, Inter en el Designer (aceptado 2026-10-17)](decisions/0019-tipografia-app-y-designer.md).
 - [0020 — Estructura de Home: hero, Apps, Tools y For deeper work (aceptado 2026-10-17)](decisions/0020-estructura-de-home.md).
 - [0021 — Nunca enviar una petición de pago con esquema derivado (aceptado 2026-10-18)](decisions/0021-esquema-derivado-sin-envio.md).
+- [0022 — Guardado local-first sin bloqueo: una pestaña activa, guarda por contenido y avisos persistentes (aceptado 2026-10-18; fase 1 en `task/save-guard`)](decisions/0022-guardado-local-first-sin-bloqueo.md).
 
 ## Propuestas de interfaz
 
@@ -76,6 +77,9 @@
 
 - [Plan: interfaz del Designer como mesa de trabajo de diseño](plan-designer-ux.md) (2026-10-10), en curso en `task/designer-ux`.
 - [Plan: Designer fluido](plan-fluidez.md) (2026-10-12): objetivo, umbrales, etapas y autorizaciones; las revisiones lo enmiendan, no lo reabren.
+- [Arquitectura del guardado protegido](arquitectura-guardado.md) (2026-10-18, fase 1): piezas, flujos (guardado, rechazo, arranque, pestañas), qué se guarda dónde, qué tocar cuando la app crece y diagnóstico.
+- [Persistencia protegida](persistencia-protegida.md) (2026-10-18): archivos y tests protegidos por la regla 5 de AGENTS.md, revisiones y evidencia por tipo de cambio; lo comprueba `scripts/check-protected.mjs`.
+- [Propuesta: persistencia protegida](propuesta-zonas-protegidas.md) (2026-10-18), implementada: documento, regla y comprobación; SQLite como dirección de la fase 2.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
@@ -135,6 +139,7 @@
 - [040-2026-10-W42: realismo, estilos de captura, borrador primero, imperfecciones, estilos propios y contraste (2026-10-17)](history/040-2026-10-W42.md) — por paso: qué, dónde, evidencia, desviaciones y límites.
 - [041-2026-10-W42: borrador primero dentro de la tarjeta de ajustes, con bloqueo de resolución y candado (2026-10-17)](history/041-2026-10-W42.md) — una sola tarjeta antes del plan.
 - [042-2026-10-W42: investigación de la persona entusiasta, rediseño de Home, borrador, tarjetas del chat y guarda de esquema (2026-10-16/18)](history/042-2026-10-W42.md) — método y límites de la evidencia, maquetas, decisiones, commits, fallos de verificación, arreglos y la guarda de esquema.
+- [043-2026-10-W42: incidente de guardado, plan y fase 1 de la protección (2026-10-18)](history/043-2026-10-W42.md) — incidente, diagnóstico, commits de `task/save-guard`, pruebas y pendientes.
 - [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
 
 ## Trazabilidad

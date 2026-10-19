@@ -495,7 +495,11 @@ function writeLayer(layerId: string): Promise<void> {
       // Live strokes mutate this same canvas in place; reference equality alone cannot acknowledge an old snapshot.
       if (buffers.get(layerId) === c && bufferVersion(layerId) === revision && !timers.has(layerId) && !idles.has(layerId)) { pending.delete(layerId); rasterSaved(layerId); }
       failureReported = false;
+      localFailed.delete(layerId);
     } catch (err) {
+      // Not even the browser copy was written (quota, broken IndexedDB): those pixels are only in memory.
+      if ((err as { diskOnly?: boolean } | null)?.diskOnly) localFailed.delete(layerId); // idb.ts DiskPendingError
+      else localFailed.add(layerId);
       failSave('Layer pixels pending', err instanceof Error && err.message.includes('Another tab'));
       if (!failureReported) {
         failureReported = true;
@@ -507,10 +511,18 @@ function writeLayer(layerId: string): Promise<void> {
   return run;
 }
 
-/** Write every pending layer now (tab hidden or closing, or before an action that needs them stored). */
+/**
+ * Write every pending layer now (tab hidden or closing, or before an action that needs them stored). Rejects when a
+ * layer could not be written even to the browser (a handover of the writer lock stops on it); a disk failure does not.
+ */
 export function flushRaster(): Promise<void> {
-  return Promise.all([...pending].map((id) => writeLayer(id))).then(() => undefined);
+  return Promise.all([...pending].map((id) => writeLayer(id))).then(() => {
+    if (localFailed.size) throw new Error('Could not save layer pixels to browser storage');
+  });
 }
+
+/** Layers whose last write failed in the browser itself, not only on disk. */
+const localFailed = new Set<string>();
 
 /** Layers whose latest pixels are not stored yet. */
 export function pendingRaster(): string[] {
@@ -518,9 +530,9 @@ export function pendingRaster(): string[] {
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('pagehide', () => void flushRaster());
+  window.addEventListener('pagehide', () => void flushRaster().catch(() => undefined));
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') void flushRaster();
+    if (document.visibilityState === 'hidden') void flushRaster().catch(() => undefined);
   });
 }
 
@@ -555,7 +567,8 @@ export async function deleteBuffers(layerIds: string[]): Promise<void> {
   }
   // Let writes already running finish first, so they cannot bring a deleted layer's pixels back.
   await Promise.all(layerIds.map((id) => chains.get(id)));
-  layerIds.forEach((id) => chains.delete(id));
+  // After those writes: a deleted layer that failed in the browser no longer blocks flushRaster (and a handover).
+  layerIds.forEach((id) => { chains.delete(id); localFailed.delete(id); });
   if (layerIds.length) await blobDb.delMany(layerIds.map(keyFor)).catch(() => undefined);
   notify();
 }

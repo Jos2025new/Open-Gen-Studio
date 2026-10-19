@@ -74,5 +74,6 @@ export default defineConfig({
     testTimeout: 20_000,
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    setupFiles: ['tests/setup-writer-lock.ts'],
   },
 });

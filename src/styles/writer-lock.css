@@ -1,0 +1,6 @@
+.writer-lock { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; padding: 16px; background: var(--overlay); backdrop-filter: blur(6px); }
+.writer-lock-card { max-width: 420px; padding: 20px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.writer-lock-card h2 { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.writer-lock-card p { margin: 0 0 12px; }
+.writer-lock-card .muted { margin: 12px 0 0; font-size: 12px; color: var(--text-3); }
+.writer-lock-actions { display: flex; flex-wrap: wrap; gap: 6px; }
