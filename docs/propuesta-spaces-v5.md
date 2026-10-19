@@ -1,6 +1,6 @@
 # Propuesta v5: Spaces separados de los Workspaces
 
-Fecha: 2026-10-18. Estado: **propuesta y plan, sin implementar**. Base: `task/agent-stop` en `3e7c553`. Sustituye a la v4 del mismo día.
+Fecha: 2026-10-18. Estado: **implementada** en dos etapas en `task/space-session-1` (2026-10-19), fusionada en `task/agent-stop`. Base: `task/agent-stop` en `3e7c553`. Sustituye a la v4 del mismo día.
 
 Esta versión incorpora las dos revisiones anteriores y cierra los dos puntos que quedaban: los resultados de texto sin activo (transcripciones) y la guarda de hidratación de Home y del Space. También fija el presupuesto de tamaño de `jobs.ts` y el contrato de `toolSeed`.
 
