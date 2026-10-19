@@ -145,6 +145,7 @@
 - [043-2026-10-W42: incidente de guardado, plan y fase 1 de la protección (2026-10-18)](history/043-2026-10-W42.md) — incidente, diagnóstico, commits de `task/save-guard`, pruebas y pendientes.
 - [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
 - [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
+- [046-2026-10-W43: Spaces, etapa 2: texto, Reusar e historial](history/046-2026-10-W43.md).
 
 ## Trazabilidad
 

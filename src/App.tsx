@@ -8,6 +8,7 @@ import { Sidebar } from './components/shell/Sidebar';
 import { TopBar, TopbarSlotContext } from './components/shell/TopBar';
 import { SaveGuardBanner } from './components/shell/SaveGuardBanner';
 import { SidePanel } from './components/shell/SidePanel';
+import { TextLightbox } from './components/assets/TextLightbox';
 import { Lightbox } from './components/assets/Lightbox';
 import { SketchEditor } from './components/assets/SketchEditor';
 import { ChatWorkspace } from './components/chat/ChatWorkspace';
@@ -79,6 +80,7 @@ export function App() {
         </main>
         <SidePanel />
         <Lightbox />
+        <TextLightbox />
         <SketchEditor />
         <TraceControl />
         <Toasts />

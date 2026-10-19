@@ -40,6 +40,7 @@ export function generationPlace(g: Generation): GenerationPlace | null {
 
 /** A Space result opens only its viewer: no session change, no container on screen. */
 export function openGeneration(g: Generation, assetId?: string): void {
+  if (g.kind === 'text' && g.status === 'done') { setUi({ textView: g.id }); return; }
   if (g.place === 'space-create' || g.place === 'space-tools') {
     const ids = assetId ? [assetId] : g.assetIds;
     if (ids.length) setUi({ lightbox: { assetIds: ids, index: 0 } });

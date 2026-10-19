@@ -4,7 +4,7 @@ import { OPS, opsFor } from '../../engine/ops';
 import { filterGenerations, statusOf, type GenerationQuery } from '../shell/generationsView';
 
 /** One cell of the Done row: a finished asset. */
-export type DoneCell = { type: 'asset'; assetId: string; generationId: string };
+export type DoneCell = { type: 'asset'; assetId: string; generationId: string } | { type: 'text'; generationId: string };
 
 export interface BoardOptions extends GenerationQuery {
   /** Favorites only: finished assets the user starred. */
@@ -30,6 +30,7 @@ export function splitBoard(generations: Record<string, Generation>, assets: Reco
     const st = statusOf(g);
     if (st === 'running') ongoing.push(g);
     else if (st === 'done') {
+      if (g.kind === 'text' && !o.starred) done.push({ type: 'text', generationId: g.id });
       for (const id of g.assetIds) {
         const a = assets[id];
         if (a && (!o.starred || a.favorite)) done.push({ type: 'asset', assetId: id, generationId: g.id });

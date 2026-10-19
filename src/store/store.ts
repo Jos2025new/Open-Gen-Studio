@@ -1,3 +1,4 @@
+import { finishSpaceUi } from './spaceUi';
 import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } from './saveStatus';
 import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
@@ -124,6 +125,8 @@ export interface UiState {
   toolOp?: import('../engine/types').OpId;
   /** An asset the Tools space starts with as its input (set by "Go" from the board). */
   toolAsset?: string;
+  toolSeed?: import('./spaceUi').ToolSeed;
+  textView?: string | null;
   /** Which Home section shows; set from outside to open Home on it (the Library icon of a Space). Default 'home'. */
   homeTab?: 'home' | 'projects' | 'sessions' | 'gallery';
   /** Unsent text in the Home prompt, per session (keyed by session id); kept across tabs and reloads, pruned of deleted sessions. */
@@ -572,7 +575,11 @@ export function setComposerMedia(kind: MediaKind, patch: Partial<ComposerState['
 }
 
 export function setUi(patch: Partial<UiState> | ((u: UiState) => Partial<UiState>)): void {
-  set((st) => ({ ui: { ...st.ui, ...(typeof patch === 'function' ? patch(st.ui) : patch) } }));
+  set((st) => {
+    const ui = { ...st.ui, ...(typeof patch === 'function' ? patch(st.ui) : patch) };
+    finishSpaceUi(ui, st.ui);
+    return { ui };
+  });
 }
 
 export function setSettings(patch: Partial<Settings> | ((s: Settings) => Partial<Settings>)): void {

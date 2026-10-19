@@ -8,7 +8,7 @@ import { isTraceKey } from './TraceControl';
  * Keys aimed at Home itself, a popover, the lightbox or the sketch editor still pass.
  */
 export function installHomeKeyGuard(): void {
-  const covered = () => { const ui = useStore.getState().ui; return (ui.home || ui.space) && !ui.lightbox && !ui.sketch; };
+  const covered = () => { const ui = useStore.getState().ui; return (ui.home || ui.space) && !ui.lightbox && !ui.textView && !ui.sketch; };
   const OWN = '.popover, .lightbox, .sketch-editor, .side-panel, [role="dialog"]';
   const target = (e: Event) => (e.target instanceof Element ? e.target : null);
   window.addEventListener('keydown', (e) => {

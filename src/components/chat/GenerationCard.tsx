@@ -1,11 +1,12 @@
+import { TextResult } from '../assets/TextResult';
 import { useEta } from '../ui/useEta';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { CircleAlert, CircleStop, Copy, CopyPlus, Expand, FileText, Info, Music, RefreshCw, Trash, Film, Image as ImageIcon } from 'lucide-react';
-import { setComposer, setUi, toast, useStore } from '../../store/store';
+import { setUi, useStore } from '../../store/store';
 import { formatUsd } from '../../lib/format';
 import { StopFollowingPopover } from './StopFollowing';
 import { ImproveShotButton } from './ImproveShotButton';
-import { applyLyrics, copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
+import { copyText, deleteGeneration, editInComposer, regenerate, regenerateEstimate } from '../../engine/actions';
 import { cancelGeneration, checkStatusNow } from '../../engine/jobs';
 import { aspectLabel, durationLabel, ratioOf } from '../../engine/params';
 import { OPS } from '../../engine/ops';
@@ -138,8 +139,6 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
   const del = usePopover();
   const stopFollowing = usePopover();
   const info = usePopover();
-  // Text from a lyrics model (MiniMax Lyrics), as opposed to a transcription or an id.
-  const lyrics = useStore((s) => Boolean(g && s.catalog.models[g.modelRef]?.textOutput));
 
   if (!g) {
     return <div className="gen-card is-deleted faint">This generation was deleted.</div>;
@@ -239,32 +238,7 @@ export function GenerationCard({ generationId, compact = false, initialOutputInd
           <GenerationRecovery g={g} />
         </div>
       ) : g.kind === 'text' && g.status === 'done' ? (
-        // Transcription or lyrics: the text, ready to copy, to use as a prompt or as the lyrics of a song.
-        <div className="gen-text">
-          <p>{g.text || <span className="faint">{lyrics ? 'No lyrics came back.' : 'No speech was found.'}</span>}</p>
-          <div className="gen-text-actions">
-            <Button size="sm" variant="ghost" icon={Copy} disabled={!g.text} onClick={() => void copyText(g.text ?? '')}>
-              Copy
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={!g.text}
-              onClick={() => {
-                setComposer({ text: g.text ?? '' });
-                setUi((u) => ({ focusComposer: u.focusComposer + 1 }));
-                toast(`${lyrics ? 'Lyrics' : 'Transcription'} placed in the composer.`, 'info');
-              }}
-            >
-              Use as prompt
-            </Button>
-            {lyrics || g.op?.id === 'transcribe' ? (
-              <Button size="sm" variant={lyrics ? 'primary' : 'secondary'} icon={Music} disabled={!g.text} data-tip="Put this text in the lyrics of a music model" onClick={() => void applyLyrics(g.text ?? '')}>
-                Use as lyrics
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <TextResult g={g} />
       ) : (
         <div className={`tiles ${single ? 'is-single' : ''} ${single && shown > 1 ? 'is-multi' : ''}`} style={{ ['--cols' as string]: cols }}>
           {outputs.map((id, i) => (

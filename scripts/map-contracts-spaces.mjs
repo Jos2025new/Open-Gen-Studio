@@ -1,4 +1,4 @@
-/** Checked by map.mjs: stage 1 of ADR 0023. */
+/** Checked by map.mjs: Spaces and their browser-only prompt history. */
 export default [
   {
     id: 'space-place',
@@ -26,5 +26,51 @@ export default [
       ['src/components/shell/HomeView.tsx', 'visibleSessions(sessions)'],
     ],
     tests: ['tests/space-place.test.ts', 'tests/create-space.test.ts'],
+  },
+  {
+    id: 'space-text-results',
+    what: 'Los textos terminados no necesitan activo: tablero y Library los muestran; Generations abre textView sin cambiar de sesión. El chat comparte TextResult.',
+    sides: [
+      ['src/components/assets/TextResult.tsx', 'export function TextResult'],
+      ['src/components/chat/GenerationCard.tsx', '<TextResult g={g} />'],
+      ['src/components/assets/TextLightbox.tsx', 'export function TextLightbox'],
+      ['src/App.tsx', '<TextLightbox />'],
+      ['src/components/space/boardModel.ts', "g.kind === 'text' && !o.starred"],
+      ['src/components/space/SpaceBoard.tsx', "c.type === 'text'"],
+      ['src/components/gallery/GalleryPanel.tsx', '...textBase.filter'],
+      ['src/components/shell/GenerationsPanel.tsx', 'Open text'],
+      ['src/engine/goTo.ts', 'textView: g.id'],
+      ['src/components/shell/homeGuard.ts', '!ui.textView'],
+    ],
+    tests: ['tests/space-text.test.ts'],
+  },
+  {
+    id: 'space-reuse',
+    what: 'Reusar devuelve un resultado de Space a su formulario; Tools consume y limpia un seed aunque ya esté abierto. El seed y textView no se persisten; el transcriptor se elige por ejecución.',
+    sides: [
+      ['src/store/reuse.ts', 'export async function reuseGeneration'],
+      ['src/store/spaceUi.ts', 'export interface ToolSeed'],
+      ['src/store/store.ts', 'finishSpaceUi(ui, st.ui)'],
+      ['src/store/persistUi.ts', 'export function pickUi'],
+      ['src/components/assets/ReuseButton.tsx', 'export function ReuseButton'],
+      ['src/components/space/ToolsPanel.tsx', 'setUi({ toolSeed: undefined })'],
+      ['src/components/assets/opRun.tsx', 'setParams({ ...defaultOpParams(def), ...seed.params })'],
+      ['src/engine/opRunModel.ts', 'export function transcriberForRun'],
+      ['src/engine/jobs.ts', 'reusedOpChoice(input)'],
+      ['src/engine/jobs.ts', 'const t = transcriberForRun(input.modelRef)'],
+    ],
+    tests: ['tests/space-reuse.test.ts', 'tests/tools-space.test.ts'],
+  },
+  {
+    id: 'create-prompt-history',
+    what: 'Solo Generate de Create guarda texto: 200 recientes únicos y favoritos sin descarte automático en ogs-prompts; borrar todos los datos solicita eliminar también esa base.',
+    sides: [
+      ['src/lib/promptHistory.ts', "createStore('ogs-prompts', 'kv')"],
+      ['src/components/space/PromptHistory.tsx', 'history.favorites.length >= 1000'],
+      ['src/components/space/SpacePanel.tsx', 'onLaunch={recordCreatePrompt}'],
+      ['src/components/composer/Composer.tsx', 'onLaunch?.(useStore.getState().composer.text)'],
+      ['src/lib/idb.ts', "'ogs-store-v2', 'ogs-prompts'"],
+    ],
+    tests: ['tests/prompt-history.test.ts', 'tests/prompt-history-ui.test.ts', 'tests/prompt-history-wipe.test.ts'],
   },
 ];

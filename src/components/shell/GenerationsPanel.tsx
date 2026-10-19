@@ -147,6 +147,8 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
           <AssetMedia assetId={asset} hoverPlay={false} />
           {g.assetIds.length > 1 ? <span className="gen-row-count num">{g.assetIds.length}</span> : null}
         </button>
+      ) : thumbs && g.kind === 'text' && g.status === 'done' ? (
+        <button type="button" className="gen-row-thumb" aria-label="Open text" onClick={() => openGeneration(g)}><Icon size={18} /></button>
       ) : thumbs ? (
         <span className="gen-row-thumb is-empty" aria-hidden="true"><Icon size={18} /></span>
       ) : null}
@@ -161,7 +163,7 @@ function GenerationRow({ g, thumbs, showSession, onGo }: { g: Generation; thumbs
         </div>
         {g.status === 'error' && g.error ? <div className="gen-row-error" title={g.error}>{g.error}</div> : null}
       </div>
-      {space ? (asset ? <IconButton icon={CornerDownRight} label="Open result" size="sm" className="gen-row-go" onClick={() => openGeneration(g, asset)} /> : null) : place ? (
+      {g.kind === 'text' && g.status === 'done' ? <IconButton icon={CornerDownRight} label="Open text" size="sm" onClick={() => openGeneration(g)} /> : space ? (asset ? <IconButton icon={CornerDownRight} label="Open result" size="sm" className="gen-row-go" onClick={() => openGeneration(g, asset)} /> : null) : place ? (
         <>
           <IconButton ref={jump.ref} icon={CornerDownRight} label="Go to where it was made" size="sm" className="gen-row-go" active={jump.open} onClick={jump.toggle} />
           <Popover open={jump.open} anchor={jump.ref} onClose={jump.close} width={260} label="Go to generation">

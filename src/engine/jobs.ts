@@ -1,3 +1,4 @@
+import { reusedOpChoice, transcriberForRun } from './opRunModel';
 import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
@@ -13,7 +14,7 @@ import { fxOnCanvas, fxOpDetail } from './fx/op';
 import { describeRequest, type MediaInfoLite } from '../lib/debug';
 import { logEvent } from '../lib/log';
 import { approvalEstimateForPlan, journeyActive, journeyIdFor, recordJourneyEvent } from '../lib/journeyTrace';
-import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel, transcriberFor } from './catalog';
+import { apiKeyFor, PICKABLE_VIDEO_OPS, videoOpFits, modelSummary, isConnected, KLING_VOICE_REF, opFollowsSource, opModelForAsset, inputVariant, RECRAFT_STYLE_REF, resolveModel } from './catalog';
 import { estimateMedia, estimateOp, estimateTranscribe } from './costs';
 import { variantRoute } from './variants';
 import { withVariation } from './sentPrompt';
@@ -1003,7 +1004,7 @@ export interface OpSpecInput {
   stepId?: string;
   /** Dimensions of the source when it is not an asset yet (designer layers). */
   sourceDims?: { width: number; height: number };
-  /** Model picked for this run (edit / video engines); by default the source's model or the engine's. */
+  /** Model picked for this run (replay, edit / video / transcribe engines); by default the source's model or the engine's. */
   modelRef?: string;
   /** Model and composer settings reviewed by the Node Run confirmation. */
   nodeChoice?: { ref: string; viaEdit: boolean; settings?: GenSettings };
@@ -1061,7 +1062,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
     return { ...base, kind: 'text', prompt: 'Create Kling voice', modelRef: KLING_VOICE_REF, settings: { count: 1, advanced: {} }, op, estimate: { usd: null, approximate: true, note: 'fal bills the voice when it is created' } };
   }
   if (def.engine === 'transcribe') {
-    const t = transcriberFor();
+    const t = transcriberForRun(input.modelRef);
     if (!t) throw new Error('No connected provider offers Transcribe. Connect NanoGPT.');
     const clip = get().assets[input.sourceAssetId];
     const language = String(input.params.language ?? 'auto');
@@ -1070,7 +1071,7 @@ export async function opSpec(input: OpSpecInput): Promise<GenerationSpec> {
   const picked = PICKABLE_VIDEO_OPS.includes(def.engine) && typeof input.params._modelRef === 'string' ? input.params._modelRef : undefined;
   const upscaleRef = picked ?? (def.engine === 'video_upscale' ? input.modelRef ?? input.nodeChoice?.ref : undefined);
   if (upscaleRef && (!modelSummary(upscaleRef) || !videoOpFits(def.engine, modelSummary(upscaleRef)!) || !isConnected(modelSummary(upscaleRef)!.provider))) throw new Error('Choose a dedicated video upscaler, not a video generation/edit model.');
-  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
+  const choice = upscaleRef ? { ref: upscaleRef, viaEdit: false } : input.nodeChoice ?? (opFollowsSource(def.engine) && typeof input.params._modelRef === 'string' ? { ref: input.params._modelRef, viaEdit: false } : null) ?? reusedOpChoice(input) ?? (input.modelRef && opFollowsSource(def.engine) ? { ref: input.modelRef, viaEdit: false } : opModelForAsset(def.engine, input.sourceAssetId));
   if (!choice.ref) throw new Error(`No connected provider offers “${def.label}”. Connect Atlas Cloud, NanoGPT or fal.ai.`);
   const resolved = await resolveModel(choice.ref);
   const schema = resolved?.schema;

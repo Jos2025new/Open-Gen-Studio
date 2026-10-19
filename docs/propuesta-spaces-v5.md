@@ -107,12 +107,12 @@ Lo existente no se mueve ni se etiqueta. Lo que no tiene `place` sale como «Sin
 
 ## Etapas
 
-Decidido por el usuario el 2026-10-18: se implementa en dos etapas, cada una con su rama, sus tests y `npm test` en verde.
+Decidido por el usuario el 2026-10-18: se implementa en dos etapas, con sus tests y `npm test` en verde. El 2026-10-19 el usuario indicó continuar la etapa 2 en la misma rama `task/space-session-1`.
 
 - **Etapa 1, la separación** (rama `task/space-session-1`). Arregla el fallo reportado. Pasos del plan: 1 (tamaño), 2 (tipos), 3 (cálculo de `place`/`mode`), 4 (contenedor), 5 (vistas), 7 (abrir solo el visor), 10 (persistencia y guarda de hidratación) y 11 (contrato), más los filtros Lugar y Modo de Library y Generations, y sus tests y docs. No toca la zona protegida ni crea interfaz nueva.
-- **Etapa 2, las comodidades** (rama `task/space-session-2`, sale de la 1 cuando la 1 esté aceptada). Pasos 6 (resultados de texto), 8 («Reusar» y `toolSeed`) y 9 (historial de prompts y favoritos, con el cambio autorizado en `ALL_DB_NAMES` y su revisión independiente), y sus tests y docs.
+- **Etapa 2, las comodidades** (misma rama `task/space-session-1`, a continuación de la etapa 1). Pasos 6 (resultados de texto), 8 («Reusar» y `toolSeed`) y 9 (historial de prompts y favoritos, con el cambio autorizado en `ALL_DB_NAMES` y su revisión independiente), y sus tests y docs.
 
-Hasta la etapa 2, una transcripción de Tools sigue sin salir en el tablero, como hoy.
+La etapa 2 implementa el tablero de texto, Reusar y el historial; su prueba visual queda pendiente del usuario. Ver [046](history/046-2026-10-W43.md).
 
 ## Plan
 

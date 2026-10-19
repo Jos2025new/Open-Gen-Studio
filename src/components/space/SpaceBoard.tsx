@@ -1,3 +1,5 @@
+import { ReuseButton } from '../assets/ReuseButton';
+import { TextTile } from '../assets/TextTile';
 import { useEta } from '../ui/useEta';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ChevronDown, X, ArrowUpDown, CircleAlert, LayoutGrid, MousePointerClick, RefreshCw, SlidersHorizontal, Star } from 'lucide-react';
@@ -84,7 +86,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
           <Segmented size="sm" value={scope} onChange={setScope} options={[{ value: 'all', label: 'All sessions' }, { value: 'session', label: 'This session' }]} />
         </div>
         <div className="sv-row"><span className="sv-label">Type</span>
-          <div className="sv-canvas">{KINDS.filter((k) => k.id !== 'text').map((k) => {
+          <div className="sv-canvas">{KINDS.map((k) => {
             const KIcon = k.id === 'all' ? null : KIND_ICON[k.id];
             return <button key={k.id} type="button" className={`canvas-tab ${kind === k.id ? 'is-on' : ''}`} onClick={() => setKind(k.id)}>{KIcon ? <KIcon size={12} /> : null}{k.label}</button>;
           })}</div>
@@ -112,14 +114,14 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
         <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
       </button>
       {!doneOpen ? null : rows.done.length ? <div className={layout === 'list' ? 'space-list' : `space-grid is-${density}`}>
-        {rows.done.map((c) => <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
+        {rows.done.map((c) => c.type === 'text' ? <TextTile key={c.generationId} g={generations[c.generationId]} /> : <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
             <KindBackdrop kind={assets[c.assetId]?.kind} />
             <AssetMedia assetId={c.assetId} hoverPlay={false} autoPlay={false} draggable={false} />
             {assets[c.assetId]?.favorite ? <Star size={12} className="space-tile-star" aria-label="Favorite" /> : null}
-          </button><AgentAttachToggle assetId={c.assetId} />
+          </button><AgentAttachToggle assetId={c.assetId} />{!studio ? <ReuseButton g={generations[c.generationId]} /> : null}
           {layout === 'list' ? <ListInfo g={generations[c.generationId]} /> : null}</div>)}
       </div> : <p className="space-empty">{starred ? 'No favorites yet.' : empty}</p>}
     </div>
