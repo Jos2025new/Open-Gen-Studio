@@ -160,6 +160,15 @@ describe('raster saving (D1–D3)', () => {
     expect(pendingRaster()).toEqual([]);
   });
 
+  it('review: flushRaster rejects when the browser itself could not store a layer (a handover stops on it), and not after a later success', async () => {
+    setBuffer('q', canvas('p1'));
+    failNext = 1;
+    await expect(flushRaster()).rejects.toThrow(/browser storage/);
+    expect(pendingRaster()).toEqual(['q']);
+    await expect(flushRaster()).resolves.toBeUndefined();
+    expect(pendingRaster()).toEqual([]);
+  });
+
   it('deleting a layer waits for its write, so its pixels do not come back', async () => {
     setBuffer('e', canvas('gone'));
     const writing = flushRaster();

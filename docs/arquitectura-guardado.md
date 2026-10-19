@@ -57,7 +57,7 @@ Mientras dura el rechazo, el servidor guarda como mucho una copia por minuto del
 El servidor exige que se aprueben todas las pérdidas. Si falta una, rechaza el commit entero. Guarda `backups/kept-before-<id>-<ts>.json` (y `kept-before-order-*`) antes de escribir y nunca salta un `baseAt`.
 
 ### «Volver a la del disco»
-Pide confirmación en el propio aviso. Guarda en `:conflict-<at>` el estado en memoria (incluido lo que aún no se había escrito); si esa copia falla, no adopta nada y el guardado sigue. Después pone `guard.discarding`, adopta el disco (una escritura tardía responde `fail`) y recarga la página. Si la adopción falla, `discarding` vuelve a falso.
+Pide confirmación en el propio aviso. Guarda en `:conflict-<at>` el estado en memoria (incluido lo que aún no se había escrito); si esa copia falla, no adopta nada y el guardado sigue. Después pone `guard.discarding`: ningún envío nuevo sale (los de la cola responden `fail`). Espera al que está en vuelo, lee el disco ya con él y lo adopta; luego recarga la página. Si la adopción falla, `discarding` vuelve a falso.
 
 ### Pestañas
 1. **Al cargar el módulo,** `writerLock.ts` pide el candado. La persistencia usa `skipHydration`, y `onWriterLockGranted` llama a `persist.rehydrate()`. Todo lo que `App.tsx` lanza con `hydrated` corre después.
@@ -66,7 +66,8 @@ Pide confirmación en el propio aviso. Guarda en `:conflict-<at>` el estado en m
    - Si nada se perdería, entrega en el acto.
    - Si algo se perdería, la nueva ofrece «Wait for them to finish» (sondeo cada 500 ms) o «Take over now».
 4. **La entrega,** en este orden: corta las consultas con `remoteJob` con `WRITER_HANDOFF` (siguen `running`, sin cobro parcial); `saveNow()` (estado y raster diferido); suelta el candado. La anterior queda tapada y vuelve a la cola.
-   - Si `saveNow()` lanza porque IndexedDB falló, no se suelta nada: la pestaña conserva el candado y responde `kept`. Un disco caído no lanza.
+   - Si `saveNow()` lanza porque IndexedDB falló, no se suelta nada: la pestaña conserva el candado y responde `kept`. Lanza cuando falla el estado de la versión más reciente (un `ok` tardío de una anterior no lo borra) o cuando una capa de píxeles no llegó al navegador (`flushRaster`). Un disco caído no lanza.
+   - Fuera de la garantía quedan los medios que no pasan por `saveNow()` (p. ej. `putAssetBlob` de un resultado descargado).
 5. **Sin respuesta en 5 s:** el panel pide cerrar o recargar la otra pestaña y ofrece «Ask again». No hay `steal`: no cortaría las peticiones que la otra ya envió.
 6. **La nueva hidrata sin recargar,** y `resumeInterrupted()` reanuda las generaciones con `remoteJob`.
 7. **Al recuperar el candado,** `stateDb.get` empieza de cero: `disk.reset()` (sin `stale` ni el último rechazo), `acked`, `held`, `problem` y el estado del aviso. Después lo reconstruye desde las copias actuales y solo mantiene un conflicto si sigue siéndolo.
@@ -104,7 +105,7 @@ Ninguno tiene retención todavía; es la fase 3.
 
 ## 6. Límites conocidos
 
-- Revisión externa del 2026-10-18: seis fallos corregidos, cada uno con su test (`tests/save-guard-review.test.ts`, el traspaso en `writer-lock-handoff.test.ts` y el servidor en `save-guard-server.test.ts`). Se comprobó que los tests fallan con el código anterior.
+- Revisión externa del 2026-10-18: seis fallos corregidos, cada uno con su test (`tests/save-guard-review.test.ts`, el traspaso en `writer-lock-handoff.test.ts` y el servidor en `save-guard-server.test.ts`). Se comprobó que los tests fallan con el código anterior. Una segunda revisión, sobre `7d153fd`, encontró tres huecos más, también corregidos con sus tests (ADR 0022).
 - Para un conflicto real solo hay descargar o volver a la del disco. «Mantener mi versión» frente a un conflicto, y la lectura de las copias `:conflict-`, son de la fase 3.
 - Los tests del candado se escribieron después del código: no consta que fallaran antes.
 - Sin prueba visual en el navegador todavía.

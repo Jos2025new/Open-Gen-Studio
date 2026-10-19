@@ -332,8 +332,11 @@ function released(e: { pointerId?: number; type: string }): void {
   flushWhenIdle();
 }
 
-/** The last browser write of the state failed (IndexedDB full or broken): what is in memory is not safe anywhere. */
-let localFailed = false;
+/**
+ * The newest state version whose browser write failed (IndexedDB full or broken): that memory state is not safe
+ * anywhere. Only a later version written successfully clears it.
+ */
+let localFailed: number | null = null;
 
 function flushWrite(): Promise<void> {
   clearTimeout(writeTimer);
@@ -351,10 +354,11 @@ function flushWrite(): Promise<void> {
   const operation = (async () => {
     try {
       const result = await stateDb.set(next.name, persistState(next.value));
-      localFailed = false;
+      // An older revision confirmed late never clears the failure of a newer one.
+      if (localFailed != null && next.version >= localFailed) localFailed = null;
       reportSave(next.version, result);
     } catch (err) {
-      localFailed = true;
+      localFailed = Math.max(localFailed ?? 0, next.version);
       console.error('Could not save state', err);
       failSave('Could not save to browser storage', false, next.version);
     }
@@ -372,7 +376,7 @@ export async function saveNow(): Promise<void> {
   const state = flushWrite();
   const { flushRaster } = await import('../engine/design/raster');
   await Promise.all([state, flushRaster()]);
-  if (localFailed) throw new Error('Could not save to browser storage');
+  if (localFailed != null) throw new Error('Could not save to browser storage');
 }
 
 const idbStorage: PersistStorage<Persisted> = {

@@ -131,6 +131,8 @@ describe('test 15c: "Use here" hands the work over completely', () => {
     world.locks.terminate(); // the user closes the frozen tab
     await hydrated(b);
     expect(b.state().spentUsd).toBe(3);
+    await b.store.saveNow(); // b's own debounced save ends here, not in the next test's storage
+    await settle();
   });
 
   it('a tab waiting in the queue takes the lock by itself when the holder tab closes, and hydrates', async () => {

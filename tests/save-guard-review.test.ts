@@ -121,6 +121,27 @@ describe('review of phase 1', () => {
     expect(await db.set(KEY, val({ ses_a: sess('ses_a', 9) }))).toBe('fail');
   });
 
+  it('3 (second review): a revert with a send in flight and one queued cancels the queued one and adopts the disk as it is after the first', async () => {
+    const s1 = sess('ses_a', 1), s2 = sess('ses_a', 2), s3 = sess('ses_a', 3);
+    const { db } = await boot({ ses_a: s1 });
+    const gate = deferred();
+    net.handle = (_r, n) => (n === 1 ? gate.promise : { status: 204 });
+    const p2 = db.set(KEY, val({ ses_a: s2 }));
+    await until(() => commits().length === 1);
+    const p3 = db.set(KEY, val({ ses_a: s3 }));
+    await until(() => v2().get('session:ses_a') === s3);
+    const reverting = db.revertToDisk(KEY);
+    net.disk = diskText(2000, { ses_a: s2 }); // the disk once S2 lands
+    gate.resolve({ status: 204 });
+    await reverting;
+    expect(await p2).toBe('ok');
+    expect(await p3).toBe('fail');
+    expect(commits()).toHaveLength(1); // S3 never reached the disk
+    expect(v2().get('session:ses_a')).toBe(s2); // memory is given up; the local copy is the disk's
+    expect(v2().get('pending')).toBeUndefined();
+    expect([...(stores.get('ogs-state')?.keys() ?? [])].some((k) => k.startsWith(`${KEY}:conflict-`))).toBe(true);
+  });
+
   it('5: keep approves every loss the server listed for the exact texts sent', async () => {
     const a = sess('ses_a', 1), b = sess('ses_b', 1);
     const { db } = await boot({ ses_a: a, ses_b: b });

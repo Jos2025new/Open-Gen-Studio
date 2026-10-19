@@ -155,6 +155,8 @@ async function sendCommit(key: string, rev: number, at: number, parts: V2Parts, 
   // The lock is asked again at send time: a tab that lost it while this send waited sends nothing (pending stays, so
   // the next holder resends it from IndexedDB).
   if (!holdsWriterLock()) return 'browser-only';
+  // The disk version is being adopted: a send queued before that must not reach the disk.
+  if (guard.discarding) return 'fail';
   if (guard.held) return 'conflict';
   const differs = (id: string) => guard.acked.get(id) !== parts.sessions.get(id);
   const changed = parts.order.filter(differs).map((id) => [id, parts.sessions.get(id)!] as [string, string]);
@@ -272,15 +274,18 @@ export const stateDb = {
    */
   async revertToDisk(key: string, current?: string): Promise<void> {
     if (!holdsWriterLock()) return;
-    const onDisk = await disk.getState();
-    if (!onDisk) throw new Error('The disk copy is not available');
     // The copy of this tab's version comes first (`current`: the memory state, with edits not saved yet): if it cannot be
     // written, nothing is adopted and saving goes on.
     const v2 = current ? null : await readV2();
     const mine = current ?? (v2 ? assembleText(v2) : undefined);
     if (mine) await set(`${key}:conflict-${Date.now()}`, mine, stateStore);
+    // From here no send starts (queued ones answer 'fail'); the one in flight ends first, and only then is the disk
+    // read, so what is adopted is what the disk holds after it.
     guard.discarding = true;
     try {
+      await sendChain;
+      const onDisk = await disk.getState();
+      if (!onDisk) throw new Error('The disk copy is not available');
       await commitV2(splitText(onDisk), null);
     } catch (err) {
       guard.discarding = false;
@@ -290,6 +295,9 @@ export const stateDb = {
   },
   del: async (key: string) => { if (holdsWriterLock()) await del(`${key}:b`, stateStore); },
 };
+
+/** The browser copy was written; only the disk copy is missing (a handover may go on: IndexedDB holds the bytes). */
+export class DiskPendingError extends Error { readonly diskOnly = true; }
 
 export const blobDb = {
   /** Browser copy first; a blob only on disk (cleared browser) is read from there and cached again. */
@@ -305,7 +313,7 @@ export const blobDb = {
     const receipt = disk.setBlob(key, value);
     await set(key, value, blobStore);
     const result = await receipt;
-    if (result === 'fail' || result === 'conflict') throw new Error(result === 'conflict' ? 'Another tab saved newer work' : 'Disk copy pending');
+    if (result === 'fail' || result === 'conflict') throw new DiskPendingError(result === 'conflict' ? 'Another tab saved newer work' : 'Disk copy pending');
   },
   async del(key: string): Promise<void> {
     if (!holdsWriterLock()) return;
