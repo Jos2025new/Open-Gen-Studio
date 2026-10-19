@@ -1,6 +1,6 @@
 # Propuesta: persistencia protegida
 
-Fecha: 2026-10-18. Estado: **propuesta recortada, lista para implementar**. No toca el guardado.
+Fecha: 2026-10-18. Estado: **implementada** en [persistencia-protegida.md](persistencia-protegida.md), regla 5 de AGENTS.md y `scripts/check-protected.mjs`. No toca el guardado.
 
 El usuario la pidió para que el guardado protegido, corregido después de cuatro revisiones externas, quede «claro y permanente» y «no se toque en un futuro a menos que se encuentren bugs evidentes». La versión anterior traía huellas, conteos, futuras zonas y extracciones. Se recortó con la revisión de GPT y el acuerdo del usuario: un documento corto, una regla y una comprobación obligatoria.
 
