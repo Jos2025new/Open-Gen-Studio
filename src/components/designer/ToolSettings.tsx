@@ -16,7 +16,7 @@ import type { DesignDoc, StrokeStyle, TextStyle } from '../../engine/types';
 import { getDoc, mutateDoc } from '../../engine/design/actions';
 import { clearSelected, fillSelection, getSelection, growSelection, invertSelection, selectAll, selectionToLayer, setSelection, useSelectionVersion } from '../../engine/design/pixelSelection';
 import { toast } from '../../store/store';
-import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
+import { InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { BrushSettings } from './BrushSettings';
 import { PaintModeToggle } from './PaintModeToggle';
 import { strokeObjectsAvailable } from '../../engine/design/paintMode';
@@ -68,7 +68,7 @@ export function EditModeOptions({ mode, objects = true }: { mode: 'objects' | 'l
 /** Click acts on the topmost layer under the pointer (Auto-select, as Photoshop); off: the selected layer only. */
 export function AutoSelectToggle() {
   const on = useStore((st) => st.ui.autoSelect ?? false);
-  return <label className="tool-setting" title="Click acts on the topmost layer under the pointer. Off: only the selected layer, and a click elsewhere keeps the selection"><input type="checkbox" checked={on} onChange={(e) => setUi({ autoSelect: e.target.checked })} /><span>Auto-select</span></label>;
+  return <InlineToggle label="Auto-select" checked={on} tip="Click acts on the topmost layer under the pointer. Off: only the selected layer, and a click elsewhere keeps the selection" onChange={(v) => setUi({ autoSelect: v })} />;
 }
 
 /** Edit tool: align, distribute (3+), fit/fill one image, or transform picked objects/layers. */
@@ -241,7 +241,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
       {g.mode === 'two' && <InlineColor label="Second" value={g.color2} onChange={(v) => set({ color2: v })} />}
       {!compact && <>
       <button type="button" className="opt" onClick={() => setUi({ brush: { ...brush, color: g.color2 }, gradient: { ...g, color2: brush.color } })} data-tip="Swap the two colors">⇄</button>
-      <label className="opt check-row"><input type="checkbox" checked={!!g.reverse} onChange={(e) => set({ reverse: e.target.checked })} />Reverse</label>
+      <InlineToggle label="Reverse" checked={!!g.reverse} onChange={(v) => set({ reverse: v })} />
       </>}
       <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={g.opacity} onChange={(v) => set({ opacity: v })} />
     </div>;

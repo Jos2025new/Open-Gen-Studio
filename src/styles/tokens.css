@@ -104,6 +104,12 @@
   --new-hover: var(--surface-hover);
   /* Money left with the providers: plain text, not a highlight. */
   --money: var(--text);
+  /* Setting fields (InlineControls, ADR 0013): one look for sliders, toggles, choices, pickers and tool buttons in every bar and panel. */
+  --field-bg: var(--surface-2);
+  --field-bg-hover: var(--surface-3);
+  --field-border: transparent;
+  --field-radius: var(--radius);
+  --field-fill: color-mix(in srgb, var(--text) 10%, transparent);
   /* Feed lines (agent turns, resolved cards): one left edge, icons in a 13px column, text after a 7px gap. */
   --feed-icon: 13px;
   --feed-gap: 7px;

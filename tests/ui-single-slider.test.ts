@@ -20,4 +20,29 @@ describe('the Designer draws its controls from InlineControls', () => {
     });
     expect(offenders).toEqual([]);
   });
+  // An on/off setting in a bar or panel is an InlineToggle; native checkboxes only in menus, dialogs and popovers
+  // (SnapControl, CanvasSize, DrawingChoice, AlignControls, and No fill / No stroke inside InlineColor's picker).
+  it('settings use InlineToggle, not a native checkbox', () => {
+    for (const f of ['ToolSettings.tsx', 'BrushSettings.tsx', 'LayersPanel.tsx']) {
+      const src = readFileSync(join('src/components/designer', f), 'utf8').replace(/<InlineColor\b[\s\S]*?<\/InlineColor>/g, '');
+      expect(src, f).not.toMatch(/type="checkbox"/);
+    }
+  });
+  // One look for every field (ADR 0013, ADR 0024 M): fill, outline and corners come from the --field-* tokens, never a surface set by hand.
+  it('field rules take their background, border and radius from the --field-* tokens', () => {
+    const css = ['designer.css', 'designer-connected.css'].map((f) => readFileSync(join('src/styles', f), 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
+    const field = /(^|[\s,>])\.(opt|tool-setting)(\.(opt-slider|opt-toggle|opt-choice|opt-presets|opt-color|opt-pick|is-icon))*(:not\([^)]*\))?$/;
+    // The tool rail's quick palette is the one flat exception: its fields sit on the rail with no fill of their own.
+    const FLAT = ['.palette-quick .opt'];
+    const bad: string[] = [];
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sels = m[1].split(',').map((x) => x.trim());
+      if (!sels.some((x) => field.test(x)) || sels.every((x) => FLAT.includes(x))) continue;
+      for (const d of m[2].split(';')) {
+        const [k, v] = d.split(':').map((x) => x?.trim());
+        if ((k === 'background' || k === 'border-radius') && v && !v.includes('--field-') && v !== 'none' && !/50%/.test(v)) bad.push(`${sels.join(', ')} { ${k}: ${v} }`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
 });

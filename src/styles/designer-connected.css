@@ -16,7 +16,7 @@
 .designer-view .zoom-value { font-size: 12px; min-height: var(--control-h); display: flex; align-items: center; justify-content: center; }
 .designer-context { padding: 8px; border-radius: var(--toolbar-radius); }
 .designer-context .tool-settings { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; overflow: visible; }
-.designer-context .opt { min-width: 0; height: var(--control-h); padding: 0 7px; background: var(--surface); border-color: transparent; border-radius: var(--radius-s); }
+.designer-context .opt { min-width: 0; height: var(--control-h); padding: 0 7px; background: var(--field-bg); border-color: var(--field-border); border-radius: var(--field-radius); }
 .designer-context .opt-range { flex: 1; min-width: 24px; max-width: 68px; }
 .designer-context .opt-pick svg { margin-left: auto; }
 .designer-context.settings-text .tool-settings { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); }
@@ -50,7 +50,7 @@
 .layer-properties .xywh-cell > span { order: 2; }
 .layer-properties .field:has(select), .layer-properties .property-grid .field { padding: 5px 8px; background: var(--surface-2); border-radius: 8px; }
 .layer-properties .field:has(select) > select, .layer-properties .property-grid .field > input { padding: 3px 0; background: transparent; }
-.layer-properties .field:has(.opt-color) .opt-color { justify-content: flex-start; width: 100%; padding: 8px; border: 0; background: var(--surface-2); border-radius: 8px; }
+.layer-properties .field:has(.opt-color) .opt-color { justify-content: flex-start; width: 100%; padding: 8px; border: 0; background: var(--field-bg); border-radius: var(--field-radius); }
 .layer-properties .field:has(.opt-color) > .field-label { display: none; }
 .color-plane-controls { display: grid; gap: 10px; }
 .color-plane { position: relative; height: 160px; border-radius: 8px; background-image: linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,transparent); touch-action: none; cursor: crosshair; }
@@ -74,8 +74,8 @@
   .designer-palette { top: 116px; }
 }
 
-.designer-context .tool-setting { min-height: var(--control-h); background: var(--surface); border-color: transparent; }
-.designer-context .tool-setting:hover, .designer-context .tool-setting[aria-expanded="true"] { background: var(--surface-3); }
+.designer-context .tool-setting { min-height: var(--control-h); background: var(--field-bg); border-color: var(--field-border); }
+.designer-context .tool-setting:hover, .designer-context .tool-setting[aria-expanded="true"] { background: var(--field-bg-hover); }
 
 /* The same parameter layout is used in tool popovers and layer properties. */
 .stroke-controls, .designer-context .tool-settings {
@@ -85,14 +85,13 @@
   display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); width: 100%;
 }
 .stroke-controls .opt-color, .stroke-controls .opt-pick {
-  min-width: 0; height: 36px; padding: 0 12px; background: var(--surface-2); border-color: transparent;
-  border-radius: var(--radius); gap: 6px;
+  min-width: 0; height: 36px; padding: 0 12px; background: var(--field-bg); border-color: var(--field-border); border-radius: var(--field-radius); gap: 6px;
 }
 .stroke-controls .opt-color .opt-value { margin-left: auto; font-variant-numeric: tabular-nums; }
 .stroke-controls .opt-pick .opt-value { flex: 1; text-align: right; max-width: none; }
 .stroke-controls .opt-pick svg { margin-left: 0; }
 .stroke-controls .field { min-width: 0; padding: 8px 12px; background: var(--surface-2); border-radius: var(--radius); }
-.layer-properties .stroke-controls .opt { background: var(--surface-2); }
+.layer-properties .stroke-controls .opt { background: var(--field-bg); }
 .designer-context .tool-settings > .opt-slider { flex: 1 1 170px; }
 .designer-context .tool-settings > .opt-pick, .designer-context .tool-settings > .opt-color {
   flex: 1 1 130px; height: 36px; justify-content: space-between; padding: 0 12px; border-radius: var(--radius);
@@ -192,14 +191,14 @@
 .opt.opt-slider, .opt.opt-toggle, .opt.opt-choice, .opt.opt-presets {
   position: relative; display: flex; align-items: center; justify-content: space-between; gap: 8px;
   height: 36px; min-width: 0; padding: 0 12px; overflow: hidden; flex: 1 1 100%;
-  background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius); font-size: 12px; color: var(--text-2);
+  background: var(--field-bg); border: 1px solid var(--field-border); border-radius: var(--field-radius); font-size: 12px; color: var(--text-2);
 }
 .opt-slider::before {
   content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
-  background: color-mix(in srgb, var(--text) 8.5%, transparent); border-right: 2px solid var(--text-2); pointer-events: none;
+  background: var(--field-fill); border-right: 2px solid var(--text-2); pointer-events: none;
 }
-.opt-slider:hover::before, .opt-slider:focus-within::before { border-right-color: var(--accent); }
-.opt-slider:focus-within { border-color: var(--accent-line, var(--accent)); }
+.opt-slider:hover::before, .opt-slider:focus-within::before { border-right-color: var(--text); }
+.opt-slider:focus-within { border-color: var(--border-focus); }
 .opt.opt-slider .opt-range, .opt.opt-slider .opt-range:disabled { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; margin: 0; opacity: 0; cursor: ew-resize; }
 .opt-slider .opt-label, .opt-slider .opt-readout { position: relative; pointer-events: none; }
 .opt-slider .opt-label { overflow: hidden; text-overflow: ellipsis; }
@@ -238,11 +237,11 @@
 /* Every brush row spans the panel and shares it out, so no field is left alone with a gap beside it. */
 .tool-settings > .brush-row { display: flex; gap: 8px; flex: 1 1 100%; width: 100%; min-width: 0; }
 .tool-settings > .brush-row > .opt-slider, .tool-settings > .brush-row > .opt.opt-pick:not(.is-icon) { flex: 1 1 0; min-width: 0; height: 36px; }
-.tool-settings > .brush-row > .opt.opt-pick:not(.is-icon) { justify-content: space-between; padding: 0 12px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
+.tool-settings > .brush-row > .opt.opt-pick:not(.is-icon) { justify-content: space-between; padding: 0 12px; background: var(--field-bg); border: 0; border-radius: var(--field-radius); }
 .tool-settings > .opt-choice, .tool-settings > .brush-check, .tool-settings > .brush-pressure, .tool-settings > .opt-toggle { flex: 1 1 100%; }
-.opt.opt-color.is-icon, .opt.opt-pick.is-icon { flex: 0 0 36px; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; background: var(--surface-2); border: 1px solid transparent; }
+.opt.opt-color.is-icon, .opt.opt-pick.is-icon { flex: 0 0 36px; width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; background: var(--field-bg); border: 1px solid var(--field-border); }
 .opt.opt-color.is-icon .opt-swatch { margin: 0; width: 22px; height: 22px; border-radius: 50%; }
-.opt.is-icon:hover, .opt.is-icon[aria-expanded="true"] { border-color: var(--accent-line, var(--accent)); }
+.opt.is-icon:hover, .opt.is-icon[aria-expanded="true"] { border-color: var(--border-strong); }
 .texture-icon { display: block; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--border); }
 .texture-icon.is-none { background: linear-gradient(135deg, transparent 46%, #e5484d 46%, #e5484d 54%, transparent 54%); }
 .brush-check { flex-basis: 100%; padding: 4px 4px 0; font-size: 12px; color: var(--text-2); }

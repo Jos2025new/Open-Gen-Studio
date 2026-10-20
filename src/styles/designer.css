@@ -6,8 +6,8 @@
 .tool-settings, .tool-settings-group { display: flex; align-items: center; gap: 4px; }
 .tool-settings { min-width: 0; max-width: min(48vw, 760px); overflow-x: auto; }
 .tool-settings-group { flex-shrink: 0; }
-.tool-setting { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-s); color: var(--text-2); font-size: 11px; }
-.tool-setting:hover, .tool-setting[aria-expanded="true"] { background: var(--surface-2); color: var(--text); }
+.tool-setting { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; white-space: nowrap; padding: 6px; border: 1px solid var(--field-border); border-radius: var(--field-radius); background: var(--field-bg); color: var(--text-2); font-size: 11px; }
+.tool-setting:hover, .tool-setting[aria-expanded="true"] { background: var(--field-bg-hover); color: var(--text); }
 .tool-setting-content { padding: 10px; }
 .tool-rail { overflow-y: auto; }
 .tool-rail > * { flex-shrink: 0; }
@@ -86,8 +86,8 @@
 .xywh-cell input { padding-right: 2px !important; }
 
 /* Tool options in the top bar: values set in place (slider + number), color swatches, short lists; no menus. */
-.opt { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 30px; padding: 0 8px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--border); font-size: 11px; color: var(--text-2); }
-.opt:hover { border-color: var(--border-strong); color: var(--text); }
+.opt { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 30px; padding: 0 8px; border-radius: var(--field-radius); background: var(--field-bg); border: 1px solid var(--field-border); font-size: 11px; color: var(--text-2); }
+.opt:hover { background: var(--field-bg-hover); color: var(--text); }
 .opt-label { white-space: nowrap; }
 .opt-range { width: 72px; accent-color: var(--accent); }
 .opt-num { width: 40px; padding: 2px 3px !important; border: 0 !important; background: transparent !important; color: var(--text); font-size: 11px; text-align: right; -moz-appearance: textfield; }

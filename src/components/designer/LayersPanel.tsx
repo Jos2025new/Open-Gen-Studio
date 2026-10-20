@@ -18,7 +18,7 @@ import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
 import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
-import { InlineColor, InlineSlider } from './InlineControls';
+import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
 import { useObjectSelection } from '../../engine/design/objectSelection';
 import { groupLayers, groupMembers, liveGroups, patchGroup, selectGroup, setGroupFlag, ungroup } from '../../engine/design/groups';
 import { FxEditor, FxEditorPopover, FxMenu, fxIcon } from './FxPanel';
@@ -268,7 +268,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
       <summary>Layer properties</summary>
       <fieldset className="layer-properties form-stack" disabled={layer.locked} aria-label="Layer properties">
         {layer.type === 'fx' ? <FxEditor key={layer.id} sessionId={sessionId} doc={doc} layer={layer} /> : <LayerGeometry sessionId={sessionId} doc={doc} layer={layer} />}
-        {layer.type === 'raster' && layer.sourceAssetId && <label className="check-row"><input type="checkbox" checked={!!layer.allowPaint} onChange={(e) => patch({ allowPaint: e.target.checked })} />Allow painting on this image</label>}
+        {layer.type === 'raster' && layer.sourceAssetId && <InlineToggle label="Allow painting on this image" checked={!!layer.allowPaint} onChange={(v) => patch({ allowPaint: v })} />}
         {layer.type === 'text' && <>
           <Field label="Text"><textarea rows={3} value={layer.text} onChange={(e) => patch({ text: e.target.value })} /></Field>
           <Field label="Font"><select value={layer.fontFamily} onChange={(e) => patch({ fontFamily: e.target.value })}>{FONT_NAMES.map((f) => <option key={f}>{f}</option>)}</select></Field>

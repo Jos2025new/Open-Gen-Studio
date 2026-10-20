@@ -60,6 +60,8 @@ Corrección tras probarlo (el usuario: «me gustó… se siente menos ruidoso»)
 
 **N. Base Blanco** (2026-10-20). El usuario pidió «un tema variante de blanco con estos tonos» a partir de una captura de Google Vids, «manteniendo flexible el color de resaltado tal como ya existe». Nueva base `blanco` («White»): página blanca, paneles `#f0f4f9`, texto `#1f1f1f`/`#444746`; reutiliza el juego claro de los seis resaltados de Claro. Claro (cálido) se queda; Sistema sigue resolviendo a Claro en claro.
 
+**O. Una norma para los campos de ajuste** (2026-10-20). El usuario: «auto-select y los demás tienen un marco pero no se ve coherente… hay que definir una fuente de verdad», con el deslizador de Influence casi invisible frente al de Opacity y una casilla que «no cuadra». Causa: la tira de contexto sobreescribía el fondo de los campos con `--surface` (el mismo de la tira) y otro radio, y «Auto-select» dibujaba su propio marco con casilla nativa. Ahora los tokens `--field-bg`, `--field-bg-hover`, `--field-border`, `--field-radius` y `--field-fill` son la única fuente para todos los campos de [ADR 0013](0013-campos-y-brocha.md) y los botones de la tira (`.tool-setting`), en cualquier barra o panel y en todas las bases. Los ajustes de encendido/apagado son `InlineToggle` (Auto-select, Reverse, Mirror, Simulate pressure, Allow painting); las casillas nativas quedan para menús, diálogos y popovers, con un solo estilo (el de `.cc-box`). `tests/ui-single-slider.test.ts` lo comprueba.
+
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
 ## Alternativas

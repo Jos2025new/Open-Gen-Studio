@@ -51,3 +51,4 @@ Antes de este cambio:
 - `RasterStroke` gana el campo opcional `tip`. Una versión anterior de la app dibujaría los trazos nuevos con líneas duras: perdería dureza, textura, fusión y presión, aunque no el trazo.
 - Con un ratón, la presión es siempre total, así que el tamaño y la densidad mínimos solo actúan con lápiz. Eso está cubierto por tests unitarios; no se ha probado con un lápiz real.
 - El coste por movimiento es proporcional al área del segmento: a 240 px son unos 60.000 píxeles. No se ha medido con el registro de rendimiento.
+- Actualización 2026-10-20 ([ADR 0024 O](0024-identidad-visual-tarjetas-bases-resaltado.md)): el aspecto de estos campos (fondo, borde, radio, relleno del deslizador) sale de los tokens `--field-*`, también en la tira de contexto; los ajustes de encendido/apagado son `InlineToggle` y no casillas.
