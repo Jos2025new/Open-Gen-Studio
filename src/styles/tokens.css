@@ -130,6 +130,16 @@
   --text: #111111; --text-2: #4a4846; --text-3: #6e6b67; --text-4: #9a968f;
   --danger: #b3261e; --danger-soft: rgba(179, 38, 30, 0.1); --warn: #8a5a00; --ok: #1e6b3a;
 }
+/* Blanco: white page, cool blue-grey panels (from Google Vids); the light highlight sets, as in Claro. */
+[data-base="blanco"] {
+  color-scheme: light;
+  --bg: #f0f4f9; --bg-canvas: #ffffff;
+  --surface: #f0f4f9; --surface-2: #e9eef6; --surface-3: #dde3ea; --surface-hover: #e6ebf2;
+  --overlay: rgba(255, 255, 255, 0.72);
+  --border: #d3dbe5; --border-strong: #c4c7c5; --border-focus: #747775;
+  --text: #1f1f1f; --text-2: #444746; --text-3: #5f6368; --text-4: #80868b;
+  --danger: #b3261e; --danger-soft: rgba(179, 38, 30, 0.1); --warn: #7a5300; --ok: #146c2e;
+}
 /* Original (legacy, to be retired): exactly the values this file had before the bases; today's corners, no pill. */
 [data-base="original"] {
   color-scheme: dark;

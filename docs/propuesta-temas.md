@@ -8,7 +8,7 @@ Fecha: 2026-10-20. Estado: **aprobada (2026-10-20); pasos 1 y 2 del plan impleme
 - «Decisión» sin banda y con la huella antigua.
 - La selección sigue al color de resaltado; el verde queda solo para estados.
 - Radio de píldora (999px) en botones y chips.
-- Un selector de base (cinco opciones) y una fila de resaltado independiente, sin catálogo de temas.
+- Un selector de base (seis opciones desde Blanco) y una fila de resaltado independiente, sin catálogo de temas.
 - Los cinco resaltados originales, con lima por defecto, más Aurora.
 
 - «Decisión» se mantiene como variante; las tarjetas de cambio de modelo y de seguimiento usan `card-m`.
@@ -26,7 +26,8 @@ En este orden:
 2. **Atlas**: la base oscura principal.
 3. **Grafito**: la oscura secundaria, de carbón azulado.
 4. **Claro**: off-white cálido, el modo claro general.
-5. **Original (antigua)**: el oscuro verdoso de hoy (`tokens.css`), tal cual. **No recibe mejoras de color ni de radios**: conserva sus colores y esquinas de 10 px, sin píldoras. Sí usa las plantillas de disposición de las tarjetas (aprobado por el usuario, 2026-10-20). Se retirará más adelante.
+5. **Blanco** («White»): página blanca y paneles gris azulado frío, a partir de Google Vids (2026-10-20, pedido por el usuario). Usa el juego claro de los seis resaltados, como Claro. Sistema sigue dando Claro en claro.
+6. **Original (antigua)**: el oscuro verdoso de hoy (`tokens.css`), tal cual. **No recibe mejoras de color ni de radios**: conserva sus colores y esquinas de 10 px, sin píldoras. Sí usa las plantillas de disposición de las tarjetas (aprobado por el usuario, 2026-10-20). Se retirará más adelante.
 
 Debajo, la fila **«Color de resaltado»**, independiente de la base: Predeterminado (lima, en todas las bases), Azul, Violeta, Rosa, Verde agua y Aurora. Cada uno tiene su juego oscuro y su juego claro. Cada resaltado define solo la familia del acento (`--accent`, `--accent-ink`, `--accent-soft`, `--accent-line`, `--select-on`, `--select-on-soft`, `--select-line`); selección y primario lo siguen.
 
@@ -76,6 +77,20 @@ Lienzo `#f1efec` (muestreado); tarjeta `#fbfaf8` (derivado).
 | `--danger`, `--warn`, `--ok` | `#b3261e`, `#8a5a00`, `#1e6b3a` |
 
 Contrastes sobre la tarjeta: texto 18,1; texto 2 8,73; meta 5,08 (4,62 sobre lienzo); estados 6,27 / 5,68 / 6,25. El borde `#d8d4ce` (1,41) solo separa.
+
+### Blanco (página blanca, paneles gris azulado)
+
+Referencia: Google Vids (paleta clara de Google). La página del chat es blanca; barra lateral, panel derecho y tarjetas van en el gris azulado.
+
+| Token | Valor |
+|---|---|
+| `--bg-canvas`, `--bg`/`--surface` | `#ffffff`, `#f0f4f9` |
+| `--surface-2`, `--surface-3`, `--surface-hover` | `#e9eef6`, `#dde3ea`, `#e6ebf2` |
+| `--border`, `--border-strong`, `--border-focus` | `#d3dbe5`, `#c4c7c5`, `#747775` |
+| `--text`, `--text-2`, `--text-3`, `--text-4` | `#1f1f1f`, `#444746`, `#5f6368`, `#80868b` |
+| `--danger`, `--warn`, `--ok` | `#b3261e`, `#7a5300`, `#146c2e` |
+
+Contrastes sobre el panel (sobre la página): texto 14,9 (16,5); texto 2 8,51 (9,39); meta 5,48 (6,05); text-4 3,34 (adorno); estados 5,92 / 6,20 / 5,92. El borde (1,26) solo separa. Resaltados: las mismas reglas que Claro (`[data-base="blanco"]` junto a `[data-base="claro"]` en `accents.css`); en Aurora, el relleno de lo elegido se apoya en `#f0f4f9`.
 
 ### Original (antigua)
 

@@ -58,7 +58,7 @@ function resolve(rules: Rule[], el: Record<string, string>): Record<string, stri
 
 const tokens = parse(read('tokens.css'));
 const rules = [...tokens, ...parse(read('accents.css'), tokens.length)];
-const BASES = ['atlas', 'grafito', 'claro', 'original'];
+const BASES = ['atlas', 'grafito', 'claro', 'blanco', 'original'];
 const ACCENTS = ['lima', 'azul', 'violeta', 'rosa', 'agua', 'aurora'];
 const themeOf = (base: string, accent: string) => resolve(rules, { 'data-base': base, 'data-accent': accent });
 
@@ -115,6 +115,9 @@ describe('theme tokens: bases, radii and accents', () => {
     expect(themeOf('grafito', 'lima')['--bg-canvas']).toBe('#1a1a1e');
     const claro = themeOf('claro', 'lima');
     expect([claro['--bg-canvas'], claro['--surface'], claro['--accent']]).toEqual(['#f1efec', '#fbfaf8', '#4f6b00']);
+    // Blanco: white page, blue-grey panels, and the same light highlight sets as Claro.
+    const blanco = themeOf('blanco', 'azul');
+    expect([blanco['--bg-canvas'], blanco['--surface'], blanco['--accent']]).toEqual(['#ffffff', '#f0f4f9', themeOf('claro', 'azul')['--accent']]);
   });
   it('only Aurora has the gradient and the grain', () => {
     for (const base of BASES) for (const accent of ACCENTS) {

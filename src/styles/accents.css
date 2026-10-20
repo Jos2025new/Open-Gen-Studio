@@ -5,11 +5,11 @@
 [data-accent="rosa"] { --accent: #ffb1c8; --accent-ink: #5e1133; --accent-soft: rgba(255, 177, 200, 0.14); --accent-line: rgba(255, 177, 200, 0.45); --select-on: #ffd9e3; --select-on-soft: #7b2949; --select-line: #7b2949; }
 [data-accent="agua"] { --accent: #6bd8d6; --accent-ink: #003735; --accent-soft: rgba(107, 216, 214, 0.14); --accent-line: rgba(107, 216, 214, 0.45); --select-on: #9cf1ee; --select-on-soft: #004f4d; --select-line: #004f4d; }
 /* Base Claro: los pasteles no se leen sobre claro; cada color usa un tono oscuro como relleno y como texto, con tinta blanca. La línea de selección es el acento (el relleno claro apenas se separa de la tarjeta). */
-[data-base="claro"]:not([data-accent]), [data-base="claro"][data-accent="lima"] { --accent: #4f6b00; --accent-ink: #ffffff; --accent-soft: rgba(79, 107, 0, 0.12); --accent-line: rgba(79, 107, 0, 0.45); --select-on: #2c3d00; --select-on-soft: #e3efb8; --select-line: #4f6b00; }
-[data-base="claro"][data-accent="azul"] { --accent: #1a56b0; --accent-ink: #ffffff; --accent-soft: rgba(26, 86, 176, 0.12); --accent-line: rgba(26, 86, 176, 0.45); --select-on: #0b2f66; --select-on-soft: #d3e3fd; --select-line: #1a56b0; }
-[data-base="claro"][data-accent="violeta"] { --accent: #5b3fd6; --accent-ink: #ffffff; --accent-soft: rgba(91, 63, 214, 0.12); --accent-line: rgba(91, 63, 214, 0.45); --select-on: #2a1a7a; --select-on-soft: #e5dcff; --select-line: #5b3fd6; }
-[data-base="claro"][data-accent="rosa"] { --accent: #b0285f; --accent-ink: #ffffff; --accent-soft: rgba(176, 40, 95, 0.12); --accent-line: rgba(176, 40, 95, 0.45); --select-on: #5e1133; --select-on-soft: #ffd9e3; --select-line: #b0285f; }
-[data-base="claro"][data-accent="agua"] { --accent: #00797a; --accent-ink: #ffffff; --accent-soft: rgba(0, 121, 122, 0.12); --accent-line: rgba(0, 121, 122, 0.45); --select-on: #003735; --select-on-soft: #bff0ee; --select-line: #00797a; }
+[data-base="claro"]:not([data-accent]), [data-base="claro"][data-accent="lima"], [data-base="blanco"]:not([data-accent]), [data-base="blanco"][data-accent="lima"] { --accent: #4f6b00; --accent-ink: #ffffff; --accent-soft: rgba(79, 107, 0, 0.12); --accent-line: rgba(79, 107, 0, 0.45); --select-on: #2c3d00; --select-on-soft: #e3efb8; --select-line: #4f6b00; }
+[data-base="claro"][data-accent="azul"], [data-base="blanco"][data-accent="azul"] { --accent: #1a56b0; --accent-ink: #ffffff; --accent-soft: rgba(26, 86, 176, 0.12); --accent-line: rgba(26, 86, 176, 0.45); --select-on: #0b2f66; --select-on-soft: #d3e3fd; --select-line: #1a56b0; }
+[data-base="claro"][data-accent="violeta"], [data-base="blanco"][data-accent="violeta"] { --accent: #5b3fd6; --accent-ink: #ffffff; --accent-soft: rgba(91, 63, 214, 0.12); --accent-line: rgba(91, 63, 214, 0.45); --select-on: #2a1a7a; --select-on-soft: #e5dcff; --select-line: #5b3fd6; }
+[data-base="claro"][data-accent="rosa"], [data-base="blanco"][data-accent="rosa"] { --accent: #b0285f; --accent-ink: #ffffff; --accent-soft: rgba(176, 40, 95, 0.12); --accent-line: rgba(176, 40, 95, 0.45); --select-on: #5e1133; --select-on-soft: #ffd9e3; --select-line: #b0285f; }
+[data-base="claro"][data-accent="agua"], [data-base="blanco"][data-accent="agua"] { --accent: #00797a; --accent-ink: #ffffff; --accent-soft: rgba(0, 121, 122, 0.12); --accent-line: rgba(0, 121, 122, 0.45); --select-on: #003735; --select-on-soft: #bff0ee; --select-line: #00797a; }
 :root {
   --grain-img: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .5 0'/></filter><rect width='96' height='96' filter='url(%23n)' opacity='.35'/></svg>");
 }
@@ -20,12 +20,14 @@
   --select-fill: linear-gradient(135deg, rgba(201,182,238,.22), rgba(236,156,192,.18)), linear-gradient(#2a2a33, #2a2a33);
   --grain: var(--grain-img);
 }
-[data-base="claro"][data-accent="aurora"] {
+[data-base="claro"][data-accent="aurora"], [data-base="blanco"][data-accent="aurora"] {
   --accent: #5a3fa0; --accent-ink: #ffffff; --accent-soft: rgba(90, 63, 160, 0.12); --accent-line: rgba(90, 63, 160, 0.45);
   --select-on: #2a1a5e; --select-on-soft: #e9e0f7; --select-line: #5a3fa0;
   --accent-grad: linear-gradient(135deg, #5a3fa0 0%, #7b3f9e 38%, #a03c92 70%, #b0357f 100%);
   --select-fill: linear-gradient(135deg, rgba(90,63,160,.14), rgba(176,53,127,.12)), linear-gradient(#fbfaf8, #fbfaf8);
 }
+/* Blanco under Aurora: the chosen-row fill sits on its own surface. */
+[data-base="blanco"][data-accent="aurora"] { --select-fill: linear-gradient(135deg, rgba(90,63,160,.14), rgba(176,53,127,.12)), linear-gradient(#f0f4f9, #f0f4f9); }
 /* Original keeps today's look: its selection reads the plain accent (what .q-opt.is-on and .cc-pick.is-on drew before), its ink and its primary hover. */
 html[data-base="original"] { --select-on: var(--accent); --select-on-soft: var(--accent-soft); --select-line: var(--accent-line); }
 [data-base="original"]:not([data-accent]), [data-base="original"][data-accent="lima"] { --accent-ink: #0b0c05; --accent-hover: #e1ff76; --accent-hover-filter: none; }

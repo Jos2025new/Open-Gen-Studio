@@ -49,7 +49,7 @@ describe('Settings → Appearance', () => {
     localStorage.setItem('ogs-base', 'grafito');
     localStorage.setItem('ogs-accent', 'rosa');
     mount();
-    expect(radios().map((b) => b.textContent)).toEqual(['System', 'Atlas', 'Graphite', 'Light', 'Original (old)']);
+    expect(radios().map((b) => b.textContent)).toEqual(['System', 'Atlas', 'Graphite', 'Light', 'White', 'Original (old)']);
     expect(radios().filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.textContent)).toEqual(['Graphite']);
     expect(swatches().map((b) => b.getAttribute('aria-label'))).toEqual(['Default (lime)', 'Blue', 'Violet', 'Pink', 'Aqua', 'Aurora']);
     expect(swatches().filter((b) => b.getAttribute('aria-pressed') === 'true').map((b) => b.getAttribute('aria-label'))).toEqual(['Pink']);

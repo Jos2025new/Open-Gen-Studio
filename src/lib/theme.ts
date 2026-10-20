@@ -1,10 +1,10 @@
 // Appearance preference (base + highlight colour). UI preference only: kept in localStorage, never in the store or the
 // persisted settings. The inline script in index.html applies the same mapping before first paint; tests/theme-appearance.test.ts keeps both in sync.
-export const BASE_CHOICES = ['sistema', 'atlas', 'grafito', 'claro', 'original'] as const;
+export const BASE_CHOICES = ['sistema', 'atlas', 'grafito', 'claro', 'blanco', 'original'] as const;
 export const ACCENT_CHOICES = ['lima', 'azul', 'violeta', 'rosa', 'agua', 'aurora'] as const;
 export type BaseChoice = (typeof BASE_CHOICES)[number];
 export type AccentChoice = (typeof ACCENT_CHOICES)[number];
-export type ResolvedBase = 'atlas' | 'grafito' | 'claro' | 'original';
+export type ResolvedBase = 'atlas' | 'grafito' | 'claro' | 'blanco' | 'original';
 
 export const BASE_KEY = 'ogs-base';
 export const ACCENT_KEY = 'ogs-accent';

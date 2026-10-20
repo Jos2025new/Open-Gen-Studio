@@ -11,7 +11,7 @@
         try {
           var sb = localStorage.getItem('ogs-base'), sa = localStorage.getItem('ogs-accent');
           if (sa === 'lima' || sa === 'azul' || sa === 'violeta' || sa === 'rosa' || sa === 'agua' || sa === 'aurora') a = sa;
-          if (sb === 'atlas' || sb === 'grafito' || sb === 'claro' || sb === 'original') b = sb;
+          if (sb === 'atlas' || sb === 'grafito' || sb === 'claro' || sb === 'blanco' || sb === 'original') b = sb;
           else if (sb === 'sistema') b = matchMedia('(prefers-color-scheme: light)').matches ? 'claro' : 'atlas';
         } catch (e) {}
         r.setAttribute('data-base', b);

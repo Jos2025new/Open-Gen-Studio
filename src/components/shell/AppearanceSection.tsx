@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import { ACCENT_CHOICES, BASE_CHOICES, readTheme, setAccent, setBase, watchSystemTheme, type AccentChoice, type BaseChoice } from '../../lib/theme';
 import { Segmented } from '../ui/primitives';
 
-const BASE_LABELS: Record<BaseChoice, string> = { sistema: 'System', atlas: 'Atlas', grafito: 'Graphite', claro: 'Light', original: 'Original (old)' };
+const BASE_LABELS: Record<BaseChoice, string> = { sistema: 'System', atlas: 'Atlas', grafito: 'Graphite', claro: 'Light', blanco: 'White', original: 'Original (old)' };
 const ACCENT_LABELS: Record<AccentChoice, string> = { lima: 'Default (lime)', azul: 'Blue', violeta: 'Violet', rosa: 'Pink', agua: 'Aqua', aurora: 'Aurora' };
 
 /** Settings → Appearance: base and highlight colour. Applied at once; kept in localStorage only (not in the store). */

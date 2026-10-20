@@ -40,7 +40,7 @@ describe('pre-paint theme script', () => {
     expect(run().attrs).toEqual({ 'data-base': 'atlas', 'data-accent': 'lima' });
   });
 
-  it.each(['atlas', 'grafito', 'claro', 'original'])('maps base %s to itself', (base) => {
+  it.each(['atlas', 'grafito', 'claro', 'blanco', 'original'])('maps base %s to itself', (base) => {
     expect(run({ stored: { 'ogs-base': base } }).attrs['data-base']).toBe(base);
   });
 
