@@ -1,0 +1,27 @@
+/* Resaltado «Aurora» (propuesta): degradado suave con grano. Muestreado de una esfera (referencias 15 y 16). Estrellas de color elevadas para que la tinta pase en cada una. */
+:root, [data-mode] {
+  --grain-img: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .5 0'/></filter><rect width='96' height='96' filter='url(%23n)' opacity='.35'/></svg>");
+}
+[data-accent="aurora"] {
+  --accent: #c9b6ee; --accent-ink: #1c1030; --accent-soft: rgba(201, 182, 238, 0.14); --accent-line: rgba(201, 182, 238, 0.45);
+  --select-on: #f0e6ff; --select-on-soft: #3a2d5c; --select-line: #c9b6ee;
+  --accent-grad: linear-gradient(135deg, #c9b6ee 0%, #b9a4ec 38%, #d19fd9 70%, #ec9cc0 100%);
+  --select-fill: linear-gradient(135deg, rgba(201,182,238,.22), rgba(236,156,192,.18)), linear-gradient(#2a2a33, #2a2a33);
+  --grain: var(--grain-img);
+}
+[data-mode="light"] [data-accent="aurora"], [data-mode="light"][data-accent="aurora"] {
+  --accent: #5a3fa0; --accent-ink: #ffffff; --accent-soft: rgba(90, 63, 160, 0.12); --accent-line: rgba(90, 63, 160, 0.45);
+  --select-on: #2a1a5e; --select-on-soft: #e9e0f7; --select-line: #5a3fa0;
+  --accent-grad: linear-gradient(135deg, #5a3fa0 0%, #7b3f9e 38%, #a03c92 70%, #b0357f 100%);
+  --select-fill: linear-gradient(135deg, rgba(90,63,160,.14), rgba(176,53,127,.12)), linear-gradient(#fbfaf8, #fbfaf8);
+}
+/* Dónde vive el degradado (en cualquier resaltado; sin él, caen a color liso) */
+.btn-primary { background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--accent)); }
+.q-opt.is-on, .set-model.is-on, .cc-pick.is-on { background: var(--select-fill, linear-gradient(var(--select-on-soft), var(--select-on-soft))) padding-box, var(--accent-grad, linear-gradient(var(--select-line), var(--select-line))) border-box; border: 1px solid transparent; }
+.card-check.is-on .cc-box, .cc-pick.is-on .cc-box { background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--select-on)); border-color: transparent; color: var(--accent-ink); }
+/* Muestra grande y esfera (comparación con la referencia) */
+.aurora-big { height: 150px; border-radius: 24px; background: var(--grain-img), var(--accent-grad); }
+.orb { width: 120px; height: 120px; border-radius: 50%; background: var(--grain-img), radial-gradient(circle at 36% 18%, #c1a2d0 0%, #8d63af 22%, #5a4690 42%, #5c367c 62%, #7d3c75 82%, #9c4376 100%); }
+.orb-sm { width: 18px; height: 18px; display: inline-block; vertical-align: -4px; border-radius: 50%; background: var(--grain-img), var(--accent-grad); }
+.stops { display: flex; gap: 6px; flex-wrap: wrap; font-size: 11px; color: var(--text-3); }
+.stops i { display: inline-block; width: 44px; height: 28px; border-radius: 8px; vertical-align: middle; }
