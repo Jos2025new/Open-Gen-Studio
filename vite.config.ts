@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
 import { localStore } from './server/local-store.js';
 import react from '@vitejs/plugin-react';
+import { HOST_NOT_ALLOWED, mediaHostAllowed } from './src/lib/mediaHosts';
 
 // Provider schema documents are served without CORS headers, so the dev and
 // preview servers relay them. Generation and chat calls go direct (CORS ok).
@@ -19,8 +20,7 @@ const proxy = {
 };
 
 // Some providers hand back results on storage without CORS (Atlas/BytePlus: *.volces.com), so the browser can
-// neither save nor read them. The dev/preview servers relay downloads from these hosts only (not an open proxy).
-const MEDIA_HOSTS = /(^|\.)(volces\.com|bytepluses\.com|atlascloud\.ai|aliyuncs\.com)$/;
+// neither save nor read them. The dev/preview servers relay downloads from the hosts in mediaHosts.ts only (not an open proxy).
 function mediaRelay(): Plugin {
   // Node's http types are not installed in this browser project; only these members are used.
   type Res = { statusCode: number; setHeader(name: string, value: string): void; end(body?: string | Uint8Array): void };
@@ -36,9 +36,9 @@ function mediaRelay(): Plugin {
       res.statusCode = 400;
       return res.end('bad url');
     }
-    if (url.protocol !== 'https:' || !MEDIA_HOSTS.test(url.hostname)) {
+    if (url.protocol !== 'https:' || !mediaHostAllowed(url.hostname)) {
       res.statusCode = 403;
-      return res.end('host not allowed');
+      return res.end(HOST_NOT_ALLOWED);
     }
     const upstream = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(() => null);
     if (!upstream?.ok || !upstream.body) {

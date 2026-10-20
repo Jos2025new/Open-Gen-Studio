@@ -3,6 +3,7 @@ import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
 import { logged } from '../lib/log';
+import { notKept } from './keepResult';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
 import { assetBlobKey, getAssetBlob, putAssetBlob } from '../lib/idb';
@@ -148,7 +149,7 @@ async function ensureAssetBlob(assetId: string): Promise<Blob> {
 /** Keep results that are still only at the provider (e.g. after a download was blocked). Best effort. */
 export async function adoptRemoteAssets(): Promise<void> {
   for (const a of Object.values(get().assets)) {
-    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(logged('keep a remote result'));
+    if (!a.stored && a.remoteUrl) await ensureAssetBlob(a.id).catch(notKept('keep a remote result'));
   }
 }
 
@@ -175,8 +176,8 @@ async function storeOutput(o: GenOutput, g: Generation, kind: MediaKind, fallbac
   if (!blob && o.url) {
     try {
       blob = await fetchBlob(o.url);
-    } catch {
-      /* keep the remote URL */
+    } catch (err) {
+      notKept('download result')(err); // keep the remote URL
     }
   }
   let info: MediaInfo = fallback;

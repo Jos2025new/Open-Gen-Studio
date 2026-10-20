@@ -1,4 +1,5 @@
 import { AbortedError, isAbort } from './http';
+import { HOST_NOT_ALLOWED } from './mediaHosts';
 import { canvasMade } from './trace';
 
 export interface MediaInfo {
@@ -87,10 +88,17 @@ export async function blobToCanvas(blob: Blob): Promise<HTMLCanvasElement> {
   return c;
 }
 
+/** Why the local relay refused (a host outside its list) or what the provider's storage answered, with the host. */
+async function relayReason(res: Response, url: string): Promise<string> {
+  const host = (() => { try { return new URL(url).hostname; } catch { return 'this address'; } })();
+  const body = await res.text().catch(() => '');
+  return body.trim() === HOST_NOT_ALLOWED ? `: the local server does not relay downloads from ${host}` : `: ${host} refused the download`;
+}
+
 /** Each download attempt bounds both the response and its body; a CORS failure uses the existing relay. */
 export async function fetchBlob(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Blob> {
   const { timeoutMs = 30_000, signal, ...options } = init;
-  const download = async (target: string, opts: RequestInit): Promise<Blob> => {
+  const download = async (target: string, opts: RequestInit, relayed?: string): Promise<Blob> => {
     const controller = new AbortController();
     let timedOut = false;
     const forward = () => controller.abort();
@@ -99,7 +107,7 @@ export async function fetchBlob(url: string, init: RequestInit & { timeoutMs?: n
     const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
     try {
       const res = await fetch(target, { ...opts, signal: controller.signal });
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      if (!res.ok) throw new Error(`Download failed (${res.status})${relayed ? await relayReason(res, relayed) : ''}`);
       return await res.blob();
     } catch (err) {
       if (signal?.aborted) throw new AbortedError();
@@ -115,7 +123,7 @@ export async function fetchBlob(url: string, init: RequestInit & { timeoutMs?: n
     if (isAbort(err) || signal?.aborted) throw new AbortedError();
     if (err instanceof Error && err.message.startsWith('Download failed (')) throw err;
     // A failed or stalled direct download may still work through the allow-listed media relay.
-    return download(`/x/media?url=${encodeURIComponent(url)}`, {});
+    return download(`/x/media?url=${encodeURIComponent(url)}`, {}, url);
   }
 }
 
