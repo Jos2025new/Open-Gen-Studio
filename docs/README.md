@@ -84,6 +84,7 @@
 - [Propuesta: Spaces separados de los Workspaces, con lugar y modo en cada generación](propuesta-sesion-espacios.md) (2026-10-18), sustituida por la v5: campos place y mode, Reusar, historial de prompts y espacio recordado.
 - [Propuesta v5: Spaces separados de los Workspaces](propuesta-spaces-v5.md) (2026-10-18), implementada en dos etapas (`task/space-session-1`, 2026-10-19): resultados de texto, guarda de hidratación, presupuesto de tamaño y porqués.
 - [Propuesta: el agente pregunta antes de cargar un workflow](propuesta-workflow-despues-de-preguntar.md) (2026-10-19), sin implementar: ficha corta antes de preguntar, `ready: true`, entregable frente a propósito; plan para otro agente.
+- [Propuesta: sistema visual acotado de las tarjetas del chat](propuesta-sistema-visual-tarjetas.md) (2026-10-20), sin implementar: inventario con valores fijos, tres tamaños (mínimo, medio, estándar), reglas para agentes y plan de migración.
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
