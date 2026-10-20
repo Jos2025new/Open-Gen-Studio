@@ -54,6 +54,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       </article>
     );
   }
+  if (item.switchFrom) return <SwitchModelCard item={item} sessionId={sessionId} name={name} />;
   return (
     <article className="q-card set-card cc-card cc-w">
       <header className="cc-head"><CardIcon /><h4 className="cc-title">Confirm settings</h4></header>
@@ -278,5 +279,23 @@ function StepSlider({ values, value, unit, label, onChange }: { values: number[]
         {unit ? <span className="faint">{unit}</span> : null}
       </label>
     </div>
+  );
+}
+
+/** The user named another model: one question, one big button. Keep answers with the model already confirmed. */
+function SwitchModelCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
+  const section = sectionsOf(item)[0];
+  const next = section.recommended;
+  const keep = item.switchFrom!;
+  const e = choiceEstimate(next, section.kind, 1);
+  const price = e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
+  return (
+    <article className="q-card set-card cc-card cc-w cc-switch">
+      <p className="cc-switch-line">Found <b>{name(next.modelRef)}</b> · {price}. Switch to it?</p>
+      <footer className="q-foot">
+        <Button variant="ghost" size="sm" onClick={() => void confirmSettings(sessionId, item.id, [{ ...keep, needsImage: next.needsImage }])}>Keep {name(keep.modelRef)}</Button>
+        <Button variant="primary" size="md" className="cc-switch-go" onClick={() => void confirmSettings(sessionId, item.id, [next])}>Switch to {name(next.modelRef)}</Button>
+      </footer>
+    </article>
   );
 }

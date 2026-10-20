@@ -109,6 +109,8 @@
 .plan-card .plan-foot .plan-progress { flex: none; }
 .cc-card .set-total { color: var(--text-4); }
 .cc-approve { gap: 8px; border-radius: 12px; font-weight: 700; padding: 10px 16px; }
+.cc-switch-line { margin: 0 0 10px; }
+.cc-switch .cc-switch-go { padding: 12px 22px; font-size: 1.05em; font-weight: 700; }
 .cc-ap-sep { opacity: .55; margin: 0 2px; }
 .cc-ap-cost { font-weight: 700; }
 .cc-card .set-section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }

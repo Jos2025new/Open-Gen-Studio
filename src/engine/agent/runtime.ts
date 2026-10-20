@@ -79,6 +79,7 @@ import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults }
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
+import { confirmedState, switchNote, switchSection } from './switchModel';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
@@ -455,8 +456,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.confirmed', reason: 'user selected and continued', sessionId, approvalId: itemId, before: { status: item.status, choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.recommended.count, duration: x.recommended.duration })) }, after: { status: 'confirmed', choices: sections.map((x) => ({ kind: x.kind, modelRef: x.chosen!.modelRef, needsImage: x.chosen!.needsImage, count: x.chosen!.count, resolution: x.chosen!.resolution, duration: x.chosen!.duration, aspect: x.chosen!.aspect })) } });
   const pending = s.agent.pending;
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
-  const firstOfKind = sections.filter((x, i) => sections.findIndex((y) => y.kind === x.kind) === i);
-  patchAgent(sessionId, (a) => ({ pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: sections.map((x) => ({ ...x.chosen!, kind: x.kind })) }));
+  patchAgent(sessionId, (a) => confirmedState(a, item, sections));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const name = (ref: string) => modelSummary(ref)?.name ?? ref;
   const lines = draftLines(item.draft, sections);
@@ -481,7 +481,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   pushHistory(sessionId, {
     role: 'tool',
     tool_call_id: pending.toolCallId,
-    content: `Settings confirmed by the user (the app applies them to every step of each kind; with several models of one kind, to the steps that name that model):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
+    content: `Settings confirmed by the user (the app applies them to every step of each kind; with several models of one kind, to the steps that name that model):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}${switchNote(item, sections, name(sections[0].chosen.modelRef), name(item.switchFrom?.modelRef ?? ''))}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
   });
   await llmTurn(sessionId, item.workspace);
 }
@@ -1518,7 +1518,8 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sections) };
+          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, [session(sessionId).agent.draft?.request ?? '', ...Object.values(session(sessionId).agent.draft?.answers ?? {})].join('\n'), parts[0]?.model);
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : sections), ...(sw ? { switchFrom: sw.from } : {}) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });

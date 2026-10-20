@@ -579,8 +579,10 @@ export interface SettingsFeedItem extends FeedBase {
   sections: SettingsSection[];
   status: 'pending' | 'confirmed' | 'skipped';
   draft?: DraftMode;
-  /** The agent's call this card answers (to reopen and confirm again). */
+  /** The agent's call this card answers (to reopen). */
   toolCallId?: string;
+  /** Switch-model card: the confirmed choice kept for other steps. */
+  switchFrom?: SettingsChoice;
 }
 
 /** What the user changed back in the conversation (for us, never sent to the agent). */
