@@ -64,6 +64,8 @@ Corrección tras probarlo (el usuario: «me gustó… se siente menos ruidoso»)
 
 **P. Revisión externa** (2026-10-20). El usuario encargó una revisión estática a otro modelo (informe fuera del repo, `../ogs-audit-ui-2026-10-20.md`): 8 hallazgos. Aplicados: la selección y los tiradores del Designer siguen al resaltado (`accentA()` en `Stage.tsx`, que deriva las transparencias de `--accent`); fondo opaco de las acciones de la sesión activa (`--active-solid`); la pastilla «Soon» y el dock del visor con tokens; generación terminada y aviso de éxito en `--ok`; selección de texto con `--select-on*`; los últimos campos del Designer a `--field-*`; tres contradicciones de documentos. Pendiente a propósito: resumir en una línea las preguntas respondidas, que es el paso 4b del §8 y necesita la revisión visual del usuario.
 
+**Q. Bordes de paneles flotantes** (2026-10-20). El usuario: «¿por qué el borde es negro?… debería ser el más oscurito el que resalte»; la tira de contexto, la vista, la paleta y «Conversation» llevaban siempre `--border-strong` (parecían enfocados), y el compositor pasaba a `--border-focus` (casi negro en las bases claras). Norma: `--panel-line` (= `--border`) en reposo y `--panel-line-focus` (= `--border-strong`) solo con foco o ratón encima; `--border-focus` queda para campos de texto. Original conserva su aspecto (`--border-strong` → `--border-focus`). Prueba: `theme-tokens.test.ts`.
+
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
 ## Alternativas

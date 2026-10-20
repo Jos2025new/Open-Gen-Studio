@@ -192,5 +192,16 @@ describe('app CSS and canvas drawing follow the theme', () => {
     expect(rule('ui.css', '.toast-success > svg:first-child')).toContain('var(--ok)');
     expect(rule('base.css', '::selection')).toMatch(/background: var\(--select-on-soft\);\s*color: var\(--select-on\)/);
   });
+  it('floating panels share one border logic: --panel-line at rest, --panel-line-focus only when focused', () => {
+    const rest: [string, string][] = [['composer.css', '.composer'], ['composer.css', '.thread-peek.is-open'], ['designer-connected.css', '.context-strip'], ['designer-connected.css', '.designer-palette .tool-rail'], ['designer-connected.css', '.designer-view']];
+    for (const [f, sel] of rest) expect(rule(f, sel), sel).toMatch(/border: 1px solid var\(--panel-line\)/);
+    expect(rule('composer.css', '.composer:focus-within')).toContain('var(--panel-line-focus)');
+    expect(read('composer.css')).toMatch(/\.context-strip:focus-within[^{]*\{ border-color: var\(--panel-line-focus\); \}/);
+    for (const b of ['atlas', 'grafito', 'claro', 'blanco']) {
+      const t = themeOf(b, 'lima');
+      expect(t['--panel-line']).toBe(t['--border']);
+      expect(t['--panel-line-focus']).toBe(t['--border-strong']);
+    }
+  });
 });
 

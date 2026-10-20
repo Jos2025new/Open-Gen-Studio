@@ -1,5 +1,5 @@
 .composer-dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: 20px; width: min(760px, calc(100% - 48px)); z-index: 12; }
-.composer { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-l); padding: 12px; box-shadow: var(--shadow-card); }.composer:focus-within { border-color: var(--border-focus); }.composer.is-drop { border-color: var(--accent); }
+.composer { background: var(--surface-2); border: 1px solid var(--panel-line); border-radius: var(--radius-l); padding: 12px; box-shadow: var(--shadow-card); }.composer:focus-within { border-color: var(--panel-line-focus); }.composer.is-drop { border-color: var(--accent); }
 textarea.composer-input { display: block; width: 100%; resize: none; border: none; outline: none; background: none; padding: 5px 3px 14px; min-height: 48px; font-size: 13px; line-height: 1.6; }.composer-input::placeholder { color: var(--text-2); }
 .composer-bar { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }.composer-controls { display: flex; gap: 5px; flex: 1; min-width: 0; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }.composer-end { display: flex; align-items: center; gap: 5px; margin-left: auto; }
 .mode-btn { display: flex; gap: 6px; align-items: center; padding: 7px 8px; font-size: 12px; border: 1px solid var(--border-strong); border-radius: 6px; }.mode-btn.is-agent { color: var(--text); }.send-btn { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 32px; height: 32px; border-radius: 6px; padding: 0 8px; }.send-btn.is-stop { background: var(--danger-soft); color: var(--danger); }.send-cost { font-size: var(--fs-xs); }.model-chip { max-width: 210px; }.model-chip .truncate { max-width: 140px; }
@@ -105,13 +105,15 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 /* Conversation card beside the composer (inside the dock), bottom-aligned with it; as wide as the space to the right allows. */
 .thread-peek { position: absolute; right: calc(100% + 12px); bottom: 0; z-index: 13; display: flex; flex-direction: column; width: max(260px, min(420px, calc((100vw - 56px - 100%) / 2 - 28px))); }
 .thread-designer { width: var(--conversation-side-width, 260px); }
-.thread-peek.is-open { background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: hidden; }
+.thread-peek.is-open { background: var(--surface); border: 1px solid var(--panel-line); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: hidden; }
 .thread-peek.is-open .thread-toggle { width: 100%; margin: 0; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: var(--surface-2); padding: 9px 12px; }
 .thread-peek.is-open .thread-toggle svg:last-child { margin-left: auto; }
 .thread-peek .thread-body { max-height: min(560px, calc(100vh - 160px)); margin: 0; border: 0; border-radius: 0; box-shadow: none; }
 @media (max-width: 1400px) { .thread-peek { right: auto; left: 0; bottom: calc(100% + 8px); width: 100%; } .thread-peek .thread-body { max-height: calc(100vh - 300px); } }
 .thread-peek-folded { position: absolute; right: calc(100% + 12px); bottom: 0; }
-.thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; min-width: 190px; height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); padding: 0 12px; border-color: var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); }
+.thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; min-width: 190px; height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); padding: 0 12px; border-color: var(--panel-line); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); }
+/* Floating panels: --panel-line at rest, the darker --panel-line-focus only while focused or hovered (one rule for strip, palette, view, conversation). */
+.thread-peek.is-open:focus-within, .thread-peek-folded .thread-toggle:is(:hover, :focus-visible), .context-strip:focus-within, .designer-palette .tool-rail:focus-within, .designer-view:focus-within, .designer .document-picker-toggle:is(:hover, :focus-visible) { border-color: var(--panel-line-focus); }
 .thread-peek-folded .thread-toggle svg { width: var(--control-icon); height: var(--control-icon); }
 .thread-peek-folded .thread-toggle svg:last-child { margin-left: auto; }
 @media (max-width: 1400px) { .thread-peek-folded { right: auto; left: 0; bottom: calc(100% + 8px); } }

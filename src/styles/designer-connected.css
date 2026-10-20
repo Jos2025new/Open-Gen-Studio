@@ -1,9 +1,9 @@
 .designer .document-picker { z-index: 9; top: 12px; }
-.designer .document-picker-toggle { height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); border-color: var(--border-strong); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.designer .document-picker-toggle { height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); border-color: var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .designer .document-picker-toggle svg { width: var(--control-icon); height: var(--control-icon); }
 .designer .document-picker-panel { width: 100%; }
 .designer-palette { position: absolute; z-index: 8; top: 62px; --palette-left: var(--designer-dock-left); left: var(--palette-left); max-width: calc(100% - var(--layers-w,260px) - var(--palette-left) - 12px); }
-.designer-palette .tool-rail { width: max-content; max-width: 100%; display: flex; flex-direction: row; align-items: center; padding: var(--toolbar-padding); gap: 3px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); overflow: hidden; }
+.designer-palette .tool-rail { width: max-content; max-width: 100%; display: flex; flex-direction: row; align-items: center; padding: var(--toolbar-padding); gap: 3px; background: var(--surface-2); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); overflow: hidden; }
 .designer-palette .icon-btn { position: relative; }
 .designer-palette .icon-btn, .designer-view .icon-btn { width: var(--control-h); height: var(--control-h); border-radius: var(--radius-s); flex-shrink: 0; }
 .designer-palette .icon-btn svg, .designer-view .icon-btn svg { width: var(--control-icon); height: var(--control-icon); }
@@ -12,7 +12,7 @@
 .tool-family { display: flex; gap: 3px; flex-shrink: 0; }
 .tool-family + .tool-family { border-left: 1px solid var(--border-strong); padding-left: 7px; margin-left: 4px; }
 .palette-history { display: flex; order: -1; gap: 2px; padding-right: 7px; margin-right: 4px; border-right: 1px solid var(--border-strong); }
-.designer-view { position: absolute; bottom: 24px; left: 28px; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
+.designer-view { position: absolute; bottom: 24px; left: 28px; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--toolbar-padding); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); background: var(--surface-2); box-shadow: var(--shadow-card); }
 .designer-view .zoom-value { font-size: 12px; min-height: var(--control-h); display: flex; align-items: center; justify-content: center; }
 .designer-context { padding: 8px; border-radius: var(--toolbar-radius); }
 .designer-context .tool-settings { display: flex; flex-wrap: wrap; gap: 4px; max-width: 100%; overflow: visible; }
@@ -263,7 +263,7 @@
 .composer-tools-bar .context-strip { left: 64px; max-width: calc(100% - 84px); }
 /* Not docked, the palette floats at the top of the page: the strip opens below it. */
 .designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }
-.context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
+.context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface); border: 1px solid var(--panel-line); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
 .context-strip .tool-settings { display: contents; }
 .context-strip .opt { height: var(--control-h); }
 .context-strip .opt.opt-slider { flex: 0 0 auto; width: 120px; }
