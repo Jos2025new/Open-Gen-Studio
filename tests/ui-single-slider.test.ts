@@ -31,7 +31,7 @@ describe('the Designer draws its controls from InlineControls', () => {
   // One look for every field (ADR 0013, ADR 0024 M): fill, outline and corners come from the --field-* tokens, never a surface set by hand.
   it('field rules take their background, border and radius from the --field-* tokens', () => {
     const css = ['designer.css', 'designer-connected.css'].map((f) => readFileSync(join('src/styles', f), 'utf8')).join('\n').replace(/\/\*[\s\S]*?\*\//g, '');
-    const field = /(^|[\s,>])\.(opt|tool-setting)(\.(opt-slider|opt-toggle|opt-choice|opt-presets|opt-color|opt-pick|is-icon))*(:not\([^)]*\))?$/;
+    const field = /(^|[\s,>])\.(opt|tool-setting)(\.(opt-slider|opt-toggle|opt-choice|opt-presets|opt-color|opt-pick|opt-[\w-]+|is-icon|is-on))*(:not\([^)]*\))?$|(^|[\s>])\.(opt-color|opt-pick)$/;
     // The tool rail's quick palette is the one flat exception: its fields sit on the rail with no fill of their own.
     const FLAT = ['.palette-quick .opt'];
     const bad: string[] = [];
@@ -40,7 +40,8 @@ describe('the Designer draws its controls from InlineControls', () => {
       if (!sels.some((x) => field.test(x)) || sels.every((x) => FLAT.includes(x))) continue;
       for (const d of m[2].split(';')) {
         const [k, v] = d.split(':').map((x) => x?.trim());
-        if ((k === 'background' || k === 'border-radius') && v && !v.includes('--field-') && v !== 'none' && !/50%/.test(v)) bad.push(`${sels.join(', ')} { ${k}: ${v} }`);
+        const ok = !v || v.includes('--field-') || v.includes('--active-') || ['none', '0', 'transparent'].includes(v) || /50%/.test(v);
+        if (['background', 'border-radius', 'border', 'border-color'].includes(k) && !ok) bad.push(`${sels.join(', ')} { ${k}: ${v} }`);
       }
     }
     expect(bad).toEqual([]);

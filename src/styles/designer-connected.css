@@ -94,7 +94,7 @@
 .layer-properties .stroke-controls .opt { background: var(--field-bg); }
 .designer-context .tool-settings > .opt-slider { flex: 1 1 170px; }
 .designer-context .tool-settings > .opt-pick, .designer-context .tool-settings > .opt-color {
-  flex: 1 1 130px; height: 36px; justify-content: space-between; padding: 0 12px; border-radius: var(--radius);
+  flex: 1 1 130px; height: 36px; justify-content: space-between; padding: 0 12px; border-radius: var(--field-radius);
 }
 .designer-context .tool-settings > .stroke-controls { flex-basis: 100%; }
 .designer-context .tool-setting { padding: 7px 10px; }
@@ -137,7 +137,7 @@
 .sidebar-align-settings h3 { margin: 0 0 6px; font-size: 11px; }
 .sidebar-tool-settings .tool-settings { display: flex; flex-wrap: wrap; align-items: stretch; width: 100%; max-width: none; overflow: visible; gap: 8px; }
 .sidebar-tool-settings .tool-settings > .opt-slider { flex: 1 1 140px; }
-.sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 36px; padding: 0 12px; background: var(--surface-2); border: 0; border-radius: var(--radius); }
+.sidebar-tool-settings .tool-settings > .opt-color, .sidebar-tool-settings .tool-settings > .opt-pick { flex: 1 1 130px; justify-content: space-between; min-width: 0; height: 36px; padding: 0 12px; background: var(--field-bg); border: 1px solid var(--field-border); border-radius: var(--field-radius); }
 .sidebar-tool-settings .tool-settings > .stroke-controls { flex-basis: 100%; }
 .sidebar-tool-settings .tool-settings .edit-mode { flex-basis: 100%; justify-content: space-between; }
 .sidebar-tool-settings .opt-hint { white-space: normal; }
