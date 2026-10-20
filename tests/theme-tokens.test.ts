@@ -186,5 +186,11 @@ describe('app CSS and canvas drawing follow the theme', () => {
     expect(rule('shell.css', '.lb-dock')).toContain('box-shadow: var(--shadow-float)');
     for (const b of ['claro', 'blanco']) expect(themeOf(b, 'lima')['--shadow-float']).toContain('60, 64, 67');
   });
+  it('finished states use --ok, not the accent; text selection follows the highlight', () => {
+    for (const sel of ['.gen-row-status.status-done', '.generation-entry-status.status-done']) expect(rule('shell.css', sel)).toContain('var(--ok)');
+    expect(rule('ui.css', '.toast-success')).not.toContain('--accent');
+    expect(rule('ui.css', '.toast-success > svg:first-child')).toContain('var(--ok)');
+    expect(rule('base.css', '::selection')).toMatch(/background: var\(--select-on-soft\);\s*color: var\(--select-on\)/);
+  });
 });
 

@@ -154,7 +154,7 @@
 .generations-list { overflow: auto; min-height: 0; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .generation-entry { flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
 .generation-entry-meta { padding: 10px 12px 0; font-size: 11px; }
-.generation-entry-status.status-done { color: var(--accent); }
+.generation-entry-status.status-done { color: var(--ok); }
 .generation-entry-status.status-error { color: var(--danger); }
 .generations-popover .generations-panel .generation-entry .gen-card { display: grid; grid-template-columns: 116px minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 0 8px; width: 100%; min-width: 0; border: 0; padding: 10px; }
 .generations-popover .generations-panel .generation-entry .gen-card > .gen-head, .generations-popover .generations-panel .generation-entry .gen-card > .gen-meta, .generations-popover .generations-panel .generation-entry .gen-card > .gen-billed { grid-column: 2; width: auto; min-width: 0; padding: 2px 0 6px; }
@@ -254,7 +254,7 @@ button.info-thumb { padding: 0; cursor: pointer; }
 .gen-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .gen-row-title { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gen-row-meta { display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; }
-.gen-row-status.status-done { color: var(--accent); }
+.gen-row-status.status-done { color: var(--ok); }
 .gen-row-status.status-error { color: var(--danger); }
 .gen-row-status.status-running { color: var(--warn); }
 .gen-row-error { font-size: 11px; color: var(--danger); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

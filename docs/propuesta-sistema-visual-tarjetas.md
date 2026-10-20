@@ -42,7 +42,7 @@ Leyenda: **[px]** = valor fijo en vez de token.
 
 | Diferencia | Veredicto | Motivo |
 |---|---|---|
-| Cambio de modelo y seguimiento (`cc-narrow`): letra toda `--fs-xs`, relleno 12/14, casilla propia, sin cabecera | **Deriva: migrar a `card-s`** | Es un tamaño legítimo (mínimo), pero con letra, relleno y radios inventados; no tiene papel de jerarquía. |
+| Cambio de modelo y seguimiento (`cc-narrow`): letra toda `--fs-xs`, relleno 12/14, casilla propia, sin cabecera | **Deriva: migrar a `card-m`** (decidido por el usuario, 2026-10-20; ver §8, 4a) | Es un tamaño legítimo (mínimo), pero con letra, relleno y radios inventados; no tiene papel de jerarquía. |
 | Preguntas: sin `.cc-w`, `.q-opt` de radio 5, sin cabecera de icono y título | **Deriva: migrar a `card-m`** | Es una tarjeta común con otro esqueleto, sin motivo. |
 | `.cc-set-done` (la tarjeta resuelta en una línea de resumen) | **Conservar y promover a estado común** | Toda tarjeta, al resolverse, se pliega a una línea; reduce ruido del historial. Pasa a ser plantilla («resuelta»), no excepción de ajustes. |
 | `.cc-mini` (píldora de solo lectura) frente a `.cc-chip` (control que abre algo) | **Conservar con dos papeles** | Mostrar un valor frente a editarlo. Ambos con `--chip-radius` (píldora, 999px, según la propuesta de temas). |
@@ -148,7 +148,7 @@ Una sola secuencia; cada paso es un commit con `npm run test:related`, y al cerr
 - Pruebas: `check-sizes`, `check-docs`; un test nuevo que calcula los contrastes de cada base y resaltado (tinta/relleno, acento/tarjeta, texto elegido/relleno ≥ 4,5; meta ≥ 4,5) leyendo los CSS; suite entera (nada debe cambiar en pantalla salvo el aspecto de la base).
 
 **2. Selector de base y de resaltado**
-- Apariencia en Ajustes (cinco bases, seis muestras con `aria-pressed`), claves `ogs-base` y `ogs-accent` en `localStorage`, `data-base` y `data-accent` en `<html>`, lectura de una línea antes del primer pintado; `Sistema` resuelto con `matchMedia`.
+- Apariencia en Ajustes (cinco bases, seis desde Blanco, seis muestras con `aria-pressed`), claves `ogs-base` y `ogs-accent` en `localStorage`, `data-base` y `data-accent` en `<html>`, lectura de una línea antes del primer pintado; `Sistema` resuelto con `matchMedia`.
 - Pruebas: jsdom del selector y de las muestras; claves y atributos escritos y leídos; `Sistema` con `matchMedia` simulado a claro y a oscuro; valor por defecto `atlas` + `lima`. No toca los ajustes persistidos.
 
 **3. Plantillas de tarjeta** (`chat-cards.css`)
@@ -176,4 +176,4 @@ Una maqueta estática con las hojas reales de la app y los tokens propuestos, an
 
 - Es un documento; no cambia código ni estilos.
 - Los valores salen de los más usados hoy; el usuario puede ajustarlos antes del paso 1.
-- No cubre Home, Designer ni nodos, que seguirán la misma norma de tokens después.
+- Las plantillas de tarjeta (`card-s/m/l`) no cubren Home, Designer ni nodos. Los contratos de color, estados activos y campos ([ADR 0024](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md) M y O) sí rigen ya en toda la app.

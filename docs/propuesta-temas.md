@@ -162,7 +162,7 @@ Los demás resaltados siguen lisos (el CSS cae a color liso porque `--accent-gra
 
 ## 4. Almacenamiento
 
-`localStorage`: `ogs-base` (`sistema`, `atlas`, `grafito`, `claro`, `original`) y `ogs-accent` (`lima`, `azul`, `violeta`, `rosa`, `agua`, `aurora`). Se aplican como `data-base` y `data-accent` en `<html>`, con una lectura de una línea antes del primer pintado (`sistema` se resuelve con `matchMedia('(prefers-color-scheme: light)')` a `claro` o `atlas`). Sin atributo valen `atlas` y `lima`. **No se guarda en los ajustes persistidos**: toca la zona de persistencia protegida.
+`localStorage`: `ogs-base` (`sistema`, `atlas`, `grafito`, `claro`, `blanco`, `original`) y `ogs-accent` (`lima`, `azul`, `violeta`, `rosa`, `agua`, `aurora`). Se aplican como `data-base` y `data-accent` en `<html>`, con una lectura de una línea antes del primer pintado (`sistema` se resuelve con `matchMedia('(prefers-color-scheme: light)')` a `claro` o `atlas`). Sin atributo valen `atlas` y `lima`. **No se guarda en los ajustes persistidos**: toca la zona de persistencia protegida.
 
 ## 5. Migración
 
