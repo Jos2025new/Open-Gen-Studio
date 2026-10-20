@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowRight, Check, ChevronDown, Lock, LockOpen } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { selectDraft, unlockDraft } from '../../engine/agent/draftActions';
-import { IMAGE_COUNTS, sectionsOf, choiceEstimate, defaultChoice, settingsOptions } from '../../engine/agent/settingsCard';
+import { IMAGE_COUNTS, sectionsOf, choiceEstimate, settingsOptions } from '../../engine/agent/settingsCard';
 import { aspectLabel, durationChoices } from '../../engine/params';
 import type { SettingsChoice, SettingsFeedItem, SettingsSection } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
@@ -13,8 +13,9 @@ import { ensureSchema } from '../../engine/catalog';
 import { variantRoute } from '../../engine/variants';
 import { EditAnswerButton } from './EditAnswerButton';
 import { AspectPicker, AspectShape } from './aspectShape';
-import { CardIcon, CountIcon, DurationIcon, ModelIcon, ResolutionIcon } from './cardIcons';
+import { CardIcon, CountIcon, DurationIcon, ResolutionIcon } from './cardIcons';
 import { ChipPop } from './ChipPop';
+import { ModelField } from './ModelField';
 import { ClampedText } from './ClampedText';
 
 /**
@@ -113,22 +114,12 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   // The draft choice (selectDraft) changes the stored selection from outside: follow it.
   useEffect(() => { if (item.chosen && item.chosen.resolution !== choice.resolution) setChoice(item.chosen); }, [item.chosen?.resolution]); // eslint-disable-line react-hooks/exhaustive-deps
   const [aspectOpen, setAspectOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(choice.modelRef !== item.recommended.modelRef);
-  const name = (ref: string) => models[ref]?.name ?? ref.split('::')[1] ?? ref;
-  const provider = (ref: string) => ref.split('::')[0];
-  // Indicative: one clip or image with the values above. The exact cost comes on the plan card, once the prompts exist.
-  const price = (c: SettingsChoice) => {
-    const e = choiceEstimate(c, item.kind, 1);
-    return e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
-  };
 
   const locked = item.kind === 'video' && Boolean(draft?.locked);
   const update = (next: SettingsChoice) => {
     setChoice(next);
     selectSettings(sessionId, itemId, index, next);
   };
-  // Another model keeps the values the user picked when it has them, else its own medium ones.
-  const pickModel = (ref: string) => update({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage });
   const opts = settingsOptions(schemas[choice.modelRef], item.kind);
   // A locked draft keeps the lowest resolution of whichever model is picked (the schema may arrive late).
   const lockedRes = locked ? lowestResolution(opts.resolutions) : undefined;
@@ -140,20 +131,6 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   const px = opts.px;
   const pxNow = px && choice.aspect ? px.of(choice.aspect) : undefined;
   const allSecs = item.kind === 'video' ? durationChoices(schemas[choice.modelRef]).filter((d) => d > 0) : [];
-
-  // Other models in order of price with the values above, cheapest first (unknown prices last).
-  const usdOf = (ref: string) => choiceEstimate({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage }, item.kind, 1).usd ?? Infinity;
-  const modelRow = (ref: string, tag?: string) => {
-    const on = choice.modelRef === ref;
-    return (
-      <button key={ref} type="button" className={`q-opt set-model ${on ? 'is-on' : ''}`} aria-pressed={on} onClick={() => pickModel(ref)}>
-        {on ? <Check size={12} /> : null}
-        <span className="set-model-name">{name(ref)}</span>
-        <span className="faint">{provider(ref)}{tag ? ` · ${tag}` : ''}</span>
-        <span className="set-model-price num">{price({ ...defaultChoice(ref, schemas[ref], { kind: item.kind, startImage: item.recommended.needsImage, duration: choice.duration, aspect: choice.aspect }, choice), needsImage: item.recommended.needsImage })}</span>
-      </button>
-    );
-  };
 
   const chips = <T extends string | number>(values: T[], current: T | undefined, label: (v: T) => string, set: (v: T) => void, icon?: (v: T) => ReactNode) =>
     values.map((v) => {
@@ -178,17 +155,16 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   return (
     <>
     <div className="cc-chips">
-      <ChipPop icon={<ModelIcon />} label={name(choice.modelRef)} tip="Model" width={480}>
-        <div className="set-models">
-          {modelRow(first, [item.recommended.needsImage && models[first] && ['edit', 'image', 'reference'].includes(variantRoute(models[first])) ? variantRoute(models[first]) : '', 'recommended'].filter(Boolean).join(' · '))}
-          {item.alternatives.length ? (
-            <button type="button" className="set-more" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
-              {moreOpen ? 'Hide other models' : `Show ${item.alternatives.length} other model${item.alternatives.length === 1 ? '' : 's'}`} <ChevronDown size={13} className={moreOpen ? 'is-flipped' : ''} />
-            </button>
-          ) : null}
-          {moreOpen ? [...item.alternatives].sort((a, b) => usdOf(a) - usdOf(b)).map((ref) => modelRow(ref)) : null}
-        </div>
-      </ChipPop>
+      <ModelField
+        kind={item.kind}
+        base={choice}
+        startImage={item.recommended.needsImage}
+        current={choice.modelRef}
+        leading={[{ ref: first, tag: [item.recommended.needsImage && models[first] && ['edit', 'image', 'reference'].includes(variantRoute(models[first])) ? variantRoute(models[first]) : '', 'recommended'].filter(Boolean).join(' · ') }]}
+        alternatives={item.alternatives}
+        initiallyOpen={choice.modelRef !== item.recommended.modelRef}
+        onPick={update}
+      />
 
       {opts.aspects.length || px ? (
         <button type="button" className={`cc-chip${aspectOpen ? ' is-open' : ''}`} aria-expanded={aspectOpen} aria-label="Aspect ratio" data-tip={aspectOpen ? undefined : 'Aspect ratio'} onClick={() => setAspectOpen((o) => !o)}>
@@ -302,13 +278,11 @@ function SwitchModelCard({ item, sessionId, name }: { item: SettingsFeedItem; se
 
 /** The request after a switch: a tiny card; each option is a checkbox (grey and empty, green and checked once picked); one click answers. */
 function FollowUpCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
-  const schemas = useStore((s) => s.catalog.schemas);
   const [picked, setPicked] = useState<string>();
   const section = sectionsOf(item)[0];
   const switched = section.recommended;
   const kept = item.switchFrom!;
   const answer = (c: SettingsChoice) => { setPicked(c.modelRef); void confirmSettings(sessionId, item.id, [c]); };
-  const other = (ref: string) => answer({ ...defaultChoice(ref, schemas[ref], { kind: section.kind, startImage: switched.needsImage, duration: switched.duration, aspect: switched.aspect, count: switched.count }, switched), needsImage: switched.needsImage });
   const row = (ref: string, label: string, onClick: () => void) => (
     <button key={ref} type="button" role="checkbox" aria-checked={picked === ref} className={`cc-pick ${picked === ref ? 'is-on' : ''}`} onClick={onClick}>
       <span className="cc-box" aria-hidden>{picked === ref ? <Check size={12} strokeWidth={3} /> : null}</span>
@@ -323,20 +297,18 @@ function FollowUpCard({ item, sessionId, name }: { item: SettingsFeedItem; sessi
         {row(switched.modelRef, 'Continue', () => answer(switched))}
         {row(kept.modelRef, 'Back', () => answer({ ...kept, needsImage: switched.needsImage }))}
       </div>
-      {section.alternatives.length ? (
-        <div className="cc-chips">
-          <ChipPop icon={<ModelIcon />} label="Another model" tip="Another model" width={360}>
-            <div className="set-models">
-              {section.alternatives.map((ref) => (
-                <button key={ref} type="button" className="q-opt set-model" onClick={() => other(ref)}>
-                  <span className="set-model-name">{name(ref)}</span>
-                  <span className="faint">{ref.split('::')[0]}</span>
-                </button>
-              ))}
-            </div>
-          </ChipPop>
-        </div>
-      ) : null}
+      <div className="cc-chips">
+        <ModelField
+          kind={section.kind}
+          base={switched}
+          startImage={switched.needsImage}
+          current={picked}
+          placeholder="Another model"
+          leading={[{ ref: switched.modelRef, tag: 'switched' }, { ref: kept.modelRef, tag: 'confirmed' }]}
+          alternatives={section.alternatives}
+          onPick={(c) => answer(c.modelRef === kept.modelRef ? { ...kept, needsImage: switched.needsImage } : c.modelRef === switched.modelRef ? switched : c)}
+        />
+      </div>
     </article>
   );
 }

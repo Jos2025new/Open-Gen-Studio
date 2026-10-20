@@ -64,8 +64,8 @@ describe('the follow-up card after a switch', () => {
     expect(host.querySelectorAll('.cc-pick.is-on')).toHaveLength(0);
     expect(host.querySelector('button.btn-primary')).toBeNull();
     // The same capsule the confirm_settings card uses for its model (ChipPop: cc-chip), not a plain-text fold.
-    const chip = host.querySelector('button.cc-chip[aria-label="Another model"]');
-    expect(chip).not.toBeNull();
+    const chip = host.querySelector('button.cc-chip[aria-label="Model"]');
+    expect(chip?.textContent).toBe('Another model');
     expect(host.textContent).not.toContain('Nano Banana 2');
   });
 
@@ -79,8 +79,29 @@ describe('the follow-up card after a switch', () => {
     expect(on?.getAttribute('aria-checked')).toBe('true');
     expect(on?.querySelector('.cc-box svg')).not.toBeNull();
     expect(on?.textContent).toContain('Back');
-    await act(async () => { (host.querySelector('button.cc-chip[aria-label="Another model"]') as HTMLElement).click(); });
-    expect(document.body.querySelector('.cc-pop .set-models button.set-model')?.textContent).toContain('Nano Banana 2');
+    await act(async () => { (host.querySelector('button.cc-chip[aria-label="Model"]') as HTMLElement).click(); });
+    spy.mockRestore();
+  });
+
+  it('the "Another model" popover is the confirm_settings model field: rows with provider tag and price, highlighted chosen row, fold toggle', async () => {
+    const spy = vi.spyOn(runtime, 'confirmSettings').mockResolvedValue(undefined);
+    await show();
+    await act(async () => { (host.querySelector('button.cc-chip[aria-label="Model"]') as HTMLElement).click(); });
+    const pop = document.body.querySelector('.cc-pop .set-models')!;
+    const rows = [...pop.querySelectorAll('button.set-model')];
+    expect(rows.map((r) => r.querySelector('.set-model-name')?.textContent)).toEqual(['Grok Imagine Image', 'FLUX 3 Image Klein']);
+    expect(rows.map((r) => r.querySelector('.faint')?.textContent)).toEqual(['atlas · switched', 'atlas · confirmed']);
+    expect(rows.every((r) => /^(from \$|price unknown)/.test(r.querySelector('.set-model-price')?.textContent ?? ''))).toBe(true);
+    const toggle = pop.querySelector('button.set-more')!;
+    expect(toggle.textContent).toContain('Show 1 other model');
+    expect(pop.textContent).not.toContain('Nano Banana 2');
+    await act(async () => { (toggle as HTMLElement).click(); });
+    expect(pop.textContent).toContain('Hide other models');
+    const last = [...pop.querySelectorAll('button.set-model')].at(-1)!;
+    expect(last.querySelector('.set-model-name')?.textContent).toBe('Nano Banana 2');
+    expect(last.querySelector('.set-model-price')?.textContent).toBeTruthy();
+    await act(async () => { (last as HTMLElement).click(); });
+    expect(spy.mock.calls[0][2][0]).toMatchObject({ modelRef: OTHER });
     spy.mockRestore();
   });
 });
