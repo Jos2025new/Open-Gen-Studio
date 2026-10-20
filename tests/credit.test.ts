@@ -47,7 +47,7 @@ describe('no credit at the provider', () => {
   });
 
   it('never switches by itself to a dearer model: it offers the choices above the prompt box', async () => {
-    setup(0.2, 5);
+    setup(0.14, 5);
     const rerun = vi.fn(async () => []);
     expect(await onGenerationCredit('g1', rerun)).toBe(false);
     expect(rerun).not.toHaveBeenCalled();
@@ -62,5 +62,54 @@ describe('no credit at the provider', () => {
     expect(await onGenerationCredit('g1', async () => [])).toBe(false);
     expect(useAlerts.getState().alerts[0]).toMatchObject({ level: 'error' });
     expect(useAlerts.getState().alerts[0].text).toMatch(/Recharge NanoGPT/);
+  });
+});
+
+describe('the equivalent model when a provider has no credit', () => {
+  const img = (provider: 'nanogpt' | 'atlas', id: string, usd: number, acceptsImage: boolean): ModelSummary =>
+    ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'image', acceptsText: true, acceptsImage, tags: [], price: { skus: [{ unit: 'image', usd }] } }) as unknown as ModelSummary;
+
+  const run = async (models: ModelSummary[], failing: ModelSummary) => {
+    const st = useStore.getState();
+    useStore.setState({
+      settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
+      catalog: { ...st.catalog, models: Object.fromEntries(models.map((x) => [x.ref, x])) },
+      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, status: 'error', inputs: { refs: [] }, settings: { count: 1 }, assetIds: [] } as never },
+    });
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(0);
+    vi.spyOn(ADAPTERS.nanogpt, 'balance').mockResolvedValue(5);
+    useAlerts.setState({ alerts: [] });
+    forgetBalances();
+    const rerun = vi.fn(async () => []);
+    return { rerun, switched: await onGenerationCredit('g1', rerun) };
+  };
+
+  it('a text-only model switches to the image-capable copy of the same line, which can run the text job', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/text-to-image', 0.07, false);
+    const nano = img('nanogpt', 'nano-banana-2', 0.06, true);
+    const pro = img('nanogpt', 'nano-banana-pro', 0.14, true);
+    const { switched, rerun } = await run([atlas, nano, pro], atlas);
+    expect(switched).toBe(true);
+    expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2');
+    expect(rerun).toHaveBeenCalledWith('g1');
+  });
+
+  it('never switches an image job to a model that takes no image', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/edit', 0.07, true);
+    const nano = img('nanogpt', 'nano-banana-2', 0.06, false);
+    const { switched } = await run([atlas, nano], atlas);
+    expect(switched).toBe(false);
+    expect(useAlerts.getState().alerts[0].level).toBe('error');
+  });
+
+  it('does not offer a family member far dearer than the failed model; a slightly dearer one is marked', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/text-to-image', 0.1, false);
+    const pro = img('nanogpt', 'nano-banana-pro', 0.25, true);
+    const lite = img('nanogpt', 'nano-banana-2-lite', 0.13, true);
+    const { switched } = await run([atlas, pro, lite], atlas);
+    expect(switched).toBe(false);
+    const labels = (useAlerts.getState().alerts[0].actions ?? []).map((a) => a.label);
+    expect(labels).toHaveLength(1);
+    expect(labels[0]).toMatch(/nano-banana-2-lite.*pricier/);
   });
 });

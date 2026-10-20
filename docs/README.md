@@ -73,6 +73,7 @@
 - [0022 — Guardado local-first sin bloqueo: una pestaña activa, guarda por contenido y avisos persistentes (aceptado 2026-10-18; fase 1 en `task/save-guard`)](decisions/0022-guardado-local-first-sin-bloqueo.md).
 - [0023 — Spaces separados de los Workspaces (etapa 1)](decisions/0023-spaces-separados-etapa-1.md).
 - [0024 — Identidad visual: sistema de tarjetas, bases y resaltado (aceptado 2026-10-20; pasos 1 y 2 en `task/workflow-ask-first`)](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md).
+- [0025 — Revisión de la sesión «house party»: número confirmado, revisiones del plan, crédito, cambio de modelo o proveedor y aspecto por entregable (aceptado 2026-10-20)](decisions/0025-revision-sesion-house-party.md).
 
 ## Propuestas de interfaz
 

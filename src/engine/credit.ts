@@ -60,6 +60,20 @@ export interface CreditOption {
   model: ModelSummary;
   /** Same model as the one that failed, at the same price or less. */
   same: boolean;
+  /** Price over the failed model's (same unit), when known: above 1 the option is dearer and says so. */
+  ratio?: number;
+}
+
+/** Dearer than this (same unit) is not offered: it is another product, not a way out of a missing credit. */
+export const CREDIT_PRICE_LIMIT = 1.5;
+
+/**
+ * A candidate runs the job when it takes at least the inputs the failed model needs: an image-capable model can do
+ * a text-only job (one model, text and image routes), a text-only model cannot do a job that needs an image.
+ */
+export function takesInputsOf(cur: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>, m: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>): boolean {
+  if (cur.acceptsImage && !m.acceptsImage) return false;
+  return !(cur.acceptsText !== false && m.acceptsText === false);
 }
 
 /**
@@ -72,7 +86,7 @@ export async function creditOptions(ref: string): Promise<CreditOption[]> {
   const key = lineKey(cur);
   const family = modelFamily(cur).key;
   const price = priceOf(cur);
-  const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && Boolean(m.acceptsImage) === Boolean(cur.acceptsImage));
+  const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m));
   const out: CreditOption[] = [];
   const providers = [...new Set(all.map((m) => m.provider))];
   const balances = new Map(await Promise.all(providers.map(async (p) => [p, await providerBalance(p)] as const)));
@@ -82,16 +96,18 @@ export async function creditOptions(ref: string): Promise<CreditOption[]> {
     const sameVariant = lineKey(m) === key;
     if (!sameVariant && modelFamily(m).key !== family) continue;
     const p = priceOf(m);
-    const cheaper = Boolean(price && p && p.unit === price.unit && p.usd <= price.usd);
-    out.push({ model: m, same: sameVariant && cheaper });
+    const comparable = price && p && p.unit === price.unit && price.usd > 0;
+    const ratio = comparable ? p.usd / price.usd : undefined;
+    if (ratio !== undefined && ratio > CREDIT_PRICE_LIMIT) continue;
+    out.push({ model: m, same: sameVariant && Boolean(price && p && p.unit === price.unit && p.usd <= price.usd), ratio });
   }
   const cost = (o: CreditOption) => priceOf(o.model)?.usd ?? Infinity;
   return out.sort((a, b) => Number(b.same) - Number(a.same) || Number(lineKey(b.model) === key) - Number(lineKey(a.model) === key) || cost(a) - cost(b)).slice(0, 4);
 }
 
-const label = (m: ModelSummary) => {
+const label = (m: ModelSummary, ratio?: number) => {
   const p = priceOf(m);
-  return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p ? ` · ${formatUsd(p.usd)}` : ''}`;
+  return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p ? ` · ${formatUsd(p.usd)}` : ''}${ratio !== undefined && ratio > 1 ? ' · pricier' : ''}`;
 };
 
 /**
@@ -118,8 +134,8 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (options.length) {
     const id = pushAlert({
       level: 'warn',
-      text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
+      text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
     });
     return false;
   }
