@@ -97,7 +97,7 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
   });
 
   it('an acceptance is short, starts accepting and has no refusal', () => {
-    for (const ok of ['sí', 'Si, cámbialo', 'dale', 'vale', 'ok', 'yes', 'sure', 'go ahead', 'do it', 'hazlo']) expect(isAcceptance(ok), ok).toBe(true);
-    for (const no of ['no', 'no, sigue así', 'sí pero no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', '']) expect(isAcceptance(no), no).toBe(false);
+    for (const ok of ['sí', 'Si, cámbialo', 'dale', 'vale', 'ok', 'yes', 'sure', 'go ahead', 'do it', 'hazlo', 'sí, mejor cámbialo', 'venga', 'listo, cámbialo']) expect(isAcceptance(ok), ok).toBe(true);
+    for (const no of ['no', 'no, sigue así', 'sí pero no', 'mejor no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', '']) expect(isAcceptance(no), no).toBe(false);
   });
 });

@@ -97,8 +97,8 @@ export async function followUpProblem(ctx: PlanContext, confirmedRef: string, ki
   return `The user switched ${kind} to ${tag(sw.model)} (${to.modelRef}) last time and has not said whether to continue with it; call confirm_settings for ${kind} with model ${to.modelRef} first (the app asks: continue with ${tag(sw.model)} or go back to ${tag(conf.model)}).`;
 }
 
-const ACCEPT = new Set(['si', 'vale', 'ok', 'okay', 'dale', 'claro', 'hazlo', 'cambialo', 'cambia', 'cambiar', 'adelante', 'perfecto', 'yes', 'yeah', 'yep', 'sure', 'go', 'do', 'please']);
-const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco', 'mejor']);
+const ACCEPT = new Set(['si', 'vale', 'ok', 'okay', 'dale', 'claro', 'hazlo', 'cambialo', 'cambia', 'cambiar', 'adelante', 'perfecto', 'venga', 'listo', 'bueno', 'yes', 'yeah', 'yep', 'sure', 'go', 'do', 'please']);
+const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco']);
 
 /**
  * Whether a message is a plain acceptance of what the agent just offered ("sí, cámbialo", "dale", "go ahead"): short
