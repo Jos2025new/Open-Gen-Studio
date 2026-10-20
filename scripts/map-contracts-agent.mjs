@@ -19,6 +19,8 @@ export default [
       ['src/engine/agent/runtime.ts', 'switchSection('],
       ['src/engine/agent/switchModel.ts', 'export function confirmedState'],
       ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],
+      ['src/components/chat/SettingsCard.tsx', 'function FollowUpCard'],
+      ['src/engine/modelNamed.ts', 'export async function followUpProblem'],
     ],
     tests: ['tests/confirmed-named-model.test.ts', 'tests/switch-model-card.test.ts', 'tests/switch-model-card-ui.test.ts'],
   },
