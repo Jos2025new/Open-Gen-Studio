@@ -22,25 +22,34 @@ function Thinking({ entry, live }: { entry: Extract<ActivityEntry, { kind: 'thin
         <span>{live ? 'Thinking…' : entry.ms != null ? `Thought for ${seconds(entry.ms)}` : 'Thought it through'}</span>
         {text ? open ? <ChevronDown size={12} /> : <ChevronRight size={12} /> : null}
       </button>
-      {text ? <p className={`act-thought ${open ? 'is-open' : ''}`}>{preview}</p> : null}
+      {/* Finished reasoning stays behind its line until opened; while it thinks, the newest lines show. */}
+      {text && (open || live) ? <p className={`act-thought ${open ? 'is-open' : ''}`}>{preview}</p> : null}
     </li>
   );
 }
 
-/** One agent turn: how long it worked, its reasoning (when streamed) and what it did (L3). */
+/** What a finished turn did, in one line: its action labels, thinking left out (ADR 0024 M). */
+function summary(entries: ActivityEntry[]): string {
+  const labels = [...new Set(entries.flatMap((e) => (e.kind === 'thinking' ? [] : [e.label])))];
+  return labels.length > 3 ? `${labels.slice(0, 3).join(', ')} +${labels.length - 3}` : labels.join(', ');
+}
+
+/** One agent turn: how long it worked, its reasoning (when streamed) and what it did (L3). Open while it runs, folded to one line once it ends. */
 export function ActivityBlock({ item, sessionId }: { item: ActivityFeedItem; sessionId: string }) {
   const busy = useStore((s) => s.sessions[sessionId]?.agent.busy ?? false);
   const phase = useStore((s) => s.sessions[sessionId]?.agent.phase ?? 'working');
   const waiting = useStore((s) => s.sessions[sessionId]?.agent.waiting ?? NO_WAITS);
   const running = !item.endedAt && busy;
   const now = useNow(1000, running);
-  const [open, setOpen] = useState(true);
+  const [userOpen, setOpen] = useState<boolean | null>(null);
+  const open = userOpen ?? running;
   const elapsed = (item.endedAt ?? now) - item.startedAt;
   return (
     <section className={`activity ${running ? 'is-running' : ''}`} aria-live="polite">
-      <button type="button" className="act-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      <button type="button" className="act-head" onClick={() => setOpen(!open)} aria-expanded={open}>
         {running ? <LoaderCircle size={13} className="spin" /> : !item.entries.length ? <Clock size={13} /> : open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
         <span>{running ? `${PHASE[phase]}… ${seconds(elapsed)}` : item.endedAt ? `Worked for ${seconds(elapsed)}` : 'Worked'}</span>
+        {!open && !running && summary(item.entries) ? <span className="act-sum">{summary(item.entries)}</span> : null}
       </button>
       {open && (item.entries.length || (running && waiting.length)) ? (
         <ol className="act-list">

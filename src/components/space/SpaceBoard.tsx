@@ -110,9 +110,10 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
     </Popover>
 
     <div className={`space-done ${doneOpen ? '' : 'is-folded'}`} aria-label="Done">
-      <button type="button" className="space-sub space-fold" aria-expanded={doneOpen} onClick={() => setUserDone(!doneOpen)}>
+      {/* Studio with nothing done or running: just the one empty line (ADR 0024 M). */}
+      {studio && !rows.done.length && !rows.ongoing.length ? null : <button type="button" className="space-sub space-fold" aria-expanded={doneOpen} onClick={() => setUserDone(!doneOpen)}>
         <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
-      </button>
+      </button>}
       {!doneOpen ? null : rows.done.length ? <div className={layout === 'list' ? 'space-list' : `space-grid is-${density}`}>
         {rows.done.map((c) => c.type === 'text' ? <TextTile key={c.generationId} g={generations[c.generationId]} /> : <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
@@ -131,7 +132,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
       {rows.failed.length ? <div className="space-failed-row">{rows.failed.map((g) => <div key={g.id} className="space-fail" title={g.error}><CircleAlert size={14} /><span className="space-run-title">{generationTitle(g)}</span><span className="faint">{STATUS_LABEL[g.status]}</span></div>)}</div> : <p className="space-empty">Nothing failed.</p>}
     </div> : null}
 
-    <div className="space-lower">
+    {studio && !rows.ongoing.length ? null : <div className="space-lower">
       <div className="space-ongoing" aria-label="Ongoing">
         <div className="space-sub">Ongoing</div>
         {rows.ongoing.length ? rows.ongoing.map((g) => studio ? <OngoingTiles key={g.id} g={g} density={density} layout={layout} selecting={selecting} selected={selected} setSelected={setSelected} /> : <OngoingRow key={g.id} g={g} />) : <p className="space-empty">Nothing running.</p>}
@@ -144,7 +145,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
         </div> : <p className="space-empty">No {kind_ === 'model3d' ? '3D model' : kind_} yet: generate one to see its actions.</p>}
         {hint ? <p className="space-empty space-hint-note" role="status">Pick {nounOf(kind_)} from your generations first (use Select), then press → to use it here.</p> : null}
       </div>}
-    </div>
+    </div>}
   </section>;
 }
 

@@ -12,7 +12,7 @@ svg { flex-shrink: 0; }
 .topbar .topbar-slot { flex: 0 0 auto; }
 .icon-btn-sm { width: 27px; height: 27px; }
 .icon-btn-lg { width: 38px; height: 38px; }
-.icon-btn.is-active, .chip.is-active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); }
+.icon-btn.is-active, .chip.is-active { background: var(--active-bg); color: var(--active-text); box-shadow: inset 0 0 0 1px var(--active-line); }
 .btn { padding: 8px 12px; font-weight: 550; border: 1px solid transparent; }
 .btn-sm { padding: 5px 9px; font-size: 12px; }
 .btn-secondary { background: var(--surface-2); border-color: var(--border-strong); }
@@ -29,7 +29,7 @@ svg { flex-shrink: 0; }
 .pop-title { font-weight: 600; font-size: 13px; }
 .pop-sub, .menu-detail, .field-hint { color: var(--text-2); font-size: 11px; margin-top: 3px; line-height: 1.5; }
 .menu-item { display: flex; align-items: center; text-align: left; width: 100%; padding: 9px; gap: 9px; border-radius: var(--radius-s); }
-.menu-item.is-active, .option.is-active, .pick-row.is-active { background: var(--accent-soft); color: var(--accent); }
+.menu-item.is-active, .option.is-active, .pick-row.is-active { background: var(--active-bg); color: var(--active-text); }
 .menu-text, .pick-text { display: flex; flex: 1; min-width: 0; flex-direction: column; }
 .menu-icon, .menu-right { color: var(--text-2); flex-shrink: 0; }
 .menu-sep { border-top: 1px solid var(--border); margin: 5px 0; }
@@ -109,7 +109,7 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 
 /* Import from Chat / Nodes in the top bar: boxed like the secondary buttons beside it, so it reads as an action. */
 .import-chat-btn { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; }
-.import-chat-btn:hover { border-color: var(--accent-line); color: var(--accent); }
+.import-chat-btn:hover { border-color: var(--border-strong); color: var(--text); }
 
 /* A parameter reads as one control: quiet label, clear value, then its adjustment. */
 .field:has(> input[type=range]), .op-field:has(> input[type=range]) {
@@ -120,7 +120,7 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
   min-height: var(--control-h); background-color: var(--surface-2); color: var(--text); border-color: var(--border);
 }
 .field:has(> select) > .field-label, .op-field:has(> select) > .field-label { padding-left: 2px; }
-.menu-item[aria-selected=true], .menu-item.is-active { box-shadow: inset 2px 0 var(--accent); }
+.menu-item[aria-selected=true], .menu-item.is-active { box-shadow: inset 2px 0 var(--active-line); }
 .opt-unit { font-size: var(--fs-xs); opacity: .8; }
 .opt-pick .opt-value { font-weight: 550; }
 /* Performance trace chip (ADR 0012): visible while a session records. */

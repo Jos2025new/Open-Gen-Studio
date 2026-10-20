@@ -37,4 +37,31 @@ describe('ActivityBlock renders', () => {
     errors.mockRestore();
     await act(async () => { root.unmount(); });
   });
+
+  it('a finished turn folds to one line with what it did; its reasoning shows only when opened (ADR 0024 M)', async () => {
+    const sessionId = Object.keys(useStore.getState().sessions)[0];
+    const s = useStore.getState().sessions[sessionId];
+    useStore.setState({ sessions: { ...useStore.getState().sessions, [sessionId]: { ...s, agent: { ...s.agent, busy: false, waiting: [] } } } });
+    const item = { id: 'a2', type: 'activity', startedAt: Date.now() - 7000, endedAt: Date.now(), entries: [
+      { kind: 'thinking', text: 'Long private reasoning text', ms: 2000 },
+      { kind: 'action', icon: 'questions', label: 'Asked 1 question' },
+    ] } as unknown as ActivityFeedItem;
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(createElement(ActivityBlock, { item, sessionId })); });
+    const head = host.querySelector<HTMLButtonElement>('.act-head')!;
+    expect(head.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('.act-sum')?.textContent).toBe('Asked 1 question');
+    expect(host.querySelector('.act-list')).toBeNull();
+    expect(host.textContent).not.toContain('Long private reasoning');
+    await act(async () => { head.click(); });
+    expect(head.getAttribute('aria-expanded')).toBe('true');
+    expect(host.querySelector('.act-sum')).toBeNull();
+    expect(host.textContent).toContain('Thought for');
+    expect(host.textContent).not.toContain('Long private reasoning');
+    await act(async () => { host.querySelector<HTMLButtonElement>('.act-thinking .act-line')!.click(); });
+    expect(host.textContent).toContain('Long private reasoning');
+    await act(async () => { root.unmount(); });
+  });
 });

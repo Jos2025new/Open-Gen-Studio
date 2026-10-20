@@ -11,19 +11,19 @@
 .composer-bar .segmented .is-active { background: var(--surface-3); }
 .composer-end { gap: 12px; max-width: 100%; flex-wrap: wrap; }
 .composer-end .models-chip { height: 34px; background: transparent; padding: 0 8px; color: var(--text-2); }
-.composer-end .models-chip.is-active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); box-shadow: none; }
-.composer-end .models-chip:not(:disabled):hover, .composer-end .models-chip:focus-visible { color: var(--accent); border-color: var(--accent-line); }
+.composer-end .models-chip.is-active { background: var(--active-bg); color: var(--active-text); border-color: var(--active-line); box-shadow: none; }
+.composer-end .models-chip:not(:disabled):hover, .composer-end .models-chip:focus-visible { color: var(--text); border-color: var(--border-strong); }
 .composer-bar .send-btn.is-agent, .composer-bar .send-btn.is-stop { width: 36px; height: 36px; min-width: 36px; border-radius: 50%; padding: 0; }
 .composer-bar .send-btn.is-agent svg { width: 19px; height: 19px; }
 .composer-bar .send-btn:disabled { background: var(--surface-3); color: var(--text-3); opacity: 1; }
 .composer-options-trigger { width: 36px; height: 36px; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-3); border-radius: 50%; color: var(--text-2); }
-.composer-options-trigger:hover, .composer-options-trigger.is-open { background: var(--accent-soft); color: var(--accent); }
+.composer-options-trigger:hover, .composer-options-trigger.is-open { background: var(--active-bg); color: var(--active-text); }
 .composer-options { padding: 7px; border-radius: 16px; }
 .composer-options-file, .composer-options .chip { width: 100%; min-height: 42px; height: auto; display: flex; justify-content: flex-start; gap: 12px; border: 0; background: transparent; border-radius: var(--radius); color: var(--text); font-size: 13px; padding: 8px 12px; }
 .composer-options-file span { text-align: left; }
 .composer-options-file svg, .composer-options .chip svg { flex-shrink: 0; color: var(--text-2); }
 .composer-options-file:hover:not(:disabled), .composer-options .chip:hover { background: var(--surface-hover); }
-.composer-options .chip.is-active { background: var(--accent-soft); color: var(--accent); }
+.composer-options .chip.is-active { background: var(--active-bg); color: var(--active-text); }
 .composer-options-separator { border-top: 1px solid var(--border); margin: 7px 9px; }
 .composer-attachments { display: flex; gap: 12px; padding: 2px 2px 15px; max-width: 100%; overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .composer-attachments .attach-thumb { width: 108px; height: 92px; flex-shrink: 0; border-radius: 13px; overflow: hidden; background: var(--surface-3); }
@@ -75,7 +75,7 @@
   .chat-welcome { width: calc(100% - 28px); }
 }
 
-.composer-options-group { padding: 6px 12px 2px; font-size: 11px; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.composer-options-group { padding: 6px 12px 2px; font-size: 11px; color: var(--text-3); }
 .composer-options-file .menu-right { margin-left: auto; }
 .composer-options-file.is-open { background: var(--surface-hover); }
-.composer-options-file.is-active { background: var(--accent-soft); color: var(--accent); }
+.composer-options-file.is-active { background: var(--active-bg); color: var(--active-text); }

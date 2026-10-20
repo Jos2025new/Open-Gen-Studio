@@ -50,6 +50,14 @@ Entre el 2026-10-19 y el 2026-10-20 el usuario fue probando en el sandbox las ta
 
 **K. Ajustes del marco tras probar** (`a705c97`, `9e7b47b`, `c98c2c7`): la barra superior es transparente y pierde la línea divisoria; los popovers usan el mismo borde que la caja del prompt (`--border`), que el usuario prefirió a reforzar el de la caja.
 
+**M. Marco tranquilo** (2026-10-20). Tras probar los pasos 1 y 2, el usuario sentía la app «ruidosa con todo abierto» frente a Higgsfield, Flora y Gemini, con colores menos puntualizados. Se diagnosticaron cinco causas: el lima en unos diez sitios a la vez (235 usos del acento en el CSS, `--accent-soft` como fondo de casi todo lo activo); demasiadas cajas con borde; el razonamiento desplegado; letra pequeña, muchos grises y etiquetas en mayúsculas; estados vacíos repetidos. El usuario aprobó las cinco correcciones y pidió aplicarlas directamente, sin maqueta, en esta rama («si no me gusta revertimos»):
+1. Acento solo para el primario o enviar, la marca, la selección en tarjetas y lo que está en curso; lo activo es neutro (`--active-*`).
+2. Barra lateral, panel derecho y burbuja sin contorno (`--frame-border`); tarjetas resueltas como una línea.
+3. Un turno del agente terminado se pliega a «Worked for Xs · lo que hizo»; el razonamiento solo se ve al abrirlo.
+4. Conversación a 15 px (`--fs-chat`); títulos de sección y de tarjeta sin mayúsculas.
+5. En Studio, el panel vacío muestra una sola línea; «Ongoing» solo aparece si algo corre.
+Original conserva el lima en lo activo y los contornos (redefine los tokens). Fuera de alcance por ahora: Designer y nodos, que aún usan el acento en sus estados activos.
+
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
 ## Alternativas

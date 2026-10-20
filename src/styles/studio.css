@@ -4,7 +4,7 @@
 .workspace.ws-chat.has-studio-board:has(.chat-empty) .composer-dock { left: auto; width: min(800px, calc(100% - 48px)); }
 .workspace.ws-chat.has-studio-board > .chat { height: 100%; }
 .workspace.is-home > .studio-board, .workspace.is-space > .studio-board { visibility: hidden; }
-.studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--border); background: var(--surface); }
+.studio-board { position: absolute; top: 0; right: 0; bottom: 0; z-index: 13; display: flex; min-width: 0; border-left: 1px solid var(--frame-border); background: var(--surface); }
 .studio-board > .space-board { flex: 1; min-width: 0; }
 .studio-divider { position: absolute; top: 0; bottom: 0; left: calc(var(--sp-1) * -1); width: var(--sp-2); cursor: col-resize; z-index: 1; touch-action: none; }
 .studio-divider::after { content: ''; position: absolute; inset: 0 calc(50% - 1px); transition: background .12s; }
@@ -44,7 +44,7 @@
 .studio-views { display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--border); }
 .studio-view { height: 28px; padding: 0 var(--sp-3); border-radius: var(--r-s); color: var(--text-3); font-size: var(--fs-s); font-weight: 500; }
 .studio-view:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
-.studio-view.is-active { background: var(--accent-soft); color: var(--accent); }
+.studio-view.is-active { background: var(--active-bg); color: var(--active-text); }
 .studio-view:disabled { opacity: .45; cursor: default; }
 .studio-views-end { margin-left: auto; }
 .node-canvas.is-embedded { position: relative; }
@@ -65,7 +65,7 @@
 .studio-layers { list-style: none; margin: 0; padding: 0; max-height: 40vh; overflow: auto; }
 p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 .studio-layer { display: flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-2); border-bottom: 1px solid var(--border); }
-.studio-layer.is-active { background: var(--accent-soft); }
+.studio-layer.is-active { background: var(--active-bg); }
 .studio-layer.is-hidden .studio-layer-name { opacity: .5; }
 .studio-layer-name { flex: 1; min-width: 0; text-align: left; padding: var(--sp-1) 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-board-main > .studio-designer { flex: 1; min-height: 0; }

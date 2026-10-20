@@ -27,7 +27,7 @@
 .space-divider:focus-visible { outline: none; }
 
 .space-board { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.space-board-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); }
+.space-board-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--frame-border); }
 .space-board-tools { display: flex; align-items: center; gap: var(--sp-1); }
 .space-board-title { margin: 0 var(--sp-2); }
 .space-done { flex: 1; min-height: 0; overflow-y: auto; padding: var(--sp-4); }

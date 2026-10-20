@@ -89,6 +89,15 @@
   --pop-pad: 14px;
   --pop-shadow: var(--shadow-pop);
 
+  /* Calm frame (ADR 0024 M): the accent is for the primary action, the brand and selection inside cards.
+     Active navigation, tabs, chips and menus are neutral; frames (sidebar, side panel) have no outline. */
+  --active-bg: var(--surface-3);
+  --active-text: var(--text);
+  --active-line: transparent;
+  --frame-border: transparent;
+  /* Conversation text: agent replies and the user's bubble. */
+  --fs-chat: 15px;
+
   --sidebar-w: 56px;
   --topbar-h: 48px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
@@ -120,6 +129,8 @@
   --text: #ececf0; --text-2: #c3c3cb; --text-3: #8e8e98; --text-4: #61616a;
   --danger: #f06a6a; --danger-soft: rgba(240, 106, 106, 0.12); --warn: #ffc25e; --ok: #86e3a5;
   --btn-radius: var(--radius-s); --chip-radius: 10px;
+  /* Original keeps its lime active states and outlined frames. */
+  --active-bg: var(--accent-soft); --active-text: var(--accent); --active-line: var(--accent-line); --frame-border: var(--border);
 }
 
 /* Native dropdown options: some systems (Linux GTK) draw them light despite color-scheme; force the dark ones. */

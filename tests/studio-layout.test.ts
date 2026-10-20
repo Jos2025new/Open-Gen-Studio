@@ -80,12 +80,17 @@ describe('Studio board layout state', () => {
     act(() => q('[aria-label="Hide generations"]')!.click());
     expect(q('.studio-board')).toBeNull();
   });
-  it('has Done and Ongoing only: no Actions suggested', () => {
+  it('has Done and Ongoing only: no Actions suggested; empty, it is one line (ADR 0024 M)', () => {
     setData([]);
     render(createElement(StudioBoard));
     expect(q('[aria-label="Done"]')).not.toBeNull();
-    expect(q('[aria-label="Ongoing"]')).not.toBeNull();
+    expect(q('.space-fold')).toBeNull();
+    expect(q('[aria-label="Ongoing"]')).toBeNull();
+    expect(host.querySelectorAll('.space-empty')).toHaveLength(1);
     expect(q('[aria-label="Actions suggested"]')).toBeNull();
+    setData([gen('g1', 'running')]);
+    expect(q('[aria-label="Ongoing"]')).not.toBeNull();
+    expect(q('.space-fold')).not.toBeNull();
   });
 });
 
