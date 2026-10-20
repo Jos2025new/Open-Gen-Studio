@@ -10,7 +10,7 @@ Las tarjetas nuevas (cambio de modelo y seguimiento, `cc-narrow`) desentonan con
 
 ## 1. Inventario (desde el código)
 
-Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde `--ok #86e3a5`; acento `--accent` (lima `#d8ff3a`).
+Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde `--ok #86e3a5`; acento `--accent` (lima `#d8ff3a`; en la [propuesta de temas](propuesta-temas.md) es el «Predeterminado» de cinco colores de resaltado, sobre los neutros de Atlas).
 
 Leyenda: **[px]** = valor fijo en vez de token.
 
@@ -18,9 +18,9 @@ Leyenda: **[px]** = valor fijo en vez de token.
 |---|---|---|---|---|---|---|---|---|
 | Base común `.gen-card, .plan-card, .q-card` | `max-width:100%` | — | `--r-m` 16 | — | — | — | — | `chat.css:3`, `:169` |
 | **Ajustes (confirm_settings)** `q-card set-card cc-card cc-w` | `.cc-w`: `min(620px,100%)` **[px]**, `margin-right:auto` | `16px 18px 12px` **[px]**; cabecera `margin-bottom:14px`; pie `margin-top:14px; padding-top:12px` | `--r-m` | título `600 16px/1.3` **[px]** (`.cc-title`); cuerpo `--fs-m`; meta `.set-total` 11px **[px]** | `Button` primario `sm`/`md` (`.btn` 8px 12px; `.btn-sm` 5px 9px, 12px **[px]**) | `.cc-chip` 8px 12px, radio 10 **[px]**, `--fs-m` | 13-16 | `chat-cards.css:2,6-7,18,41-42,102`; `SettingsCard.tsx:61` |
-| Ajustes confirmada `cc-set-done` | `.cc-w` | `11px 14px` **[px]** | `--r-m` | nombre 600; chips `.cc-mini` 12px **[px]** | — | `.cc-mini` 3px 9px, radio 8 **[px]** | 16 | `chat-cards.css:131-135`; `SettingsCard.tsx:35` |
+| Ajustes confirmada `cc-set-done` | `.cc-w` | `11px 14px` **[px]** | `--r-m` | nombre 600; chips `.cc-mini` 12px **[px]** | — | `.cc-mini` 3px 9px, radio 8 **[px]** (propuesta: píldora) | 16 | `chat-cards.css:131-135`; `SettingsCard.tsx:35` |
 | **Plan** `plan-card cc-w` | `.cc-w` 620 | igual que ajustes; pasos `padding:12px 0 6px`, hueco 12 **[px]** | `--r-m` | título `600 16px` **[px]**; paso `--fs-m` 600; detalle `--fs-s`; coste `--fs-s` | aprobar `.cc-approve` 10px 16px, radio 12, 700 **[px]** | miniatura de paso 44×44 radio 9 **[px]** | 44 | `chat-cards.css:3-9,43-70,102-111`; `PlanCard.tsx:182` |
-| **Preguntas** `q-card` | sin `.cc-w`: ancho del contenedor | `padding:16px` **[px]**; `q-block margin:16px 0` | `--r-m` | `q-question` 550 (hereda 13); intro 12px/1.6 **[px]** | pie a la derecha, hueco 8 | `.q-opt` 7px 10px, **radio 5**, 12px **[px]**; elegida = acento lima | — | `chat.css:3-5`; `QuestionsCard.tsx:67` |
+| **Preguntas** `q-card` | sin `.cc-w`: ancho del contenedor | `padding:16px` **[px]**; `q-block margin:16px 0` | `--r-m` | `q-question` 550 (hereda 13); intro 12px/1.6 **[px]** | pie a la derecha, hueco 8 | `.q-opt` 7px 10px, **radio 5**, 12px **[px]**; elegida = color de resaltado (hoy lima) | — | `chat.css:3-5`; `QuestionsCard.tsx:67` |
 | Preguntas respondida `q-card is-done` | contenedor | `16px` | `--r-m` | `q-summary` 12px | — | — | — | `QuestionsCard.tsx:30` |
 | **Generación** `gen-card` | `.is-fit`: `fit-content`, mín `min(100%,240px)`; error `min 300 / max 480` **[px]** | cabecera `12px 16px 6px`, meta `2px 16px 12px`; `.is-fit` 9px 10px **[px]** | `--r-m` (teselas 7) | prompt 12px, meta `--fs-xs` | barra de tesela | — | 30 (origen) | `chat.css:3,62-73,92` |
 | **Cambio de modelo** (nueva) `cc-narrow cc-switch` | `fit-content`, `max-width:min(360px,100%)` **[px]** | `12px 14px 10px` **[px]**; línea `margin-bottom:6px`; pie `margin-top:10px` | `--r-m` | solo una línea `--fs-xs` | «Keep» ghost `sm`, «Change» primario `sm` | `.cc-mini` | — | `chat-cards.css:112-118`; `SettingsCard.tsx:262-280` |
@@ -41,9 +41,9 @@ Leyenda: **[px]** = valor fijo en vez de token.
 | Cambio de modelo y seguimiento (`cc-narrow`): letra toda `--fs-xs`, relleno 12/14, casilla propia, sin cabecera | **Deriva: migrar a `card-s`** | Es un tamaño legítimo (mínimo), pero con letra, relleno y radios inventados; no tiene papel de jerarquía. |
 | Preguntas: sin `.cc-w`, `.q-opt` de radio 5, sin cabecera de icono y título | **Deriva: migrar a `card-m`** | Es una tarjeta común con otro esqueleto, sin motivo. |
 | `.cc-set-done` (la tarjeta resuelta en una línea de resumen) | **Conservar y promover a estado común** | Toda tarjeta, al resolverse, se pliega a una línea; reduce ruido del historial. Pasa a ser plantilla («resuelta»), no excepción de ajustes. |
-| `.cc-mini` (píldora de solo lectura) frente a `.cc-chip` (control que abre algo) | **Conservar con dos papeles** | Mostrar un valor frente a editarlo. Ambos con `--chip-radius`. |
+| `.cc-mini` (píldora de solo lectura) frente a `.cc-chip` (control que abre algo) | **Conservar con dos papeles** | Mostrar un valor frente a editarlo. Ambos con `--chip-radius` (píldora, 999px, según la propuesta de temas). |
 | `.q-opt` radio 5 y `.set-more` radio 5 | **Deriva** | Forma de chip repetida sin papel; migran a `.cc-chip`/`--chip-radius`. |
-| Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` (relleno tintado, borde y texto en lima) | **Conservar: es el estándar** | Decisión del usuario: elegir = acento lima, igual que la acción primaria. El verde `--ok` queda solo para estados (hecho, correcto). La casilla nueva se alinea con ello (antes iba en verde: deriva ya corregida). |
+| Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` (relleno tintado, borde y texto en lima) | **Conservar: es el estándar** | Decisión del usuario: elegir = color de resaltado (hoy lima, a elegir entre cinco), igual que la acción primaria. El verde `--ok` queda solo para estados (hecho, correcto). La casilla nueva se alinea con ello (antes iba en verde: deriva ya corregida). |
 | `notice-retry` como botón aparte | **Deriva** | Debe ser un `Button` `sm`. |
 | `.cc-approve` (relleno 10×16, radio 12, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§4) | Es la acción que gasta dinero: merece énfasis. |
 | Generación `is-fit` (ancho = medios), teselas de radio 7, barra de tesela, error 300-480 | **Conservar dentro de la variante «Resultado»** (§3) | El contenido manda: el ancho sigue a la imagen. |
@@ -71,7 +71,7 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 
 1. **Cabecera** `.card-head`: icono 16 (14 en `card-s`) + título; a la derecha, meta o menú opcionales. En `card-s` la propia línea de pregunta hace de cabecera.
 2. **Cuerpo** `.card-body`: texto, campos o secciones (`.card-section`, separadas por borde superior y `--sp-3`).
-3. **Opciones** `.card-options`: tres formas permitidas, nada más: **casillas** `.card-check` (16×16, radio 4, gris vacío; elegida = relleno lima `--select-on` + check oscuro `--accent-ink`), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura). Elegido = lima: relleno tintado (`--select-on-soft`), borde `--select-line` y texto/check en `--select-on`.
+3. **Opciones** `.card-options`: tres formas permitidas, nada más: **casillas** `.card-check` (16×16, radio 4, gris vacío; elegida = relleno de resaltado `--select-on` + check oscuro `--accent-ink`), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura). Elegido = resaltado (lima por defecto): relleno tintado (`--select-on-soft`), borde `--select-line` y texto/check en `--select-on`.
 4. **Pie** `.card-foot`: meta o total a la izquierda; acciones a la derecha; **un solo primario**; borde superior en `card-m`/`card-l`, sin borde en `card-s`.
 5. **Resuelta** `.card-done`: una línea con check, nombre y píldoras de lo elegido, más «editar». Todas las tarjetas que piden algo la tienen.
 
@@ -85,7 +85,7 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 | Título / cuerpo / meta | 13 / 12 / 11 | 15 / 13 / 11 | 16 / 13 / 12 |
 | Chip / botón | `.cc-mini` / `Button sm` | `.cc-chip` / `Button md` | `.cc-chip`, `ModelField` / `Button md` |
 
-Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--chip-radius: var(--radius)`, `--fs-title: 16px`, `--select-on: var(--accent)`, `--select-on-soft: var(--accent-soft)`, `--select-line: var(--accent-line)` (alias de la selección existente; `--ok` solo para estados), `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
+Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--chip-radius: 999px`, `--fs-title: 16px`, `--select-on: var(--accent)`, `--select-on-soft: var(--accent-soft)`, `--select-line: var(--accent-line)` (alias de la selección existente, que cada color de resaltado redefine, véase la propuesta de temas; `--ok` solo para estados), `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
 
 ## 4. Variaciones permitidas (máximo dos)
 
@@ -120,7 +120,7 @@ Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens
 1. **Elige un tamaño** (`card-s`, `card-m`, `card-l`) y las plantillas de §3 (cabecera, cuerpo, opciones, pie, resuelta). Sin anchos, rellenos ni radios nuevos.
 2. **Reutiliza** `ModelField`, `ChipPop`, `Button`, `.cc-mini`, `.cc-chip`, `.card-check` y `AspectPicker`. Un selector de modelo es `ModelField` y nada más.
 3. **Solo tokens**: ni `px`, ni `rem` sueltos, ni colores fijos en CSS de tarjetas.
-4. **Un solo primario por tarjeta**, a la derecha; selección en lima (`--select-on`, el mismo acento que el primario); el verde `--ok` solo para estados.
+4. **Un solo primario por tarjeta**, a la derecha; selección en el color de resaltado (`--select-on`, el mismo acento que el primario); el verde `--ok` solo para estados.
 5. **Ninguna tarjeta nueva ni cambio de aspecto sin actualizar este documento.** Una variación nueva sigue §5 (papel, entrada, tope de dos).
 6. **Los tests jsdom** afirman el tamaño (`card-s|m|l`), la variante si la hay, y los componentes reutilizados.
 

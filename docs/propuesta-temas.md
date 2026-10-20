@@ -1,95 +1,84 @@
-# Propuesta: temas de color, y un primer tema «Atlas»
+# Propuesta: base «Atlas» y color de resaltado
 
-Fecha: 2026-10-20. Estado: **propuesta con maqueta, sin implementar** (sin cambios en el código de la app). Depende de [propuesta-sistema-visual-tarjetas.md](propuesta-sistema-visual-tarjetas.md): sus tokens de selección y de radio son lo que un tema sobrescribe. Maqueta: [mockups/temas.html](mockups/temas.html) (hojas reales + [propuesta.css](mockups/propuesta.css) + [tema-atlas.css](mockups/tema-atlas.css)).
+Fecha: 2026-10-20. Estado: **propuesta, sin implementar** (no hay código de la app en este cambio). Maqueta: [temas.html](mockups/temas.html), con [base-atlas.css](mockups/base-atlas.css), [base-grafito.css](mockups/base-grafito.css) y [acentos.css](mockups/acentos.css). Complementa [el sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md).
 
-La referencia de Atlas es una captura de una app de fotos con modo oscuro; se usaron **solo sus colores y formas** (muestreados del píxel), nada de su contenido, nombres ni imágenes.
+## 1. Modelo
 
-## 1. El modelo de tema
+- **Un solo esquema para toda la app, sin catálogo de temas.** Los neutros de «Atlas» (muestreados de una imagen de referencia: solo colores y formas, ningún nombre, imagen ni contenido) pasan a ser la base: fondos, superficies, niveles de texto, líneas y estados. Botones y chips son **píldora (999px)**: `--btn-radius` y `--chip-radius`.
+- **Lo único que varía es el color de resaltado**, con una fila de muestras en Ajustes («Color de resaltado») y cinco opciones fijas. Cada una define solo la familia del acento: `--accent`, `--accent-ink`, `--accent-soft`, `--accent-line`, `--select-on`, `--select-on-soft` (más `--select-line`, igual al relleno). Selección y botón primario siguen al acento.
+- **Alternativa «Grafito»** (segunda referencia, §5): otros neutros con matiz azulado. No es un tema que elegir; es la otra base posible, para decidir una sola.
 
-Un tema **sobrescribe solo tokens de color** y, opcionalmente, el radio de chips y botones. **Nunca** toca la escala tipográfica, el espaciado ni las maquetaciones de la propuesta de tarjetas (`card-s/m/l`, plantillas, variantes). Así un tema cambia el aspecto sin cambiar la estructura.
+## 2. Base Atlas
 
-Tokens que cada tema debe definir (todos; sin herencia parcial):
-
-| Grupo | Tokens |
-|---|---|
-| Fondos | `--bg`, `--bg-canvas`, `--surface`, `--surface-2`, `--surface-3`, `--surface-hover`, `--overlay` |
-| Líneas | `--border`, `--border-strong`, `--border-focus` |
-| Texto | `--text`, `--text-2`, `--text-3`, `--text-4` |
-| Acento (acción primaria) | `--accent`, `--accent-ink`, `--accent-soft`, `--accent-line` |
-| Selección | `--select-on` (texto y marca), `--select-on-soft` (relleno), `--select-line` (borde) |
-| Estados | `--danger`, `--danger-soft`, `--warn`, `--ok` |
-| Forma (opcional) | `--chip-radius`, `--btn-radius` (nuevo) |
-
-Los matices por tipo de medio (`--type-*`) y las sombras no cambian en esta primera versión. La propuesta de tarjetas hoy define `--select-on*` como alias del acento lima; con temas pasan a ser tokens propios (en el tema actual siguen valiendo lima: `--accent`, `--accent-soft`, `--accent-line`).
-
-## 2. Dónde se elige y cómo se guarda
-
-- **Aplicación:** atributo `data-theme="<id>"` en `<html>`. El tema actual no lleva atributo (o `data-theme="actual"`) y usa los valores de `:root` de `tokens.css`; cada tema nuevo es un bloque `[data-theme="id"]` en su propio archivo (`src/styles/themes/<id>.css`).
-- **Dónde se elige:** una sección «Apariencia» en el panel de Ajustes (`SettingsPanel.tsx`), con una muestra de cada tema.
-- **Cómo se guarda (preferencia de interfaz, no dato del usuario):** lo más seguro es `localStorage` (`ogs-theme`) y una línea mínima en `index.html` que la lee antes del primer pintado para evitar el parpadeo. No toca el almacén protegido ni `data/`.
-- **Si se prefiere guardarlo en los ajustes de la app** (`settings.theme` en el store), eso es estado persistido: **hay que pedir autorización al usuario** antes, y no se tocan los archivos de la zona protegida (`docs/persistencia-protegida.md`).
-- Sin JS en esta propuesta de maqueta; la lógica real son ~10 líneas.
-
-## 3. Contrastes (WCAG 2.x)
-
-Calculados con la fórmula de luminancia relativa. Mínimos: 4,5 para texto normal, 3 para texto grande y componentes.
-
-| Par | Atlas | Tema actual |
+| Token | Valor | Nota |
 |---|---|---|
-| Texto `#e3e3e3` sobre tarjeta `#1e1f20` | **12,86** | 15,47 (`#ececf0` sobre `#151518`) |
-| Texto sobre el panel de contenido `#131314` | 14,47 | — |
-| Texto secundario `#c4c7c5` sobre tarjeta | 9,69 | 10,40 |
-| Meta (`--text-3`) `#8d908e` sobre tarjeta / panel | 5,12 / 5,76 | 5,62 |
-| Tenue (`--text-4`) `#747775` sobre tarjeta | **3,65** (no llega a 4,5; solo para texto no esencial) | 2,97 |
-| Texto del primario `#062e6f` sobre su relleno `#a8c7fa` | **7,50** | 17,10 |
-| Texto elegido `#c2e7ff` sobre relleno de selección `#004a77` | **7,20** | — |
-| Enlace / acento `#a8c7fa` sobre tarjeta / panel | 9,60 / 10,80 | — |
-| Texto sobre `--surface-2` `#282a2c` | 11,22 | — |
-| Estados sobre tarjeta: peligro `#f28b82` / aviso `#fdd663` / correcto `#81c995` | 6,91 / 11,77 / 8,43 | — |
-
-Todos los pares de uso normal pasan AA con holgura; solo `--text-4` queda por debajo de 4,5 (mejor que el actual 2,97) y se reserva a marcadores de posición y texto desactivado.
-
-## 4. Primer tema: «Atlas»
-
-Neutro y sin matiz cálido ni verde; azul de Material oscuro como único acento. Valores completos en [tema-atlas.css](mockups/tema-atlas.css).
-
-| Token | Valor | Origen |
-|---|---|---|
-| `--bg` (barra lateral y superior), `--surface` | `#1e1f20` | muestreado |
-| `--bg-canvas` (panel de contenido) | `#131314` | muestreado |
-| `--surface-2` (campo de búsqueda) | `#282a2c` | muestreado |
-| `--surface-3` (pista de la barra de almacenamiento) | `#333537` | muestreado |
+| `--bg`, `--surface` | `#1e1f20` | muestreado |
+| `--bg-canvas` | `#131314` | muestreado |
+| `--surface-2`, `--surface-3` | `#282a2c`, `#333537` | muestreados |
 | `--surface-hover` | `#2d2f31` | derivado |
-| `--border` | `#333537` | muestreado (pista) |
-| `--border-strong` (divisores) | `#444746` | muestreado |
-| `--border-focus` (contorno del botón secundario) | `#8d908e` | muestreado |
-| `--text` / `--text-2` | `#e3e3e3` / `#c4c7c5` | muestreado |
-| `--text-3` / `--text-4` | `#8d908e` / `#747775` | muestreado / derivado |
-| `--accent` (enlaces, botones de texto, barra) | `#a8c7fa` | muestreado |
-| `--accent-ink` | `#062e6f` | derivado (Material oscuro) |
-| `--accent-soft` / `--accent-line` | `rgba(168,199,250,.14)` / `.45` | derivado |
-| `--select-on-soft` (píldora elegida) | `#004a77` | muestreado |
-| `--select-on` (texto de lo elegido) | `#c2e7ff` | muestreado |
-| `--danger` / `--warn` / `--ok` | `#f28b82` / `#fdd663` / `#81c995` | derivado |
-| `--chip-radius`, `--btn-radius` | `999px` (píldoras) | forma de la referencia |
+| `--border`, `--border-strong`, `--border-focus` | `#333537`, `#444746`, `#8d908e` | muestreados |
+| `--text`, `--text-2`, `--text-3`, `--text-4` | `#e3e3e3`, `#c4c7c5`, `#8d908e`, `#747775` | text-4 derivado |
+| `--danger`, `--warn`, `--ok` | `#f28b82`, `#fdd663`, `#81c995` | estados, derivados |
+| `--btn-radius`, `--chip-radius` | `999px` | estándar |
 
-**Elecciones y dudas:**
-- **Fondos al revés de lo esperado.** Muestreado: las barras y la columna lateral son `#1e1f20` y el **panel de contenido es más oscuro**, `#131314`. Atlas mantiene esa relación: las tarjetas (`--surface`) toman el color de la barra, más claro que el panel donde viven.
-- **Selección** = píldora con relleno azul profundo `#004a77` y texto `#c2e7ff` (como el elemento activo del menú de la referencia); en la casilla, relleno azul claro con la marca en azul profundo.
-- **Primario.** La referencia **no tiene botón relleno**: su acción visible es una píldora con contorno gris y texto azul. Se propone el primario relleno **azul claro `#a8c7fa` con tinta `#062e6f`** (par primario y «sobre primario» de Material oscuro), coherente con el relleno de selección; y se conserva el **secundario como en la referencia** (contorno `#8d908e`, texto azul, sin relleno).
-- **Ambiguo:** los estados (`--danger`, `--warn`, `--ok`) no aparecen en la captura (solo un corazón rojo diminuto); se derivan de la paleta de Material oscuro. `--text-4` y `--surface-hover` también son derivados. Pedir al usuario más imágenes antes de fijarlos.
-- **Radio de las tarjetas** (`--r-m`) y de las teselas no cambia; la referencia redondea el panel de contenido (~24 px), pero eso es maquetación, no color.
+## 3. Colores de resaltado
 
-## 5. Plan de migración (pasos pequeños, cada uno con su prueba)
+Los acentos evitan los matices de los estados (`--danger` rojo-coral, `--warn` ámbar, `--ok` verde): por eso **no hay coral, naranja ni ámbar**, y el verde que se ofrece es un verde agua, no el verde de «hecho». Rosa y agua son la propuesta nueva; azul sale de Atlas.
 
-1. **Tokens de tema** en `tokens.css`: `--select-on*`, `--btn-radius`, y mover los colores fijos de las tarjetas a tokens (depende de la migración de tarjetas). Prueba: `check-sizes`, suite.
-2. **Los selectores actuales leen los tokens** (`.q-opt.is-on`, `.set-model.is-on`, `.cc-pick`, `.btn`, `.btn-secondary`, `.cc-chip`): hoy fijan colores y radios (los «puentes» de `tema-atlas.css` los simulan). Prueba: jsdom de tarjetas sin cambios visibles en el tema actual.
-3. **Mecanismo `data-theme`** y `src/styles/themes/atlas.css` (pasar el bloque de la maqueta). Prueba: test que comprueba que cada tema define todos los tokens de §1.
-4. **Selector en Ajustes → Apariencia** y persistencia (`localStorage`; `settings.theme` solo con autorización). Prueba: jsdom del selector.
-5. **Comprobación de contraste en CI** (`scripts/check-themes.mjs`, solo propuesta): lee los bloques de tema y falla bajo los mínimos de §3.
+| Nombre (`data-accent`) | `--accent` | `--accent-ink` | `--select-on-soft` (relleno) | `--select-on` (texto) |
+|---|---|---|---|---|
+| Predeterminado (`lima`) | `#d8ff3a` | `#10140a` | `#3d4d0a` | `#e6ff7a` |
+| Azul (`azul`) | `#a8c7fa` | `#062e6f` | `#004a77` | `#c2e7ff` |
+| Violeta (`violeta`) | `#d0bcff` | `#381e72` | `#4f378b` | `#eaddff` |
+| Rosa (`rosa`) | `#ffb1c8` | `#5e1133` | `#7b2949` | `#ffd9e3` |
+| Verde agua (`agua`) | `#6bd8d6` | `#003735` | `#004f4d` | `#9cf1ee` |
 
-## Límites
+`--accent-soft` = acento al 14 % y `--accent-line` = acento al 45 %. `--select-line` = relleno de selección.
 
-- Es un documento y una maqueta; no cambia la app.
-- Atlas se basa en una sola imagen; los valores derivados están marcados y pueden ajustarse.
-- Los temas no cambian estructura: eso es la propuesta de tarjetas.
+### Contrastes (WCAG, todos ≥ 4,5)
+
+Sobre tarjeta `#1e1f20` y lienzo `#131314`.
+
+| Preset | tinta / relleno | acento / tarjeta | acento / lienzo | texto elegido / relleno |
+|---|---|---|---|---|
+| Predeterminado | 16,23 | 14,37 | 16,17 | 8,37 |
+| Azul | 7,50 | 9,60 | 10,80 | 7,20 |
+| Violeta | 7,71 | 9,68 | 10,89 | 7,23 |
+| Rosa | 7,72 | 9,73 | 10,94 | 7,22 |
+| Verde agua | 7,77 | 9,76 | 10,98 | 7,29 |
+
+El relleno de selección frente a la tarjeta ronda 1,8: no es texto, la selección se lee por el texto y la marca claros sobre él.
+
+## 4. Almacenamiento
+
+Atributo `data-accent` en `<html>` y `localStorage` (`ogs-accent`), leído antes de pintar. Sin atributo vale `lima`. Pasarlo a los ajustes persistidos del proyecto **requiere aprobación del usuario** (toca la zona de persistencia protegida); hasta entonces, solo localStorage.
+
+## 5. Segunda referencia: «Grafito»
+
+Muestreada de un editor oscuro (solo colores y formas; sus fotos, marcas y nombres no se usan). Píxeles dominantes: `#1a1a1e` (página, 1,6 M píxeles), `#232327` (paneles), `#313135` (bordes y botones secundarios), `#0c0c0d` (fondo más profundo), `#cbccd0` (texto), `#8d8d8f` (meta), acento `#90e957`.
+
+| Token | Valor | Nota |
+|---|---|---|
+| `--bg-canvas` | `#1a1a1e` | muestreado |
+| `--bg`, `--surface` | `#232327` | muestreado |
+| `--surface-2`, `--surface-hover` | `#2a2a2e` | derivado |
+| `--surface-3`, `--border` | `#313135` | muestreado |
+| `--border-strong` | `#3f3f44` | derivado |
+| `--text`, `--text-2` | `#e8e8ea` (derivado), `#cbccd0` | |
+| `--text-3`, `--text-4` | `#8d8d8f`, `#6b6b70` | text-4 derivado, solo decorativo |
+
+Contrastes sobre su tarjeta `#232327`: texto 12,8; texto 2 9,76; **meta `#8d8d8f` 4,73** (5,24 sobre el lienzo); text-4 2,95 (solo adorno, no texto).
+
+**Radio:** la referencia usa botones de ~8 px; Atlas, píldoras. Se mantienen las **píldoras (999px) como estándar** (preferencia del usuario) y el 8 px queda como diferencia observada.
+
+**Verde frente a lima.** El acento de la referencia, `#90e957`, está a 25° de tono del lima (97° frente a 72°) y la razón de contraste entre ambos es 1,31: **demasiado cerca para ser una muestra aparte**. Propuesta: **no añadir «Verde»**; el lima Predeterminado cubre ese hueco (con Grafito, el verde de la referencia sería su acento natural; si se prefiere, se sustituye el lima por él, no se suman). Su ratio, por si se cambia: tinta `#0e1f08` / relleno 11,48; acento / tarjeta 10,42; acento / lienzo 11,55; texto elegido `#c4f5a6` sobre relleno `#2f5a14` 6,54.
+
+**Recomendación:** quedarse con Atlas (más neutro, ya probado en la maqueta de tarjetas); Grafito solo si se prefiere su matiz azulado. Se decide una base, no dos.
+
+## 6. Migración (cuando se apruebe)
+
+1. Mover los neutros de Atlas a `tokens.css` (sustituyen a los actuales) y añadir `--btn-radius` / `--chip-radius`.
+2. Añadir la familia del acento y los cinco bloques `[data-accent]`.
+3. Tarjetas: aplicar los puentes de `base-atlas.css` (selección y primario leen `--select-*` y `--accent-*`).
+4. Fila de muestras en Ajustes (`aria-pressed`, nombre accesible), con su test jsdom.
+5. Tras aprobarlo: valorar guardar la elección en los ajustes persistidos.

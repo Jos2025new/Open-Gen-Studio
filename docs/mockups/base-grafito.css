@@ -1,0 +1,9 @@
+/* Base alternativa «Grafito» (propuesta): neutros con un matiz azulado, muestreados de la referencia 12. Solo cambia los neutros; los radios siguen en 999px (la referencia usa ~8px: diferencia observada, no adoptada). */
+[data-base="grafito"] {
+  --bg: #232327; --bg-canvas: #1a1a1e;
+  --surface: #232327; --surface-2: #2a2a2e; --surface-3: #313135; --surface-hover: #2a2a2e; /* surface-2/hover: derivados */
+  --overlay: rgba(12, 12, 13, 0.72);
+  --border: #313135; --border-strong: #3f3f44; --border-focus: #8d8d8f; /* border-strong: derivado */
+  --text: #e8e8ea; --text-2: #cbccd0; --text-3: #8d8d8f; --text-4: #6b6b70; /* text: derivado; text-4: derivado, solo decorativo */
+  background: var(--bg-canvas); color: var(--text);
+}

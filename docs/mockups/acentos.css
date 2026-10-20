@@ -1,0 +1,6 @@
+/* Colores de resaltado (propuesta). Cada uno define solo la familia del acento; sin atributo = «lima». */
+:root, [data-accent="lima"] { --accent: #d8ff3a; --accent-ink: #10140a; --accent-soft: rgba(216, 255, 58, 0.14); --accent-line: rgba(216, 255, 58, 0.45); --select-on: #e6ff7a; --select-on-soft: #3d4d0a; --select-line: #3d4d0a; }
+[data-accent="azul"] { --accent: #a8c7fa; --accent-ink: #062e6f; --accent-soft: rgba(168, 199, 250, 0.14); --accent-line: rgba(168, 199, 250, 0.45); --select-on: #c2e7ff; --select-on-soft: #004a77; --select-line: #004a77; }
+[data-accent="violeta"] { --accent: #d0bcff; --accent-ink: #381e72; --accent-soft: rgba(208, 188, 255, 0.14); --accent-line: rgba(208, 188, 255, 0.45); --select-on: #eaddff; --select-on-soft: #4f378b; --select-line: #4f378b; }
+[data-accent="rosa"] { --accent: #ffb1c8; --accent-ink: #5e1133; --accent-soft: rgba(255, 177, 200, 0.14); --accent-line: rgba(255, 177, 200, 0.45); --select-on: #ffd9e3; --select-on-soft: #7b2949; --select-line: #7b2949; }
+[data-accent="agua"] { --accent: #6bd8d6; --accent-ink: #003735; --accent-soft: rgba(107, 216, 214, 0.14); --accent-line: rgba(107, 216, 214, 0.45); --select-on: #9cf1ee; --select-on-soft: #004f4d; --select-line: #004f4d; }

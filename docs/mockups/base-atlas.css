@@ -1,0 +1,19 @@
+/* Base «Atlas» (propuesta): los neutros, estados y formas de toda la app. Sustituye a los de tokens.css. Valores muestreados de la referencia salvo los marcados «derivado». */
+:root {
+  color-scheme: dark;
+  --bg: #1e1f20; --bg-canvas: #131314;
+  --surface: #1e1f20; --surface-2: #282a2c; --surface-3: #333537; --surface-hover: #2d2f31; /* hover: derivado */
+  --overlay: rgba(19, 19, 20, 0.72);
+  --border: #333537; --border-strong: #444746; --border-focus: #8d908e;
+  --text: #e3e3e3; --text-2: #c4c7c5; --text-3: #8d908e; --text-4: #747775; /* text-4: derivado */
+  --danger: #f28b82; --danger-soft: rgba(242, 139, 130, 0.14); --warn: #fdd663; --ok: #81c995; /* estados: derivados */
+  --chip-radius: 999px; --btn-radius: 999px;
+  /* Resaltado por defecto («Predeterminado»): ver acentos.css */
+}
+/* ---- Puentes: selectores que hoy fijan colores o radios; en la migración leerán los tokens ---- */
+.btn, .cc-chip, .cc-mini, .q-opt, .card-check, .cc-pick, .set-more { border-radius: var(--btn-radius); }
+.btn-secondary { background: transparent; border-color: var(--border-focus); color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:not(:disabled):hover { filter: brightness(1.08); background: var(--accent); }
+.q-opt.is-on, .set-model.is-on, .card .cc-chip.is-sel, .cc-pick.is-on { background: var(--select-on-soft); border-color: var(--select-line); color: var(--select-on); box-shadow: none; }
+.card-check.is-on .cc-box, .cc-pick.is-on .cc-box { background: var(--select-on); border-color: var(--select-on); color: var(--select-on-soft); }
