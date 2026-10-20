@@ -11,6 +11,8 @@ import { Button, Range } from '../ui/primitives';
 import { DRAFT, HQ, lowestResolution, type DraftMode } from '../../engine/agent/draftFirst';
 import { ensureSchema } from '../../engine/catalog';
 import { variantRoute } from '../../engine/variants';
+import { modelChange } from '../../engine/modelNamed';
+import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { EditAnswerButton } from './EditAnswerButton';
 import { AspectPicker, AspectShape } from './aspectShape';
 import { CardIcon, CountIcon, DurationIcon, ResolutionIcon } from './cardIcons';
@@ -259,18 +261,25 @@ function StepSlider({ values, value, unit, label, onChange }: { values: number[]
   );
 }
 
-/** The user named another model: one short line with the model as a pill, "Keep" and "Change". */
+/** Another model or only another provider of the same model (ADR 0025 D). */
+function changeOf(models: Record<string, { provider: keyof typeof PROVIDER_LABELS } & Parameters<typeof modelChange>[0]>, now: string, was: string) {
+  return models[now] && models[was] ? modelChange(models[now], models[was]) : undefined;
+}
+
+/** The user asked for another model, or another provider of the same one: one short line with the model as a pill, "Keep" and "Change". */
 function SwitchModelCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
   const section = sectionsOf(item)[0];
   const next = section.recommended;
   const keep = item.switchFrom!;
   const e = choiceEstimate(next, section.kind, 1);
+  const models = useStore((s) => s.catalog.models);
+  const where = changeOf(models, next.modelRef, keep.modelRef) === 'provider' ? PROVIDER_LABELS[models[next.modelRef].provider] : undefined;
   return (
     <article className="q-card set-card cc-card cc-w cc-narrow cc-switch">
-      <p className="cc-switch-line">Found model <span className="cc-mini" title={next.modelRef}>{name(next.modelRef)}{e.usd == null ? null : <span className="faint"> · from {formatUsd(e.usd)}</span>}</span></p>
+      <p className="cc-switch-line">{where ? null : 'Found model '}<span className="cc-mini" title={next.modelRef}>{name(next.modelRef)}{where ? ` is also on ${where}` : null}{e.usd == null ? null : <span className="faint"> · from {formatUsd(e.usd)}</span>}</span></p>
       <footer className="q-foot">
         <Button variant="ghost" size="sm" title={`Keep ${name(keep.modelRef)}`} onClick={() => void confirmSettings(sessionId, item.id, [{ ...keep, needsImage: next.needsImage }])}>Keep</Button>
-        <Button variant="primary" size="sm" title={`Change to ${name(next.modelRef)}`} onClick={() => void confirmSettings(sessionId, item.id, [next])}>Change</Button>
+        <Button variant="primary" size="sm" title={`Change to ${name(next.modelRef)}${where ? ` on ${where}` : ''}`} onClick={() => void confirmSettings(sessionId, item.id, [next])}>Change</Button>
       </footer>
     </article>
   );
@@ -282,12 +291,15 @@ function FollowUpCard({ item, sessionId, name }: { item: SettingsFeedItem; sessi
   const section = sectionsOf(item)[0];
   const switched = section.recommended;
   const kept = item.switchFrom!;
+  const models = useStore((s) => s.catalog.models);
+  // The same model at another provider has the same name: the row says where.
+  const shown = (ref: string) => (changeOf(models, switched.modelRef, kept.modelRef) === 'provider' ? `${name(ref)} · ${PROVIDER_LABELS[models[ref].provider]}` : name(ref));
   const answer = (c: SettingsChoice) => { setPicked(c.modelRef); void confirmSettings(sessionId, item.id, [c]); };
   const row = (ref: string, label: string, onClick: () => void) => (
     <button key={ref} type="button" role="checkbox" aria-checked={picked === ref} className={`cc-pick ${picked === ref ? 'is-on' : ''}`} onClick={onClick}>
       <span className="cc-box" aria-hidden>{picked === ref ? <Check size={12} strokeWidth={3} /> : null}</span>
       <span>{label}</span>
-      <span className="cc-mini" title={ref}>{name(ref)}</span>
+      <span className="cc-mini" title={ref}>{shown(ref)}</span>
     </button>
   );
   return (

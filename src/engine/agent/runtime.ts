@@ -23,6 +23,7 @@ import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { carryOverRevision } from '../planRevision';
+import { partModel } from '../modelNamed';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
@@ -289,7 +290,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     }
     patchAgent(sessionId, { pending: undefined });
   }
-  // Typing while a plan waits for approval: the agent revises it (only what was asked) or treats it as a new request.
+  // Typing while a plan waits: the agent revises it (only what was asked) or treats it as a new request.
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'plan-revision', event: 'plan.comment_received', reason: 'user replied while plan awaits approval', sessionId, planId: pendingItem.plan.id, approvalId: pendingItem.id, before: { status: pendingItem.status, adjustments: pendingItem.plan.adjustments } });
     const engine = agentEngine();
@@ -300,7 +301,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
         tool_call_id: pending.toolCallId,
         content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan.adjustments)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`,
       });
-      // Images attached to the comment: a user message right after the tool result (tool results carry no images).
+      // Images attached to the comment: a user message after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
@@ -350,7 +351,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // Auto and Guided confirm the image model of an image-model operation first (Auto once per session; Guided each request).
   const confirmFirst = get().composer.agentStyle !== 'direct' && !session(sessionId).agent.settings?.image && gate.some((g) => g.fired && (OPS as Record<string, { engine: string }>)[g.op]?.engine === 'edit');
   const forced = steerNote(gate, confirmFirst);
-  // The route goes first: an instruction buried after the context was followed after the prompt's own steps.
+  // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = session(sessionId).agent.questionRound === 0;
   pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
   await llmTurn(sessionId, workspace);
@@ -992,7 +993,7 @@ async function executePlanItem(
       }));
       if (state === 'done' || state === 'error') recordPriceResults(sessionId, itemId);
       if (info?.generationId) {
-        // The Designer shows each generation's card in its conversation too (it also lands on the page, below).
+        // The Designer shows each generation's card in its conversation too (it also lands on the page).
         if (workspace === 'chat' || workspace === 'designer') {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'generation', generationId: info.generationId });
         } else if (workspace === 'node') {
@@ -1197,7 +1198,7 @@ export async function resumePlan(sessionId: string, itemId: string, mode: PlanRe
         blocked.set(id, g.error ?? 'Failed');
         return;
       }
-      // A step that fails again rejects here; its card already shows the error, the plan must still settle.
+      // A step that fails again rejects here; its card shows the error, the plan must still settle.
       await (mode === 'check' ? recheckGeneration(g.id) : retryGeneration(g.id)).catch(() => undefined);
       // A retry creates a new attempt and relinks the plan's step → generation mapping itself (jobs.ts relinkAttempt).
       // The latest attempt of the same operation is the one whose status counts.
@@ -1319,7 +1320,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
     silenceTimer = setTimeout(() => log.action({ icon: 'fix', label: `Still working — no answer for ${SILENCE_MS / 1000} s` }), SILENCE_MS);
   };
   const limitNote = () => notice(sessionId, workspace, `The agent reached the ${TURN_CAP_MS / 60_000} min limit for one turn and was stopped. Retry to continue.`, 'error', {});
-  // The end of the turn, once: Stop and the cap call it at once; the turn's own exit finds it done and leaves a newer turn alone.
+  // The end of the turn, once: Stop and the cap call it; the turn's own exit finds it done and leaves a newer turn alone.
   const finish = (say?: () => void) => {
     if (done) return;
     done = true;
@@ -1511,7 +1512,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             const seen = parts.slice(0, parts.indexOf(d)).filter((x) => x.kind === d.kind);
             if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
             const built = await until(buildSettings(
-              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: d.model },
+              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: partModel(d, session(sessionId).agent.settings), provider: d.provider },
               { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
             ));
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
@@ -1612,7 +1613,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           continue;
         }
         if (call.name === 'view_canvas') {
-          // Read-only look at the page or one layer; the image follows the tool results (they carry no images).
+          // Read-only look at the page or one layer; the image follows the tool results.
           const v = viewCanvasSchema.safeParse(parsed.value);
           if (!v.success) respond(`Invalid view_canvas input: ${formatZodError(v.error)}`);
           else if (workspace !== 'designer') respond('view_canvas works only in the Designer.');
@@ -1723,13 +1724,13 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             respond(wrongCanvas);
             continue;
           }
-          // A video model's prompting guide waits for phase 2: only the confirmed model's, which comes with the confirmation.
+          // A video model's prompting guide waits for phase 2: only the confirmed model's comes with the confirmation.
           const early = v.success && workspace !== 'node' ? earlyModelGuide(sessionId, v.data.id) : undefined;
           if (early) {
             respond(early);
             continue;
           }
-          // A workflow asks before it loads: the short card (no metric, no "Read the…" action) until the questions are done.
+          // A workflow asks before it loads: the short card (no metric, no "Read the…" action) until answered.
           const card = v.success ? cardInsteadOfGuide(v.data, session(sessionId).agent.questionRound, get().composer.agentStyle === 'direct') : undefined;
           if (card) {
             respond(card);

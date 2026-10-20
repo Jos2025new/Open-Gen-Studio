@@ -1,4 +1,5 @@
 import { estimateMedia } from '../costs';
+import { resolveNamedModel } from '../modelNamed';
 import { aspectLabel, durationChoices, isAutoOption, mediumResolution, nearestAspect, paramByRole, pixelSizes } from '../params';
 import { routeFits, routeMode, routeVideo, VIDEO_ROUTES, type VideoPurpose } from '../routing';
 import type { Estimate, ModelSchema, ModelSummary, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
@@ -20,6 +21,8 @@ export interface SettingsRequest {
   aspect?: string;
   /** A model the user named, or one of the short list (image by task). */
   model?: string;
+  /** The provider the user asked for (ADR 0025 D): the model is looked for there. */
+  provider?: string;
 }
 
 type Resolve = (ref: string) => Promise<{ model: ModelSummary; schema: ModelSchema } | null>;
@@ -123,7 +126,9 @@ export async function buildSettings(req: SettingsRequest, deps: SettingsDeps): P
 
   let recommended: string | undefined;
   if (req.model?.trim()) {
-    const ref = byName(req.model.trim());
+    const at = req.provider ? resolveNamedModel(req.model.trim(), req.kind, needsImage, req.provider) : undefined;
+    if (at && 'error' in at) return at;
+    const ref = at?.ref ?? byName(req.model.trim());
     if (!ref || !(await deps.getModel(ref))) return { error: `Unknown model "${req.model}". Call find_models, or leave "model" out for the recommended one.` };
     recommended = ref;
   } else if (req.kind === 'video') {

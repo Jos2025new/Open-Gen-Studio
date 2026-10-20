@@ -13,7 +13,7 @@ export default [
   },
   {
     id: 'model-switch',
-    what: 'DELICADO: un modelo que el usuario nombra en la petición actual se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida).',
+    what: 'DELICADO: un modelo que el usuario nombra en la petición actual, o solo otro proveedor del mismo modelo (ADR 0025 D), se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida).',
     sides: [
       ['src/engine/plan.ts', 'call confirm_settings for ${kind} with model'],
       ['src/engine/agent/runtime.ts', 'switchSection('],
@@ -21,7 +21,10 @@ export default [
       ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],
       ['src/components/chat/SettingsCard.tsx', 'function FollowUpCard'],
       ['src/engine/modelNamed.ts', 'export async function followUpProblem'],
+      ['src/engine/modelNamed.ts', 'export function resolveNamedModel'],
+      ['src/engine/agent/settingsCard.ts', 'resolveNamedModel('],
+      ['src/engine/agent/tools.ts', 'provider: z.string()'],
     ],
-    tests: ['tests/confirmed-named-model.test.ts', 'tests/switch-model-card.test.ts', 'tests/switch-model-card-ui.test.ts'],
+    tests: ['tests/confirmed-named-model.test.ts', 'tests/switch-model-card.test.ts', 'tests/switch-model-card-ui.test.ts', 'tests/ask-change-model.test.ts'],
   },
 ];

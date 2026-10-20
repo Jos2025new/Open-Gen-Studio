@@ -57,3 +57,5 @@ El usuario fijó también cómo se comporta cada modo. La revisión de `task/mod
 - **Lo que pide la ruta lo cumple el agente.** La señal no se impone por código. Si el agente la ignora, el plan pasa por el normalizador como cualquier otro.
 - **El planificador local (sin clave) usa la misma puerta** para las operaciones de imagen.
 - **Guided pierde los ajustes heredados.** Cada petición empieza sin ajustes confirmados. Al volver a Auto, la tarjeta aparece una vez para lo no aprobado.
+
+- **Actualización 2026-10-20 ([ADR 0025 D](0025-revision-sesion-house-party.md)).** El modelo de imagen que confirma una operación también puede cambiarse por otra línea o por otro proveedor del mismo modelo con la tarjeta «Keep / Change»; nunca en silencio.

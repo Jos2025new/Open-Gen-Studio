@@ -105,3 +105,33 @@ describe('the follow-up card after a switch', () => {
     spy.mockRestore();
   });
 });
+
+describe('the same card asks for another provider of the same model (ADR 0025 D)', () => {
+  const NANO = 'nanogpt::nano-banana-2';
+  const mk = (extra: Partial<SettingsFeedItem>) => ({ id: 'p1', createdAt: 0, workspace: 'chat', type: 'settings', status: 'pending', sections: [{ kind: 'image', count: 1, recommended: { modelRef: NANO, needsImage: false }, alternatives: [] }], switchFrom: { modelRef: OTHER, needsImage: false }, ...extra }) as SettingsFeedItem;
+  const show = async (item: SettingsFeedItem) => { await act(async () => { root.render(createElement(SettingsCard, { item, sessionId: useStore.getState().activeSessionId })); }); };
+  beforeEach(() => {
+    useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [NANO]: { ref: NANO, id: 'nano-banana-2', provider: 'nanogpt', kind: 'image', name: 'Nano Banana 2', acceptsText: true, acceptsImage: true, tags: [] } as ModelSummary } } }));
+  });
+
+  it('same layout and buttons; the line says where the model is also available', async () => {
+    await show(mk({}));
+    expect(host.querySelector('.cc-switch-line')?.textContent).toMatch(/^Nano Banana 2 is also on NanoGPT/);
+    expect(host.querySelector('.cc-switch-line')?.textContent).not.toContain('Found model');
+    expect(host.querySelectorAll('.cc-switch-line .cc-mini')).toHaveLength(1);
+    expect(host.querySelector('article')?.className).toContain('cc-narrow');
+    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Keep', 'Change']);
+    expect(host.querySelector('button.btn-primary')?.getAttribute('title')).toBe('Change to Nano Banana 2 on NanoGPT');
+  });
+
+  it('a change of model keeps its own wording', async () => {
+    await show(mk({ sections: [{ kind: 'image', count: 1, recommended: { modelRef: GROK, needsImage: false }, alternatives: [] }] }));
+    expect(host.querySelector('.cc-switch-line')?.textContent).toMatch(/^Found model Grok Imagine Image/);
+  });
+
+  it('the follow-up rows tell the two providers apart when the name is the same', async () => {
+    await show(mk({ followUp: true }));
+    const rows = [...host.querySelectorAll('button[role="checkbox"]')];
+    expect(rows.map((b) => b.textContent)).toEqual(['ContinueNano Banana 2 · NanoGPT', 'BackNano Banana 2 · Atlas Cloud']);
+  });
+});

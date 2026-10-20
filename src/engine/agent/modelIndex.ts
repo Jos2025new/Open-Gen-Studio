@@ -43,12 +43,31 @@ export function tokens(s: string): string[] {
 
 const GENERIC = new Set(['video', 'image', 'audio', 'music', 'model', 'models', 'to', 'text', 'the', 'a', 'de', 'modelo', 'v', '3d']);
 
+/** One letter off (typo, missing or extra letter): "banan" ~ "banana", "nanno" ~ "nano". */
+function oneOff(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (i === a.length || i === b.length) return true;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
+}
+
+/** Whether the query word names one of the model's words: exactly, as the start of it, or one letter off (words of 5+ letters only: numbers and "pro" never fuzz). */
+function nameHit(t: string, have: Set<string>): 'exact' | 'near' | undefined {
+  if (have.has(t)) return 'exact';
+  if (t.length < 5) return undefined;
+  for (const h of have) if (h.length >= 4 && (h.startsWith(t) || oneOff(t, h))) return 'near';
+  return undefined;
+}
+
 export interface SearchOptions {
   kind?: MediaKind;
   /** Prefer variants that take an input image (image-to-video) when the step has one. */
   needsImage?: boolean;
   /** Among equal matches, prefer this provider (the one of the user's selected model). */
   provider?: string;
+  /** Every word of the query must name the model (a typo still counts): for a name the user wrote, where a looser match would be a guess. */
+  strict?: boolean;
   limit?: number;
 }
 
@@ -60,22 +79,23 @@ export function searchIndex(models: ModelSummary[], query: string, opts: SearchO
   if (!q.length) return [];
   // Uncensored "-spicy" variants only when asked for by name (provisional choice, PLAN_AGENT_ROUTE.md decision 3).
   const spicy = q.includes('spicy');
-  const scored: Array<{ m: ModelSummary; hits: number; extra: number; fit: number; away: number }> = [];
+  const scored: Array<{ m: ModelSummary; hits: number; exact: number; extra: number; fit: number; away: number }> = [];
   for (const m of models) {
     if (opts.kind && m.kind !== opts.kind) continue;
     if (!spicy && /spicy/i.test(m.id)) continue;
     const have = new Set([...tokens(m.id), ...tokens(m.name)]);
-    const hits = q.filter((t) => have.has(t)).length;
+    const found = q.map((t) => nameHit(t, have));
+    const hits = found.filter(Boolean).length;
     if (!hits) continue;
     const fit = opts.needsImage == null ? 0 : opts.needsImage === Boolean(m.acceptsImage) ? 0 : 1;
-    scored.push({ m, hits, extra: tokens(m.id).filter((t) => !q.includes(t) && !GENERIC.has(t)).length, fit, away: opts.provider && m.provider !== opts.provider ? 1 : 0 });
+    scored.push({ m, hits, exact: found.filter((f) => f === 'exact').length, extra: tokens(m.id).filter((t) => !q.includes(t) && !GENERIC.has(t)).length, fit, away: opts.provider && m.provider !== opts.provider ? 1 : 0 });
   }
   const best = Math.max(0, ...scored.map((s) => s.hits));
   // With several words, a single stray match ("2") is noise: at least half of them must match.
-  const floor = Math.max(1, best - 1, Math.ceil(q.length / 2));
+  const floor = opts.strict ? q.length : Math.max(1, best - 1, Math.ceil(q.length / 2));
   return scored
     .filter((s) => s.hits >= floor)
-    .sort((a, b) => b.hits - a.hits || a.fit - b.fit || a.away - b.away || a.extra - b.extra || a.m.ref.localeCompare(b.m.ref))
+    .sort((a, b) => b.hits - a.hits || b.exact - a.exact || a.fit - b.fit || a.away - b.away || a.extra - b.extra || a.m.ref.localeCompare(b.m.ref))
     .slice(0, opts.limit ?? 8)
     .map((s) => s.m);
 }

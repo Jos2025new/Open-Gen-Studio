@@ -553,9 +553,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           }
         }
         // A model named in THIS request is never swapped silently: the user confirms first.
-        if (conf && parts.length <= 1 && s.model?.trim() && await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef)) {
-          const ref = (await ctx.getModel(s.model.trim()))?.model;
-          errors.push(`${where}: The user named ${ref?.name ?? s.model.trim()} (${ref?.ref ?? s.model.trim()}); call confirm_settings for ${kind} with model ${ref?.ref ?? s.model.trim()} first.`);
+        const asked = conf && parts.length <= 1 && s.model?.trim() ? await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef) : undefined;
+        if (asked) {
+          errors.push(`${where}: The user named ${asked.name} (${asked.ref}); call confirm_settings for ${kind} with model ${asked.ref} first.`);
           continue;
         }
         const ask = conf && parts.length <= 1 && ctx.switchedTo?.(kind) ? await followUpProblem(ctx, conf.modelRef, kind) : undefined;

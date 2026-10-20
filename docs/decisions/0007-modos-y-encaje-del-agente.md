@@ -39,3 +39,5 @@ El agente tiene tres modos (Auto, Guided y Direct). Tras probar el disparo por p
 - Pendiente de aprobación: la reversión de la regla "ajustes solo para la petición" (`0006`), el umbral de 0,50 USD (`0006`) y la fusión de las ramas de esta sesión en `task/modelo-general`.
 - Sin verificar con generación real: los cortes de cuatro vistas y de 2×3.
 - Enmendada por [0009](0009-disparo-forzado.md), que además decide el disparo forzado: modelo del compositor en Direct pese a confirmaciones anteriores, ambigüedades preguntadas aunque el agente rellene, sujeto de hoja con lugar, ángulos en Direct sin vuelta extra y upscale encadenado.
+
+**Actualización 2026-10-20 ([ADR 0025](0025-revision-sesion-house-party.md)).** `confirm_settings` admite `provider` en la parte (cambiar de proveedor sin cambiar de modelo pasa por la misma tarjeta «Keep / Change»); el número de imágenes confirmado vale para cada paso de imagen sin `count` propio.

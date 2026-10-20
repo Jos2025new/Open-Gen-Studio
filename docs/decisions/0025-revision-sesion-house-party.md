@@ -22,11 +22,14 @@ Una sesión de prueba en el sandbox (la fiesta en casa) mostró cinco fallos del
 
 **C. El crédito busca el equivalente.** Un candidato sirve si acepta al menos las entradas que necesita el modelo actual (uno que admite imagen puede hacer un trabajo de texto; uno solo de texto no puede hacer uno con imagen). El cambio automático sigue siendo solo para la misma línea de modelo al mismo precio o menos. No se ofrece nada a más de 1,5 veces el precio del modelo que falló (misma unidad); lo que cuesta más pero menos que eso se marca «pricier».
 
-(D y E se añaden con sus commits: pedir cambio de modelo o de proveedor, y el aspecto por entregable.)
+**D. Una sola pregunta para cambiar de modelo o de proveedor.** Mismo diseño, dos variantes: el agente solo declara el cambio (`confirm_settings` con el modelo y, si el usuario lo pidió, el `provider`; el proveedor solo, significa el modelo confirmado allí) y la app decide qué es. Otra línea de modelo (nombrada en la petición actual) es `model`; la misma línea en otro proveedor (nombrado en la petición actual) es `provider`. Ambos usan la tarjeta «Keep / Change» con su seguimiento; el texto de `provider` es «<Modelo> is also on <Proveedor> · from $X». Nunca se sustituye en silencio. La resolución del nombre es única (agente y validador): ref exacto; misma línea en el proveedor pedido; búsqueda por palabras solo en ese proveedor, con todas las palabras y tolerancia de una letra en palabras de 5 o más; si no hay nada parecido, vuelve al agente con el motivo y lo más cercano. Un empate real elige uno (la tarjeta muestra el nombre y el precio); no se hizo una tarjeta con dos opciones.
+
+(E, el aspecto por entregable, se añade con su commit.)
 
 ## Alternativas
 
 C: exigir igualdad de `acceptsImage` (descartado: excluía la copia equivalente de otro proveedor y ofrecía un miembro más caro de la familia).
+D: una herramienta nueva `ask_change` (descartado: `confirm_settings` ya lleva la parte y la tarjeta; basta un campo); una tarjeta con las dos opciones en un empate (descartado por tamaño de interfaz); búsqueda suelta de palabras (descartado: «nano banana 2 lite» acababa en «nano banana 2»).
 
 ## Consecuencias
 
