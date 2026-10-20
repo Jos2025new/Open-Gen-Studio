@@ -24,7 +24,7 @@ svg { flex-shrink: 0; }
 .tone-accent, .accent { color: var(--accent); }
 .chip { min-height: 28px; padding: 4px 7px; font-size: 11px; color: var(--text-2); border: 1px solid var(--border); }
 .chip.is-muted { color: var(--text-3); }
-.popover { position: fixed; z-index: 100; padding: 5px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: auto; overscroll-behavior: contain; animation: fade-in .12s; }
+.popover { position: fixed; z-index: 100; padding: 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-pop); overflow: auto; overscroll-behavior: contain; animation: fade-in .12s; }
 .pop-head { padding: 11px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 5px; }
 .pop-title { font-weight: 600; font-size: 13px; }
 .pop-sub, .menu-detail, .field-hint { color: var(--text-2); font-size: 11px; margin-top: 3px; line-height: 1.5; }
