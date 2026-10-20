@@ -162,10 +162,11 @@ describe('Done / Ongoing rule', () => {
 });
 
 describe('Studio board: tile size and new-tile sheen (CSS)', () => {
-  it('Large tiles are at least 200px; the sheen runs 3 passes and is off for reduced motion', async () => {
+  it('Large tiles are at least 200px; the sheen sweeps 3 times in the first 3 s of every 5 s and is off for reduced motion', async () => {
     const css = (await import('node:fs')).readFileSync('src/styles/studio.css', 'utf8');
     expect(css).toMatch(/\.space-board\.is-studio \.space-grid \{[^}]*minmax\(200px/);
-    expect(css).toMatch(/is-pending::after[^}]*animation: tile-sheen [^;]* 3 both/);
+    expect(css).toMatch(/is-pending::after[^}]*animation: tile-sheen 5s [^;]*infinite/);
+    expect(css).toMatch(/@keyframes tile-sheen \{[^\n]*59\.99%[^\n]*60%, 100% \{[^}]*opacity: 0/);
     expect(css).toMatch(/prefers-reduced-motion: reduce\) \{ \.space-board\.is-studio \.space-tile\.is-pending::after \{ animation: none/);
   });
 });
@@ -180,6 +181,7 @@ describe('Studio board: Ongoing tiles and default scope', () => {
     const t = host.querySelector('.space-ongoing .space-tile.is-pending .studio-pending-text')!;
     expect(t.textContent).toContain('1/3');
     expect(t.textContent).not.toContain('Ongoing');
+    expect(t.querySelector('.studio-spinner')).not.toBeNull();
     render(createElement(SpaceBoard, { kind: 'image' }));
     expect(q('.space-ongoing .space-run')).not.toBeNull();
   });
@@ -313,7 +315,10 @@ describe('compact generation in Studio chat', () => {
     expect(host.querySelectorAll('.studio-thumb.is-pending')).toHaveLength(1);
     expect(q('.studio-pending-text')!.textContent).toContain('Ongoing');
     expect(q('.studio-pending-text')!.textContent).not.toContain('0/1');
-    expect(q('.studio-thumb .studio-spinner')).not.toBeNull();
+    // The chat placeholder is the quietest one (board > plan thumbnails > chat): flat, the kind icon, no spinner or shimmer.
+    expect(q('.studio-thumb.is-pending .kind-backdrop.is-image')).not.toBeNull();
+    expect(q('.studio-thumb .studio-spinner')).toBeNull();
+    expect(q('.studio-thumb .shimmer')).toBeNull();
     expect(q('.studio-gen')!.textContent).not.toContain('prompt g2');
     expect(q('.studio-gen-head')).toBeNull();
   });

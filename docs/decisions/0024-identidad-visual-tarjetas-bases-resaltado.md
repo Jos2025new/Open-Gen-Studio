@@ -66,6 +66,8 @@ Corrección tras probarlo (el usuario: «me gustó… se siente menos ruidoso»)
 
 **Q. Bordes de paneles flotantes** (2026-10-20). El usuario: «¿por qué el borde es negro?… debería ser el más oscurito el que resalte»; la tira de contexto, la vista, la paleta y «Conversation» llevaban siempre `--border-strong` (parecían enfocados), y el compositor pasaba a `--border-focus` (casi negro en las bases claras). Norma: `--panel-line` (= `--border`) en reposo y `--panel-line-focus` (= `--border-strong`) solo con foco o ratón encima; `--border-focus` queda para campos de texto. Original conserva su aspecto (`--border-strong` → `--border-focus`). Prueba: `theme-tokens.test.ts`.
 
+**R. Jerarquía de los marcadores de carga** (2026-10-20). El usuario: «todos los placeholder tienen la misma jerarquía… la que dice ongoing debería ser la más aburrida». Orden de atención: 1) la casilla del tablero Generations (brillo del borde: tres pasadas en los primeros 3 s de cada 5 s, en bucle, y el circulito sobre el estado); 2) las miniaturas del plan, sin cambios; 3) el marcador del chat, plano: fondo, icono del tipo y «Ongoing», sin brillo, circulito ni puntos. Prueba: `studio-layout.test.ts`.
+
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
 ## Alternativas

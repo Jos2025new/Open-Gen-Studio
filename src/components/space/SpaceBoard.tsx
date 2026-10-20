@@ -179,7 +179,7 @@ export function PendingStatus({ g }: { g: Generation }) {
   const total = g.op ? 1 : g.settings.count;
   const p = g.progress == null ? null : Math.min(1, Math.max(0, g.progress > 1 ? g.progress / 100 : g.progress));
   return <>
-    <div className="studio-pending-text"><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{g.assetIds.length}/{total}</span>{eta ? <span className="faint">{eta}</span> : null}</div>
+    <div className="studio-pending-text"><span className="studio-spinner" aria-hidden /><span>{g.status === 'queued' ? 'Queued' : g.statusText ?? 'Creating'}</span><span className="faint">{g.assetIds.length}/{total}</span>{eta ? <span className="faint">{eta}</span> : null}</div>
     {p != null ? <div className="space-run-bar" role="progressbar" aria-valuenow={Math.round(p * 100)}><span style={{ width: `${p * 100}%` }} /></div> : null}
   </>;
 }
