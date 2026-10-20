@@ -45,7 +45,7 @@ Leyenda: **[px]** = valor fijo en vez de token.
 | `.q-opt` radio 5 y `.set-more` radio 5 | **Deriva** | Forma de chip repetida sin papel; migran a `.cc-chip`/`--chip-radius`. |
 | Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` (relleno tintado, borde y texto en lima) | **Conservar: es el estándar** | Decisión del usuario: elegir = acento lima, igual que la acción primaria. El verde `--ok` queda solo para estados (hecho, correcto). La casilla nueva se alinea con ello (antes iba en verde: deriva ya corregida). |
 | `notice-retry` como botón aparte | **Deriva** | Debe ser un `Button` `sm`. |
-| `.cc-approve` (relleno 10×16, radio 12, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§3) | Es la acción que gasta dinero: merece énfasis. |
+| `.cc-approve` (relleno 10×16, radio 12, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§4) | Es la acción que gasta dinero: merece énfasis. |
 | Generación `is-fit` (ancho = medios), teselas de radio 7, barra de tesela, error 300-480 | **Conservar dentro de la variante «Resultado»** (§3) | El contenido manda: el ancho sigue a la imagen. |
 | Popover del modelo (480 px, radio 16, relleno 14) | **Conservar como categoría «superposición»** | No es una tarjeta del hilo; se le dan tokens (`--pop-w`, `--pop-radius`) sin cambiar el aspecto. |
 | Burbuja del usuario (radio 12/12/3/12, 85 %) | **Conservar** | Es un mensaje, no una tarjeta. |
@@ -92,9 +92,10 @@ Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card
 Una tarjeta destaca cuando es un **momento clave** del flujo. Se proponen dos, y ninguna más sin pasar por la regla de §5.
 
 ### Variante «Decisión»: la tarjeta del plan (aprobar y gastar)
-Por qué: es el punto donde el usuario autoriza coste; debe leerse como lo más importante del hilo.
-- **Puede variar:** borde y cabecera con `--accent-line` / `--accent-soft`; el coste total en `--fs-l` 600 junto al primario; el primario más grande (`.cc-approve`: relleno 10×16, radio 12, 700, ya existente); miniaturas de paso más grandes (44 px) con sus estados.
-- **Debe seguir fijo:** escala tipográfica, espaciado, plantillas (cabecera, pasos como secciones, pie), un solo primario a la derecha, `card-l` de ancho.
+Por qué: es el punto donde el usuario autoriza coste; el énfasis va en la acción, no en la cabecera. Tras la prueba del usuario se **recorta**: sin banda de cabecera tintada (se vio fea), con la huella de hoy (mismo relleno exterior, sin sangría extra en la lista de pasos) y los títulos de paso con su peso y tamaño actuales.
+- **Puede variar (solo esto):** un borde sutil `--accent-line`; el botón de aprobar con el coste, ya existente (`.cc-approve`: relleno 10×16, radio 12, 700); un aire algo mayor entre filas de pasos (`padding-top` de 12 a `--sp-4`).
+- **Debe seguir fijo:** cabecera sobre la superficie plana (título y subtítulo como hoy), escala tipográfica (título de paso 13/600, coste a la derecha como hoy), relleno de la tarjeta, plantillas, un solo primario a la derecha, `card-l` de ancho.
+- **Honestidad:** lo que queda es muy poco, «el botón de aprobar con coste» y un borde. Si el usuario lo prefiere, la variante puede retirarse y el plan ser una `card-l` normal con ese botón (la regla de §5 deja entonces un solo hueco de variante libre).
 - Aplica a: `PlanCard` (y, si el usuario quiere, la aprobación de coste de un paso).
 
 ### Variante «Resultado»: la tarjeta de generación
@@ -133,7 +134,7 @@ Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens
 2. **Cambio de modelo y seguimiento → `card-s`**: ancho `fit-content` con tope, letra por plantilla (13/12/11), relleno `--card-pad-s`, casilla `.card-check`. Prueba: `switch-model-card-ui.test.ts` afirma `card-s`, píldora y casilla.
 3. **Resuelta común**: `.cc-set-done` pasa a `.card-done` y la usan preguntas y plan. Prueba: tests de tarjetas resueltas.
 4. **Preguntas → `card-m`**: cabecera de icono y título, `.cc-chip` en vez de `.q-opt`. Prueba: tests de preguntas + afirmación de tamaño. Mayor riesgo visual.
-5. **Ajustes → `card-l`** y **Plan → `card-l` + variante «Decisión»**: sustituir `620px`, `16px 18px`, `.cc-title 16px` por tokens y marcar la variante con una clase `card-v-decision`. Sin cambio visible salvo el énfasis de la variante. Prueba: tests actuales + afirmación de clase.
+5. **Ajustes → `card-l`** y **Plan → `card-l` + variante «Decisión»**: sustituir `620px`, `16px 18px`, `.cc-title 16px` por tokens y marcar la variante con una clase `card-v-decision`. Sin cambio visible salvo el borde, el aire entre filas y el botón. Prueba: tests actuales + afirmación de clase.
 6. **Generación → variante «Resultado»** (`card-v-result`): tokens en sus anchos y radios, sin tocar su maquetación. Prueba: `chat-cards-c7b` y tests de generación.
 7. **Chips, botones, radios**: un `--chip-radius`; `notice-retry` a `Button`; `.set-more`, `.cc-approve` con tokens; eliminar `!important`. Prueba: jsdom de chips y avisos.
 8. **Script `check-card-style`** con su baseline congelado. Prueba: el propio script en `npm test`.

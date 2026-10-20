@@ -16,7 +16,7 @@
 .card-check.is-on{color:var(--text)}.card-check.is-on .cc-box{background:var(--select-on);border-color:var(--select-on);color:#0b1f12}
 .card .cc-chip,.cc-mini{border-radius:var(--chip-radius)}.card .cc-chip.is-sel{background:var(--select-on-soft);color:var(--select-on);box-shadow:inset 0 0 0 1px var(--select-on)}
 .card-done{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3);flex-wrap:wrap}.card-done>svg{color:var(--select-on)}
-.card-v-decision{border-color:var(--accent-line)}.card-v-decision .card-head{margin:calc(-1*var(--card-pad-l));margin-bottom:var(--sp-3);padding:var(--sp-3) var(--card-pad-l);background:var(--accent-soft)}
-.card-v-decision .card-foot .cc-approve{border-radius:12px;font-weight:700}
+.card-v-decision{border-color:var(--accent-line)}.card-v-decision .plan-step{padding-top:var(--sp-4)}
+.card-v-decision .cc-approve{border-radius:12px;font-weight:700}
 .card-v-result{width:fit-content;min-width:min(100%,240px);max-width:var(--card-w-l);padding:var(--sp-2)}.card-v-result .card-head{margin:0 var(--sp-1) var(--sp-2)}.card-v-result .card-meta{margin:var(--sp-2) var(--sp-1) 0}.result-media{width:260px;height:260px;border-radius:var(--radius)}
 /* ===== fin de la propuesta ===== */
