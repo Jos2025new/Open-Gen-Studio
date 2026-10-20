@@ -11,7 +11,11 @@ Fecha: 2026-10-20. Estado: **aprobada (2026-10-20), sin implementar** (solo prop
 - Un selector de base (cinco opciones) y una fila de resaltado independiente, sin catálogo de temas.
 - Los cinco resaltados originales, con lima por defecto, más Aurora.
 
-**Pendiente** (no decidido): si «Decisión» sigue siendo una variante; el tamaño de las tarjetas de cambio de modelo; el puntero en `AGENTS.md`.
+- «Decisión» se mantiene como variante; las tarjetas de cambio de modelo y de seguimiento usan `card-m`.
+- Original conserva sus colores y esquinas de 10 px y usa las plantillas nuevas.
+- Estas reglas son la identidad visual: cambiarlas exige aprobación explícita del usuario (regla 6 de AGENTS.md).
+
+**Pendiente:** nada.
 
 ## 1. Selector de base (Ajustes → Apariencia)
 

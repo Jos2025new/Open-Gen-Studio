@@ -2,9 +2,9 @@
 
 Fecha: 2026-10-20. Estado: **propuesta aprobada en lo esencial, sin implementar** (solo documento y maqueta; ningún cambio de código). Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app. Va junto a [la propuesta de temas](propuesta-temas.md) (bases y color de resaltado), también aprobada.
 
-**Aprobado:** plantillas base fijas; tres tamaños; una o dos tarjetas que destacan; «Decisión» sin banda y con la huella antigua; la línea «resuelta»; Atlas como base por defecto; botones y chips en píldora; todo color sale de tokens (selección = resaltado, verde solo para estados).
+**Aprobado:** plantillas base fijas; tres tamaños; una o dos tarjetas que destacan; «Decisión» sin banda y con la huella antigua; la línea «resuelta»; Atlas como base por defecto; botones y chips en píldora; todo color sale de tokens (selección = resaltado, verde solo para estados). Decidido por el usuario el 2026-10-20: «Decisión» se mantiene como variante; las tarjetas de cambio de modelo y de seguimiento usan `card-m`; estas reglas son la identidad visual de la app y cambiarlas exige su aprobación explícita (regla 6 de AGENTS.md).
 
-**Pendiente:** si «Decisión» sigue siendo una variante (o el plan pasa a una `card-l` normal); el tamaño de las tarjetas de cambio de modelo (`card-s`, o `card-m` el seguimiento); el puntero en `AGENTS.md`.
+**Pendiente:** nada.
 
 ## Por qué (y qué se busca)
 
@@ -107,7 +107,7 @@ Una tarjeta destaca cuando es un **momento clave** del flujo. Se proponen dos, y
 Por qué: es el punto donde el usuario autoriza coste; el énfasis va en la acción, no en la cabecera. Sin banda de cabecera tintada, con la huella de hoy (mismo relleno exterior, sin sangría extra en la lista de pasos) y los títulos de paso con su peso y tamaño actuales.
 - **Puede variar (solo esto):** un borde sutil `--accent-line`; el botón de aprobar con el coste, ya existente (`.cc-approve`, 700, en píldora); un aire algo mayor entre filas de pasos (`padding-top` de 12 a `--sp-4`).
 - **Debe seguir fijo:** cabecera sobre la superficie plana (título y subtítulo como hoy), escala tipográfica (título de paso 13/600, coste a la derecha como hoy), relleno de la tarjeta, plantillas, un solo primario a la derecha, `card-l` de ancho.
-- **Pendiente:** lo que queda es poco, un borde y el botón de aprobar con coste. Si el usuario lo prefiere, la variante se retira y el plan es una `card-l` normal con ese botón (queda entonces un hueco de variante libre).
+- **Decidido (2026-10-20):** se mantiene como variante, aunque lo que varía es poco: el borde, el botón de aprobar con coste y el aire entre filas.
 - Aplica a: `PlanCard` (y, si el usuario quiere, la aprobación de coste de un paso).
 
 ### Variante «Resultado»: la tarjeta de generación
@@ -136,7 +136,7 @@ Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens
 5. **Ninguna tarjeta nueva ni cambio de aspecto sin actualizar este documento.** Una variación nueva sigue §6 (papel, entrada, tope de dos).
 6. **Los tests jsdom** afirman el tamaño (`card-s|m|l`), la variante si la hay, y los componentes reutilizados.
 
-**Dónde viven:** este documento (enlazado desde `docs/README.md`) y **una línea en AGENTS.md** (pendiente). AGENTS.md pesa 3 064 bytes y el tope es 3 KB (3 072): hay que recortar otra línea antes (p. ej. abreviar «Salvaguardas»). Línea propuesta (≈ 110 bytes): «Tarjetas del chat: un tamaño y una plantilla de [docs/propuesta-sistema-visual-tarjetas.md](docs/propuesta-sistema-visual-tarjetas.md); sin px sueltos.» Alternativa sin tocar AGENTS.md: contrato `card-sizes` en `docs/map.md`.
+**Dónde viven:** este documento y [propuesta-temas.md](propuesta-temas.md), enlazados desde `docs/README.md`, y la **regla 6 de AGENTS.md**: forman la identidad visual; cambiarlas exige aprobación explícita del usuario.
 
 ## 8. Plan de migración único (tarjetas y temas)
 
@@ -155,9 +155,9 @@ Una sola secuencia; cada paso es un commit con `npm run test:related`, y al cerr
 - Pruebas: `check-sizes`, suite.
 
 **4. Migración tarjeta a tarjeta**
-- 4a. Cambio de modelo y seguimiento a `card-s` (ancho `fit-content` con tope, letra 13/12/11, casilla de plantilla). Prueba: `switch-model-card-ui.test.ts` afirma `card-s`, píldora y casilla.
+- 4a. Cambio de modelo y seguimiento a `card-m` (decidido por el usuario; ancho 512, cabecera de plantilla, letra 15/13/11, casilla de plantilla). Prueba: `switch-model-card-ui.test.ts` afirma `card-m`, píldora y casilla.
 - 4b. Resuelta común (`.cc-set-done` a `.card-done`) y Preguntas a `card-m` (`.cc-chip` en vez de `.q-opt`): el mayor riesgo visual. Pruebas: tarjetas resueltas y preguntas, con afirmación de tamaño.
-- 4c. Ajustes y Plan a `card-l`; el plan con `card-v-decision` (si sigue siendo variante). Pruebas: las actuales más la afirmación de clase.
+- 4c. Ajustes y Plan a `card-l`; el plan con `card-v-decision`. Pruebas: las actuales más la afirmación de clase.
 - 4d. Generación a `card-v-result`, con su indicador de «generando» (esfera con grano en Aurora). Pruebas: `chat-cards-c7b` y las de generación.
 - 4e. Chips, botones y radios: `notice-retry` a `Button`; `.set-more` y `.cc-approve` con tokens; fuera `!important`. Prueba: jsdom de chips y avisos.
 
