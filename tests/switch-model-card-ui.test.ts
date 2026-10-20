@@ -69,7 +69,7 @@ describe('the follow-up card after a switch', () => {
     expect(host.textContent).not.toContain('Nano Banana 2');
   });
 
-  it('one click fills the box green (is-on, checked) and answers; the picker lists the other models with the Model-chip rows', async () => {
+  it('one click fills the box with the accent (is-on, checked) and answers; the picker lists the other models with the Model-chip rows', async () => {
     const spy = vi.spyOn(runtime, 'confirmSettings').mockResolvedValue(undefined);
     await show();
     await act(async () => { (host.querySelectorAll('button[role="checkbox"]')[1] as HTMLElement).click(); });

@@ -43,7 +43,7 @@ Leyenda: **[px]** = valor fijo en vez de token.
 | `.cc-set-done` (la tarjeta resuelta en una línea de resumen) | **Conservar y promover a estado común** | Toda tarjeta, al resolverse, se pliega a una línea; reduce ruido del historial. Pasa a ser plantilla («resuelta»), no excepción de ajustes. |
 | `.cc-mini` (píldora de solo lectura) frente a `.cc-chip` (control que abre algo) | **Conservar con dos papeles** | Mostrar un valor frente a editarlo. Ambos con `--chip-radius`. |
 | `.q-opt` radio 5 y `.set-more` radio 5 | **Deriva** | Forma de chip repetida sin papel; migran a `.cc-chip`/`--chip-radius`. |
-| Selección: `.q-opt` y `.cc-ratio` en lima; casilla en verde | **Deriva (a decidir)** | Dos colores para «elegido». Se propone el verde para selección y la lima solo para la acción primaria y la navegación activa. |
+| Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` (relleno tintado, borde y texto en lima) | **Conservar: es el estándar** | Decisión del usuario: elegir = acento lima, igual que la acción primaria. El verde `--ok` queda solo para estados (hecho, correcto). La casilla nueva se alinea con ello (antes iba en verde: deriva ya corregida). |
 | `notice-retry` como botón aparte | **Deriva** | Debe ser un `Button` `sm`. |
 | `.cc-approve` (relleno 10×16, radio 12, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§3) | Es la acción que gasta dinero: merece énfasis. |
 | Generación `is-fit` (ancho = medios), teselas de radio 7, barra de tesela, error 300-480 | **Conservar dentro de la variante «Resultado»** (§3) | El contenido manda: el ancho sigue a la imagen. |
@@ -71,7 +71,7 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 
 1. **Cabecera** `.card-head`: icono 16 (14 en `card-s`) + título; a la derecha, meta o menú opcionales. En `card-s` la propia línea de pregunta hace de cabecera.
 2. **Cuerpo** `.card-body`: texto, campos o secciones (`.card-section`, separadas por borde superior y `--sp-3`).
-3. **Opciones** `.card-options`: tres formas permitidas, nada más: **casillas** `.card-check` (16×16, radio 4, gris vacío; elegida = relleno `--select-on` + check), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura). Elegido = verde.
+3. **Opciones** `.card-options`: tres formas permitidas, nada más: **casillas** `.card-check` (16×16, radio 4, gris vacío; elegida = relleno lima `--select-on` + check oscuro `--accent-ink`), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura). Elegido = lima: relleno tintado (`--select-on-soft`), borde `--select-line` y texto/check en `--select-on`.
 4. **Pie** `.card-foot`: meta o total a la izquierda; acciones a la derecha; **un solo primario**; borde superior en `card-m`/`card-l`, sin borde en `card-s`.
 5. **Resuelta** `.card-done`: una línea con check, nombre y píldoras de lo elegido, más «editar». Todas las tarjetas que piden algo la tienen.
 
@@ -85,7 +85,7 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 | Título / cuerpo / meta | 13 / 12 / 11 | 15 / 13 / 11 | 16 / 13 / 12 |
 | Chip / botón | `.cc-mini` / `Button sm` | `.cc-chip` / `Button md` | `.cc-chip`, `ModelField` / `Button md` |
 
-Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--chip-radius: var(--radius)`, `--fs-title: 16px`, `--select-on: var(--ok)`, `--select-on-soft: color-mix(in srgb, var(--ok) 16%, transparent)`, `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
+Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--chip-radius: var(--radius)`, `--fs-title: 16px`, `--select-on: var(--accent)`, `--select-on-soft: var(--accent-soft)`, `--select-line: var(--accent-line)` (alias de la selección existente; `--ok` solo para estados), `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
 
 ## 4. Variaciones permitidas (máximo dos)
 
@@ -119,7 +119,7 @@ Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens
 1. **Elige un tamaño** (`card-s`, `card-m`, `card-l`) y las plantillas de §3 (cabecera, cuerpo, opciones, pie, resuelta). Sin anchos, rellenos ni radios nuevos.
 2. **Reutiliza** `ModelField`, `ChipPop`, `Button`, `.cc-mini`, `.cc-chip`, `.card-check` y `AspectPicker`. Un selector de modelo es `ModelField` y nada más.
 3. **Solo tokens**: ni `px`, ni `rem` sueltos, ni colores fijos en CSS de tarjetas.
-4. **Un solo primario por tarjeta**, a la derecha; selección en verde (`--select-on`).
+4. **Un solo primario por tarjeta**, a la derecha; selección en lima (`--select-on`, el mismo acento que el primario); el verde `--ok` solo para estados.
 5. **Ninguna tarjeta nueva ni cambio de aspecto sin actualizar este documento.** Una variación nueva sigue §5 (papel, entrada, tope de dos).
 6. **Los tests jsdom** afirman el tamaño (`card-s|m|l`), la variante si la hay, y los componentes reutilizados.
 
@@ -131,24 +131,22 @@ Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens
 
 1. **Tokens y plantillas** (`tokens.css`, `chat-cards.css`): añadir los tokens de §3 y las clases `card-s/m/l`, `.card-head/body/options/foot/done`, `.card-check`; sin usarlas. Prueba: `check-sizes`, suite.
 2. **Cambio de modelo y seguimiento → `card-s`**: ancho `fit-content` con tope, letra por plantilla (13/12/11), relleno `--card-pad-s`, casilla `.card-check`. Prueba: `switch-model-card-ui.test.ts` afirma `card-s`, píldora y casilla.
-3. **Selección verde unificada** (con decisión del usuario): `.q-opt.is-on`, `.cc-ratio.is-on` a `--select-on`. Prueba: jsdom de `chat-cards-c5/c7b` afirman la clase, no el color.
-4. **Resuelta común**: `.cc-set-done` pasa a `.card-done` y la usan preguntas y plan. Prueba: tests de tarjetas resueltas.
-5. **Preguntas → `card-m`**: cabecera de icono y título, `.cc-chip` en vez de `.q-opt`. Prueba: tests de preguntas + afirmación de tamaño. Mayor riesgo visual.
-6. **Ajustes → `card-l`** y **Plan → `card-l` + variante «Decisión»**: sustituir `620px`, `16px 18px`, `.cc-title 16px` por tokens y marcar la variante con una clase `card-v-decision`. Sin cambio visible salvo el énfasis de la variante. Prueba: tests actuales + afirmación de clase.
-7. **Generación → variante «Resultado»** (`card-v-result`): tokens en sus anchos y radios, sin tocar su maquetación. Prueba: `chat-cards-c7b` y tests de generación.
-8. **Chips, botones, radios**: un `--chip-radius`; `notice-retry` a `Button`; `.set-more`, `.cc-approve` con tokens; eliminar `!important`. Prueba: jsdom de chips y avisos.
-9. **Script `check-card-style`** con su baseline congelado. Prueba: el propio script en `npm test`.
+3. **Resuelta común**: `.cc-set-done` pasa a `.card-done` y la usan preguntas y plan. Prueba: tests de tarjetas resueltas.
+4. **Preguntas → `card-m`**: cabecera de icono y título, `.cc-chip` en vez de `.q-opt`. Prueba: tests de preguntas + afirmación de tamaño. Mayor riesgo visual.
+5. **Ajustes → `card-l`** y **Plan → `card-l` + variante «Decisión»**: sustituir `620px`, `16px 18px`, `.cc-title 16px` por tokens y marcar la variante con una clase `card-v-decision`. Sin cambio visible salvo el énfasis de la variante. Prueba: tests actuales + afirmación de clase.
+6. **Generación → variante «Resultado»** (`card-v-result`): tokens en sus anchos y radios, sin tocar su maquetación. Prueba: `chat-cards-c7b` y tests de generación.
+7. **Chips, botones, radios**: un `--chip-radius`; `notice-retry` a `Button`; `.set-more`, `.cc-approve` con tokens; eliminar `!important`. Prueba: jsdom de chips y avisos.
+8. **Script `check-card-style`** con su baseline congelado. Prueba: el propio script en `npm test`.
 
-Cada paso es un commit con `npm run test:related`; al cerrar, `npm test`. El usuario revisa visualmente los pasos 2, 5 y 6 en el sandbox.
-
+Cada paso es un commit con `npm run test:related`; al cerrar, `npm test`. El usuario revisa visualmente los pasos 2, 4 y 5 en el sandbox.
 **Tamaño de las tarjetas nuevas:** `card-s` (mínimo). Son confirmaciones de una línea con acciones; conservan la anchura corta pero con la jerarquía de letra, relleno y píldoras del sistema. El seguimiento, por su lista de modelos, puede pasar a `card-m` sin cambiar de lógica.
 
 ## Maqueta
 
-Una maqueta estática con las hojas reales de la app y los tokens propuestos, antes y después, de cada caso: [mockups/tarjetas.html](mockups/tarjetas.html) (CSS propuesto en [mockups/propuesta.css](mockups/propuesta.css)). Se abre directamente en el navegador; las fuentes salen de `node_modules`.
+Una maqueta estática con las hojas reales de la app y los tokens propuestos, antes y después, de cada caso: [mockups/tarjetas.html](mockups/tarjetas.html) (CSS propuesto en [mockups/propuesta.css](mockups/propuesta.css)). Se abre directamente en el navegador; las fuentes salen de `node_modules`. Si el visor bloquea las hojas locales enlazadas, la página sale sin estilo: ábrela desde un navegador con acceso a archivos, o genera una copia con el CSS incrustado (no se versiona, por el tope de tamaño).
 
 ## Límites
 
 - Es un documento; no cambia código ni estilos.
-- Los valores salen de los más usados hoy; el usuario puede ajustarlos antes del paso 1. La decisión del verde (toda la app o solo tarjetas) está pendiente.
+- Los valores salen de los más usados hoy; el usuario puede ajustarlos antes del paso 1.
 - No cubre Home, Designer ni nodos, que seguirán la misma norma de tokens después.
