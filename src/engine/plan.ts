@@ -1,4 +1,5 @@
 import { countFollowsCard } from './planCount';
+import { aspectFor } from './planAspect';
 import { lineKey, type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
 import { parsePath } from './design/path';
@@ -587,7 +588,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             (s as Record<string, unknown>)[field] = value;
           };
           keep('resolution', conf.resolution);
-          keep('aspect', conf.aspect);
+          keep('aspect', kind === 'image' ? aspectFor(s, raw, rawSteps, imageRefs, inputAspect, conf.aspect, adjustments) : conf.aspect);
           if (kind === 'video') keep('duration', conf.duration);
           if (kind === 'image' && countFollowsCard(rawSteps, s)) keep('count', conf.count);
         }

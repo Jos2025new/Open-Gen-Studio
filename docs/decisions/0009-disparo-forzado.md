@@ -58,4 +58,4 @@ El usuario fijó también cómo se comporta cada modo. La revisión de `task/mod
 - **El planificador local (sin clave) usa la misma puerta** para las operaciones de imagen.
 - **Guided pierde los ajustes heredados.** Cada petición empieza sin ajustes confirmados. Al volver a Auto, la tarjeta aparece una vez para lo no aprobado.
 
-- **Actualización 2026-10-20 ([ADR 0025 D](0025-revision-sesion-house-party.md)).** El modelo de imagen que confirma una operación también puede cambiarse por otra línea o por otro proveedor del mismo modelo con la tarjeta «Keep / Change»; nunca en silencio.
+- **Actualización 2026-10-20 ([ADR 0025 D](0025-revision-sesion-house-party.md)).** El modelo de imagen que confirma una operación también puede cambiarse por otra línea o por otro proveedor del mismo modelo con la tarjeta «Keep / Change»; nunca en silencio. Los pasos de imagen toman el aspecto de la tarjeta salvo una referencia que escribe el suyo o una imagen de fuera del plan ([ADR 0025 E](0025-revision-sesion-house-party.md)).
