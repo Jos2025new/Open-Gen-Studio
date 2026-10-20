@@ -16,26 +16,36 @@ export async function switchSection(
   parts: AgentState['settingsParts'],
   requestText: string,
   written: string | undefined,
-): Promise<{ section: SettingsSection; from: SettingsChoice } | undefined> {
+  follow?: { switchedTo: AgentState['switchedTo']; auto: boolean },
+): Promise<{ section: SettingsSection; from: SettingsChoice; followUp?: boolean } | undefined> {
   const sec = sections[0];
   const from = sec && sections.length === 1 ? confirmed?.[sec.kind] : undefined;
   if (!sec || !from || (parts ?? []).filter((p) => p.kind === sec.kind).length > 1) return undefined;
   const [now, was] = await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]);
-  if (!now || !was || lineKey(now.model) === lineKey(was.model)) return undefined;
-  if (!userNamed([now.model.name, written ?? ''], requestText)) return undefined;
+  if (!now || !was) return undefined;
+  if (lineKey(now.model) === lineKey(was.model) || !userNamed([now.model.name, written ?? ''], requestText)) {
+    // The follow-up (Auto): the last request switched this kind and this one names no model: continue with it, go back, or another.
+    const to = follow?.auto ? follow.switchedTo?.[sec.kind] : undefined;
+    if (!to || userNamed([was.model.name], requestText)) return undefined;
+    return { section: { ...sec, recommended: { ...to, needsImage: sec.recommended.needsImage }, alternatives: sec.alternatives.filter((r) => r !== to.modelRef && r !== from.modelRef) }, from, followUp: true };
+  }
   const carried = defaultChoice(sec.recommended.modelRef, now.schema, { kind: sec.kind, startImage: sec.recommended.needsImage, count: from.count }, { ...from, modelRef: sec.recommended.modelRef });
   return { section: { ...sec, count: from.count ?? sec.count, recommended: { ...carried, needsImage: sec.recommended.needsImage } }, from };
 }
 
 /** A switch card whose answer is the new model (Keep answers with the confirmed one: an ordinary confirmation). */
-const switched = (item: SettingsFeedItem, sections: SettingsSection[]) => Boolean(item.switchFrom && sections[0]?.chosen?.modelRef !== item.switchFrom.modelRef);
+const switched = (item: SettingsFeedItem, sections: SettingsSection[]) => Boolean(item.switchFrom && !item.followUp && sections[0]?.chosen?.modelRef !== item.switchFrom.modelRef);
 
 /** What the session keeps once a card is confirmed. A switch card adds the new model as a part and leaves the confirmed one as the kind's settings. */
-export function confirmedState(a: AgentState, item: SettingsFeedItem, sections: SettingsSection[]): Pick<AgentState, 'pending' | 'settings' | 'settingsParts'> {
+export function confirmedState(a: AgentState, item: SettingsFeedItem, sections: SettingsSection[]): Pick<AgentState, 'pending' | 'settings' | 'settingsParts' | 'switchedTo'> {
   const firstOfKind = sections.filter((x, i) => sections.findIndex((y) => y.kind === x.kind) === i);
   const parts: NonNullable<AgentState['settingsParts']> = sections.map((x) => ({ ...(x.chosen as SettingsChoice), kind: x.kind }));
-  if (switched(item, sections)) return { pending: undefined, settings: a.settings, settingsParts: [...parts, { ...(item.switchFrom as SettingsChoice), kind: sections[0].kind }] };
-  return { pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: parts };
+  const kind = sections[0].kind;
+  if (switched(item, sections)) return { pending: undefined, settings: a.settings, settingsParts: [...parts, { ...(item.switchFrom as SettingsChoice), kind }], switchedTo: { ...a.switchedTo, [kind]: sections[0].chosen } };
+  // An ordinary confirmation (and the follow-up's three answers) settles the question: nothing left to ask for these kinds.
+  const left = { ...a.switchedTo };
+  for (const x of firstOfKind) delete left[x.kind];
+  return { pending: undefined, settings: { ...a.settings, ...Object.fromEntries(firstOfKind.map((x) => [x.kind, x.chosen])) }, settingsParts: parts, switchedTo: left };
 }
 
 /** For the agent after a switch: which steps get the new model, which keep the confirmed one. */

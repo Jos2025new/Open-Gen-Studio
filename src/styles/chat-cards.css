@@ -110,6 +110,13 @@
 .cc-card .set-total { color: var(--text-4); }
 .cc-approve { gap: 8px; border-radius: 12px; font-weight: 700; padding: 10px 16px; }
 .cc-switch-line { margin: 0 0 10px; }
+.cc-follow .cc-switch-line { margin-bottom: 6px; font-size: var(--fs-xs); }
+.cc-picks { display: flex; flex-direction: column; gap: 2px; }
+.cc-pick { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: var(--fs-xs); text-align: left; color: var(--text-2); }
+.cc-pick svg { color: var(--text-4); flex: none; }
+.cc-pick:hover { background: var(--surface-2); }
+.cc-pick.is-on { color: var(--text); }
+.cc-pick.is-on svg { color: var(--ok); }
 .cc-switch .cc-switch-go { padding: 12px 22px; font-size: 1.05em; font-weight: 700; }
 .cc-ap-sep { opacity: .55; margin: 0 2px; }
 .cc-ap-cost { font-weight: 700; }

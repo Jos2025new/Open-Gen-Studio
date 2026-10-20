@@ -11,7 +11,7 @@ import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import { userNamed } from './modelNaming';
-import { namedOverConfirmed } from './modelNamed';
+import { followUpProblem, namedOverConfirmed } from './modelNamed';
 import type {
   AdvancedValue,
   AssetKind,
@@ -160,6 +160,7 @@ export interface PlanContext {
   confirmedParts?: (kind: MediaKind) => SettingsChoice[];
   /** The request being handled: its message and its answers. What a fitted operation parameter is read from. */
   requestText?: () => string;
+  switchedTo?: (kind: MediaKind) => SettingsChoice | undefined;
   /** Angle values already made from this source image, so "a different angle" takes one that is not made yet. */
   usedAngles?: (assetId: string) => string[];
   /** Direct mode: no questions, so an ambiguity takes the operation's visible default instead of asking. */
@@ -548,12 +549,14 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             if (m && lineKey(m) === lineKey(named!)) { conf = p; break; }
           }
         }
-        // A model the user named in THIS request is never swapped silently, in either direction: the user confirms the switch first.
+        // A model named in THIS request is never swapped silently: the user confirms first.
         if (conf && parts.length <= 1 && s.model?.trim() && await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef)) {
           const ref = (await ctx.getModel(s.model.trim()))?.model;
           errors.push(`${where}: The user named ${ref?.name ?? s.model.trim()} (${ref?.ref ?? s.model.trim()}); call confirm_settings for ${kind} with model ${ref?.ref ?? s.model.trim()} first.`);
           continue;
         }
+        const ask = conf && parts.length <= 1 && ctx.switchedTo?.(kind) ? await followUpProblem(ctx, conf.modelRef, kind) : undefined;
+        if (ask) { errors.push(`${where}: ${ask}`); continue; }
         if (conf) {
           const confName = (await ctx.getModel(conf.modelRef))?.model.name ?? conf.modelRef;
           const stepNeedsImage = refs.length > 0 || Boolean(s.first_frame);

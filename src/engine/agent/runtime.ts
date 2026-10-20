@@ -235,6 +235,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
     // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
+    switchedTo: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle === 'auto' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.switchedTo?.[kind] : undefined),
     confirmedParts: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
   };
 }
@@ -1518,8 +1519,8 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, [session(sessionId).agent.draft?.request ?? '', ...Object.values(session(sessionId).agent.draft?.answers ?? {})].join('\n'), parts[0]?.model);
-          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : sections), ...(sw ? { switchFrom: sw.from } : {}) };
+          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, [session(sessionId).agent.draft?.request ?? '', ...Object.values(session(sessionId).agent.draft?.answers ?? {})].join('\n'), parts[0]?.model, { switchedTo: session(sessionId).agent.switchedTo, auto: get().composer.agentStyle === 'auto' });
+          const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : {}) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });

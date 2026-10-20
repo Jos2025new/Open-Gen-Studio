@@ -272,7 +272,7 @@ export interface SavedView3D {
   grid: boolean;
 }
 
-export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | 'variations' | 'reference_sheet' | 'edit' | 'animate' | 'extract_frame' | 'continue' | 'contact_sheet' | 'grid_split' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'create_voice' | 'edit_region' | 'remove_object' | 'join_clips' | 'fx' | 'replace_background' | 'replace_background';
+export type OpId = 'relight' | 'angle' | 'upscale' | 'remove_bg' | 'reframe' | 'variations' | 'reference_sheet' | 'edit' | 'animate' | 'extract_frame' | 'continue' | 'contact_sheet' | 'grid_split' | 'video_upscale' | 'video_edit' | 'video_extend' | 'transcribe' | 'create_voice' | 'edit_region' | 'remove_object' | 'join_clips' | 'fx' | 'replace_background';
 
 export type GenerationOrigin = 'composer' | 'agent' | 'op' | 'node' | 'designer';
 export type GenerationStatus = 'queued' | 'running' | 'done' | 'error' | 'canceled' | 'review';
@@ -573,9 +573,9 @@ export interface SettingsSection {
 
 export interface SettingsFeedItem extends FeedBase {
   type: 'settings';
-  /** What the plan will make, in the agent's words (one line). */
+  /** What the plan will make (one line). */
   summary?: string;
-  /** Only the kinds of the plan that comes now, images before video. */
+  /** The plan's kinds, images first. */
   sections: SettingsSection[];
   status: 'pending' | 'confirmed' | 'skipped';
   draft?: DraftMode;
@@ -583,6 +583,8 @@ export interface SettingsFeedItem extends FeedBase {
   toolCallId?: string;
   /** Switch-model card: the confirmed choice kept for other steps. */
   switchFrom?: SettingsChoice;
+  /** With switchFrom: asks whether to continue with the switched model. */
+  followUp?: boolean;
 }
 
 /** What the user changed back in the conversation (for us, never sent to the agent). */
@@ -895,24 +897,26 @@ export interface LlmMessage {
 export interface AgentState {
   history: LlmMessage[];
   pending?: { toolCallId: string | null; kind: 'questions' | 'settings' | 'plan'; feedItemId: string };
-  /** Settings the user confirmed for this work (phase 2); plans apply them, follow-ups reuse them. */
+  /** Settings confirmed for this work (phase 2); plans apply them. */
   settings?: Partial<Record<'video' | 'image', SettingsChoice>>;
-  /** Every part of the last confirmed card, in order (two image models when the user compares them). */
+  /** Parts of the last confirmed card, in order (two image models when compared). */
   settingsParts?: Array<SettingsChoice & { kind: 'video' | 'image' }>;
+  /** Model added by the last switch, per kind. */
+  switchedTo?: Partial<Record<'video' | 'image', SettingsChoice>>;
   draftMode?: DraftMode;
   questionRound: number;
-  /** Facts to hand to the model with the next user turn (e.g. execution results). */
+  /** Facts for the model with the next user turn. */
   notes: string[];
   busy: boolean;
-  /** What the agent is doing while busy, for the chat's status row (no model output is shown). */
+  /** What the agent is doing while busy (status row). */
   phase?: 'working' | 'drafting' | 'checking';
   /** Schema loads the plan check awaits now. */
   waiting?: { key: string; name: string; since: number }[];
-  /** Plan card the user commented on instead of approving; replaced by a revision or closed at the end of the turn. */
+  /** Plan card the user commented on instead of approving. */
   revising?: string;
   /** Offline planner memory for the request being clarified. */
   draft?: { request: string; answers: Record<string, string>; attachments: string[] };
-  /** Canvas the conversation above belongs to; each canvas keeps its own (unset: older sessions, adopted as is). */
+  /** Canvas the conversation above belongs to (unset: older sessions). */
   canvas?: Workspace;
   /** The other canvases' conversations, kept while this one is active. */
   parked?: Partial<Record<Workspace, CanvasConversation>>;

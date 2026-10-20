@@ -54,6 +54,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
       </article>
     );
   }
+  if (item.switchFrom && item.followUp) return <FollowUpCard item={item} sessionId={sessionId} name={name} />;
   if (item.switchFrom) return <SwitchModelCard item={item} sessionId={sessionId} name={name} />;
   return (
     <article className="q-card set-card cc-card cc-w">
@@ -296,6 +297,38 @@ function SwitchModelCard({ item, sessionId, name }: { item: SettingsFeedItem; se
         <Button variant="ghost" size="sm" onClick={() => void confirmSettings(sessionId, item.id, [{ ...keep, needsImage: next.needsImage }])}>Keep {name(keep.modelRef)}</Button>
         <Button variant="primary" size="md" className="cc-switch-go" onClick={() => void confirmSettings(sessionId, item.id, [next])}>Switch to {name(next.modelRef)}</Button>
       </footer>
+    </article>
+  );
+}
+
+/** The request after a switch: a very small card, one check per option; one click answers (grey check, green once picked). */
+function FollowUpCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
+  const schemas = useStore((s) => s.catalog.schemas);
+  const [picked, setPicked] = useState<string>();
+  const [more, setMore] = useState(false);
+  const section = sectionsOf(item)[0];
+  const switched = section.recommended;
+  const kept = item.switchFrom!;
+  const answer = (c: SettingsChoice) => { setPicked(c.modelRef); void confirmSettings(sessionId, item.id, [c]); };
+  const other = (ref: string) => answer({ ...defaultChoice(ref, schemas[ref], { kind: section.kind, startImage: switched.needsImage, duration: switched.duration, aspect: switched.aspect, count: switched.count }, switched), needsImage: switched.needsImage });
+  const row = (ref: string, label: string, onClick: () => void) => (
+    <button key={ref} type="button" className={`cc-pick ${picked === ref ? 'is-on' : ''}`} aria-pressed={picked === ref} onClick={onClick}>
+      <Check size={13} aria-hidden /> {label}
+    </button>
+  );
+  return (
+    <article className="q-card set-card cc-card cc-w cc-follow">
+      <p className="cc-switch-line">Next {section.kind === 'image' ? 'image' : 'video'} with {name(switched.modelRef)} or back to {name(kept.modelRef)}?</p>
+      <div className="cc-picks">
+        {row(switched.modelRef, `Continue with ${name(switched.modelRef)}`, () => answer(switched))}
+        {row(kept.modelRef, `Back to ${name(kept.modelRef)}`, () => answer({ ...kept, needsImage: switched.needsImage }))}
+        {section.alternatives.length ? (
+          <>
+            <button type="button" className="cc-pick cc-pick-more" aria-expanded={more} onClick={() => setMore(!more)}><ChevronDown size={13} aria-hidden /> Try another model</button>
+            {more ? section.alternatives.map((ref) => row(ref, name(ref), () => other(ref))) : null}
+          </>
+        ) : null}
+      </div>
     </article>
   );
 }
