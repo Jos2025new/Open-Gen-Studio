@@ -11,6 +11,7 @@ import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import { userNamed } from './modelNaming';
+import { namedOverConfirmed } from './modelNamed';
 import type {
   AdvancedValue,
   AssetKind,
@@ -546,6 +547,12 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             const m = (await ctx.getModel(p.modelRef))?.model;
             if (m && lineKey(m) === lineKey(named!)) { conf = p; break; }
           }
+        }
+        // A model line the user named in THIS request wins over the confirmed one; its own variant, no confirmed values forced.
+        if (conf && parts.length <= 1 && s.model?.trim() && await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef)) {
+          conf = undefined;
+          const route = kind === 'image' ? (refs.length > 0 || s.first_frame ? 'edit' : 'text') : routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
+          s.model = ctx.variantModel?.(s.model.trim(), route) ?? s.model;
         }
         if (conf) {
           const confName = (await ctx.getModel(conf.modelRef))?.model.name ?? conf.modelRef;
