@@ -128,8 +128,8 @@
 
 .cc-card .cc-aspect-pop { margin: 4px 0 8px; padding: 14px; background: var(--surface-3); border-radius: 16px; }
 
-.cc-set-done { display: flex; align-items: center; gap: 10px; padding: var(--sp-1) 0; background: transparent; }
-.cc-set-done .cc-ok { color: var(--text-3); flex: none; }
+.cc-set-done { display: flex; align-items: center; gap: var(--feed-gap); padding: var(--sp-1) 0; background: transparent; }
+.cc-set-done .cc-ok { color: var(--text-3); flex: none; width: var(--feed-icon); height: var(--feed-icon); }
 .cc-set-name { font-weight: 600; color: var(--text-2); }
 .cc-set-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
 .cc-mini { display: inline-flex; align-items: center; gap: 5px; background: var(--surface-2); color: var(--text-2); padding: 3px 9px; border-radius: 8px; font-size: 12px; }
@@ -137,3 +137,5 @@
 /* Resolved cards are a line, not a box (ADR 0024 M): no outline or fill, text aligned with the conversation. */
 .q-card.is-done { background: transparent; border-color: transparent; }
 .q-card.is-done:not(.cc-set-done) { padding: var(--sp-1) 0; }
+.q-card.is-done .q-kicker { gap: var(--feed-gap); }
+.q-card.is-done .q-ok { flex: none; width: var(--feed-icon); height: var(--feed-icon); color: var(--text-3); }

@@ -102,6 +102,9 @@
   --new-hover: var(--surface-hover);
   /* Money left with the providers: plain text, not a highlight. */
   --money: var(--text);
+  /* Feed lines (agent turns, resolved cards): one left edge, icons in a 13px column, text after a 7px gap. */
+  --feed-icon: 13px;
+  --feed-gap: 7px;
   /* Conversation text: agent replies and the user's bubble. */
   --fs-chat: 15px;
 

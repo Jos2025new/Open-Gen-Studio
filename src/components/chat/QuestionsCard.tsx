@@ -29,6 +29,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
     return (
       <article className="q-card is-done">
         <div className="q-kicker">
+          <Check size={13} className="q-ok" aria-hidden />
           {`Questions · round ${item.round} of ${item.maxRounds}`} · {item.status === 'skipped' ? 'skipped' : 'answered'}
           <EditAnswerButton sessionId={sessionId} itemId={item.id} />
         </div>
