@@ -102,6 +102,8 @@ export interface RawPlan {
   subjects?: Array<{ name?: string; kind?: SubjectKind; from?: string; description?: string }>;
   /** One style block the app appends to every image and video prompt. */
   style?: string;
+  /** Notes of what a revision copied from the plan it replaces (set by the app, not the agent). */
+  carried?: string[];
 }
 
 export type OutputKind = AssetKind | 'text' | 'layer';
@@ -375,7 +377,7 @@ function cleanParams(p: Record<string, unknown> | undefined): Record<string, Adv
  */
 export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: string): Promise<{ plan: Plan | null; errors: string[] }> {
   const errors: string[] = [];
-  const adjustments: string[] = [];
+  const adjustments: string[] = [...(raw.carried ?? [])];
   // The fit across steps (fit.ts): "múltiples ángulos" asked, or three angle steps in Direct; views as angles asked.
   const fit = fitState(Boolean(ctx.direct?.()), ctx.canAsk?.() ?? true, ctx.answered?.() ?? false);
   const planFit = fitPlanSteps(Array.isArray(raw.steps) ? raw.steps : [], ctx.requestText?.() ?? '', fit);

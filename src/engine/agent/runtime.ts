@@ -22,6 +22,7 @@ import { pushAlert } from '../alerts';
 import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
+import { carryOverRevision } from '../planRevision';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
@@ -157,12 +158,12 @@ export function designerDims(): { width: number; height: number } {
   return r >= 1 ? { width: Math.round(1080 * r), height: 1080 } : { width: 1080, height: Math.round(1080 / r) };
 }
 
-/** What the app changed in the plan it showed (models, inputs, settings): the agent keeps it in mind for what follows. */
+/** What the app changed in the plan it showed (models, inputs, settings): the agent remembers it for what follows. */
 function adjustedNote(adjustments: string[] | undefined): string {
   return adjustments?.length ? `\nThe app adjusted your plan before showing it (keep this in mind for revisions and later plans): ${adjustments.join('; ')}.` : '';
 }
 
-/** The user's own words, marked off from everything the app adds (context, guides, notes), with the canvas they wrote on. */
+/** The user's own words, marked off from what the app adds (context, guides, notes), with the canvas they wrote on. */
 function userBlock(text: string, canvas: Workspace): string {
   return `<user_message canvas="${canvas}">\n${text}\n</user_message>`;
 }
@@ -232,8 +233,8 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     canAsk: () => session(sessionId).agent.questionRound < roundsFor(get().composer.agentStyle, get().settings.guidedRounds),
     answered: () => Object.keys(session(sessionId).agent.draft?.answers ?? {}).length > 0,
     opModel: () => (workspace === 'node' ? undefined : get().composer.agentStyle === 'direct' ? get().composer.image.modelRef : session(sessionId).agent.settings?.image?.modelRef),
-    // Phase 2: settings the user confirmed apply to every step of their kind (not on the node canvas, not in Direct,
-    // where a card confirmed earlier in the session must not replace the composer's model the guide was sent for).
+    // Phase 2: confirmed settings apply to every step of their kind (not on the node canvas, not in Direct, where an
+    // earlier card must not replace the composer's model the guide was sent for).
     confirmed: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.settings?.[kind] : undefined),
     switchedTo: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle === 'auto' && (kind === 'video' || kind === 'image') ? session(sessionId).agent.switchedTo?.[kind] : undefined),
     confirmedParts: (kind: MediaKind) => (workspace !== 'node' && get().composer.agentStyle !== 'direct' ? (session(sessionId).agent.settingsParts ?? []).filter((p) => p.kind === kind) : []),
@@ -569,11 +570,12 @@ async function presentPlan(
   revision = false,
   /** Agent time so far, for the request's metrics (LLM turns only). */
   agentMs?: number,
-  /** The turn's signal: a plan checked after Stop is dropped. */
+  /** The turn's signal: a plan checked after Stop is dropped */
   signal?: AbortSignal,
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
+  if (revision) carryOverRevision(raw, session(sessionId));
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId), planId);
   if (signal?.aborted) return { errors: [] };
   const journey = revision ? 'plan-revision' : 'settings-correction';
@@ -585,9 +587,9 @@ async function presentPlan(
   if (!plan) return { errors };
   const { total } = estimateSteps(plan.steps);
   // Automation policy (§11) on the normalized plan: cost and candidates are known only here.
-  // Nothing is stored or shown before this check: a plan that needs the settings card is not presented.
+  // Nothing is shown before this check: a plan that needs the settings card is not presented.
   const settingKinds = plan.steps.map((st) => st.kind).filter((k): k is 'image' | 'video' => k === 'image' || k === 'video');
-  // Direct mode decides nothing before the plan card: the models come from the composer and the card approves the cost.
+  // Direct mode decides nothing before the plan card: the composer picks the models, the card approves the cost.
   if (workspace !== 'node' && settingKinds.length && get().composer.agentStyle !== 'direct') {
     const action = needsConfirmation({
       workspace,
@@ -598,7 +600,7 @@ async function presentPlan(
       estimatedCost: total.usd,
       hasMultipleCandidates: plan.steps.some((st) => 'settings' in st && (st.settings.count ?? 1) > 1),
     });
-    // The card the user just confirmed in this request already covers the cost: asking again looped (4 cards for one video).
+    // The card just confirmed in this request already covers the cost: asking again looped (4 cards for one video).
     const confirmedNow = settingKinds.every((k) => (session(sessionId).agent.settingsParts ?? []).some((p) => p.kind === k));
     if (action === 'ask' && !confirmedNow) return { errors: [], settingsNeeded: costAskMessage([...new Set(settingKinds)], total.usd) };
   }
@@ -624,7 +626,7 @@ async function presentPlan(
     const preview = await prepareNodeRun(sessionId, targets);
     updateFeedItem<PlanFeedItem>(sessionId, item.id, { nodeRun: { targets, force: true, signature: preview.signature }, plan: { ...plan, steps: preview.steps }, estimate: preview.estimate, error: preview.errors.join(' ') || undefined });
   }
-  // Recorded before an auto-approval closes the request.
+  // Recorded before auto-approval closes the request.
   if (agentMs != null) {
     const models = [...new Set(plan.steps.flatMap((st) => ('modelRef' in st && st.modelRef ? [st.modelRef] : [])))];
     recordMetric(sessionId, { type: 'plan', ms: agentMs, revision: replaced, models, usd: total.usd, checkMs: Date.now() - started });
