@@ -96,6 +96,8 @@
   --active-bg: var(--surface-3);
   --active-text: var(--text);
   --active-line: transparent;
+  /* Opaque twin of --active-bg, for what must hide the row text under it (the active session's actions). */
+  --active-solid: var(--surface-3);
   --frame-border: transparent;
   /* New session: an outlined action, so it never looks like the active row below it. */
   --new-bg: transparent;
@@ -166,7 +168,7 @@
   --danger: #f06a6a; --danger-soft: rgba(240, 106, 106, 0.12); --warn: #ffc25e; --ok: #86e3a5;
   --btn-radius: var(--radius-s); --chip-radius: 10px;
   /* Original keeps its lime active states and outlined frames. */
-  --active-bg: var(--accent-soft); --active-text: var(--accent); --active-line: var(--accent-line); --frame-border: var(--border);
+  --active-bg: var(--accent-soft); --active-text: var(--accent); --active-line: var(--accent-line); --active-solid: #26291a; --frame-border: var(--border);
   --new-bg: var(--accent-soft); --new-line: var(--accent-line); --new-text: var(--accent); --new-hover: rgba(216, 255, 58, 0.22); --money: var(--ok);
 }
 

@@ -90,6 +90,8 @@ function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'sc
 const RULER = 18;
 /** A theme token for canvas drawing, so rulers and the page edge follow the base. */
 const tok = (n: string, f: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
+/** The selection colour (the highlight's --accent, a hex) at an alpha: handles and picks follow the chosen highlight. */
+const accentA = (a = 1) => { const n = parseInt(tok('--accent', '#d4f25a').slice(1, 7), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
 type ShapeTool = keyof typeof SHAPE_NAMES;
@@ -410,12 +412,12 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (picked.length > 1 && !editingText) {
       const boxes = picked.map((id) => doc.layers.find((l) => l.id === id)).filter((l): l is Layer => Boolean(l && l.visible)).map((l) => layerBox(l)).filter((b): b is NonNullable<typeof b> => Boolean(b));
       ctx.save();
-      ctx.strokeStyle = 'rgba(212,242,90,0.75)';
+      ctx.strokeStyle = accentA(0.75);
       ctx.setLineDash([5, 4]);
       for (const b of boxes) ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
       const all = unionBox(boxes);
       ctx.setLineDash([]);
-      ctx.strokeStyle = 'rgba(212,242,90,0.35)';
+      ctx.strokeStyle = accentA(0.35);
       if (all) ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
       ctx.restore();
     }
@@ -429,20 +431,20 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         ctx.lineWidth = 1;
         for (const o of objects) {
           const on = ids.includes(o.id);
-          ctx.strokeStyle = on ? '#d4f25a' : 'rgba(212,242,90,0.28)';
+          ctx.strokeStyle = on ? accentA() : accentA(0.28);
           ctx.strokeRect(sx(o.box.x) + 0.5, sy(o.box.y) + 0.5, o.box.w * view.zoom, o.box.h * view.zoom);
         }
         const all = ids.length > 1 ? objectsBox(active, ids) : null;
         if (all) {
           ctx.setLineDash([5, 4]);
-          ctx.strokeStyle = 'rgba(212,242,90,0.55)';
+          ctx.strokeStyle = accentA(0.55);
           ctx.strokeRect(sx(all.x) - 3.5, sy(all.y) - 3.5, all.w * view.zoom + 7, all.h * view.zoom + 7);
         }
         ctx.restore();
       } else {
         const b = layerBox(active);
         if (b) {
-          ctx.strokeStyle = '#d4f25a';
+          ctx.strokeStyle = accentA();
           ctx.lineWidth = 1;
           ctx.strokeRect(sx(b.x) + 0.5, sy(b.y) + 0.5, b.w * view.zoom, b.h * view.zoom);
         }
@@ -473,14 +475,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     } else if (tBox && handles.length && !editingText) {
       ctx.save();
       ctx.lineWidth = 1;
-      ctx.strokeStyle = 'rgba(212,242,90,0.7)';
+      ctx.strokeStyle = accentA(0.7);
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(sx(tBox.x) - 0.5, sy(tBox.y) - 0.5, tBox.w * view.zoom + 1, tBox.h * view.zoom + 1);
       ctx.setLineDash([]);
       for (const h of handles) {
         const hx = sx(h.x), hy = sy(h.y);
         ctx.fillStyle = '#0a0a0b';
-        ctx.strokeStyle = '#d4f25a';
+        ctx.strokeStyle = accentA();
         ctx.beginPath();
         if (h.op === 'rotate' || h.op === 'skew') { drawArrowHandle(ctx, h, hx, hy); continue; }
         if (h.op === 'scale') ctx.rect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE);
@@ -493,7 +495,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if ((tool === 'move' || (tool === 'lineart' && lineartMode === 'edit')) && active?.type === 'vector' && active.visible && !active.locked && selectedCurve?.layerId === active.id) {
       const stroke = active.strokes?.find((s) => s.id === selectedCurve.strokeId);
       if (stroke) {
-        ctx.strokeStyle = '#d4f25a';
+        ctx.strokeStyle = accentA();
         ctx.lineWidth = 1;
         ctx.beginPath();
         worldPoints(stroke).forEach(([x, y], i) => i ? ctx.lineTo(sx(x), sy(y)) : ctx.moveTo(sx(x), sy(y)));
@@ -503,7 +505,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           if (!point) continue;
           ctx.beginPath();
           ctx.arc(sx(point[0]), sy(point[1]), 4, 0, Math.PI * 2);
-          ctx.fillStyle = i === 0 || i === stroke.points.length - 1 ? '#d4f25a' : '#18181c';
+          ctx.fillStyle = i === 0 || i === stroke.points.length - 1 ? accentA() : tok('--surface', '#18181c');
           ctx.fill(); ctx.stroke();
         }
       }

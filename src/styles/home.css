@@ -7,7 +7,7 @@
 .home-title { margin: var(--sp-1) 0 0; font-family: var(--font-head); font-size: var(--fs-xl); font-weight: 600; color: var(--text); }
 .home-link { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-s); color: var(--text-3); padding: var(--sp-1) var(--sp-2); border-radius: var(--r-s); }
 .home-link:hover { color: var(--text); background: var(--surface-2); }
-.home-pill { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border-radius: var(--r-full); border: 1px solid var(--border); background: rgba(10, 10, 11, .55); color: var(--text-2); font-size: var(--fs-xs); }
+.home-pill { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-2); border-radius: var(--r-full); border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: var(--fs-xs); }
 
 /* Apps: four cards, 76 px tinted icon box. */
 .home-apps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }

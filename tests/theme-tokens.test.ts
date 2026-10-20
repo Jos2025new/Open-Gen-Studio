@@ -163,3 +163,28 @@ describe('theme tokens: Original is today', () => {
     expect([t['--select-on'], t['--select-on-soft'], t['--select-line']]).toEqual([t['--accent'], t['--accent-soft'], t['--accent-line']]);
   });
 });
+
+// Outside the token files, colours that must follow the base and the highlight (ADR 0024 M, audit 2026-10-20).
+describe('app CSS and canvas drawing follow the theme', () => {
+  const rule = (file: string, sel: string) => {
+    const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '');
+    const m = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((x) => x[1].trim() === sel);
+    expect(m, `${file} ${sel}`).toBeTruthy();
+    return m![2];
+  };
+  it('every --accent is a 6-digit hex (the Designer derives its selection alphas from it)', () => {
+    for (const m of read('accents.css').matchAll(/--accent:\s*([^;]+);/g)) expect(m[1].trim()).toMatch(/^#[0-9a-f]{6}$/i);
+  });
+  it('Designer selection and handles read --accent; only the new-shape stroke default keeps the lime', () => {
+    const src = readFileSync('src/components/designer/Stage.tsx', 'utf8');
+    expect(src).toMatch(/const accentA = .*tok\('--accent'/);
+    expect(src.match(/'#d4f25a'|212,\s*242,\s*90/g) ?? []).toEqual(["'#d4f25a'", '212,242,90']);
+  });
+  it('the active session actions, the Soon pill and the viewer dock use tokens', () => {
+    expect(rule('shell.css', '.session-row.is-active .session-actions')).toContain('var(--active-solid)');
+    expect(rule('home.css', '.home-pill')).toMatch(/background: var\(--surface-2\)/);
+    expect(rule('shell.css', '.lb-dock')).toContain('box-shadow: var(--shadow-float)');
+    for (const b of ['claro', 'blanco']) expect(themeOf(b, 'lima')['--shadow-float']).toContain('60, 64, 67');
+  });
+});
+
