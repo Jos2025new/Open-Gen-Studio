@@ -147,6 +147,7 @@
 - [044-2026-10-W42: Stop libera el compositor, esperas visibles, aviso al terminar, aspecto de personas y arreglos del tablero (2026-10-18)](history/044-2026-10-W42.md) — por commit, con la corrección de lo que decía 017.
 - [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
 - [046-2026-10-W43: Spaces, etapa 2: texto, Reusar e historial](history/046-2026-10-W43.md).
+- [047-2026-10-W43: un workflow pregunta antes de cargarse (2026-10-19)](history/047-2026-10-W43.md).
 
 ## Trazabilidad
 

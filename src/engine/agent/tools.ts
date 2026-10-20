@@ -134,10 +134,13 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'read_guide',
       description:
-        'Load one skill or workflow from the index in your instructions, when the request fits it and it is not already in the context. Returns its steps, fixed values, needs and continuity (workflows) or its prompting guidance (skills).',
+        'Load one skill or workflow from the index when the request fits it and it is not already in the context. Returns its steps, needs and continuity (workflows) or its prompting guidance (skills). Before asking, a workflow gives a short card; ready: true, the full guide.',
       parameters: {
         type: 'object',
-        properties: { id: { type: 'string', description: 'An index id, e.g. "workflow:storyboard", "skill:product", "model:seedance"; a workflow variant as "workflow:<id>/<variant>".' } },
+        properties: {
+          id: { type: 'string', description: 'Index id: "workflow:storyboard", "skill:product", "workflow:<id>/<variant>".' },
+          ready: { type: 'boolean' },
+        },
         required: ['id'],
       },
     },
@@ -364,7 +367,7 @@ export const readGraphSchema = z.object({
 
 export const viewCanvasSchema = z.object({ layer_id: z.string().min(1).max(80).optional() });
 
-export const readGuideSchema = z.object({ id: z.string().min(1).max(80) });
+export const readGuideSchema = z.object({ id: z.string().min(1).max(80), ready: z.boolean().optional() });
 
 export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'retry']) });
 

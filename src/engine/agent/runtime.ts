@@ -79,6 +79,7 @@ import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults }
 import { overLimit, overLimitText } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
+import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
@@ -1722,6 +1723,12 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const early = v.success && workspace !== 'node' ? earlyModelGuide(sessionId, v.data.id) : undefined;
           if (early) {
             respond(early);
+            continue;
+          }
+          // A workflow asks before it loads: the short card (no metric, no "Read the…" action) until the questions are done.
+          const card = v.success ? cardInsteadOfGuide(v.data, session(sessionId).agent.questionRound, get().composer.agentStyle === 'direct') : undefined;
+          if (card) {
+            respond(card);
             continue;
           }
           const text = v.success ? readGuide(v.data.id) : undefined;

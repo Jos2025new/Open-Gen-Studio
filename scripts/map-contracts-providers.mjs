@@ -1,5 +1,8 @@
+import agentContracts from './map-contracts-agent.mjs';
+
 /** Provider and plan-card contracts, split from map-contracts.mjs to keep that file under 30 KB (AGENTS.md). Checked by map.mjs. */
 export default [
+  ...agentContracts,
   {
     id: 'partial-generation-retry',
     what: 'Retry conserva assets, pide solo resultados o variantes pendientes con nueva semilla y muestra presupuesto de lo pendiente en recuperación directa y de plan.',

@@ -4,6 +4,7 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **automation-policy** — Cuándo se reutilizan ajustes sin preguntar (umbral de coste): el texto debe describir exactamente needsConfirmation. | [procedure.ts](../src/engine/procedure.ts) | [general-model.test.ts](../tests/general-model.test.ts), [general-model-gate.test.ts](../tests/general-model-gate.test.ts) |
 | **no-forced-tool-choice** — Decisión del usuario (2026-10-08): las palabras clave dirigen al agente con una señal en el mensaje; nunca se envía al proveedor un tool_choice con nombre. | [llm.ts](../src/engine/providers/llm.ts), [force.ts](../src/engine/agent/force.ts) | [agent-force.test.ts](../tests/agent-force.test.ts) |
 | **ops-confirm-model** — Decisión del usuario (ADR 0009, enmienda a 0007-9): una operación con modelo de imagen confirma su modelo (Auto una vez por sesión, Guided en cada petición; Direct usa el compositor). | [procedure.ts](../src/engine/procedure.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-force.test.ts](../tests/agent-force.test.ts), [agent-fit-plan.test.ts](../tests/agent-fit-plan.test.ts) |
 | **cost-recheck** — Un plan caro se muestra tras confirmar su tarjeta en la misma petición; el mensaje de coste nombra cada tipo una vez (la tarjeta admite 4 partes). | [runtime.ts](../src/engine/agent/runtime.ts), [tools.ts](../src/engine/agent/tools.ts) | [general-model-gate.test.ts](../tests/general-model-gate.test.ts) |

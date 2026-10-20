@@ -1,6 +1,6 @@
 # Propuesta: el agente pregunta antes de cargar un workflow, y un encargo no es un pedido de workflow
 
-Fecha: 2026-10-19. Estado: **propuesta y plan, sin implementar**. La ejecutará otro agente.
+Fecha: 2026-10-19. Estado: **implementada en `task/workflow-ask-first`** (pasos 1–5, 7 y 8; el paso 6, con el LLM real, no se ejecutó: necesita aprobación y coste máximo). Ver [historial 047](history/047-2026-10-W43.md).
 
 ## Qué observa el usuario
 
