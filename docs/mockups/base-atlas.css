@@ -1,5 +1,5 @@
-/* Base «Atlas» (propuesta): los neutros, estados y formas de toda la app. Sustituye a los de tokens.css. Valores muestreados de la referencia salvo los marcados «derivado». */
-:root {
+/* Base «Atlas» (decidida), solo bajo [data-base="atlas"] para no afectar al CSS real de la maqueta de tarjetas («Antes»): los neutros, estados y formas de toda la app. Sustituye a los de tokens.css. Valores muestreados de la referencia salvo los marcados «derivado». */
+[data-base="atlas"] {
   color-scheme: dark;
   --bg: #1e1f20; --bg-canvas: #131314;
   --surface: #1e1f20; --surface-2: #282a2c; --surface-3: #333537; --surface-hover: #2d2f31; /* hover: derivado */
@@ -11,9 +11,9 @@
   /* Resaltado por defecto («Predeterminado»): ver acentos.css */
 }
 /* ---- Puentes: selectores que hoy fijan colores o radios; en la migración leerán los tokens ---- */
-.btn, .cc-chip, .cc-mini, .q-opt, .card-check, .cc-pick, .set-more { border-radius: var(--btn-radius); }
-.btn-secondary { background: transparent; border-color: var(--border-focus); color: var(--accent); }
-.btn-primary { background: var(--accent); color: var(--accent-ink); }
-.btn-primary:not(:disabled):hover { filter: brightness(1.08); background: var(--accent); }
-.q-opt.is-on, .set-model.is-on, .card .cc-chip.is-sel, .cc-pick.is-on { background: var(--select-on-soft); border-color: var(--select-line); color: var(--select-on); box-shadow: none; }
-.card-check.is-on .cc-box, .cc-pick.is-on .cc-box { background: var(--select-on); border-color: var(--select-on); color: var(--select-on-soft); }
+[data-base] .btn, [data-base] .cc-chip, [data-base] .cc-mini, [data-base] .q-opt, [data-base] .card-check, [data-base] .cc-pick, [data-base] .set-more { border-radius: var(--btn-radius); }
+[data-base] .btn-secondary { background: transparent; border-color: var(--border-focus); color: var(--accent); }
+[data-base] .btn-primary { background: var(--accent); color: var(--accent-ink); }
+[data-base] .btn-primary:not(:disabled):hover { filter: brightness(1.08); background: var(--accent); }
+[data-base] .q-opt.is-on, [data-base] .set-model.is-on, [data-base] .card .cc-chip.is-sel, [data-base] .cc-pick.is-on { background: var(--select-on-soft); border-color: var(--select-line); color: var(--select-on); box-shadow: none; }
+[data-base] .card-check.is-on .cc-box, [data-base] .cc-pick.is-on .cc-box { background: var(--select-on); border-color: var(--select-on); color: var(--select-on-soft); }

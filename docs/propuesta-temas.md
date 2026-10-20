@@ -144,9 +144,4 @@ Los demás resaltados siguen lisos (el CSS cae a color liso porque `--accent-gra
 
 ## 5. Migración
 
-1. Neutros de Atlas a `tokens.css`; `--btn-radius` y `--chip-radius`; la base Original queda como bloque `[data-base="original"]` con los valores de hoy.
-2. Bloques `[data-base]` de Grafito y Claro, y `[data-accent]` de los seis resaltados con sus juegos oscuro y claro.
-3. Puentes de selección y primario (`--select-*`, `--accent-*`, `--accent-grad`) en las tarjetas.
-4. Apariencia en Ajustes (selector de base y fila de muestras, con `aria-pressed`) y su test jsdom.
-5. Lectura previa al primer pintado.
-6. Más adelante: retirar Original.
+Una sola secuencia para temas y tarjetas, con sus pruebas, en [el plan único del sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md#8-plan-de-migración-único-tarjetas-y-temas): tokens y bases, selector, plantillas, migración tarjeta a tarjeta y script de comprobación.

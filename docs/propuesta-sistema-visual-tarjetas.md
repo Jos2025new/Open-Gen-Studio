@@ -1,6 +1,10 @@
 # Propuesta: un sistema visual acotado para las tarjetas del chat
 
-Fecha: 2026-10-20. Estado: **propuesta, sin implementar** (solo documento; ningún cambio de código). Aprobado (2026-10-20): plantillas base fijas, una o dos tarjetas que destacan, «Decisión» sin banda y con la huella antigua, selección con el color de resaltado (el verde, solo estados) y radio de píldora. **Pendiente:** si «Decisión» sigue siendo variante, el tamaño de las tarjetas de cambio de modelo y el puntero en `AGENTS.md`. Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app.
+Fecha: 2026-10-20. Estado: **propuesta aprobada en lo esencial, sin implementar** (solo documento y maqueta; ningún cambio de código). Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app. Va junto a [la propuesta de temas](propuesta-temas.md) (bases y color de resaltado), también aprobada.
+
+**Aprobado:** plantillas base fijas; tres tamaños; una o dos tarjetas que destacan; «Decisión» sin banda y con la huella antigua; la línea «resuelta»; Atlas como base por defecto; botones y chips en píldora; todo color sale de tokens (selección = resaltado, verde solo para estados).
+
+**Pendiente:** si «Decisión» sigue siendo una variante (o el plan pasa a una `card-l` normal); el tamaño de las tarjetas de cambio de modelo (`card-s`, o `card-m` el seguimiento); el puntero en `AGENTS.md`.
 
 ## Por qué (y qué se busca)
 
@@ -10,7 +14,7 @@ Las tarjetas nuevas (cambio de modelo y seguimiento, `cc-narrow`) desentonan con
 
 ## 1. Inventario (desde el código)
 
-Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde `--ok #86e3a5`; acento `--accent` (lima `#d8ff3a`; en la [propuesta de temas](propuesta-temas.md) es el «Predeterminado» de cinco colores de resaltado, sobre los neutros de Atlas; la propuesta de temas está aprobada).
+Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde de estado `--ok`; acento `--accent` (lima `#d8ff3a`). Los neutros y el acento pasan a ser bases y resaltados según [la propuesta de temas](propuesta-temas.md).
 
 Leyenda: **[px]** = valor fijo en vez de token.
 
@@ -43,15 +47,23 @@ Leyenda: **[px]** = valor fijo en vez de token.
 | `.cc-set-done` (la tarjeta resuelta en una línea de resumen) | **Conservar y promover a estado común** | Toda tarjeta, al resolverse, se pliega a una línea; reduce ruido del historial. Pasa a ser plantilla («resuelta»), no excepción de ajustes. |
 | `.cc-mini` (píldora de solo lectura) frente a `.cc-chip` (control que abre algo) | **Conservar con dos papeles** | Mostrar un valor frente a editarlo. Ambos con `--chip-radius` (píldora, 999px, según la propuesta de temas). |
 | `.q-opt` radio 5 y `.set-more` radio 5 | **Deriva** | Forma de chip repetida sin papel; migran a `.cc-chip`/`--chip-radius`. |
-| Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` (relleno tintado, borde y texto en lima) | **Conservar: es el estándar** | Decisión del usuario: elegir = color de resaltado (hoy lima, a elegir entre cinco), igual que la acción primaria. El verde `--ok` queda solo para estados (hecho, correcto). La casilla nueva se alinea con ello (antes iba en verde: deriva ya corregida). |
+| Selección: `.q-opt`, `.cc-ratio`, fila elegida de `ModelField` | **Conservar: es el estándar** | Elegir = color de resaltado (`--select-on*`, `--select-line`), igual que la acción primaria; cambia con el resaltado elegido. El verde `--ok` queda solo para estados (hecho, correcto). |
 | `notice-retry` como botón aparte | **Deriva** | Debe ser un `Button` `sm`. |
-| `.cc-approve` (relleno 10×16, radio 12, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§4) | Es la acción que gasta dinero: merece énfasis. |
-| Generación `is-fit` (ancho = medios), teselas de radio 7, barra de tesela, error 300-480 | **Conservar dentro de la variante «Resultado»** (§3) | El contenido manda: el ancho sigue a la imagen. |
+| `.cc-approve` (relleno 10×16, 700) y el coste del plan | **Conservar dentro de la variante «Decisión»** (§4) | Es la acción que gasta dinero: merece énfasis. Su radio pasa a píldora (`--btn-radius`). |
+| Generación `is-fit` (ancho = medios), teselas de radio 7, barra de tesela, error 300-480 | **Conservar dentro de la variante «Resultado»** (§4) | El contenido manda: el ancho sigue a la imagen. |
 | Popover del modelo (480 px, radio 16, relleno 14) | **Conservar como categoría «superposición»** | No es una tarjeta del hilo; se le dan tokens (`--pop-w`, `--pop-radius`) sin cambiar el aspecto. |
 | Burbuja del usuario (radio 12/12/3/12, 85 %) | **Conservar** | Es un mensaje, no una tarjeta. |
 | Siete radios, anchos fijos (620/360/480/300/240), `!important` en `.cc-result`, estilos repartidos en `chat.css` y `chat-cards.css` | **Deriva** | Sin papel; pasan a tokens y a un solo archivo de tarjetas. |
 
-## 3. La base fija: plantillas de maquetación
+## 3. Color, bases y radios
+
+- **Base por defecto: Atlas** (oscura). Las tarjetas funcionan igual en Sistema, Atlas, Grafito, Claro y Original, y con cualquiera de los seis resaltados, porque no fijan ningún color.
+- **Color solo desde tokens:** neutros (`--bg`, `--surface*`, `--border*`, `--text*`), acento y selección (`--accent`, `--accent-ink`, `--accent-soft`, `--accent-line`, `--select-on`, `--select-on-soft`, `--select-line`) y estados (`--danger`, `--warn`, `--ok`, **solo para estado**: error, aviso, hecho). Nada de hexadecimales ni verde para elegir.
+- **Selección y primario siguen al resaltado.** Elegido = relleno suave `--select-on-soft`, borde `--select-line` y texto o marca en `--select-on`. La selección no depende solo del color: lleva marca de verificación o línea.
+- **Radios:** botones y chips en píldora (`--btn-radius`, `--chip-radius`, 999px; en la base Original valen lo de hoy). La tarjeta conserva `--card-radius` (`--r-m`); la casilla, 4 px; `.cc-mini` también es píldora. Los radios de teselas y popovers siguen siendo sus tokens.
+- **Aurora (degradado con grano)** solo en los cuatro sitios que fija [la propuesta de temas](propuesta-temas.md#aurora-degradado-con-grano): botón primario, borde o tinte de lo elegido, casilla activa e indicador de «generando». Ninguna tarjeta lo usa en otro lugar, y el texto nunca va sobre el degradado en bruto.
+
+## 4. La base fija: plantillas de maquetación
 
 Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el ancho y un paso de letra, no la estructura.
 
@@ -71,7 +83,7 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 
 1. **Cabecera** `.card-head`: icono 16 (14 en `card-s`) + título; a la derecha, meta o menú opcionales. En `card-s` la propia línea de pregunta hace de cabecera.
 2. **Cuerpo** `.card-body`: texto, campos o secciones (`.card-section`, separadas por borde superior y `--sp-3`).
-3. **Opciones** `.card-options`: tres formas permitidas, nada más: **casillas** `.card-check` (16×16, radio 4, gris vacío; elegida = relleno de resaltado `--select-on` + check oscuro `--accent-ink`), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura). Elegido = resaltado (lima por defecto): relleno tintado (`--select-on-soft`), borde `--select-line` y texto/check en `--select-on`.
+3. **Opciones** `.card-options`: tres formas, nada más: **casillas** `.card-check` (16×16, gris vacío; encendida = relleno `--select-on` y marca `--accent-ink`), **chips** `.cc-chip` (valor editable, abre un `ChipPop`/`ModelField`) y **píldoras** `.cc-mini` (valor de solo lectura).
 4. **Pie** `.card-foot`: meta o total a la izquierda; acciones a la derecha; **un solo primario**; borde superior en `card-m`/`card-l`, sin borde en `card-s`.
 5. **Resuelta** `.card-done`: una línea con check, nombre y píldoras de lo elegido, más «editar». Todas las tarjetas que piden algo la tienen.
 
@@ -85,17 +97,17 @@ Todas las tarjetas usan **las mismas plantillas**. Tres tamaños; cambian el anc
 | Título / cuerpo / meta | 13 / 12 / 11 | 15 / 13 / 11 | 16 / 13 / 12 |
 | Chip / botón | `.cc-mini` / `Button sm` | `.cc-chip` / `Button md` | `.cc-chip`, `ModelField` / `Button md` |
 
-Tokens nuevos en `tokens.css`: `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--chip-radius: 999px`, `--fs-title: 16px`, `--select-on: var(--accent)`, `--select-on-soft: var(--accent-soft)`, `--select-line: var(--accent-line)` (alias de la selección existente, que cada color de resaltado redefine, véase la propuesta de temas; `--ok` solo para estados), `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
+Tokens nuevos en `tokens.css` (los de color, radio de botón y selección vienen de la propuesta de temas): `--card-w-s: 22rem`, `--card-w-m: 32rem`, `--card-w-l: 38.75rem`, `--card-pad-s: var(--sp-3)`, `--card-pad-m: var(--sp-4)`, `--card-pad-l: var(--sp-4)` (hoy 16×18), `--card-radius: var(--r-m)`, `--fs-title: 16px`, `--pop-w: 30rem`, `--pop-radius: var(--r-m)`.
 
-## 4. Variaciones permitidas (máximo dos)
+## 5. Variaciones permitidas (máximo dos)
 
-Una tarjeta destaca cuando es un **momento clave** del flujo. Se proponen dos, y ninguna más sin pasar por la regla de §5.
+Una tarjeta destaca cuando es un **momento clave** del flujo. Se proponen dos, y ninguna más sin pasar por la regla de §6.
 
 ### Variante «Decisión»: la tarjeta del plan (aprobar y gastar)
-Por qué: es el punto donde el usuario autoriza coste; el énfasis va en la acción, no en la cabecera. Tras la prueba del usuario se **recorta**: sin banda de cabecera tintada (se vio fea), con la huella de hoy (mismo relleno exterior, sin sangría extra en la lista de pasos) y los títulos de paso con su peso y tamaño actuales.
-- **Puede variar (solo esto):** un borde sutil `--accent-line`; el botón de aprobar con el coste, ya existente (`.cc-approve`: relleno 10×16, radio 12, 700); un aire algo mayor entre filas de pasos (`padding-top` de 12 a `--sp-4`).
+Por qué: es el punto donde el usuario autoriza coste; el énfasis va en la acción, no en la cabecera. Sin banda de cabecera tintada, con la huella de hoy (mismo relleno exterior, sin sangría extra en la lista de pasos) y los títulos de paso con su peso y tamaño actuales.
+- **Puede variar (solo esto):** un borde sutil `--accent-line`; el botón de aprobar con el coste, ya existente (`.cc-approve`, 700, en píldora); un aire algo mayor entre filas de pasos (`padding-top` de 12 a `--sp-4`).
 - **Debe seguir fijo:** cabecera sobre la superficie plana (título y subtítulo como hoy), escala tipográfica (título de paso 13/600, coste a la derecha como hoy), relleno de la tarjeta, plantillas, un solo primario a la derecha, `card-l` de ancho.
-- **Honestidad:** lo que queda es muy poco, «el botón de aprobar con coste» y un borde. Si el usuario lo prefiere, la variante puede retirarse y el plan ser una `card-l` normal con ese botón (la regla de §5 deja entonces un solo hueco de variante libre).
+- **Pendiente:** lo que queda es poco, un borde y el botón de aprobar con coste. Si el usuario lo prefiere, la variante se retira y el plan es una `card-l` normal con ese botón (queda entonces un hueco de variante libre).
 - Aplica a: `PlanCard` (y, si el usuario quiere, la aprobación de coste de un paso).
 
 ### Variante «Resultado»: la tarjeta de generación
@@ -106,45 +118,58 @@ Por qué: el contenido es lo que el usuario vino a ver; los medios mandan, la ta
 
 **Estados no son variantes:** error (`--danger`), cancelada, resuelta y en curso cambian color de borde, icono o la plantilla «resuelta»; no maquetación.
 
-## 5. Regla para añadir una variación
+## 6. Regla para añadir una variación
 
 Una variante nueva solo entra si cumple las tres:
-1. **Un papel en la jerarquía** escrito en la tabla de §4 («momento clave de…»). «Se veía mejor» no es un papel.
+1. **Un papel en la jerarquía** escrito en la tabla de §5 («momento clave de…»). «Se veía mejor» no es un papel.
 2. **Una entrada en este documento** con qué varía y qué sigue fijo, aprobada por el usuario antes de escribir CSS.
 3. **Tope: dos variantes** a la vez. Una tercera exige retirar o fusionar una existente.
 
 Las cosas pequeñas (un icono, un color de estado) no son variantes: usan tokens de estado.
 
-## 6. Reglas vinculantes para los agentes
+## 7. Reglas vinculantes para los agentes
 
-1. **Elige un tamaño** (`card-s`, `card-m`, `card-l`) y las plantillas de §3 (cabecera, cuerpo, opciones, pie, resuelta). Sin anchos, rellenos ni radios nuevos.
+1. **Elige un tamaño** (`card-s`, `card-m`, `card-l`) y las plantillas de §4 (cabecera, cuerpo, opciones, pie, resuelta). Sin anchos, rellenos ni radios nuevos.
 2. **Reutiliza** `ModelField`, `ChipPop`, `Button`, `.cc-mini`, `.cc-chip`, `.card-check` y `AspectPicker`. Un selector de modelo es `ModelField` y nada más.
-3. **Solo tokens**: ni `px`, ni `rem` sueltos, ni colores fijos en CSS de tarjetas.
-4. **Un solo primario por tarjeta**, a la derecha; selección en el color de resaltado (`--select-on`, el mismo acento que el primario); el verde `--ok` solo para estados.
-5. **Ninguna tarjeta nueva ni cambio de aspecto sin actualizar este documento.** Una variación nueva sigue §5 (papel, entrada, tope de dos).
+3. **Solo tokens**: ni `px`, ni `rem` sueltos, ni colores fijos en CSS de tarjetas; el color sale de los tokens de §3 y funciona en cualquier base y resaltado.
+4. **Un solo primario por tarjeta**, a la derecha; selección con `--select-*`; el verde `--ok` y los demás estados solo para estado.
+5. **Ninguna tarjeta nueva ni cambio de aspecto sin actualizar este documento.** Una variación nueva sigue §6 (papel, entrada, tope de dos).
 6. **Los tests jsdom** afirman el tamaño (`card-s|m|l`), la variante si la hay, y los componentes reutilizados.
 
-**Dónde viven:** este documento (enlazado desde `docs/README.md`) y **una línea en AGENTS.md**. AGENTS.md pesa 3 064 bytes y el tope es 3 KB (3 072): hay que recortar otra línea antes (p. ej. abreviar «Salvaguardas»). Línea propuesta (≈ 110 bytes): «Tarjetas del chat: un tamaño y una plantilla de [docs/propuesta-sistema-visual-tarjetas.md](docs/propuesta-sistema-visual-tarjetas.md); sin px sueltos.» Alternativa sin tocar AGENTS.md: contrato `card-sizes` en `docs/map.md`.
+**Dónde viven:** este documento (enlazado desde `docs/README.md`) y **una línea en AGENTS.md** (pendiente). AGENTS.md pesa 3 064 bytes y el tope es 3 KB (3 072): hay que recortar otra línea antes (p. ej. abreviar «Salvaguardas»). Línea propuesta (≈ 110 bytes): «Tarjetas del chat: un tamaño y una plantilla de [docs/propuesta-sistema-visual-tarjetas.md](docs/propuesta-sistema-visual-tarjetas.md); sin px sueltos.» Alternativa sin tocar AGENTS.md: contrato `card-sizes` en `docs/map.md`.
 
-**Script de comprobación (solo propuesta):** `scripts/check-card-style.mjs`, en `npm test` junto a los `check-*`: recorre los CSS de tarjetas y falla ante un `px`/`rem` literal, un hexadecimal o un `border-radius` que no sea token, con una lista de excepciones congelada (como `check-sizes`) que **solo puede bajar** (hoy ~170). También podría contar las variantes declaradas y fallar si pasan de dos.
+## 8. Plan de migración único (tarjetas y temas)
 
-## 7. Plan de migración (pasos pequeños, cada uno con su prueba)
+Una sola secuencia; cada paso es un commit con `npm run test:related`, y al cerrar `npm test`. [La propuesta de temas](propuesta-temas.md) solo define los valores; el orden está aquí. El usuario revisa visualmente los pasos 1, 2, 4b y 4d en el sandbox.
 
-1. **Tokens y plantillas** (`tokens.css`, `chat-cards.css`): añadir los tokens de §3 y las clases `card-s/m/l`, `.card-head/body/options/foot/done`, `.card-check`; sin usarlas. Prueba: `check-sizes`, suite.
-2. **Cambio de modelo y seguimiento → `card-s`**: ancho `fit-content` con tope, letra por plantilla (13/12/11), relleno `--card-pad-s`, casilla `.card-check`. Prueba: `switch-model-card-ui.test.ts` afirma `card-s`, píldora y casilla.
-3. **Resuelta común**: `.cc-set-done` pasa a `.card-done` y la usan preguntas y plan. Prueba: tests de tarjetas resueltas.
-4. **Preguntas → `card-m`**: cabecera de icono y título, `.cc-chip` en vez de `.q-opt`. Prueba: tests de preguntas + afirmación de tamaño. Mayor riesgo visual.
-5. **Ajustes → `card-l`** y **Plan → `card-l` + variante «Decisión»**: sustituir `620px`, `16px 18px`, `.cc-title 16px` por tokens y marcar la variante con una clase `card-v-decision`. Sin cambio visible salvo el borde, el aire entre filas y el botón. Prueba: tests actuales + afirmación de clase.
-6. **Generación → variante «Resultado»** (`card-v-result`): tokens en sus anchos y radios, sin tocar su maquetación. Prueba: `chat-cards-c7b` y tests de generación.
-7. **Chips, botones, radios**: un `--chip-radius`; `notice-retry` a `Button`; `.set-more`, `.cc-approve` con tokens; eliminar `!important`. Prueba: jsdom de chips y avisos.
-8. **Script `check-card-style`** con su baseline congelado. Prueba: el propio script en `npm test`.
+**1. Tokens y bases** (`tokens.css`, un archivo de acentos)
+- Neutros de Atlas como valores por defecto; bloque `[data-base="original"]` con los de hoy; bloques de Grafito y Claro; `--btn-radius` y `--chip-radius`; los seis `[data-accent]` con juego oscuro y claro y `--select-*`; `--accent-grad` y el grano solo en Aurora; tokens `--card-*`, `--fs-title`, `--pop-*`.
+- Pruebas: `check-sizes`, `check-docs`; un test nuevo que calcula los contrastes de cada base y resaltado (tinta/relleno, acento/tarjeta, texto elegido/relleno ≥ 4,5; meta ≥ 4,5) leyendo los CSS; suite entera (nada debe cambiar en pantalla salvo el aspecto de la base).
 
-Cada paso es un commit con `npm run test:related`; al cerrar, `npm test`. El usuario revisa visualmente los pasos 2, 4 y 5 en el sandbox.
-**Tamaño de las tarjetas nuevas:** `card-s` (mínimo). Son confirmaciones de una línea con acciones; conservan la anchura corta pero con la jerarquía de letra, relleno y píldoras del sistema. El seguimiento, por su lista de modelos, puede pasar a `card-m` sin cambiar de lógica.
+**2. Selector de base y de resaltado**
+- Apariencia en Ajustes (cinco bases, seis muestras con `aria-pressed`), claves `ogs-base` y `ogs-accent` en `localStorage`, `data-base` y `data-accent` en `<html>`, lectura de una línea antes del primer pintado; `Sistema` resuelto con `matchMedia`.
+- Pruebas: jsdom del selector y de las muestras; claves y atributos escritos y leídos; `Sistema` con `matchMedia` simulado a claro y a oscuro; valor por defecto `atlas` + `lima`. No toca los ajustes persistidos.
+
+**3. Plantillas de tarjeta** (`chat-cards.css`)
+- Clases `card-s/m/l`, `.card-head/body/options/foot/done`, `.card-check`; sin usarlas aún.
+- Pruebas: `check-sizes`, suite.
+
+**4. Migración tarjeta a tarjeta**
+- 4a. Cambio de modelo y seguimiento a `card-s` (ancho `fit-content` con tope, letra 13/12/11, casilla de plantilla). Prueba: `switch-model-card-ui.test.ts` afirma `card-s`, píldora y casilla.
+- 4b. Resuelta común (`.cc-set-done` a `.card-done`) y Preguntas a `card-m` (`.cc-chip` en vez de `.q-opt`): el mayor riesgo visual. Pruebas: tarjetas resueltas y preguntas, con afirmación de tamaño.
+- 4c. Ajustes y Plan a `card-l`; el plan con `card-v-decision` (si sigue siendo variante). Pruebas: las actuales más la afirmación de clase.
+- 4d. Generación a `card-v-result`, con su indicador de «generando» (esfera con grano en Aurora). Pruebas: `chat-cards-c7b` y las de generación.
+- 4e. Chips, botones y radios: `notice-retry` a `Button`; `.set-more` y `.cc-approve` con tokens; fuera `!important`. Prueba: jsdom de chips y avisos.
+
+**5. Script `check-card-style`** (`scripts/check-card-style.mjs`, en `npm test` junto a los `check-*`)
+- Falla ante un `px`/`rem` literal, un hexadecimal o un `border-radius` que no sea token en los CSS de tarjetas, con una lista de excepciones congelada que **solo puede bajar** (hoy ~170); puede contar las variantes y fallar si pasan de dos, y comprobar que el degradado solo aparece en los cuatro sitios permitidos.
+- Prueba: el propio script en `npm test`.
+
+**Después:** retirar la base Original cuando el usuario lo decida.
 
 ## Maqueta
 
-Una maqueta estática con las hojas reales de la app y los tokens propuestos, antes y después, de cada caso: [mockups/tarjetas.html](mockups/tarjetas.html) (CSS propuesto en [mockups/propuesta.css](mockups/propuesta.css)). Se abre directamente en el navegador; las fuentes salen de `node_modules`. Si el visor bloquea las hojas locales enlazadas, la página sale sin estilo: ábrela desde un navegador con acceso a archivos, o genera una copia con el CSS incrustado (no se versiona, por el tope de tamaño).
+Una maqueta estática con las hojas reales de la app y los tokens propuestos, antes y después, de cada caso: [mockups/tarjetas.html](mockups/tarjetas.html) (CSS propuesto en [mockups/propuesta.css](mockups/propuesta.css); «Después» sobre [base-atlas.css](mockups/base-atlas.css) y [acentos.css](mockups/acentos.css)). Se abre directamente en el navegador; las fuentes salen de `node_modules`. Si el visor bloquea las hojas locales enlazadas, la página sale sin estilo: ábrela desde un navegador con acceso a archivos.
 
 ## Límites
 
