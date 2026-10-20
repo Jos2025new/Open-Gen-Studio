@@ -143,6 +143,10 @@ Cada paso es un commit con `npm run test:related`; al cerrar, `npm test`. El usu
 
 **Tamaño de las tarjetas nuevas:** `card-s` (mínimo). Son confirmaciones de una línea con acciones; conservan la anchura corta pero con la jerarquía de letra, relleno y píldoras del sistema. El seguimiento, por su lista de modelos, puede pasar a `card-m` sin cambiar de lógica.
 
+## Maqueta
+
+Una maqueta estática con las hojas reales de la app y los tokens propuestos, antes y después, de cada caso: [mockups/tarjetas.html](mockups/tarjetas.html) (CSS propuesto en [mockups/propuesta.css](mockups/propuesta.css)). Se abre directamente en el navegador; las fuentes salen de `node_modules`.
+
 ## Límites
 
 - Es un documento; no cambia código ni estilos.

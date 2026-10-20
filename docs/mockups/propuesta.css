@@ -1,0 +1,22 @@
+/* ===== PROPUESTA: tokens y clases nuevas (no existen en la app) ===== */
+:root{--card-w-s:22rem;--card-w-m:32rem;--card-w-l:38.75rem;--card-pad-s:var(--sp-3);--card-pad-m:var(--sp-4);--card-pad-l:var(--sp-4);--card-radius:var(--r-m);--chip-radius:var(--radius);--fs-title:16px;--select-on:var(--ok);--select-on-soft:color-mix(in srgb,var(--ok) 16%,transparent)}
+.card{border:1px solid var(--border);border-radius:var(--card-radius);background:var(--surface);margin-right:auto;overflow:hidden;font-size:var(--fs-m)}
+.card-s{width:fit-content;max-width:var(--card-w-s);padding:var(--card-pad-s);font-size:var(--fs-s)}
+.card-m{width:min(var(--card-w-m),100%);padding:var(--card-pad-m)}
+.card-l{width:min(var(--card-w-l),100%);padding:var(--card-pad-l)}
+.card-head{display:flex;align-items:center;gap:var(--sp-2);margin-bottom:var(--sp-2)}.card-head>svg{color:var(--text-3);flex:none}
+.card-title{font:600 var(--fs-l)/1.3 var(--font-head);margin:0;flex:1;min-width:0}.card-l .card-title{font-size:var(--fs-title)}.card-s .card-title{font-size:var(--fs-m)}
+.card-body,.card-line{margin:0 0 var(--sp-2);color:var(--text-2)}.card-s .card-line{color:var(--text);font-weight:550;font-size:var(--fs-m);display:flex;align-items:center;gap:var(--sp-2);flex-wrap:wrap}
+.card-meta{margin:0;font-size:var(--fs-xs);color:var(--text-4)}.card-l .card-meta{font-size:var(--fs-s)}.card-meta.right{margin-left:auto}.card-meta.left{margin-right:auto}
+.card-section{border-top:1px solid var(--border);margin-top:var(--sp-3);padding-top:var(--sp-3)}.card-label{font-weight:550;margin-bottom:var(--sp-2)}
+.card-opts,.card-options{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center;margin-top:var(--sp-2)}
+.card-foot{display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-2);margin-top:var(--sp-3);padding-top:var(--sp-3);border-top:1px solid var(--border)}.card-foot.nob{border:0;padding-top:0;margin-top:var(--sp-2)}
+.card-check{display:inline-flex;align-items:center;gap:var(--sp-2);padding:var(--sp-1) var(--sp-2);border-radius:var(--chip-radius);background:var(--surface-2);color:var(--text-2);font-size:var(--fs-s);cursor:pointer}.card-check:hover{background:var(--surface-hover);color:var(--text)}
+.card .cc-box{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;flex:none;border-radius:4px;border:1.5px solid var(--text-4)}
+.card-check.is-on{color:var(--text)}.card-check.is-on .cc-box{background:var(--select-on);border-color:var(--select-on);color:#0b1f12}
+.card .cc-chip,.cc-mini{border-radius:var(--chip-radius)}.card .cc-chip.is-sel{background:var(--select-on-soft);color:var(--select-on);box-shadow:inset 0 0 0 1px var(--select-on)}
+.card-done{display:flex;align-items:center;gap:var(--sp-2);padding:var(--sp-3);flex-wrap:wrap}.card-done>svg{color:var(--select-on)}
+.card-v-decision{border-color:var(--accent-line)}.card-v-decision .card-head{margin:calc(-1*var(--card-pad-l));margin-bottom:var(--sp-3);padding:var(--sp-3) var(--card-pad-l);background:var(--accent-soft)}
+.card-v-decision .card-foot .cc-approve{border-radius:12px;font-weight:700}
+.card-v-result{width:fit-content;min-width:min(100%,240px);max-width:var(--card-w-l);padding:var(--sp-2)}.card-v-result .card-head{margin:0 var(--sp-1) var(--sp-2)}.card-v-result .card-meta{margin:var(--sp-2) var(--sp-1) 0}.result-media{width:260px;height:260px;border-radius:var(--radius)}
+/* ===== fin de la propuesta ===== */
