@@ -11,4 +11,15 @@ export default [
     ],
     tests: ['tests/workflow-ask-first.test.ts'],
   },
+  {
+    id: 'model-switch',
+    what: 'DELICADO: un modelo que el usuario nombra en la petición actual se cambia solo con la tarjeta de una pregunta (plan rechazado, tarjeta compacta, parte añadida).',
+    sides: [
+      ['src/engine/plan.ts', 'call confirm_settings for ${kind} with model'],
+      ['src/engine/agent/runtime.ts', 'switchSection('],
+      ['src/engine/agent/switchModel.ts', 'export function confirmedState'],
+      ['src/components/chat/SettingsCard.tsx', 'function SwitchModelCard'],
+    ],
+    tests: ['tests/confirmed-named-model.test.ts', 'tests/switch-model-card.test.ts', 'tests/switch-model-card-ui.test.ts'],
+  },
 ];
