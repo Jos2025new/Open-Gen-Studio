@@ -48,7 +48,7 @@ async function guide(style: AgentStyle, args: Record<string, unknown>, afterQues
   const sid = st.activeSessionId;
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
-    composer: { ...st.composer, agentStyle: style, attachments: [], workflowId: undefined },
+    composer: { ...st.composer, agentStyle: style, attachments: [], workflowId: null },
     sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agentMetrics: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
   });
   await sendAgentMessage('Quiero tres chicos para un anuncio UGC que tengo en mente');

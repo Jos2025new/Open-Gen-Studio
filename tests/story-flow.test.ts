@@ -91,7 +91,7 @@ const clip = (id: string, beat: string) => ({ id, kind: 'video', title: beat, mo
 describe('story request in Auto mode (F1–F4 together)', () => {
   it('loads the story workflow, asks one card, saves the character, runs every clip and joins them', async () => {
     replies = [
-      { name: 'read_guide', args: { id: 'workflow:story' } },
+      { name: 'read_guide', args: { id: 'workflow:story', ready: true } },
       { name: 'ask_questions', args: { intro: 'Dos cosas antes del guion', questions: [{ id: 'tone', question: 'Tono', options: ['Acción', 'Humor seco'], default: 'Acción' }] } },
     ];
     await sendAgentMessage('Quiero una historia y una animacion de este personaje, unos 3 clips de 7 segs');
