@@ -1,5 +1,6 @@
 import { SETTINGS_POLICY } from '../procedure';
-import { OPEN_BOARD_TOOL } from './agentCanvas';
+import { PROVIDER_PARAM } from './changeRules';
+import { CONTINUE_IN_CANVAS_TOOL, OPEN_BOARD_TOOL } from './agentCanvas';
 import { z } from 'zod';
 import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
@@ -18,11 +19,11 @@ export const disconnectNodesSchema = z.object({ edge_ids: z.array(z.string()).mi
 export const nodeIdsSchema = z.object({ node_ids: z.array(z.string()).min(1).max(40) }).strict();
 
 export const TOOLS: ToolSpec[] = [
-  { type:'function', function:{ name:'edit_node', description:'Node canvas: edit an existing node. prompt edits generation prompts or text-node text. settings/params merge with existing values. model_ref uses the UI model action. Keeps outputs and connections unless a model change invalidates them.', parameters:{type:'object',properties:{node_id:{type:'string'},title:{type:'string'},prompt:{type:'string'},model_ref:{type:'string'},settings:{type:'object',properties:{aspect:{type:'string'},resolution:{type:'string'},count:{type:'integer'},duration:{type:'number'},audio:{type:'boolean'},seed:{type:'number'},negative:{type:'string'},advanced:{type:'object'},extras:{type:'object'},shots:{type:'array',items:{type:'object'}}}},params:{type:'object'}},required:['node_id']} } },
+  { type:'function', function:{ name:'edit_node', description:'Node canvas: edit an existing node. prompt edits generation prompts or text-node text. settings/params merge with existing values. model_ref uses the same model action as the UI. Keeps outputs and connections except those invalidated by a model output change.', parameters:{type:'object',properties:{node_id:{type:'string'},title:{type:'string'},prompt:{type:'string'},model_ref:{type:'string'},settings:{type:'object',properties:{aspect:{type:'string'},resolution:{type:'string'},count:{type:'integer'},duration:{type:'number'},audio:{type:'boolean'},seed:{type:'number'},negative:{type:'string'},advanced:{type:'object'},extras:{type:'object'},shots:{type:'array',items:{type:'object'}}}},params:{type:'object'}},required:['node_id']} } },
   { type:'function', function:{ name:'connect_nodes', description:'Node canvas: connect existing nodes to the named target port. Uses UI port/cycle validation and replaces an occupied single-input port.', parameters:{type:'object',properties:{source:{type:'string'},target:{type:'string'},port:{type:'string'}},required:['source','target','port']} } },
   { type:'function', function:{ name:'disconnect_nodes', description:'Node canvas: disconnect existing edge IDs returned by read_graph.', parameters:{type:'object',properties:{edge_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['edge_ids']} } },
-  { type:'function', function:{ name:'delete_nodes', description:'Node canvas: delete these existing nodes and their connections. Results stay in the gallery; the chat offers Undo. No confirmation.', parameters:{type:'object',properties:{node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['node_ids']} } },
-  { type:'function', function:{ name:'restore_nodes', description:'Node canvas: restore a deletion only when the user asks to recover it. Same action as chat Undo, keeping later edits. deletion_id comes from deleted nodes in the context; optional node_ids restores only those nodes.', parameters:{type:'object',properties:{deletion_id:{type:'string'},node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['deletion_id']} } },
+  { type:'function', function:{ name:'delete_nodes', description:'Node canvas: delete these existing nodes and their connections. Results stay in the gallery; the chat offers Undo. No extra confirmation.', parameters:{type:'object',properties:{node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['node_ids']} } },
+  { type:'function', function:{ name:'restore_nodes', description:'Node canvas: restore a deletion only when the user explicitly asks to recover it. Uses the same snapshot and action as chat Undo, preserving later edits. deletion_id comes from deleted nodes in the context; optional node_ids restores only those nodes.', parameters:{type:'object',properties:{deletion_id:{type:'string'},node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['deletion_id']} } },
   { type:'function', function:{ name:'run_nodes', description:'Node canvas: propose Run for existing node IDs. The card includes stale/missing ancestors and cost, and waits for the user click, even in Auto. Never creates nodes or runs descendants outside the requested targets.', parameters:{type:'object',properties:{node_ids:{type:'array',items:{type:'string'},minItems:1,maxItems:40}},required:['node_ids']} } },
   {
     type: 'function',
@@ -45,7 +46,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'recover_plan',
       description:
-        'Resume the latest plan that failed or finished with errors, in the same card. check_status asks the providers again about the jobs they received (only steps with a job id; no new charge); retry runs the failed steps again (charged again). Steps that waited for them run afterwards. Only when the user asks to check or retry; never propose a new plan for a failed one.',
+        'Resume the latest plan that failed or finished with errors, in the same card. check_status asks the providers again about the jobs they received (only steps with a job id; no new charge for them); retry runs the failed steps again (charged again). Steps that waited for them run afterwards. Only when the user asks to check or retry; never propose a new plan for a failed one.',
       parameters: {
         type: 'object',
         properties: { action: { type: 'string', enum: ['check_status', 'retry'] } },
@@ -58,7 +59,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'find_assets',
       description:
-        'This session\'s results and uploads (never other sessions), newest first: id, type and file extension, date, model, prompt or operation, settings, inputs. Filter by kind, origin, canvas, date (since: "24h", "7d", "today" or a date) and words (prompt, model, operation, extension like "png" or "glb", id). view: true also sends the first matches (up to 4) as images in the next message — the only way to see a result you were not shown. A 3D model is shown by its saved view image; earlier captures stay separate assets.',
+        'This session\'s results and uploads (never other sessions), newest first: id, type and file extension, date, model, prompt or operation, settings, inputs. Filter by kind, origin, canvas, date (since: "24h", "7d", "today" or a date) and words (prompt, model, operation, extension like "png" or "glb", id). view: true also sends the first matches (up to 4) as images in the next message — the only way to see a result you were not shown. A 3D model is shown by its current saved view image; previous captures remain separate image assets.',
       parameters: {
         type: 'object',
         properties: {
@@ -81,7 +82,7 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'continue_in_designer',
       description:
-        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default all as layers of one design (as "layers"); each image its own design (as "documents") only when the user asks for separate canvases. Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is charged; the view switches to the Designer (in Studio the board opens on the Designer instead).',
+        'Any canvas. When the user wants images in the Designer ("pásalo al designer", "continue in the designer"): the app puts each image as a raster layer — by default all as layers of one design (as "layers"); each image its own design (as "documents") only when the user asks for separate canvases. Without asset_ids: every chat image result not in a design yet. Only images: video, audio and 3D have no layers yet and are skipped. Nothing is generated or charged; the user\'s view switches to the Designer (in Studio the board opens on the Designer instead).',
       parameters: {
         type: 'object',
         properties: {
@@ -96,22 +97,14 @@ export const TOOLS: ToolSpec[] = [
     function: {
       name: 'continue_in_chat',
       description:
-        'Any canvas. When the user wants to return to Chat or take node results there, the app switches to Chat and adds the existing generations as normal result cards. With node_ids, imports only those current node results; without them, imports every current node result not already shown in Chat. Nothing is copied, run or charged.',
+        'Any canvas. When the user wants to return to Chat or take node results there, the app switches to Chat and adds the existing generations as normal result cards. With node_ids, imports only those current node results; without them, imports every current node result not already shown in Chat. It does not copy files, duplicate generations, run providers or charge anything.',
       parameters: {
         type: 'object',
         properties: { node_ids: { type: 'array', items: { type: 'string' }, maxItems: 40, description: 'Optional node ids whose current results should appear in Chat.' } },
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'continue_in_canvas',
-      description:
-        'Any canvas. When the user wants to move to or continue on the node canvas ("pasémonos al canvas de nodos", "continuamos en canvas"): the app switches the user\'s view to Nodes (in Studio the board opens on Nodes instead) and adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs or is charged. Returns the new node ids. Call it once; then build on those nodes.',
-      parameters: { type: 'object', properties: {} },
-    },
-  },
+  CONTINUE_IN_CANVAS_TOOL,
   OPEN_BOARD_TOOL,
   {
     type: 'function',
@@ -169,7 +162,7 @@ export const TOOLS: ToolSpec[] = [
           duration: { type: 'number', description: 'Video: seconds per clip you recommend.' },
           aspect: { type: 'string', description: 'Shape you recommend ("9:16"); leave out to keep a start image\'s shape.' },
           model: { type: 'string', description: 'The model named/selected by the user; omit to use the app recommendation. Recommend another listed model only for a required capability or requested comparison.' },
-          provider: { type: 'string', description: 'Only if the user asked for a provider: the model is searched there; with no model, the confirmed one at that provider.' },
+          provider: PROVIDER_PARAM,
               },
               required: ['kind'],
             },
@@ -224,7 +217,7 @@ export const TOOLS: ToolSpec[] = [
           summary: { type: 'string', description: 'One sentence describing the result, in the user\'s language.' },
           continuity: {
             type: 'array', maxItems: 12,
-            description: 'Declare shared preservation requirements when outputs must keep identity, geometry, product details, style or other properties. Each source is an existing asset:<id>/layer:<id> or a source step (possibly the first requested output); steps lists its consumers, excluding the source itself. Consumers must receive it through compatible actual content inputs or derived inputs, not repeated text. Omit for independent work.',
+            description: 'Declare shared preservation requirements when outputs must keep identity, geometry, product details, style or other properties. Each source is an existing asset:<id>/layer:<id> or a source step (possibly the first requested output); steps lists its consumers, excluding the source itself. Consumers must receive it through compatible actual content inputs or derived inputs, not repeated text. Omit for independent work. Does not save, generate or regenerate anything.',
             items: { type: 'object', properties: { source: { type: 'string' }, preserve: { type: 'string', description: 'What must remain, not the changes.' }, steps: { type: 'array', items: { type: 'string' } } }, required: ['source', 'preserve', 'steps'] },
           },
           revision: { type: 'boolean', description: 'true when this plan changes the pending plan the user just commented on; false or omitted for a different request.' },

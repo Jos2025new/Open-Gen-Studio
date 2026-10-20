@@ -50,6 +50,17 @@ export const OPEN_BOARD_TOOL = {
   },
 };
 
+/** Moved from tools.ts unchanged (size baseline). */
+export const CONTINUE_IN_CANVAS_TOOL = {
+  type: 'function' as const,
+  function: {
+    name: 'continue_in_canvas',
+    description:
+      'Any canvas. When the user wants to move to or continue on the node canvas ("pasémonos al canvas de nodos", "continuamos en canvas"): the app switches the user\'s view to Nodes (in Studio the board opens on Nodes instead) and adds every finished chat result as a node with its own result, prompt, model and settings, connected by the inputs it used; nothing runs again and nothing is charged. Returns the new node ids. Call it once; then build on those nodes.',
+    parameters: { type: 'object', properties: {} },
+  },
+};
+
 export const STUDIO_RULE =
   '- In Studio (app_context says "You are in Studio") the board beside the chat can show Nodes or the Designer: MUST call open_board with view "nodes" before node work (read_graph, edit_node, run_nodes…) and "designer" before Designer work (view_canvas, designer_fx, layer steps); your canvas is then that one, in the same turn. open_board with "assets" or "closed" returns to the chat canvas. Never ask the user to open the board by hand.';
 
