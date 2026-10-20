@@ -86,7 +86,7 @@
 - [Propuesta: el agente pregunta antes de cargar un workflow](propuesta-workflow-despues-de-preguntar.md) (2026-10-19), sin implementar: ficha corta antes de preguntar, `ready: true`, entregable frente a propósito; plan para otro agente.
 - [Propuesta: sistema visual acotado de las tarjetas del chat](propuesta-sistema-visual-tarjetas.md) (2026-10-20), sin implementar: inventario con valores fijos, tres tamaños (mínimo, medio, estándar), reglas para agentes y plan de migración.
 - [Maqueta estática del sistema visual de tarjetas](mockups/tarjetas.html) (2026-10-20), con su [CSS propuesto](mockups/propuesta.css): antes y después, con las hojas reales de la app.
-- [Propuesta aprobada: bases y color de resaltado](propuesta-temas.md) (2026-10-20), sin implementar: selector Sistema/Atlas/Grafito/Claro/Original, seis resaltados con Aurora, contrastes WCAG, almacenamiento. Maqueta en [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html); CSS: [Atlas](mockups/base-atlas.css), [Grafito](mockups/base-grafito.css), [Claro](mockups/base-claro.css), [Original](mockups/base-original.css), [acentos](mockups/acentos.css), [Aurora](mockups/aurora.css).
+- [Propuesta aprobada: bases y color de resaltado](propuesta-temas.md) (2026-10-20), paso 1 (tokens y bases) implementado en `task/workflow-ask-first`, falta el selector: selector Sistema/Atlas/Grafito/Claro/Original, seis resaltados con Aurora, contrastes WCAG, almacenamiento. Maqueta en [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html); CSS: [Atlas](mockups/base-atlas.css), [Grafito](mockups/base-grafito.css), [Claro](mockups/base-claro.css), [Original](mockups/base-original.css), [acentos](mockups/acentos.css), [Aurora](mockups/aurora.css).
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.
@@ -151,6 +151,7 @@
 - [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
 - [046-2026-10-W43: Spaces, etapa 2: texto, Reusar e historial](history/046-2026-10-W43.md).
 - [047-2026-10-W43: un workflow pregunta antes de cargarse (2026-10-19)](history/047-2026-10-W43.md).
+- [048-2026-10-W43: sistema visual, paso 1: tokens y bases (2026-10-20)](history/048-2026-10-W43.md).
 
 ## Trazabilidad
 

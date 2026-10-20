@@ -7,6 +7,7 @@ input[type=color] { width: 100%; height: 30px; border: 1px solid var(--border); 
 textarea { resize: vertical; }
 svg { flex-shrink: 0; }
 .icon-btn, .btn, .chip { display: inline-flex; align-items: center; justify-content: center; gap: var(--control-gap); border-radius: var(--radius-s); flex-shrink: 0; }
+.btn { border-radius: var(--btn-radius); }
 .icon-btn { width: var(--control-h); height: var(--control-h); color: var(--text-2); }
 .topbar .topbar-slot { flex: 0 0 auto; }
 .icon-btn-sm { width: 27px; height: 27px; }
@@ -15,8 +16,8 @@ svg { flex-shrink: 0; }
 .btn { padding: 8px 12px; font-weight: 550; border: 1px solid transparent; }
 .btn-sm { padding: 5px 9px; font-size: 12px; }
 .btn-secondary { background: var(--surface-2); border-color: var(--border-strong); }
-.btn-primary, .send-btn { background: var(--accent); color: var(--accent-ink); }
-.btn-primary:not(:disabled):hover, .send-btn:not(:disabled):hover { background: #e1ff76; }
+.btn-primary, .send-btn { background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--accent)); color: var(--accent-ink); }
+.btn-primary:not(:disabled):hover, .send-btn:not(:disabled):hover { background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--accent-hover, var(--accent))); filter: var(--accent-hover-filter, brightness(1.08)); }
 .btn-ghost { color: var(--text-2); }
 .btn-danger { background: var(--danger-soft); color: var(--danger); }
 .tone-danger, .is-danger, .danger { color: var(--danger); }

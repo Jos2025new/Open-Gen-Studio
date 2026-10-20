@@ -2,33 +2,29 @@
   color-scheme: dark;
 
   /* Surfaces: near-black neutrals, one step apart. */
-  --bg: #0a0a0b;
-  --bg-canvas: #0d0d0f;
-  --surface: #151518;
-  --surface-2: #1d1d21;
-  --surface-3: #28282d;
-  --surface-hover: #232328;
-  --overlay: rgba(6, 6, 8, 0.72);
+  --bg: #1e1f20;
+  --bg-canvas: #131314;
+  --surface: #1e1f20;
+  --surface-2: #282a2c;
+  --surface-3: #333537;
+  --surface-hover: #2d2f31;
+  --overlay: rgba(19, 19, 20, 0.72);
 
-  --border: #2a2a30;
-  --border-strong: #3a3a42;
-  --border-focus: #575761;
+  --border: #333537;
+  --border-strong: #444746;
+  --border-focus: #8d908e;
 
-  --text: #ececf0;
-  --text-2: #c3c3cb;
-  --text-3: #8e8e98;
-  --text-4: #61616a;
+  --text: #e3e3e3;
+  --text-2: #c4c7c5;
+  --text-3: #8d908e;
+  --text-4: #747775;
 
-  /* The single accent, used sparingly: primary action, active state, progress. */
-  --accent: #d8ff3a;
-  --accent-soft: rgba(216, 255, 58, 0.14);
-  --accent-line: rgba(216, 255, 58, 0.45);
-  --accent-ink: #0b0c05;
+  /* Accent and selection tokens live in accents.css (lima by default). */
 
-  --danger: #f06a6a;
-  --danger-soft: rgba(240, 106, 106, 0.12);
-  --warn: #ffc25e;
-  --ok: #86e3a5;
+  --danger: #f28b82;
+  --danger-soft: rgba(242, 139, 130, 0.14);
+  --warn: #fdd663;
+  --ok: #81c995;
 
   /* Port / media type hues, muted. */
   --type-text: #c3c3cb;
@@ -47,6 +43,9 @@
   --r-m: 16px;
   --r-l: 24px;
   --r-full: 999px;
+  /* Buttons and chips: pill in every base but Original, which keeps today's corners. */
+  --btn-radius: 999px;
+  --chip-radius: 999px;
   --fs-xs: 11px;
   --fs-s: 12px;
   --fs-m: 13px;
@@ -75,9 +74,52 @@
   --font-mono: var(--mono);
   --mono: ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 
+  /* Card system (defined for step 3+; nothing reads them yet): three widths and paddings, one radius, the L title size. */
+  --card-w-s: 22rem;
+  --card-w-m: 32rem;
+  --card-w-l: 38.75rem;
+  --card-pad-s: var(--sp-3);
+  --card-pad-m: var(--sp-4);
+  --card-pad-l: var(--sp-4);
+  --card-radius: var(--r-m);
+  --fs-title: 16px;
+  /* Popovers (same shape as .cc-pop today; unused until the card migration). */
+  --pop-bg: var(--surface-3);
+  --pop-radius: var(--r-m);
+  --pop-pad: 14px;
+  --pop-shadow: var(--shadow-pop);
+
   --sidebar-w: 56px;
   --topbar-h: 48px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* Bases. Atlas is the :root above; Sistema (the default preference) resolves to atlas or claro before first paint (index.html). */
+[data-base="grafito"] {
+  --bg: #232327; --bg-canvas: #1a1a1e;
+  --surface: #232327; --surface-2: #2a2a2e; --surface-3: #313135; --surface-hover: #2a2a2e;
+  --overlay: rgba(12, 12, 13, 0.72);
+  --border: #313135; --border-strong: #3f3f44; --border-focus: #8d8d8f;
+  --text: #e8e8ea; --text-2: #cbccd0; --text-3: #8d8d8f; --text-4: #6b6b70;
+}
+[data-base="claro"] {
+  color-scheme: light;
+  --bg: #fbfaf8; --bg-canvas: #f1efec;
+  --surface: #fbfaf8; --surface-2: #e9e6e1; --surface-3: #dedad4; --surface-hover: #ebe8e3;
+  --overlay: rgba(241, 239, 236, 0.72);
+  --border: #d8d4ce; --border-strong: #bdb8b0; --border-focus: #6e6b67;
+  --text: #111111; --text-2: #4a4846; --text-3: #6e6b67; --text-4: #9a968f;
+  --danger: #b3261e; --danger-soft: rgba(179, 38, 30, 0.1); --warn: #8a5a00; --ok: #1e6b3a;
+}
+/* Original (legacy, to be retired): exactly the values this file had before the bases; today's corners, no pill. */
+[data-base="original"] {
+  color-scheme: dark;
+  --bg: #0a0a0b; --bg-canvas: #0d0d0f; --surface: #151518; --surface-2: #1d1d21; --surface-3: #28282d; --surface-hover: #232328;
+  --overlay: rgba(6, 6, 8, 0.72);
+  --border: #2a2a30; --border-strong: #3a3a42; --border-focus: #575761;
+  --text: #ececf0; --text-2: #c3c3cb; --text-3: #8e8e98; --text-4: #61616a;
+  --danger: #f06a6a; --danger-soft: rgba(240, 106, 106, 0.12); --warn: #ffc25e; --ok: #86e3a5;
+  --btn-radius: var(--radius-s); --chip-radius: 10px;
 }
 
 /* Native dropdown options: some systems (Linux GTK) draw them light despite color-scheme; force the dark ones. */

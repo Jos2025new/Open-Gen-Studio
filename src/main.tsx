@@ -9,6 +9,7 @@ import '@fontsource/outfit/600.css';
 import '@fontsource/outfit/700.css';
 import '@xyflow/react/dist/style.css';
 import './styles/tokens.css';
+import './styles/accents.css';
 import './styles/base.css';
 import './styles/ui.css';
 import './styles/shell.css';
