@@ -21,7 +21,7 @@ En este orden:
 2. **Atlas**: la base oscura principal.
 3. **Grafito**: la oscura secundaria, de carbón azulado.
 4. **Claro**: off-white cálido, el modo claro general.
-5. **Original (antigua)**: el oscuro verdoso de hoy (`tokens.css`), tal cual. **No recibe mejoras** (ni píldoras ni los ajustes de este documento) y se retirará más adelante.
+5. **Original (antigua)**: el oscuro verdoso de hoy (`tokens.css`), tal cual. **No recibe mejoras de color ni de radios**: conserva sus colores y esquinas de 10 px, sin píldoras. Sí usa las plantillas de disposición de las tarjetas (aprobado por el usuario, 2026-10-20). Se retirará más adelante.
 
 Debajo, la fila **«Color de resaltado»**, independiente de la base: Predeterminado (lima, en todas las bases), Azul, Violeta, Rosa, Verde agua y Aurora. Cada uno tiene su juego oscuro y su juego claro. Cada resaltado define solo la familia del acento (`--accent`, `--accent-ink`, `--accent-soft`, `--accent-line`, `--select-on`, `--select-on-soft`, `--select-line`); selección y primario lo siguen.
 
