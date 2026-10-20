@@ -88,6 +88,8 @@ function boxHandles(b: { x: number; y: number; w: number; h: number }, mode: 'sc
   return out;
 }
 const RULER = 18;
+/** A theme token for canvas drawing, so rulers and the page edge follow the base. */
+const tok = (n: string, f: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f;
 const GRADIENT_DEFAULT = { shape: 'linear' as const, mode: 'two' as const, color2: '#000000', opacity: 1 };
 const SHAPE_NAMES = { rect: 'Rectangle', ellipse: 'Ellipse', polygon: 'Polygon', star: 'Star', sector: 'Sector', arc: 'Arc', chord: 'Chord', line: 'Line', curve: 'Curve', arrow: 'Arrow' } as const;
 type ShapeTool = keyof typeof SHAPE_NAMES;
@@ -109,10 +111,10 @@ function Ruler({ side, view, size, guides, ...handlers }: { side: 'top' | 'left'
     c.height = Math.round(h * dpr);
     const ctx = c.getContext('2d')!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = '#18181c';
+    ctx.fillStyle = tok('--surface', '#18181c');
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = '#8e8e98';
-    ctx.strokeStyle = '#55555e';
+    ctx.fillStyle = tok('--text-3', '#8e8e98');
+    ctx.strokeStyle = tok('--border-strong', '#55555e');
     ctx.font = '9px system-ui, sans-serif';
     const step = rulerStep(view.zoom);
     const origin = side === 'top' ? view.x : view.y;
@@ -363,7 +365,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       ctx.restore();
     }
     // The page edge, lighter than the workspace, so an empty or dark page still reads as a page.
-    ctx.strokeStyle = '#55555e';
+    ctx.strokeStyle = tok('--border-strong', '#55555e');
     ctx.lineWidth = 1 / view.zoom;
     ctx.strokeRect(0, 0, doc.width, doc.height);
     if (live) drawStroke(ctx, live);
@@ -375,7 +377,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     if (editMarquee) drawEditMarquee(ctx, editMarquee, view);
     const sx = (x: number) => view.x + x * view.zoom;
     const sy = (y: number) => view.y + y * view.zoom;
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = tok('--border', 'rgba(255,255,255,0.08)');
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
     // Ruler guides across the whole view (the one being dragged replaces its saved position).

@@ -47,7 +47,7 @@
 .nc-generating { position: absolute; inset: auto 8px 8px; z-index: 2; padding: 10px; display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--accent-line); border-radius: 7px; color: var(--text); pointer-events: none; }
 .nc-generating-label { display: flex; align-items: center; gap: 7px; font-size: 12px; }.nc-generating-label svg { color: var(--accent); }.nc-generating-label > span { margin-left: auto; }.nc-generating-detail { font-size: 11px; overflow-wrap: anywhere; color: var(--text-2); }.nc-generating progress { width: 100%; height: 5px; accent-color: var(--accent); }
 .nc-history-count { display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0; padding: 2px 5px; border-radius: 4px; background: var(--surface-2); color: var(--text); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }.nc-history-count:hover { background: var(--surface-3); }
-.nc-history-list { padding: 8px; display: flex; flex-direction: column; gap: 10px; }.nc-history-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-2); margin-bottom: 5px; }.nc-history-entry.is-current .nc-history-heading { color: var(--accent); }.nc-history-outputs { display: flex; flex-direction: column; gap: 8px; }.nc-history-preview { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }.nc-history-preview:hover { border-color: var(--accent); }.nc-history-outputs .media { width: 100%; height: 100%; object-fit: cover; }.nc-history-entry p { margin: 0; font-size: 11px; max-height: 100px; overflow: auto; white-space: pre-wrap; color: var(--text-2); }
+.nc-history-list { padding: 8px; display: flex; flex-direction: column; gap: 10px; }.nc-history-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--text-2); margin-bottom: 5px; }.nc-history-entry.is-current .nc-history-heading { color: var(--text); }.nc-history-outputs { display: flex; flex-direction: column; gap: 8px; }.nc-history-preview { width: 100%; height: auto; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }.nc-history-preview:hover { border-color: var(--accent); }.nc-history-outputs .media { width: 100%; height: 100%; object-fit: cover; }.nc-history-entry p { margin: 0; font-size: 11px; max-height: 100px; overflow: auto; white-space: pre-wrap; color: var(--text-2); }
 
 .nc-media video.media { pointer-events: auto; }
 
@@ -112,7 +112,7 @@
 .import-all { margin-right: auto; background: none; border: 0; font-size: 12px; cursor: pointer; }
 
 /* Connections readable on the dark canvas; the selected one in the accent. */
-.node-canvas .react-flow__edge-path { stroke: #8e8e98; stroke-width: 1.6; }
+.node-canvas .react-flow__edge-path { stroke: var(--text-3); stroke-width: 1.6; }
 .node-canvas .react-flow__edge:hover .react-flow__edge-path { stroke: var(--text-2); stroke-width: 2; }
 .node-canvas .react-flow__edge.selected .react-flow__edge-path,
 .node-canvas .react-flow__edge:focus-visible .react-flow__edge-path { stroke: var(--accent); stroke-width: 2.6; }
@@ -162,3 +162,5 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .node-connection-preview path { fill: none; stroke: var(--text-2); stroke-width: 2; stroke-dasharray: 6 6; }
 .node-add-search { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2); color: var(--text-3); }
 .node-add-search input { width: 100%; min-width: 0; }
+/* React Flow paints from our tokens, not its dark defaults, so the canvas follows the base (ADR 0024 M). */
+.node-canvas .react-flow { --xy-background-color: var(--bg-canvas); --xy-node-color: var(--text); --xy-node-border: 1px solid var(--border); --xy-node-background-color: var(--surface); --xy-handle-background-color: var(--text-3); --xy-handle-border-color: var(--surface); --xy-edge-stroke: var(--text-3); --xy-connectionline-stroke: var(--text-3); --xy-minimap-background-color: var(--surface); --xy-minimap-node-background-color: var(--surface-3); --xy-selection-background-color: var(--accent-soft); --xy-selection-border: 1px dotted var(--border-focus); }

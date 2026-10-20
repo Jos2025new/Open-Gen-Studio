@@ -102,7 +102,7 @@ export function CanvasNavigation({ sessionId, onSelect, tool, onTool, selectedCo
   const showHistory = (e: React.MouseEvent, dir: 'undo' | 'redo') => { e.preventDefault(); e.stopPropagation(); setDirection(dir); history.setOpen(true); };
   return (
     <>
-      {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="rgba(10,10,11,0.7)" nodeColor="var(--accent)" /> : null}
+      {mapOpen ? <MiniMap pannable zoomable position="bottom-left" className="canvas-map" style={{ bottom: 60 + lift }} maskColor="var(--overlay)" nodeColor="var(--text-4)" /> : null}
       <Panel ref={panelRef} position="bottom-left" className="canvas-navigation" style={{ bottom: lift }}>
         <IconButton icon={MousePointer2} label="Select: drag a box; middle or right drag pans" active={tool === 'select'} onClick={() => onTool('select')} />
         <IconButton icon={Hand} label="Pan (default): drag moves the canvas, scroll pans, double-click and hold to box-select" active={tool === 'pan'} onClick={() => onTool('pan')} />

@@ -7,8 +7,8 @@
 .designer-palette .icon-btn { position: relative; }
 .designer-palette .icon-btn, .designer-view .icon-btn { width: var(--control-h); height: var(--control-h); border-radius: var(--radius-s); flex-shrink: 0; }
 .designer-palette .icon-btn svg, .designer-view .icon-btn svg { width: var(--control-icon); height: var(--control-icon); }
-.designer-palette .icon-btn.is-active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.designer-palette .icon-btn.is-active::after { content: ''; position: absolute; top: -5px; left: 8px; right: 8px; height: 2px; background: var(--accent); }
+.designer-palette .icon-btn.is-active { background: var(--active-bg); color: var(--active-text); box-shadow: inset 0 0 0 1px var(--active-line); }
+.designer-palette .icon-btn.is-active::after { content: ''; position: absolute; top: -5px; left: 8px; right: 8px; height: 2px; background: var(--active-line); }
 .tool-family { display: flex; gap: 3px; flex-shrink: 0; }
 .tool-family + .tool-family { border-left: 1px solid var(--border-strong); padding-left: 7px; margin-left: 4px; }
 .palette-history { display: flex; order: -1; gap: 2px; padding-right: 7px; margin-right: 4px; border-right: 1px solid var(--border-strong); }
@@ -36,7 +36,7 @@
 .layer-shelf { flex-shrink: 0; padding: 0 8px; border-bottom: 1px solid var(--border); }
 .layer-shelf .layer-list { max-height: min(180px, 25dvh); }
 .layer-shelf .layer-row { gap: 4px; border: 0; border-radius: 8px; min-height: 48px; padding: 5px 3px; }
-.layer-shelf .layer-row.is-active { box-shadow: inset 2px 0 var(--accent); }
+.layer-shelf .layer-row.is-active { box-shadow: inset 2px 0 var(--active-line); }
 .layer-shelf .layer-thumb-wrap { width: 42px; flex: 0 0 42px; }
 .layer-shelf .layer-row.is-active > .layer-select { flex: 0 0 50px; }
 .layer-name-inline { flex: 1; min-width: 0; background: transparent !important; border: 0 !important; padding: 4px 0 !important; font-size: 12px; }
@@ -196,7 +196,7 @@
 }
 .opt-slider::before {
   content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
-  background: rgba(255, 255, 255, .085); border-right: 2px solid var(--text-2); pointer-events: none;
+  background: color-mix(in srgb, var(--text) 8.5%, transparent); border-right: 2px solid var(--text-2); pointer-events: none;
 }
 .opt-slider:hover::before, .opt-slider:focus-within::before { border-right-color: var(--accent); }
 .opt-slider:focus-within { border-color: var(--accent-line, var(--accent)); }
@@ -215,12 +215,12 @@
 .opt-choice .opt-choices { display: flex; gap: 2px; }
 .opt-choice .opt-choices button { display: grid; place-items: center; width: 34px; height: 26px; border-radius: var(--radius-s); color: var(--text-3, var(--text-2)); }
 .opt-choice .opt-choices button:hover { color: var(--text); background: var(--surface-3); }
-.opt-choice .opt-choices button.is-on { color: var(--accent-ink, #111); background: var(--accent); }
+.opt-choice .opt-choices button.is-on { color: var(--active-text); background: var(--active-bg); }
 .opt.opt-presets { height: auto; padding: 6px; gap: 2px; flex-wrap: wrap; justify-content: flex-start; }
 .opt-presets button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 34px; height: 40px; padding-bottom: 3px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); }
 .opt-presets button i { display: block; border-radius: 50%; background: currentColor; }
 .opt-presets button:hover { background: var(--surface-3); color: var(--text); }
-.opt-presets button.is-on { background: var(--accent-soft); color: var(--accent); }
+.opt-presets button.is-on { background: var(--active-bg); color: var(--active-text); }
 .brush-preview { display: block; width: 100%; height: 56px; border-radius: var(--radius); background: repeating-conic-gradient(#2a2a30 0 25%, #34343b 0 50%) 0 0 / 12px 12px; flex-basis: 100%; }
 /* In the panel the fields line up in two columns; previews, presets and toggles span the row when they need it. */
 .designer-context .tool-settings > .brush-preview, .designer-context .tool-settings > .opt-presets { flex-basis: 100%; }
@@ -278,7 +278,7 @@
 .context-strip .rounding-controls > [data-multi-rectangle-convert] { overflow: hidden; text-overflow: ellipsis; }
 .context-target { display: inline-flex; gap: 4px; align-items: baseline; padding: 0 6px 0 2px; font-size: 11px; color: var(--text-2); white-space: nowrap; border-right: 1px solid var(--border-strong); margin-right: 2px; }
 .context-target strong { color: var(--text); font-weight: 600; }
-.context-target span { color: var(--accent); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.context-target span { color: var(--text); max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .context-more { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px; }
 /* Right panel (LayersPanel.tsx, plan step 2): the inspector on top, the layers below with a draggable split. */
 .layers-panel > .panel-tabs { order: 0; }
@@ -294,7 +294,7 @@
 .layers-split:hover, .layers-split:active { background: var(--accent-line); }
 .layers-panel .layer-shelf .layer-row { position: relative; }
 /* Under the FX layer's name: what it acts on ("→ Photo"), small, after the thumbnail. */
-.layer-fx-target { position: absolute; left: 52px; right: 56px; bottom: 4px; font-size: var(--fs-xs); line-height: 1; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.layer-fx-target { position: absolute; left: 52px; right: 56px; bottom: 4px; font-size: var(--fs-xs); line-height: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
 /* Tool help line (ToolHelp.tsx, plan step 5): discreet, above the canvas, never moving it. */
 .tool-help { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 7; max-width: min(720px, calc(100% - var(--layers-w,260px) - 380px)); display: flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; font-size: 11px; color: var(--text-2); background: color-mix(in srgb, var(--surface-2) 88%, transparent); border: 1px solid var(--border); border-radius: 999px; pointer-events: auto; }
 .tool-help strong { color: var(--text); font-weight: 600; white-space: nowrap; }
@@ -309,7 +309,7 @@
 .shape-knots { z-index: 4; }
 .shape-knot { cursor: pointer; }
 .shape-knot-lines line { stroke: var(--accent); stroke-width: 1; }
-.context-mode { font-weight: 600; color: var(--accent); padding: 0 6px; }
+.context-mode { font-weight: 600; color: var(--text); padding: 0 6px; }
 .path-node.is-picked { fill: var(--accent); }
 .path-nodes .node-marquee-hit { fill: transparent; pointer-events: all; }
 .path-nodes .node-marquee { fill: color-mix(in srgb, var(--accent) 12%, transparent); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
