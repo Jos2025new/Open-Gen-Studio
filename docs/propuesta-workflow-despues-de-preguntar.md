@@ -42,10 +42,17 @@ Se comprobó leyendo el código de `task/agent-stop` en `fb579b0`.
 - **En Direct** no hay preguntas: la guía completa llega como hoy.
 - **Lo que no cambia:** las skills, las guías de modelo y de app, y el workflow elegido en el compositor siguen su camino actual.
 
-### 2. Entregable frente a propósito (instrucción)
+### 2. Entregable frente a propósito, y el workflow como sugerencia (instrucción)
 
 - Se sustituye «o se parece mucho a» de `context.ts:97` por una regla explícita:
   > El entregable es lo que la petición pide ahora. «Para un anuncio», «para un UGC», «para unas ideas» es propósito: úsalo para el estilo del prompt, no cargues el workflow. Carga un workflow solo cuando la petición pide la pieza completa («hazme un anuncio UGC», «un vídeo de unboxing»). Si encaja después, ofrécelo al terminar.
+- **Proactividad, siempre como sugerencia** (pedido del usuario, 2026-10-19). El usuario puede querer un flujo completo sin estar seguro, y le falta el impulso. Por eso, cuando un workflow encaja con el propósito, el agente lo **sugiere**, sin asumirlo ni cargarlo sin aprobación:
+  - entrega primero lo pedido (las imágenes) y, al terminar, ofrece una línea con las dos opciones: seguir directo o montar el flujo («¿Seguimos con estas, o monto el anuncio UGC con quien elijas?»);
+  - si el propósito es ambiguo y cambia el entregable, puede preguntarlo antes, en la misma ronda de preguntas y con «directo» como primera opción;
+  - nunca cambia el entregable por su cuenta: el workflow solo se carga si el usuario lo acepta;
+  - una sugerencia por respuesta como máximo, sin insistir si el usuario la ignora.
+- Texto propuesto para las instrucciones:
+  > MUST: first identify the deliverable the request asks for now (an image, three images, a video…); a purpose ("for an ad", "for a UGC", "for some ideas") is not a deliverable and not a process. Never turn a deliverable into a workflow on your own. When a workflow fits the purpose, deliver what was asked and then offer it in one line as a choice: go on directly, or build that flow. Load the workflow only if the user accepts.
 - Coste en tokens: mínimo, porque sustituye una línea por otra parecida. Hay que medir el tamaño de `context.ts` con `check-sizes`.
 
 ## Plan previsto
@@ -71,7 +78,8 @@ Se hace en un worktree propio, `task/workflow-ask-first`, que sale de `task/agen
    - Las skills y las guías de modelo no cambian.
    - La ficha no registra la métrica `guide` ni impide cargar la guía después.
    - El `SYSTEM_PROMPT` contiene la regla de entregable frente a propósito y ya no dice «closely resembles».
-6. **Comprobación con el LLM real (opcional, con coste):** hay un arnés, `scripts/agent-baseline.mjs`. Correr los tres ejemplos del usuario y comprobar que terminan en un plan de imágenes sin cargar ningún workflow completo, antes y después del cambio.
+   - El `SYSTEM_PROMPT` contiene la regla de sugerir el workflow como opción, sin cargarlo sin aprobación.
+6. **Comprobación con el LLM real (opcional, con coste):** hay un arnés, `scripts/agent-baseline.mjs`. Correr los tres ejemplos del usuario y comprobar que terminan en un plan de imágenes sin cargar ningún workflow completo y, a lo sumo, con una sugerencia del workflow al final, antes y después del cambio.
    - Solo con la aprobación del usuario: modelo concreto y coste máximo, según AGENTS.md.
    - Sin aprobación, se entrega con los tests deterministas y se dice que el comportamiento del LLM no se verificó.
 7. **Docs:**
