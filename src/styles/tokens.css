@@ -112,6 +112,8 @@
   --field-border: transparent;
   --field-radius: var(--radius);
   --field-fill: color-mix(in srgb, var(--text) 10%, transparent);
+  /* The chosen option inside a field (InlineChoice, a Segmented in a field): a raised step, never the field's hover. */
+  --field-on: var(--surface-3);
   /* Feed lines (agent turns, resolved cards): one left edge, icons in a 13px column, text after a 7px gap. */
   --feed-icon: 13px;
   --feed-gap: 7px;
@@ -143,6 +145,7 @@
   --shadow-pop: 0 8px 24px rgba(60, 64, 67, 0.12), 0 2px 6px rgba(60, 64, 67, 0.08);
   --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.06);
   --shadow-float: 0 4px 14px rgba(60, 64, 67, 0.12);
+  --field-on: #ffffff;
 }
 /* Blanco: white page, cool blue-grey panels (from Google Vids); the light highlight sets, as in Claro. */
 [data-base="blanco"] {
@@ -157,6 +160,7 @@
   --shadow-pop: 0 8px 24px rgba(60, 64, 67, 0.12), 0 2px 6px rgba(60, 64, 67, 0.08);
   --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.06);
   --shadow-float: 0 4px 14px rgba(60, 64, 67, 0.12);
+  --field-on: #ffffff;
 }
 /* Original (legacy, to be retired): exactly the values this file had before the bases; today's corners, no pill. */
 [data-base="original"] {

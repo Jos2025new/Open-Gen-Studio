@@ -214,7 +214,7 @@
 .opt-choice .opt-choices { display: flex; gap: 2px; }
 .opt-choice .opt-choices button { display: grid; place-items: center; width: 34px; height: 26px; border-radius: var(--radius-s); color: var(--text-3, var(--text-2)); }
 .opt-choice .opt-choices button:hover { color: var(--text); background: var(--surface-3); }
-.opt-choice .opt-choices button.is-on { color: var(--active-text); background: var(--active-bg); }
+.opt-choice .opt-choices button.is-on { color: var(--text); background: var(--field-on); }
 .opt.opt-presets { height: auto; padding: 6px; gap: 2px; flex-wrap: wrap; justify-content: flex-start; }
 .opt-presets button { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: 34px; height: 40px; padding-bottom: 3px; border-radius: var(--radius-s); color: var(--text-2); font-size: var(--fs-xs); }
 .opt-presets button i { display: block; border-radius: 50%; background: currentColor; }
@@ -263,7 +263,7 @@
 .composer-tools-bar .context-strip { left: 64px; max-width: calc(100% - 84px); }
 /* Not docked, the palette floats at the top of the page: the strip opens below it. */
 .designer-palette:not(.is-docked) .context-strip { bottom: auto; top: calc(100% + 8px); }
-.context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
+.context-strip { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(100%, 980px); display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 5px 8px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); z-index: 6; }
 .context-strip .tool-settings { display: contents; }
 .context-strip .opt { height: var(--control-h); }
 .context-strip .opt.opt-slider { flex: 0 0 auto; width: 120px; }
@@ -315,3 +315,8 @@
 .path-outline { fill: none; stroke: transparent; stroke-width: 12; pointer-events: none; }
 /* The segment band takes the press (it inherits pointer-events: none from .stroke-ruler); only its stroke is hit. */
 .path-nodes .segment-hit { pointer-events: stroke; }
+/* Fields sit on --surface (strip, panel, rail) so the --field-bg capsule always reads; one hover; a Segmented inside a field looks like InlineChoice. */
+.opt:is(.opt-slider, .opt-toggle, .opt-pick, .opt-color):not(.is-icon, .is-disabled):hover, .tool-setting:not(.is-on):hover { background: var(--field-bg-hover); }
+.opt .segmented { padding: 0; background: transparent; }
+.opt .segmented button.is-active { background: var(--field-on); color: var(--text); box-shadow: none; }
+

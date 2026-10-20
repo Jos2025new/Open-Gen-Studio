@@ -87,7 +87,7 @@
 
 /* Tool options in the top bar: values set in place (slider + number), color swatches, short lists; no menus. */
 .opt { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; height: 30px; padding: 0 8px; border-radius: var(--field-radius); background: var(--field-bg); border: 1px solid var(--field-border); font-size: 11px; color: var(--text-2); }
-.opt:hover { background: var(--field-bg-hover); color: var(--text); }
+.opt:hover { color: var(--text); }
 .opt-label { white-space: nowrap; }
 .opt-range { width: 72px; accent-color: var(--accent); }
 .opt-num { width: 40px; padding: 2px 3px !important; border: 0 !important; background: transparent !important; color: var(--text); font-size: 11px; text-align: right; -moz-appearance: textfield; }
