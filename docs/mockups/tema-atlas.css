@@ -1,0 +1,38 @@
+/* Tema «Atlas» (propuesta): solo colores, sacados de la referencia (Material oscuro neutro) y, donde se indica, derivados. */
+[data-theme="atlas"] {
+  color-scheme: dark;
+  --bg: #1e1f20;            /* referencia: barra lateral y superior */
+  --bg-canvas: #131314;     /* referencia: panel de contenido */
+  --surface: #1e1f20;
+  --surface-2: #282a2c;     /* referencia: campo de búsqueda */
+  --surface-3: #333537;     /* referencia: pista de la barra de almacenamiento */
+  --surface-hover: #2d2f31; /* derivado: entre surface-2 y surface-3 */
+  --overlay: rgba(19, 19, 20, 0.72);
+  --border: #333537;
+  --border-strong: #444746; /* referencia: divisores */
+  --border-focus: #8d908e;  /* referencia: contorno del botón secundario */
+  --text: #e3e3e3;
+  --text-2: #c4c7c5;
+  --text-3: #8d908e;
+  --text-4: #747775;        /* derivado */
+  --accent: #a8c7fa;        /* referencia: enlaces y botones de texto */
+  --accent-ink: #062e6f;    /* derivado (Material oscuro, texto sobre primario) */
+  --accent-soft: rgba(168, 199, 250, 0.14);
+  --accent-line: rgba(168, 199, 250, 0.45);
+  --select-on: #c2e7ff;     /* referencia: texto del elemento elegido */
+  --select-on-soft: #004a77;/* referencia: relleno del elemento elegido */
+  --select-line: #004a77;
+  --danger: #f28b82; --danger-soft: rgba(242, 139, 130, 0.14); /* derivado */
+  --warn: #fdd663;          /* derivado */
+  --ok: #81c995;            /* derivado */
+  --chip-radius: 999px;
+  --btn-radius: 999px;
+}
+/* ---- Puentes: selectores actuales que hoy fijan colores o radios; en la migración leerán los tokens de arriba ---- */
+[data-theme="atlas"] .btn, [data-theme="atlas"] .cc-chip, [data-theme="atlas"] .cc-mini, [data-theme="atlas"] .q-opt, [data-theme="atlas"] .card-check { border-radius: var(--btn-radius); }
+[data-theme="atlas"] .btn-secondary { background: transparent; border-color: var(--border-focus); color: var(--accent); }
+[data-theme="atlas"] .btn-primary { background: var(--accent); color: var(--accent-ink); }
+[data-theme="atlas"] .btn-primary:not(:disabled):hover { background: #c2d9fb; }
+[data-theme="atlas"] .q-opt.is-on, [data-theme="atlas"] .set-model.is-on, [data-theme="atlas"] .card .cc-chip.is-sel, [data-theme="atlas"] .cc-pick.is-on { background: var(--select-on-soft); border-color: var(--select-line); color: var(--select-on); box-shadow: none; }
+[data-theme="atlas"] .card-check.is-on .cc-box, [data-theme="atlas"] .cc-pick.is-on .cc-box { background: var(--select-on); border-color: var(--select-on); color: var(--select-on-soft); }
+[data-theme="atlas"] .cc-mini { background: var(--surface-2); }
