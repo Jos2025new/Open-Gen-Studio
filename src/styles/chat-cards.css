@@ -109,15 +109,18 @@
 .plan-card .plan-foot .plan-progress { flex: none; }
 .cc-card .set-total { color: var(--text-4); }
 .cc-approve { gap: 8px; border-radius: 12px; font-weight: 700; padding: 10px 16px; }
-.cc-switch-line { margin: 0 0 10px; }
-.cc-follow .cc-switch-line { margin-bottom: 6px; font-size: var(--fs-xs); }
-.cc-picks { display: flex; flex-direction: column; gap: 2px; }
-.cc-pick { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 8px; font-size: var(--fs-xs); text-align: left; color: var(--text-2); }
-.cc-pick svg { color: var(--text-4); flex: none; }
-.cc-pick:hover { background: var(--surface-2); }
+.cc-narrow { width: fit-content; max-width: min(360px, 100%); }
+.cc-narrow .q-foot { justify-content: flex-end; margin-top: 10px; padding-top: 10px; }
+.cc-narrow.cc-card { padding: 12px 14px 10px; }
+.cc-switch-line { margin: 0 0 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: var(--fs-xs); }
+.cc-narrow .cc-chips { margin: 8px 0 0; }
+.cc-narrow .cc-chip { padding: 5px 9px; font-size: var(--fs-xs); }
+.cc-picks { display: flex; flex-direction: column; gap: 4px; }
+.cc-pick { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 8px; font-size: var(--fs-xs); text-align: left; color: var(--text-2); background: var(--surface-2); cursor: pointer; }
+.cc-pick:hover { background: var(--surface-hover); color: var(--text); }
+.cc-box { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: none; border-radius: 4px; border: 1.5px solid var(--text-4); background: transparent; color: #fff; }
 .cc-pick.is-on { color: var(--text); }
-.cc-pick.is-on svg { color: var(--ok); }
-.cc-switch .cc-switch-go { padding: 12px 22px; font-size: 1.05em; font-weight: 700; }
+.cc-pick.is-on .cc-box { background: var(--ok); border-color: var(--ok); color: #0b1f12; }
 .cc-ap-sep { opacity: .55; margin: 0 2px; }
 .cc-ap-cost { font-weight: 700; }
 .cc-card .set-section { border-top: 1px solid var(--border); margin-top: 12px; padding-top: 10px; }

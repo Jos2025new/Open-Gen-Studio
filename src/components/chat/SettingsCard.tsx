@@ -283,52 +283,60 @@ function StepSlider({ values, value, unit, label, onChange }: { values: number[]
   );
 }
 
-/** The user named another model: one question, one big button. Keep answers with the model already confirmed. */
+/** The user named another model: one short line with the model as a pill, "Keep" and "Change". */
 function SwitchModelCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
   const section = sectionsOf(item)[0];
   const next = section.recommended;
   const keep = item.switchFrom!;
   const e = choiceEstimate(next, section.kind, 1);
-  const price = e.usd == null ? 'price unknown' : `from ${formatUsd(e.usd)}`;
   return (
-    <article className="q-card set-card cc-card cc-w cc-switch">
-      <p className="cc-switch-line">Found <b>{name(next.modelRef)}</b> · {price}. Switch to it?</p>
+    <article className="q-card set-card cc-card cc-w cc-narrow cc-switch">
+      <p className="cc-switch-line">Found model <span className="cc-mini" title={next.modelRef}>{name(next.modelRef)}{e.usd == null ? null : <span className="faint"> · from {formatUsd(e.usd)}</span>}</span></p>
       <footer className="q-foot">
-        <Button variant="ghost" size="sm" onClick={() => void confirmSettings(sessionId, item.id, [{ ...keep, needsImage: next.needsImage }])}>Keep {name(keep.modelRef)}</Button>
-        <Button variant="primary" size="md" className="cc-switch-go" onClick={() => void confirmSettings(sessionId, item.id, [next])}>Switch to {name(next.modelRef)}</Button>
+        <Button variant="ghost" size="sm" title={`Keep ${name(keep.modelRef)}`} onClick={() => void confirmSettings(sessionId, item.id, [{ ...keep, needsImage: next.needsImage }])}>Keep</Button>
+        <Button variant="primary" size="sm" title={`Change to ${name(next.modelRef)}`} onClick={() => void confirmSettings(sessionId, item.id, [next])}>Change</Button>
       </footer>
     </article>
   );
 }
 
-/** The request after a switch: a very small card, one check per option; one click answers (grey check, green once picked). */
+/** The request after a switch: a tiny card; each option is a checkbox (grey and empty, green and checked once picked); one click answers. */
 function FollowUpCard({ item, sessionId, name }: { item: SettingsFeedItem; sessionId: string; name: (ref: string) => string }) {
   const schemas = useStore((s) => s.catalog.schemas);
   const [picked, setPicked] = useState<string>();
-  const [more, setMore] = useState(false);
   const section = sectionsOf(item)[0];
   const switched = section.recommended;
   const kept = item.switchFrom!;
   const answer = (c: SettingsChoice) => { setPicked(c.modelRef); void confirmSettings(sessionId, item.id, [c]); };
   const other = (ref: string) => answer({ ...defaultChoice(ref, schemas[ref], { kind: section.kind, startImage: switched.needsImage, duration: switched.duration, aspect: switched.aspect, count: switched.count }, switched), needsImage: switched.needsImage });
   const row = (ref: string, label: string, onClick: () => void) => (
-    <button key={ref} type="button" className={`cc-pick ${picked === ref ? 'is-on' : ''}`} aria-pressed={picked === ref} onClick={onClick}>
-      <Check size={13} aria-hidden /> {label}
+    <button key={ref} type="button" role="checkbox" aria-checked={picked === ref} className={`cc-pick ${picked === ref ? 'is-on' : ''}`} onClick={onClick}>
+      <span className="cc-box" aria-hidden>{picked === ref ? <Check size={12} strokeWidth={3} /> : null}</span>
+      <span>{label}</span>
+      <span className="cc-mini" title={ref}>{name(ref)}</span>
     </button>
   );
   return (
-    <article className="q-card set-card cc-card cc-w cc-follow">
-      <p className="cc-switch-line">Next {section.kind === 'image' ? 'image' : 'video'} with {name(switched.modelRef)} or back to {name(kept.modelRef)}?</p>
+    <article className="q-card set-card cc-card cc-w cc-narrow cc-follow">
+      <p className="cc-switch-line">Next {section.kind}:</p>
       <div className="cc-picks">
-        {row(switched.modelRef, `Continue with ${name(switched.modelRef)}`, () => answer(switched))}
-        {row(kept.modelRef, `Back to ${name(kept.modelRef)}`, () => answer({ ...kept, needsImage: switched.needsImage }))}
-        {section.alternatives.length ? (
-          <>
-            <button type="button" className="cc-pick cc-pick-more" aria-expanded={more} onClick={() => setMore(!more)}><ChevronDown size={13} aria-hidden /> Try another model</button>
-            {more ? section.alternatives.map((ref) => row(ref, name(ref), () => other(ref))) : null}
-          </>
-        ) : null}
+        {row(switched.modelRef, 'Continue', () => answer(switched))}
+        {row(kept.modelRef, 'Back', () => answer({ ...kept, needsImage: switched.needsImage }))}
       </div>
+      {section.alternatives.length ? (
+        <div className="cc-chips">
+          <ChipPop icon={<ModelIcon />} label="Another model" tip="Another model" width={360}>
+            <div className="set-models">
+              {section.alternatives.map((ref) => (
+                <button key={ref} type="button" className="q-opt set-model" onClick={() => other(ref)}>
+                  <span className="set-model-name">{name(ref)}</span>
+                  <span className="faint">{ref.split('::')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </ChipPop>
+        </div>
+      ) : null}
     </article>
   );
 }

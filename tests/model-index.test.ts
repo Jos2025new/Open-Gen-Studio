@@ -107,3 +107,23 @@ describe('default route: family names resolve locally (R1)', () => {
     expect((b.plan!.steps[0] as { modelRef: string }).modelRef).toBe('fal::minimax/h3/text-to-video');
   });
 });
+
+describe('find_models finds the FLUX 3 image models', () => {
+  const fake = (provider: string, id: string, name: string, kind: MediaKind): ModelSummary => ({ ref: `${provider}::${id}`, provider: provider as ModelSummary['provider'], id, name, kind, acceptsText: true, acceptsImage: false, tags: [] });
+  const catalog = [
+    fake('openrouter', 'black-forest-labs/flux.3-klein', 'FLUX 3 Image Klein', 'image'),
+    fake('openrouter', 'black-forest-labs/flux.3-klein-edit', 'FLUX 3 Image Klein Edit', 'image'),
+    fake('atlas', 'blackforestlabs/flux-3/text-to-image', 'BLACKFORESTLABS FLUX 3 Text-to-Image', 'image'),
+    fake('atlas', 'black-forest-labs/flux-3/text-to-video', 'FLUX 3 Text-to-Video', 'video'),
+  ];
+  const indexed = catalog.filter((m) => inIndex(m, undefined));
+
+  it('the image FLUX 3 models are in the index (the image family had no FLUX 3, only the video one)', () => {
+    expect(indexed.map((m) => m.name)).toEqual(expect.arrayContaining(['FLUX 3 Image Klein', 'FLUX 3 Image Klein Edit', 'BLACKFORESTLABS FLUX 3 Text-to-Image']));
+  });
+  it.each(['flux 3 klein', 'flux klein', 'FLUX 3 Image Klein'])('"%s" for an image step finds Klein, not only the video models', (q) => {
+    const found = searchIndex(indexed, q, { kind: 'image' });
+    expect(found.map((m) => m.name)).toContain('FLUX 3 Image Klein');
+    expect(found.every((m) => m.kind === 'image')).toBe(true);
+  });
+});
