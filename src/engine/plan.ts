@@ -1,3 +1,4 @@
+import { countFollowsCard } from './planCount';
 import { lineKey, type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
 import { parsePath } from './design/path';
@@ -586,9 +587,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           keep('resolution', conf.resolution);
           keep('aspect', conf.aspect);
           if (kind === 'video') keep('duration', conf.duration);
-          // The confirmed number is the candidates of the one image being explored: forced only on a single image step
-          // (variations are checked below); separate image steps (options written apart, a sheet + a product) keep theirs.
-          if (kind === 'image' && rawSteps.filter((x) => x.kind === 'image').length === 1 && !(Array.isArray(s.variations) && s.variations.length > 1)) keep('count', conf.count);
+          if (kind === 'image' && countFollowsCard(rawSteps, s)) keep('count', conf.count);
         }
         // The user's own model pick (composer, or a video route) wins over a model only the plan names.
         const named = conf ? undefined : s.model?.trim();
