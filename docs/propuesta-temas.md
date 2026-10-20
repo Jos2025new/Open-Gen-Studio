@@ -1,6 +1,6 @@
 # Propuesta: base «Atlas» y color de resaltado
 
-Fecha: 2026-10-20. Estado: **propuesta, sin implementar** (no hay código de la app en este cambio). Maqueta: [temas.html](mockups/temas.html), con [base-atlas.css](mockups/base-atlas.css), [base-grafito.css](mockups/base-grafito.css) y [acentos.css](mockups/acentos.css). Complementa [el sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md).
+Fecha: 2026-10-20. Estado: **propuesta, sin implementar**; los cinco colores de resaltado están aprobados (Predeterminado lima por defecto) (no hay código de la app en este cambio). Maqueta: [temas.html](mockups/temas.html), con [base-atlas.css](mockups/base-atlas.css), [base-grafito.css](mockups/base-grafito.css) y [base-tinta.css](mockups/base-tinta.css), [acentos.css](mockups/acentos.css) y la segunda parte [temas-2.html](mockups/temas-2.html). Complementa [el sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md).
 
 ## 1. Modelo
 
@@ -75,7 +75,64 @@ Contrastes sobre su tarjeta `#232327`: texto 12,8; texto 2 9,76; **meta `#8d8d8f
 
 **Recomendación:** quedarse con Atlas (más neutro, ya probado en la maqueta de tarjetas); Grafito solo si se prefiere su matiz azulado. Se decide una base, no dos.
 
-## 6. Migración (cuando se apruebe)
+## 6. Tercera referencia: «Tinta» (monocromo, claro y oscuro)
+
+Muestreada de dos imágenes del mismo diseño (solo colores y formas; sin logo, nombre ni texto). Es la primera base con **modo claro**, así que el modelo de tokens pasa a tener un juego oscuro y otro claro por base (`data-mode="dark|light"` junto a `data-base`).
+
+Muestreo: claro, lienzo `#f1efec` (de lejos el más frecuente) y texto `#000000`; oscuro, superficie `#1b1b1b` (con grano entre `#101010` y `#1f1f1f`) y texto blanco; barra morada `#423163` (claro) y `#8c67d3` (oscuro); magenta `#a14c88` en los extremos del degradado. El degradado `#5b3fd6 → #c2408f` supuesto no se confirmó en píxeles: se usan los valores muestreados.
+
+| Token | Oscuro | Claro |
+|---|---|---|
+| `--bg-canvas` | `#141414` (derivado) | `#f1efec` (muestreado) |
+| `--surface` | `#1b1b1b` (muestreado) | `#fbfaf8` (derivado) |
+| `--surface-2`, `--surface-3` | `#222222`, `#2c2c2c` | `#e9e6e1`, `#dedad4` |
+| `--border`, `--border-strong`, `--border-focus` | `#333333`, `#444444`, `#8f8f8f` | `#d8d4ce`, `#bdb8b0`, `#6e6b67` |
+| `--text`, `--text-2`, `--text-3`, `--text-4` | `#f5f5f5`, `#c9c9c9`, `#8f8f8f`, `#666666` | `#111111`, `#4a4846`, `#6e6b67`, `#9a968f` |
+| `--danger`, `--warn`, `--ok` | `#f28b82`, `#fdd663`, `#81c995` | `#b3261e`, `#8a5a00`, `#1e6b3a` |
+
+### Contrastes de Tinta (WCAG)
+
+| Par | Oscuro (sobre `#1b1b1b`) | Claro (sobre `#fbfaf8`) |
+|---|---|---|
+| texto | 15,8 | 18,1 |
+| texto 2 | 10,4 | 8,73 |
+| meta (`--text-3`) | 5,33 (5,70 sobre lienzo) | 5,08 (4,62 sobre lienzo) |
+| estados danger / warn / ok | 7,21 / 12,28 / 8,79 | 6,27 / 5,68 / 6,25 |
+| Monocromo: tinta / relleno | 16,9 | 18,88 |
+| Monocromo: texto elegido / relleno | 10,76 | 14,48 |
+| Monocromo: línea de selección / tarjeta | 5,33 | 5,08 |
+
+Valores corregidos: el morado `#8c67d3` como acento de texto da 3,74 en oscuro (no pasa), y el meta `#8a8a8a` queda en 4,55 (justo): se usó `#8f8f8f`. El borde claro `#d8d4ce` es solo separador (1,41), no transmite información.
+
+### Modo claro y los colores de resaltado
+
+Los pasteles del oscuro no se leen sobre claro, así que cada color tiene un **juego claro** (acento oscuro, tinta blanca, línea de selección = acento, porque el relleno suave apenas se separa de la tarjeta: 1,2):
+
+| Preset | `--accent` | tinta / acento | acento / tarjeta | acento / lienzo | texto elegido / relleno |
+|---|---|---|---|---|---|
+| Predeterminado | `#4f6b00` | 6,11 | 5,86 | 5,33 | 9,75 |
+| Azul | `#1a56b0` | 7,00 | 6,71 | 6,10 | 10,03 |
+| Violeta | `#5b3fd6` | 6,72 | 6,44 | 5,85 | 10,48 |
+| Rosa | `#b0285f` | 6,34 | 6,07 | 5,52 | 10,15 |
+| Verde agua | `#00797a` | 5,23 | 5,01 | 4,56 | 10,59 |
+
+Rellenos y textos elegidos: lima `#e3efb8`/`#2c3d00`, azul `#d3e3fd`/`#0b2f66`, violeta `#e5dcff`/`#2a1a7a`, rosa `#ffd9e3`/`#5e1133`, agua `#bff0ee`/`#003735`. El lima Predeterminado sigue siendo el valor por defecto y, en claro, se vuelve un verde oliva oscuro.
+
+### Primario monocromo
+
+Opción **«Monocromo»**, sexta muestra, sin aprobar: el primario es el color inverso del texto (píldora negra con texto blanco en claro; blanca con texto negro en oscuro) y no lleva color. Encaja en el modelo sin tokens nuevos: es otro bloque `[data-accent="mono"]` con `--accent` = inverso, `--accent-ink` = el fondo, y la selección neutra (`--select-on-soft` gris, `--select-on` = texto). **La selección sigue legible**: texto elegido / relleno 10,76 (oscuro) y 14,48 (claro), más una línea `--select-line` de 5,3 y 5,1 contra la tarjeta y la marca de verificación, así que no depende del color. Coste: el enlace deja de tener color (se subraya) y primario y selección se parecen más entre sí; por eso es una opción y no el estándar.
+
+### Degradado y textura
+
+- **Degradado** (`--brand-grad`, morado a magenta): solo decorativo, sin texto encima y fuera de la regla de acento. Dónde, como mucho: el indicador de «generando» (barra fina) y los estados vacíos. Nunca en botones, selección ni tarjetas de decisión: sería una tercera variante visual. Un solo uso a la vez.
+- **Textura** (grano fino, clase `.grain`): solo opcional en el lienzo; no por defecto, para no ir contra el rendimiento (ver «velocidad antes que completitud») ni ensuciar el texto pequeño.
+- **Tipografía** (títulos grandes y ligeros): fuera de alcance; no se cambia ninguna fuente.
+
+### Recomendación
+
+Atlas oscuro sigue siendo la base por defecto. **Modo claro: sí**, pero como segundo juego de la misma base (Atlas ya podría tener uno derivado de Tinta claro), no como esquema aparte: es lo que más pide un usuario de día y los contrastes pasan. **Primario monocromo: solo como sexta muestra opcional**, no como valor por defecto, porque el lima da al primario la identidad de la app. Maqueta: [temas-2.html](mockups/temas-2.html).
+
+## 7. Migración (cuando se apruebe)
 
 1. Mover los neutros de Atlas a `tokens.css` (sustituyen a los actuales) y añadir `--btn-radius` / `--chip-radius`.
 2. Añadir la familia del acento y los cinco bloques `[data-accent]`.

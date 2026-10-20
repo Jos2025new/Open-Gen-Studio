@@ -1,0 +1,27 @@
+/* Base «Tinta» (propuesta): monocromo con modo oscuro y claro, muestreada de las referencias 13 (claro) y 14 (oscuro). Radios: píldora, como en las demás bases. */
+[data-base="tinta"][data-mode="dark"] {
+  color-scheme: dark;
+  --bg: #1b1b1b; --bg-canvas: #141414; /* surface sampled; canvas derived (the images grain between #101010 and #1f1f1f) */
+  --surface: #1b1b1b; --surface-2: #222222; --surface-3: #2c2c2c; --surface-hover: #262626;
+  --overlay: rgba(10, 10, 10, 0.72);
+  --border: #333333; --border-strong: #444444; --border-focus: #8f8f8f;
+  --text: #f5f5f5; --text-2: #c9c9c9; --text-3: #8f8f8f; --text-4: #666666;
+  --danger: #f28b82; --danger-soft: rgba(242, 139, 130, 0.14); --warn: #fdd663; --ok: #81c995;
+  background: var(--bg-canvas); color: var(--text);
+}
+[data-base="tinta"][data-mode="light"] {
+  color-scheme: light;
+  --bg: #fbfaf8; --bg-canvas: #f1efec; /* canvas sampled (#f1efec); surface derived, a step lighter */
+  --surface: #fbfaf8; --surface-2: #e9e6e1; --surface-3: #dedad4; --surface-hover: #ebe8e3;
+  --overlay: rgba(241, 239, 236, 0.72);
+  --border: #d8d4ce; --border-strong: #bdb8b0; --border-focus: #6e6b67;
+  --text: #111111; --text-2: #4a4846; --text-3: #6e6b67; --text-4: #9a968f;
+  --danger: #b3261e; --danger-soft: rgba(179, 38, 30, 0.1); --warn: #8a5a00; --ok: #1e6b3a;
+  background: var(--bg-canvas); color: var(--text);
+}
+/* Degradado de marca (solo decorativo, sin texto encima): estados «generando» y vacíos. Muestreado: #8c67d3 (oscuro), #423163 (claro), magenta ~#a14c88 */
+[data-base="tinta"] { --brand-grad: linear-gradient(90deg, #8c67d3, #a14c88); }
+[data-base="tinta"][data-mode="light"] { --brand-grad: linear-gradient(90deg, #423163, #a14c88); }
+/* Textura opcional (no por defecto): grano fino, solo con la clase .grain en el lienzo */
+.grain { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence baseFrequency='.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .06 0'/></filter><rect width='120' height='120' filter='url(%23n)'/></svg>"); }
+.brand-bar { height: 4px; border-radius: 999px; background: var(--brand-grad); }
