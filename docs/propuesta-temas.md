@@ -92,6 +92,8 @@ Referencia: Google Vids (paleta clara de Google). La página del chat es blanca;
 
 Contrastes sobre el panel (sobre la página): texto 14,9 (16,5); texto 2 8,51 (9,39); meta 5,48 (6,05); text-4 3,34 (adorno); estados 5,92 / 6,20 / 5,92. El borde (1,26) solo separa. Resaltados: las mismas reglas que Claro (`[data-base="blanco"]` junto a `[data-base="claro"]` en `accents.css`); en Aurora, el relleno de lo elegido se apoya en `#f0f4f9`.
 
+**Sombras en las bases claras** (Claro y Blanco, 2026-10-20: «el sombreado es muy intenso»): `--shadow-pop`, `--shadow-card` y `--shadow-float` usan un gris `rgba(60, 64, 67, …)` suave (12 % y 8 % en los popovers, 6 % en las tarjetas) en lugar del negro al 45-55 % de las oscuras. `--shadow-float` reúne las sombras sueltas de adjuntos, avisos del composer y chips de traza.
+
 ### Original (antigua)
 
 `--bg #0a0a0b`, `--surface #151518`, `--border #2a2a30`, `--text #ececf0`, estados `#f06a6a` / `#ffc25e` / `#86e3a5` y los radios de hoy. Sin cambios; se retirará.

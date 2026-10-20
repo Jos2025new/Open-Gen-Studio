@@ -88,13 +88,13 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .attach-pile-card:nth-child(3) { transform: translate(4px, 3px) rotate(8deg); }
 .attach-pile-card .media { width: 100%; height: 100%; object-fit: cover; }
 .attach-pile-add { position: absolute; right: -6px; bottom: -6px; z-index: 4; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text); }
-.attach-row { display: none; position: absolute; left: -6px; top: -6px; z-index: 20; gap: 8px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45); }
+.attach-row { display: none; position: absolute; left: -6px; top: -6px; z-index: 20; gap: 8px; align-items: center; padding: 6px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border-strong); box-shadow: var(--shadow-float); }
 .attach-stack:hover .attach-row, .attach-stack:focus-within .attach-row { display: flex; }
 .attach-row .attach-thumb { width: 56px; height: 56px; }
 .attach-row .attach-thumb > .media { width: 100%; height: 100%; object-fit: cover; }
 .attach-row .attach-thumb > button { opacity: 0; }
 .attach-row .attach-thumb:hover > button { opacity: 1; }
-.attach-preview { display: none; position: absolute; left: 0; bottom: calc(100% + 10px); width: 220px; height: 220px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface-2); box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5); pointer-events: none; }
+.attach-preview { display: none; position: absolute; left: 0; bottom: calc(100% + 10px); width: 220px; height: 220px; border-radius: 10px; overflow: hidden; border: 1px solid var(--border-strong); background: var(--surface-2); box-shadow: var(--shadow-float); pointer-events: none; }
 .attach-preview .media { width: 100%; height: 100%; object-fit: contain; }
 .attach-row .attach-thumb:hover .attach-preview { display: block; }
 .attach-more { width: 56px; height: 56px; display: grid; place-items: center; border-radius: 6px; border: 1px dashed var(--border-strong); color: var(--text-2); background: var(--surface-2); }
@@ -144,7 +144,7 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 
 /* Warnings above the prompt box: no credit, a switched model, agent errors. */
 .composer-alerts { display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px; }
-.composer-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 10px 9px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 12px; color: var(--text); box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.composer-alert { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 10px 9px 12px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); font-size: 12px; color: var(--text); box-shadow: var(--shadow-float); }
 .composer-alert.is-error { border-color: color-mix(in srgb, var(--danger) 55%, transparent); }
 .composer-alert.is-error > svg:first-child { color: var(--danger); }
 .composer-alert.is-warn { border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
