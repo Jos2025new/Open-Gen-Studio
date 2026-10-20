@@ -95,6 +95,13 @@
   --active-text: var(--text);
   --active-line: transparent;
   --frame-border: transparent;
+  /* New session: an outlined action, so it never looks like the active row below it. */
+  --new-bg: transparent;
+  --new-line: var(--border-strong);
+  --new-text: var(--text);
+  --new-hover: var(--surface-hover);
+  /* Money left with the providers: plain text, not a highlight. */
+  --money: var(--text);
   /* Conversation text: agent replies and the user's bubble. */
   --fs-chat: 15px;
 
@@ -131,6 +138,7 @@
   --btn-radius: var(--radius-s); --chip-radius: 10px;
   /* Original keeps its lime active states and outlined frames. */
   --active-bg: var(--accent-soft); --active-text: var(--accent); --active-line: var(--accent-line); --frame-border: var(--border);
+  --new-bg: var(--accent-soft); --new-line: var(--accent-line); --new-text: var(--accent); --new-hover: rgba(216, 255, 58, 0.22); --money: var(--ok);
 }
 
 /* Native dropdown options: some systems (Linux GTK) draw them light despite color-scheme; force the dark ones. */

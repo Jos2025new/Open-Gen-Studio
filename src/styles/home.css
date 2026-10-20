@@ -66,7 +66,7 @@
 .home-tabs { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .home-tab { height: 32px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-full); background: var(--surface); color: var(--text-2); font-size: var(--fs-m); font-weight: 500; transition: background .12s, color .12s; }
 .home-tab:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
-.home-tab.is-active { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
+.home-tab.is-active { background: var(--active-bg); border-color: var(--active-line); color: var(--active-text); }
 .home-tab:disabled { opacity: .45; cursor: default; }
 .side-panel.home-embed { position: static; width: auto; min-height: 60vh; border: 1px solid var(--border); border-radius: var(--r-m); box-shadow: none; overflow: hidden; z-index: auto; }
 /* Hero carousel: three stacked slides, 68 px Outfit word, the Home prompt bar on Studio. */
@@ -74,7 +74,7 @@
 .home-hero-dots { display: flex; gap: 7px; align-items: center; height: 8px; margin-bottom: var(--sp-5); }
 .home-hero-dot { width: 8px; height: 8px; padding: 0; border: 0; border-radius: var(--r-full); background: var(--border-strong); transition: width .45s cubic-bezier(.4, 0, .2, 1), background .3s; }
 .home-hero-dot:hover { background: var(--text-4); }
-.home-hero-dot.is-on { width: 26px; background: var(--accent); }
+.home-hero-dot.is-on { width: 26px; background: var(--text-2); }
 .home-hero-dot:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .home-hero-slides { display: grid; }
 .home-hero-slide { grid-area: 1 / 1; position: relative; opacity: 0; visibility: hidden; transform: translateX(24px); transition: opacity .6s ease, transform .6s ease, visibility 0s .6s; }
@@ -82,11 +82,11 @@
 .home-hero-word { margin: 0 0 var(--sp-5); position: relative; font-family: var(--font-head); font-size: 68px; font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--text); }
 .home-hero-mi { position: absolute; right: 0; top: -6px; width: 72px; height: 72px; opacity: .08; color: var(--text); pointer-events: none; }
 .home-newbox { width: 100%; height: 72px; display: flex; align-items: center; justify-content: center; gap: var(--sp-2); border: 1.5px dashed var(--border-strong); border-radius: 24px; background: transparent; color: var(--text-3); font-size: var(--fs-m); transition: border-color .2s, background .2s, color .2s; }
-.home-newbox:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--text); }
+.home-newbox:hover { border-color: var(--border-strong); background: var(--surface-hover); color: var(--text); }
 .home-newbox:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 .home-bar-wrap { display: flex; flex-direction: column; gap: var(--sp-2); }
 .home-bar { display: flex; align-items: center; gap: var(--sp-3); height: 56px; padding: 0 10px 0 20px; border: 1px solid var(--border-strong); border-radius: var(--r-full); background: var(--surface-2); box-shadow: var(--shadow-card); }
-.home-bar:focus-within { border-color: var(--accent-line); }
+.home-bar:focus-within { border-color: var(--border-focus); }
 /* The global input rule (specificity 0,3,1) sets a border on every text input; this selector is 0,4,0 so the bar's input keeps no box of its own. */
 .home .home-bar .home-bar-input:not([type="checkbox"]) { flex: 1; min-width: 0; height: 100%; border: 0; border-radius: 0; background: transparent; box-shadow: none; color: var(--text); font: inherit; font-size: 16px; outline: none; }
 .home .home-bar .home-bar-input::placeholder { color: var(--text-3); }

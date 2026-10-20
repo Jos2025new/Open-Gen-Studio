@@ -56,7 +56,7 @@ Entre el 2026-10-19 y el 2026-10-20 el usuario fue probando en el sandbox las ta
 3. Un turno del agente terminado se pliega a «Worked for Xs · lo que hizo»; el razonamiento solo se ve al abrirlo.
 4. Conversación a 15 px (`--fs-chat`); títulos de sección y de tarjeta sin mayúsculas.
 5. En Studio, el panel vacío muestra una sola línea; «Ongoing» solo aparece si algo corre.
-Original conserva el lima en lo activo y los contornos (redefine los tokens). Fuera de alcance por ahora: Designer y nodos, que aún usan el acento en sus estados activos.
+Corrección tras probarlo (el usuario: «me gustó… se siente menos ruidoso»): en Home «New session» no se distinguía de la fila activa y quedaba resaltado de más. «New session» pasa a acción con contorno y sin relleno (`--new-*`); las pestañas de Home y de Spaces y el punto del carrusel, neutros; el dinero del pool en texto normal (`--money`; antes verde «para que se note»). Original conserva el lima en lo activo, los contornos, el verde del dinero y su «New session» (redefine los tokens). Fuera de alcance por ahora: Designer y nodos, que aún usan el acento en sus estados activos.
 
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
