@@ -4,7 +4,7 @@ import { modelSummary } from './catalog';
 import { indexedModels, searchIndex, suggestModel } from './agent/modelIndex';
 import { PROVIDER_LABELS } from './providers/types';
 import type { PlanContext } from './plan';
-import type { MediaKind, ModelSummary, ProviderId } from './types';
+import type { AgentState, MediaKind, ModelSummary, ProviderId } from './types';
 
 /*
  * "Ask to change" (ADR 0025 D): the user names another model, or only another provider for the same model. Both go
@@ -95,4 +95,39 @@ export async function followUpProblem(ctx: PlanContext, confirmedRef: string, ki
   // The same model at another provider has the same name: say where each one is.
   const tag = (m: ModelSummary) => (modelChange(sw.model, conf.model) === 'provider' ? `${m.name} at ${PROVIDER_LABELS[m.provider]}` : m.name);
   return `The user switched ${kind} to ${tag(sw.model)} (${to.modelRef}) last time and has not said whether to continue with it; call confirm_settings for ${kind} with model ${to.modelRef} first (the app asks: continue with ${tag(sw.model)} or go back to ${tag(conf.model)}).`;
+}
+
+const ACCEPT = new Set(['si', 'vale', 'ok', 'okay', 'dale', 'claro', 'hazlo', 'cambialo', 'cambia', 'cambiar', 'adelante', 'perfecto', 'yes', 'yeah', 'yep', 'sure', 'go', 'do', 'please']);
+const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco', 'mejor']);
+
+/**
+ * Whether a message is a plain acceptance of what the agent just offered ("sí, cámbialo", "dale", "go ahead"): short
+ * (up to 6 words), starts with an accepting word and has no refusal word ("no, sigue así", "sí pero no"). No LLM.
+ */
+export function isAcceptance(message: string): boolean {
+  const words = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/'/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+  return words.length > 0 && words.length <= 6 && ACCEPT.has(words[0]) && !words.some((w) => REFUSE.has(w));
+}
+
+/** The agent's last visible text before the user's current message (the one with exactly `request`), or ''. */
+function previousAgentText(history: AgentState['history'], request: string): string {
+  const text = (m: AgentState['history'][number]) => (typeof m.content === 'string' ? m.content : '');
+  const mine = history.map((m, i) => (m.role === 'user' && text(m).includes(`\n${request}\n</user_message>`) ? i : -1)).filter((i) => i >= 0).at(-1);
+  for (let i = (mine ?? history.length) - 1; i >= 0; i--) {
+    const m = history[i];
+    if (m.role === 'user' && text(m).includes('<user_message')) return '';
+    if (m.role === 'assistant' && text(m).trim()) return text(m);
+  }
+  return '';
+}
+
+/**
+ * The request text that decides a change (ADR 0025 D): this turn's words and answers, plus the agent's previous reply
+ * when the user's message only accepts it. So "Nano Banana 2 is also on NanoGPT, switch?" + "sí, cámbialo" names
+ * NanoGPT; "sí" after a reply that named nothing, or "no, sigue así", names nothing. The Keep / Change card still decides.
+ */
+export function offerRequest(agent: Pick<AgentState, 'draft' | 'history'>): string {
+  const request = agent.draft?.request ?? '';
+  const base = [request, ...Object.values(agent.draft?.answers ?? {})].join('\n');
+  return isAcceptance(request) ? `${base}\n${previousAgentText(agent.history, request)}` : base;
 }

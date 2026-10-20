@@ -23,7 +23,7 @@ import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { carryOverRevision } from '../planRevision';
-import { partModel } from '../modelNamed';
+import { offerRequest, partModel } from '../modelNamed';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
@@ -221,8 +221,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     userText: () => userWords(sessionId),
     // The request being handled, not the whole conversation: an old "un ángulo diferente" must not fit a new request.
     requestText: () => {
-      const draft = session(sessionId).agent.draft;
-      return [draft?.request ?? '', ...Object.values(draft?.answers ?? {})].join('\n');
+      return offerRequest(session(sessionId).agent);
     },
     // Angles already made from this source image, by finished angle operations on it.
     usedAngles: (assetId: string) => Object.values(get().generations)
@@ -1522,7 +1521,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, [session(sessionId).agent.draft?.request ?? '', ...Object.values(session(sessionId).agent.draft?.answers ?? {})].join('\n'), parts[0]?.model, { switchedTo: session(sessionId).agent.switchedTo, auto: get().composer.agentStyle === 'auto' });
+          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, offerRequest(session(sessionId).agent), parts[0]?.model, { switchedTo: session(sessionId).agent.switchedTo, auto: get().composer.agentStyle === 'auto' });
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : {}) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
