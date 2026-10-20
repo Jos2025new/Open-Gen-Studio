@@ -1,6 +1,6 @@
 # Propuesta: un sistema visual acotado para las tarjetas del chat
 
-Fecha: 2026-10-20. Estado: **propuesta aprobada en lo esencial, sin implementar** (solo documento y maqueta; ningún cambio de código). Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app. Va junto a [la propuesta de temas](propuesta-temas.md) (bases y color de resaltado), también aprobada.
+Fecha: 2026-10-20. Estado: **aprobada; pasos 1 y 2 del plan (§8) implementados, pasos 3 a 5 pendientes**. Justificación y correcciones del usuario: [ADR 0024](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md). Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app. Va junto a [la propuesta de temas](propuesta-temas.md) (bases y color de resaltado), también aprobada.
 
 **Aprobado:** plantillas base fijas; tres tamaños; una o dos tarjetas que destacan; «Decisión» sin banda y con la huella antigua; la línea «resuelta»; Atlas como base por defecto; botones y chips en píldora; todo color sale de tokens (selección = resaltado, verde solo para estados). Decidido por el usuario el 2026-10-20: «Decisión» se mantiene como variante; las tarjetas de cambio de modelo y de seguimiento usan `card-m`; estas reglas son la identidad visual de la app y cambiarlas exige su aprobación explícita (regla 6 de AGENTS.md).
 

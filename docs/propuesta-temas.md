@@ -1,6 +1,6 @@
 # Propuesta aprobada: bases y color de resaltado
 
-Fecha: 2026-10-20. Estado: **aprobada (2026-10-20), sin implementar** (solo propuesta y maqueta; no hay código de la app). Maqueta: [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html), con [base-atlas.css](mockups/base-atlas.css), [base-grafito.css](mockups/base-grafito.css), [base-claro.css](mockups/base-claro.css), [base-original.css](mockups/base-original.css), [acentos.css](mockups/acentos.css) y [aurora.css](mockups/aurora.css). Complementa [el sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md).
+Fecha: 2026-10-20. Estado: **aprobada (2026-10-20); pasos 1 y 2 del plan implementados** (tokens, bases y selector en Ajustes), pasos 3 a 5 pendientes. Justificación y correcciones del usuario: [ADR 0024](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md). Maqueta: [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html), con [base-atlas.css](mockups/base-atlas.css), [base-grafito.css](mockups/base-grafito.css), [base-claro.css](mockups/base-claro.css), [base-original.css](mockups/base-original.css), [acentos.css](mockups/acentos.css) y [aurora.css](mockups/aurora.css). Complementa [el sistema visual de las tarjetas](propuesta-sistema-visual-tarjetas.md).
 
 ## Decisiones aprobadas
 

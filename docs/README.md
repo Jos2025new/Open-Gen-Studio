@@ -72,6 +72,7 @@
 - [0021 — Nunca enviar una petición de pago con esquema derivado (aceptado 2026-10-18)](decisions/0021-esquema-derivado-sin-envio.md).
 - [0022 — Guardado local-first sin bloqueo: una pestaña activa, guarda por contenido y avisos persistentes (aceptado 2026-10-18; fase 1 en `task/save-guard`)](decisions/0022-guardado-local-first-sin-bloqueo.md).
 - [0023 — Spaces separados de los Workspaces (etapa 1)](decisions/0023-spaces-separados-etapa-1.md).
+- [0024 — Identidad visual: sistema de tarjetas, bases y resaltado (aceptado 2026-10-20; pasos 1 y 2 en `task/workflow-ask-first`)](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md).
 
 ## Propuestas de interfaz
 
@@ -152,7 +153,7 @@
 - [045-2026-10-W42: Spaces separados, etapa 1 (2026-10-19)](history/045-2026-10-W42.md).
 - [046-2026-10-W43: Spaces, etapa 2: texto, Reusar e historial](history/046-2026-10-W43.md).
 - [047-2026-10-W43: un workflow pregunta antes de cargarse (2026-10-19)](history/047-2026-10-W43.md).
-- [048-2026-10-W43: sistema visual, paso 1: tokens y bases (2026-10-20)](history/048-2026-10-W43.md).
+- [048-2026-10-W43: ronda de interfaz 2026-10-19/20, pasos 1 y 2 del sistema visual (2026-10-20)](history/048-2026-10-W43.md).
 
 ## Trazabilidad
 
