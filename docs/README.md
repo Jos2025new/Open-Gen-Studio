@@ -32,6 +32,7 @@
 - [agente: variantes automáticas por entradas y ajustes confirmados](features/agente.md).
 - [biblioteca](features/biblioteca.md).
 - [canvas](features/canvas.md).
+- [apariencia: bases, resaltados y su selector en Ajustes](features/apariencia.md).
 - [home y barra lateral: vista Home (hero, Apps, Tools, barra superior), secciones Spaces/Create/Tools](features/home.md).
 - [Create Media y Tools: Space Panel + Space Board (ajustes a la izquierda, resultados a la derecha)](features/create-space.md).
 - [Studio: chat y tablero Generations, Nodes y Designer (pasos 1 a 3)](features/studio.md).
@@ -86,7 +87,7 @@
 - [Propuesta: el agente pregunta antes de cargar un workflow](propuesta-workflow-despues-de-preguntar.md) (2026-10-19), sin implementar: ficha corta antes de preguntar, `ready: true`, entregable frente a propósito; plan para otro agente.
 - [Propuesta: sistema visual acotado de las tarjetas del chat](propuesta-sistema-visual-tarjetas.md) (2026-10-20), sin implementar: inventario con valores fijos, tres tamaños (mínimo, medio, estándar), reglas para agentes y plan de migración.
 - [Maqueta estática del sistema visual de tarjetas](mockups/tarjetas.html) (2026-10-20), con su [CSS propuesto](mockups/propuesta.css): antes y después, con las hojas reales de la app.
-- [Propuesta aprobada: bases y color de resaltado](propuesta-temas.md) (2026-10-20), paso 1 (tokens y bases) implementado en `task/workflow-ask-first`, falta el selector: selector Sistema/Atlas/Grafito/Claro/Original, seis resaltados con Aurora, contrastes WCAG, almacenamiento. Maqueta en [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html); CSS: [Atlas](mockups/base-atlas.css), [Grafito](mockups/base-grafito.css), [Claro](mockups/base-claro.css), [Original](mockups/base-original.css), [acentos](mockups/acentos.css), [Aurora](mockups/aurora.css).
+- [Propuesta aprobada: bases y color de resaltado](propuesta-temas.md) (2026-10-20), paso 2 (tokens, bases y selector en Ajustes) implementado en `task/workflow-ask-first`: selector Sistema/Atlas/Grafito/Claro/Original, seis resaltados con Aurora, contrastes WCAG, almacenamiento. Maqueta en [temas.html](mockups/temas.html) y [temas-2.html](mockups/temas-2.html); CSS: [Atlas](mockups/base-atlas.css), [Grafito](mockups/base-grafito.css), [Claro](mockups/base-claro.css), [Original](mockups/base-original.css), [acentos](mockups/acentos.css), [Aurora](mockups/aurora.css).
 - [Arquitectura de render profesional](arquitectura-render.md) (2026-10-12; estado al 2026-10-13): cómo lo resuelven Krita, GIMP, Photopea, Figma y pixiv, qué hace OGS hoy, cambio de rumbo y estado de las 8 tareas.
 - [Cifras de partida del documento profesional](render-baseline.md) (2026-10-12): gestos medidos con Canvas2D actual (tarea 1), renderer, límites y pasadas descartadas.
 - [Estado del cierre de render-bench](render-estado.md) (2026-10-13): fuente única de pendientes; estado de las 6 entregas del plan, atribución de commits y contradicción abierta.

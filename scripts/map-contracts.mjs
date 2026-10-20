@@ -1,6 +1,7 @@
 /** Checked by map.mjs. */
 import designerSelection from './map-contracts-designer.mjs';
 import videoContracts from './map-contracts-video.mjs';
+import uiContracts from './map-contracts-ui.mjs';
 import providerContracts from './map-contracts-providers.mjs';
 import captureContracts from './map-contracts-capture.mjs';
 import nodeContracts from './map-contracts-nodes.mjs';
@@ -8,6 +9,7 @@ import sg from './map-contracts-saveguard.mjs';
 
 export default [
   ...videoContracts,
+  ...uiContracts,
   ...designerSelection,
   ...providerContracts,
   ...captureContracts,
@@ -260,21 +262,6 @@ export default [
       ['docs/catalogo-voz-y-efectos.md', 'Gemini 3.8 Flash TTS'],
     ],
     tests: ['tests/nanogpt-speech.test.ts'],
-  },
-  {
-    id: 'shortcuts',
-    what: 'Los atajos de teclado: el manejador, Ajustes → Shortcuts y el README leen la misma lista.',
-    sides: [
-      ['src/engine/shortcuts.ts', "{ keys: 'Mod + S'"],
-      ['src/components/designer/designerKeys.ts', 'void saveNow().catch'],
-      ['src/components/shell/SettingsPanel.tsx', 'Save (Mod+S) also works while typing'],
-      ['src/engine/shortcuts.ts', 'export function shortcutGroups'],
-      ['src/components/designer/designerKeys.ts', 'DESIGN_TOOL_KEYS[e.key.toLowerCase()]'],
-      ['src/components/designer/PathNodes.tsx', 'marqueeNodeSelection'],
-      ['src/components/shell/SettingsPanel.tsx', 'shortcutGroups()'],
-      ['README.md', '<!-- shortcuts:start -->'],
-    ],
-    tests: ['tests/readme-shortcuts.test.ts'],
   },
   {
     id: 'sandbox',

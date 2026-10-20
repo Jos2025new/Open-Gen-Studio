@@ -131,3 +131,7 @@ input[type=range]:disabled { opacity: .45; cursor: default; }
 .trace-dot { width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; flex-shrink: 0; animation: trace-blink 1.2s ease-in-out infinite; }
 @keyframes trace-blink { 50% { opacity: .3; } }
 @media (max-width: 520px) { .trace-chip input { width: 110px; } .trace-chip .trace-label { max-width: 90px; } }
+/* Settings → Appearance: round highlight swatches. Each button carries its own data-accent, so it paints that preset's colour. */
+.accent-swatches { display: flex; flex-wrap: wrap; gap: 10px; padding: 3px; }
+.accent-swatch { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--grain, linear-gradient(#0000, #0000)), var(--accent-grad, var(--accent)); color: var(--accent-ink); }
+.accent-swatch.is-on { outline: 2px solid var(--text); outline-offset: 2px; }

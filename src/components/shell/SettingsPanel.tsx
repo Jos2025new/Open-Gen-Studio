@@ -18,6 +18,7 @@ import { Button, Chip, Segmented, Spinner, Toggle } from '../ui/primitives';
 import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
 import { PeopleLookRow } from './PeopleLookRow';
+import { AppearanceSection } from './AppearanceSection';
 import { shortcutGroups } from '../../engine/shortcuts';
 
 export function ProviderRow({ id, autoFocus = false }: { id: RemoteProviderId; autoFocus?: boolean }) {
@@ -307,7 +308,7 @@ export function SettingsPanel() {
     if (changed || !settings.agent.model) void repickAgentModel();
   };
 
-  const [tab, setTab] = usePref<'providers' | 'agent' | 'ops' | 'budget' | 'data' | 'keys'>('ogs:settings-tab', 'providers');
+  const [tab, setTab] = usePref<'providers' | 'agent' | 'ops' | 'budget' | 'look' | 'data' | 'keys'>('ogs:settings-tab', 'providers');
   // Load missing catalogs when Settings opens.
   useEffect(() => {
     void loadCatalogs();
@@ -317,7 +318,7 @@ export function SettingsPanel() {
     <div className="settings">
       <PopoverHeader title="Settings" sub="Keys are kept on this computer and sent only to their provider." />
       <div className="set-tabs">
-        <Segmented size="sm" value={tab} onChange={setTab} options={[{ value: 'providers', label: 'Providers' }, { value: 'agent', label: 'Agent' }, { value: 'ops', label: 'Operations' }, { value: 'budget', label: 'Budget' }, { value: 'data', label: 'Data' }, { value: 'keys', label: 'Shortcuts' }]} />
+        <Segmented size="sm" value={tab} onChange={setTab} options={[{ value: 'providers', label: 'Providers' }, { value: 'agent', label: 'Agent' }, { value: 'ops', label: 'Operations' }, { value: 'budget', label: 'Budget' }, { value: 'look', label: 'Look' }, { value: 'data', label: 'Data' }, { value: 'keys', label: 'Shortcuts' }]} />
       </div>
 
       {tab === 'providers' ? <section className="set-section">
@@ -431,6 +432,7 @@ export function SettingsPanel() {
         <PeopleLookRow />
       </section> : null}
 
+      {tab === 'look' ? <AppearanceSection /> : null}
       {tab === 'ops' ? <section className="set-section">
         <OpsModelRow label="Image edits" tip="Edit, relight, change angle, reframe, variations" slot="edit" kind="image" engine="edit" filter={(m) => m.acceptsImage && !m.tags.length} />
         <OpsModelRow label="Upscale" tip="Image upscale" slot="upscale" kind="image" engine="upscale" filter={(m) => m.acceptsImage} />
