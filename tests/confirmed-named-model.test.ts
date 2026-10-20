@@ -29,27 +29,46 @@ function context(said: string, extra: Partial<PlanContext> = {}): PlanContext {
 }
 const run = (said: string, extra?: Partial<PlanContext>) => normalizePlan({ steps: [{ id: 's1', kind: 'image', model: GROK, prompt: 'A mug' }] }, context(said, extra), 'p');
 
-describe('user-named model vs confirmed model', () => {
-  it('named in this request: the written model stays, no "(confirmed)" model note', async () => {
+const ref = (r: { plan?: { steps: unknown[] } | null }, i = 0) => (r.plan?.steps[i] as ImageStep).modelRef;
+let CURRENT = '';
+const SWITCHED = [{ modelRef: GROK, needsImage: false, count: 1 }, { modelRef: FLUX, needsImage: false, count: 1 }];
+
+describe('user-named model vs confirmed model (outside Direct: refused until the user confirms the switch)', () => {
+  it('named in this request: the plan is refused with the exact fix, nothing is swapped', async () => {
     const r = await run('prueba ahora con grok image imagine');
-    expect(r.errors).toEqual([]);
-    expect((r.plan?.steps[0] as ImageStep).modelRef).toBe(GROK);
-    expect(JSON.stringify(r)).not.toContain('→ FLUX');
-    expect(JSON.stringify(r)).not.toContain('(confirmed)');
+    expect(r.plan).toBeNull();
+    expect(r.errors.join(' ')).toContain(`The user named Grok Imagine Image (${GROK}); call confirm_settings for image with model ${GROK} first.`);
   });
   it('not named in this request: the confirmed model wins, as before', async () => {
     const r = await run('otra imagen de una taza');
-    expect((r.plan?.steps[0] as ImageStep).modelRef).toBe(FLUX);
+    expect(ref(r)).toBe(FLUX);
     expect(JSON.stringify(r)).toContain('Grok Imagine Image → FLUX 3 Image Klein (confirmed)');
   });
-  it('repeat case: Grok named requests ago (history), current request names none: FLUX', async () => {
+  it('repeat case: Grok named requests ago (history), current request names none: FLUX, no refusal', async () => {
     const r = await run('hazme otra con la misma luz');
-    expect((r.plan?.steps[0] as ImageStep).modelRef).toBe(FLUX);
+    expect(r.errors).toEqual([]);
+    expect(ref(r)).toBe(FLUX);
+  });
+  it('after the switch is confirmed (Grok added as a part): steps that write Grok keep it, the others keep the confirmed model', async () => {
+    CURRENT = 'prueba la azotea con grok image imagine';
+    const ctxParts = { confirmedParts: () => SWITCHED };
+    const r = await normalizePlan({ steps: [{ id: 's1', kind: 'image', model: GROK, prompt: 'rooftop' }, { id: 's2', kind: 'image', prompt: 'A mug' }, { id: 's3', kind: 'image', model: FLUX, prompt: 'A cup' }] }, context(CURRENT, ctxParts), 'p');
+    expect(r.errors).toEqual([]);
+    expect([ref(r, 0), ref(r, 1), ref(r, 2)]).toEqual([GROK, FLUX, FLUX]);
+  });
+  it('named in general ("try now with Grok"): every step that writes Grok keeps it', async () => {
+    CURRENT = 'prueba ahora con grok image imagine';
+    const r = await normalizePlan({ steps: [{ id: 's1', kind: 'image', model: GROK, prompt: 'a' }, { id: 's2', kind: 'image', model: GROK, prompt: 'b' }] }, context(CURRENT, { confirmedParts: () => SWITCHED }), 'p');
+    expect([ref(r, 0), ref(r, 1)]).toEqual([GROK, GROK]);
+  });
+  it('Direct: no card, the named model is used', async () => {
+    const r = await run('prueba ahora con grok image imagine', { confirmed: () => undefined, composerChosen: () => true });
+    expect(r.errors).toEqual([]);
+    expect(ref(r)).toBe(GROK);
   });
   it('an A/B comparison keeps its own parts', async () => {
-    const parts = [{ modelRef: FLUX, needsImage: false, count: 1 }, { modelRef: GROK, needsImage: false, count: 1 }];
-    const r = await run('compara flux y grok image imagine', { confirmedParts: () => parts });
-    expect((r.plan?.steps[0] as ImageStep).modelRef).toBe(GROK);
+    const r = await run('compara flux y grok image imagine', { confirmedParts: () => SWITCHED });
+    expect(ref(r)).toBe(GROK);
     expect(JSON.stringify(r)).not.toContain('(confirmed)');
   });
 });

@@ -548,11 +548,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             if (m && lineKey(m) === lineKey(named!)) { conf = p; break; }
           }
         }
-        // A model line the user named in THIS request wins over the confirmed one; its own variant, no confirmed values forced.
+        // A model the user named in THIS request is never swapped silently, in either direction: the user confirms the switch first.
         if (conf && parts.length <= 1 && s.model?.trim() && await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef)) {
-          conf = undefined;
-          const route = kind === 'image' ? (refs.length > 0 || s.first_frame ? 'edit' : 'text') : routeMode({ firstFrame: Boolean(s.first_frame), refs: imageRefs.length });
-          s.model = ctx.variantModel?.(s.model.trim(), route) ?? s.model;
+          const ref = (await ctx.getModel(s.model.trim()))?.model;
+          errors.push(`${where}: The user named ${ref?.name ?? s.model.trim()} (${ref?.ref ?? s.model.trim()}); call confirm_settings for ${kind} with model ${ref?.ref ?? s.model.trim()} first.`);
+          continue;
         }
         if (conf) {
           const confName = (await ctx.getModel(conf.modelRef))?.model.name ?? conf.modelRef;
