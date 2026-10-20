@@ -1,5 +1,5 @@
-/* Modo claro (propuesta): off-white cálido, muestreado de la referencia 13 (#f1efec). El modo oscuro es Atlas. Radios: píldora. */
-[data-base="tinta"][data-mode="light"] {
+/* Base «Claro» (decidida): off-white cálido, muestreado de una referencia (#f1efec); es el modo claro general. Radios: píldora. */
+[data-base="claro"] {
   color-scheme: light;
   --bg: #fbfaf8; --bg-canvas: #f1efec; /* canvas sampled (#f1efec); surface derived, a step lighter */
   --surface: #fbfaf8; --surface-2: #e9e6e1; --surface-3: #dedad4; --surface-hover: #ebe8e3;

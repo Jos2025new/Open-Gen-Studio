@@ -1,5 +1,5 @@
 /* Resaltado «Aurora» (propuesta): degradado suave con grano. Muestreado de una esfera (referencias 15 y 16). Estrellas de color elevadas para que la tinta pase en cada una. */
-:root, [data-mode] {
+:root, [data-base] {
   --grain-img: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .5 0'/></filter><rect width='96' height='96' filter='url(%23n)' opacity='.35'/></svg>");
 }
 [data-accent="aurora"] {
@@ -9,7 +9,7 @@
   --select-fill: linear-gradient(135deg, rgba(201,182,238,.22), rgba(236,156,192,.18)), linear-gradient(#2a2a33, #2a2a33);
   --grain: var(--grain-img);
 }
-[data-mode="light"] [data-accent="aurora"], [data-mode="light"][data-accent="aurora"] {
+[data-base="claro"] [data-accent="aurora"], [data-base="claro"][data-accent="aurora"] {
   --accent: #5a3fa0; --accent-ink: #ffffff; --accent-soft: rgba(90, 63, 160, 0.12); --accent-line: rgba(90, 63, 160, 0.45);
   --select-on: #2a1a5e; --select-on-soft: #e9e0f7; --select-line: #5a3fa0;
   --accent-grad: linear-gradient(135deg, #5a3fa0 0%, #7b3f9e 38%, #a03c92 70%, #b0357f 100%);

@@ -1,0 +1,11 @@
+/* Base «Original» (antigua): los neutros de hoy (tokens.css), tal cual y sin mejoras; se retirará más adelante. Radios de hoy, no píldora. Va tras base-atlas.css para anular sus valores. */
+[data-base="original"] {
+  color-scheme: dark;
+  --bg: #0a0a0b; --bg-canvas: #0d0d0f; --surface: #151518; --surface-2: #1d1d21; --surface-3: #28282d; --surface-hover: #232328;
+  --overlay: rgba(6, 6, 8, 0.72);
+  --border: #2a2a30; --border-strong: #3a3a42; --border-focus: #575761;
+  --text: #ececf0; --text-2: #c3c3cb; --text-3: #8e8e98; --text-4: #61616a;
+  --danger: #f06a6a; --danger-soft: rgba(240, 106, 106, 0.12); --warn: #ffc25e; --ok: #86e3a5;
+  --chip-radius: 10px; --btn-radius: 10px;
+  background: var(--bg-canvas); color: var(--text);
+}

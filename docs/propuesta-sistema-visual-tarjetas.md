@@ -1,6 +1,6 @@
 # Propuesta: un sistema visual acotado para las tarjetas del chat
 
-Fecha: 2026-10-20. Estado: **propuesta, sin implementar** (solo documento; ningún cambio de código). Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app.
+Fecha: 2026-10-20. Estado: **propuesta, sin implementar** (solo documento; ningún cambio de código). Aprobado (2026-10-20): plantillas base fijas, una o dos tarjetas que destacan, «Decisión» sin banda y con la huella antigua, selección con el color de resaltado (el verde, solo estados) y radio de píldora. **Pendiente:** si «Decisión» sigue siendo variante, el tamaño de las tarjetas de cambio de modelo y el puntero en `AGENTS.md`. Alcance: todas las tarjetas del chat y las superficies parecidas; la regla sirve para el resto de la app.
 
 ## Por qué (y qué se busca)
 
@@ -10,7 +10,7 @@ Las tarjetas nuevas (cambio de modelo y seguimiento, `cc-narrow`) desentonan con
 
 ## 1. Inventario (desde el código)
 
-Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde `--ok #86e3a5`; acento `--accent` (lima `#d8ff3a`; en la [propuesta de temas](propuesta-temas.md) es el «Predeterminado» de cinco colores de resaltado, sobre los neutros de Atlas).
+Tokens existentes (`tokens.css:1-60`): letras `--fs-xs 11 / s 12 / m 13 / l 15 / xl 20`; radios `--r-s 6 / --r-m 16 / --r-l 24 / --r-full` (y la familia antigua `--radius-xs 5 … -xl 18`); espacio `--sp-1 4 / 2 8 / 3 12 / 4 16 / 5 24`; verde `--ok #86e3a5`; acento `--accent` (lima `#d8ff3a`; en la [propuesta de temas](propuesta-temas.md) es el «Predeterminado» de cinco colores de resaltado, sobre los neutros de Atlas; la propuesta de temas está aprobada).
 
 Leyenda: **[px]** = valor fijo en vez de token.
 
