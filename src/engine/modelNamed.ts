@@ -6,6 +6,9 @@ import { PROVIDER_LABELS } from './providers/types';
 import type { PlanContext } from './plan';
 import type { AgentState, MediaKind, ModelSummary, ProviderId } from './types';
 
+/** requestText plus the agent's reply an acceptance answers: change detection only (ADR 0025 D); plan fitting reads requestText. */
+export type OfferContext = PlanContext & { offerText?: () => string };
+
 /*
  * "Ask to change" (ADR 0025 D): the user names another model, or only another provider for the same model. Both go
  * through the same Keep / Change card; the agent only declares the model (and the provider it was asked for), the
@@ -76,9 +79,10 @@ export function resolveNamedModel(name: string, kind: MediaKind, needsImage: boo
  * answers, never the whole history) and it is not what the card confirmed: another line they named, or the same line
  * at the provider they named. Then the user's words win over the card, after a question. Undefined when it is not.
  */
-export async function namedOverConfirmed(ctx: PlanContext, written: string, confirmedRef: string): Promise<ModelSummary | undefined> {
-  if (!ctx.requestText) return undefined;
-  const said = ctx.requestText();
+export async function namedOverConfirmed(ctx: OfferContext, written: string, confirmedRef: string): Promise<ModelSummary | undefined> {
+  const asking = ctx.offerText ?? ctx.requestText;
+  if (!asking) return undefined;
+  const said = asking();
   const conf = (await ctx.getModel(confirmedRef))?.model;
   if (!conf) return undefined;
   // A name that is not a ref is read as the user wrote it: the provider they named (other than the confirmed one) decides.
@@ -88,10 +92,10 @@ export async function namedOverConfirmed(ctx: PlanContext, written: string, conf
 }
 
 /** After a switch, a request that names no model must first ask whether to continue with the switched one; undefined when it need not. */
-export async function followUpProblem(ctx: PlanContext, confirmedRef: string, kind: MediaKind): Promise<string | undefined> {
+export async function followUpProblem(ctx: OfferContext, confirmedRef: string, kind: MediaKind): Promise<string | undefined> {
   const to = ctx.switchedTo?.(kind);
   const [sw, conf] = to ? await Promise.all([ctx.getModel(to.modelRef), ctx.getModel(confirmedRef)]) : [];
-  if (!to || !sw || !conf || userNamed([conf.model.name], ctx.requestText?.() ?? '')) return undefined;
+  if (!to || !sw || !conf || userNamed([conf.model.name], (ctx.offerText ?? ctx.requestText)?.() ?? '')) return undefined;
   // The same model at another provider has the same name: say where each one is.
   const tag = (m: ModelSummary) => (modelChange(sw.model, conf.model) === 'provider' ? `${m.name} at ${PROVIDER_LABELS[m.provider]}` : m.name);
   return `The user switched ${kind} to ${tag(sw.model)} (${to.modelRef}) last time and has not said whether to continue with it; call confirm_settings for ${kind} with model ${to.modelRef} first (the app asks: continue with ${tag(sw.model)} or go back to ${tag(conf.model)}).`;
@@ -102,11 +106,12 @@ const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco'])
 
 /**
  * Whether a message is a plain acceptance of what the agent just offered ("sí, cámbialo", "dale", "go ahead"): short
- * (up to 6 words), starts with an accepting word and has no refusal word ("no, sigue así", "sí pero no"). No LLM.
+ * (up to 6 words), starts with an accepting word, has no refusal word ("no, sigue así", "sí pero no") and is not a
+ * question ("sí, ¿y el precio?"). No LLM.
  */
 export function isAcceptance(message: string): boolean {
   const words = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/'/g, '').split(/[^a-z0-9]+/).filter(Boolean);
-  return words.length > 0 && words.length <= 6 && ACCEPT.has(words[0]) && !words.some((w) => REFUSE.has(w));
+  return !message.includes('?') && words.length > 0 && words.length <= 6 && ACCEPT.has(words[0]) && !words.some((w) => REFUSE.has(w));
 }
 
 /** The agent's last visible text before the user's current message (the one with exactly `request`), or ''. */
@@ -127,7 +132,12 @@ function previousAgentText(history: AgentState['history'], request: string): str
  * NanoGPT; "sí" after a reply that named nothing, or "no, sigue así", names nothing. The Keep / Change card still decides.
  */
 export function offerRequest(agent: Pick<AgentState, 'draft' | 'history'>): string {
+  const base = userRequest(agent);
   const request = agent.draft?.request ?? '';
-  const base = [request, ...Object.values(agent.draft?.answers ?? {})].join('\n');
   return isAcceptance(request) ? `${base}\n${previousAgentText(agent.history, request)}` : base;
+}
+
+/** Only the user's own words (the request and its answers): what plan fitting reads, never the agent's reply. */
+export function userRequest(agent: Pick<AgentState, 'draft'>): string {
+  return [agent.draft?.request ?? '', ...Object.values(agent.draft?.answers ?? {})].join('\n');
 }

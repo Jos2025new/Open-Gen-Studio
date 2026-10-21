@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
 import { localStore } from './server/local-store.js';
 import react from '@vitejs/plugin-react';
-import { HOST_NOT_ALLOWED, mediaHostAllowed } from './src/lib/mediaHosts';
+import { HOST_NOT_ALLOWED, mediaHostAllowed, nextHop } from './src/lib/mediaHosts';
 
 // Provider schema documents are served without CORS headers, so the dev and
 // preview servers relay them. Generation and chat calls go direct (CORS ok).
@@ -40,7 +40,17 @@ function mediaRelay(): Plugin {
       res.statusCode = 403;
       return res.end(HOST_NOT_ALLOWED);
     }
-    const upstream = await fetch(url, { signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    // Redirects are followed here, not by fetch: every hop must pass the same https + allow-list check as the first URL.
+    let upstream = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    for (let hop = 1; upstream && upstream.status >= 300 && upstream.status < 400 && upstream.headers.get('location'); hop++) {
+      const next = nextHop(url, upstream.headers.get('location')!, hop);
+      if ('refused' in next) {
+        res.statusCode = 403;
+        return res.end(`${HOST_NOT_ALLOWED}: ${next.refused}`);
+      }
+      url = next.url;
+      upstream = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    }
     if (!upstream?.ok || !upstream.body) {
       res.statusCode = upstream?.status ?? 502;
       return res.end('upstream failed');

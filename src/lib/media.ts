@@ -92,7 +92,10 @@ export async function blobToCanvas(blob: Blob): Promise<HTMLCanvasElement> {
 async function relayReason(res: Response, url: string): Promise<string> {
   const host = (() => { try { return new URL(url).hostname; } catch { return 'this address'; } })();
   const body = await res.text().catch(() => '');
-  return body.trim() === HOST_NOT_ALLOWED ? `: the local server does not relay downloads from ${host}` : `: ${host} refused the download`;
+  const said = body.trim();
+  // A refused redirect names the host it went to (`host not allowed: <host>`); the first URL's host is the one asked for.
+  if (said.startsWith(HOST_NOT_ALLOWED)) return `: the local server does not relay downloads from ${said.slice(HOST_NOT_ALLOWED.length).replace(/^:\s*/, '') || host}`;
+  return `: ${host} refused the download`;
 }
 
 /** Each download attempt bounds both the response and its body; a CORS failure uses the existing relay. */

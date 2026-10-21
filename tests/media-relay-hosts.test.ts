@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mediaHostAllowed } from '../src/lib/mediaHosts';
+import { mediaHostAllowed, nextHop } from '../src/lib/mediaHosts';
 import { fetchBlob } from '../src/lib/media';
 import { notKept } from '../src/engine/keepResult';
 import { useAlerts } from '../src/engine/alerts';
@@ -35,5 +35,20 @@ describe('media relay hosts', () => {
     expect(alerts).toHaveLength(2);
     expect(alerts[0].level).toBe('warn');
     expect(alerts[0].text).toContain('could not be saved on this computer');
+  });
+  it('a redirect is followed only to an https allowed host, at most 3 hops', () => {
+    const cur = new URL('https://ark-content.volces.com/a/b.png');
+    expect(nextHop(cur, `https://${NANO}/x.png`, 1)).toEqual({ url: new URL(`https://${NANO}/x.png`) });
+    expect(nextHop(cur, '/c/d.png', 1)).toEqual({ url: new URL('https://ark-content.volces.com/c/d.png') });
+    expect(nextHop(cur, 'https://evil.example/x.png', 1)).toEqual({ refused: 'evil.example' });
+    expect(nextHop(cur, 'http://ark-content.volces.com/x.png', 1)).toEqual({ refused: 'ark-content.volces.com' });
+    expect(nextHop(cur, '/ok.png', 3)).toHaveProperty('url');
+    expect(nextHop(cur, '/ok.png', 4)).toHaveProperty('refused');
+  });
+  it('a refused redirect names the host it went to', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response('host not allowed: evil.example', { status: 403 })));
+    await expect(fetchBlob(`https://${NANO}/a.png`)).rejects.toThrow('Download failed (403): the local server does not relay downloads from evil.example');
   });
 });

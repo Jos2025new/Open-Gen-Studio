@@ -24,7 +24,7 @@ Esta página dice qué está protegido y qué no, con la prueba de cada punto. *
 ## Límites que conviene saber
 
 - **Con `--host`, la app se puede abrir desde otro dispositivo, pero sin tus datos:** no guarda ni carga nada. Es intencionado.
-- **El relay `/x/media` no está limitado al propio ordenador.** Solo descarga medios de los dominios de proveedores de una lista fija (`src/lib/mediaHosts.ts`: Atlas, BytePlus y Alibaba por dominio; el depósito de NanoGPT en Cloudflare R2 solo por su host exacto, no cualquier R2) y los sirve aislados. No da acceso a `data/`.
+- **El relay `/x/media` no está limitado al propio ordenador.** Solo descarga medios de los dominios de proveedores de una lista fija (`src/lib/mediaHosts.ts`: Atlas, BytePlus y Alibaba por dominio; el depósito de NanoGPT en Cloudflare R2 solo por su host exacto, no cualquier R2) y los sirve aislados. No sigue redirecciones a ciegas: las sigue él mismo (máximo 3) y cada salto debe ser `https` y de la lista (`nextHop`); si no, responde 403 `host not allowed: <host>` y el cliente nombra ese host. No da acceso a `data/`.
 - **No hay contraseña ni usuarios.** La app está pensada para una sola persona en su ordenador. Publicarla como servicio necesitaría autenticación, que no existe.
 
 ## Importar EPS con Ghostscript local (2026-10-13)

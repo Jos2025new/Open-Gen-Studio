@@ -81,13 +81,19 @@ export function takesInputsOf(cur: Pick<ModelSummary, 'acceptsText' | 'acceptsIm
  * provider whose balance is unknown counts as possible), cheapest first. `same` = equal model at ≤ price.
  */
 export async function creditOptions(ref: string): Promise<CreditOption[]> {
+  return (await creditCandidates(ref)).options;
+}
+
+/** creditOptions plus the equivalents the price cap dropped (cheapest first), so the alert can say they exist. */
+async function creditCandidates(ref: string): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
   const cur = modelSummary(ref);
-  if (!cur) return [];
+  if (!cur) return { options: [], pricey: [] };
   const key = lineKey(cur);
   const family = modelFamily(cur).key;
   const price = priceOf(cur);
   const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m));
   const out: CreditOption[] = [];
+  const pricey: CreditOption[] = [];
   const providers = [...new Set(all.map((m) => m.provider))];
   const balances = new Map(await Promise.all(providers.map(async (p) => [p, await providerBalance(p)] as const)));
   for (const m of all) {
@@ -98,11 +104,13 @@ export async function creditOptions(ref: string): Promise<CreditOption[]> {
     const p = priceOf(m);
     const comparable = price && p && p.unit === price.unit && price.usd > 0;
     const ratio = comparable ? p.usd / price.usd : undefined;
-    if (ratio !== undefined && ratio > CREDIT_PRICE_LIMIT) continue;
-    out.push({ model: m, same: sameVariant && Boolean(price && p && p.unit === price.unit && p.usd <= price.usd), ratio });
+    const option = { model: m, same: sameVariant && Boolean(price && p && p.unit === price.unit && p.usd <= price.usd), ratio };
+    if (ratio !== undefined && ratio > CREDIT_PRICE_LIMIT) pricey.push(option);
+    else out.push(option);
   }
   const cost = (o: CreditOption) => priceOf(o.model)?.usd ?? Infinity;
-  return out.sort((a, b) => Number(b.same) - Number(a.same) || Number(lineKey(b.model) === key) - Number(lineKey(a.model) === key) || cost(a) - cost(b)).slice(0, 4);
+  const options = out.sort((a, b) => Number(b.same) - Number(a.same) || Number(lineKey(b.model) === key) - Number(lineKey(a.model) === key) || cost(a) - cost(b)).slice(0, 4);
+  return { options, pricey: pricey.sort((a, b) => (a.ratio ?? 0) - (b.ratio ?? 0)) };
 }
 
 const label = (m: ModelSummary, ratio?: number) => {
@@ -120,7 +128,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (!g || !cur) return false;
   markEmpty(cur.provider);
   const empty = PROVIDER_LABELS[cur.provider];
-  const options = await creditOptions(g.modelRef);
+  const { options, pricey } = await creditCandidates(g.modelRef);
   const switchTo = (m: ModelSummary) => {
     patchGeneration(genId, { modelRef: m.ref, modelName: m.name, error: undefined });
     return rerun(genId);
@@ -137,6 +145,12 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
       actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
     });
+    return false;
+  }
+  // Equivalents exist but cost too much to switch to on their own: say so instead of claiming there are none.
+  if (pricey.length) {
+    const p = pricey[0];
+    pushAlert({ level: 'error', text: `${empty} has no credit for ${cur.name}. ${PROVIDER_LABELS[p.model.provider]} has a similar model (${p.model.name}) but it costs ${Math.round((p.ratio ?? 0) * 10) / 10}× more, so it is not offered automatically. Recharge ${empty} or pick a model yourself.` });
     return false;
   }
   pushAlert({ level: 'error', text: `${empty} has no credit and no other connected provider has ${cur.name} or a similar model with credit. Recharge ${empty} (or another provider) and retry.` });

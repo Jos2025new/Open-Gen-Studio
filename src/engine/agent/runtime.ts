@@ -22,8 +22,8 @@ import { pushAlert } from '../alerts';
 import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
-import { carryOverRevision } from '../planRevision';
-import { offerRequest, partModel } from '../modelNamed';
+import { adjustedNote, carryOverRevision } from '../planRevision';
+import { offerRequest, partModel, userRequest } from '../modelNamed';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
@@ -159,11 +159,6 @@ export function designerDims(): { width: number; height: number } {
   return r >= 1 ? { width: Math.round(1080 * r), height: 1080 } : { width: 1080, height: Math.round(1080 / r) };
 }
 
-/** What the app changed in the plan it showed (models, inputs, settings): the agent remembers it for what follows. */
-function adjustedNote(adjustments: string[] | undefined): string {
-  return adjustments?.length ? `\nThe app adjusted your plan before showing it (keep this in mind for revisions and later plans): ${adjustments.join('; ')}.` : '';
-}
-
 /** The user's own words, marked off from what the app adds (context, guides, notes), with the canvas they wrote on. */
 function userBlock(text: string, canvas: Workspace): string {
   return `<user_message canvas="${canvas}">\n${text}\n</user_message>`;
@@ -220,9 +215,9 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     strictContinuity:strict,
     userText: () => userWords(sessionId),
     // The request being handled, not the whole conversation: an old "un ángulo diferente" must not fit a new request.
-    requestText: () => {
-      return offerRequest(session(sessionId).agent);
-    },
+    // Only the user's words: the agent's reply an acceptance refers to goes in offerText (change detection), not into plan fitting.
+    requestText: () => userRequest(session(sessionId).agent),
+    offerText: () => offerRequest(session(sessionId).agent),
     // Angles already made from this source image, by finished angle operations on it.
     usedAngles: (assetId: string) => Object.values(get().generations)
       .filter((g) => g.status === 'done' && g.op?.id === 'angle' && g.op.sourceAssetId === assetId)
@@ -298,7 +293,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       pushHistory(sessionId, {
         role: 'tool',
         tool_call_id: pending.toolCallId,
-        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan.adjustments)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`,
+        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`,
       });
       // Images attached to the comment: a user message after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
@@ -575,8 +570,9 @@ async function presentPlan(
 ): Promise<{ errors: string[]; itemId?: string; settingsNeeded?: string }> {
   const started = Date.now();
   const planId = uid('pln');
-  if (revision) carryOverRevision(raw, session(sessionId));
+  const carried = revision ? carryOverRevision(raw, session(sessionId)) : [];
   const { plan, errors } = await normalizePlan(raw, planContext(sessionId, workspace, !!toolCallId), planId);
+  if (plan && carried.length) plan.agentNotes = carried;
   if (signal?.aborted) return { errors: [] };
   const journey = revision ? 'plan-revision' : 'settings-correction';
   const summarizeInputs = (step: PlanStep) => step.kind === 'video'
@@ -844,7 +840,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
   const pending = s.agent.pending;
   if (pending?.feedItemId === itemId) {
     const note = off.size ? ` The user unchecked ${[...off].join(', ')}: they will not run. Running ${chosen.map((st) => st.id).join(', ')}.` : '';
-    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan.adjustments)} The app is executing the plan now.` });
+    if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` });
     closeRequest(sessionId, 'approved', total.usd);
     if (item.style === 'direct') inheritApproved(chosen);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });

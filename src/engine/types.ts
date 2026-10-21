@@ -506,6 +506,8 @@ export interface Plan {
   /** Style block appended to every image and video prompt (already in the prompts). */
   style?: string;
   adjustments: string[];
+  /** Agent-voiced revision notes (told to the agent only). */
+  agentNotes?: string[];
 }
 
 export type StepState = 'pending' | 'running' | 'done' | 'error' | 'skipped' | 'review';

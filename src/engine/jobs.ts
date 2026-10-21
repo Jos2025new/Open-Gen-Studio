@@ -2,7 +2,6 @@ import { reusedOpChoice, transcriberForRun } from './opRunModel';
 import { isRestart, statusChecker } from './checkStatus';
 import { mayStartWork } from '../lib/writerLock';
 import { checkStepAuthorization, costAuthorization, PriceReviewRequired } from './priceAuthorization';
-import { logged } from '../lib/log';
 import { notKept } from './keepResult';
 import { uid } from '../lib/id';
 import { AbortedError, isAbort, JobFailedError, NetworkError, sleep } from '../lib/http';
@@ -211,7 +210,7 @@ export async function storeModelOutputs(outputs: GenOutput[], g: Generation): Pr
   const files = await Promise.all(
     outputs.map(async (o) => {
       let blob = o.blob;
-      if (!blob && o.url) blob = await fetchBlob(o.url).catch(logged('download result'));
+      if (!blob && o.url) blob = await fetchBlob(o.url).catch(notKept('download result'));
       const mime = blob ? await sniffModelMime(blob, o.mime) : (o.mime ?? modelMime(o.url ?? '') ?? 'application/octet-stream');
       return { o, blob: blob && blob.type !== mime ? new Blob([blob], { type: mime }) : blob, mime };
     }),

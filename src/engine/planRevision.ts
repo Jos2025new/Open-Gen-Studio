@@ -4,8 +4,8 @@ import type { Plan, PlanContinuity } from './types';
 /*
  * A revision changes only what was asked: the plan's style and continuity (shared preservation) are part of the plan
  * even when the agent does not repeat them. What the agent omits is copied from the plan being revised; what it
- * writes wins. The notes go to `raw.carried` (the normalizer starts its adjustments with them), so the agent reads
- * them in the approval result and in the next comment ("keep this in mind for revisions").
+ * writes wins. The user sees neutral lines (`raw.carried`, the start of the plan's adjustments); the agent-voiced notes
+ * are the plan's `agentNotes`, read by the agent in the approval result and in the next comment ("keep this in mind for revisions").
  */
 
 /** The plan the user commented on, if still waiting. */
@@ -14,13 +14,24 @@ function revisedPlan(session: { feed: Array<{ id: string; type: string }>; agent
   return item?.type === 'plan' && item.status === 'awaiting' ? item.plan : undefined;
 }
 
-/** Fills the style and continuity a revision left out from the plan it replaces; returns what it did. */
+const KEPT_STYLE = 'Kept the previous style';
+const KEPT_CONTINUITY = 'Kept the previous continuity';
+
+/** What the app changed in the plan it showed: the agent remembers it for what follows (its own notes, not the user's neutral ones). */
+export function adjustedNote(plan: Pick<Plan, 'adjustments' | 'agentNotes'>): string {
+  const list = [...(plan.agentNotes ?? []), ...(plan.adjustments ?? []).filter((a) => a !== KEPT_STYLE && a !== KEPT_CONTINUITY)];
+  return list.length ? `\nThe app adjusted your plan before showing it (keep this in mind for revisions and later plans): ${list.join('; ')}.` : '';
+}
+
+/** Fills the style and continuity a revision left out from the plan it replaces; returns the agent's notes (raw.carried gets the user's). */
 export function carryOverRevision(raw: RawPlan, session: Parameters<typeof revisedPlan>[0]): string[] {
   const prev = revisedPlan(session);
   const notes: string[] = [];
+  const shown: string[] = [];
   if (!prev) return notes;
   if (raw.style == null && prev.style) {
     raw.style = prev.style;
+    shown.push(KEPT_STYLE);
     notes.push(`You omitted the style; the previous one was kept: ${prev.style}`);
   }
   if (raw.continuity == null && prev.continuity?.length) {
@@ -35,8 +46,9 @@ export function carryOverRevision(raw: RawPlan, session: Parameters<typeof revis
       else kept.push({ ...g, steps });
     }
     if (kept.length) raw.continuity = kept;
+    if (kept.length || dropped) shown.push(KEPT_CONTINUITY);
     if (kept.length || dropped) notes.push(`You omitted the continuity; the previous one was kept for ${kept.length} group${kept.length === 1 ? '' : 's'}${dropped ? ` (${dropped} dropped because ${dropped === 1 ? 'its' : 'their'} steps were removed)` : ''}`);
   }
-  raw.carried = notes;
+  raw.carried = shown;
   return notes;
 }

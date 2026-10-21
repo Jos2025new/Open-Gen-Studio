@@ -14,3 +14,17 @@ export function mediaHostAllowed(hostname: string): boolean {
 
 /** The relay's answer for a host outside the list (the client turns it into a readable error). */
 export const HOST_NOT_ALLOWED = 'host not allowed';
+
+/** Redirects the relay follows itself (each hop is checked like the first URL). */
+export const MAX_HOPS = 3;
+
+/**
+ * Where a relayed download goes next: `location` resolved against `current`, only if it is https and an allowed host.
+ * The refusal carries the host to name (the relay answers `host not allowed: <host>` for a hop, the client names it).
+ */
+export function nextHop(current: URL, location: string, hop: number): { url: URL } | { refused: string } {
+  let url: URL;
+  try { url = new URL(location, current); } catch { return { refused: current.hostname }; }
+  if (hop > MAX_HOPS || url.protocol !== 'https:' || !mediaHostAllowed(url.hostname)) return { refused: url.hostname || current.hostname };
+  return { url };
+}

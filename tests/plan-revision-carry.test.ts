@@ -49,7 +49,8 @@ describe('a revision keeps the style of the plan it replaces', () => {
     const [revised] = plans();
     expect(revised).toMatchObject({ revised: true });
     expect(revised.plan.style).toBe('grainy 16mm film, warm tungsten light');
-    expect(revised.plan.adjustments.join(' ')).toContain('You omitted the style; the previous one was kept: grainy 16mm film');
+    expect(revised.plan.adjustments).toContain('Kept the previous style');
+    expect(revised.plan.adjustments.join(' ')).not.toContain('You omitted');
     await approvePlan(sid(), revised.id);
     const told = useStore.getState().sessions[sid()].agent.history.some((m) => m.role === 'tool' && typeof m.content === 'string' && /You omitted the style; the previous one was kept/.test(m.content));
     expect(told).toBe(true);
@@ -90,6 +91,7 @@ describe('continuity of the revised plan', () => {
     const notes = carryOverRevision(r, session);
     expect(r.continuity).toEqual([{ source: 's1', preserve: 'her face', steps: ['s2'] }]);
     expect(notes.join(' ')).toContain('previous one was kept for 1 group (2 dropped because their steps were removed)');
+    expect(r.carried).toEqual(['Kept the previous style', 'Kept the previous continuity']);
   });
 
   it('what the agent writes wins, even an empty list', () => {

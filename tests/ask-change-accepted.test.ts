@@ -14,7 +14,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { sendAgentMessage } from '../src/engine/agent/runtime';
-import { isAcceptance } from '../src/engine/modelNamed';
+import { isAcceptance, offerRequest, userRequest } from '../src/engine/modelNamed';
 import { useStore } from '../src/store/store';
 import type { ModelSchema, ModelSummary, SettingsFeedItem } from '../src/engine/types';
 
@@ -98,6 +98,14 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
 
   it('an acceptance is short, starts accepting and has no refusal', () => {
     for (const ok of ['sí', 'Si, cámbialo', 'dale', 'vale', 'ok', 'yes', 'sure', 'go ahead', 'do it', 'hazlo', 'sí, mejor cámbialo', 'venga', 'listo, cámbialo']) expect(isAcceptance(ok), ok).toBe(true);
-    for (const no of ['no', 'no, sigue así', 'sí pero no', 'mejor no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', '']) expect(isAcceptance(no), no).toBe(false);
+    for (const no of ['no', 'no, sigue así', 'sí pero no', 'mejor no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', 'sí, ¿y el precio?', 'ok, is it cheaper?', '']) expect(isAcceptance(no), no).toBe(false);
+  });
+
+  it('the agent reply an acceptance refers to reaches the change detection, never the plan fitting', () => {
+    const msg = 'Quieres 4 ángulos extra en vertical 9:16 con NanoGPT?';
+    const agent = { draft: { request: 'sí', answers: {} }, history: [{ role: 'assistant', content: msg }, { role: 'user', content: '<user_message>\nsí\n</user_message>' }] } as unknown as Parameters<typeof offerRequest>[0];
+    expect(offerRequest(agent)).toContain('NanoGPT');
+    expect(userRequest(agent)).not.toContain('vertical');
+    expect(userRequest(agent)).toContain('sí');
   });
 });

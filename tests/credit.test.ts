@@ -112,4 +112,16 @@ describe('the equivalent model when a provider has no credit', () => {
     expect(labels).toHaveLength(1);
     expect(labels[0]).toMatch(/nano-banana-2-lite.*pricier/);
   });
+
+  it('when the only equivalent was dropped for its price, the alert says so instead of claiming there is none', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/text-to-image', 0.1, false);
+    const pro = img('nanogpt', 'nano-banana-pro', 0.25, true);
+    const { switched } = await run([atlas, pro], atlas);
+    expect(switched).toBe(false);
+    const alert = useAlerts.getState().alerts[0];
+    expect(alert.level).toBe('error');
+    expect(alert.text).toContain('has a similar model (nano-banana-pro) but it costs 2.5× more, so it is not offered automatically');
+    expect(alert.text).not.toContain('no other connected provider');
+    expect(alert.actions ?? []).toHaveLength(0);
+  });
 });
