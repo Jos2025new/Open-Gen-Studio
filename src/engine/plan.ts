@@ -13,7 +13,7 @@ import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from
 import { routeFits, routeMode, routeVideo, VIDEO_PURPOSES, type RouteMode, type VideoPurpose } from './routing';
 import { aspectLabel, audioInputProblem, coerceSettings, isAutoOption, nearestAspect, paramByRole, ratioOf, lyricsParam, routeVideoInputs, shotsProblem, songProblem, videoInputProblem } from './params';
 import { userNamed } from './modelNaming';
-import { followUpProblem, namedOverConfirmed } from './modelNamed';
+import { followUpProblem, modelChange, modelMove, namedOverConfirmed, partNamed } from './modelNamed';
 import type {
   AdvancedValue,
   AssetKind,
@@ -546,13 +546,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         let conf = kind === 'video' || kind === 'image' ? ctx.confirmed?.(kind) : undefined;
         // Several confirmed models of this kind (an A/B comparison): each step keeps the part of the model line it names.
         const parts = kind === 'video' || kind === 'image' ? ctx.confirmedParts?.(kind) ?? [] : [];
-        if (parts.length > 1 && s.model?.trim()) {
-          const named = (await ctx.getModel(s.model.trim()))?.model;
-          for (const p of named ? parts : []) {
-            const m = (await ctx.getModel(p.modelRef))?.model;
-            if (m && lineKey(m) === lineKey(named!)) { conf = p; break; }
-          }
-        }
+        if (parts.length > 1 && s.model?.trim()) conf = (await partNamed(parts, s.model.trim(), ctx.getModel)) ?? conf;
         // A model named in THIS request is never swapped silently: the user confirms first.
         const asked = conf && parts.length <= 1 && s.model?.trim() ? await namedOverConfirmed(ctx, s.model.trim(), conf.modelRef) : undefined;
         if (asked) {
@@ -574,7 +568,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           // Noted only when the plan named another model line: the confirmed model's own variant (edit, image-to-video) is the same choice.
           const wroteModel = wrote?.includes('::') ? (await ctx.getModel(wrote))?.model : undefined;
           const confModel = (await ctx.getModel(conf.modelRef))?.model;
-          if (wrote && wroteModel && confModel && lineKey(wroteModel) !== lineKey(confModel)) adjustments.push(`${s.id}: model ${wroteModel.name} → ${confName} (confirmed)`);
+          if (wrote && wroteModel && confModel && modelChange(wroteModel, confModel)) adjustments.push(`${s.id}: ${modelMove(wroteModel, confModel)}`);
           // Same meaning is not an adjustment: "1:1" and "2048x2048" are one ratio; "1776x2368" and "1776*2368" one size.
           const norm = (v: unknown) => String(v).toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
           const sameValue = (field: string, a: unknown, b: unknown) => {

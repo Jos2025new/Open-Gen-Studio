@@ -49,6 +49,30 @@ export function changeNamed(now: ModelSummary, was: ModelSummary, said: string, 
   return change && providersIn(said).includes(now.provider) ? change : undefined;
 }
 
+/** The adjustment note for a step that wrote another line or provider than the confirmed one; same names are told apart by ref. */
+export function modelMove(wrote: ModelSummary, conf: ModelSummary): string {
+  const same = wrote.name === conf.name;
+  return `model ${same ? wrote.ref : wrote.name} → ${same ? conf.ref : conf.name} (confirmed)`;
+}
+
+/**
+ * With several confirmed parts of a kind (an A/B), the part a step's written model means: the exact ref, else the same
+ * line at the same provider (another input route of it), else the same line when only one part has it (never the
+ * wrong provider of a line compared across providers). Undefined: the step keeps the kind's confirmed choice.
+ */
+export async function partNamed<P extends { modelRef: string }>(parts: P[], written: string, getModel: (ref: string) => Promise<{ model: ModelSummary } | null | undefined>): Promise<P | undefined> {
+  const named = (await getModel(written))?.model;
+  if (!named) return undefined;
+  const exact = parts.find((p) => p.modelRef === named.ref);
+  if (exact) return exact;
+  const same: Array<{ p: P; m: ModelSummary }> = [];
+  for (const p of parts) {
+    const m = (await getModel(p.modelRef))?.model;
+    if (m && lineKey(m) === lineKey(named)) same.push({ p, m });
+  }
+  return same.find((x) => x.m.provider === named.provider)?.p ?? (same.length === 1 ? same[0].p : undefined);
+}
+
 /** The model a confirm_settings part names; with only a provider, the model already confirmed for that kind (the same model at that provider). */
 export function partModel(part: { kind: MediaKind; model?: string; provider?: string }, confirmed: Partial<Record<MediaKind, { modelRef: string }>> | undefined): string | undefined {
   return part.model?.trim() || (part.provider ? confirmed?.[part.kind]?.modelRef : undefined);

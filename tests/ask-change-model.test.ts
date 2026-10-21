@@ -98,6 +98,23 @@ describe('the same model at another provider is a change the user confirms', () 
     expect(JSON.stringify(st().agent.history)).toContain(`steps whose \\"model\\" is ${NANO} use it`);
   });
 
+  it('F-02: an A/B between providers of one line: each step that writes its ref keeps its own provider, and the note says so', async () => {
+    script = [ask({ model: 'nano-banana-2', provider: 'nanogpt' })];
+    await sendAgentMessage('Cambia a nanogpt como proveedor');
+    const c = card()!;
+    script = [steps(ATLAS, NANO)];
+    await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
+    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([NANO, ATLAS]);
+    expect(refs()).toEqual([ATLAS, NANO]);
+  });
+
+  it('F-02: with one confirmed provider, a step that writes the other provider is told it was adjusted', async () => {
+    script = [steps(NANO)];
+    await sendAgentMessage('Una imagen de un faro');
+    expect(refs()).toEqual([ATLAS]);
+    expect(JSON.stringify(plan()!.notes ?? plan())).toContain(`model ${NANO} → ${ATLAS} (confirmed)`);
+  });
+
   it('a provider the user never named is not a change: the app\'s own default stays an ordinary confirmation', async () => {
     script = [ask({ model: NANO })];
     await sendAgentMessage('Otra imagen con nano banana 2');
