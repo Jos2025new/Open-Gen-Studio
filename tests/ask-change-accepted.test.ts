@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { isAcceptance, offerRequest, userRequest } from '../src/engine/modelNamed';
 import { useStore } from '../src/store/store';
 import type { ModelSchema, ModelSummary, SettingsFeedItem } from '../src/engine/types';
@@ -73,6 +73,25 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
     script = [ask({ provider: 'nanogpt' })];
     await sendAgentMessage('no, sigue así');
     expect(card()?.switchFrom).toBeUndefined();
+    // F-01: the ordinary card recommends what is confirmed, never the provider the agent asked for anyway.
+    expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
+    expect(card()?.sections[0].alternatives).toContain(NANO);
+    await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
+    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
+    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([ATLAS]);
+  });
+
+  it('(b2) F-01: another model line the user did not ask for does not slip through an ordinary card either, and the agent is told', async () => {
+    script = [ask({ model: 'nano banana 2 lite' })];
+    await sendAgentMessage('Una imagen de un faro');
+    expect(card()?.switchFrom).toBeUndefined();
+    expect(card()?.sections[0].recommended.modelRef).toBe(ATLAS);
+    expect(card()?.sections[0].alternatives).toContain(LITE);
+    await confirmSettings(sid(), card()!.id, [card()!.sections[0].recommended]);
+    expect(st().agent.settings?.image?.modelRef).toBe(ATLAS);
+    const told = st().agent.history.filter((m) => m.role === 'tool').map((m) => String(m.content)).join('\n');
+    expect(told).toContain('did not ask to change the model');
+    expect(told).toContain('offer the change in text first');
   });
 
   it('(c) "sí" after a reply that named no provider: no change card', async () => {

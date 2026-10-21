@@ -1,8 +1,8 @@
 import type { AgentState, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { defaultChoice } from './settingsCard';
-import { resolveModel } from '../catalog';
+import { modelSummary, resolveModel } from '../catalog';
 import { userNamed } from '../modelNaming';
-import { changeNamed, type ModelChange } from '../modelNamed';
+import { changeNamed, modelChange, type ModelChange } from '../modelNamed';
 
 /**
  * DELICATE (docs/features/agente.md, "Cambio de modelo"): a model the user names in the CURRENT request replaces the
@@ -35,6 +35,30 @@ export async function switchSection(
   return { section: { ...sec, count: from.count ?? sec.count, recommended: { ...carried, needsImage: sec.recommended.needsImage } }, from, change };
 }
 
+/** A settings card that kept the confirmed model over one the agent wrote without the user asking (see keepConfirmed). */
+export type KeptItem = SettingsFeedItem & { keptAsked?: string };
+
+/**
+ * An ordinary card never carries a model change the user did not ask for (ADR 0025 G, F-01): when a kind is already
+ * confirmed, its call has one part and the agent's model is another line or provider, and switchSection found no valid
+ * request, the card recommends the confirmed choice (the agent's model stays an alternative). Only the Keep / Change
+ * card changes a confirmed kind. `asked` is the agent's ref, to tell it so when the card is answered.
+ */
+export async function keepConfirmed(sections: SettingsSection[], confirmed: AgentState['settings'], parts: Array<{ kind: string }>): Promise<{ sections: SettingsSection[]; asked?: string }> {
+  let asked: string | undefined;
+  const out: SettingsSection[] = [];
+  for (const sec of sections) {
+    const from = confirmed?.[sec.kind];
+    const [now, was] = from && parts.filter((p) => p.kind === sec.kind).length <= 1 ? await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]) : [];
+    if (!from || !now || !was || !modelChange(now.model, was.model)) { out.push(sec); continue; }
+    asked ??= sec.recommended.modelRef;
+    const rec = sec.recommended;
+    const kept = { ...defaultChoice(from.modelRef, was.schema, { kind: sec.kind, startImage: rec.needsImage, duration: rec.duration, aspect: rec.aspect, count: rec.count }), needsImage: rec.needsImage };
+    out.push({ ...sec, recommended: kept, alternatives: [rec.modelRef, ...sec.alternatives.filter((r) => r !== rec.modelRef && r !== from.modelRef)] });
+  }
+  return { sections: out, asked };
+}
+
 /** A switch card whose answer is the new model (Keep answers with the confirmed one: an ordinary confirmation). */
 const switched = (item: SettingsFeedItem, sections: SettingsSection[]) => Boolean(item.switchFrom && !item.followUp && sections[0]?.chosen?.modelRef !== item.switchFrom.modelRef);
 
@@ -52,6 +76,8 @@ export function confirmedState(a: AgentState, item: SettingsFeedItem, sections: 
 
 /** For the agent after a switch: which steps get the new model, which keep the confirmed one. */
 export function switchNote(item: SettingsFeedItem, sections: SettingsSection[], newName: string, oldName: string): string {
+  const asked = (item as KeptItem).keptAsked;
+  if (asked) return `\nThe user did not ask to change the model, so the confirmed ${newName} was kept instead of ${modelSummary(asked)?.name ?? asked} (${asked}); offer the change in text first and wait for their yes.`;
   // The same model at another provider has the same name: the refs tell them apart.
   if (newName === oldName) [newName, oldName] = [sections[0].chosen?.modelRef ?? newName, item.switchFrom?.modelRef ?? oldName];
   return switched(item, sections) ? `\nModel switch: steps whose "model" is ${newName} use it; steps that write no model or another one keep ${oldName}. Write the model on each step that should use ${newName}.` : '';
