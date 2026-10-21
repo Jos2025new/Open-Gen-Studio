@@ -112,7 +112,7 @@ describe('the same model at another provider is a change the user confirms', () 
     script = [steps(NANO)];
     await sendAgentMessage('Una imagen de un faro');
     expect(refs()).toEqual([ATLAS]);
-    expect(JSON.stringify(plan()!.notes ?? plan())).toContain(`model ${NANO} → ${ATLAS} (confirmed)`);
+    expect(JSON.stringify(plan())).toContain(`model ${NANO} → ${ATLAS} (confirmed)`);
   });
 
   it('a provider the user never named is not a change: the app\'s own default stays an ordinary confirmation', async () => {

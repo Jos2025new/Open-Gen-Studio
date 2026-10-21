@@ -6,7 +6,7 @@ import { pushAlert, dismissAlert } from './alerts';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
-import type { ModelSummary, ProviderId } from './types';
+import type { Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, useStore } from '../store/store';
 
 /*
@@ -67,12 +67,18 @@ export interface CreditOption {
 /** Dearer than this (same unit) is not offered: it is another product, not a way out of a missing credit. */
 export const CREDIT_PRICE_LIMIT = 1.5;
 
+/** What the generation really sends: an image when it has references, a first or last frame, or works on a source asset (an op). */
+export function jobNeedsImage(g: Pick<Generation, 'inputs' | 'op'>): boolean {
+  return Boolean(g.inputs?.refs?.length || g.inputs?.firstFrame || g.inputs?.lastFrame || g.op);
+}
+
 /**
- * A candidate runs the job when it takes at least the inputs the failed model needs: an image-capable model can do
- * a text-only job (one model, text and image routes), a text-only model cannot do a job that needs an image.
+ * A candidate runs the job when it takes the inputs the job uses (not the ones the failed model could take): a job
+ * with an image needs an image-capable model; a text-only job runs on a text-only model too. Only text and image
+ * inputs are judged here. `needsImage` undefined: what the failed model accepts (no job known).
  */
-export function takesInputsOf(cur: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>, m: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>): boolean {
-  if (cur.acceptsImage && !m.acceptsImage) return false;
+export function takesInputsOf(cur: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>, m: Pick<ModelSummary, 'acceptsText' | 'acceptsImage'>, needsImage: boolean | undefined = cur.acceptsImage): boolean {
+  if (needsImage && !m.acceptsImage) return false;
   return !(cur.acceptsText !== false && m.acceptsText === false);
 }
 
@@ -80,18 +86,18 @@ export function takesInputsOf(cur: Pick<ModelSummary, 'acceptsText' | 'acceptsIm
  * What can run instead of `ref`: the same variant, then the same family, on connected providers with credit (a
  * provider whose balance is unknown counts as possible), cheapest first. `same` = equal model at ≤ price.
  */
-export async function creditOptions(ref: string): Promise<CreditOption[]> {
-  return (await creditCandidates(ref)).options;
+export async function creditOptions(ref: string, needsImage?: boolean): Promise<CreditOption[]> {
+  return (await creditCandidates(ref, needsImage)).options;
 }
 
 /** creditOptions plus the equivalents the price cap dropped (cheapest first), so the alert can say they exist. */
-async function creditCandidates(ref: string): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
+async function creditCandidates(ref: string, needsImage?: boolean): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
   const cur = modelSummary(ref);
   if (!cur) return { options: [], pricey: [] };
   const key = lineKey(cur);
   const family = modelFamily(cur).key;
   const price = priceOf(cur);
-  const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m));
+  const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m, needsImage));
   const out: CreditOption[] = [];
   const pricey: CreditOption[] = [];
   const providers = [...new Set(all.map((m) => m.provider))];
@@ -128,7 +134,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (!g || !cur) return false;
   markEmpty(cur.provider);
   const empty = PROVIDER_LABELS[cur.provider];
-  const { options, pricey } = await creditCandidates(g.modelRef);
+  const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g));
   const switchTo = (m: ModelSummary) => {
     patchGeneration(genId, { modelRef: m.ref, modelName: m.name, error: undefined });
     return rerun(genId);

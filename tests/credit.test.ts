@@ -69,12 +69,12 @@ describe('the equivalent model when a provider has no credit', () => {
   const img = (provider: 'nanogpt' | 'atlas', id: string, usd: number, acceptsImage: boolean): ModelSummary =>
     ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'image', acceptsText: true, acceptsImage, tags: [], price: { skus: [{ unit: 'image', usd }] } }) as unknown as ModelSummary;
 
-  const run = async (models: ModelSummary[], failing: ModelSummary) => {
+  const run = async (models: ModelSummary[], failing: ModelSummary, inputs: Record<string, unknown> = { refs: [] }) => {
     const st = useStore.getState();
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
       catalog: { ...st.catalog, models: Object.fromEntries(models.map((x) => [x.ref, x])) },
-      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, status: 'error', inputs: { refs: [] }, settings: { count: 1 }, assetIds: [] } as never },
+      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'image', modelRef: failing.ref, modelName: failing.name, status: 'error', inputs, settings: { count: 1 }, assetIds: [] } as never },
     });
     vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(0);
     vi.spyOn(ADAPTERS.nanogpt, 'balance').mockResolvedValue(5);
@@ -97,9 +97,24 @@ describe('the equivalent model when a provider has no credit', () => {
   it('never switches an image job to a model that takes no image', async () => {
     const atlas = img('atlas', 'google/nano-banana-2/edit', 0.07, true);
     const nano = img('nanogpt', 'nano-banana-2', 0.06, false);
-    const { switched } = await run([atlas, nano], atlas);
+    const { switched } = await run([atlas, nano], atlas, { refs: ['asset-1'] });
     expect(switched).toBe(false);
     expect(useAlerts.getState().alerts[0].level).toBe('error');
+  });
+
+  it('F-06: a text-only job (no references) may use a text-only equivalent, even if the failed model also takes images', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/edit', 0.07, true);
+    const nano = img('nanogpt', 'nano-banana-2', 0.06, false);
+    const { switched, rerun } = await run([atlas, nano], atlas, { refs: [] });
+    expect(switched).toBe(true);
+    expect(useStore.getState().generations.g1.modelRef).toBe('nanogpt::nano-banana-2');
+    expect(rerun).toHaveBeenCalledWith('g1');
+  });
+
+  it('F-06: a job whose only input is a first frame rejects a text-only equivalent too', async () => {
+    const atlas = img('atlas', 'google/nano-banana-2/edit', 0.07, true);
+    const nano = img('nanogpt', 'nano-banana-2', 0.06, false);
+    expect((await run([atlas, nano], atlas, { refs: [], firstFrame: 'asset-1' })).switched).toBe(false);
   });
 
   it('does not offer a family member far dearer than the failed model; a slightly dearer one is marked', async () => {
