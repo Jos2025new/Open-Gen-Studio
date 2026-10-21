@@ -68,3 +68,23 @@ export function doneMode({ running, override }: { running: boolean; override: bo
 export function batchCells(done: DoneCell[], generations: Record<string, Pick<Generation, 'createdAt'>>, since: number | null): DoneCell[] {
   return since == null ? [] : done.filter((c) => (generations[c.generationId]?.createdAt ?? 0) >= since);
 }
+
+type Stamped = Pick<Generation, 'createdAt' | 'planId' | 'sessionId'>;
+
+/**
+ * When the running batch began, read from the store (not from what a mounted board happened to see): the earliest
+ * generation that is running, or that belongs to the same plan as one that is, so a board mounted mid-plan still lists
+ * the steps that plan already finished. Null when nothing runs.
+ */
+export function batchStart(generations: Record<string, Stamped & Pick<Generation, 'discard'>>, ongoing: Stamped[]): number | null {
+  if (!ongoing.length) return null;
+  const plans = new Set(ongoing.flatMap((g) => (g.planId ? [`${g.sessionId}|${g.planId}`] : [])));
+  const ofPlan = Object.values(generations).filter((g) => !g.discard && g.planId && plans.has(`${g.sessionId}|${g.planId}`));
+  return Math.min(...[...ongoing, ...ofPlan].map((g) => g.createdAt));
+}
+
+/** The batch start a board keeps for `key` (session + scope): the earliest seen for that key; another key starts over, never reusing the old start. */
+export function keepBatch(prev: { key: string; at: number | null }, key: string, start: number | null): { key: string; at: number | null } {
+  const at = prev.key === key && prev.at != null && start != null ? Math.min(prev.at, start) : start;
+  return { key, at };
+}

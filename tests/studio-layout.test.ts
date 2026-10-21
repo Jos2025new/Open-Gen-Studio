@@ -19,7 +19,7 @@ import { StudioReopen } from '../src/components/studio/StudioReopen';
 import { BOARD_MAX, BOARD_MIN, boardMax, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
-import { batchCells, doneMode } from '../src/components/space/boardModel';
+import { batchCells, batchStart, doneMode, keepBatch } from '../src/components/space/boardModel';
 import { useStore } from '../src/store/store';
 import { checkStatusNow } from '../src/engine/jobs';
 import { downloadAsset } from '../src/engine/actions';
@@ -135,6 +135,24 @@ describe('Done / Ongoing rule', () => {
     const done = [{ type: 'asset' as const, assetId: 'a1', generationId: 'g1' }, { type: 'asset' as const, assetId: 'a2', generationId: 'g2' }];
     expect(batchCells(done, { g1: { createdAt: 1 }, g2: { createdAt: 10 } }, 10).map((c) => c.generationId)).toEqual(['g2']);
     expect(batchCells(done, { g1: { createdAt: 1 }, g2: { createdAt: 10 } }, null)).toEqual([]);
+  });
+  it('F-07: the batch start is read from the store: a board mounted mid-plan keeps the step the plan already finished', () => {
+    const g = (id: string, createdAt: number, planId?: string, sessionId = 's1') => ({ id, createdAt, planId, sessionId });
+    const gens = { g1: g('g1', 1, 'P'), g2: g('g2', 5, 'P'), g3: g('g3', 0, 'OTHER'), g4: g('g4', 0, 'P', 's2') };
+    const start = batchStart(gens, [gens.g2]);
+    expect(start).toBe(1);
+    const done = [{ type: 'asset' as const, assetId: 'a1', generationId: 'g1' }, { type: 'asset' as const, assetId: 'a3', generationId: 'g3' }];
+    expect(batchCells(done, gens, start).map((c) => c.generationId)).toEqual(['g1']);
+    // Without a plan, only the running ones count; nothing running, no batch.
+    expect(batchStart({ g3: gens.g3 }, [gens.g3])).toBe(0);
+    expect(batchStart(gens, [])).toBeNull();
+  });
+  it('F-07: a session or scope switch does not reuse the old start; the same key keeps the earliest', () => {
+    const a = keepBatch({ key: 's1|session', at: null }, 's1|session', 5);
+    expect(a).toEqual({ key: 's1|session', at: 5 });
+    expect(keepBatch(a, 's1|session', 9).at).toBe(5);
+    expect(keepBatch(a, 's2|session', 9)).toEqual({ key: 's2|session', at: 9 });
+    expect(keepBatch(a, 's1|all', 9).at).toBe(9);
   });
   it('Studio: while a batch runs, Ongoing comes first and Done shows what the batch finished, the rest behind Show all', () => {
     vi.useFakeTimers();

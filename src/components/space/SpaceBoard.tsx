@@ -14,7 +14,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, Segmented } from '../ui/primitives';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
-import { batchCells, doneMode, splitBoard, suggestedOps, targetAsset } from './boardModel';
+import { batchCells, batchStart, doneMode, keepBatch, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { goWithAction } from './actionGo';
@@ -60,13 +60,17 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   const filtered = kind !== 'all' || scope !== (studio ? 'session' : 'all');
   const live = rows.ongoing.length > 0;
   const [running, setRunning] = useState(live);
-  const [since, setSince] = useState<number | null>(null);
+  // The batch start comes from the store (the plan's earliest generation) and belongs to this session and scope, not to this mount.
+  const batchKey = `${sessionId}|${scope}`;
+  const start = batchStart(generations, rows.ongoing);
+  const [batch, setBatch] = useState({ key: batchKey, at: null as number | null });
+  const since = batch.key === batchKey ? batch.at : null;
   useEffect(() => {
-    if (live) { setRunning(true); setSince((s) => s ?? Math.min(...rows.ongoing.map((g) => g.createdAt))); return; }
+    if (live) { setRunning(true); setBatch((b) => keepBatch(b, batchKey, start)); return; }
     // A plan's next step starts a moment after the previous one ends: the batch ends only after a short quiet spell.
-    const t = window.setTimeout(() => { setRunning(false); setSince(null); }, 2000);
+    const t = window.setTimeout(() => { setRunning(false); setBatch({ key: batchKey, at: null }); }, 2000);
     return () => window.clearTimeout(t);
-  }, [live, rows.ongoing]);
+  }, [live, rows.ongoing, batchKey, start]);
   const [userDone, setUserDone] = useState<boolean | null>(null);
   // Every board shows Ongoing first while something runs, and in Done only what this batch finished (as in Studio).
   useEffect(() => { setUserDone(null); }, [running]);
