@@ -68,6 +68,8 @@ Corrección tras probarlo (el usuario: «me gustó… se siente menos ruidoso»)
 
 **R. Jerarquía de los marcadores de carga** (2026-10-20). El usuario: «todos los placeholder tienen la misma jerarquía… la que dice ongoing debería ser la más aburrida». Orden de atención: 1) la casilla del tablero Generations (brillo del borde: tres pasadas en los primeros 3 s de cada 5 s, en bucle, y el circulito sobre el estado); 2) las miniaturas del plan, sin cambios; 3) el marcador del chat, plano: fondo, icono del tipo y «Ongoing», sin brillo, circulito ni puntos. Prueba: `studio-layout.test.ts`.
 
+**S. Tablero mientras algo corre** (2026-10-20). El usuario: las imágenes «aparecen primero en el chat y no en el board… deben aparecer en todos lados a la vez» (estaban en «Done», plegado mientras algo corría). Regla, aprobada: mientras corre una tanda, «Ongoing» va arriba y «Done» debajo muestra solo lo terminado desde que empezó la tanda; lo anterior queda tras «Show all N»; al terminar todo (tras 2 s sin nada en marcha, porque el siguiente paso de un plan llega enseguida) «Done» vuelve entero. El plegado a mano se respeta hasta que cambia el estado. Vale para todos los tableros. Prueba: `studio-layout.test.ts`.
+
 **L. Proceso.** Las maquetas usan el CSS real de la app. El visor del usuario bloquea el CSS local enlazado, así que se enviaron copias en línea. El usuario prueba en el sandbox; los agentes no abren navegadores.
 
 ## Alternativas

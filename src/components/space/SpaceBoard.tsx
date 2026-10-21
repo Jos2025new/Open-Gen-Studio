@@ -14,7 +14,7 @@ import { AssetMedia } from '../ui/AssetMedia';
 import { Popover, usePopover } from '../ui/Popover';
 import { Chip, IconButton, Segmented } from '../ui/primitives';
 import { KINDS, KIND_ICON, STATUS_LABEL, type Kind, type Sort } from '../shell/generationsView';
-import { doneExpanded, splitBoard, suggestedOps, targetAsset } from './boardModel';
+import { batchCells, doneMode, splitBoard, suggestedOps, targetAsset } from './boardModel';
 import { nounOf } from './actionRoute';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { goWithAction } from './actionGo';
@@ -58,13 +58,23 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
   };
   const reset = () => { setKind('all'); setScope(studio ? 'session' : 'all'); setSort('newest'); setDensity('comfortable'); setLayout('grid'); setStarred(false); setShowFailed(false); setSelecting(false); setSelected([]); };
   const filtered = kind !== 'all' || scope !== (studio ? 'session' : 'all');
-  const running = rows.ongoing.length > 0;
+  const live = rows.ongoing.length > 0;
+  const [running, setRunning] = useState(live);
+  const [since, setSince] = useState<number | null>(null);
+  useEffect(() => {
+    if (live) { setRunning(true); setSince((s) => s ?? Math.min(...rows.ongoing.map((g) => g.createdAt))); return; }
+    // A plan's next step starts a moment after the previous one ends: the batch ends only after a short quiet spell.
+    const t = window.setTimeout(() => { setRunning(false); setSince(null); }, 2000);
+    return () => window.clearTimeout(t);
+  }, [live, rows.ongoing]);
   const [userDone, setUserDone] = useState<boolean | null>(null);
-  // Every board folds Done while something runs, so a launch is seen at once (as in Studio).
+  // Every board shows Ongoing first while something runs, and in Done only what this batch finished (as in Studio).
   useEffect(() => { setUserDone(null); }, [running]);
-  const doneOpen = doneExpanded({ running, override: userDone, auto: true });
+  const mode = doneMode({ running, override: userDone });
+  const shown = mode === 'all' ? rows.done : mode === 'batch' ? batchCells(rows.done, generations, since) : [];
+  const doneOpen = mode === 'all' || shown.length > 0;
 
-  return <section className={`space-board ${studio ? 'is-studio' : ''} ${doneOpen ? '' : 'is-done-folded'}`} aria-label="Generated assets">
+  return <section className={`space-board ${studio ? 'is-studio' : ''} ${doneOpen ? '' : 'is-done-folded'} ${running ? 'is-running' : ''}`} aria-label="Generated assets">
     <header className="space-board-head">
       <div className="space-board-tools">
         <IconButton icon={RefreshCw} label="Reset view" size="sm" onClick={reset} />
@@ -114,8 +124,8 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
       {studio && !rows.done.length && !rows.ongoing.length ? null : <button type="button" className="space-sub space-fold" aria-expanded={doneOpen} onClick={() => setUserDone(!doneOpen)}>
         <ChevronDown size={12} className={doneOpen ? '' : 'is-closed'} />Done <span className="num">{rows.done.length}</span>
       </button>}
-      {!doneOpen ? null : rows.done.length ? <div className={layout === 'list' ? 'space-list' : `space-grid is-${density}`}>
-        {rows.done.map((c) => c.type === 'text' ? <TextTile key={c.generationId} g={generations[c.generationId]} /> : <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
+      {!doneOpen ? null : shown.length ? <div className={layout === 'list' ? 'space-list' : `space-grid is-${density}`}>
+        {shown.map((c) => c.type === 'text' ? <TextTile key={c.generationId} g={generations[c.generationId]} /> : <div key={c.assetId} className={layout === 'list' ? 'space-list-row attach-host' : 'attach-host'}><button type="button" className={`space-tile t-${assets[c.assetId]?.kind ?? 'image'} ${selected.includes(c.assetId) ? 'is-selected' : ''}`} aria-label={assets[c.assetId]?.name || 'Open asset'} aria-pressed={selecting ? selected.includes(c.assetId) : undefined}
             onClick={() => selecting
               ? setSelected((s) => (s.includes(c.assetId) ? s.filter((x) => x !== c.assetId) : [...s, c.assetId]))
               : setUi({ lightbox: { assetIds: doneAssets, index: doneAssets.indexOf(c.assetId) } })}>
@@ -125,6 +135,7 @@ export function SpaceBoard({ kind: activeKind = 'image', empty = 'Nothing genera
           </button><AgentAttachToggle assetId={c.assetId} />{!studio ? <ReuseButton g={generations[c.generationId]} /> : null}
           {layout === 'list' ? <ListInfo g={generations[c.generationId]} /> : null}</div>)}
       </div> : <p className="space-empty">{starred ? 'No favorites yet.' : empty}</p>}
+      {mode === 'batch' && shown.length > 0 && shown.length < rows.done.length ? <button type="button" className="space-show-all" onClick={() => setUserDone(true)}>Show all {rows.done.length}</button> : null}
     </div>
 
     {showFailed ? <div className="space-failed" aria-label="Failed">

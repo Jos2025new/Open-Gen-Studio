@@ -120,3 +120,8 @@
 .space-list-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .space-list-body > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-video-mark { position: absolute; left: 6px; bottom: 6px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: rgb(0 0 0 / 0.55); color: #fff; pointer-events: none; }
+/* While something runs, Ongoing comes first and Done below it shows only what this batch finished (ADR 0024 S). */
+.space-board.is-running .space-done, .space-board.is-running .space-failed { order: 1; }
+.space-board.is-running .space-lower { border-top: 0; border-bottom: 1px solid var(--border); }
+.space-show-all { margin-top: var(--sp-2); padding: var(--sp-1) 0; font-size: var(--fs-s); color: var(--text-2); }
+.space-show-all:hover { color: var(--text); }

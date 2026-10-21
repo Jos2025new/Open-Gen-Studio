@@ -19,7 +19,7 @@ import { StudioReopen } from '../src/components/studio/StudioReopen';
 import { BOARD_MAX, BOARD_MIN, boardMax, getStudioBoard, reloadStudioBoard, setStudioBoard } from '../src/lib/studioBoard';
 import { StudioGeneration } from '../src/components/chat/StudioGeneration';
 import { SpaceBoard } from '../src/components/space/SpaceBoard';
-import { doneExpanded } from '../src/components/space/boardModel';
+import { batchCells, doneMode } from '../src/components/space/boardModel';
 import { useStore } from '../src/store/store';
 import { checkStatusNow } from '../src/engine/jobs';
 import { downloadAsset } from '../src/engine/actions';
@@ -127,24 +127,47 @@ describe('board views', () => {
 });
 
 describe('Done / Ongoing rule', () => {
-  it('pure rule: Studio folds Done while running; the hand toggle wins; elsewhere always open', () => {
-    expect(doneExpanded({ running: true, override: null, auto: true })).toBe(false);
-    expect(doneExpanded({ running: false, override: null, auto: true })).toBe(true);
-    expect(doneExpanded({ running: true, override: true, auto: true })).toBe(true);
-    expect(doneExpanded({ running: true, override: null, auto: false })).toBe(true);
-    expect(doneExpanded({ running: false, override: false, auto: false })).toBe(false);
+  it('pure rule: while running Done shows the batch; the hand toggle wins (true = all, false = folded)', () => {
+    expect(doneMode({ running: true, override: null })).toBe('batch');
+    expect(doneMode({ running: false, override: null })).toBe('all');
+    expect(doneMode({ running: true, override: true })).toBe('all');
+    expect(doneMode({ running: false, override: false })).toBe('folded');
+    const done = [{ type: 'asset' as const, assetId: 'a1', generationId: 'g1' }, { type: 'asset' as const, assetId: 'a2', generationId: 'g2' }];
+    expect(batchCells(done, { g1: { createdAt: 1 }, g2: { createdAt: 10 } }, 10).map((c) => c.generationId)).toEqual(['g2']);
+    expect(batchCells(done, { g1: { createdAt: 1 }, g2: { createdAt: 10 } }, null)).toEqual([]);
   });
-  it('Studio: Done folds when something runs and opens when nothing does', () => {
-    setData([gen('g1', 'done', ['a1'])]);
-    render(createElement(SpaceBoard, { studio: true }));
-    expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('true');
-    expect(host.querySelectorAll('.space-tile')).toHaveLength(1);
-    setData([gen('g1', 'done', ['a1']), gen('g2', 'running')]);
-    expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
-    expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(0);
-    expect(q('.space-ongoing .space-tile.is-pending')).not.toBeNull();
-    setData([gen('g1', 'done', ['a1']), gen('g2', 'done', ['a2'])]);
-    expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('true');
+  it('Studio: while a batch runs, Ongoing comes first and Done shows what the batch finished, the rest behind Show all', () => {
+    vi.useFakeTimers();
+    try {
+      const assets = [asset('a1'), asset('a2'), asset('a3')];
+      setData([gen('g1', 'done', ['a1'])], assets);
+      render(createElement(SpaceBoard, { studio: true }));
+      expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('true');
+      expect(host.querySelectorAll('.space-tile')).toHaveLength(1);
+      // The batch starts: nothing of it finished yet, so Done is just its line; Ongoing has the room.
+      setData([gen('g1', 'done', ['a1']), gen('g2', 'running', [], { createdAt: 10 }), gen('g3', 'queued', [], { createdAt: 11 })], assets);
+      expect(q('.space-board')!.classList.contains('is-running')).toBe(true);
+      expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
+      expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(0);
+      expect(q('.space-ongoing .space-tile.is-pending')).not.toBeNull();
+      // One step of the batch finishes: it shows in Done at once, the older result stays behind Show all.
+      setData([gen('g1', 'done', ['a1']), gen('g2', 'done', ['a2'], { createdAt: 10 }), gen('g3', 'running', [], { createdAt: 11 })], assets);
+      expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('true');
+      expect([...host.querySelectorAll('.space-done .space-tile')].map((t) => t.getAttribute('aria-label'))).toHaveLength(1);
+      expect(q('.space-show-all')!.textContent).toBe('Show all 2');
+      act(() => q('.space-show-all')!.click());
+      expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(2);
+      expect(q('.space-show-all')).toBeNull();
+      // Everything done: after a short quiet spell (a plan's next step may follow) Done is whole again.
+      setData([gen('g1', 'done', ['a1']), gen('g2', 'done', ['a2'], { createdAt: 10 }), gen('g3', 'done', ['a3'], { createdAt: 11 })], assets);
+      act(() => { vi.advanceTimersByTime(2100); });
+      expect(q('.space-board')!.classList.contains('is-running')).toBe(false);
+      expect(host.querySelectorAll('.space-done .space-tile')).toHaveLength(3);
+    } finally { vi.useRealTimers(); }
+  });
+  it('Ongoing is placed above Done while running (CSS order)', async () => {
+    const css = (await import('node:fs')).readFileSync('src/styles/space.css', 'utf8');
+    expect(css).toMatch(/\.space-board\.is-running \.space-done, \.space-board\.is-running \.space-failed \{ order: 1; \}/);
   });
   it('Done folds by hand with its count, in Studio and in the plain board (which keeps Actions)', () => {
     setData([gen('g1', 'done', ['a1', 'a2'])]);
@@ -154,7 +177,7 @@ describe('Done / Ongoing rule', () => {
     expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
     expect(host.querySelectorAll('.space-tile')).toHaveLength(0);
     expect(q('[aria-label="Actions suggested"]')).not.toBeNull();
-    setData([gen('g1', 'done', ['a1', 'a2']), gen('g2', 'running')]);
+    setData([gen('g1', 'done', ['a1', 'a2']), gen('g2', 'running', [], { createdAt: 5 })]);
     expect(q('.space-fold')!.getAttribute('aria-expanded')).toBe('false');
     act(() => q('.space-fold')!.click());
     expect(host.querySelectorAll('.space-tile')).toHaveLength(2);
@@ -198,7 +221,7 @@ describe('attach checkboxes', () => {
   const fallback = createElement('div');
   it('ticking a chat thumbnail or a board tile (Done and Ongoing) adds it to the composer attachments', () => {
     useStore.setState({ composer: { ...useStore.getState().composer, attachments: [] } });
-    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never })]);
+    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never, createdAt: 5 })]);
     render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
     act(() => q('.studio-gen .attach-toggle')!.click());
     expect(useStore.getState().composer.attachments).toEqual(['a1']);
@@ -348,7 +371,7 @@ describe('compact generation in Studio chat', () => {
 describe('Board View popover', () => {
   const pick = (label: string) => act(() => [...document.body.querySelectorAll<HTMLElement>('button')].find((b) => b.textContent === label)!.click());
   it('Small applies is-compact to Done and Ongoing grids; List renders rows', () => {
-    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never })]);
+    setData([gen('g1', 'done', ['a1']), gen('g2', 'running', ['a2'], { settings: { count: 2 } as never, createdAt: 5 })]);
     render(createElement(SpaceBoard, { studio: true }));
     act(() => q('[aria-label="View"]')!.click());
     act(() => q('.space-fold')!.click());

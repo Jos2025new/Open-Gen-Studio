@@ -54,9 +54,17 @@ export function targetAsset(rows: BoardRows, selected: string[], assets: Record<
 }
 
 /**
- * Whether the Done row is open. Studio folds it while something runs (Ongoing gets the room) and opens it again when
- * nothing does; the user's own toggle wins until the running state next changes. Elsewhere it is open unless folded by hand.
+ * What Done shows. While something runs: only what finished since the batch began ("batch"; Ongoing sits above it and
+ * keeps the attention), the rest folded behind "Show all"; when nothing runs, everything. The user's own toggle wins
+ * until the running state next changes (true = all, false = folded).
  */
-export function doneExpanded({ running, override, auto }: { running: boolean; override: boolean | null; auto: boolean }): boolean {
-  return override ?? (auto ? !running : true);
+export type DoneMode = 'all' | 'batch' | 'folded';
+export function doneMode({ running, override }: { running: boolean; override: boolean | null }): DoneMode {
+  if (override != null) return override ? 'all' : 'folded';
+  return running ? 'batch' : 'all';
+}
+
+/** The Done cells of the running batch: generations created since it began. */
+export function batchCells(done: DoneCell[], generations: Record<string, Pick<Generation, 'createdAt'>>, since: number | null): DoneCell[] {
+  return since == null ? [] : done.filter((c) => (generations[c.generationId]?.createdAt ?? 0) >= since);
 }
