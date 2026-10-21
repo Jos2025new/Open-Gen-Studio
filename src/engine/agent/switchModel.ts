@@ -42,15 +42,16 @@ export type KeptItem = SettingsFeedItem & { keptAsked?: string };
  * An ordinary card never carries a model change the user did not ask for (ADR 0025 G, F-01): when a kind is already
  * confirmed, its call has one part and the agent's model is another line or provider, and switchSection found no valid
  * request, the card recommends the confirmed choice (the agent's model stays an alternative). Only the Keep / Change
- * card changes a confirmed kind. `asked` is the agent's ref, to tell it so when the card is answered.
+ * card changes a confirmed kind. `asked` is the agent's ref, to tell it so when the card is answered. The model the user
+ * picked in the composer since (`picked`) is their own change, not the agent's: it stays recommended.
  */
-export async function keepConfirmed(sections: SettingsSection[], confirmed: AgentState['settings'], parts: Array<{ kind: string }>): Promise<{ sections: SettingsSection[]; asked?: string }> {
+export async function keepConfirmed(sections: SettingsSection[], confirmed: AgentState['settings'], parts: Array<{ kind: string }>, picked?: (kind: SettingsSection['kind']) => string | undefined): Promise<{ sections: SettingsSection[]; asked?: string }> {
   let asked: string | undefined;
   const out: SettingsSection[] = [];
   for (const sec of sections) {
     const from = confirmed?.[sec.kind];
     const [now, was] = from && parts.filter((p) => p.kind === sec.kind).length <= 1 ? await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]) : [];
-    if (!from || !now || !was || !modelChange(now.model, was.model)) { out.push(sec); continue; }
+    if (!from || !now || !was || !modelChange(now.model, was.model) || picked?.(sec.kind) === sec.recommended.modelRef) { out.push(sec); continue; }
     asked ??= sec.recommended.modelRef;
     const rec = sec.recommended;
     const kept = { ...defaultChoice(from.modelRef, was.schema, { kind: sec.kind, startImage: rec.needsImage, duration: rec.duration, aspect: rec.aspect, count: rec.count }), needsImage: rec.needsImage };

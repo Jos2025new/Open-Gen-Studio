@@ -94,6 +94,13 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
     expect(told).toContain('offer the change in text first');
   });
 
+  it('(b3) F-01: a model the user picked in the composer since is their own change: the card keeps it', async () => {
+    useStore.setState((s) => ({ composer: { ...s.composer, userPicked: { ...s.composer.userPicked, image: true }, image: { ...s.composer.image, modelRef: NANO } } }));
+    script = [ask({})];
+    await sendAgentMessage('Una imagen de un faro');
+    expect(card()?.sections[0].recommended.modelRef).toBe(NANO);
+  });
+
   it('(c) "sí" after a reply that named no provider: no change card', async () => {
     offered('Puedo hacerlo mas barato si quieres.');
     script = [ask({ provider: 'nanogpt' })];

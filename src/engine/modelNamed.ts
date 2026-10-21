@@ -21,7 +21,7 @@ const REMOTE = (Object.keys(PROVIDER_LABELS) as ProviderId[]).filter((p) => p !=
 const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** Words that turn the provider right after them into one the user does not want ("no en fal", "instead of fal"). */
-const NEGATORS = new Set(['no', 'not', 'sin', 'nunca', 'never', 'tampoco', 'don', 'dont', 'nor', 'ni', 'instead', 'vez', 'rather']);
+const NEGATORS = new Set(['no', 'not', 'sin', 'nunca', 'never', 'tampoco', 'don', 'dont', 'nor', 'ni', 'instead', 'rather']);
 const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 /** Whether a clause (its words) names provider `p`, by id or label, and not right after a negation (within 3 words). */
@@ -36,7 +36,8 @@ function mentions(p: ProviderId, words: string[]): boolean {
 
 /** The providers a text asks for ("use NanoGPT", "en atlas cloud"): by id or label as whole words; a negated one ("no en fal") is not asked for. */
 export function providersIn(said: string): ProviderId[] {
-  const clauses = plain(said).split(/[,.;:!?\n]+/).map((c) => c.split(/[^a-z0-9]+/).filter(Boolean));
+  // "en vez de" is one negator; "vez" alone is not ("otra vez en NanoGPT").
+  const clauses = plain(said).replace(/\ben vez de\b/g, 'instead of').split(/[,.;:!?\n]+/).map((c) => c.split(/[^a-z0-9]+/).filter(Boolean));
   return REMOTE.filter((p) => clauses.some((words) => mentions(p, words)));
 }
 

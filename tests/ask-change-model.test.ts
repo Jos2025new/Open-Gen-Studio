@@ -200,7 +200,7 @@ describe('name resolution without false positives', () => {
   it('F-05: a negated provider is not asked for, and two asked providers are ambiguous', () => {
     const m = useStore.getState().catalog.models;
     const FAL = { ...m[NANO], provider: 'fal', ref: 'fal::fal-ai/nano-banana-2', id: 'fal-ai/nano-banana-2' } as ModelSummary;
-    for (const [said, only] of [['hazlo en Atlas Cloud, no en fal', ['atlas']], ['use atlas, not fal', ['atlas']], ['atlas instead of fal', ['atlas']], ['fal en vez de nanogpt', ['fal']], ['sin nanogpt, con atlas', ['atlas']], ['rather than fal use nanogpt', ['nanogpt']], ['No sé, usa atlas', ['atlas']]] as const) expect(providersIn(said), said).toEqual(only);
+    for (const [said, only] of [['hazlo en Atlas Cloud, no en fal', ['atlas']], ['use atlas, not fal', ['atlas']], ['atlas instead of fal', ['atlas']], ['fal en vez de nanogpt', ['fal']], ['sin nanogpt, con atlas', ['atlas']], ['rather than fal use nanogpt', ['nanogpt']], ['No sé, usa atlas', ['atlas']], ['otra vez en nanogpt', ['nanogpt']]] as const) expect(providersIn(said), said).toEqual(only);
     // Confirmed at Atlas: "Atlas, not fal" asks for no other provider; "fal, no atlas" asks for fal; nanogpt and fal together is ambiguous.
     expect(changeNamed(FAL, m[ATLAS], 'hazlo en Atlas Cloud, no en fal')).toBeUndefined();
     expect(changeNamed(m[NANO], m[ATLAS], 'hazlo en nanogpt, no en fal')).toBe('provider');

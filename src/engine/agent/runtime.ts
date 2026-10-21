@@ -1518,7 +1518,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
           const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, offerRequest(session(sessionId).agent), parts[0]?.model, { switchedTo: session(sessionId).agent.switchedTo, auto: get().composer.agentStyle === 'auto' });
-          const kept = sw ? undefined : await keepConfirmed(sections, session(sessionId).agent.settings, parts);
+          const kept = sw ? undefined : await keepConfirmed(sections, session(sessionId).agent.settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
