@@ -117,7 +117,15 @@ describe('ADR 0025 D: a change the agent offered in text and the user accepted',
 
   it('an acceptance is short, starts accepting and has no refusal', () => {
     for (const ok of ['sí', 'Si, cámbialo', 'dale', 'vale', 'ok', 'yes', 'sure', 'go ahead', 'do it', 'hazlo', 'sí, mejor cámbialo', 'venga', 'listo, cámbialo']) expect(isAcceptance(ok), ok).toBe(true);
-    for (const no of ['no', 'no, sigue así', 'sí pero no', 'mejor no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', 'sí, ¿y el precio?', 'ok, is it cheaper?', '']) expect(isAcceptance(no), no).toBe(false);
+    for (const no of ['no', 'no, sigue así', 'sí pero no', 'mejor no', "don't", 'una taza roja', 'sí, pero antes dime cuánto cuesta cada una de las otras', 'sí, ¿y el precio?', 'ok, is it cheaper?', 'bueno, prefiero seguir igual', 'ok, keep it', 'vale, mantén el actual', 'sure, but only if it is cheaper', 'dale, quédate con atlas', 'yes, stay with it', '']) expect(isAcceptance(no), no).toBe(false);
+  });
+
+  it('F-04: "sí" after an informative reply (no offer) appends nothing; only an offer is appended', () => {
+    const at = (reply: string) => offerRequest({ draft: { request: 'sí', answers: {} }, history: [{ role: 'assistant', content: reply }, { role: 'user', content: '<user_message>\nsí\n</user_message>' }] } as unknown as Parameters<typeof offerRequest>[0]);
+    expect(at('Nano Banana 2 is available on NanoGPT and costs $0.067 per image.')).not.toContain('NanoGPT');
+    expect(at('Nano Banana 2 Lite is cheaper here.')).not.toContain('Lite');
+    expect(at('Nano Banana 2 is also on NanoGPT. Quieres cambiar?')).toContain('NanoGPT');
+    expect(at('Nano Banana 2 Lite is cheaper. Do you want me to use it?')).toContain('Lite');
   });
 
   it('the agent reply an acceptance refers to reaches the change detection, never the plan fitting', () => {

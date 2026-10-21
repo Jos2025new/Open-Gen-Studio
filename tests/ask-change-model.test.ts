@@ -188,12 +188,24 @@ describe('name resolution without false positives', () => {
 
   it('the providers a text names, and what counts as a change', () => {
     expect(providersIn('Cambia a nanogpt como proveedor')).toEqual(['nanogpt']);
-    expect(providersIn('hazlo en Atlas Cloud, no en fal')).toEqual(['fal', 'atlas']);
+    expect(providersIn('hazlo en Atlas Cloud, no en fal')).toEqual(['atlas']);
     expect(providersIn('Una imagen fallida de un faro')).toEqual([]);
     const m = useStore.getState().catalog.models;
     expect(changeNamed(m[NANO], m[ATLAS], 'Cambia a nanogpt como proveedor')).toBe('provider');
     expect(changeNamed(m[NANO], m[ATLAS], 'Otra imagen con nano banana 2')).toBeUndefined();
     expect(changeNamed(m[LITE], m[ATLAS], 'Usa nano banana 2 lite')).toBe('model');
     expect(changeNamed(m[LITE], m[ATLAS], 'Una taza')).toBeUndefined();
+  });
+
+  it('F-05: a negated provider is not asked for, and two asked providers are ambiguous', () => {
+    const m = useStore.getState().catalog.models;
+    const FAL = { ...m[NANO], provider: 'fal', ref: 'fal::fal-ai/nano-banana-2', id: 'fal-ai/nano-banana-2' } as ModelSummary;
+    for (const [said, only] of [['hazlo en Atlas Cloud, no en fal', ['atlas']], ['use atlas, not fal', ['atlas']], ['atlas instead of fal', ['atlas']], ['fal en vez de nanogpt', ['fal']], ['sin nanogpt, con atlas', ['atlas']], ['rather than fal use nanogpt', ['nanogpt']], ['No sé, usa atlas', ['atlas']]] as const) expect(providersIn(said), said).toEqual(only);
+    // Confirmed at Atlas: "Atlas, not fal" asks for no other provider; "fal, no atlas" asks for fal; nanogpt and fal together is ambiguous.
+    expect(changeNamed(FAL, m[ATLAS], 'hazlo en Atlas Cloud, no en fal')).toBeUndefined();
+    expect(changeNamed(m[NANO], m[ATLAS], 'hazlo en nanogpt, no en fal')).toBe('provider');
+    expect(changeNamed(FAL, m[ATLAS], 'hazlo en fal, no en atlas')).toBe('provider');
+    expect(changeNamed(m[NANO], m[ATLAS], 'nanogpt o fal, lo que sea')).toBeUndefined();
+    expect(changeNamed(FAL, m[ATLAS], 'nanogpt o fal, lo que sea')).toBeUndefined();
   });
 });

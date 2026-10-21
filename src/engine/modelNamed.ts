@@ -20,11 +20,24 @@ export type ModelChange = 'model' | 'provider';
 const REMOTE = (Object.keys(PROVIDER_LABELS) as ProviderId[]).filter((p) => p !== 'local');
 const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The providers a text names ("use NanoGPT", "en atlas cloud"): by id or label; "fal" only as a whole word. */
+/** Words that turn the provider right after them into one the user does not want ("no en fal", "instead of fal"). */
+const NEGATORS = new Set(['no', 'not', 'sin', 'nunca', 'never', 'tampoco', 'don', 'dont', 'nor', 'ni', 'instead', 'vez', 'rather']);
+const plain = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+/** Whether a clause (its words) names provider `p`, by id or label, and not right after a negation (within 3 words). */
+function mentions(p: ProviderId, words: string[]): boolean {
+  const label = flat(PROVIDER_LABELS[p]);
+  return words.some((w, i) => {
+    let hit = w === p;
+    for (let j = i, acc = ''; !hit && label.length >= 6 && j < words.length && acc.length < label.length; j++) hit = (acc += words[j]) === label;
+    return hit && !words.slice(Math.max(0, i - 3), i).some((x) => NEGATORS.has(x));
+  });
+}
+
+/** The providers a text asks for ("use NanoGPT", "en atlas cloud"): by id or label as whole words; a negated one ("no en fal") is not asked for. */
 export function providersIn(said: string): ProviderId[] {
-  const words = new Set(said.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
-  const all = flat(said);
-  return REMOTE.filter((p) => words.has(p) || (flat(PROVIDER_LABELS[p]).length >= 6 && all.includes(flat(PROVIDER_LABELS[p]))));
+  const clauses = plain(said).split(/[,.;:!?\n]+/).map((c) => c.split(/[^a-z0-9]+/).filter(Boolean));
+  return REMOTE.filter((p) => clauses.some((words) => mentions(p, words)));
 }
 
 /** A provider written by the agent ("nanogpt", "NanoGPT", "Atlas Cloud"). */
@@ -46,7 +59,9 @@ export function modelChange(now: ModelSummary, was: ModelSummary): ModelChange |
 export function changeNamed(now: ModelSummary, was: ModelSummary, said: string, written?: string): ModelChange | undefined {
   const change = modelChange(now, was);
   if (change === 'model') return userNamed([now.name, written ?? ''], said) ? change : undefined;
-  return change && providersIn(said).includes(now.provider) ? change : undefined;
+  // The provider asked for, other than the confirmed one: two of them is ambiguous, so no change is inferred.
+  const others = providersIn(said).filter((p) => p !== was.provider);
+  return change && others.length === 1 && others[0] === now.provider ? change : undefined;
 }
 
 /** The adjustment note for a step that wrote another line or provider than the confirmed one; same names are told apart by ref. */
@@ -127,6 +142,8 @@ export async function followUpProblem(ctx: OfferContext, confirmedRef: string, k
 
 const ACCEPT = new Set(['si', 'vale', 'ok', 'okay', 'dale', 'claro', 'hazlo', 'cambialo', 'cambia', 'cambiar', 'adelante', 'perfecto', 'venga', 'listo', 'bueno', 'yes', 'yeah', 'yep', 'sure', 'go', 'do', 'please']);
 const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco']);
+/** Keep, stay, prefer or conditional wording ("bueno, prefiero seguir igual", "ok, keep it"): not an acceptance of a change. "si" as "if" cannot be told from "yes". */
+const KEEP = new Set(['sigue', 'seguir', 'sigo', 'igual', 'mantener', 'manten', 'mantengo', 'quedate', 'quedo', 'prefiero', 'keep', 'stay', 'same', 'prefer', 'rather', 'instead', 'if', 'unless']);
 
 /**
  * Whether a message is a plain acceptance of what the agent just offered ("sí, cámbialo", "dale", "go ahead"): short
@@ -135,7 +152,15 @@ const REFUSE = new Set(['no', 'nope', 'nah', 'not', 'dont', 'nunca', 'tampoco'])
  */
 export function isAcceptance(message: string): boolean {
   const words = message.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/'/g, '').split(/[^a-z0-9]+/).filter(Boolean);
-  return !message.includes('?') && words.length > 0 && words.length <= 6 && ACCEPT.has(words[0]) && !words.some((w) => REFUSE.has(w));
+  return !message.includes('?') && words.length > 0 && words.length <= 6 && ACCEPT.has(words[0]) && !words.some((w) => REFUSE.has(w) || KEEP.has(w));
+}
+
+/** Whether a reply of the agent offers a change: it names a provider or a model, with a change / offer cue. */
+function isOffer(reply: string): boolean {
+  const text = plain(reply);
+  const cue = /\b(cambi\w*|switch\w*|chang\w*|quier\w*|want|would you|shall|prefer\w*|usar|use|probar|try|pasar|offer\w*|ofrezc\w*)\b/.test(text);
+  const names = flat(reply);
+  return cue && (providersIn(reply).length > 0 || indexedModels().some((m) => flat(m.name).length >= 6 && names.includes(flat(m.name))));
 }
 
 /** The agent's last visible text before the user's current message (the one with exactly `request`), or ''. */
@@ -152,13 +177,14 @@ function previousAgentText(history: AgentState['history'], request: string): str
 
 /**
  * The request text that decides a change (ADR 0025 D): this turn's words and answers, plus the agent's previous reply
- * when the user's message only accepts it. So "Nano Banana 2 is also on NanoGPT, switch?" + "sí, cámbialo" names
+ * when the user's message only accepts it and that reply is an offer (a provider or model with a change cue). So "Nano Banana 2 is also on NanoGPT, switch?" + "sí, cámbialo" names
  * NanoGPT; "sí" after a reply that named nothing, or "no, sigue así", names nothing. The Keep / Change card still decides.
  */
 export function offerRequest(agent: Pick<AgentState, 'draft' | 'history'>): string {
   const base = userRequest(agent);
   const request = agent.draft?.request ?? '';
-  return isAcceptance(request) ? `${base}\n${previousAgentText(agent.history, request)}` : base;
+  const offer = isAcceptance(request) ? previousAgentText(agent.history, request) : '';
+  return isOffer(offer) ? `${base}\n${offer}` : base;
 }
 
 /** Only the user's own words (the request and its answers): what plan fitting reads, never the agent's reply. */
