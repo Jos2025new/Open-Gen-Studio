@@ -12,6 +12,11 @@ export function mediaHostAllowed(hostname: string): boolean {
   return MEDIA_DOMAINS.test(h) || MEDIA_EXACT.has(h);
 }
 
+/** A URL the relay may download: https, an allowed host and the default port (url.port is '' for 443), never an allowed host's other ports. */
+export function mediaUrlAllowed(url: URL): boolean {
+  return url.protocol === 'https:' && url.port === '' && mediaHostAllowed(url.hostname);
+}
+
 /** The relay's answer for a host outside the list (the client turns it into a readable error). */
 export const HOST_NOT_ALLOWED = 'host not allowed';
 
@@ -29,6 +34,6 @@ export function nextHop(current: URL, location: string, hop: number): { url: URL
   if (hop > MAX_HOPS) return { tooMany: true };
   let url: URL;
   try { url = new URL(location, current); } catch { return { refused: current.hostname }; }
-  if (url.protocol !== 'https:' || !mediaHostAllowed(url.hostname)) return { refused: url.hostname || current.hostname };
+  if (!mediaUrlAllowed(url)) return { refused: url.hostname || current.hostname };
   return { url };
 }

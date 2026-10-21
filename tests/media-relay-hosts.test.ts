@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mediaHostAllowed, nextHop } from '../src/lib/mediaHosts';
+import { mediaHostAllowed, mediaUrlAllowed, nextHop } from '../src/lib/mediaHosts';
 import { fetchBlob } from '../src/lib/media';
 import { notKept } from '../src/engine/keepResult';
 import { useAlerts } from '../src/engine/alerts';
@@ -44,6 +44,16 @@ describe('media relay hosts', () => {
     expect(nextHop(cur, 'http://ark-content.volces.com/x.png', 1)).toEqual({ refused: 'ark-content.volces.com' });
     expect(nextHop(cur, '/ok.png', 20)).toHaveProperty('url');
     expect(nextHop(cur, '/ok.png', 21)).toEqual({ tooMany: true });
+  });
+  it('F-03: only the default https port of an allowed host, for the first URL and for every hop', () => {
+    expect(mediaUrlAllowed(new URL(`https://${NANO}/a.png`))).toBe(true);
+    expect(mediaUrlAllowed(new URL(`https://${NANO}:443/a.png`))).toBe(true);
+    expect(mediaUrlAllowed(new URL(`https://${NANO}:8443/a.png`))).toBe(false);
+    expect(mediaUrlAllowed(new URL('https://ark-content.volces.com:22/a.png'))).toBe(false);
+    expect(mediaUrlAllowed(new URL('http://ark-content.volces.com/a.png'))).toBe(false);
+    const cur = new URL('https://ark-content.volces.com/a.png');
+    expect(nextHop(cur, 'https://ark-content.volces.com:8443/x.png', 1)).toEqual({ refused: 'ark-content.volces.com' });
+    expect(nextHop(cur, 'https://ark-content.volces.com:443/x.png', 1)).toHaveProperty('url');
   });
   it('a redirect loop is said as such, not as a refused host', async () => {
     vi.stubGlobal('fetch', vi.fn()

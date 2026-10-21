@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
 import { localStore } from './server/local-store.js';
 import react from '@vitejs/plugin-react';
-import { HOST_NOT_ALLOWED, TOO_MANY_REDIRECTS, mediaHostAllowed, nextHop } from './src/lib/mediaHosts';
+import { HOST_NOT_ALLOWED, TOO_MANY_REDIRECTS, mediaUrlAllowed, nextHop } from './src/lib/mediaHosts';
 
 // Provider schema documents are served without CORS headers, so the dev and
 // preview servers relay them. Generation and chat calls go direct (CORS ok).
@@ -36,7 +36,7 @@ function mediaRelay(): Plugin {
       res.statusCode = 400;
       return res.end('bad url');
     }
-    if (url.protocol !== 'https:' || !mediaHostAllowed(url.hostname)) {
+    if (!mediaUrlAllowed(url)) {
       res.statusCode = 403;
       return res.end(HOST_NOT_ALLOWED);
     }
