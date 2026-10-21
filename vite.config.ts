@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from 'vitest/config';
 import type { Connect } from 'vite';
 import { localStore } from './server/local-store.js';
 import react from '@vitejs/plugin-react';
-import { HOST_NOT_ALLOWED, mediaHostAllowed, nextHop } from './src/lib/mediaHosts';
+import { HOST_NOT_ALLOWED, TOO_MANY_REDIRECTS, mediaHostAllowed, nextHop } from './src/lib/mediaHosts';
 
 // Provider schema documents are served without CORS headers, so the dev and
 // preview servers relay them. Generation and chat calls go direct (CORS ok).
@@ -41,15 +41,21 @@ function mediaRelay(): Plugin {
       return res.end(HOST_NOT_ALLOWED);
     }
     // Redirects are followed here, not by fetch: every hop must pass the same https + allow-list check as the first URL.
-    let upstream = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    // One 30 s budget for the whole chain, however many hops it takes.
+    const signal = AbortSignal.timeout(30_000);
+    let upstream = await fetch(url, { redirect: 'manual', signal }).catch(() => null);
     for (let hop = 1; upstream && upstream.status >= 300 && upstream.status < 400 && upstream.headers.get('location'); hop++) {
       const next = nextHop(url, upstream.headers.get('location')!, hop);
+      if ('tooMany' in next) {
+        res.statusCode = 508;
+        return res.end(TOO_MANY_REDIRECTS);
+      }
       if ('refused' in next) {
         res.statusCode = 403;
         return res.end(`${HOST_NOT_ALLOWED}: ${next.refused}`);
       }
       url = next.url;
-      upstream = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(30_000) }).catch(() => null);
+      upstream = await fetch(url, { redirect: 'manual', signal }).catch(() => null);
     }
     if (!upstream?.ok || !upstream.body) {
       res.statusCode = upstream?.status ?? 502;

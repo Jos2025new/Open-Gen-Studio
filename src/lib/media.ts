@@ -1,5 +1,5 @@
 import { AbortedError, isAbort } from './http';
-import { HOST_NOT_ALLOWED } from './mediaHosts';
+import { HOST_NOT_ALLOWED, MAX_HOPS, TOO_MANY_REDIRECTS } from './mediaHosts';
 import { canvasMade } from './trace';
 
 export interface MediaInfo {
@@ -94,6 +94,7 @@ async function relayReason(res: Response, url: string): Promise<string> {
   const body = await res.text().catch(() => '');
   const said = body.trim();
   // A refused redirect names the host it went to (`host not allowed: <host>`); the first URL's host is the one asked for.
+  if (said === TOO_MANY_REDIRECTS) return `: ${host} redirected the download more than ${MAX_HOPS} times`;
   if (said.startsWith(HOST_NOT_ALLOWED)) return `: the local server does not relay downloads from ${said.slice(HOST_NOT_ALLOWED.length).replace(/^:\s*/, '') || host}`;
   return `: ${host} refused the download`;
 }
