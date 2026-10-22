@@ -39,7 +39,8 @@ describe('what a request debug record may contain', () => {
     expect(text).not.toMatch(/secret-token-value/);
     // No media: a data URL never reaches the file.
     expect(text).not.toMatch(/base64/);
-    expect(text).toMatch(/<image 1024×1024>/);
+    // Named for what was sent (this PNG is 1×1), not for the first input's size.
+    expect(text).toMatch(/<image 1×1, 1 KB>/);
     expect(text.length).toBeLessThan(2000);
   });
 
@@ -177,3 +178,29 @@ describe('what a generation remembers of its request (T5)', () => {
 });
 
 const REF = 'atlas::google/nano-banana-2-lite/text-to-image';
+
+describe('each image of a request is named for what it is', () => {
+  const b64 = (bytes: number[]) => btoa(String.fromCharCode(...bytes));
+  const png = (w: number, h: number) => [0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, w >>> 24, (w >> 16) & 255, (w >> 8) & 255, w & 255, h >>> 24, (h >> 16) & 255, (h >> 8) & 255, h & 255, 8, 6, 0, 0, 0];
+  // SOI, an APP0 segment to skip, then SOF0 with height before width.
+  const jpeg = (w: number, h: number) => [0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, h >> 8, h & 255, w >> 8, w & 255, 3, 0, 0, 0];
+
+  it('three references of different sizes keep their own sizes (the house was logged as the girl)', async () => {
+    const { describeRequest } = await import('../src/lib/debug');
+    const sent = describeRequest({
+      url: 'https://nano-gpt.com/api/generate-video',
+      attempt: 1,
+      body: { referenceImages: [`data:image/png;base64,${b64(png(896, 1200))}`, `data:image/jpeg;base64,${b64(jpeg(1376, 768))}`] },
+      media: [{ mime: 'image/png', width: 896, height: 1200 }],
+    });
+    expect(sent.params.referenceImages).toEqual(['<image 896×1200, 1 KB>', '<image 1376×768, 1 KB>']);
+  });
+
+  it('reads WebP and GIF headers, and says only the kind when it cannot read one', async () => {
+    const { imageSize, redact } = await import('../src/lib/debug');
+    const vp8x = [...'RIFF'].map((c) => c.charCodeAt(0)).concat([0, 0, 0, 0], [...'WEBPVP8X'].map((c) => c.charCodeAt(0)), [0, 0, 0, 0, 0, 0, 0, 0], [639 & 255, 639 >> 8, 0, 479 & 255, 479 >> 8, 0]);
+    expect(imageSize(Uint8Array.from(vp8x))).toEqual({ width: 640, height: 480 });
+    expect(imageSize(Uint8Array.from([...'GIF89a'].map((c) => c.charCodeAt(0)).concat([32, 0, 16, 0])))).toEqual({ width: 32, height: 16 });
+    expect(redact('A'.repeat(200), { mime: 'image/png', width: 896, height: 1200 })).toBe('<image>');
+  });
+});

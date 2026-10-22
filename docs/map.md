@@ -25,7 +25,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 73 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 2 |
 | [actions.ts](../src/engine/design/actions.ts) | 47 | 18 |
-| [media.ts](../src/lib/media.ts) | 46 | 37 |
+| [media.ts](../src/lib/media.ts) | 47 | 37 |
 | [ops.ts](../src/engine/ops.ts) | 39 | 16 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 34 |
 | [params.ts](../src/engine/params.ts) | 37 | 17 |
@@ -62,12 +62,12 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/engine/flow` | 11 | 13 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
-| `src/engine/providers` | 13 | 51 |
+| `src/engine/providers` | 14 | 52 |
 | `src/engine/skills` | 7 | 16 |
 | `src/lib` | 32 | 219 |
 | `src/store` | 13 | 157 |
 
-156 de 429 módulos no tienen ningún test que los importe directamente.
+156 de 430 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

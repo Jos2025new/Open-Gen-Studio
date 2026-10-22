@@ -4,6 +4,7 @@ import { fetchBlob } from '../../lib/media';
 import { humanizeKey, ratioOf, roleForKey, wireParams, isHiddenKey } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
 import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined, POLL_TIMEOUT_MS, pollJob } from './shared';
+import { fitBody, NANOGPT_BODY_LIMIT } from './bodyBudget';
 import type { GenOutput, GenRequest, GenResult, ProviderAdapter, RecoverQuery, ResumeContext } from './types';
 import { modelRef } from './types';
 import { generateSpeech, isSpeechModel, listTranscribers, nanoHeaders, pollTranscription, speechSchema, speechSummaries, transcribe } from './nanogptAudio';
@@ -451,6 +452,7 @@ export const nanogpt: ProviderAdapter = {
         body[req.schema.slots.images.key] = await Promise.all(req.refs.slice(0, req.schema.slots.images.max).map((r) => encodeImage(r, 'data-url')));
       }
       req.onStatus('Generating');
+      await fitBody(body, NANOGPT_BODY_LIMIT);
       req.onRequest?.({ url: `${BASE}/v1/images`, body });
       const res = await requestJson<Loose>(`${BASE}/v1/images`, {
         method: 'POST',
@@ -471,6 +473,7 @@ export const nanogpt: ProviderAdapter = {
         if (slots.images.multiple) body[slots.images.key] = urls;
       }
       req.onStatus('Submitting');
+      await fitBody(body, NANOGPT_BODY_LIMIT);
       req.onRequest?.({ url: `${BASE}/generate-video`, body });
       const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
         method: 'POST',
@@ -497,6 +500,7 @@ export const nanogpt: ProviderAdapter = {
     // Some aspect params are orientation based; keep the ratio-derived value only when valid.
     if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto') delete body.aspect_ratio;
     req.onStatus('Submitting');
+    await fitBody(body, NANOGPT_BODY_LIMIT);
     req.onRequest?.({ url: `${BASE}/generate-video`, body });
     const submit = await requestJson<Loose>(`${BASE}/generate-video`, {
       method: 'POST',

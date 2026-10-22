@@ -34,11 +34,55 @@ export function mediaLabel(m: MediaInfoLite | undefined): string {
   return `<${kind}${size}>`;
 }
 
+/** Width and height from the first bytes of a PNG, JPEG, WebP or GIF; undefined for anything else. */
+export function imageSize(b: Uint8Array): { width: number; height: number } | undefined {
+  const at = (i: number, s: string) => [...s].every((ch, k) => b[i + k] === ch.charCodeAt(0));
+  const be16 = (i: number) => (b[i] << 8) | b[i + 1];
+  const le16 = (i: number) => b[i] | (b[i + 1] << 8);
+  if (b[0] === 0x89 && at(1, 'PNG')) return { width: (be16(16) << 16) | be16(18), height: (be16(20) << 16) | be16(22) };
+  if (at(0, 'GIF8')) return { width: le16(6), height: le16(8) };
+  if (at(0, 'RIFF') && at(8, 'WEBP')) {
+    if (at(12, 'VP8X')) return { width: 1 + (le16(24) | (b[26] << 16)), height: 1 + (le16(27) | (b[29] << 16)) };
+    if (at(12, 'VP8 ')) return { width: le16(26) & 0x3fff, height: le16(28) & 0x3fff };
+    if (at(12, 'VP8L')) return { width: 1 + (le16(21) & 0x3fff), height: 1 + (((b[22] >> 6) | (b[23] << 2) | (b[24] << 10)) & 0x3fff) };
+  }
+  if (b[0] === 0xff && b[1] === 0xd8) {
+    for (let i = 2; i + 9 < b.length && b[i] === 0xff; i += 2 + be16(i + 2)) {
+      const m = b[i + 1];
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { width: be16(i + 7), height: be16(i + 5) };
+    }
+  }
+  return undefined;
+}
+
+/** "<image 1376×768, 1.2 MB>" read from the data itself, so each image of a request is named for what it is. */
+function inlineLabel(value: string): string | undefined {
+  const prefix = /^data:([\w/+.-]+);base64,/.exec(value);
+  const b64 = prefix ? value.slice(prefix[0].length) : value;
+  let bytes: Uint8Array;
+  try {
+    // The first ~64 KB are enough for the header, also behind a JPEG's metadata.
+    const bin = atob(b64.slice(0, 87_380).replace(/=+$/, '').replace(/-/g, '+').replace(/_/g, '/'));
+    bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  } catch {
+    return undefined;
+  }
+  const dims = imageSize(bytes);
+  if (!dims) return prefix && !prefix[1].startsWith('image') ? `<${prefix[1].split('/')[0]}, ${sizeText(b64)}>` : undefined;
+  return `<image ${dims.width}×${dims.height}, ${sizeText(b64)}>`;
+}
+
+function sizeText(b64: string): string {
+  const n = Math.floor((b64.length * 3) / 4);
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1000))} KB`;
+}
+
 /** Keys, media and endless base64 never reach a file: they become a marker or a label. */
 export function redact(value: unknown, media?: MediaInfoLite): unknown {
   if (value == null || typeof value === 'number' || typeof value === 'boolean') return value;
   if (typeof value === 'string') {
-    if (BLOB.test(value)) return mediaLabel(media);
+    // Undecodable: the kind only. Sizes from `media` would be one input's, not necessarily this one's.
+    if (BLOB.test(value)) return inlineLabel(value) ?? mediaLabel(media && { mime: media.mime });
     return value.length > LONG_TEXT ? `${value.slice(0, LONG_TEXT)}… (${value.length} chars)` : value;
   }
   if (Array.isArray(value)) return value.slice(0, 12).map((v) => redact(v, media));

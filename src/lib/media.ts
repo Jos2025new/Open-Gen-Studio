@@ -289,6 +289,19 @@ export async function prepareImageForUpload(blob: Blob, maxSide = 2048): Promise
   return canvasToBlob(c, 'image/png');
 }
 
+/** A JPEG of the image for a request with a size cap: longest side at most `maxSide`, white under any transparency. */
+export async function recompressImage(blob: Blob, maxSide: number, quality: number): Promise<Blob> {
+  const img = await blobToImage(blob);
+  const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = createCanvas(img.naturalWidth * scale, img.naturalHeight * scale);
+  const ctx = ctx2d(c);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, c.width, c.height);
+  return canvasToBlob(c, 'image/jpeg', quality);
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
