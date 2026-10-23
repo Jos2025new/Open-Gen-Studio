@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" data-base="atlas" data-accent="lima"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Designer toolbox</title>
+<link rel="stylesheet" href="../../node_modules/@fontsource-variable/inter/index.css">
+<link rel="stylesheet" href="../../node_modules/@fontsource/dm-sans/400.css"><link rel="stylesheet" href="../../node_modules/@fontsource/dm-sans/500.css"><link rel="stylesheet" href="../../node_modules/@fontsource/dm-sans/600.css">
+<link rel="stylesheet" href="../../src/styles/tokens.css"><link rel="stylesheet" href="../../src/styles/accents.css"><link rel="stylesheet" href="../../src/styles/base.css"><link rel="stylesheet" href="../../src/styles/ui.css">
+<link rel="stylesheet" href="../../src/styles/composer.css"><link rel="stylesheet" href="../../src/styles/designer.css"><link rel="stylesheet" href="../../src/styles/prompt-box.css"><link rel="stylesheet" href="../../src/styles/designer-connected.css">
+<script src="toolbox-dock/real-1.js"></script><script src="toolbox-dock/real-2.js"></script><script src="toolbox-dock/real-3.js"></script><script src="toolbox-dock/real-4.js"></script><script src="toolbox-dock/real-5.js"></script>
+<script src="toolbox-dock/real-6.js"></script><script src="toolbox-dock/real-7.js"></script><script src="toolbox-dock/real-8.js"></script><script src="toolbox-dock/real-9.js"></script>
+<style>
+/* Maqueta de docs/propuesta-toolbox-dock.md. Todos los controles son el HTML real de la app, capturado del sandbox
+   (toolbox-dock/capture-*.js → build.mjs → real-*.js) y sin tocar. Lo único nuevo es lo de abajo: la fila de variantes,
+   la tarjeta (con el aspecto de .context-strip, sin sus reglas), sus columnas, las pestañas y el tirador. */
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg-canvas);color:var(--text);font-family:var(--font)}
+.stage{position:fixed;inset:0;display:grid;place-items:center;padding-bottom:200px}
+.doc{width:min(40vw,40vh);aspect-ratio:1;background:var(--surface);box-shadow:0 0 0 1px var(--panel-line)}
+.note{position:fixed;top:12px;left:16px;right:16px;margin:0;color:var(--text-3);font-size:var(--fs-xs)}
+.composer-dock.dock-designer{left:50%;width:auto}
+.composer{position:relative}.composer-bar{position:static}
+/* Toolbox del mismo ancho que la tarjeta: los iconos se reparten a lo largo; iconos más grandes. */
+.composer:has(.composer-tools-bar){width:min(580px,calc(100vw - 24px));padding:10px 12px}
+.composer-tools-bar .designer-palette.is-docked,.composer-tools-bar .tool-rail,.composer-tools-bar .palette-fixed,.composer-tools-bar .tool-family{flex:1;width:auto}
+.composer-tools-bar .tool-family{justify-content:space-between;gap:4px}
+.composer-tools-bar .designer-palette .icon-btn{width:40px;height:40px}
+.composer-tools-bar .designer-palette .icon-btn svg{width:21px;height:21px}
+.composer-tools-bar .composer-options-trigger{width:40px;height:40px;margin-right:4px}
+.composer-tools-bar .palette-sep{height:24px;margin:0 6px}
+.dock-stack{position:absolute;left:-1px;right:-1px;bottom:calc(100% + 8px);display:flex;flex-direction:column;gap:8px}
+/* Mismo aspecto que .context-strip (designer-connected.css), sin sus reglas de tira compacta. */
+.dock-box{position:relative;display:flex;align-items:center;background:var(--surface);border:1px solid var(--panel-line);border-radius:var(--toolbar-radius);box-shadow:var(--shadow-card)}
+.variant-bar{gap:3px;padding:var(--toolbar-padding)}
+.variant-bar .icon-btn{width:var(--control-h);height:var(--control-h)}
+.variant-bar .icon-btn.is-active{background:var(--active-bg);color:var(--active-text)}
+[aria-disabled=true]{opacity:.35;cursor:not-allowed}
+.variant-bar .grow{flex:1}
+.tool-card{display:grid;grid-template-columns:1fr 1fr;padding:0;max-height:var(--card-h,320px);align-items:stretch}
+.tool-card.one{grid-template-columns:1fr}
+.tool-card>.sidebar-align-settings{padding:12px 10px}
+.tool-card>.col{min-height:0;overflow:auto;border-bottom:0}
+.tool-card>.col+.col{border-left:1px solid var(--panel-line)}
+.tool-card>.tabs-col{display:flex;flex-direction:column;overflow:hidden;padding:0}
+.tabs-col>.card-tabs{flex:none;padding:10px 10px 0}
+.tabs-col>.card-tabs .segmented{display:flex;width:100%}
+/* Todas las pestañas ocupan la misma celda: la tarjeta mide lo que la más alta y no salta al cambiar. */
+.tab-stack{flex:1;min-height:0;overflow:auto;display:grid}
+.tab-stack>.sidebar-tool-settings{grid-area:1/1;border-bottom:0}
+.tab-stack>[aria-hidden=true]{visibility:hidden}
+.tool-card .popover{position:static;visibility:visible;width:auto;max-height:none;box-shadow:none;border:0;background:transparent}
+.card-grip{position:absolute;top:-1px;left:50%;transform:translateX(-50%);width:56px;height:12px;display:grid;place-items:center;cursor:ns-resize;color:var(--text-4);z-index:2;touch-action:none}
+.card-grip svg{width:14px;height:14px}
+.composer-bar>.popover{position:absolute;left:0;top:auto;bottom:calc(100% + 8px)}
+.palette-sep{width:1px;height:20px;background:var(--panel-line);margin:0 4px;flex:none}
+</style></head><body>
+<p class="note">Maqueta del toolbox · controles = HTML real del sandbox · herramienta: abre la fila plegada · variante: despliega · flecha: pliega · herramienta activa otra vez: cierra · arrastra el tirador para fijar la altura máxima</p>
+<div class="stage"><div class="doc"></div></div>
+<div class="composer-dock dock-designer"><div class="composer"><div class="composer-bar composer-tools-bar" id="bar"></div></div></div>
+<script>
+const ic=n=>R.icons[n];
+const frag=h=>{const t=document.createElement('template');t.innerHTML=h.trim();return t.content.firstElementChild;};
+// Nombres con que se reconoce un control real: su .opt-label, su aria-label y los de lo que lleva dentro.
+const names=el=>{const s=new Set();if(el.getAttribute('aria-label'))s.add(el.getAttribute('aria-label'));
+  el.querySelectorAll('.opt-label,[aria-label]').forEach(x=>{const t=x.classList.contains('opt-label')?x.textContent.trim():x.getAttribute('aria-label');if(t)s.add(t);});
+  if(el.matches('.opt,button')&&!el.querySelector('.opt-label'))s.add(el.textContent.trim());return s;};
+const hit=(el,m)=>m.startsWith('.')?el.matches(m):[...names(el)].some(t=>t===m||t.startsWith(m+' ·'));
+// Controles de primer nivel de un panel real; los que viven dentro de un envoltorio (.stroke-controls) recuerdan cuál.
+const cache={};
+function items(key){
+  if(cache[key])return cache[key];
+  const sec=frag(R[key]), ts=sec.querySelector(':scope > .tool-settings'), list=[];
+  [...(ts||sec).children].forEach(el=>{if(el.classList.contains('stroke-controls')){const w=el.cloneNode(false);[...el.children].forEach(c=>list.push({el:c,wrap:w}));}else list.push({el});});
+  return cache[key]={sec,ts,list};
+}
+// Reparte los controles reales: pestañas según la lista; el resto, en su orden real, a la cabecera. Nada se pierde.
+function split(spec){
+  const {sec,ts,list}=items(spec.k), tabs=(spec.tabs||[]).map(([n])=>[n,[]]), hero=[];
+  list.forEach(it=>{if((spec.drop||[]).some(m=>hit(it.el,m)))return;const i=(spec.tabs||[]).findIndex(([,ms])=>ms.some(m=>hit(it.el,m)));(i<0?hero:tabs[i][1]).push(it);});
+  return {sec,ts,hero,tabs};
+}
+// Cada grupo va en el mismo envoltorio real que la pestaña Tool: section.sidebar-tool-settings > .tool-settings.
+function panel(sec,ts,its){
+  const s=sec.cloneNode(false);s.classList.add('col');
+  if(!ts){its.forEach(it=>s.append(it.el));return s;}
+  const t=ts.cloneNode(false);s.append(t);let w=null,wn=null;
+  its.forEach(it=>{if(it.wrap){if(w!==it.wrap){w=it.wrap;wn=w.cloneNode(false);t.append(wn);}wn.append(it.el);}else{w=null;t.append(it.el);}});
+  return s;
+}
+const SHAPE={tabs:[['Stroke',['Join','Miter limit','Cap','Stroke behind fill']],['Dashes',['Dashes','Dash offset']]]};
+const PAINT=erase=>({tabs:[['Tip',['Tip','Hardness','Texture strength','Mirror']],['Stroke',['Taper start','Stabilize']],
+  ['Pressure',['Simulate pressure','Speed influence','Pressure → size','Min size','Pressure → density','Min density']],...(erase?[]:[['Blend',['Blend','Keep opacity']]])],drop:['Advanced settings']});
+const sh=(n,k,i)=>({n,i,k,...SHAPE});
+const T=[
+ {id:'pointer',n:'Pointer',i:'mouse-pointer-2',v:[
+   {n:'Edit (V)',i:'mouse-pointer-2',k:'move'},{n:'Pan (H)',i:'hand',k:'hand',one:1},
+   {n:'Nodes · edits the nodes of a selected path',i:'spline-pointer'},{n:'Align',i:'align-center-vertical',k:'move',align:1},
+   {n:'Boolean',i:'squares-unite',soon:1},{n:'Form Builder',i:'blocks',soon:1}]},
+ {id:'layout',n:'Layout',i:'layout-panel-top',v:[{n:'Sizes · canvas size',i:'crop',k:'sizePop',one:1},{n:'Templates',i:'layout-template',soon:1},{n:'Grids',i:'grid-3x3',soon:1},{n:'Guides',i:'ruler-dimension-line',soon:1}]},
+ {id:'shapes',n:'Shapes',i:'shapes',v:[sh('Rectangle (R)','rect','square'),sh('Ellipse (O)','ellipse','circle'),sh('Line (L)','line','minus'),sh('Arrow','arrow','move-up-right'),
+   sh('Polygon','polygon','pentagon'),sh('Star','star','star'),sh('Sector','sector','chart-pie'),sh('Arc','arc','spline'),sh('Chord','chord','circle')]},
+ {id:'bezier',n:'Bezier pen',i:'pen-tool',v:[
+   {n:'Lineart (P)',i:'pen-tool',k:'lineart',alt:'lineartTex',altOn:'Texture',tabs:[['Pressure',['Pressure thinning','Smoothing','Streamline']],['Ink',['Texture','Spacing','Jitter','Seed','Taper start','Taper end']]]},
+   sh('Curve','curve','spline')]},
+ {id:'brush',n:'Brush',i:'brush',v:[{n:'Brush (B)',i:'brush',k:'brush',...PAINT(0)},{n:'Fill (G)',i:'paint-bucket',k:'fill'},{n:'Gradient (U)',i:'blend',k:'gradient'},
+   {n:'Select (M)',i:'square-dashed',k:'select',alt:'selectWand',altOn:'Shape'}]},
+ {id:'eraser',n:'Eraser (E)',i:'eraser',k:'eraser',...PAINT(1)},
+ {id:'text',n:'Text (T)',i:'type',k:'text'},
+ {id:'rulers',n:'Rulers (K)',i:'drafting-compass',k:'ruler',extra:[['Snap','snapPop']]},
+ 0,{id:'layers',n:'Show or hide right panel',i:'layers',toggle:1},{id:'settings',n:'Toolbox settings',i:'settings-2',soon:1}];
+const st={t:'brush',v:{},tab:{},alt:{},mode:'open',plus:false,layers:false};
+let cardH=320;try{cardH=+localStorage.getItem('dock-card-h')||320}catch(e){}
+const $=q=>document.querySelector(q), tool=()=>T.find(x=>x&&x.id===st.t), vi=()=>st.v[st.t]||0, cur=()=>tool().v?tool().v[vi()]:tool();
+const keyOf=c=>c.alt&&st.alt[c.k]?c.alt:c.k;
+const ibtn=(i,label,cls,attrs)=>`<button type="button" class="icon-btn icon-btn-md tone-default ${cls}" aria-label="${label}" title="${label}" ${attrs}>${ic(i)}</button>`;
+// Tres estados: closed (nada), folded (solo la fila de variantes), open (fila + tarjeta).
+const open=()=>st.mode==='open';
+const hideBtn=()=>ibtn('chevron-down',open()?'Hide settings':'Show settings','hide-btn',`data-hide aria-expanded="${open()}"`).replace('<svg',`<svg style="transform:rotate(${open()?0:180}deg)"`);
+const extras={};
+function card(t,c){
+  const key=keyOf(c), {sec,ts,hero,tabs}=split({...c,k:key});
+  (c.extra||[]).forEach(([n,k])=>{extras[k]=extras[k]||frag(R[k]).querySelector('.snap-pop');tabs.push([n,[{el:extras[k],bare:1}]]);});
+  const el=document.createElement('div');el.className='dock-box tool-card';el.style.setProperty('--card-h',cardH+'px');el.setAttribute('aria-label',(c.n||t.n)+' settings');
+  el.insertAdjacentHTML('beforeend',`<div class="card-grip" role="separator" aria-orientation="horizontal" aria-label="Resize settings" title="Drag to resize" tabindex="0">${ic('grip-horizontal')}</div>`);
+  if(c.align){const m=items(key),a=m.align=m.align||sec.querySelector(':scope > .sidebar-align-settings');a.classList.add('col');el.classList.add('one');el.append(a);}
+  else if(tabs.length){
+    el.append(panel(sec,ts,hero));
+    const on=Math.min(st.tab[key]||0,tabs.length-1), col=document.createElement('div');col.className='col tabs-col';
+    col.innerHTML=`<div class="card-tabs"><div class="segmented seg-sm" role="tablist">${tabs.map(([n],i)=>`<button type="button" role="tab" aria-selected="${i===on}" class="${i===on?'is-active':''}" data-tab="${i}">${n}</button>`).join('')}</div></div>`;
+    const box=document.createElement('div');box.className='tab-stack';
+    tabs.forEach(([,its],i)=>{const p=panel(sec,its[0]?.bare?null:ts,its);if(i===on)p.setAttribute('role','tabpanel');else p.setAttribute('aria-hidden','true');box.append(p);});
+    col.append(box);el.append(col);
+  }else if(hero.length>1&&!c.one){const h=Math.ceil(hero.length/2);el.append(panel(sec,ts,hero.slice(0,h)),panel(sec,ts,hero.slice(h)));}
+  else{el.classList.add('one');el.append(panel(sec,ts,hero));}
+  return el;
+}
+function render(){
+  const t=tool(), c=cur(), bar=$('#bar');bar.innerHTML='';
+  const stack=document.createElement('div');stack.className='dock-stack';
+  // Sin variantes, la fila lleva solo la herramienta, para que plegar y desplegar funcione igual en todas.
+  if(st.mode!=='closed')stack.insertAdjacentHTML('beforeend',`<div class="dock-box variant-bar" role="radiogroup" aria-label="${t.n} variants">${(t.v||[t]).map((v,i)=>ibtn(v.i,v.n+(v.soon?' · Soon':''),i===vi()?'is-active':'',v.soon?'aria-disabled="true"':`role="radio" aria-checked="${i===vi()}" data-v="${i}"`)).join('')}<span class="grow"></span>${hideBtn()}</div>`);
+  if(open()&&c.k)stack.append(card(t,c));
+  bar.append(stack);
+  bar.insertAdjacentHTML('beforeend',R.plusBtn);
+  const pal=document.createElement('div');pal.className='designer-palette is-docked';
+  pal.innerHTML=`<div class="tool-rail" role="toolbar" aria-label="Design tools"><div class="palette-fixed"><div class="tool-family" role="group">`+T.map(x=>x?ibtn(x.i,x.n+(x.soon?' · Soon':''),(x.id===st.t&&!x.toggle)||(x.toggle&&st.layers)?'is-active':'',x.soon?'aria-disabled="true"':`data-t="${x.id}" aria-pressed="${x.toggle?st.layers:x.id===st.t}"`):'<span class="palette-sep"></span>').join('')+`</div></div></div>`;
+  bar.append(pal);
+  bar.querySelector('.composer-options-trigger').setAttribute('aria-expanded',st.plus);
+  if(st.plus){const p=frag(R.plusPop);p.removeAttribute('style');bar.append(p);}
+}
+document.addEventListener('click',e=>{
+  const x=e.target.closest('button');if(!x){if(st.plus&&!e.target.closest('.popover')){st.plus=false;render();}return;}
+  if(x.closest('[aria-disabled=true]')||x.disabled)return;
+  const d=x.dataset;
+  if(x.classList.contains('composer-options-trigger')){st.plus=!st.plus;return render();}
+  if(d.t){const t=T.find(y=>y&&y.id===d.t);if(t.toggle)st.layers=!st.layers;else if(st.t===d.t)st.mode=st.mode==='closed'?'folded':'closed';else{st.t=d.t;st.mode='folded';}st.plus=false;return render();}
+  if(d.v){if(tool().v)st.v[st.t]=+d.v;st.mode='open';return render();}
+  if('hide' in d){st.mode=open()?'folded':'open';return render();}
+  if(d.tab){st.tab[keyOf(cur())]=+d.tab;return render();}
+  // En la app una lista se abre; aquí solo Select → Shape y Lineart → Texture cambian entre los dos estados capturados.
+  if(x.classList.contains('opt-pick')){const c=cur();if(c.alt&&hit(x,c.altOn)){st.alt[c.k]=!st.alt[c.k];render();}return;}
+  if(x.classList.contains('opt-toggle')){const on=!x.classList.contains('is-on');x.classList.toggle('is-on',on);x.querySelector('.toggle')?.classList.toggle('is-on',on);x.setAttribute('aria-checked',on);return;}
+  const grp=x.parentElement;
+  if(grp&&grp.matches('.segmented:not([role=tablist]),.opt-choices,.opt-presets')){const seg=grp.classList.contains('segmented');grp.querySelectorAll(':scope > button').forEach(y=>{const on=y===x;y.classList.toggle(seg?'is-active':'is-on',on);y.setAttribute('aria-checked',on);});}
+});
+document.addEventListener('input',e=>{const r=e.target.closest('.opt-range');if(!r)return;const f=(r.value-r.min)/(r.max-r.min)*100;r.style.setProperty('--fill',f+'%');r.parentElement.style.setProperty('--fill',f+'%');const n=r.parentElement.querySelector('.opt-num');if(n)n.value=Math.round(r.value*(+r.max<=2&&+n.max>=25?100:1));});
+const setH=(g,h)=>{cardH=Math.max(120,Math.min(innerHeight*0.6,h));g.parentElement.style.setProperty('--card-h',cardH+'px');try{localStorage.setItem('dock-card-h',Math.round(cardH))}catch(err){}};
+document.addEventListener('pointerdown',e=>{
+  const g=e.target.closest('.card-grip');if(!g)return;e.preventDefault();
+  const y0=e.clientY, h0=g.parentElement.offsetHeight;g.parentElement.style.setProperty('--card-h',h0+'px');g.setPointerCapture(e.pointerId);
+  const move=ev=>setH(g,h0+(y0-ev.clientY));
+  g.addEventListener('pointermove',move);g.addEventListener('pointerup',()=>g.removeEventListener('pointermove',move),{once:true});
+});
+document.addEventListener('keydown',e=>{
+  const g=e.target.closest?.('.card-grip');if(g&&(e.key==='ArrowUp'||e.key==='ArrowDown')){setH(g,cardH+(e.key==='ArrowUp'?16:-16));e.preventDefault();return;}
+  if(e.key==='Escape'){if(st.plus)st.plus=false;else if(st.mode==='open')st.mode='folded';else st.mode='closed';render();}
+  const row=e.target.closest?.('.variant-bar,.tool-family');if(row&&(e.key==='ArrowRight'||e.key==='ArrowLeft')){const bs=[...row.querySelectorAll('button')],i=bs.indexOf(e.target);bs[(i+(e.key==='ArrowRight'?1:-1)+bs.length)%bs.length].focus();e.preventDefault();}
+});
+render();
+</script></body></html>
