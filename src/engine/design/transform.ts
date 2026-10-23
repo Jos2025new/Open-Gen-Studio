@@ -1,6 +1,7 @@
 import { bakeStroke } from './strokes';
 import { composeShape } from './shapeTransform';
-import { multiply, rotateAbout } from './matrix';
+import { apply, multiply, rotateAbout, scaleAbout } from './matrix';
+import type { Mat } from './matrix';
 import { mapPathShape } from './path';
 import { looksUnchanged, noChangeNote } from './symmetry';
 import type { DesignDoc, Layer, VectorLayer, VectorShape } from '../types';
@@ -76,6 +77,17 @@ export function turnVector(layer: VectorLayer, turn: Turn): VectorLayer {
   return { ...layer, shapes, ...(strokes ? { strokes } : {}), ...(layer.pixelMask ? { pixelMask: { ...layer.pixelMask, transform: multiply(rotateAbout(cw ? Math.PI / 2 : -Math.PI / 2, cx, cy), layer.pixelMask.transform ?? [1, 0, 0, 1, 0, 0]) } } : {}) };
 }
 
+/**
+ * A rotated or skewed image flips on the screen's axis through its center, not its own: the pixels were mirrored in the
+ * image's axes, so the matrix becomes Mirror ∘ T ∘ Flip. Unchanged for other turns and for images without a matrix.
+ */
+function flipTransform(t: Mat | undefined, turn: Turn, cx: number, cy: number): Mat | undefined {
+  if (!t || (turn !== 'flip-h' && turn !== 'flip-v')) return t;
+  const h = turn === 'flip-h';
+  const [sx, sy] = apply(t, cx, cy);
+  return multiply(h ? scaleAbout(-1, 1, sx, sy) : scaleAbout(1, -1, sx, sy), multiply(t, h ? scaleAbout(-1, 1, cx, cy) : scaleAbout(1, -1, cx, cy)));
+}
+
 /** Raster: the pixels turned, the layer box turned about its center; painted strokes are merged into the image. */
 function turnRaster(sessionId: string, docId: string, layer: Extract<Layer, { type: 'raster' }>, turn: Turn): void {
   const src = getBuffer(layer.id);
@@ -110,7 +122,8 @@ function turnRaster(sessionId: string, docId: string, layer: Extract<Layer, { ty
   setBuffer(layer.id, out);
   const cx = layer.x + layer.width / 2, cy = layer.y + layer.height / 2;
   const w = quarter ? layer.height : layer.width, h = quarter ? layer.width : layer.height;
-  setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { x: cx - w / 2, y: cy - h / 2, width: w, height: h, pxWidth: out.width, pxHeight: out.height, paintBaseId: undefined, paintStrokes: undefined, rev: layer.rev + 1 }));
+  const transform = flipTransform(layer.transform, turn, cx, cy);
+  setDoc(sessionId, docId, (d) => D.updateLayer(d, layer.id, { ...(transform ? { transform } : {}), x: cx - w / 2, y: cy - h / 2, width: w, height: h, pxWidth: out.width, pxHeight: out.height, paintBaseId: undefined, paintStrokes: undefined, rev: layer.rev + 1 }));
 }
 
 export function turnLayer(sessionId: string, docId: string, layerId: string, turn: Turn): void {

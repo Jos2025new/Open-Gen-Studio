@@ -2,6 +2,7 @@ import type { DesignDoc } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { setUi, useStore } from '../../store/store';
 import { drawDoc } from './render';
+import { peekPixel } from './framePeek';
 
 /* Designer colors: recent ones (newest first) and saved ones, kept with the UI settings. */
 
@@ -36,11 +37,14 @@ const hex = (n: number) => n.toString(16).padStart(2, '0');
 
 /**
  * The visible color at a point of the page (all visible layers and the background), as #rrggbb.
- * Renders only that pixel: the document is drawn into a 1×1 canvas shifted to the point.
+ * Reads the editor's already composed page when it is the current one; otherwise renders only that pixel: the document is
+ * drawn into a 1×1 canvas shifted to the point.
  * Null outside the page or where nothing is drawn (fully transparent).
  */
 export function sampleColor(doc: DesignDoc, x: number, y: number): string | null {
   if (x < 0 || y < 0 || x >= doc.width || y >= doc.height) return null;
+  const seen = peekPixel(doc, x, y);
+  if (seen) return seen[3] ? `#${hex(seen[0])}${hex(seen[1])}${hex(seen[2])}` : null;
   const canvas = createCanvas(1, 1);
   const ctx = ctx2d(canvas);
   ctx.translate(-Math.floor(x), -Math.floor(y));

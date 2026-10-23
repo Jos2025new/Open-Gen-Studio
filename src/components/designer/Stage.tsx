@@ -28,7 +28,7 @@ import { cornerRadii, editableShapeAt, traceRoundRect } from '../../engine/desig
 import { TextEditor } from './TextEditor';
 import {withPaintBase, beginEdit, commitEdit, ensureBuffers, rasterVersion, subscribeRaster, getRasterSurface} from '../../engine/design/raster';
 import {composeMoving} from '../../engine/design/rasterCompose';
-import { record } from '../../engine/design/history';
+import { record, unrecord } from '../../engine/design/history';
 import { toolBlockReason, type DesignTool } from '../../engine/design/rules';
 import { addTextLayer, ensurePaintLayer, getDoc, patchLayer, rebasePaintLayer, placeAsset, setActiveLayer } from '../../engine/design/actions';
 import { setDoc, setUi, toast, useStore } from '../../store/store';
@@ -59,7 +59,7 @@ type Drag =
   | { kind: 'pan'; sx: number; sy: number; vx: number; vy: number }
   | { kind: 'move'; layerId: string; startX: number; startY: number; base: Layer; others?: Layer[]; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc }
   | { kind: 'xform'; pre?: DesignDoc; moved?: boolean; op: XformOp; h: Handle; startX: number; startY: number; cx: number; cy: number; box: { x: number; y: number; w: number; h: number }; bases: Array<{ layer: Layer; ids: string[] | null; buffers: ReturnType<typeof gestureBuffers> }> }
-  | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer }
+  | { kind: 'scale'; layerId: string; ax: number; ay: number; startDist: number; base: Layer; startX: number; startY: number; pre: DesignDoc; moved?: boolean }
   | { kind: 'objMove'; layerId: string; ids: string[]; startX: number; startY: number; base: Layer; again?: boolean; moved?: boolean; ctrlToggle?: string; pre?: DesignDoc; compose?: (moved: RasterLayer) => void }
   | EditMarqueeDrag
   | StagePaintGesture
@@ -783,8 +783,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           const hit = corners(b).findIndex(([hx, hy]) => Math.abs(p.x - hx) <= tol && Math.abs(p.y - hy) <= tol);
           if (hit >= 0) {
             const [ax, ay] = corners(b)[(hit + 2) % 4];
-            record(current);
-            drag.current = { kind: 'scale', layerId: act.id, ax, ay, startDist: Math.hypot(p.x - ax, p.y - ay) || 1, base: act };
+            drag.current = { kind: 'scale', layerId: act.id, ax, ay, startDist: Math.hypot(p.x - ax, p.y - ay) || 1, base: act, startX: p.x, startY: p.y, pre: current };
             return;
           }
           if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
@@ -818,6 +817,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (!target || target.type !== 'raster') return;
       if (!getRasterSurface(target.id) || (!target.paintFlattened && target.paintBaseId && !getRasterSurface(target.paintBaseId))) {
         toast('Layer pixels are still loading. Try again in a moment.', 'error');
+        if (getDoc(sessionId, doc.id)?.layers === current.layers) unrecord(current);
         return;
       }
       const direct = paintsPixelsDirectly(current, target);
@@ -1044,7 +1044,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       startDragPreview(doc);
       const moved = new Map(group.map((l) => [l.id, translateLayer(l, dx, dy)]));
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => moved.get(l.id) ?? l) }));
-    } else if (d.kind === 'scale') {
+    } else if (d.kind === 'scale' && started(d, p)) {
       const k = Math.max(0.02, Math.hypot(p.x - d.ax, p.y - d.ay) / d.startDist);
       const scaled = scaleLayer(d.base, k, k, d.ax, d.ay);
       setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: dd.layers.map((l) => (l.id === d.layerId ? scaled : l)) }));

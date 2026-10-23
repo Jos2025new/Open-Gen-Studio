@@ -77,6 +77,8 @@ export function commitStagePaintGesture(args: {
   const nextStrokes = [...(layer.paintStrokes ?? []), gesture.stroke];
   const shouldFlatten = !args.clipped && (layer.paintFlattened || shouldFlattenRasterPaint({ ...layer, paintStrokes: nextStrokes }, args.limits));
   const flattenNow = shouldFlatten && !layer.paintFlattened;
+  // Painting inside a selection also drops the editable strokes (the clipped branch below): same notice.
+  const lostStrokes = args.clipped && !!layer.paintStrokes?.length;
   if (!gesture.erase && !args.clipped && !shouldFlatten && !layer.paintFlattened) {
     setObjectPick(docId, { layerId: gesture.layerId, ids: [gesture.stroke.id] });
   }
@@ -92,7 +94,7 @@ export function commitStagePaintGesture(args: {
       return { ...item, rev, paintStrokes: nextStrokes };
     }),
   }));
-  if (flattenNow) toast('Strokes flattened to pixels. Undo restores editable strokes.', 'info');
+  if (flattenNow || lostStrokes) toast('Strokes flattened to pixels. Undo restores editable strokes.', 'info');
 }
 
 /**
