@@ -61,7 +61,7 @@ export interface Settings {
   budgetOn: boolean;
   /** The limit the user chose to go past ("Continue anyway"); valid while budgetUsd stays the same. */
   budgetAccepted?: number | null;
-  /** A step whose price rises past what was approved by more than this % (min 1¢) waits for review; 'off' never stops. Default 5. */
+  /** % over approval before a step waits (default 5). */
   priceMargin?: number | 'off';
   /** Browser notification when generations finish in a hidden tab (default off; permission is asked only when turned on). */
   notify?: boolean;
