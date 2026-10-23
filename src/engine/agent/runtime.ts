@@ -78,7 +78,7 @@ import { findModelsResult, suggestModel } from './modelIndex';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
-import { overLimit, overLimitText } from '../budget';
+import { overLimit, overLimitText, rerunNote } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
 import { confirmedState, keepConfirmed, switchNote, switchSection } from './switchModel';
@@ -892,14 +892,14 @@ async function approveNodeRun(sessionId: string, item: PlanFeedItem): Promise<vo
     });
     return;
   }
-  if (overLimit(preview.estimate)) { toast(overLimitText(preview.estimate), 'error'); return; }
+  if (overLimit(preview.estimate)) { updateFeedItem(sessionId, item.id, { estimate: preview.estimate, error: overLimitText(preview.estimate) }); return; }
   updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'running', error: undefined, stepStates: {} });
   const result = await runNodes(sessionId, request.targets, preview, request.force, (id, state, info) => {
     updateFeedItem<PlanFeedItem>(sessionId, item.id, it => ({ ...it, stepStates: { ...it.stepStates, [id]: state }, stepGenerations: info?.generationId ? { ...it.stepGenerations, [id]: info.generationId } : it.stepGenerations }));
   });
   if (!result) {
     const next = previewRun(sessionId, request.targets, request.force);
-    updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || 'The execution changed. Review and approve again.' });
+    updateFeedItem<PlanFeedItem>(sessionId, item.id, { status: 'awaiting', nodeRun: { ...request, signature: next.signature }, plan: { ...item.plan, steps: next.steps }, estimate: next.estimate, error: next.errors.join(' ') || rerunNote(next.estimate) });
     return;
   }
   const status = result.failed.length || result.skipped.length ? result.outputs.size ? 'partial' : 'error' : 'done';

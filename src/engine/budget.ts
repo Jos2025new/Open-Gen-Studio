@@ -38,3 +38,8 @@ export function overLimitText(e: Estimate): string {
 export function acceptOverLimit(): void {
   setSettings((s) => ({ budgetAccepted: s.budgetUsd }));
 }
+
+/** A Nodes run that did not start: the real reason for the card (the limit, or the graph changed). */
+export function rerunNote(e: Estimate): string {
+  return overLimit(e) ? overLimitText(e) : 'The execution changed. Review and approve again.';
+}
