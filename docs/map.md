@@ -21,13 +21,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 248 | 169 |
-| [store.ts](../src/store/store.ts) | 169 | 163 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 76 | 0 |
-| [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 2 |
+| [store.ts](../src/store/store.ts) | 168 | 163 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 75 | 0 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
+| [Popover.tsx](../src/components/ui/Popover.tsx) | 47 | 2 |
 | [actions.ts](../src/engine/design/actions.ts) | 47 | 23 |
-| [doc.ts](../src/engine/design/doc.ts) | 40 | 41 |
 | [ops.ts](../src/engine/ops.ts) | 39 | 16 |
+| [doc.ts](../src/engine/design/doc.ts) | 38 | 41 |
 | [params.ts](../src/engine/params.ts) | 38 | 17 |
 | [catalog.ts](../src/engine/catalog.ts) | 34 | 18 |
 | [raster.ts](../src/engine/design/raster.ts) | 32 | 22 |
@@ -35,7 +35,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [format.ts](../src/lib/format.ts) | 28 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 26 | 6 |
 | [id.ts](../src/lib/id.ts) | 26 | 0 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 6 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 8 |
 | [idb.ts](../src/lib/idb.ts) | 18 | 198 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |

@@ -49,17 +49,6 @@ export default [
     tests: ['tests/paint-mode.test.ts', 'tests/paint-mode-history.test.ts'],
   },
   {
-    id: 'designer-toolbox-dock',
-    what: 'Dock por modo.',
-    sides: [
-      ['src/components/designer/ToolDock.tsx', 'export function ToolDock'],
-      ['src/components/composer/Composer.tsx', '<ToolDock '],
-      ['src/components/designer/ToolPalette.tsx', '<ToolDock '],
-      ['src/components/studio/EmbeddedDesignerBar.tsx', '<ToolDock '],
-    ],
-    tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
-  },
-  {
     id: 'drawing-choice',
     what: 'ADR 0016: pintar trazos editables en Dibujo pregunta; cerrar cancela y Ajustes reinicia la preferencia.',
     sides: [

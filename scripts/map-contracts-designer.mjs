@@ -24,4 +24,17 @@ export default [{
     ['src/styles/designer.css', '.align-panel-controls'],
   ],
   tests: ['tests/marquee.test.ts', 'tests/layer-transform.test.ts', 'tests/object-ops.test.ts', 'tests/multi-layer-rect-rounding.test.ts', 'tests/multi-path-edit.test.ts', 'tests-e2e/edit-marquee.spec.ts', 'tests-e2e/multi-select.spec.ts'],
+},
+{
+  id: 'designer-toolbox-dock',
+  what: 'Dock por modo; Edit sigue la selección.',
+  sides: [
+    ['src/components/designer/ToolDock.tsx', 'export function ToolDock'],
+    ['src/components/composer/Composer.tsx', '<ToolDock '],
+    ['src/components/designer/ToolPalette.tsx', '<ToolDock '],
+    ['src/components/studio/EmbeddedDesignerBar.tsx', '<ToolDock '],
+    ['src/components/designer/ToolDock.tsx', '<EditCard '],
+    ['src/components/designer/EditCard.tsx', 'export function EditCard'],
+  ],
+  tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
 }];

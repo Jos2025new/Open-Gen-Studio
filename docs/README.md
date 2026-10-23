@@ -42,6 +42,7 @@
 - [Studio: chat y tablero Generations, Nodes y Designer (pasos 1 a 3)](features/studio.md).
 - [designer: resize, selección raster/vectorial, cursores, importación múltiple y referencias en el dock](features/designer.md).
 - [selección y marquee de Edit por modo](features/designer-selection.md).
+- Toolbox del Designer (un solo dock: familias → variantes → tarjeta de ajustes; Edit sigue la selección): código `src/components/designer/ToolDock.tsx`, `toolboxModel.ts`, `EditCard.tsx`; test `tests/toolbox-dock.test.ts`, `tests/toolbox-model.test.ts`; contrato `designer-toolbox-dock`; ver [propuesta](propuesta-toolbox-dock.md) y [plan](plan-toolbox-dock.md).
 - [cuota provisional de trazos raster](raster-limit.md).
 - [nodes](features/nodes.md).
 - [persistencia](features/persistencia.md).
@@ -168,6 +169,7 @@
 - [049-2026-10-W43: DeepSeek sin prompt en NanoGPT y tope de bytes de las referencias (2026-10-21)](history/049-2026-10-W43.md).
 - [050-2026-10-W43: precio honesto del plan (B10), margen de precio del usuario, frenos de Nodes con motivo (2026-10-23)](history/050-2026-10-W43.md).
 - [051-2026-10-W43: auditoría del pincel, lienzo/exportación/selección, D30 y presión simulada (2026-10-23)](history/051-2026-10-W43.md).
+- [052-2026-10-W43: un solo toolbox, tarjeta del pincel con pestañas, tarjeta Sizes y tarjeta Edit (2026-10-23)](history/052-2026-10-W43.md).
 
 ## Trazabilidad
 
