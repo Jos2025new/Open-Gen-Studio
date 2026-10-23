@@ -6,7 +6,8 @@ import { pushAlert, dismissAlert } from './alerts';
 import { ADAPTERS } from './providers/registry';
 import { PROVIDER_LABELS } from './providers/types';
 import { lineKey, modelFamily } from './variants';
-import type { Generation, ModelSummary, ProviderId } from './types';
+import { estimateMedia } from './costs';
+import type { GenSettings, Generation, ModelSummary, ProviderId } from './types';
 import { patchGeneration, useStore } from '../store/store';
 
 /*
@@ -56,12 +57,23 @@ function priceOf(m: ModelSummary): { usd: number; unit: string } | undefined {
   return sku ? { usd: sku.usd, unit: sku.unit } : undefined;
 }
 
+/** What this job costs on `m` with its own settings (B11); without a job or a price, the first published price. */
+function jobPrice(m: ModelSummary, job: { settings: GenSettings; needsImage: boolean } | undefined): { usd: number; unit: string } | undefined {
+  if (job && (m.kind === 'image' || m.kind === 'video' || m.kind === 'audio')) {
+    const usd = estimateMedia(m.ref, m.kind, job.settings, job.needsImage, true).usd;
+    if (usd != null) return { usd, unit: 'job' };
+  }
+  return priceOf(m);
+}
+
 export interface CreditOption {
   model: ModelSummary;
   /** Same model as the one that failed, at the same price or less. */
   same: boolean;
   /** Price over the failed model's (same unit), when known: above 1 the option is dearer and says so. */
   ratio?: number;
+  /** What the job costs on this model, when known. */
+  usd?: number;
 }
 
 /** Dearer than this (same unit) is not offered: it is another product, not a way out of a missing credit. */
@@ -91,12 +103,13 @@ export async function creditOptions(ref: string, needsImage?: boolean): Promise<
 }
 
 /** creditOptions plus the equivalents the price cap dropped (cheapest first), so the alert can say they exist. */
-async function creditCandidates(ref: string, needsImage?: boolean): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
+async function creditCandidates(ref: string, needsImage?: boolean, settings?: GenSettings): Promise<{ options: CreditOption[]; pricey: CreditOption[] }> {
   const cur = modelSummary(ref);
   if (!cur) return { options: [], pricey: [] };
   const key = lineKey(cur);
   const family = modelFamily(cur).key;
-  const price = priceOf(cur);
+  const job = settings ? { settings, needsImage: Boolean(needsImage) } : undefined;
+  const price = jobPrice(cur, job);
   const all = Object.values(get().catalog.models).filter((m) => m.kind === cur.kind && m.provider !== cur.provider && m.provider !== 'local' && isConnected(m.provider) && takesInputsOf(cur, m, needsImage));
   const out: CreditOption[] = [];
   const pricey: CreditOption[] = [];
@@ -107,21 +120,21 @@ async function creditCandidates(ref: string, needsImage?: boolean): Promise<{ op
     if (bal !== undefined && bal <= 0) continue;
     const sameVariant = lineKey(m) === key;
     if (!sameVariant && modelFamily(m).key !== family) continue;
-    const p = priceOf(m);
+    const p = jobPrice(m, job);
     const comparable = price && p && p.unit === price.unit && price.usd > 0;
     const ratio = comparable ? p.usd / price.usd : undefined;
-    const option = { model: m, same: sameVariant && Boolean(price && p && p.unit === price.unit && p.usd <= price.usd), ratio };
+    const option = { model: m, same: sameVariant && Boolean(price && p && p.unit === price.unit && p.usd <= price.usd), ratio, usd: p?.unit === 'job' ? p.usd : undefined };
     if (ratio !== undefined && ratio > CREDIT_PRICE_LIMIT) pricey.push(option);
     else out.push(option);
   }
-  const cost = (o: CreditOption) => priceOf(o.model)?.usd ?? Infinity;
+  const cost = (o: CreditOption) => o.usd ?? priceOf(o.model)?.usd ?? Infinity;
   const options = out.sort((a, b) => Number(b.same) - Number(a.same) || Number(lineKey(b.model) === key) - Number(lineKey(a.model) === key) || cost(a) - cost(b)).slice(0, 4);
   return { options, pricey: pricey.sort((a, b) => (a.ratio ?? 0) - (b.ratio ?? 0)) };
 }
 
-const label = (m: ModelSummary, ratio?: number) => {
-  const p = priceOf(m);
-  return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p ? ` · ${formatUsd(p.usd)}` : ''}${ratio !== undefined && ratio > 1 ? ' · pricier' : ''}`;
+const label = (m: ModelSummary, ratio?: number, usd?: number) => {
+  const p = usd ?? priceOf(m)?.usd;
+  return `${m.name} · ${PROVIDER_LABELS[m.provider]}${p != null ? ` · ${formatUsd(p)}` : ''}${ratio !== undefined && ratio > 1 ? ' · pricier' : ''}`;
 };
 
 /**
@@ -134,14 +147,14 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
   if (!g || !cur) return false;
   markEmpty(cur.provider);
   const empty = PROVIDER_LABELS[cur.provider];
-  const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g));
+  const { options, pricey } = await creditCandidates(g.modelRef, jobNeedsImage(g), g.settings);
   const switchTo = (m: ModelSummary) => {
     patchGeneration(genId, { modelRef: m.ref, modelName: m.name, error: undefined });
     return rerun(genId);
   };
   const auto = options.find((o) => o.same);
   if (auto) {
-    pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model)}, same price or less).` });
+    pushAlert({ level: 'info', text: `${empty} has no credit: ${cur.name} switched to the same model at ${PROVIDER_LABELS[auto.model.provider]} (${label(auto.model, undefined, auto.usd)}, same price or less).` });
     await switchTo(auto.model);
     return true;
   }
@@ -149,7 +162,7 @@ export async function onGenerationCredit(genId: string, rerun: (id: string) => P
     const id = pushAlert({
       level: 'warn',
       text: `${empty} has no credit for ${cur.name}. Run it with another model that has credit (prices per run, dearer ones marked), or recharge ${empty}:`,
-      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
+      actions: options.slice(0, 3).map((o) => ({ label: label(o.model, o.ratio, o.usd), run: () => { dismissAlert(id); void switchTo(o.model).catch(logged('switch model after no credit')); } })),
     });
     return false;
   }

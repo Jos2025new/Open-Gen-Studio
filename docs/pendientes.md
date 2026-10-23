@@ -17,7 +17,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
 8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
-Después, por riesgo: B11 (crédito; de la auditoría de Studio), A24 (Nodes, hacerlo bien), los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
+Después, por riesgo: A24 (Nodes, hacerlo bien), los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
 ## Archivos de detalle
 
@@ -72,7 +72,6 @@ Después, por riesgo: B11 (crédito; de la auditoría de Studio), A24 (Nodes, ha
 | B7 | Prueba con gasto real de voz y efectos (usuario) | medio | 2026-10-08 |
 | B8 | Modelos `-spicy` excluidos de forma provisional | bajo | 2026-10-08 |
 | B9 | «Download failed (404)» en sesión previa del sandbox | bajo | 2026-10-21 |
-| B11 | Crédito compara el primer precio, no el del trabajo | alto | 2026-10-22 |
 | B12 | Resto de la auditoría de Studio (E2-01, E3-01, E1-01) | medio | 2026-10-22 |
 
 ### Datos, guardado, calidad y pruebas (C) · [detalle](pendientes-sistema.md)

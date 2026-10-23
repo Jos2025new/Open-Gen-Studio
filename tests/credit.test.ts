@@ -67,7 +67,7 @@ describe('no credit at the provider', () => {
 
 describe('the equivalent model when a provider has no credit', () => {
   const img = (provider: 'nanogpt' | 'atlas', id: string, usd: number, acceptsImage: boolean): ModelSummary =>
-    ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'image', acceptsText: true, acceptsImage, tags: [], price: { skus: [{ unit: 'image', usd }] } }) as unknown as ModelSummary;
+    ({ ref: `${provider}::${id}`, provider, id, name: id, kind: 'image', acceptsText: true, acceptsImage, tags: [], price: { skus: [{ unit: 'output', usd }] } }) as unknown as ModelSummary;
 
   const run = async (models: ModelSummary[], failing: ModelSummary, inputs: Record<string, unknown> = { refs: [] }) => {
     const st = useStore.getState();
@@ -138,5 +138,24 @@ describe('the equivalent model when a provider has no credit', () => {
     expect(alert.text).toContain('has a similar model (nano-banana-pro) but it costs 2.5× more, so it is not offered automatically');
     expect(alert.text).not.toContain('no other connected provider');
     expect(alert.actions ?? []).toHaveLength(0);
+  });
+});
+
+describe('B11: the credit switch compares what this job costs, not the first listed price', () => {
+  it('a 1080p job switches to a provider whose flat price is under the failed model\'s 1080p price', async () => {
+    const nano = { ...m('nanogpt', 'bytedance-seedance-2-0-fast', 0.1), price: { skus: [{ unit: 'second', usd: 0.1, resolution: '480p' }, { unit: 'second', usd: 0.3, resolution: '1080p' }] } } as ModelSummary;
+    const atlas = m('atlas', 'bytedance/seedance-2.0-fast/image-to-video', 0.2);
+    const st = useStore.getState();
+    useStore.setState({
+      settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k', atlas: 'k' } },
+      catalog: { ...st.catalog, models: { [nano.ref]: nano, [atlas.ref]: atlas }, schemas: {} },
+      generations: { g1: { id: 'g1', sessionId: st.activeSessionId, kind: 'video', modelRef: nano.ref, modelName: nano.name, status: 'error', inputs: { refs: [] }, settings: { count: 1, duration: 5, resolution: '1080p', advanced: {} }, assetIds: [] } as never },
+    });
+    vi.spyOn(ADAPTERS.atlas, 'balance').mockResolvedValue(10);
+    useAlerts.setState({ alerts: [] });
+    forgetBalances();
+    const rerun = vi.fn(async () => []);
+    expect(await onGenerationCredit('g1', rerun)).toBe(true);
+    expect(useStore.getState().generations.g1.modelRef).toBe(atlas.ref);
   });
 });

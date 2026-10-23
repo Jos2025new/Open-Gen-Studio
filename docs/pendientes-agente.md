@@ -49,5 +49,5 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 - **B8 · bajo · 2026-10-08 · Modelos `-spicy` excluidos salvo que se nombren:** aplicado de forma provisional (`modelNaming.ts`, `modelIndex.ts`). Probablemente se bloqueen si la app deja de ser solo local. Pendiente del usuario.
 - **B9 · bajo · 2026-10-21 · «Download failed (404)»** visible en una sesión previa del sandbox (informe, notas). No se atribuye a la prueba. Puede ser un enlace caducado de NanoGPT; sin investigar.
 - **B10 · cerrado 2026-10-23** · precio del plan con el modelo enviado y margen de precio del usuario: [050](history/050-2026-10-W43.md).
-- **B11 · alto · 2026-10-22 · El cambio por crédito compara el primer precio, no el del trabajo** (auditoría de Studio, E4-02, `credit.ts`, `priceOf` usa `skus[0]`). Comparar el coste del trabajo con sus ajustes en los dos proveedores; si es igual o menor, cambia solo; si no, las opciones que ya existen.
+- **B11 · cerrado 2026-10-23** · el cambio por crédito compara lo que cuesta el trabajo con sus ajustes: [050](history/050-2026-10-W43.md).
 - **B12 · medio · 2026-10-22 · Otros de la auditoría de Studio:** E2-01 (la elección borrador/calidad se pide en cada vídeo; va con A1), E3-01 (el total de segundos no se vuelve a sumar; mostrarlo en el plan, sin bloquear), E1-01 (la variante archviz solo para Chat se carga en Nodes).
