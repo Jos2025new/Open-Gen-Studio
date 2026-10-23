@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
 import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
+import { Segmented } from '../ui/primitives';
 
 /*
  * Brush and eraser settings, after PaintTool SAI's brush panel, in the app's own fields (one slider, one toggle,
@@ -91,19 +92,72 @@ function PressureReadout() {
   return <p className={`opt-hint brush-pressure${r && r.pressure === null ? ' is-warn' : ''}`} role="status">{text}</p>;
 }
 
-export function BrushSettings({ erase, compact = false }: { erase: boolean; compact?: boolean }) {
+type BrushTab = 'tip' | 'stroke' | 'pressure' | 'blend';
+
+/** `card`: the toolbox card of the mockup. The brush on the left, the rest in tabs on the right; every tab shares one cell so switching never changes the height. */
+export function BrushSettings({ erase, compact = false, card = false, head }: { erase: boolean; compact?: boolean; card?: boolean; head?: ReactNode }) {
   const brush = useStore((s) => s.ui.brush);
   const set = (patch: Partial<Brush>) => setUi({ brush: { ...brush, ...patch } });
   const hardness = brush.hardness ?? BRUSH_DEFAULTS.hardness;
   const tipIndex = TIP_PRESETS.findIndex((h) => Math.abs(h - hardness) < 0.005);
   // Pressure curves and Keep Opacity: hidden until asked for.
   const [advanced, setAdvanced] = useState(false);
+  const [tab, setTab] = useState<BrushTab>('tip');
   if (compact) return <>
     <InlineSlider label="Size" unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
     {!erase && <InlineColor label="Color" value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
     {/* Smoothing and Stabilize live in the Tool tab: set once, not touched every stroke. */}
   </>;
+  const pane = (id: BrushTab, children: ReactNode) => <div className="brush-card-pane" key={id} inert={tab !== id} aria-hidden={tab !== id} data-active={tab === id}>{children}</div>;
+  if (card) return <div className="brush-card">
+    <div className="brush-card-head">
+      {head}
+      <BrushPreview brush={brush} erase={erase} />
+      <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />
+    <div className="brush-row">
+      {!erase && <InlineColor label="Color" iconOnly value={brush.color} onChange={(v) => set({ color: v })} alpha={{ value: brush.opacity, onChange: (o) => set({ opacity: Math.max(0.01, o) }) }} />}
+      <InlineSlider label="Size" icon={<Circle size={13} />} unit="px" min={1} max={240} value={brush.size} onChange={(v) => set({ size: v })} />
+      <InlineSlider label="Opacity" icon={<Droplet size={13} />} unit="%" scale={100} min={0.01} max={1} step={0.01} value={brush.opacity} onChange={(v) => set({ opacity: v })} />
+      <InlineSelect label="Texture" icon={<TextureIcon texture={brush.texture ?? 'none'} />} value={brush.texture ?? 'none'} options={BRUSH_TEXTURES} onChange={(v) => set({ texture: v as BrushTexture, textureStrength: v !== 'none' && !brush.textureStrength ? BRUSH_DEFAULTS.textureStrength : brush.textureStrength })} />
+    </div>
+    </div>
+    <div className="brush-card-tabs">
+      <Segmented<BrushTab> size="sm" value={tab} onChange={setTab} options={[{ value: 'tip', label: 'Tip' }, { value: 'stroke', label: 'Stroke' }, { value: 'pressure', label: 'Pressure' }, ...(erase ? [] : [{ value: 'blend' as const, label: 'Blend' }])]} />
+      <div className="brush-card-panes">
+        {pane('tip', <>
+    {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
+    <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
+    <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
+    <InlineToggle label="Mirror" tip="Every stroke is also painted reflected across the page's vertical centre line" checked={!!brush.mirror} onChange={(v) => set({ mirror: v })} />
+        </>)}
+        {pane('stroke', <>
+    <div className="brush-row">
+      <InlineSlider label="Taper start" allowManualOverflow unit="px" min={0} max={500} value={brush.taperStart ?? 0} onChange={(v) => set({ taperStart: v })} />
+      <InlineSlider label="Taper end" allowManualOverflow unit="px" min={0} max={500} value={brush.taperEnd ?? 0} onChange={(v) => set({ taperEnd: v })} />
+    </div>
+    <div className="brush-row">
+      <InlineSlider label="Stabilize" min={0} max={10} value={brush.stabilization ?? 0} onChange={(v) => set({ stabilization: v })} />
+      <InlineSlider label="Smoothing" min={0} max={10} value={brush.smoothing ?? 0} onChange={(v) => set({ smoothing: v })} />
+    </div>
+        </>)}
+        {pane('pressure', <>
+    <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
+    {brush.simulatePressure && <InlineSlider label="Speed influence" unit="%" scale={100} min={0.25} max={2} step={0.05} value={brush.pressureSpeed ?? 1} onChange={(v) => set({ pressureSpeed: v })} />}
+    {/* Only without simulation: then a missing pen pressure matters. */}
+    {!brush.simulatePressure && <PressureReadout />}
+      <InlineToggle label="Pressure → size" tip="Lighter pressure paints thinner, down to the minimum size" checked={brush.pressureSize !== false} onChange={(v) => set({ pressureSize: v })} />
+      <InlineSlider label="Min size" unit="%" scale={100} min={0} max={1} step={0.01} disabled={brush.pressureSize === false} value={brush.minSize ?? BRUSH_DEFAULTS.minSize} onChange={(v) => set({ minSize: v })} />
+      <InlineToggle label="Pressure → density" tip="Lighter pressure paints fainter, down to the minimum density" checked={!!brush.pressureDensity} onChange={(v) => set({ pressureDensity: v })} />
+      <InlineSlider label="Min density" unit="%" scale={100} min={0} max={1} step={0.01} disabled={!brush.pressureDensity} value={brush.minDensity ?? BRUSH_DEFAULTS.minDensity} onChange={(v) => set({ minDensity: v })} />
+        </>)}
+        {!erase && pane('blend', <>
+    {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
+      {!erase && <InlineToggle label="Keep opacity" tip="Paint only where the layer already has pixels; transparent areas stay transparent" checked={!!brush.keepOpacity} onChange={(v) => set({ keepOpacity: v })} />}
+        </>)}
+      </div>
+    </div>
+  </div>;
   return <>
     <BrushPreview brush={brush} erase={erase} />
     <SizePresets value={brush.size} onChange={(v) => set({ size: v })} />

@@ -118,4 +118,16 @@ describe('ToolDock real interaction', () => {
     expect(card.querySelector('[aria-label="Anchor"]')).toBeTruthy();
     expect([...card.querySelectorAll('button')].map((b) => b.textContent)).toEqual(expect.arrayContaining(['Trim to content', 'Apply']));
   });
+
+  it('lays the brush card out as the mockup: brush on the left, every other control in tabs that keep the height', async () => {
+    await click('Brush'); await click('Pencil');
+    const card = host.querySelector('.brush-card')!;
+    expect(card.querySelector('.brush-card-head .paint-mode')).toBeTruthy();
+    expect([...card.querySelectorAll('.brush-card-tabs .segmented button')].map((b) => b.textContent)).toEqual(['Tip', 'Stroke', 'Pressure', 'Blend']);
+    const labels = [...card.querySelectorAll('.brush-card-pane .opt-label')].map((l) => l.textContent);
+    for (const label of ['Tip', 'Hardness', 'Mirror', 'Taper start', 'Taper end', 'Stabilize', 'Smoothing', 'Simulate pressure', 'Pressure → size', 'Min size', 'Pressure → density', 'Min density', 'Blend', 'Keep opacity']) expect(labels, label).toContain(label);
+    expect(labels).not.toContain('Advanced settings');
+    const panes = [...card.querySelectorAll<HTMLElement>('.brush-card-pane')];
+    expect(panes.filter((p) => !p.hasAttribute('inert')).length).toBe(1);
+  });
 });

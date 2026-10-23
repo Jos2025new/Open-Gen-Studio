@@ -47,7 +47,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
   const [dockState, dispatch] = useReducer(reduceToolboxState, initialToolboxState);
   const { depth, familyId } = dockState;
   const familyButtons = useRef(new Map<string, HTMLButtonElement>());
-  const [height, setHeight] = useState(320);
+  const [height, setHeight] = useState(360);
   const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
@@ -121,7 +121,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
           el.addEventListener('pointermove', move); el.addEventListener('pointerup', up, { once: true });
         }}><GripHorizontal size={14} /></button>
         <div className="tool-dock-settings-grid">
-          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} /></div>}
+          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} card /></div>}
           {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} inline /></div>}
         </div>
       </section>}
