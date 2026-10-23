@@ -1,0 +1,77 @@
+.tool-dock {
+  --tool-dock-width: min(580px, calc(100vw - 32px));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: var(--tool-dock-width);
+  max-width: 100%;
+  min-width: 0;
+  color: var(--text);
+}
+.tool-dock-stack { position: absolute; z-index: 7; left: 0; bottom: calc(100% + 8px); display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 0; }
+.tool-dock-variants, .tool-dock-family {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: var(--toolbar-padding);
+  background: var(--surface-2);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--toolbar-radius);
+  box-shadow: var(--shadow-card);
+  overflow-x: auto;
+}
+.tool-dock-family { width: 100%; }
+.tool-dock-family > span { display: inline-flex; align-items: center; flex: none; }
+.tool-dock .icon-btn { flex: none; width: var(--control-h); height: var(--control-h); border-radius: var(--radius-s); }
+.tool-dock .icon-btn svg { width: var(--control-icon); height: var(--control-icon); }
+.tool-dock .icon-btn.is-active { background: var(--active-bg); color: var(--active-text); box-shadow: inset 0 0 0 1px var(--active-line); }
+.tool-dock-grow { flex: 1 1 auto; }
+.tool-dock-separator { display: inline-block; flex: none; width: 1px; height: 20px; margin: 0 4px; background: var(--panel-line); }
+.tool-dock-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  height: min(var(--tool-dock-card-height), 60vh);
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--panel-line);
+  border-radius: var(--toolbar-radius);
+  box-shadow: var(--shadow-card);
+}
+.tool-dock-grip {
+  display: flex;
+  flex: 0 0 18px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  padding: 0;
+  color: var(--text-2);
+  background: transparent;
+  border: 0;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.tool-dock-grip:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
+.tool-dock-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; min-width: 0; padding: 4px 8px 8px; }
+.tool-dock-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; min-width: 0; }
+.tool-dock-settings .tool-settings { display: contents; }
+.tool-dock-settings .opt-hint, .tool-dock-settings .brush-preview { grid-column: 1 / -1; }
+.tool-dock-actions { display: flex; align-items: center; }
+.tool-dock .tool-dock-visitor { border-left: 0; }
+.tool-dock-family .paint-mode { flex: none; }
+.composer-tools-bar .tool-dock { flex: 1 1 auto; }
+.composer-tools-bar .tool-dock-family { box-shadow: none; }
+@media (max-width: 600px) {
+  .tool-dock { width: 100%; }
+  .tool-dock-family { width: 100%; }
+  .tool-dock-settings-grid { grid-template-columns: minmax(0, 1fr); }
+  .tool-dock-settings { grid-template-columns: minmax(0, 1fr); }
+}
