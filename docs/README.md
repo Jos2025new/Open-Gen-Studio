@@ -161,6 +161,7 @@
 - [048-2026-10-W43: ronda de interfaz 2026-10-19/20, pasos 1 y 2 del sistema visual (2026-10-20)](history/048-2026-10-W43.md).
 - [049-2026-10-W43: DeepSeek sin prompt en NanoGPT y tope de bytes de las referencias (2026-10-21)](history/049-2026-10-W43.md).
 - [050-2026-10-W43: precio honesto del plan (B10), margen de precio del usuario, frenos de Nodes con motivo (2026-10-23)](history/050-2026-10-W43.md).
+- [051-2026-10-W43: auditoría del pincel, lienzo/exportación/selección, D30 y presión simulada (2026-10-23)](history/051-2026-10-W43.md).
 
 ## Trazabilidad
 

@@ -11,6 +11,16 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 1. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
 2. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
 3. **Probar en el sandbox lo hecho el 2026-10-23** (sin prueba visual ni LLM real): ajuste «Price margin», Nodes frenado por límite, puertos por resultado en Nodes, Designer D19–D28, «como antes · Cambiar» en la tarjeta del plan y A1 con un LLM real. Lista en [050](history/050-2026-10-W43.md#pendiente).
+   Del mismo día, auditoría del Designer ([051](history/051-2026-10-W43.md#pendiente)):
+   - Keep Opacity en capa de borde suave, normal y Multiply: los bordes no se aclaran.
+   - Preset con textura muestra la textura.
+   - Trazo con textura y presión simulada; un trazo fino muy largo con textura no tiene huecos.
+   - Presión simulada con el touchpad, lento y rápido; mover «Speed influence».
+   - Trim: capa de pintura vacía, rectángulo con trazo grueso, contenido > 8192 px (se rechaza con mensaje).
+   - SVG con Glow: aviso; trazo de degradado semitransparente igual que en el editor.
+   - Clic en la esquina de la caja de una elipse y dentro de un bucle libre no selecciona; cerca de una línea diagonal sí.
+   - D30: icono de aviso en Layers con tooltip, al pulsar reintenta.
+   - Opcional: borrar el «Design 1» de prueba del sandbox.
 4. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
 5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
 6. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)

@@ -12,6 +12,7 @@ Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se mo
 - **A24** resultado por conexión en Nodes (`33447d2`) y puertos por resultado (`55f31d4`, `tests/node-link-result.test.ts`).
 - **D19–D22** (`912d48f`, `f734a40`, `8287a66`, `daeb56c`, `tests/designer-layer-fixes.test.ts`) y **D23–D28** (`tests/designer-audit-d23-d28.test.ts`).
 - **Frenos de Nodes con su motivo** (`07f535c`).
+- **Auditoría del Designer** (detalle en [051](history/051-2026-10-W43.md)): Keep Opacity (`19499ef`, `tests/keep-opacity-lock.test.ts`), textura y sellos (`b14c7f7`, `3c6c719`), Trim (`aacb89b`), exportación SVG/PDF (`ebb7358`), selección por forma (`4906746`), **D30** capa ilegible sin sobrescribir (`b72412e`, `b19b84a`, `tests/raster-unreadable.test.ts`) y presión simulada por velocidad (`3481b33`, `tests/simulated-pressure-rate.test.ts`).
 - Pendiente de prueba en el sandbox: ver [pendientes](pendientes.md), punto 3.
 
 ## Hechos: cerrados en la revisión del 2026-10-22 [rev]
