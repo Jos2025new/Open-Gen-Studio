@@ -17,13 +17,13 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
 8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
-Después, por riesgo: B10 y B11 (precio honesto y crédito; de la auditoría de Studio), A24 (Nodes, hacerlo bien), el informe del Designer de GPT (pendiente de revisar), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
+Después, por riesgo: B10 y B11 (precio honesto y crédito; de la auditoría de Studio), A24 (Nodes, hacerlo bien), los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
 ## Archivos de detalle
 
 - [pendientes-agente](pendientes-agente.md): agente (A1 a A24) y proveedores, precios y coste (B1 a B12).
 - [pendientes-sistema](pendientes-sistema.md): datos y guardado (C0 a C6), calidad y pruebas (C7 a C14), funciones propuestas (F1 a F7), decisiones y ramas (G1 a G7).
-- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D18).
+- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D28).
 - [pendientes-gui](pendientes-gui.md): interfaz por espacios, Home, tarjetas del chat (39 filas; abiertas, prioridad y origen en su cabecera).
 - [pendientes-cerrados](pendientes-cerrados.md): lo hecho, superado u obsoleto, con evidencia.
 - Otras fuentes únicas: [render-estado](render-estado.md) (render y rendimiento, D14), [modelos-pruebas](modelos-pruebas.md) (A22), [fx-pruebas](fx-pruebas.md) (D16), [gui-cohesion-pruebas](gui-cohesion-pruebas.md) (cómo probar la interfaz).
@@ -141,6 +141,16 @@ Después, por riesgo: B10 y B11 (precio honesto y crédito; de la auditoría de 
 | D16 | Capas FX: plan de pruebas completo | medio | 2026-10-08 |
 | D17 | Interfaz del Designer al estilo ibisPaint y Photoshop | medio | 2026-10-10 |
 | D18 | Lineart que se deforma al encoger (10 % residual) | medio | 2026-10-13 |
+| D19 | Las imágenes de capas borradas o fusionadas nunca se liberan | alto | 2026-10-22 |
+| D20 | «Merge down» con la capa de abajo oculta hace desaparecer lo visible | alto | 2026-10-22 |
+| D21 | La goma borra en capas ocultas | alto | 2026-10-22 |
+| D22 | Rellenar una capa vectorial vacía la sube arriba del todo | alto | 2026-10-22 |
+| D23 | Cortar (Ctrl+X) puede borrar sin copiar | medio | 2026-10-22 |
+| D24 | Pintar con selección aplana los trazos sin aviso | medio | 2026-10-22 |
+| D25 | «Flip horizontal» sobre una imagen girada la voltea en vertical (sin confirmar) | medio | 2026-10-22 |
+| D26 | Pasos de deshacer que no deshacen nada | bajo | 2026-10-22 |
+| D27 | El cuentagotas compone la página entera para un píxel (lentitud sin medir) | bajo | 2026-10-22 |
+| D28 | Una fuente que carga tarde no se redibuja hasta interactuar | bajo | 2026-10-22 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 
