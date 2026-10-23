@@ -13,6 +13,8 @@ vi.mock('../src/lib/media', async () => {
   const { pixelCanvas } = await import('./helpers/pixelCanvas');
   return { createCanvas: pixelCanvas, ctx2d: (c: HTMLCanvasElement) => Object.assign({ translate() {}, scale() {}, rotate() {}, drawImage() {} }, c.getContext('2d')), canvasToBlob: async () => new Blob() };
 });
+const composed = vi.hoisted(() => ({ calls: 0 }));
+vi.mock('../src/engine/design/render', async (orig) => ({ ...await orig<typeof import('../src/engine/design/render')>(), drawDoc: () => { composed.calls++; } }));
 vi.mock('../src/engine/design/pixelSelection', () => ({
   clearSelected: () => { dom.cleared++; return null; }, getSelection: () => ({}), selectedCrop: () => ({ width: 1, height: 1 }),
 }));
@@ -117,6 +119,36 @@ describe('D26: no undo step for a gesture that changed nothing', () => {
     expect(stage).not.toMatch(/record\(current\);\s*drag\.current = \{ kind: 'scale'/);
     expect(stage).toMatch(/kind: 'scale'[^\n]*pre: current/);
     expect(stage).toMatch(/else if \(d\.kind === 'scale' && started\(d, p\)\)/);
+  });
+});
+
+import { forgetFrame, rememberFrame } from '../src/engine/design/framePeek';
+import { sampleColor } from '../src/engine/design/swatches';
+
+describe('D27: the eyedropper reads the painted frame', () => {
+  const page = (rgba: number[]) => ({ getContext: () => ({ getImageData: () => ({ data: rgba }) }) }) as unknown as HTMLCanvasElement;
+  afterEach(() => forgetFrame());
+  it('takes the pixel from the frame already composed for this very document, without composing the page', () => {
+    const doc = createDoc('d27', 40, 40);
+    rememberFrame(doc, page([10, 20, 30, 255]), 1);
+    composed.calls = 0;
+    expect(sampleColor(doc, 5, 5)).toBe('#0a141e');
+    expect(composed.calls).toBe(0);
+  });
+  it('a transparent pixel of the frame is "nothing here"', () => {
+    const doc = createDoc('d27b', 40, 40);
+    rememberFrame(doc, page([0, 0, 0, 0]), 1);
+    expect(sampleColor(doc, 5, 5)).toBeNull();
+  });
+  it('composes as before for another document, a changed document or a downscaled frame', () => {
+    const doc = createDoc('d27c', 40, 40);
+    rememberFrame(doc, page([10, 20, 30, 255]), 1);
+    for (const other of [createDoc('other', 40, 40), { ...doc }]) { composed.calls = 0; sampleColor(other, 5, 5); expect(composed.calls).toBe(1); }
+    rememberFrame(doc, page([10, 20, 30, 255]), 0.5);
+    composed.calls = 0; sampleColor(doc, 5, 5); expect(composed.calls).toBe(1);
+    rememberFrame(doc, page([10, 20, 30, 255]), 1);
+    forgetFrame();
+    composed.calls = 0; sampleColor(doc, 5, 5); expect(composed.calls).toBe(1);
   });
 });
 

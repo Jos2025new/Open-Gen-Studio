@@ -265,7 +265,7 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
       ctx.fillRect(0, 0, doc.width, doc.height);
     }
     for (const s of steps) drawLayer(ctx, s.layer);
-  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context, !!(ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas'));
+  } else drawWithFx(ctx, doc, steps, opts.resolution === 'document', context, !!(ctx.canvas as HTMLCanvasElement | undefined)?.classList?.contains('stage-canvas'), !!opts.hideLayerId);
   ctx.restore();
   end?.(stage ? takeCanvasCount() : undefined);
   if (stage) frameShown();
@@ -279,9 +279,10 @@ export function drawDoc(ctx: CanvasRenderingContext2D, doc: DesignDoc, opts: { h
  */
 import { editorCacheBudget } from './cacheBudget';
 import { drawRevision } from './drawRevision';
+import { forgetFrame, rememberFrame } from './framePeek';
 const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
-if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; });
+if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; forgetFrame(); });
 function contentKey(l: Layer, s: { fx: FxLayer[] }, geom: unknown[]): unknown[] {
   // The pixels' versions go last: while a stroke is painted only they change (see cachedFx). The drawing revision
   // replaces the layer object, so moving or fading the layer keeps its filtered result.
@@ -441,11 +442,13 @@ function retainedFrame(doc: DesignDoc, steps: ReturnType<typeof fxPlan>, scale: 
   return page;
 }
 
-function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false): void {
+function drawWithFx(ctx: CanvasRenderingContext2D, doc: DesignDoc, steps: ReturnType<typeof fxPlan>, fullResolution: boolean, trace?: RenderTrace, editor = false, hidden = false): void {
   const m = ctx.getTransform();
   const scale = fullResolution ? 1 : Math.min(Math.max(0.05, Math.hypot(m.a, m.b) || 1), Math.sqrt(FX_MAX_PX / Math.max(1, doc.width * doc.height)));
   const W = Math.max(1, Math.floor(doc.width * scale)), H = Math.max(1, Math.floor(doc.height * scale));
-  const page = editor && !fullResolution && !dragPreview ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
+  const retainedPath = editor && !fullResolution && !dragPreview;
+  const page = retainedPath ? retainedFrame(doc, steps, scale, W, H, trace) : composeFx(doc, steps, scale, W, H, fullRect(W, H), editor, trace);
+  if (retainedPath && !hidden && !servedStale) rememberFrame(doc, page, scale); else forgetFrame();
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(page, 0, 0, doc.width, doc.height);
 }
