@@ -1,17 +1,15 @@
 import { useEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
-import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Minus, MousePointer2, MoveUpRight, PaintBucket, PanelRight, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
+import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
-import { paintModeOf } from '../../engine/design/paintMode';
 import type { DesignTool } from '../../engine/design/rules';
 import { toolBlockReason } from '../../engine/design/rules';
 import { activeLayer } from '../../engine/design/doc';
 import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { ToolSettings } from './ToolSettings';
-import { PaintModeToggle } from './PaintModeToggle';
 import { CanvasSize } from './CanvasSize';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
-import { initialToolboxState, reduceToolboxState, TOOLBOXES, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
+import { initialToolboxState, reduceToolboxState, TOOLBOX, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
 import '../../styles/tool-dock.css';
 
 const ICONS: Record<string, LucideIcon> = {
@@ -44,25 +42,21 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
   const brushHardness = useStore((state) => state.ui.brush.hardness ?? TIP_PRESETS[0]);
-  const mode = paintModeOf(doc);
-  const families = TOOLBOXES[mode];
-  const visitorFamilies = TOOLBOXES[mode === 'drawing' ? 'design' : 'drawing'];
-  const currentFamily = familyFor(families, currentTool, currentShape, rulerKind, brushHardness);
-  const visitor = !currentFamily ? familyFor(visitorFamilies, currentTool, currentShape, rulerKind, brushHardness) : undefined;
-  const shownFamilies = visitor ? [...families, { ...visitor, id: `visitor-${visitor.id}`, label: `${visitor.label} · other mode` }] : families;
+  const currentFamily = familyFor(TOOLBOX, currentTool, currentShape, rulerKind, brushHardness);
+  const shownFamilies = TOOLBOX;
   const [dockState, dispatch] = useReducer(reduceToolboxState, initialToolboxState);
   const { depth, familyId } = dockState;
   const familyButtons = useRef(new Map<string, HTMLButtonElement>());
   const [height, setHeight] = useState(320);
-  const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? (visitor ? shownFamilies.at(-1) : currentFamily);
+  const selectedFamily = shownFamilies.find((family) => family.id === familyId) ?? currentFamily;
   const selectedVariant = selectedFamily ? selectedFamily.variants.find((variant) => variant.id === dockState.variantId) ?? toolFor(selectedFamily, currentTool, currentShape, rulerKind, brushHardness) ?? selectedFamily.variants[0] : undefined;
   const activeLayerValue = activeLayer(doc);
   const disabledReason = (variant: ToolboxVariant) => variant.tool ? toolBlockReason(variant.tool, activeLayerValue) : undefined;
 
   useEffect(() => {
-    const desiredId = visitor ? `visitor-${visitor.id}` : currentFamily?.id;
+    const desiredId = currentFamily?.id;
     if (desiredId && desiredId !== familyId) dispatch({ type: 'family', familyId: desiredId });
-  }, [currentTool, mode, doc.id]);
+  }, [currentTool, doc.id]);
 
   const chooseVariant = (variant: ToolboxVariant) => {
     if (variant.soon) return;
@@ -127,17 +121,16 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
           el.addEventListener('pointermove', move); el.addEventListener('pointerup', up, { once: true });
         }}><GripHorizontal size={14} /></button>
         <div className="tool-dock-settings-grid">
-          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} modeToggle={false} /></div>}
+          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} /></div>}
           {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} inline /></div>}
         </div>
       </section>}
     </div>
-    <div className="tool-dock-family" role="toolbar" aria-label={`${mode} tools`} onKeyDown={moveToolbarFocus}>
-      {shownFamilies.map((family, index) => {
+    <div className="tool-dock-family" role="toolbar" aria-label="Tools" onKeyDown={moveToolbarFocus}>
+      {shownFamilies.map((family) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
         const soonReason = family.variants.every((variant) => variant.soon) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
-        return <span className={family.id.startsWith('visitor-') ? 'tool-dock-visitor' : ''} key={`${family.id}-${index}`}>
-          {family.id.startsWith('visitor-') && <span className="tool-dock-separator" aria-hidden="true" />}
+        const button = <span key={family.id}>
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
             if (soonReason) return;
             if (family.id !== familyId) {
@@ -147,10 +140,12 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
             dispatch({ type: 'family', familyId: family.id });
           }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); })}
         </span>;
+        return family.id === 'settings' ? <span key="panels" className="tool-dock-end">
+          <span className="tool-dock-separator" aria-hidden="true" />
+          <IconButton icon={Layers} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
+          {button}
+        </span> : button;
       })}
-      <span className="tool-dock-separator" aria-hidden="true" />
-      <IconButton icon={PanelRight} label="Show or hide right panel" size="md" onClick={() => window.dispatchEvent(new Event('ogs:layers-toggle'))} />
-      <PaintModeToggle sessionId={sessionId} doc={doc} />
     </div>
   </div>;
 }

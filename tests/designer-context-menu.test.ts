@@ -47,16 +47,16 @@ it('switches the settings to another tool and follows keyboard tool changes', as
   expect(variants()?.getAttribute('aria-label')).toBe('Ruler variants');
 });
 it('opens variants for a selected family and activates its tool', async () => {
-  await click('Color', '.tool-dock-family');
-  expect(variants()?.getAttribute('aria-label')).toBe('Color variants');
+  await click('Edit', '.tool-dock-family'); await click('Brush', '.tool-dock-family');
+  expect(variants()?.getAttribute('aria-label')).toBe('Brush variants');
   await click('Fill');
   expect(useStore.getState().ui.tool).toBe('fill');
   expect(host.querySelector('[aria-label="Fill settings"]')).toBeTruthy();
 });
-it('retains the real Add control and includes Layers and mode controls in the dock', async () => {
+it('retains the real Add control and includes Layers in the dock, without the mode switch', async () => {
   expect(host.querySelector('button')?.textContent).toBe('Add');
   expect(host.querySelector('.tool-dock')?.contains(host.querySelector('button'))).toBe(false);
   expect([...document.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Show or hide right panel')).toBe(true);
-  expect(host.querySelector('.paint-mode[aria-label="Paint mode"]')).toBeTruthy();
+  expect(host.querySelector('.tool-dock-family .paint-mode')).toBeNull();
   await click('Brush'); expect(variants()).toBeTruthy();
 });

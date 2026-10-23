@@ -10,7 +10,7 @@
   min-width: 0;
   color: var(--text);
 }
-.tool-dock-stack { position: absolute; z-index: 7; left: 0; bottom: calc(100% + 8px); display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 0; }
+.tool-dock-stack { position: absolute; z-index: 7; left: -1px; right: -1px; width: auto; bottom: calc(100% + 8px); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .designer-palette:not(.is-docked) .tool-dock-stack { top: calc(100% + 8px); bottom: auto; }
 .tool-dock-variants, .tool-dock-family {
   display: flex;
@@ -67,10 +67,15 @@
 .tool-dock-settings .tool-settings { display: contents; }
 .tool-dock-settings .opt-hint, .tool-dock-settings .brush-preview { grid-column: 1 / -1; }
 .tool-dock-actions { display: flex; align-items: center; }
-.tool-dock .tool-dock-visitor { border-left: 0; }
-.tool-dock-family .paint-mode { flex: none; }
-.composer-tools-bar .tool-dock { flex: 1 1 auto; }
-.composer-tools-bar .tool-dock-family { box-shadow: none; }
+.tool-dock-end { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+/* In the composer the bar itself is the toolbox (mockup): one box, the row and card as wide as it, icons spread along it. */
+.composer:has(.composer-tools-bar) { position: relative; padding: 6px 8px; }
+.composer-tools-bar { position: static; }
+.composer-tools-bar .tool-dock { position: static; flex: 1 1 auto; width: auto; }
+.composer-tools-bar .designer-palette.is-docked { display: flex; flex: 1 1 auto; min-width: 0; }
+.composer-tools-bar .tool-dock-family { justify-content: space-between; padding: 0; background: transparent; border: 0; box-shadow: none; }
+.composer-tools-bar .tool-dock-family .icon-btn { width: 44px; height: 44px; }
+.composer-tools-bar .tool-dock-family .icon-btn svg { width: 24px; height: 24px; }
 @media (max-width: 600px) {
   .tool-dock { width: 100%; }
   .tool-dock-family { width: 100%; }

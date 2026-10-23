@@ -16,7 +16,7 @@ let doc: ReturnType<typeof createDoc>;
 beforeEach(async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  useStore.setState({ ui: { ...initialUi, tool: 'fill', selectShape: 'rect' } });
+  useStore.setState({ ui: { ...initialUi, tool: 'move', selectShape: 'rect' } });
   doc = { ...createDoc('Dock', 100, 100), paintMode: 'drawing' };
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc })));
@@ -71,15 +71,13 @@ describe('ToolDock real interaction', () => {
     expect(useStore.getState().ui.tool).toBe('ellipse');
   });
 
-  it('shows a visitor family for an external tool and returns to the document mode without changing it', async () => {
-    doc = { ...doc, paintMode: 'drawing' };
-    await act(async () => { setUi({ tool: 'rect' }); root.render(createElement(ToolDock, { sessionId: 'test', doc })); });
-    expect(host.querySelector('[aria-label="drawing tools"] [aria-label="Shapes · other mode"]')).toBeTruthy();
-    expect(host.querySelector('[aria-label="Paint mode"]')).toBeTruthy();
-    await click('Brush');
-    expect(useStore.getState().ui.tool).toBe('brush');
+  it('shows the same toolbox in both paint modes, and a tool key never changes the mode', async () => {
+    const ids = () => [...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'));
+    const drawing = ids();
+    await act(async () => { setUi({ tool: 'rect' }); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...doc, paintMode: 'design' } })); });
+    expect(ids()).toEqual(drawing);
+    expect(host.querySelector('[aria-label="Shapes"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(doc.paintMode).toBe('drawing');
-    expect(host.querySelector('[aria-label="drawing tools"] [aria-label="Shapes · other mode"]')).toBeNull();
   });
 
   it('uses Escape on real key events to descend one depth at a time', async () => {
@@ -101,10 +99,11 @@ describe('ToolDock real interaction', () => {
     expect(host.querySelector('.tool-dock-card')).toBeNull();
   });
 
-  it('shows the mode switch once, in the toolbox, not again inside the brush card', async () => {
+  it('keeps the Drawing/Design switch out of the toolbox and inside the brush card', async () => {
+    expect(host.querySelector('.tool-dock-family .paint-mode')).toBeNull();
     await click('Brush'); await click('Pencil');
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
-    expect(host.querySelectorAll('.paint-mode').length).toBe(1);
+    expect(host.querySelectorAll('.tool-dock-card .paint-mode').length).toBe(1);
   });
 
   it('opens Layout in design mode: Sizes is real, so the family is not Soon', async () => {
