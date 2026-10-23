@@ -74,8 +74,8 @@ function TextureIcon({ texture }: { texture: BrushTexture }) {
   return <canvas ref={ref} className="texture-icon" width={36} height={36} aria-hidden="true" />;
 }
 
-/** One-click sizes, as in SAI's size grid. Dots grow on a log scale (3 → 18 px over 1 → 200) so every step is visibly larger; sqrt made 1–5 look alike and capped 96–200. */
-const dotFor = (s: number) => Math.round((3 + 15 * Math.log(s) / Math.log(SIZE_PRESETS[SIZE_PRESETS.length - 1])) * 10) / 10;
+/** One-click sizes, as in SAI's size grid. Dots grow on a log scale (3 → 18 px from the first to the last preset) so every step is visibly larger; sqrt made 1–5 look alike and capped 96–200. */
+const dotFor = (s: number) => Math.round((3 + 15 * Math.log(s / SIZE_PRESETS[0]) / Math.log(SIZE_PRESETS[SIZE_PRESETS.length - 1] / SIZE_PRESETS[0])) * 10) / 10;
 function SizePresets({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return <div className="opt opt-presets" role="radiogroup" aria-label="Size presets">
     {SIZE_PRESETS.map((s) => <button key={s} type="button" role="radio" aria-checked={s === value} aria-label={`${s} px`} className={s === value ? 'is-on' : ''} onClick={() => onChange(s)}>
