@@ -9,7 +9,8 @@ export function pixelCanvas(width: number, height: number) {
     const i = y * width + x, a = alpha * ctx.globalAlpha, old = pixels[i];
     pixels[i] = ctx.globalCompositeOperation === 'destination-over' ? old + a * (1 - old)
       : ctx.globalCompositeOperation === 'destination-out' ? old * (1 - a)
-      : ctx.globalCompositeOperation === 'destination-in' ? old * a : a + old * (1 - a);
+      : ctx.globalCompositeOperation === 'destination-in' ? old * a
+      : ctx.globalCompositeOperation === 'source-atop' ? old : a + old * (1 - a);
   };
   const mapped = (x: number, y: number) => [x * matrix[0] + matrix[4], y * matrix[3] + matrix[5]];
   const inside = (x: number, y: number) => {

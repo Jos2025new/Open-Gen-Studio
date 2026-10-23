@@ -1,4 +1,4 @@
-import { createCanvas, ctx2d } from '../../lib/media';
+import { ctx2d } from '../../lib/media';
 import type { RasterStroke } from '../types';
 import { compositeOp, type BrushTip } from './brushEngine';
 import { rasterStrokeMask } from './rasterStrokeMask';
@@ -45,32 +45,29 @@ function drawTipStroke(ctx: CanvasRenderingContext2D, stroke: RasterStroke, tip:
 
 /**
  * The mask laid on the canvas region (dx, dy, w, h) from (sx, sy) in the mask: at the stroke's opacity, with its
- * blend; Keep Opacity then keeps the canvas's alpha as it was before the stroke. `before` is the pre-stroke canvas,
- * read at (dx + bx, dy + by).
+ * blend. Keep Opacity is an alpha lock: the paint changes colour only, each pixel keeps the alpha it had before the
+ * stroke. `before` is the pre-stroke canvas, read at (dx + bx, dy + by).
  */
 export function layMask(ctx: CanvasRenderingContext2D, mask: HTMLCanvasElement, sx: number, sy: number, dx: number, dy: number, w: number, h: number, tip: BrushTip | undefined, opacity: number, erase: boolean, before?: HTMLCanvasElement, bx = 0, by = 0): void {
-  const keep = tip?.keepOpacity && !erase;
-  // The pixels under the stroke before it lands, for Keep Opacity (the live stroke passes its base).
-  let base = before, sxb = dx + bx, syb = dy + by;
-  if (keep && !base) {
-    base = createCanvas(w, h);
-    ctx2d(base).drawImage(ctx.canvas, dx, dy, w, h, 0, 0, w, h);
-    sxb = 0; syb = 0;
-  }
+  const keep = tip?.keepOpacity && !erase, op = compositeOp(tip, erase);
+  const locked = keep && op !== 'source-over' && w > 0 && h > 0;
+  // A blend mode cannot be combined with source-atop: blend, then put back the alpha from before the stroke.
+  const base = !locked ? null : before ? ctx2d(before).getImageData(dx + bx, dy + by, w, h) : ctx.getImageData(dx, dy, w, h);
   ctx.save();
   ctx.globalAlpha = opacity;
-  ctx.globalCompositeOperation = compositeOp(tip, erase);
+  // Normal paint: source-atop leaves the destination's alpha as it was, on the GPU.
+  ctx.globalCompositeOperation = keep && op === 'source-over' ? 'source-atop' : op;
   ctx.drawImage(mask, sx, sy, w, h, dx, dy, w, h);
-  if (keep && base) {
-    // destination-in clears outside what it draws: kept to the stroke's region.
-    ctx.beginPath();
-    ctx.rect(dx, dy, w, h);
-    ctx.clip();
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'destination-in';
-    ctx.drawImage(base, sxb, syb, w, h, dx, dy, w, h);
-  }
   ctx.restore();
+  if (!base) return;
+  const painted = ctx.getImageData(dx, dy, w, h);
+  lockAlpha(painted.data, base.data);
+  ctx.putImageData(painted, dx, dy);
+}
+
+/** The painted pixels with the alpha of `base` (straight RGBA, as ImageData holds it): an exact alpha lock. */
+export function lockAlpha(painted: Uint8ClampedArray, base: Uint8ClampedArray): void {
+  for (let i = 3; i < painted.length; i += 4) painted[i] = base[i];
 }
 
 /** One brush or eraser segment in canvas pixels (shared by the Designer and the sketch editor). */
