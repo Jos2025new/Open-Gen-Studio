@@ -222,7 +222,7 @@ export function stepDeps(step: PlanStep): StepRef[] {
   return step.kind === 'layer' ? own : [...own, ...(step.after ?? [])];
 }
 
-function ownDeps(step: PlanStep): StepRef[] {
+export function ownDeps(step: PlanStep): StepRef[] {
   switch (step.kind) {
     case 'text':
       return [];
@@ -952,7 +952,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   if (style) {
     for (const st of steps) applyPlanStyle(st, style);
   }
-  if (ctx.workspace === 'node') errors.push(...nodeCandidateErrors(steps.flatMap((st) => stepDeps(st).map((r) => parseRef(r)).filter((p): p is ParsedRef => p?.type === 'step'))));
+  if (ctx.workspace === 'node') errors.push(...nodeCandidateErrors(steps.flatMap((st) => ownDeps(st).map((r) => parseRef(r)).filter((p): p is ParsedRef => p?.type === 'step'))));
   // Candidates end a plan: no later step may take one of several results the user has not picked (not in Nodes).
   if (ctx.workspace !== 'node') {
     // Steps with count > 1, and ops that make several.

@@ -79,6 +79,12 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(split.errors.join(' ')).toMatch(/s1: later steps use different results of it \(s1#1, s1#2\)/);
     const same = await normalizePlan(plan('s1#2', 's1#2') as never, ctx, 'p');
     expect(same.errors.join(' ')).not.toMatch(/different results/);
+    // A step that names a subject made by s1 waits for s1 ("after"): that orders the run and picks no result.
+    const wait = { title: 't', subjects: [{ name: 'Kai', kind: 'character', from: 's1#2' }], steps: [
+      { id: 's1', kind: 'image', prompt: 'a face', count: 2 },
+      { id: 's2', kind: 'image', prompt: '@Kai smiling', refs: ['s1#2'] },
+    ] };
+    expect((await normalizePlan(wait as never, ctx, 'p')).errors.join(' ')).not.toMatch(/different results/);
   });
 
   it('counts the plan style, which is appended to the prompt after validation (audit E3-02)', async () => {
