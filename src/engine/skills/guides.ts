@@ -39,10 +39,13 @@ function canvasNote(w: Workflow): string {
 export function guideWorkspaceProblem(id: string, workspace: Workspace): string | undefined {
   const [type, rest = ''] = id.trim().split(':');
   if (type !== 'workflow') return undefined;
-  const w = workflowById(rest.split('/')[0]);
-  if (!w || w.workspaces.includes(workspace)) return undefined;
+  const [wid, vid] = rest.split('/');
+  const w = workflowById(wid);
+  // E1-01: a variant can be narrower than its workflow (exterior→interior joins clips: chat only).
+  const allowed = w?.variants?.find((v) => v.id === vid)?.workspaces ?? w?.workspaces;
+  if (!w || !allowed || allowed.includes(workspace)) return undefined;
   const instead = workspace === 'node' ? ' For several clips keep the same narrative split, one node per clip, without join_clips.' : '';
-  return `Workflow "${w.id}" works only on the ${w.workspaces.join(' / ')} canvas; you are on the ${workspace} canvas. Plan the request directly with the steps this canvas supports.${instead}`;
+  return `Workflow "${w.id}${vid ? `/${vid}` : ''}" works only on the ${allowed.join(' / ')} canvas; you are on the ${workspace} canvas. Plan the request directly with the steps this canvas supports.${instead}`;
 }
 
 /** The full text of a skill or workflow for read_guide ("skill:product", "workflow:storyboard", "workflow:ugc/unboxing"). */

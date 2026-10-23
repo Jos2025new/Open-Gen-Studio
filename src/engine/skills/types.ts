@@ -46,7 +46,8 @@ export interface Workflow {
   /** Inputs the workflow needs; missing ones are asked in the one questions card. */
   needs?: string[];
   /** Formats of the same workflow; only the chosen one is loaded. */
-  variants?: Array<{ id: string; name: string; description: string; steps?: WorkflowStepTemplate[] }>;
+  /** A variant with its own `workspaces` is refused elsewhere (e.g. one that joins clips is chat only). */
+  variants?: Array<{ id: string; name: string; description: string; steps?: WorkflowStepTemplate[]; workspaces?: Workspace[] }>;
   /** How steps chain: what an approved result feeds next, and the one identity kept throughout. */
   continuity?: string;
   steps: WorkflowStepTemplate[];

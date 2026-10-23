@@ -53,6 +53,10 @@ describe('workflows by canvas', () => {
     expect(guideWorkspaceProblem('workflow:story', 'chat')).toBeUndefined();
     expect(guideWorkspaceProblem('workflow:story', 'node')).toMatch(/one node per clip, without join_clips/);
     expect(guideWorkspaceProblem('skill:product', 'node')).toBeUndefined();
+    // E1-01: a chat-only variant is refused in Nodes even though its workflow fits there.
+    expect(guideWorkspaceProblem('workflow:archviz-walkthrough/inside', 'node')).toMatch(/archviz-walkthrough\/inside" works only on the chat canvas/);
+    expect(guideWorkspaceProblem('workflow:archviz-walkthrough/dolly', 'node')).toBeUndefined();
+    expect(guideWorkspaceProblem('workflow:archviz-walkthrough/inside', 'chat')).toBeUndefined();
     expect(readGuide('workflow:story')).toBeTruthy();
   });
 

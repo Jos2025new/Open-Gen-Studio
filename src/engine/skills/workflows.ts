@@ -247,6 +247,7 @@ export const WORKFLOWS: Workflow[] = [
         id: 'inside',
         name: 'Exterior to interior',
         description: 'From the facade through the open door into the main space: two clips joined (chat only).',
+        workspaces: ['chat'],
         steps: [
           { id: 's1', kind: 'image', title: 'Facade near the door', prompt: '{prompt}, exterior near the open glazed entrance', aspect: '16:9' },
           { id: 's2', kind: 'image', title: 'Main interior', prompt: '{prompt}, main interior seen from the entrance, same building', refs: ['s1'], aspect: '16:9' },
