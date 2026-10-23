@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 225 |
 | `src/store` | 13 | 162 |
 
-159 de 434 módulos no tienen ningún test que los importe directamente.
+158 de 434 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

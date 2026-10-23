@@ -7,6 +7,7 @@ import { lineKey } from '../variants';
 import { journeyIdFor, recordJourneyEvent } from '../../lib/journeyTrace';
 import { useStore } from '../../store/store';
 import { confirmedStandNote } from './changeRules';
+import { latestDraft } from './draftFirst';
 
 /** Words that may ask to change the model, provider or settings: when unsure the card is shown (the safe side). */
 const CHANGE_WORDS = /cambi|chang|switch|swap|modelo|model\b|proveedor|provider|resoluci|resolution|calidad|quality|ajuste|setting|\b[1-8]k\b|\b\d{3,4}p\b|en vez|instead|distint|different|another|otro\b/i;
@@ -33,6 +34,8 @@ export async function repeatedConfirmation(sessionId: string, sections: Settings
   for (const sec of sections) {
     const from = agent.settings?.[sec.kind];
     if (!from || parts.filter((p) => p.kind === sec.kind).length > 1) return undefined;
+    // A video card also carries the draft choice: with none confirmed yet, the card is the only way to make it (no loop with draftGate).
+    if (sec.kind === 'video' && !latestDraft(sessions[sessionId].feed)) return undefined;
     const [now, was] = await Promise.all([resolveModel(sec.recommended.modelRef), resolveModel(from.modelRef)]);
     if (!now || !was || modelChange(now.model, was.model)) return undefined;
     const pick = composerChosen(sec.kind) ? composer[sec.kind].modelRef : undefined;

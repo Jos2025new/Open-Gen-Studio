@@ -102,3 +102,22 @@ describe('A1: confirm_settings repeated after the first confirmation', () => {
     expect(cards()).toHaveLength(1);
   });
 });
+
+import { repeatedConfirmation } from '../src/engine/agent/confirmRepeat';
+describe('A1: a video card is skipped only when a draft choice was already confirmed (no loop with the draft gate)', () => {
+  it('no draft choice yet: the card is shown; with one: the settings stand', async () => {
+    const V = 'atlas::alibaba/wan-3.0/text-to-video';
+    const s = useStore.getState();
+    useStore.setState({
+      settings: { ...s.settings, keys: { ...s.settings.keys, atlas: 'k' } },
+      composer: { ...s.composer, agentStyle: 'auto', userPicked: {} },
+      catalog: { ...s.catalog, models: { ...s.catalog.models, [V]: { ref: V, id: V.split('::')[1], provider: 'atlas', kind: 'video', name: 'Wan', acceptsText: true, tags: [] } as unknown as ModelSummary }, schemas: { ...s.catalog.schemas, [V]: { ref: V, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema } },
+      sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [{ id: 'u', type: 'user', text: 'otra toma igual', createdAt: 1 } as never], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { video: { modelRef: V, needsImage: false } } } } },
+    });
+    const sections = [{ kind: 'video', count: 1, recommended: { modelRef: V }, alternatives: [] }] as never;
+    expect(await repeatedConfirmation(sid(), sections, [{ kind: 'video' }])).toBeUndefined();
+    const card = { id: 'c', type: 'settings', status: 'confirmed', draft: { kind: 'draft', locked: true }, createdAt: 0 } as never;
+    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...x.sessions[sid()], feed: [card, { id: 'u', type: 'user', text: 'una toma igual', createdAt: 1 } as never] } } }));
+    expect(await repeatedConfirmation(sid(), sections, [{ kind: 'video' }])).toMatch(/settings already confirmed/);
+  });
+});
