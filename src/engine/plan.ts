@@ -1,5 +1,5 @@
 import { countFollowsCard } from './planCount';
-import { promptTooLong, totalNote } from './planSent';
+import { fitTotal, promptTooLong, totalNote } from './planSent';
 import { aspectFor } from './planAspect';
 import { lineKey, type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
@@ -973,6 +973,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     }
   }
   if (errors.length) return { plan: null, errors };
+  if (share) await fitTotal(total, rawSteps, steps, ctx.getModel);
   const totalLine = totalNote(raw.total_duration, steps);
   if (totalLine) adjustments.push(totalLine);
   return {

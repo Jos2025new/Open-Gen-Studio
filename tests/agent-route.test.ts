@@ -210,14 +210,34 @@ describe('skills and workflows index, guides and total length (R4)', () => {
     expect(r.plan!.adjustments.join(' ')).toMatch(/total 30s: about 10s for each of s1, s2, s3/);
   });
 
-  it('a total the clip lengths cannot make is said on the plan, without stopping it (B12, audit E3-01)', async () => {
+  const totalCtx = (options: number[]): PlanContext => {
     const model = { ref: 'fal::v', provider: 'fal', id: 'v', name: 'V', kind: 'video', acceptsText: true, tags: [] } as never;
-    const schema = { ref: 'fal::v', params: [{ key: 'duration', role: 'duration', type: 'enum', options: [5, 10], default: 5 }], slots: { prompt: 'prompt' }, source: 'openapi' } as never;
-    const ctx: PlanContext = { workspace: 'chat', getModel: async () => ({ model, schema }), defaultModel: () => 'fal::v', defaultSettings: () => ({ duration: 5 }), asset: () => undefined, layer: () => undefined };
-    const r = await normalizePlan({ title: 't', total_duration: 25, steps: [1, 2, 3].map((i) => ({ id: `s${i}`, kind: 'video', prompt: `shot ${i}` })) }, ctx, 'p');
+    const schema = { ref: 'fal::v', params: [{ key: 'duration', role: 'duration', type: 'enum', options, default: options[0] }], slots: { prompt: 'prompt' }, source: 'openapi' } as never;
+    return { workspace: 'chat', getModel: async () => ({ model, schema }), defaultModel: () => 'fal::v', defaultSettings: () => ({ duration: options[0] }), asset: () => undefined, layer: () => undefined };
+  };
+  const durs = (r: { plan: { steps: unknown[] } | null }) => r.plan!.steps.map((x) => (x as { settings: { duration?: number } }).settings.duration);
+  const clips = (n: number, extra: Record<string, unknown> = {}) => Array.from({ length: n }, (_, i) => ({ id: `s${i + 1}`, kind: 'video', prompt: `shot ${i + 1}`, ...(i === 0 ? extra : {}) }));
+
+  it('25 s over three clips of 5/10 s is 10+10+5, with no note (E3-01)', async () => {
+    const r = await normalizePlan({ title: 't', total_duration: 25, steps: clips(3) }, totalCtx([5, 10]), 'p');
     expect(r.errors).toEqual([]);
-    expect(r.plan!.adjustments).toContain('video total: 30 s instead of the 25 s asked; each clip uses a length the model allows.');
-    const exact = await normalizePlan({ title: 't', total_duration: 30, steps: [1, 2, 3].map((i) => ({ id: `s${i}`, kind: 'video', prompt: `shot ${i}` })) }, ctx, 'p');
-    expect(exact.plan!.adjustments.join(' ')).not.toMatch(/video total/);
+    expect(durs(r)).toEqual([10, 10, 5]);
+    expect(r.plan!.adjustments.join(' ')).not.toMatch(/video total/);
+    const even = await normalizePlan({ title: 't', total_duration: 30, steps: clips(3) }, totalCtx([5, 10]), 'p');
+    expect(durs(even)).toEqual([10, 10, 10]);
+    expect(even.plan!.adjustments.join(' ')).not.toMatch(/video total/);
+  });
+
+  it('a total no combination makes keeps the closest sum and the note (B12, E3-01)', async () => {
+    const r = await normalizePlan({ title: 't', total_duration: 22, steps: clips(3) }, totalCtx([5, 10]), 'p');
+    expect(r.errors).toEqual([]);
+    expect(durs(r)!.reduce((a, b) => a! + b!, 0)).toBe(20);
+    expect(r.plan!.adjustments).toContain('video total: 20 s instead of the 22 s asked; each clip uses a length the model allows.');
+  });
+
+  it('a clip with its own duration keeps it; only the unset ones are chosen (E3-01)', async () => {
+    const r = await normalizePlan({ title: 't', total_duration: 25, steps: clips(3, { duration: 5 }) }, totalCtx([5, 10]), 'p');
+    expect(durs(r)).toEqual([5, 10, 10]);
+    expect(r.plan!.adjustments.join(' ')).not.toMatch(/video total/);
   });
 });
