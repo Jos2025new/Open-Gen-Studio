@@ -45,7 +45,7 @@ function stepIcon(s: PlanStep) {
 const aboutUserModel = (a: string) => /\byour [\w-]+ model\b/.test(a);
 /** A result short of what the user asked ("short of 8K") is a promise the plan cannot keep: never folded either. */
 const shortOfRequest = (a: string) => /\bshort of\b/.test(a);
-const neverFolded = (a: string) => aboutUserModel(a) || shortOfRequest(a);
+const neverFolded = (a: string) => aboutUserModel(a) || shortOfRequest(a) || a.startsWith('video total:');
 
 /** `ref` names an input in words for the card: a step by its title, an asset as "your image" or "the earlier clip". */
 type RefName = (ref: string) => string;

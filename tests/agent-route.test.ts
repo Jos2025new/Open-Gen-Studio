@@ -209,4 +209,15 @@ describe('skills and workflows index, guides and total length (R4)', () => {
     expect(r.plan!.steps.map((x) => (x as { settings: { duration?: number } }).settings.duration)).toEqual([10, 10, 10]);
     expect(r.plan!.adjustments.join(' ')).toMatch(/total 30s: about 10s for each of s1, s2, s3/);
   });
+
+  it('a total the clip lengths cannot make is said on the plan, without stopping it (B12, audit E3-01)', async () => {
+    const model = { ref: 'fal::v', provider: 'fal', id: 'v', name: 'V', kind: 'video', acceptsText: true, tags: [] } as never;
+    const schema = { ref: 'fal::v', params: [{ key: 'duration', role: 'duration', type: 'enum', options: [5, 10], default: 5 }], slots: { prompt: 'prompt' }, source: 'openapi' } as never;
+    const ctx: PlanContext = { workspace: 'chat', getModel: async () => ({ model, schema }), defaultModel: () => 'fal::v', defaultSettings: () => ({ duration: 5 }), asset: () => undefined, layer: () => undefined };
+    const r = await normalizePlan({ title: 't', total_duration: 25, steps: [1, 2, 3].map((i) => ({ id: `s${i}`, kind: 'video', prompt: `shot ${i}` })) }, ctx, 'p');
+    expect(r.errors).toEqual([]);
+    expect(r.plan!.adjustments).toContain('video total: 30 s instead of the 25 s asked; each clip uses a length the model allows.');
+    const exact = await normalizePlan({ title: 't', total_duration: 30, steps: [1, 2, 3].map((i) => ({ id: `s${i}`, kind: 'video', prompt: `shot ${i}` })) }, ctx, 'p');
+    expect(exact.plan!.adjustments.join(' ')).not.toMatch(/video total/);
+  });
 });
