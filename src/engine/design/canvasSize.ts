@@ -1,6 +1,8 @@
-import type { DesignDoc } from '../types';
+import type { DesignDoc, Layer } from '../types';
 import { getDoc, mutateDoc, rebasePaintLayer } from './actions';
-import { translateLayer, unionBox } from './doc';
+import { shapeBox, translateLayer, unionBox, type Box } from './doc';
+import { rasterPaintedBox } from './rasterBounds';
+import { blurRegion, strokeReach } from './shapeLook';
 import { layerBox } from './render';
 import { setSelection } from './pixelSelection';
 import { solidPageFills, extendSolidPageFills } from './solidPageFill';
@@ -45,14 +47,26 @@ export function resizeCanvas(sessionId: string, docId: string, width: number, he
   return null;
 }
 
-/** The page shrinks (or grows) to the box of every visible layer. */
+/**
+ * What a layer paints, for trimming: an empty paint layer adds nothing (not its whole page), and a shape counts its
+ * stroke and blur, not only its geometry. Other uses of layerBox (handles, hit tests) are left as they are.
+ */
+function paintedBox(l: Layer): Box | null {
+  if (l.type === 'raster' && !l.sourceAssetId && rasterPaintedBox(l) === null) return null;
+  const b = layerBox(l);
+  if (!b || l.type !== 'vector' || l.pixelMask) return b;
+  return unionBox([b, ...l.shapes.map((s) => (strokeReach(s) > 0 || (s.blur ?? 0) > 0 ? blurRegion(s) : shapeBox(s)))]);
+}
+
+/** The page shrinks (or grows) to the box of every visible layer; never cut: past MAX_SIDE it refuses. */
 export function trimToContent(sessionId: string, docId: string): string | null {
   const doc = getDoc(sessionId, docId);
   if (!doc) return 'No design.';
-  const box = unionBox(doc.layers.filter((l) => l.visible).map(layerBox).filter((b): b is NonNullable<typeof b> => Boolean(b)));
+  const box = unionBox(doc.layers.filter((l) => l.visible).map(paintedBox).filter((b): b is Box => Boolean(b)));
   if (!box || box.w < 1 || box.h < 1) return 'Nothing is drawn to trim to.';
   const x = Math.floor(box.x), y = Math.floor(box.y);
-  const w = Math.min(MAX_SIDE, Math.ceil(box.x + box.w) - x), h = Math.min(MAX_SIDE, Math.ceil(box.y + box.h) - y);
+  const w = Math.ceil(box.x + box.w) - x, h = Math.ceil(box.y + box.h) - y;
+  if (w > MAX_SIDE || h > MAX_SIDE) return `The content needs ${w} × ${h} px; the page goes up to ${MAX_SIDE} px a side. Nothing changed.`;
   if (x === 0 && y === 0 && w === doc.width && h === doc.height) return null;
   resizeBy(sessionId, docId, w, h, -x, -y);
   return null;
