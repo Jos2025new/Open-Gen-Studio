@@ -43,9 +43,9 @@ De la [auditoría del Designer](../../ogs-designer-audit-2026-10-22.md) (HEAD `6
 - **D20 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D21 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D22 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
-- **D23 · medio · 2026-10-22 · Cortar (Ctrl+X) puede borrar sin copiar.** `designerClipboard.ts:37-52`: borra antes de que el portapapeles confirme. Se recupera con deshacer. Arreglo: borrar al confirmarse la copia.
-- **D24 · medio · 2026-10-22 · Pintar con selección aplana los trazos sin aviso.** `StagePaintCommit.ts:89`: los trazos dejan de ser editables sin mensaje. Arreglo: el mismo aviso que el aplanado normal.
-- **D25 · medio · 2026-10-22 · «Flip horizontal» sobre una imagen girada la voltea en vertical (sin confirmar).** `transform.ts:105`: voltea en los ejes de la imagen, no de la pantalla. Confirmar con una prueba antes de arreglar.
-- **D26 · bajo · 2026-10-22 · Pasos de deshacer que no deshacen nada.** `Stage.tsx:815` (trazo sobre capa que aún carga) y `:786` (clic en esquina sin arrastrar): se guarda el paso antes de saber si habrá cambio. Arreglo: guardarlo al cambiar.
-- **D27 · bajo · 2026-10-22 · El cuentagotas compone la página entera para un píxel (lentitud sin medir).** `swatches.ts:43`. Arreglo: leer del fotograma ya pintado.
-- **D28 · bajo · 2026-10-22 · Una fuente que carga tarde no se redibuja hasta interactuar.** `render.ts:284`. Hoy apenas se nota. Arreglo: pedir un redibujado al cargar.
+- **D23 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D24 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D25 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D26 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D27 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D28 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).

@@ -138,12 +138,6 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | D16 | Capas FX: plan de pruebas completo | medio | 2026-10-08 |
 | D17 | Interfaz del Designer al estilo ibisPaint y Photoshop | medio | 2026-10-10 |
 | D18 | Lineart que se deforma al encoger (10 % residual) | medio | 2026-10-13 |
-| D23 | Cortar (Ctrl+X) puede borrar sin copiar | medio | 2026-10-22 |
-| D24 | Pintar con selección aplana los trazos sin aviso | medio | 2026-10-22 |
-| D25 | «Flip horizontal» sobre una imagen girada la voltea en vertical (sin confirmar) | medio | 2026-10-22 |
-| D26 | Pasos de deshacer que no deshacen nada | bajo | 2026-10-22 |
-| D27 | El cuentagotas compone la página entera para un píxel (lentitud sin medir) | bajo | 2026-10-22 |
-| D28 | Una fuente que carga tarde no se redibuja hasta interactuar | bajo | 2026-10-22 |
 
 ### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 
