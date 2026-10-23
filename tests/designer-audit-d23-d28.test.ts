@@ -97,6 +97,29 @@ describe('D25: flip on a rotated image mirrors across the screen axis', () => {
   });
 });
 
+import { readFileSync } from 'node:fs';
+import { historyDepth as depth, unrecord } from '../src/engine/design/history';
+
+describe('D26: no undo step for a gesture that changed nothing', () => {
+  const stage = readFileSync('src/components/designer/Stage.tsx', 'utf8');
+  it('unrecord takes back the step just recorded', () => {
+    const doc = createDoc('d26', 8, 8);
+    record(doc);
+    record(doc);
+    unrecord(doc);
+    expect(depth(doc.id).undo).toBe(1);
+    unrecord(doc); unrecord(doc);
+    expect(depth(doc.id).undo).toBe(0);
+    dropHistory(doc.id);
+  });
+  it('the stage drops the step when the stroke stops on a loading layer, and records a corner scale only once it moves', () => {
+    expect(stage).toMatch(/Try again in a moment\.', 'error'\);\s*if \(getDoc\([^\n]*unrecord\(current\)/);
+    expect(stage).not.toMatch(/record\(current\);\s*drag\.current = \{ kind: 'scale'/);
+    expect(stage).toMatch(/kind: 'scale'[^\n]*pre: current/);
+    expect(stage).toMatch(/else if \(d\.kind === 'scale' && started\(d, p\)\)/);
+  });
+});
+
 describe('D24: painting inside a selection says it flattened the strokes', () => {
   afterEach(() => flushRaster());
   it('shows the flatten notice when editable strokes are lost', () => {

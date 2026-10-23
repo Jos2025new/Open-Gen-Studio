@@ -115,6 +115,12 @@ export function record(doc: DesignDoc): void {
   listeners.forEach((l) => l());
 }
 
+/** Takes back the step `record` just made, when the gesture ended up changing nothing. */
+export function unrecord(doc: DesignDoc): void {
+  stack(doc.id).past.pop();
+  listeners.forEach((l) => l());
+}
+
 export function undo(current: DesignDoc): DesignDoc | null {
   const s = stack(current.id);
   const prev = s.past.pop();
