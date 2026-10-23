@@ -251,6 +251,16 @@ describe('attach checkboxes', () => {
   });
 });
 
+describe('a finished Studio result keeps what the app noticed', () => {
+  const fallback = createElement('div');
+  it('shows the delivery mismatch and the notes, as the full card does (audit E5-02)', () => {
+    setData([gen('g1', 'done', ['a1'], { delivery: ['asked 9:16, got 1:1'], notes: ['switched to NanoGPT'] } as never)]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback }));
+    expect(q('.studio-gen .gen-delivery')!.textContent).toContain('asked 9:16, got 1:1');
+    expect(q('.studio-gen .gen-delivery.faint')!.textContent).toContain('switched to NanoGPT');
+  });
+});
+
 describe('pick mode for per-image actions', () => {
   const fallback = createElement('div');
   const btn = (l: string) => host.querySelector<HTMLElement>(`[aria-label="${l}"]`);

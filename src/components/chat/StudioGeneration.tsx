@@ -15,6 +15,7 @@ import { GenerationInfo } from '../assets/GenerationInfo';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { StopFollowingPopover } from './StopFollowing';
 import { setStudioBoard } from '../../lib/studioBoard';
+import { GenerationNotices } from './GenerationNotices';
 
 /** A running placeholder opens the Generations board on Ongoing. */
 function showOngoing() {
@@ -75,6 +76,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}
       </button>{pick ? <span className={`studio-pick-box ${picked.includes(id) ? 'is-on' : ''}`} role="checkbox" aria-checked={picked.includes(id)} aria-label="Select image" onClick={() => toggleId(id)}>{picked.includes(id) ? picked.indexOf(id) + 1 : null}</span> : <AgentAttachToggle assetId={id} />}</div>)}
     </div> : null}
+    <GenerationNotices g={g} />
     </>}
     <div className="studio-gen-actions">
       {g.prompt ? <IconButton icon={Copy} label="Copy prompt" size="sm" active={pick === 'copy'} onClick={multi ? () => startPick('copy') : () => void copyText(g.prompt)} /> : null}{multi ? pickBtn('copy', 'Copy') : null}
