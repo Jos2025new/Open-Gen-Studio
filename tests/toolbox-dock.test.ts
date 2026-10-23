@@ -113,5 +113,10 @@ describe('ToolDock real interaction', () => {
     expect(layout.getAttribute('aria-label')).toBe('Layout');
     await act(async () => (layout as HTMLButtonElement).click());
     expect(host.querySelector('[aria-label="Layout variants"] button[aria-label="Sizes"]')).toBeTruthy();
+    await click('Sizes');
+    const card = host.querySelector('[aria-label="Sizes settings"]')!;
+    expect([...card.querySelectorAll('input[type=number]')].map((i) => (i as HTMLInputElement).value)).toEqual(['100', '100']);
+    expect(card.querySelector('[aria-label="Anchor"]')).toBeTruthy();
+    expect([...card.querySelectorAll('button')].map((b) => b.textContent)).toEqual(expect.arrayContaining(['Trim to content', 'Apply']));
   });
 });

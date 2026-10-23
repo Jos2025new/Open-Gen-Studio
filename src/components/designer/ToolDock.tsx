@@ -128,7 +128,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
         }}><GripHorizontal size={14} /></button>
         <div className="tool-dock-settings-grid">
           {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} modeToggle={false} /></div>}
-          {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} /></div>}
+          {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} inline /></div>}
         </div>
       </section>}
     </div>
