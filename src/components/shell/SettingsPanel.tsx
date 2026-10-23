@@ -15,6 +15,7 @@ import { setCatalog, setSettings, setUi, toast, useStore, wipeAllData, type Sett
 import { setDrawingPreference } from '../../engine/design/drawingChoice';
 import { Popover, PopoverHeader, usePopover } from '../ui/Popover';
 import { Button, Chip, Segmented, Spinner, Toggle } from '../ui/primitives';
+import { priceMargin } from '../../engine/priceAuthorization';
 import { ModelList } from '../composer/ModelList';
 import { DataSummary } from './DataSummary';
 import { PeopleLookRow } from './PeopleLookRow';
@@ -478,6 +479,17 @@ export function SettingsPanel() {
             />
           </div>
         ) : null}
+        <div className="set-row">
+          <span className="set-label" data-tip="If a step would cost more than its approved price by more than this (at least 1¢), it waits for you. Off: it runs and the card shows the difference.">
+            Price margin
+          </span>
+          <Segmented
+            value={String(priceMargin())}
+            options={[{ value: '5', label: '5%' }, { value: '25', label: '25%' }, { value: '50', label: '50%' }, { value: 'off', label: 'Off' }]}
+            onChange={(v) => setSettings({ priceMargin: v === 'off' ? 'off' : Number(v) })}
+            size="sm"
+          />
+        </div>
         <div className="set-row set-row-3">
           <span className="set-label">Spent</span>
           <span className="num">{formatUsd(spent)}</span>

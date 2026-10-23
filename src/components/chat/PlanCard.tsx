@@ -15,6 +15,7 @@ import { acceptOverLimit, overLimit, overLimitText, remainingBudget } from '../.
 import type { Estimate, Generation, PlanFeedItem, PlanStep, StepState, StepAuthorization } from '../../engine/types';
 import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
+import { priceMargin } from '../../engine/priceAuthorization';
 import { PlanRecoveryChips } from './RecoveryActions';
 import { Button, costLabel } from '../ui/primitives';
 import { AspectShape } from './aspectShape';
@@ -98,10 +99,11 @@ const thumbed = (s: PlanStep) => s.kind === 'image' || s.kind === 'video' || s.k
 
 /** The estimate-versus-minimum distinction the label's symbol carries, said in words on the approve button. */
 function costTip(e: Estimate): string | undefined {
-  if (e.note) return e.note;
-  if (e.lowerBound) return 'Minimum: the final price can be higher.';
-  if (e.approximate) return 'Estimate: the final price may differ.';
-  return undefined;
+  const m = priceMargin();
+  // The margin the app enforces, said where the price is shown (Settings → Budget → Price margin).
+  const guard = m === 'off' ? 'No price stop: steps run at their price and the card shows any difference.' : `A step that would cost more than ${m}% over this (at least 1¢) waits for you.`;
+  const base = e.note ?? (e.lowerBound ? 'Minimum: the final price can be higher.' : e.approximate ? 'Estimate: the final price may differ.' : undefined);
+  return e.usd ? (base ? `${base} ${guard}` : guard) : base;
 }
 
 /** "model · shape ratio · rest": the aspect ratio drawn at its real proportion, tight to its label. */

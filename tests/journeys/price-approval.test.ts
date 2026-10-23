@@ -151,6 +151,30 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     expect(html).toContain('Cancelar paso');
   });
 
+  it('price margin off: the step runs at the new price and the card says what it cost against the approval', async () => {
+    const run = await prepare('injected-change');
+    useStore.setState((st) => ({ settings: { ...st.settings, priceMargin: 'off' } }));
+    try {
+      expect(renderToStaticMarkup(createElement(PlanCard, { item: run.item!, sessionId: run.sessionId }))).toContain('No price stop');
+      await approvePlan(run.sessionId, run.item!.id);
+      const item = currentPlan(run.sessionId);
+      expect(run.sent).toHaveLength(1);
+      expect(item.stepStates.s1).not.toBe('review');
+      expect(item.stepVariantNotes?.s1).toContain('$1.20 en vez de $0.20');
+    } finally { useStore.setState((st) => ({ settings: { ...st.settings, priceMargin: undefined } })); }
+  });
+
+  it('a wider price margin still stops a jump past it', async () => {
+    const run = await prepare('injected-change');
+    useStore.setState((st) => ({ settings: { ...st.settings, priceMargin: 50 } }));
+    try {
+      expect(renderToStaticMarkup(createElement(PlanCard, { item: run.item!, sessionId: run.sessionId }))).toContain('more than 50% over this');
+      await approvePlan(run.sessionId, run.item!.id);
+      expect(run.sent).toEqual([]);
+      expect(currentPlan(run.sessionId).stepStates.s1).toBe('review');
+    } finally { useStore.setState((st) => ({ settings: { ...st.settings, priceMargin: undefined } })); }
+  });
+
   it('[JNY-PRICE-01] no request outside the test authorization may be transmitted', async () => {
     const run = await prepare('injected-change');
     expect(run.errors).toEqual([]);

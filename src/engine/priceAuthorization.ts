@@ -17,6 +17,12 @@ export function costAuthorization(modelRef: string, settings: GenSettings, estim
   };
 }
 
+/** The user's price margin (Settings → Budget): % over the approved price before a step stops, or 'off'. */
+export function priceMargin(): number | 'off' {
+  const m = useStore.getState().settings.priceMargin;
+  return m === 'off' ? 'off' : typeof m === 'number' && m >= 0 ? m : 5;
+}
+
 export class PriceReviewRequired extends Error {}
 
 function parameterKey(a: StepAuthorization): string {
@@ -36,7 +42,8 @@ export function checkStepAuthorization(g: Generation, proposed: StepAuthorizatio
   const before = approved.estimate.usd;
   const after = proposed.estimate.usd;
   const measurable = before != null && after != null;
-  const increased = measurable && after - before > Math.max(0.01, before * 0.05) + 1e-9;
+  const margin = priceMargin();
+  const increased = measurable && margin !== 'off' && after - before > Math.max(0.01, before * margin / 100) + 1e-9;
   const name = useStore.getState().catalog.models[proposed.modelRef]?.name ?? proposed.modelRef;
   const reason = variantChanged
     ? `cambió a ${name}${g.inputs.refs.length || g.inputs.firstFrame ? ' porque lleva una imagen' : ''}`
@@ -49,6 +56,15 @@ export function checkStepAuthorization(g: Generation, proposed: StepAuthorizatio
     logEvent('app', data);
     if (journeyActive()) recordJourneyEvent({ journeyId: journeyIdFor(g.sessionId) ?? g.sessionId, journey: 'price-approval-execution', event: 'plan.step_cost_stopped', reason, sessionId: g.sessionId, planId: g.planId, stepId, generationId: g.id, prices: { acceptedEstimateUsd: before, currentEstimateUsd: after } });
     throw new PriceReviewRequired(message);
+  }
+  if (measurable && margin === 'off' && after - before > 0.005) {
+    // No price stop chosen: it runs, and the card keeps what it cost against what was approved.
+    const message = `Costará $${after.toFixed(2)} en vez de $${before.toFixed(2)} aprobados (${reason}); sin freno de precio.`;
+    if (item.stepVariantNotes?.[stepId] !== message) {
+      updateFeedItem<PlanFeedItem>(g.sessionId, item.id, it => ({ ...it, stepVariantNotes: { ...it.stepVariantNotes, [stepId]: message } }));
+      logEvent('app', { ...data, event: 'plan-step-cost-unstopped' });
+    }
+    return;
   }
   if (variantChanged && !measurable) {
     const message = `Se usó ${name}${g.inputs.refs.length || g.inputs.firstFrame ? ', la variante de edición porque lleva una imagen' : ', una variante distinta'}. Precio desconocido.`;
