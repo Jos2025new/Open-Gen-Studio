@@ -18,7 +18,9 @@ export function onPressure(fn: () => void): () => void { readers.add(fn); return
  * sends (0.5 pressed, 0 released). Some tablets reach the browser as a "mouse" with real pressure (Linux). Without
  * pressure the brush paints at full size and density.
  */
-export function penPressure(e: { pointerType: string; pressure: number }): number {
+export function penPressure(e: { pointerType: string; pressure: number; timeStamp?: number }): number {
+  // When the sample was taken: simulated pressure reads speed from it (Stage reads pressure just before painting).
+  if (e.timeStamp != null) { sampledAt = e.timeStamp; }
   const real = e.pressure > 0 && (e.pointerType === 'pen' || e.pressure !== 0.5);
   const reading = { device: e.pointerType || 'mouse', pressure: real ? e.pressure : null };
   if (reading.device !== lastReading?.device || (reading.pressure === null) !== (lastReading?.pressure === null) || Math.abs((reading.pressure ?? 0) - (lastReading?.pressure ?? 0)) > 0.02) {
@@ -32,10 +34,14 @@ export function penPressure(e: { pointerType: string; pressure: number }): numbe
 // it has gone, for the start taper.
 let simulated = 0.5;
 let travelled = 0;
+/** Time of the latest pointer sample and of the one the previous segment ended at (ms). */
+let sampledAt: number | undefined;
+let segmentAt: number | undefined;
 
 export function newBrushStroke(brush: BrushOptions & { color: string; opacity: number }, erase: boolean): RasterStroke {
   simulated = 0.5;
   travelled = 0;
+  segmentAt = sampledAt;
   const tip = tipFor(brush, erase);
   return { id: uid('rst'), x: 0, y: 0, segments: [], color: brush.color, opacity: brush.opacity, erase, tip };
 }
@@ -62,7 +68,10 @@ function brushSegmentOnly(layer: RasterLayer, a: { x: number; y: number }, b: { 
   if (layer.transform) { const [ax, ay] = toLayerSpace(layer, a.x, a.y), [bx, by] = toLayerSpace(layer, b.x, b.y); a = { x: ax, y: ay }; b = { x: bx, y: by }; }
   const step = Math.hypot(b.x - a.x, b.y - a.y);
   travelled += step;
-  if (brush.simulatePressure) pressure = simulated = simulatedPressure(simulated, step, brush.size);
+  // The time this move took, so the speed (not the pointer's event rate) sets the pressure; unknown: one 60 Hz step.
+  const ms = sampledAt != null && segmentAt != null && sampledAt > segmentAt ? sampledAt - segmentAt : undefined;
+  segmentAt = sampledAt;
+  if (brush.simulatePressure) pressure = simulated = simulatedPressure(simulated, step, brush.size, ms, brush.pressureSpeed ?? 1);
   // The start taper: the first touch is a point, and the width opens over Taper start (then pressure shapes it).
   const { width, density } = atPressure(brush, pressure), w = width * taperAt(travelled, brush.taperStart, 'start');
   return { seg: [(a.x - layer.x) * kx, (a.y - layer.y) * ky, (b.x - layer.x) * kx, (b.y - layer.y) * ky, (w * (kx + ky)) / 2], density };

@@ -127,6 +127,7 @@ export function BrushSettings({ erase, compact = false }: { erase: boolean; comp
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
     <InlineToggle label="Mirror" tip="Every stroke is also painted reflected across the page's vertical centre line" checked={!!brush.mirror} onChange={(v) => set({ mirror: v })} />
     <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
+    {brush.simulatePressure && <InlineSlider label="Speed influence" unit="%" scale={100} min={0.25} max={2} step={0.05} value={brush.pressureSpeed ?? 1} onChange={(v) => set({ pressureSpeed: v })} />}
     {/* Only without simulation: then a missing pen pressure matters. */}
     {!brush.simulatePressure && <PressureReadout />}
     <InlineToggle label="Advanced settings" checked={advanced} onChange={setAdvanced} />

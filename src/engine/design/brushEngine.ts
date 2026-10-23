@@ -39,6 +39,8 @@ export interface BrushOptions {
   pressureSize?: boolean;
   /** Pressure from the pointer's speed, as Lineart does it (perfect-freehand): fast is light, slow is full. */
   simulatePressure?: boolean;
+  /** How much speed thins a simulated-pressure stroke: 1 = as Lineart, 2 = twice as much, 0.25 = barely. */
+  pressureSpeed?: number;
   pressureDensity?: boolean;
   /** Paint a reflection of every stroke across the page's vertical centre line. */
   mirror?: boolean;
@@ -75,13 +77,20 @@ export function atPressure(o: BrushOptions, pressure: number): { width: number; 
   };
 }
 
+/** One 60 Hz event: the step the original formula was tuned for. */
+const FRAME_MS = 1000 / 60;
+
 /**
  * The simulated pressure after a move of `distance`, from the previous one: perfect-freehand's own formula (the one
- * Lineart strokes use), so both tools respond to speed the same way.
+ * Lineart strokes use), so both tools respond to speed the same way. With `ms` (the time the move took) it follows
+ * the speed, not the event rate: the move counts as `ms / 16.7` steps of 60 Hz at the same speed, so a 60, 120 or
+ * 240 Hz pointer gives the same pressure, and at 60 Hz the values are the formula's own. `influence` scales how
+ * much speed thins the stroke (1 = as Lineart).
  */
-export function simulatedPressure(previous: number, distance: number, size: number): number {
-  const r = Math.min(1, distance / Math.max(1e-6, size));
-  return Math.min(1, previous + (Math.min(1, 1 - r) - previous) * (r * 0.275));
+export function simulatedPressure(previous: number, distance: number, size: number, ms = FRAME_MS, influence = 1): number {
+  const steps = Math.max(0.01, ms) / FRAME_MS;
+  const r = Math.min(1, (influence * distance) / steps / Math.max(1e-6, size));
+  return Math.min(1, previous + (Math.min(1, 1 - r) - previous) * (1 - (1 - r * 0.275) ** steps));
 }
 
 /**
