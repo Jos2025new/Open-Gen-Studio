@@ -162,4 +162,11 @@ describe('ToolDock real interaction', () => {
     expect(soon.map((x) => x.textContent)).toEqual(['Boolean', 'Form builder']);
     for (const x of soon) { expect(x.disabled).toBe(true); expect(x.title).toContain('Soon:'); }
   });
+
+  it('size preset dots grow at every step, small sizes included, and none is capped', async () => {
+    await click('Brush'); await click('Pencil');
+    const dots = [...host.querySelectorAll<HTMLElement>('.opt-presets i')].map((i) => parseFloat(i.style.width));
+    expect(dots.length).toBe(14);
+    for (let i = 1; i < dots.length; i++) expect(dots[i], `dot ${i}`).toBeGreaterThan(dots[i - 1]);
+  });
 });

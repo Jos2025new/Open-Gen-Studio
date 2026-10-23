@@ -74,11 +74,12 @@ function TextureIcon({ texture }: { texture: BrushTexture }) {
   return <canvas ref={ref} className="texture-icon" width={36} height={36} aria-hidden="true" />;
 }
 
-/** One-click sizes: each dot is the size it sets (capped to fit), as in SAI's size grid. */
+/** One-click sizes, as in SAI's size grid. Dots grow on a log scale (3 → 18 px over 1 → 200) so every step is visibly larger; sqrt made 1–5 look alike and capped 96–200. */
+const dotFor = (s: number) => Math.round((3 + 15 * Math.log(s) / Math.log(SIZE_PRESETS[SIZE_PRESETS.length - 1])) * 10) / 10;
 function SizePresets({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   return <div className="opt opt-presets" role="radiogroup" aria-label="Size presets">
     {SIZE_PRESETS.map((s) => <button key={s} type="button" role="radio" aria-checked={s === value} aria-label={`${s} px`} className={s === value ? 'is-on' : ''} onClick={() => onChange(s)}>
-      <i style={{ width: Math.max(2, Math.min(18, Math.sqrt(s) * 1.7)), height: Math.max(2, Math.min(18, Math.sqrt(s) * 1.7)) }} /><span className="num">{s}</span>
+      <i style={{ width: dotFor(s), height: dotFor(s) }} /><span className="num">{s}</span>
     </button>)}
   </div>;
 }

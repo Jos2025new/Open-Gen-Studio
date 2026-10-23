@@ -63,7 +63,7 @@
 }
 .tool-dock-grip:focus-visible { outline: 2px solid var(--panel-line-focus); outline-offset: -2px; }
 .tool-dock-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; min-width: 0; padding: 4px 8px 8px; }
-.tool-dock-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 8px; min-width: 0; }
+.tool-dock-settings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 4px 8px; min-width: 0; }
 .tool-dock-settings .tool-settings { display: contents; }
 .tool-dock-settings .opt-hint, .tool-dock-settings .brush-preview { grid-column: 1 / -1; }
 .tool-dock-actions { display: flex; align-items: center; }
@@ -86,6 +86,11 @@
 .brush-card-panes { display: grid; }
 .brush-card-pane { grid-area: 1 / 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .brush-card-pane[data-active="false"] { visibility: hidden; }
+/* Every field in the card is one height: a column flex must not stretch the rows' flex-basis 100% into height. */
+:is(.brush-card-head, .brush-card-pane) > .opt:not(.opt-presets):not(.is-icon) { flex: none; }
+.tool-dock-card .opt:not(.opt-presets):not(.is-icon):not(.paint-mode) { height: 36px; box-sizing: border-box; }
+.brush-card .opt.opt-presets { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.brush-card .opt-presets button { width: auto; }
 @media (max-width: 600px) {
   .brush-card { grid-template-columns: minmax(0, 1fr); }
   .brush-card-tabs { border-left: 0; }
