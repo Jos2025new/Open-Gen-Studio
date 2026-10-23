@@ -1,9 +1,12 @@
 import { patchSession, updateFeedItem, useStore } from '../../store/store';
 import type { AgentState, SettingsFeedItem, SettingsSection } from '../types';
-import { draftMode, unlockNote, withModeResolution, type DraftMode } from './draftFirst';
+import { draftMode, latestDraft, unlockNote, withModeResolution, type DraftMode } from './draftFirst';
 
 export { draftGate } from './draftFirst';
 import { sectionsOf, settingsOptions } from './settingsCard';
+
+/** A new request starts with the session's last confirmed draft choice in Auto (a later card inherits it, and a Borrador keeps its lock); Guided and Direct start clean. */
+export const carried = (sessionId: string): DraftMode | undefined => (useStore.getState().composer.agentStyle === 'auto' ? latestDraft(useStore.getState().sessions[sessionId]?.feed ?? []) : undefined);
 
 /** The video sections with the draft mode's resolution applied to the selection (the app's, never the agent's). */
 export function lockSections<S extends SettingsSection>(sections: S[], mode: DraftMode): S[] {

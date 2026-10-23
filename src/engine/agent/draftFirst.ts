@@ -6,14 +6,14 @@ export interface DraftMode { kind: 'draft' | 'hq' | 'other'; text?: string; lock
 /*
  * Draft first (all videos): the video settings card carries a mandatory choice at its top: "Borrador" (cheap, lowest
  * resolution, to choose the style and the feeling), "Alta calidad" or the user's own words. The plan is refused until
- * a settings card with that choice was confirmed. "Borrador" sets the lowest resolution and LOCKS it: the app applies it
+ * a settings card with that choice was confirmed; in Auto the latest choice confirmed in the session is reused (the plan card says so and has a Cambiar button) unless the user asks to change it. "Borrador" sets the lowest resolution and LOCKS it: the app applies it
  * at confirmation and over every plan step, so the agent cannot change it. The padlock on the card lifts the lock.
  */
 
 export const DRAFT = 'Borrador';
 export const HQ = 'Alta calidad';
 
-export const DRAFT_RULE = `Every video plan: the app puts the draft choice ("${DRAFT}" / "${HQ}" / the user's words) at the top of the video settings card; never ask it yourself and never put a resolution in confirm_settings. "${DRAFT}": the app sets the lowest resolution and locks it; you cannot change or unlock it, and any resolution you write in a step is replaced. If a note says the user unlocked the resolution and chose another, they decided it: acknowledge it briefly, do not question it, and go on with the plan already accepted. Free text: follow it. A finished draft offers "Mejorar esta toma" (same prompt and seed in high quality); never offer it yourself.`;
+export const DRAFT_RULE = `Every video plan: the app puts the draft choice ("${DRAFT}" / "${HQ}" / the user's words) at the top of the video settings card; never ask it yourself and never put a resolution in confirm_settings. "${DRAFT}": the app sets the lowest resolution and locks it; you cannot change or unlock it, and any resolution you write in a step is replaced. If a note says the user unlocked the resolution and chose another, they decided it: acknowledge it briefly, do not question it, and go on with the plan already accepted. Free text: follow it. In Auto the app reuses the draft choice the user confirmed earlier in the session, so a new video request needs no new card; when the user asks to change it (e.g. "Quiero cambiar la elección de borrador/calidad"), call confirm_settings (kind video) again and wait for them. Guided asks on every request. A finished draft offers "Mejorar esta toma" (same prompt and seed in high quality); never offer it yourself.`;
 
 const pixels = (r: string): number => Number(/(\d{3,4})/.exec(r)?.[1] ?? NaN);
 
@@ -54,11 +54,42 @@ export function draftAnswer(feed: FeedItem[], sinceLastUser = true): 'draft' | '
   return undefined;
 }
 
-/** Why a plan with video cannot be shown yet, or null. Direct mode has no cards, so it never asks. */
+/** The user's words ask to change the draft / quality choice ("en alta calidad", "mejor un borrador", "cambiar la resolución"). */
+export const asksDraftChange = (text: string | undefined): boolean => /borrador|draft|calidad|quality|resoluci|resolution/i.test(text ?? '');
+
+const lastUserText = (feed: FeedItem[]): string | undefined => {
+  const u = [...feed].reverse().find((f) => f.type === 'user');
+  return u?.type === 'user' ? u.text : undefined;
+};
+
+/** The latest draft choice confirmed in the session (Auto reuses it in later requests), or undefined. */
+export function latestDraft(feed: FeedItem[]): DraftMode | undefined {
+  for (let i = feed.length - 1; i >= 0; i--) {
+    const f = feed[i];
+    if (f.type === 'settings' && f.status === 'confirmed' && f.draft && !(f.draft.kind === 'other' && !f.draft.text?.trim())) return f.draft;
+  }
+  return undefined;
+}
+
+/**
+ * The draft choice this plan reused instead of asking again (Auto only), for the plan card: none was confirmed since
+ * the user's last message before the plan, and an earlier one exists.
+ */
+export function reusedDraft(feed: FeedItem[], planId: string): DraftMode | undefined {
+  const at = feed.findIndex((f) => f.id === planId);
+  const plan = feed[at];
+  if (plan?.type !== 'plan' || plan.style !== 'auto' || !plan.plan.steps.some((s) => s.kind === 'video')) return undefined;
+  const before = feed.slice(0, at);
+  return draftAnswer(before) ? undefined : latestDraft(before);
+}
+
+/** Why a plan with video cannot be shown yet, or null. Direct mode has no cards, so it never asks. Auto reuses the session's last choice unless the user asks to change it; a revision keeps the request's own (any style). */
 export function draftGate(steps: Array<{ kind?: string }>, feed: FeedItem[], style: AgentStyle, revision: boolean): string | null {
   if (!steps.some((s) => s.kind === 'video') || style === 'direct') return null;
-  const answer = draftAnswer(feed) ?? (revision ? draftAnswer(feed, false) : undefined);
-  if (answer) return null;
+  if (draftAnswer(feed)) return null;
+  const auto = style === 'auto';
+  const change = auto && asksDraftChange(lastUserText(feed));
+  if ((revision || auto) && !change && latestDraft(feed)) return null;
   return `Not shown: a video plan needs the draft choice, which is on the video settings card. Call confirm_settings (kind video) and wait for the user to continue; then call propose_plan again.`;
 }
 

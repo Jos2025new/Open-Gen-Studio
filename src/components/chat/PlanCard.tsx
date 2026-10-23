@@ -1,12 +1,13 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
 import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound } from 'lucide-react';
-import { approvePlan, cancelPlan, resolveStepCostReview } from '../../engine/agent/runtime';
+import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { cancelGeneration } from '../../engine/jobs';
 import { plannedSpend, spentLabel } from './planSpent';
 import { stopPlanRun } from '../../engine/planStop';
 import { stepSentPrompt } from '../../engine/sentPrompt';
 import { toggleStep } from '../../engine/plan';
+import { DRAFT, HQ, reusedDraft } from '../../engine/agent/draftFirst';
 import { estimateSteps } from '../../engine/executor';
 import { OPS } from '../../engine/ops';
 import { aspectLabel, durationLabel } from '../../engine/params';
@@ -137,6 +138,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const workspace = useStore((s) => s.ui.workspace);
   // While the agent revises this plan after a comment, it must not run in its old form.
   const revising = useStore((s) => s.sessions[sessionId]?.agent.revising === item.id);
+  const reused = useStore((s) => reusedDraft(s.sessions[sessionId]?.feed ?? [], item.id));
   const { plan } = item;
   const awaiting = item.status === 'awaiting';
   const nodePreview = awaiting && item.nodeRun ? previewRun(sessionId, item.nodeRun.targets, item.nodeRun.force) : null;
@@ -190,6 +192,12 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             {running ? <span className="cc-run num"><LoaderCircle size={14} className="spin accent" />{resultsDone} of {results.length}</span> : null}
           </div>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
+          {reused ? (
+            <p className="plan-summary faint">
+              {reused.kind === 'draft' ? DRAFT : reused.kind === 'hq' ? HQ : (reused.text ?? '').trim().slice(0, 40)} (como antes)
+              {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [] }); }}>Cambiar</Button></> : null}
+            </p>
+          ) : null}
           {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
       </header>

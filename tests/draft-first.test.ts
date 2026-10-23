@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DRAFT, HQ, draftAnswer, draftGate, draftMode, highestResolution, lowestResolution, modeResolution, unlockNote } from '../src/engine/agent/draftFirst';
+import { DRAFT, HQ, draftAnswer, draftGate, draftMode, highestResolution, latestDraft, reusedDraft, lowestResolution, modeResolution, unlockNote } from '../src/engine/agent/draftFirst';
 import { improvePlan } from '../src/engine/improveShot';
 import { useStore } from '../src/store/store';
 import type { DraftMode } from '../src/engine/agent/draftFirst';
@@ -33,11 +33,29 @@ describe('borrador primero (todo video), en la tarjeta de ajustes', () => {
     for (const m of [draftMode('draft'), draftMode('hq'), draftMode('other', 'mejor un plano más largo')]) expect(draftGate([video], [user, card(m)], 'auto', false)).toBeNull();
     expect(draftGate([video], [user, card(draftMode('other', '  '))], 'auto', false)).not.toBeNull();
   });
-  it('la respuesta de una petición anterior no vale, salvo en una revisión', () => {
+  it('la respuesta de una petición anterior vale en Auto (si no piden cambiarla) y en una revisión, no en Guided', () => {
     const feed = [card(draftMode('hq')), user];
     expect(draftAnswer(feed)).toBeUndefined();
-    expect(draftGate([video], feed, 'auto', false)).not.toBeNull();
+    expect(draftGate([video], feed, 'guided', false)).not.toBeNull();
+    expect(draftGate([video], feed, 'guided', true)).toBeNull();
+    expect(draftGate([video], feed, 'auto', false)).toBeNull();
     expect(draftGate([video], feed, 'auto', true)).toBeNull();
+    expect(draftGate([video], feed, 'direct', false)).toBeNull();
+  });
+  it('Auto vuelve a preguntar si el usuario pide cambiar borrador/calidad, también en una revisión', () => {
+    const ask = { ...user, text: 'Quiero cambiar la elección de borrador/calidad' } as FeedItem;
+    const feed = [card(draftMode('draft')), ask];
+    expect(draftGate([video], feed, 'auto', false)).not.toBeNull();
+    expect(draftGate([video], feed, 'auto', true)).not.toBeNull();
+    expect(draftGate([video], [...feed, card(draftMode('hq'))], 'auto', false)).toBeNull();
+  });
+  it('latestDraft devuelve la última elección confirmada (no omitidas ni vacías) y reusedDraft la marca en el plan', () => {
+    expect(latestDraft([card(draftMode('draft')), card(draftMode('hq'), 'skipped')])?.kind).toBe('draft');
+    expect(latestDraft([card(draftMode('other', ' '))])).toBeUndefined();
+    const plan = { id: 'p', createdAt: 2, workspace: 'chat', type: 'plan', style: 'auto', plan: { steps: [video] } } as unknown as FeedItem;
+    expect(reusedDraft([card(draftMode('hq')), user, plan], 'p')?.kind).toBe('hq');
+    expect(reusedDraft([card(draftMode('hq')), user, card(draftMode('draft')), plan], 'p')).toBeUndefined();
+    expect(reusedDraft([card(draftMode('hq')), user, { ...plan, style: 'guided' } as FeedItem], 'p')).toBeUndefined();
   });
   it('la app fija la resolución: Borrador la más baja (480p) y bloqueada; Alta calidad desbloqueada', () => {
     expect(draftMode('draft').locked).toBe(true);

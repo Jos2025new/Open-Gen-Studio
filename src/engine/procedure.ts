@@ -90,7 +90,8 @@ export const AUTOMATION_POLICY =
   '(no video step, no step with several candidates) and the user did not name a model. It shows the same plan with its model, count and cost on the card ' +
   '(without asking) when the user named a model, the plan is a video, or any step asks for several candidates. ' +
   'It asks and blocks when a kind was never confirmed in this session, or (not in Auto) when the plan\'s cost is unknown or above $' +
-  LOW_COST_USD.toFixed(2) + '. In Auto a confirmed kind is never asked again for its cost: the plan card shows the price and the user approves the spending there.';
+  LOW_COST_USD.toFixed(2) + '. In Auto a confirmed kind is never asked again for its cost: the plan card shows the price and the user approves the spending there. ' +
+  'The draft choice of a video (Borrador / Alta calidad / the user\'s words) is separate: in Auto the app reuses the last one the user confirmed in the session for a new video request (the plan card says "como antes" with a Cambiar button) unless the user asks to change it, in which case call confirm_settings (kind video) again; Guided asks on every request.';
 
 /**
  * The gate before a plan is normalized: a kind that was never confirmed still blocks, as before.

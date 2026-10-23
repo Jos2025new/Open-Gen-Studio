@@ -1,4 +1,4 @@
-import { cardDraft, confirmedSections, draftGate, draftLines } from './draftActions';
+import { cardDraft, carried, confirmedSections, draftGate, draftLines } from './draftActions';
 import { agentAccepts } from './sendGate';
 import { mayStartWork } from '../../lib/writerLock';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
@@ -316,7 +316,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   beginJourney(sessionId, 'settings-response');
   // Cost/candidates in presentPlan still gate reuse of confirmed settings; per-request comparison parts are cleared.
   // Guided confirms its settings in every request; Auto inherits what was confirmed once in the session.
-  patchAgent(sessionId, { questionRound: 0, draftMode: undefined, draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
+  patchAgent(sessionId, { questionRound: 0, draftMode: carried(sessionId), draft: { request: clean, answers: {}, attachments }, settingsParts: undefined, ...(get().composer.agentStyle === 'guided' ? { settings: undefined } : {}) });
   const engine = agentEngine();
   if (engine.kind === 'offline') {
     const { agent, keys } = get().settings;
