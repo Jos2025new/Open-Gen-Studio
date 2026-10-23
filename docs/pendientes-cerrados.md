@@ -4,6 +4,16 @@ Lo que salió de las listas abiertas ([índice](pendientes.md)). Una línea por 
 
 Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se movieron tal cual estaban marcados `[x]`.
 
+## Hechos el 2026-10-23 (detalle y commits en [050](history/050-2026-10-W43.md))
+
+- **B10** precio del plan con el modelo enviado (`43203ea`, `tests/plan-price-variant.test.ts`), más el margen de precio del usuario (`5eaa8ec`).
+- **B11** crédito compara el coste del trabajo (`6ff43fe`, `tests/credit.test.ts`).
+- **B12** E1-01 (`1b78aa1`), E3-01 exacto y E2-01 reutilización en Auto (`a047c82`, `bc21a37`).
+- **A24** resultado por conexión en Nodes (`33447d2`) y puertos por resultado (`55f31d4`, `tests/node-link-result.test.ts`).
+- **D19–D22** (`912d48f`, `f734a40`, `8287a66`, `daeb56c`, `tests/designer-layer-fixes.test.ts`) y **D23–D28** (`tests/designer-audit-d23-d28.test.ts`).
+- **Frenos de Nodes con su motivo** (`07f535c`).
+- Pendiente de prueba en el sandbox: ver [pendientes](pendientes.md), punto 3.
+
 ## Hechos: cerrados en la revisión del 2026-10-22 [rev]
 
 - **C5 · `source-map-js` (alta)** (de pendientes-sistema y [problemas conocidos](problemas-conocidos-2026-10-18.md)). Hecho el 2026-10-22 al consolidar ramas: `eea511d` traído como `46045ae` (lockfile a 1.2.2); `npm test` pasa.

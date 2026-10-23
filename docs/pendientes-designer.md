@@ -49,3 +49,4 @@ De la [auditoría del Designer](../../ogs-designer-audit-2026-10-22.md) (HEAD `6
 - **D26 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D27 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D28 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D29 · bajo · 2026-10-23 · Los PNG de capas borradas o fusionadas se quedan en el disco.** D19 ya las saca de memoria; borrar sus archivos es un borrado de datos y necesita aprobación explícita antes de tocar `deleteBuffers` (zona protegida).

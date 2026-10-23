@@ -10,7 +10,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 1. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
 2. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
-3. **A1 · `confirm_settings` repetida con el mismo modelo ya confirmado** (2026-10-22; familia del 2026-10-16). El usuario pidió un solo cambio y el agente puso otra tarjeta a esperar clic. Fricción de uso; arreglo propuesto, falta tu aprobación. [detalle](pendientes-agente.md)
+3. **Probar en el sandbox lo hecho el 2026-10-23** (sin prueba visual ni LLM real): ajuste «Price margin», Nodes frenado por límite, puertos por resultado en Nodes, Designer D19–D28, «como antes · Cambiar» en la tarjeta del plan y A1 con un LLM real. Lista en [050](history/050-2026-10-W43.md#pendiente).
 4. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
 5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
 6. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)
@@ -34,7 +34,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 
 | ID | Asunto | Prio | Origen |
 | --- | --- | --- | --- |
-| A1 | `confirm_settings` repetida con el mismo modelo confirmado | crítico | 2026-10-22 |
+| A1 | `confirm_settings` repetida: hecho en código, falta probar con LLM real | medio | 2026-10-22 |
 | A2 | Etiqueta de proveedor falsa tras Atlas → NanoGPT | crítico | 2026-10-21 |
 | A3 | Keep/Change no nombra los dos proveedores (falla del informe) | crítico | 2026-10-21 |
 | A4 | Repetir la prueba visual del sandbox (1 falla, 4 dudosas, 9 sin ver) | crítico | 2026-10-21 |
@@ -119,6 +119,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 
 | ID | Asunto | Prio | Origen |
 | --- | --- | --- | --- |
+| D29 | Borrar del disco los PNG de capas borradas o fusionadas (borrado de datos: pide aprobación) | bajo | 2026-10-23 |
 | D1 | Probar en el navegador brocha, zoom, modos, fusionar, rasterizar, espejo | medio | 2026-10-09 |
 | D2 | Brocha SAI: mezcla húmeda, calidad, multiplicador de tamaño | medio | 2026-10-09 |
 | D3 | Mismo campo fuera del Designer (preguntar antes) | bajo | 2026-10-09 |
