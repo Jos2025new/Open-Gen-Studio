@@ -48,7 +48,7 @@ import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoo
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
-import { clickCandidate } from '../../engine/design/autoSelect';
+import { clickCandidate, topObjectLayer } from '../../engine/design/autoSelect';
 import { usePanRequest } from './usePanRequest';
 import { commitStagePaintGesture, drawingChoiceFirst, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
@@ -688,15 +688,14 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       if (!editLayers) {
         const additive = e.ctrlKey || e.metaKey || e.shiftKey;
         const owner = (l: Layer | null | undefined) => (l && l.visible && !l.locked ? l : null);
-        // The top layer wins. A modifier picks parts of one layer, or whole layers for a group.
-        const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => Boolean(objectAt(l, p.x, p.y))); 
+        const top = clickCandidate(useStore.getState().ui.autoSelect ?? false, hitTestPixel(current, p.x, p.y), act ?? undefined, (l) => !!objectAt(l, p.x, p.y));
         let layer: Layer | null = null;
         const currentObject = objectPick(doc.id);
         const pickedLayerIds = pickedLayers(doc.id, current.layers.map((l) => l.id));
         if (additive) {
           if (pickedLayerIds.length < 2 && owner(act) && objectAt(act!, p.x, p.y) && (!currentObject || currentObject.layerId === act!.id)) layer = act!;
         } else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
-        else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
+        else if (!top) layer = topObjectLayer(current.layers, (l) => !!objectAt(l, p.x, p.y), act);
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
           if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast(pixelsNotReady([layer.paintBaseId]), 'error');
