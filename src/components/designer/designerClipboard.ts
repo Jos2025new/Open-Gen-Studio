@@ -32,10 +32,11 @@ export function designerClipboard(sessionId: string, doc: DesignDoc | undefined,
       }
     })().catch((err) => toast(err instanceof Error ? err.message : 'Could not paste image.', 'error'));
   };
-  const toClipboard = (canvas: HTMLCanvasElement, done: string) => {
+  /** Writes the image; `then` runs only once the clipboard has confirmed it (a cut erases then, never before). */
+  const toClipboard = (canvas: HTMLCanvasElement, done: string, then?: () => void) => {
     if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') { toast('This browser cannot copy images to the clipboard.', 'error'); return false; }
     void navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasToBlob(canvas, 'image/png') })])
-      .then(() => toast(done, 'success'))
+      .then(() => { toast(done, 'success'); then?.(); })
       .catch(() => toast('Could not copy image to the clipboard.', 'error'));
     return true;
   };
@@ -46,10 +47,10 @@ export function designerClipboard(sessionId: string, doc: DesignDoc | undefined,
       e.preventDefault();
       const crop = selectedCrop(doc);
       if (typeof crop === 'string') { toast(crop, 'error'); return; }
-      if (toClipboard(crop, e.type === 'cut' ? 'Selection cut' : 'Selection copied') && e.type === 'cut') {
+      toClipboard(crop, e.type === 'cut' ? 'Selection cut' : 'Selection copied', e.type === 'cut' ? () => {
         const err = clearSelected(sessionId, doc);
         if (err) toast(err, 'error');
-      }
+      } : undefined);
       return;
     }
     if (e.type === 'cut') return;
