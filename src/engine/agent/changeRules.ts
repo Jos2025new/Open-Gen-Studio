@@ -6,3 +6,7 @@ export const ASPECT_RULE = `- Aspect: the card's is the deliverable's and the ap
 
 /** confirm_settings part field: another provider for the model (ADR 0025 D). */
 export const PROVIDER_PARAM = { type: 'string', description: 'Only if the user asked for a provider: the model is searched there; with no model, the confirmed one at that provider.' } as const;
+
+/** The app's own answer to a repeated confirm_settings (A1): the confirmed settings stand and no card was shown. */
+export const confirmedStandNote = (kept: string[]): string =>
+  `The settings already confirmed in this session stand: ${kept.join('; ')}. Nothing was asked of the user and no card was shown. Aspect and count come from the request. Do not call confirm_settings again for these; call propose_plan now (a different model or provider only if the user asks for it).`;

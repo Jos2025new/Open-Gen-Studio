@@ -81,6 +81,7 @@ import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults }
 import { overLimit, overLimitText, rerunNote } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { guideForModel, modelGuide } from '../guides';
+import { repeatedConfirmation } from './confirmRepeat';
 import { confirmedState, keepConfirmed, switchNote, switchSection } from './switchModel';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
@@ -214,8 +215,7 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
     librarySubjects:()=>get().library,
     strictContinuity:strict,
     userText: () => userWords(sessionId),
-    // The request being handled, not the whole conversation: an old "un ángulo diferente" must not fit a new request.
-    // Only the user's words: the agent's reply an acceptance refers to goes in offerText (change detection), not into plan fitting.
+    // This request only (an old "un ángulo diferente" must not fit a new one), user words only; the agent's reply is in offerText.
     requestText: () => userRequest(session(sessionId).agent),
     offerText: () => offerRequest(session(sessionId).agent),
     // Angles already made from this source image, by finished angle operations on it.
@@ -1495,6 +1495,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           continue;
         }
         if (call.name === 'confirm_settings') {
+          const ag = () => session(sessionId).agent;
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
           if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
@@ -1507,18 +1508,19 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             const seen = parts.slice(0, parts.indexOf(d)).filter((x) => x.kind === d.kind);
             if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
             const built = await until(buildSettings(
-              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: partModel(d, session(sessionId).agent.settings), provider: d.provider },
+              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: partModel(d, ag().settings), provider: d.provider },
               { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
             ));
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
           }
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
+          const stands = await repeatedConfirmation(sessionId, sections, parts); if (stands) { respond(stands); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, session(sessionId).agent.settings, session(sessionId).agent.settingsParts, offerRequest(session(sessionId).agent), parts[0]?.model, { switchedTo: session(sessionId).agent.switchedTo, auto: get().composer.agentStyle === 'auto' });
-          const kept = sw ? undefined : await keepConfirmed(sections, session(sessionId).agent.settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
+          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model, { switchedTo: ag().switchedTo, auto: get().composer.agentStyle === 'auto' });
+          const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
           appendFeed(sessionId, item);
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
