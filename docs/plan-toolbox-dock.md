@@ -1,6 +1,6 @@
 # Plan: toolbox del Designer por flujo de trabajo
 
-2026-10-23. Para auditoría externa antes de implementar. Diseño: [propuesta](propuesta-toolbox-dock.md). Maqueta: [toolbox-dock.html](mockups/toolbox-dock.html), hecha con el HTML real de la app. Datos de cada control: [inventario](inventario-herramientas-designer.md).
+2026-10-23. Pasada 1 implementada en la rama nueva solicitada por el usuario. Aprobó el dock real, las variantes y el selector de modo; pidió no crear otra maqueta ni hacer las pasadas 2/3 o rediseños. Diseño de referencia: [propuesta](propuesta-toolbox-dock.md). La maqueta existente [toolbox-dock.html](mockups/toolbox-dock.html) sirvió solo como referencia de interacción. Datos de cada control: [inventario](inventario-herramientas-designer.md).
 
 ## 1. Qué se propone
 
@@ -64,41 +64,41 @@ En Edit, la tarjeta sigue a la selección:
 - el motor del pincel y el de las formas;
 - nada de `designerKeys.ts` fuera de sacar esas ramas.
 
-## 4. Pasadas (mínimo viable)
+## 4. Alcance y límites
 
 La base ya existe: los controles reales, el modo de pintura, el rail y la maqueta probada. Son tres pasadas; cada una se entrega y se puede revertir sola.
 
-**Pasada 1 (hoy):**
+**Pasada 1 (implementada):**
 - `ToolDock` con los dos toolbox según el modo, la fila de variantes y los tres estados.
-- La tarjeta lleva `ToolSettings` entero, en dos columnas, con el tirador y el ancho común. Las variantes «Soon» van en gris.
+- La tarjeta reutiliza `ToolSettings`; la fila de familia incluye Layers y `PaintModeToggle`. Las variantes «Soon» se muestran deshabilitadas con una explicación.
 - La herramienta real se selecciona como hoy (`select(id)` de `ToolRail`).
+- `Composer` y la paleta flotante usan el mismo `ToolDock`; `+` sigue siendo el control real del compositor.
+- El inventario cubre todas las herramientas actuales y los atajos del otro modo aparecen como familia visitante sin cambiar el modo guardado.
 
-Esto ya cambia toda la experiencia.
+La tarjeta usa los ajustes actuales completos. Las pestañas por grupo, los ajustes que reaccionan a selección múltiple y «Fill» contextual no forman parte de esta entrega.
 
-**Pasada 2:**
+**Fuera de esta autorización:**
 - Pestañas en cápsula. Un archivo `toolGroups.ts` reparte los controles por pestaña; la maqueta los reconoce por su etiqueta. `ToolSettings` recibe un `group?`.
 - Todas las pestañas se pintan en la misma celda; las ocultas llevan `inert` y `visibility:hidden`.
 - La tarjeta de Edit sigue a la selección: con 2 o más objetos, Align y Distribute.
 - Fill aparece delante después de seleccionar.
 
-**Pasada 3 (por retrospectiva):** lo que salga al revisar las dos primeras.
-
 **Después (cada una con su ADR):**
 - herramientas nuevas: Blur, Sculpt, Bezier pen, Cutter, Grid, Guides, Templates, borrador vector, Text y Layers avanzados, ajustes del toolbox;
 - pasar sola a Edit después de crear una forma.
 
-## 5. Reparto para subagentes (pasada 1)
+## 5. Reparto y evidencia (pasada 1)
 
 Dos agentes, cada uno en su propio worktree (`git worktree add ../ogs-<t> -b task/<t>`) y solo con sus archivos. Nadie fusiona.
 
 | Agente | Archivos (exclusivos) | Entrega |
 |---|---|---|
-| A (Sonnet) | `toolboxModel.ts`, `ToolDock.tsx`, `src/styles/tool-dock.css`, `designerKeys.ts`, `tests/toolbox-model.test.ts`, `tests/toolbox-dock.test.ts`, `tests/designer-keys.test.ts` | El modelo, el dock con clases e iconos reales (`lucide-react`, nombres de `toolbox-dock/build.mjs`) y `PaintModeToggle` en el toolbox. El arreglo de atajos. Tests: inventario del modelo, secuencia de la maqueta montando `ToolDock`, y teclas reales |
-| B (Opus, integrador y revisor) | `Composer.tsx`, `ToolPalette.tsx`, `tests/designer-inventory.test.ts`, `tests/designer-context-menu.test.ts`, `docs/map.md` (regenerar), `docs/` | Monta el dock en los dos sitios y pasa los dos tests viejos al modelo nuevo. Lo prueba en el sandbox en las dos ubicaciones, en los dos modos (puerto 5183; se para al terminar). Corre `npm run test:related` y `npm test`. Informe con capturas |
+| A | `toolboxModel.ts`, `ToolDock.tsx`, `src/styles/tool-dock.css`, `designerKeys.ts` y sus tests | Modelo, dock, selector de modo y arreglo de atajos; verificado por A con typecheck y sus 7 tests |
+| B | `designerKeys.ts`, `tests/designer-keys.test.ts` | Arreglo de teclas de herramientas y Delete; integrado en el commit `e2617a2` |
+| C | `Composer.tsx`, `ToolPalette.tsx`, dos tests existentes, `scripts/map-contracts.mjs`, `docs/` | Montaje compartido, migración de tests, contrato y documentación breve; ejecuta `npm run test:related` |
+| Coordinación | Sandbox, suite completa y capturas | La evidencia visual de ambas ubicaciones y modos queda pendiente de la comprobación del coordinador; este worktree no arranca el sandbox |
 
-B empieza cuando A entregue. Así no se pisan los archivos.
-
-**Hecho =** el caso de la maqueta reproducido en el sandbox con capturas, `npm test` en verde y ningún control inventado.
+El usuario autorizó la implementación real en una rama nueva. La aprobación cubre esta pasada, no las funciones pendientes enumeradas arriba. La referencia visual y el modelo de interacción están implementados con controles de la app; el resultado visual real y `npm test` los confirma el coordinador.
 
 ## 6. Riesgos para el auditor
 
@@ -106,8 +106,8 @@ Segunda auditoría: dos ajustes (inventario sobre `TOOL_NAMES` y atajo del otro 
 Primera auditoría (GPT, 2026-10-23): cuatro hallazgos, todos verificados en el código y corregidos arriba (montaje en Composer, interruptor de modo, atajos, tests sobre el rail viejo).
 
 
-- **Identidad visual:** la tarjeta es una superficie nueva. Usa los tokens de `.context-strip`, pero cambiarla exige la aprobación explícita del usuario (AGENTS.md, regla 6).
-- **Modo ↔ toolbox:** resuelto con `PaintModeToggle` siempre visible. Falta que el usuario confirme que es ese control el que decide el toolbox.
+- **Identidad visual:** aprobada por el usuario para esta implementación en rama nueva; la tarjeta usa los tokens existentes del Designer.
+- **Modo ↔ toolbox:** el selector real `PaintModeToggle` está siempre visible y el toolbox deriva del modo del documento.
 - **Atajos:** resuelto sacando las ramas de `designerKeys.ts`; se comprueba con teclas reales.
 - **Accesibilidad:**
   - `role="toolbar"` con flechas;

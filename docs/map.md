@@ -20,13 +20,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 247 | 169 |
-| [store.ts](../src/store/store.ts) | 168 | 161 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 74 | 0 |
+| [types.ts](../src/engine/types.ts) | 248 | 169 |
+| [store.ts](../src/store/store.ts) | 169 | 163 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 75 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 2 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
-| [actions.ts](../src/engine/design/actions.ts) | 47 | 22 |
-| [doc.ts](../src/engine/design/doc.ts) | 39 | 39 |
+| [actions.ts](../src/engine/design/actions.ts) | 47 | 23 |
+| [doc.ts](../src/engine/design/doc.ts) | 40 | 41 |
 | [ops.ts](../src/engine/ops.ts) | 39 | 16 |
 | [params.ts](../src/engine/params.ts) | 38 | 17 |
 | [catalog.ts](../src/engine/catalog.ts) | 34 | 18 |
@@ -35,9 +35,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [format.ts](../src/lib/format.ts) | 28 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 26 | 6 |
 | [id.ts](../src/lib/id.ts) | 26 | 0 |
-| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 5 |
+| [objectSelection.ts](../src/engine/design/objectSelection.ts) | 19 | 6 |
 | [render.ts](../src/engine/design/render.ts) | 19 | 8 |
-| [idb.ts](../src/lib/idb.ts) | 18 | 197 |
+| [idb.ts](../src/lib/idb.ts) | 18 | 198 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 17 | 4 |
 
@@ -49,25 +49,25 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 16 | 5 |
 | `src/components/chat` | 21 | 11 |
 | `src/components/composer` | 11 | 7 |
-| `src/components/designer` | 45 | 15 |
+| `src/components/designer` | 47 | 18 |
 | `src/components/gallery` | 1 | 1 |
 | `src/components/node` | 8 | 4 |
 | `src/components/shell` | 26 | 15 |
 | `src/components/space` | 10 | 7 |
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 16 | 4 |
-| `src/engine` | 60 | 219 |
+| `src/engine` | 60 | 221 |
 | `src/engine/agent` | 35 | 84 |
-| `src/engine/design` | 92 | 104 |
+| `src/engine/design` | 92 | 106 |
 | `src/engine/flow` | 11 | 14 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
 | `src/engine/providers` | 14 | 52 |
 | `src/engine/skills` | 7 | 16 |
-| `src/lib` | 32 | 227 |
-| `src/store` | 13 | 163 |
+| `src/lib` | 32 | 228 |
+| `src/store` | 13 | 165 |
 
-158 de 437 módulos no tienen ningún test que los importe directamente.
+159 de 439 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -77,7 +77,6 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [SketchEditor.tsx](../src/components/assets/SketchEditor.tsx)
 - [Viewer3DControls.tsx](../src/components/assets/Viewer3DControls.tsx)
 - [viewer3d.ts](../src/components/assets/viewer3d.ts)
-- [CanvasSize.tsx](../src/components/designer/CanvasSize.tsx)
 - [DesignerWorkspace.tsx](../src/components/designer/DesignerWorkspace.tsx)
 - [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
-import { ToolRail } from '../src/components/designer/ToolRail';
+import { ToolDock } from '../src/components/designer/ToolDock';
 import { createDoc, newRasterLayer } from '../src/engine/design/doc';
 import { setUi, useStore } from '../src/store/store';
 
@@ -20,41 +20,43 @@ beforeEach(async () => {
   const add = document.createElement('button'); add.textContent = 'Add'; host.append(add);
   const palette = document.createElement('div'); palette.className = 'designer-palette'; host.append(palette);
   root = createRoot(palette);
-  await act(async () => root.render(createElement(ToolRail, { sessionId: 'test', doc })));
+  await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc })));
 });
 afterEach(async () => {
   await act(async () => root.unmount()); host.remove();
   useStore.setState({ ui: initialUi }); vi.unstubAllGlobals();
 });
-const strip = () => host.querySelector('.context-strip');
-async function click(label: string) {
-  const button = [...document.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === label || b.textContent?.trim() === label || b.querySelector('.menu-label')?.textContent === label);
+const variants = () => host.querySelector('.tool-dock-variants');
+async function click(label: string, scope = 'body') {
+  const button = [...document.querySelectorAll<HTMLButtonElement>(`${scope} button`)].find((b) => b.getAttribute('aria-label') === label);
   expect(button, label).toBeTruthy();
   await act(async () => button!.click());
 }
 
-it('opens by default, toggles on the active tool, and keeps that tool selected', async () => {
-  expect(strip()).toBeTruthy();
-  await click('Brush (B)'); expect(strip()).toBeNull();
+it('opens a family, toggles its active variant, and keeps that tool selected', async () => {
+  expect(variants()).toBeTruthy();
+  await click('Brush', '.tool-dock-variants'); expect(host.querySelector('[aria-label="Brush settings"]')).toBeTruthy();
   expect(useStore.getState().ui.tool).toBe('brush');
-  await click('Brush (B)'); expect(strip()).toBeTruthy();
+  await click('Hide tool settings'); expect(host.querySelector('[aria-label="Brush settings"]')).toBeNull();
+  await click('Brush', '.tool-dock-family'); expect(variants()).toBeNull();
 });
-it('switches the settings to another tool and reopens after a keyboard tool change', async () => {
-  await click('Brush (B)');
-  await click('Text (T)'); expect(strip()?.getAttribute('aria-label')).toBe('Text quick settings');
-  await click('Text (T)'); expect(strip()).toBeNull();
+it('switches the settings to another tool and follows keyboard tool changes', async () => {
+  await click('Pencil'); expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
+  expect(useStore.getState().ui.tool).toBe('brush');
   await act(async () => setUi({ tool: 'ruler' }));
-  expect(strip()?.getAttribute('aria-label')).toBe('Ruler quick settings');
+  expect(variants()?.getAttribute('aria-label')).toBe('Ruler variants');
 });
-it('replaces the strip with a group menu and restores it even when choosing the current group tool', async () => {
-  await click('Fill and gradient'); expect(strip()).toBeNull();
-  await click('Fill'); expect(strip()?.getAttribute('aria-label')).toBe('Fill quick settings');
-  await click('Fill and gradient · Fill'); expect(strip()).toBeNull();
-  await click('Fill'); expect(strip()).toBeTruthy();
+it('opens variants for a selected family and activates its tool', async () => {
+  await click('Color', '.tool-dock-family');
+  expect(variants()?.getAttribute('aria-label')).toBe('Color variants');
+  await click('Fill');
+  expect(useStore.getState().ui.tool).toBe('fill');
+  expect(host.querySelector('[aria-label="Fill settings"]')).toBeTruthy();
 });
-it('hides for Snap and Add, while a settings field keeps the strip open', async () => {
-  await click('Color · #ffffff'); expect(strip()).toBeTruthy();
-  await click('Snap'); expect(strip()).toBeNull();
-  await click('Brush (B)'); expect(strip()).toBeTruthy();
-  await click('Add'); expect(strip()).toBeNull();
+it('retains the real Add control and includes Layers and mode controls in the dock', async () => {
+  expect(host.querySelector('button')?.textContent).toBe('Add');
+  expect(host.querySelector('.tool-dock')?.contains(host.querySelector('button'))).toBe(false);
+  expect([...document.querySelectorAll('button')].some((b) => b.getAttribute('aria-label') === 'Show or hide right panel')).toBe(true);
+  expect(host.querySelector('.paint-mode[aria-label="Paint mode"]')).toBeTruthy();
+  await click('Brush'); expect(variants()).toBeTruthy();
 });
