@@ -18,7 +18,7 @@ export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | nu
   const selected = activeLayer(doc);
   const paintable = (item: Layer | null | undefined): item is RasterLayer => !!item && item.type === 'raster' && !item.locked && item.visible && !isProtectedImage(item);
   const above = selected ? doc.layers[doc.layers.indexOf(selected) + 1] : undefined;
-  return erase ? selected?.type === 'raster' ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
+  return erase ? selected?.type === 'raster' && !selected.locked && selected.visible ? selected : null : paintable(selected) ? selected : paintable(above) && !above.sourceAssetId ? above : null;
 }
 
 export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {

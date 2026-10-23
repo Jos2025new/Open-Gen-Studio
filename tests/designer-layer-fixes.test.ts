@@ -44,3 +44,15 @@ describe('D20: merge down keeps what was visible', () => {
     expect(drawn.layers.every((l) => l.visible)).toBe(true);
   });
 });
+
+import { toolBlockReason } from '../src/engine/design/rules';
+import { paintCandidate } from '../src/components/designer/StagePaintCommit';
+describe('D21: the eraser does not erase a hidden layer', () => {
+  it('says why and has no target, like the brush', () => {
+    const hidden = layer('Hidden', false, [0, 0, 8, 8]);
+    expect(toolBlockReason('eraser', hidden)).toBe('"Hidden" is hidden. Show it to erase.');
+    const doc = { ...createDoc('erase', 8, 8), layers: [hidden], activeLayerId: hidden.id };
+    expect(paintCandidate(doc, true)).toBeNull();
+    expect(toolBlockReason('eraser', { ...hidden, visible: true })).toBeNull();
+  });
+});

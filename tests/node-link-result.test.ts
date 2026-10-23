@@ -39,7 +39,7 @@ describe('Nodes: each link keeps its own result', () => {
 
 describe('Nodes: one output port per result', () => {
   it('a link dragged from port 2 keeps the second result; from + it follows the node pick', () => {
-    const { nodes, edges } = planToGraph(plan);
+    const { nodes } = planToGraph(plan);
     const [a, b] = [nodes[0].id, nodes[1].id];
     const fixed = connect({ nodes, edges: [] } as never, { source: a, target: b, targetHandle: 'ref', sourceHandle: 'out-2' }).edges[0];
     expect(fixed).toMatchObject({ sourceHandle: 'out-2', outputIndex: 1 });

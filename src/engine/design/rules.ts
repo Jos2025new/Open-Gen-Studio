@@ -61,6 +61,8 @@ export function toolBlockReason(tool: DesignTool, active: Layer | null): string 
     if (!active) return 'Select a raster layer to erase.';
     if (active.type !== 'raster') return `"${active.name}" is a ${active.type} layer. Erasing only works on raster layers.`;
     if (active.locked) return `"${active.name}" is locked.`;
+    // D21: like painting (and Photoshop/Krita), a hidden layer is not erased unseen.
+    if (!active.visible) return `"${active.name}" is hidden. Show it to erase.`;
     if (isProtectedImage(active)) return `"${active.name}" is a protected image. Enable "Allow painting" in its properties to erase it.`;
     return null;
   }
