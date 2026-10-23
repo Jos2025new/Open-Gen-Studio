@@ -56,3 +56,15 @@ describe('D21: the eraser does not erase a hidden layer', () => {
     expect(toolBlockReason('eraser', { ...hidden, visible: true })).toBeNull();
   });
 });
+
+import { readFileSync } from 'node:fs';
+import { newVectorLayer, updateLayer } from '../src/engine/design/doc';
+describe('D22: drawing a shape into an empty vector layer keeps its place', () => {
+  it('the layer is filled where it is, not moved to the top', () => {
+    const empty = newVectorLayer('Empty'), top = newVectorLayer('Top');
+    const doc = { ...createDoc('z', 8, 8), layers: [empty, top] };
+    expect(updateLayer(doc, empty.id, { shapes: [{ id: 's' } as never] }).layers.map((l) => l.name)).toEqual(['Empty', 'Top']);
+    // The stage fills it through updateLayer (no filter-and-append).
+    expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).not.toMatch(/layers\.filter\(\(l\) => l\.id !== act\.id\), \{ \.\.\.act, shapes/);
+  });
+});

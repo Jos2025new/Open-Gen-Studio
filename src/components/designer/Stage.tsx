@@ -8,7 +8,7 @@ import { brushPoint } from '../../engine/design/brushControl';
 import { fillRegion } from '../../engine/design/fill';
 import { drawStroke } from '../../engine/design/brushTextures';
 import { drawDoc, layerBox, hitTest, hitTestPixel, endDragPreview, startDragPreview } from '../../engine/design/render';
-import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox } from '../../engine/design/doc';
+import { activeLayer, scaleLayer, translateLayer, newVectorLayer, insertLayer, unionBox, updateLayer } from '../../engine/design/doc';
 import { SNAP_PX, snapOptsFor } from '../../engine/design/snap';
 import { snapSessionOf } from '../../engine/design/snapSession';
 import { snapIdleFeed, snapIdleStop } from './snapIdle';
@@ -1241,7 +1241,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       record(current);
       // Each shape gets its own layer; only an empty vector layer is filled in place.
       if (act && act.type === 'vector' && !act.locked && !act.shapes.length && !act.strokes?.length) {
-        setDoc(sessionId, doc.id, (dd) => ({ ...dd, layers: [...dd.layers.filter((l) => l.id !== act.id), { ...act, shapes: [shape] }] }));
+        setDoc(sessionId, doc.id, (dd) => updateLayer(dd, act.id, { shapes: [shape] })); // D22: in its place, not moved to the top
       } else {
         const layer = newVectorLayer(`${SHAPE_NAMES[d.tool]} ${current.layers.length + 1}`);
         layer.shapes = [shape];
