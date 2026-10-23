@@ -108,7 +108,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | ID | Asunto | Prio | Origen |
 | --- | --- | --- | --- |
 | G1 | Aprobación formal de ADR 0005, 0006, 0008, 0009 (y 0015) | medio | 2026-10-08 |
-| G2 | Fusiones: avance directo a `agent-stop`, `main`, app real | medio | 2026-09-25 |
+| G2 | Poner la app real al día (migra sus datos: copia y aprobación antes) | alto | 2026-09-25 |
 | G3 | Publicar la app (plataforma, acceso, claves) | medio | 2026-09-25 |
 | G4 | Estructura de QA con subagentes (sin comprobar si sigue) | bajo | 2026-10-09 |
 | G5 | Sistema visual de tarjetas, pasos 3 a 5 y revisión visual | medio | 2026-10-20 |
