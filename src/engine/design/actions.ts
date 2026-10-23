@@ -287,8 +287,11 @@ export async function flattenLayers(sessionId: string, docId: string, ids: strin
   await ensureBuffers(layers);
   const [base, ...rest] = layers;
   const c = createCanvas(doc.width, doc.height);
-  drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: true, blend: 'normal' } as Layer, ...rest] }, { resolution: 'document' });
-  const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: 1, blend: base.blend, visible: base.visible, groupId: base.groupId };
+  // D20: drawn as they show, so a hidden layer adds nothing and the result is visible when any part was; all hidden
+  // (rasterizing a hidden layer): drawn whole and kept hidden.
+  const shown = layers.some((l) => l.visible);
+  drawDoc(ctx2d(c), { ...doc, background: null, layers: [{ ...base, visible: shown ? base.visible : true, blend: 'normal' } as Layer, ...rest.map((l) => (shown ? l : { ...l, visible: true }))] }, { resolution: 'document' });
+  const out: RasterLayer = { ...D.newRasterLayer(name ?? base.name, { x: 0, y: 0, width: doc.width, height: doc.height }, { width: doc.width, height: doc.height }), opacity: 1, blend: base.blend, visible: shown, groupId: base.groupId };
   setBuffer(out.id, c);
   const gone = new Set(layers.map((l) => l.id));
   mutateDoc(sessionId, docId, (d) => ({ ...d, activeLayerId: out.id, layers: d.layers.flatMap((l) => (l.id === base.id ? [out] : gone.has(l.id) ? [] : [l])) }));
