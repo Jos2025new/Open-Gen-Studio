@@ -21,7 +21,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
 | [types.ts](../src/engine/types.ts) | 248 | 169 |
-| [store.ts](../src/store/store.ts) | 168 | 163 |
+| [store.ts](../src/store/store.ts) | 169 | 163 |
 | [primitives.tsx](../src/components/ui/primitives.tsx) | 75 | 0 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 47 | 2 |

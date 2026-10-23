@@ -86,3 +86,4 @@ p.studio-layers { margin: 0; padding: var(--sp-2); font-size: var(--fs-s); }
 /* Chat placeholder: the quietest, a flat tile with the kind icon; the label sits under the icon. */
 .studio-thumb.is-pending .studio-pending-text.is-quiet { justify-content: flex-end; padding-bottom: var(--sp-4); color: var(--text-3); }
 @media (prefers-reduced-motion: reduce) { .space-board.is-studio .space-tile.is-pending::after { animation: none; display: none; } }
+.studio-size-pop { padding: var(--sp-2); }
