@@ -1,6 +1,6 @@
 # Propuesta: la interfaz del Designer según la filosofía de ibisPaint y Photoshop
 
-Fecha: 2026-10-10. Estado: **propuesta, sin implementar**. La pidió el usuario a partir de dos capturas: un collage de paneles de Photoshop y la pantalla de dibujo de ibisPaint. Sus palabras: «no digo que lo copiemos, digo que miremos su filosofía y la extrapolemos»; en nuestro Designer, «aunque es más grande, [funciones importantes] quedan incluso ocultas». Lo que se dice de esas apps es **inferido de las capturas**, no de su documentación. Lo que se dice del Designer está **comprobado en el código** el mismo día.
+Fecha: 2026-10-10. Estado: **superada el mismo día por el plan aplicado en la rama `task/designer-ux`** (`docs/plan-designer-ux.md` en esa rama), que combina esta propuesta con la visión de GPT 6 Astra. Lo que sigue es el análisis de origen; las secuencias de abajo ya no son las vigentes. La pidió el usuario a partir de dos capturas: un collage de paneles de Photoshop y la pantalla de dibujo de ibisPaint. Sus palabras: «no digo que lo copiemos, digo que miremos su filosofía y la extrapolemos»; en nuestro Designer, «aunque es más grande, [funciones importantes] quedan incluso ocultas». Lo que se dice de esas apps es **inferido de las capturas**, no de su documentación. Lo que se dice del Designer está **comprobado en el código** el mismo día.
 
 ## Lo que se ve en las capturas
 

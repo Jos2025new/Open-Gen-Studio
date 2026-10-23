@@ -81,7 +81,6 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | C2 | Probar «Delete all» y el webm real de H5 en el sandbox | medio | 2026-10-16 |
 | C3 | Rescate de la pestaña abierta (probablemente obsoleto) | bajo | 2026-10-18 |
 | C4 | Conflicto de guardado de las 17:49, sin analizar | medio | 2026-10-18 |
-| C5 | `source-map-js` (alta): arreglo en rama no fusionada | medio | 2026-10-18 |
 | C6 | Limpiar copias `data.bak-*` | bajo | 2026-10-08 |
 | C7 | Unificar datos repetidos de proveedores | bajo | 2026-09-24 |
 | C8 | Tests intermitentes con carga (4, 11 y `writer-lock` 15c) | medio | 2026-10-08 |

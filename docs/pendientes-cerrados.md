@@ -6,6 +6,8 @@ Cierres hechos en la revisión del 2026-10-22 llevan **[rev]**; los demás se mo
 
 ## Hechos: cerrados en la revisión del 2026-10-22 [rev]
 
+- **C5 · `source-map-js` (alta)** (de pendientes-sistema y [problemas conocidos](problemas-conocidos-2026-10-18.md)). Hecho el 2026-10-22 al consolidar ramas: `eea511d` traído como `46045ae` (lockfile a 1.2.2); `npm test` pasa.
+- **Deshacer y rehacer conservan el modo de pintura** (rama `task/paintmode-undo`, nunca integrada). Hecho el 2026-10-22: `0cc41bd` traído como `ef77935`, con `tests/paint-mode-history.test.ts` y el contrato `paint-mode`.
 - **Fusión de `task/gui-cohesion`** (de pendientes-gui). Hecho: `e618fae` es ancestro de `HEAD` (`git merge-base --is-ancestor e618fae HEAD`). Solo en esta línea: la rama de la app real, `task/agent-forcing`, no lo contiene (ver B2 en [pendientes-agente](pendientes-agente.md)).
 - **`task/save-guard` sin fusionar** y **«se perdió todo al recargar tras parar el servidor»** (de [problemas conocidos](problemas-conocidos-2026-10-18.md)). Hecho: la rama es ancestro de `HEAD`; commits `ef55688`, `cd4224f`, `7d153fd`, `bb58598`; pruebas `save-guard-server`, `save-guard-client`, `save-guard-banner` y `save-guard-review`. La fase 2 sigue abierta (C1).
 - **Guardar cada sesión por separado** (ADR 0014, Designer segunda parte). Hecho: formato 2 en `server/store-v2.js` (`1e21299` y anteriores), `tests/store-v2.test.ts`; ADR 0014 aprobado el 2026-10-12. Queda la atomicidad (C1).

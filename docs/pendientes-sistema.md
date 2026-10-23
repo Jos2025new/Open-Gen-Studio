@@ -9,7 +9,6 @@ Detalle de las filas C, F y G del [índice](pendientes.md). Prioridad, **origen*
 - **C2 · medio · 2026-10-16 · Probar en el sandbox «Delete all»** (borrar, recargar, comprobar; código en `c2c40ee`) y el webm real de H5. [039](history/039-2026-10-W42.md).
 - **C3 · bajo · 2026-10-18 · Rescate de la pestaña abierta** (`rescate-pestana.js`, fuera del repo) y restaurar lo rescatado en el sandbox con la fase 1. Probablemente obsoleto (la pestaña de entonces ya no existe); confirmar con el usuario antes de cerrarlo. [043](history/043-2026-10-W42.md).
 - **C4 · medio · 2026-10-18 · Conflicto de guardado a las 17:49 en otro sandbox:** sin registro ni causa. [problemas conocidos](problemas-conocidos-2026-10-18.md).
-- **C5 · medio · 2026-10-18 · `npm audit` marca `source-map-js` (alta).** El arreglo está en `task/audit-source-map` (`eea511d`), que no es ancestro de esta línea. Sin comprobar el commit.
 - **C6 · bajo · 2026-10-08 · Limpiar copias `data.bak-*`** (solo se crean con «Wipe all data»; solo ocupan disco). Las copias automáticas de `data/backups/` ya se limitan a 20.
 
 ## Calidad del código y pruebas (C)

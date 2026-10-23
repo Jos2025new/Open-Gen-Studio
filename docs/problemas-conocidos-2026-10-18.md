@@ -9,7 +9,7 @@ Registro de lo visto en el uso del sandbox el 2026-10-18 y de pendientes antiguo
 | Un resultado 3D (Tripo H3.1 vía Atlas) mostró «Failed to fetch» y «Provider URL only». | **Causa probable, sin verificar:** el relé de descarga `MEDIA_HOSTS` de [vite.config.ts](../vite.config.ts) solo admite `volces.com`, `bytepluses.com`, `atlascloud.ai` y `aliyuncs.com`; un host de 3D distinto recibiría 403. No se vio el host real. | Lectura de `vite.config.ts:23` y `:39`. Sin reproducir. |
 | El usuario siguió generando tras detener el servidor y todo lo posterior se perdió al recargar, sin aviso visible. | Abierto en esta rama: no hay guarda de guardado. La rama `task/save-guard` (fase 1) lo aborda y está sin fusionar, pendiente de revisión. | Relato del usuario; la rama existe (`git branch`). No se leyó su diff. |
 | Se registró un conflicto de guardado a las 17:49 en otro sandbox. | Sin analizar: no se tiene el registro ni la causa. | Relato del usuario. |
-| `npm audit` marca una vulnerabilidad alta en `source-map-js`. | Arreglada solo en la rama `task/audit-source-map` (`eea511d`), no aquí. | Relato; el commit no se comprobó. |
+| `npm audit` marca una vulnerabilidad alta en `source-map-js`. | Arreglada en la línea el 2026-10-22 (`46045ae`, traído de `task/audit-source-map`, `eea511d`). | Comprobado: lockfile en 1.2.2. |
 
 ## Pendientes antiguos revisados en el código
 
