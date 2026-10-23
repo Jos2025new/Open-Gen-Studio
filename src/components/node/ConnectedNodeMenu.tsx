@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { getBezierPath, Handle, Position, useInternalNode, useReactFlow, useViewport } from '@xyflow/react';
 import { Plus } from 'lucide-react';
 import { addConnected } from '../../engine/flow/actions';
+import { resultHandle, runsGeneration } from '../../engine/flow/graph';
 import type { GraphNode, PortType } from '../../engine/types';
 import { useStore } from '../../store/store';
 import { Popover, usePopover } from '../ui/Popover';
@@ -34,6 +35,26 @@ export function AddNext({ node, out }: { node: GraphNode; out: PortType }) {
     </Popover>
     {pop.open ? <ConnectionPreview from={node.id} menu={menu} /> : null}
   </>;
+}
+
+/**
+ * A node with several results gets one numbered output per result (Houdini/Nuke convention): a link from «2» always
+ * uses the second result; a link from + follows the result chosen on the node. Shown on hover, or while linked.
+ */
+export function ResultPorts({ node, out }: { node: GraphNode; out: PortType }) {
+  const d = node.data;
+  const made = useStore((s) => (runsGeneration(d) && d.generationId ? s.generations[d.generationId]?.assetIds.length ?? 0 : 0));
+  const used = useStore((s) => s.sessions[s.activeSessionId]?.graph.edges.filter((e) => e.source === node.id && e.outputIndex != null).map((e) => e.outputIndex!).join(',') ?? '');
+  const linked = new Set(used ? used.split(',').map(Number) : []);
+  const count = Math.max('settings' in d ? d.settings.count ?? 1 : 1, made, ...[...linked].map((i) => i + 1));
+  if (count < 2) return null;
+  return <>{Array.from({ length: count }, (_, i) => (
+    <Handle key={i} id={resultHandle(i)} type="source" position={Position.Right}
+      className={`nc-result nodrag port-${out} ${linked.has(i) ? 'is-linked' : ''}`}
+      style={{ top: `calc(50% + ${22 + i * 18}px)` }}
+      data-tip={`Result ${i + 1}: links from here always use it`}
+    >{i + 1}</Handle>
+  ))}</>;
 }
 
 /** Keep the curve while the picker is open. End at its measured position, including Popover's viewport clamping. */

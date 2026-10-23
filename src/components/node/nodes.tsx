@@ -21,7 +21,7 @@ import { AspectGlyph } from '../composer/MediaControls';
 import { VideoUpscaleControls } from '../assets/VideoUpscaleControls';
 import { GenerationInfo } from '../assets/GenerationInfo';
 import { OP_ICONS } from '../assets/AssetActions';
-import { AddNext } from './ConnectedNodeMenu';
+import { AddNext, ResultPorts } from './ConnectedNodeMenu';
 import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 
 /** `solo`: this node is the only selected one, so its toolbar and settings panel show. */
@@ -814,7 +814,7 @@ export const StudioNode = memo(function StudioNode({ data, selected }: NodeProps
           </div>
         )}
       </div>
-      {out ? <AddNext node={node} out={out} /> : null}
+      {out ? <><AddNext node={node} out={out} /><ResultPorts node={node} out={out} /></> : null}
     </>
   );
 });

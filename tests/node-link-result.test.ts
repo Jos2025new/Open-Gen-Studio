@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 vi.hoisted(() => Object.assign(globalThis, { window: { setTimeout, clearTimeout, addEventListener: () => undefined }, document: { addEventListener: () => undefined, visibilityState: 'visible' } }));
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
-import { graphToSteps, planToGraph } from '../src/engine/flow/graph';
+import { connect, graphToSteps, handleIndex, planToGraph, resultHandle } from '../src/engine/flow/graph';
 import type { Generation, Plan } from '../src/engine/types';
 
 // A24: each link keeps the result it uses, so one step can feed two of its candidates on the Node board.
@@ -34,5 +34,22 @@ describe('Nodes: each link keeps its own result', () => {
     expect(byTitle('Serious')).toEqual(['asset:a2']);
     const old = edges.map(({ outputIndex: _drop, ...e }) => e);
     expect((graphToSteps({ nodes, edges: old } as never, targets, gens, { force: true }).steps.find((s) => s.title === 'Serious') as { refs: string[] }).refs).toEqual([`asset:a${(src.data as { outputIndex: number }).outputIndex + 1}`]);
+  });
+});
+
+describe('Nodes: one output port per result', () => {
+  it('a link dragged from port 2 keeps the second result; from + it follows the node pick', () => {
+    const { nodes, edges } = planToGraph(plan);
+    const [a, b] = [nodes[0].id, nodes[1].id];
+    const fixed = connect({ nodes, edges: [] } as never, { source: a, target: b, targetHandle: 'ref', sourceHandle: 'out-2' }).edges[0];
+    expect(fixed).toMatchObject({ sourceHandle: 'out-2', outputIndex: 1 });
+    const free = connect({ nodes, edges: [] } as never, { source: a, target: b, targetHandle: 'ref', sourceHandle: 'out' }).edges[0];
+    expect(free.sourceHandle).toBe('out');
+    expect(free.outputIndex).toBeUndefined();
+    expect([handleIndex('out-3'), handleIndex('out'), resultHandle(0)]).toEqual([2, undefined, 'out-1']);
+  });
+  it('a plan link that names #1 is fixed to the first result and leaves from its port', () => {
+    const { edges } = planToGraph(plan);
+    expect(edges.map((e) => [e.sourceHandle, e.outputIndex])).toEqual([['out-1', 0], ['out-2', 1]]);
   });
 });

@@ -126,13 +126,22 @@ export function connectionError(
   return null;
 }
 
+/** A node with several results has one output port per result (`out-2` = the second), like Houdini/Nuke outputs. */
+export const resultHandle = (index: number) => `out-${index + 1}`;
+/** The result a source port names, or undefined for `out` (the node's chosen result). */
+export function handleIndex(handle: string | null | undefined): number | undefined {
+  const m = handle ? /^out-(\d+)$/.exec(handle) : null;
+  return m ? Number(m[1]) - 1 : undefined;
+}
+
 /** Add an edge, replacing the existing edge on single-input ports. */
-export function connect(graph: Graph, c: { source: string; target: string; targetHandle: string }): Graph {
+export function connect(graph: Graph, c: { source: string; target: string; targetHandle: string; sourceHandle?: string | null }): Graph {
   const tgt = graph.nodes.find((n) => n.id === c.target);
   const port = tgt ? inputPorts(tgt.data).find((p) => p.id === c.targetHandle) : undefined;
   let edges = graph.edges.filter((e) => !(e.source === c.source && e.target === c.target && e.targetHandle === c.targetHandle));
   if (port && !port.multi) edges = edges.filter((e) => !(e.target === c.target && e.targetHandle === c.targetHandle));
-  edges.push({ id: uid('edge'), source: c.source, target: c.target, sourceHandle: 'out', targetHandle: c.targetHandle });
+  const outputIndex = handleIndex(c.sourceHandle);
+  edges.push({ id: uid('edge'), source: c.source, target: c.target, sourceHandle: outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: c.targetHandle, ...(outputIndex == null ? {} : { outputIndex }) });
   return { ...graph, edges };
 }
 
@@ -170,7 +179,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     let outputIndex: number | undefined;
     if (p.type === 'step') {
       source = nodeOf.get(p.id);
-      if (p.index) outputIndex = p.index;
+      if (ref.includes('#')) outputIndex = p.index;
     }
     else if (p.type === 'asset') {
       source = existingSource(p.id) ?? assetNodes.get(p.id);
@@ -180,7 +189,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
         nodes.push({ id: source, position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Reference', assetId: p.id }, planId: plan.id });
       }
     }
-    if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle, ...(outputIndex ? { outputIndex } : {}) });
+    if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: outputIndex == null ? 'out' : resultHandle(outputIndex), targetHandle: handle, ...(outputIndex == null ? {} : { outputIndex }) });
   };
 
   for (const n of nodes) {

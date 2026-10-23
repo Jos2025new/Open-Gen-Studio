@@ -164,3 +164,8 @@ input.group-title { background: var(--surface-2); border: 1px solid var(--accent
 .node-add-search input { width: 100%; min-width: 0; }
 /* React Flow paints from our tokens, not its dark defaults, so the canvas follows the base (ADR 0024 M). */
 .node-canvas .react-flow { --xy-background-color: var(--bg-canvas); --xy-node-color: var(--text); --xy-node-border: 1px solid var(--border); --xy-node-background-color: var(--surface); --xy-handle-background-color: var(--text-3); --xy-handle-border-color: var(--surface); --xy-edge-stroke: var(--text-3); --xy-connectionline-stroke: var(--text-3); --xy-minimap-background-color: var(--surface); --xy-minimap-node-background-color: var(--surface-3); --xy-selection-background-color: var(--accent-soft); --xy-selection-border: 1px dotted var(--border-focus); }
+
+/* One numbered output per result (ResultPorts): small, under the +, visible on hover/selection or while linked. */
+.nc-result.react-flow__handle { right: -30px; width: 15px; height: 15px; transform: translateY(-50%); display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-2); font-size: 9px; line-height: 1; opacity: 0; transition: opacity .12s; }
+.react-flow__node:hover .nc-result, .react-flow__node.selected .nc-result, .nc-result.is-linked { opacity: 1; }
+.nc-result:hover { color: var(--accent); border-color: var(--accent-line); }

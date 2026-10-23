@@ -172,7 +172,7 @@ export function renameNode(sessionId: string, nodeId: string, typed: string): vo
   if (asset && st.assets[asset]) useStore.setState((s0) => ({ assets: { ...s0.assets, [asset]: { ...s0.assets[asset], name } } }));
 }
 
-export function connectNodes(sessionId: string, c: { source: string; target: string; targetHandle: string | null }): string | null {
+export function connectNodes(sessionId: string, c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null }): string | null {
   const st = get();
   const graph = st.sessions[sessionId]?.graph;
   if (!graph) return 'No such session.';
@@ -180,7 +180,7 @@ export function connectNodes(sessionId: string, c: { source: string; target: str
   if (err) { toast(err, 'error'); return err; }
   return editGraph(sessionId, g => connect(g, { ...c, targetHandle: c.targetHandle! }));
 }
-export function tryConnect(sessionId: string, c: { source: string; target: string; targetHandle: string | null }): boolean {
+export function tryConnect(sessionId: string, c: { source: string; target: string; targetHandle: string | null; sourceHandle?: string | null }): boolean {
   return connectNodes(sessionId, c) === null;
 }
 export function disconnectEdges(sessionId: string, ids: string[]): string | null {

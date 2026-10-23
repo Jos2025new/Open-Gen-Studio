@@ -14,7 +14,7 @@ import {
 import { Copy, Film, Image as ImageIcon, LayoutGrid, Maximize, Play, Plus, Trash, Type } from 'lucide-react';
 import { setGraph, setUi, toast, useStore } from '../../store/store';
 import { addAssetAsNode, addConnected, addNode, deleteNodes, disconnectEdges, duplicateNode, layoutAll, newNodeData, prepareNodeRun, previewRun, runNodes, runnableIds, tryConnect } from '../../engine/flow/actions';
-import { connectionError, outputPort, NODE_WIDTH, runsGeneration } from '../../engine/flow/graph';
+import { connectionError, outputPort, NODE_WIDTH, resultHandle, runsGeneration } from '../../engine/flow/graph';
 import { uploadFiles } from '../../engine/actions';
 import { prepareImportFile } from '../../lib/imports';
 import { setNodeSelection, useNodeFocus } from '../../engine/flow/selection';
@@ -227,7 +227,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           id: e.id,
           source: e.source,
           target: e.target,
-          sourceHandle: e.sourceHandle,
+          sourceHandle: e.outputIndex == null ? e.sourceHandle : resultHandle(e.outputIndex),
           targetHandle: e.targetHandle,
           className: `edge-${type ?? 'none'}`,
           animated: running.has(e.target),
@@ -442,7 +442,7 @@ function Canvas({ embedded = false }: { embedded?: boolean }) {
           setSelected(new Set([n.id]));
           openMenu(e, n.id);
         }}
-        onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null })}
+        onConnect={(c) => void tryConnect(sessionId, { source: c.source, target: c.target, targetHandle: c.targetHandle ?? null, sourceHandle: c.sourceHandle })}
         onConnectEnd={(e, state) => {
           if (embedded) return;
           const dropped = connectionDrop(e, state, canvasRef.current);
