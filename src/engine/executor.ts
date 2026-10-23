@@ -1,7 +1,7 @@
 import { isAbort } from '../lib/http';
 import { estimateMedia, estimateOp } from './costs';
 import { applyLayerStep, layerToAsset } from './design/actions';
-import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef } from './catalog';
+import { ensureSchema, opFollowsSource, opModelFor, opModelForAsset, opModelFromRef, sentModelRef } from './catalog';
 import { StepStillRunning, isLiveStatus, settleGeneration } from './settle';
 import { cancelGeneration, createGeneration, opSpec, opSpecForModel, type OpSpecInput, runGeneration, videoOpSeconds, videoOpSettings } from './jobs';
 import { lyricsBody, lyricsParam } from './params';
@@ -60,9 +60,11 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
   for (const s of steps) {
     let opRef: string | undefined;
     let opSettings = videoSettings;
-    if (s.kind === 'image') perStep[s.id] = estimateMedia(s.modelRef, 'image', s.settings, s.refs.length > 0);
+    // Priced as sent: inputs on a text-only model run as its image twin (jobs.ts, sentModelRef).
+    const sent = s.kind === 'image' || s.kind === 'video' ? sentModelRef(s.modelRef, s.kind, Boolean(s.refs?.length || (s.kind === 'video' && s.firstFrame))) : undefined;
+    if (s.kind === 'image') perStep[s.id] = estimateMedia(sent!, 'image', s.settings, s.refs.length > 0);
     else if (s.kind === 'model3d') perStep[s.id] = estimateMedia(s.modelRef, 'model3d', s.settings, s.refs.length > 0);
-    else if (s.kind === 'video') perStep[s.id] = estimateMedia(s.modelRef, 'video', s.settings, Boolean(s.firstFrame));
+    else if (s.kind === 'video') perStep[s.id] = estimateMedia(sent!, 'video', s.settings, Boolean(s.firstFrame || s.refs?.length));
     else if (s.kind === 'audio') perStep[s.id] = estimateMedia(s.modelRef, 'audio', s.settings, false, false, s.prompt.length);
     else if (s.kind === 'op') {
       const p = parseRef(s.input);
@@ -87,7 +89,7 @@ export function estimateSteps(steps: PlanStep[]): { total: Estimate; perStep: Re
         perStep[s.id] = estimateOp(s.op, s.params, src, videoSettings, ref);
       }
     } else perStep[s.id] = { usd: 0, approximate: false };
-    if ('modelRef' in s) authorizations[s.id] = costAuthorization(s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
+    if ('modelRef' in s) authorizations[s.id] = costAuthorization(sent ?? s.modelRef, { ...s.settings, ...(s.kind === 'image' && s.variations?.length ? { count: s.variations.length } : {}) }, perStep[s.id]);
     else if (s.kind === 'op') {
       const engine = OPS[s.op].engine;
       const source = parseRef(s.input);

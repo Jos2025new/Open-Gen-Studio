@@ -382,6 +382,11 @@ export function inputVariant(ref: string | undefined, kind: 'image' | 'video'): 
   return v?.acceptsImage ? { ref: v.ref, route: variantRoute(v) } : null;
 }
 
+/** The model a media request is sent to: with inputs, a text-only model runs as its image-input twin (jobs.ts); the plan prices the same one (B10). */
+export function sentModelRef(ref: string, kind: string, hasInputs: boolean): string {
+  return hasInputs && (kind === 'image' || kind === 'video') ? inputVariant(ref, kind)?.ref ?? ref : ref;
+}
+
 /** One line for the agent's context: the family's image-input variant, or null when the model needs none. */
 export function variantLine(ref: string, kind: string): string | null {
   const v = kind === 'image' || kind === 'video' ? inputVariant(ref, kind) : null;

@@ -102,7 +102,15 @@ async function prepare(catalog: 'injected-change' | 'stable-capable' | 'stable-i
   if (!built.plan) return { ...built, sent, blocked, logs, requests, sessionId, item: undefined };
   const item: PlanFeedItem = { id: 'approval-1', createdAt: 1, workspace: 'chat', type: 'plan', plan: built.plan, style: 'guided', status: 'awaiting', stepStates: { s1: 'pending' }, stepGenerations: {}, estimate: estimateSteps(built.plan.steps).total };
   useStore.setState((s) => ({ sessions: { ...s.sessions, [sessionId]: { ...s.sessions[sessionId], feed: [item] } } }));
-  if (catalog === 'injected-change') useStore.setState((s) => ({ catalog: { ...s.catalog, models: { ...s.catalog.models, [TEXT]: { ...s.catalog.models[TEXT], acceptsImage: false } } } }));
+  // The catalog changes after approval, before the send: the plan priced TEXT as sent (B10), so a change earlier would show on the card.
+  if (catalog === 'injected-change') {
+    const stop = useStore.subscribe((s) => {
+      const plan = s.sessions[sessionId]?.feed.find((f): f is PlanFeedItem => f.type === 'plan');
+      if (plan?.status !== 'running') return;
+      stop();
+      useStore.setState((st) => ({ catalog: { ...st.catalog, models: { ...st.catalog.models, [TEXT]: { ...st.catalog.models[TEXT], acceptsImage: false } } } }));
+    });
+  }
   return { ...built, item, sessionId, sent, blocked, logs, requests };
 }
 
@@ -313,6 +321,7 @@ describe('price approval evidence (simulated prices, real adapter)', () => {
     const run = await prepare('injected-change');
     const step = run.item!.plan.steps[0];
     if (step.kind !== 'image') throw new Error('fixture');
+    useStore.setState((st) => ({ catalog: { ...st.catalog, models: { ...st.catalog.models, [TEXT]: { ...st.catalog.models[TEXT], acceptsImage: false } } } }));
     const g = createGeneration({ sessionId: run.sessionId, origin: 'composer', kind: 'image', prompt: step.prompt, modelRef: TEXT, settings: step.settings, inputs: { refs: ['ref-image'] } });
     await runGeneration(g.id).catch(() => undefined);
     expect(run.sent).toHaveLength(1);
