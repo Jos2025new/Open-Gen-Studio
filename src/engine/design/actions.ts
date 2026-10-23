@@ -459,6 +459,8 @@ function svgDeps(): SvgDeps {
     },
     layout: layoutText,
     ascent: textAscent,
+    // What the file could not keep is said, not dropped silently.
+    notice: (message) => toast(message, 'info', 8000),
   };
 }
 

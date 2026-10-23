@@ -95,3 +95,17 @@ it('exports vector coverage as an alpha mask while retaining editable SVG shapes
   expect(svg).toContain('<ellipse');
   expect(svg).toContain('<line');
 });
+
+describe('SVG export says what it could not keep', () => {
+  it('a gradient-only stroke keeps its opacity, as on the canvas', () => {
+    const svg = shapeSvg({ id: 'g', type: 'rect', x: 0, y: 0, w: 10, h: 10, fill: null, stroke: null, strokeWidth: 2, radius: 0, strokeOpacity: 0.4, strokeGradient: { kind: 'linear', x1: 0, y1: 0, x2: 10, y2: 0, stops: [{ offset: 0, color: '#000', alpha: 1 }, { offset: 1, color: '#fff', alpha: 1 }] } });
+    expect(svg).toContain('stroke-opacity="0.4"');
+  });
+
+  it('a layer whose pixels could not be read is left out and named in a notice', async () => {
+    const notes: string[] = [];
+    const svg = await docToSvg(doc, { ...deps, rasterHref: async () => null, notice: (m) => notes.push(m) });
+    expect(svg).not.toContain('<image');
+    expect(notes.join(' ')).toContain('Photo');
+  });
+});

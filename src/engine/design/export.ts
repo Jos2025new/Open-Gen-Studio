@@ -23,13 +23,14 @@ import type { FxLayer } from '../fx/types';
 export type ExportFormat = 'png' | 'jpg' | 'svg' | 'pdf';
 
 export interface SvgDeps {
-  /** Data URL of a raster layer's pixels (as displayed). Null when the layer has no pixels. */
+  /** Data URL of a raster layer's pixels (as displayed). Null when they could not be read (an empty layer still has a
+   *  buffer after ensureBuffers): the layer is left out and the notice says so. */
   rasterHref: (layer: Extract<Layer, { type: 'raster' }>) => Promise<string | null>;
   /** Wrapped lines of a text layer, as the canvas renderer lays them out. */
   layout: (layer: TextLayer) => { lines: string[]; width: number; lineHeightPx: number };
   /** Distance from the top of the em box to the baseline, in px (canvas 'top' baseline → SVG alphabetic). */
   ascent: (layer: TextLayer) => number;
-  /** What the SVG could not keep (an FX with no SVG equivalent), said once per export. */
+  /** What the SVG could not keep (an FX with no SVG equivalent, unreadable pixels), said once per export. */
   notice?: (message: string) => void;
 }
 
@@ -46,7 +47,7 @@ function paint(s: VectorShape, strokeWidth: number, fill: string | null | undefi
   const fv = fill === 'gradient' && s.fillGradient ? `url(#${gradId(s, 'f')})` : fill;
   const sv = s.strokeGradient && s.strokeWidth > 0 ? `url(#${gradId(s, 's')})` : s.stroke;
   const fo = fill && s.fillOpacity != null && s.fillOpacity < 1 ? ` fill-opacity="${n(Math.max(0, s.fillOpacity))}"` : '';
-  const so = s.stroke && strokeWidth > 0 && s.strokeOpacity != null && s.strokeOpacity < 1 ? ` stroke-opacity="${n(Math.max(0, s.strokeOpacity))}"` : '';
+  const so = (s.stroke || s.strokeGradient) && strokeWidth > 0 && s.strokeOpacity != null && s.strokeOpacity < 1 ? ` stroke-opacity="${n(Math.max(0, s.strokeOpacity))}"` : '';
   const fr = fill && s.fillRule === 'evenodd' ? ' fill-rule="evenodd"' : '';
   return `fill="${fv ? xmlEscape(fv) : 'none'}"${fo}${fr}${so}${(s.stroke || s.strokeGradient) && strokeWidth > 0 ? ` stroke="${xmlEscape(sv ?? '')}" stroke-width="${n(strokeWidth)}"${strokeLookSvg(s, strokeWidth)}` : ''}`;
 }
@@ -104,7 +105,7 @@ export function textSvg(l: TextLayer, t: { lines: string[]; width: number; lineH
 }
 
 export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
-  const body: string[] = [], defs: string[] = [], skipped = new Set<string>();
+  const body: string[] = [], defs: string[] = [], skipped = new Set<string>(), unread: string[] = [];
   if (doc.background) body.push(`<rect width="${doc.width}" height="${doc.height}" fill="${xmlEscape(doc.background)}"/>`);
   // FX (ADR 0011): the same plan as the canvas. 'below' wraps everything before it, 'layer' wraps its target's content.
   const filtered = (content: string, fx: FxLayer, asLayer: boolean): string => {
@@ -128,7 +129,7 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
     let inner: string;
     if (l.type === 'raster') {
       const href = await deps.rasterHref(l);
-      if (!href) continue;
+      if (!href) { unread.push(l.name); continue; }
       inner = `<image x="${n(l.x)}" y="${n(l.y)}" width="${n(l.width)}" height="${n(l.height)}" preserveAspectRatio="none" href="${href}"/>`;
     } else if (l.type === 'vector') {
       // Pressure strokes become their filled outline: an editable path, not the original gesture.
@@ -136,7 +137,8 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
       inner = l.shapes.map(shapeSvg).join('') + strokes.join('');
       if (l.pixelMask) {
         const mask = l.pixelMask, href = await deps.rasterHref(mask);
-        if (!href) continue;
+        // Without its mask the layer would show what the mask hides: left out, and said.
+        if (!href) { unread.push(l.name); continue; }
         const id = `mask-${xmlEscape(l.id)}`;
         const transform = mask.transform ? ` transform="matrix(${mask.transform.map(n).join(' ')})"` : '';
         inner = `<defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-100000" y="-100000" width="200000" height="200000" style="mask-type:alpha"><image x="${n(mask.x)}" y="${n(mask.y)}" width="${n(mask.width)}" height="${n(mask.height)}" preserveAspectRatio="none" href="${href}"${transform}/></mask></defs><g mask="url(#${id})">${inner}</g>`;
@@ -153,6 +155,7 @@ export async function docToSvg(doc: DesignDoc, deps: SvgDeps): Promise<string> {
     body.push(`<g id="${xmlEscape(l.id)}" inkscape:groupmode="layer" inkscape:label="${xmlEscape(l.name)}"${opacity}${style}>${inner}</g>`);
   }
   if (skipped.size) deps.notice?.(`SVG has no equivalent for ${[...skipped].join(', ')}: left out of this file. PNG and JPG keep it.`);
+  if (unread.length) deps.notice?.(`The pixels of ${unread.join(', ')} could not be read: left out of this file.`);
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" width="${doc.width}" height="${doc.height}" viewBox="0 0 ${doc.width} ${doc.height}">`,
