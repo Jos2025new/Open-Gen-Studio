@@ -100,4 +100,18 @@ describe('ToolDock real interaction', () => {
     await act(async () => settings.click());
     expect(host.querySelector('.tool-dock-card')).toBeNull();
   });
+
+  it('shows the mode switch once, in the toolbox, not again inside the brush card', async () => {
+    await click('Brush'); await click('Pencil');
+    expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
+    expect(host.querySelectorAll('.paint-mode').length).toBe(1);
+  });
+
+  it('opens Layout in design mode: Sizes is real, so the family is not Soon', async () => {
+    await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...doc, paintMode: 'design' } })));
+    const layout = [...host.querySelectorAll('.tool-dock-family button')].find((b) => b.getAttribute('aria-label')?.startsWith('Layout'))!;
+    expect(layout.getAttribute('aria-label')).toBe('Layout');
+    await act(async () => (layout as HTMLButtonElement).click());
+    expect(host.querySelector('[aria-label="Layout variants"] button[aria-label="Sizes"]')).toBeTruthy();
+  });
 });

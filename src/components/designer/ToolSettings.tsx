@@ -208,7 +208,7 @@ export function TextStyleFields({ value, onChange, compact = false }: { value: T
   </>;
 }
 
-export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean }) {
+export function ToolSettings({ sessionId, doc, selectedCurve, compact = false, modeToggle = true }: { sessionId: string; doc: DesignDoc; selectedCurve: { layerId: string; strokeId: string } | null; compact?: boolean; modeToggle?: boolean }) {
   useSelectionVersion();
   const tool = useStore((s) => s.ui.tool);
   const brush = useStore((s) => s.ui.brush);
@@ -262,7 +262,7 @@ export function ToolSettings({ sessionId, doc, selectedCurve, compact = false }:
         </> : tool === 'lineart' ? <>
           <InlineSelect label="Mode" value={lineartMode} options={[{ value: 'draw' as const, label: 'Draw' }, { value: 'edit' as const, label: 'Edit' }]} onChange={(v) => setUi({ lineartMode: v })} />
           {lineartMode === 'edit' ? <><InlineSlider label="Influence" unit="px" min={1} max={500} value={influence} onChange={(v) => setUi({ lineartInfluence: v })} />{curve && <StrokeStyleFields value={curve} onChange={applyCurveStyle} />}</> : <StrokeStyleFields value={lineart} onChange={(p) => setUi({ lineart: { ...lineart, ...p } })} />}
-        </> : paint ? <><PaintModeToggle sessionId={sessionId} doc={doc} /><BrushSettings erase={tool === 'eraser'} compact={compact} /></> : <>
+        </> : paint ? <>{modeToggle ? <PaintModeToggle sessionId={sessionId} doc={doc} /> : null}<BrushSettings erase={tool === 'eraser'} compact={compact} /></> : <>
           {tool !== 'line' && tool !== 'curve' && tool !== 'arrow' && <InlineColor label={shape.fill === null ? "Fill · none" : "Fill"} value={shape.fill ?? '#d4f25a'} showValue onChange={(fill) => setUi({ shape: { ...shape, fill } })}><label className="check-row"><input type="checkbox" checked={shape.fill === null} onChange={(e) => setUi({ shape: { ...shape, fill: e.target.checked ? null : '#d4f25a' } })} />No fill</label></InlineColor>}
           <InlineColor label={shape.stroke === null ? "Stroke · none" : "Stroke"} value={shape.stroke ?? '#ffffff'} showValue onChange={(stroke) => setUi({ shape: { ...shape, stroke } })}><label className="check-row"><input type="checkbox" checked={shape.stroke === null} onChange={(e) => setUi({ shape: { ...shape, stroke: e.target.checked ? null : '#ffffff' } })} />No stroke</label></InlineColor>
           <InlineSlider label="Width" unit="px" min={1} max={40} value={shape.strokeWidth} onChange={(v) => setUi({ shape: { ...shape, strokeWidth: v } })} />

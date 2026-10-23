@@ -127,7 +127,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
           el.addEventListener('pointermove', move); el.addEventListener('pointerup', up, { once: true });
         }}><GripHorizontal size={14} /></button>
         <div className="tool-dock-settings-grid">
-          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} /></div>}
+          {selectedVariant.action !== 'size' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} modeToggle={false} /></div>}
           {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} /></div>}
         </div>
       </section>}
@@ -135,7 +135,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
     <div className="tool-dock-family" role="toolbar" aria-label={`${mode} tools`} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family, index) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
-        const soonReason = family.variants.every((variant) => !variant.tool) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
+        const soonReason = family.variants.every((variant) => variant.soon) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
         return <span className={family.id.startsWith('visitor-') ? 'tool-dock-visitor' : ''} key={`${family.id}-${index}`}>
           {family.id.startsWith('visitor-') && <span className="tool-dock-separator" aria-hidden="true" />}
           {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
