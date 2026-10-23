@@ -1,4 +1,5 @@
 import { countFollowsCard } from './planCount';
+import { nodeCandidateErrors, promptTooLong } from './planSent';
 import { aspectFor } from './planAspect';
 import { lineKey, type VariantRoute } from './variants';
 import { applyPlanStyle, continuityErrors, exposeShotSubjects, recurringSubjectErrors, transportsNamedSubjects } from './continuity';
@@ -704,10 +705,8 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
         if (cited && !refs.length && !s.first_frame && !s.last_frame) errors.push(`${where}: the prompt cites "${cited}" but the step has no refs, so the model would invent it. Fix: put that image in refs (asset:<id> or a step id), or drop the citation if the step is really made from text.`);
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required. Fix: write "prompt" (what happens and how it looks).`);
-        // Measured as sent: the plan style is appended to every image and video prompt after this check.
-        const planStyle = (kind === 'image' || kind === 'video') && raw.style?.trim() && !prompt.includes(raw.style.trim()) ? `\n\nStyle: ${raw.style.trim()}` : '';
-        const sentLength = prompt.length + planStyle.length;
-        if (schema.slots.promptMax && sentLength > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${sentLength}${planStyle ? ', with the plan style' : ''}). Shorten it${planStyle ? ' or the style' : ''}. [PROMPT_TOO_LONG]`);
+        const tooLong = promptTooLong(kind, prompt, raw.style, schema.slots.promptMax);
+        if (tooLong) errors.push(`${where}: model "${modelRef}" ${tooLong}`);
         if (kind === 'model3d') {
           if (videoRefs.length || audioRefs.length) errors.push(`${where}: 3D models take only images in refs.`);
           // Sizes are checked by the job runner once the images exist.
@@ -953,15 +952,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   if (style) {
     for (const st of steps) applyPlanStyle(st, style);
   }
-  // A node gives one chosen output to all its links, so on the board one step cannot feed two of its candidates.
-  if (ctx.workspace === 'node') {
-    const picks = new Map<string, Set<number>>();
-    for (const st of steps) for (const r of stepDeps(st)) {
-      const p = parseRef(r);
-      if (p?.type === 'step') picks.set(p.id, (picks.get(p.id) ?? new Set()).add(p.index));
-    }
-    for (const [id, used] of picks) if (used.size > 1) errors.push(`${id}: later steps use different results of it (${[...used].sort((a, b) => a - b).map((i) => `${id}#${i + 1}`).join(', ')}), but on the Node board a node passes one chosen result to all its links. Fix: make each wanted result its own step (count 1), and link each one where it is used.`);
-  }
+  if (ctx.workspace === 'node') errors.push(...nodeCandidateErrors(steps.flatMap((st) => stepDeps(st).map((r) => parseRef(r)).filter((p): p is ParsedRef => p?.type === 'step'))));
   // Candidates end a plan: no later step may take one of several results the user has not picked (not in Nodes).
   if (ctx.workspace !== 'node') {
     // Steps with count > 1, and ops that make several.
