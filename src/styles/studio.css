@@ -54,9 +54,8 @@
 .designer.studio-designer { flex: 1; height: auto; min-height: 0; --designer-dock-left: var(--sp-3); --layers-w: 0px; --stage-hint-top: var(--sp-2); flex-direction: column; flex-wrap: nowrap; overflow: hidden; padding: 0; outline: none; }
 /* The bottom bar is the full Designer's palette, docked on the stage's lower edge; its strip opens above it. */
 .studio-designer .studio-palette { position: absolute; top: auto; bottom: var(--sp-3); left: 50%; transform: translateX(-50%); max-width: calc(100% - var(--sp-3) * 2); }
-.studio-designer .studio-palette .context-strip { max-width: 100%; }
+.studio-dock-row { display: flex; align-items: flex-end; gap: var(--sp-2); }
 .studio-designer-none { margin: auto; padding: var(--sp-4); text-align: center; font-size: var(--fs-s); }
-.studio-size-pop { padding: var(--sp-2); }
 .studio-designer-bar { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-bottom: 1px solid var(--border); flex-shrink: 0; min-width: 0; }
 .studio-designer-bar select, .studio-designer-name { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-s); }
 .studio-designer-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; flex-shrink: 0; }

@@ -113,7 +113,7 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .thread-peek-folded { position: absolute; right: calc(100% + 12px); bottom: 0; }
 .thread-peek-folded .thread-toggle { margin: 0; white-space: nowrap; min-width: 190px; height: calc(var(--control-h) + 2 * var(--toolbar-padding) + 2px); padding: 0 12px; border-color: var(--panel-line); border-radius: var(--toolbar-radius); box-shadow: var(--shadow-card); }
 /* Floating panels: --panel-line at rest, the darker --panel-line-focus only while focused or hovered (one rule for strip, palette, view, conversation). */
-.thread-peek.is-open:focus-within, .thread-peek-folded .thread-toggle:is(:hover, :focus-visible), .context-strip:focus-within, .designer-palette .tool-rail:focus-within, .designer-view:focus-within, .designer .document-picker-toggle:is(:hover, :focus-visible) { border-color: var(--panel-line-focus); }
+.thread-peek.is-open:focus-within, .thread-peek-folded .thread-toggle:is(:hover, :focus-visible), .context-strip:focus-within, .designer-view:focus-within, .designer .document-picker-toggle:is(:hover, :focus-visible) { border-color: var(--panel-line-focus); }
 .thread-peek-folded .thread-toggle svg { width: var(--control-icon); height: var(--control-icon); }
 .thread-peek-folded .thread-toggle svg:last-child { margin-left: auto; }
 @media (max-width: 1400px) { .thread-peek-folded { right: auto; left: 0; bottom: calc(100% + 8px); } }

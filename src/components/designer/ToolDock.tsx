@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type CSSProperties, type KeyboardEvent, type Ref } from 'react';
 import { AirVent, Blend, Brush, ChartPie, ChevronDown, ChevronUp, Circle, CircleHelp, Crop, DraftingCompass, Eraser, Eye, GripHorizontal, Grid3X3, Hand, LayoutPanelTop, LayoutTemplate, Lasso, Layers, Minus, MousePointer2, MoveUpRight, PaintBucket, PenTool, Pentagon, Pencil, Pipette, Ruler, Scissors, Settings2, Shapes, Square, SquareDashed, Star, Spline, Type, WandSparkles, type LucideIcon } from 'lucide-react';
 import type { DesignDoc } from '../../engine/types';
 import type { DesignTool } from '../../engine/design/rules';
@@ -37,13 +37,19 @@ function familyFor(families: ToolboxFamily[], tool: DesignTool, shape: string, r
   return families.find((family) => toolFor(family, tool, shape, rulerKind, hardness));
 }
 
-export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null }) {
+/** Families with only the variants whose tool is in `tools` (Studio's board offers a subset); everything when `tools` is absent. */
+function restrictToolbox(tools?: ReadonlySet<DesignTool>): ToolboxFamily[] {
+  if (!tools) return TOOLBOX;
+  return TOOLBOX.map((family) => ({ ...family, variants: family.variants.filter((variant) => variant.tool && tools.has(variant.tool)) })).filter((family) => family.variants.length > 0);
+}
+
+export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sessionId: string; doc: DesignDoc; selectedCurve?: { layerId: string; strokeId: string } | null; tools?: ReadonlySet<DesignTool> }) {
   const currentTool = useStore((state) => state.ui.tool);
   const currentShape = useStore((state) => state.ui.selectShape ?? 'rect');
   const rulerKind = useStore((state) => state.ui.strokeRulerKind ?? 'line');
   const brushHardness = useStore((state) => state.ui.brush.hardness ?? TIP_PRESETS[0]);
-  const currentFamily = familyFor(TOOLBOX, currentTool, currentShape, rulerKind, brushHardness);
-  const shownFamilies = TOOLBOX;
+  const shownFamilies = useMemo(() => restrictToolbox(tools), [tools]);
+  const currentFamily = familyFor(shownFamilies, currentTool, currentShape, rulerKind, brushHardness);
   const [dockState, dispatch] = useReducer(reduceToolboxState, initialToolboxState);
   const { depth, familyId } = dockState;
   const familyButtons = useRef(new Map<string, HTMLButtonElement>());

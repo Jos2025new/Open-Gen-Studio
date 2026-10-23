@@ -65,13 +65,11 @@ describe('the Designer view of the Studio board', () => {
     expect(getStudioBoard().view).toBe('designer');
     expect(useStore.getState().ui.workspace).toBe(ws);
     expect(q('.studio-designer .stage')).not.toBeNull();
-    for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Line art', 'Size', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
+    for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Pen', 'Shapes', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
     expect(q('[aria-label^="Pan"]')).not.toBeNull();
     // Top bar keeps: select · hand · undo · redo · zoom − · % · zoom + · fit; the bottom bar has no select/hand.
     expect([...document.querySelectorAll('.studio-designer-tools [aria-label]')].map((b) => b.getAttribute('aria-label'))).toEqual(['Select and move', 'Pan (or hold Space and drag)', 'Undo', 'Redo', 'Zoom out', 'Zoom in', 'Fit canvas']);
-    expect(q('.studio-palette [aria-label="Select and move"], .studio-palette [aria-label^="Pan"]')).toBeNull();
-    expect(q('.studio-palette .tool-rail > [aria-label^="Color"]')).not.toBeNull();
-    expect(q('.studio-palette .tool-group-btn')).not.toBeNull();
+    expect(q('.studio-palette .tool-dock')).not.toBeNull();
     for (const sel of ['.designer-view', '.layers-panel', '.document-picker', '.studio-layers']) expect(q(sel), sel).toBeNull();
     expect(host.textContent).not.toContain('Export');
     expect([...EMBEDDED_TOOLS]).toEqual(expect.arrayContaining(['move', 'hand', 'lineart', 'eraser', 'text', 'rect', 'ellipse', 'line']));
@@ -92,39 +90,29 @@ describe('the Designer view of the Studio board', () => {
     act(() => document.querySelectorAll<HTMLElement>('.studio-layer-name')[rows.length - 1].click());
     expect(doc().activeLayerId).not.toBe(second);
   });
-  it('the bottom bar sets the tool and opens the full Designer\'s popovers for color, size and shapes', () => {
+  it('the bottom bar is the ToolDock limited to the board\'s tools: families open variants and set the tool', () => {
     addEmptyLayer(sid, doc().id, 'raster');
     setStudioBoard({ view: 'designer' });
     render(createElement(StudioBoard));
     const tool = () => useStore.getState().ui.tool;
-    act(() => q('[aria-label="Line art"]')!.click());
+    const dock = () => q('.studio-palette .tool-dock')!;
+    const pick = (label: string) => act(() => [...dock().querySelectorAll<HTMLElement>(`button[aria-label="${label}"]`)].at(-1)!.click());
+    expect([...dock().querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Shapes', 'Pen', 'Eraser', 'Text']);
+    pick('Pen'); pick('Lineart');
     expect(tool()).toBe('lineart');
-    act(() => q('[aria-label="Eraser"]')!.click());
+    expect(dock().querySelector('[aria-label="Pen variants"] button[aria-label="Bezier pen"]')).toBeNull();
+    pick('Eraser');
     expect(tool()).toBe('eraser');
-    expect(q('.studio-palette .tool-rail > [aria-label="Color"]')!.hasAttribute('disabled')).toBe(true);
-    act(() => q('[aria-label="Text"]')!.click());
+    pick('Text');
     expect(tool()).toBe('text');
+    pick('Shapes'); pick('Rectangle');
+    expect(tool()).toBe('rect');
+    expect(dock().querySelector('[aria-label="Shapes variants"] button[aria-label="Arrow"]')).not.toBeNull();
+    for (const no of ['Brush', 'Ruler', 'Layout']) expect(dock().querySelector(`[aria-label="Tools"] button[aria-label="${no}"]`), no).toBeNull();
     act(() => q('[aria-label="Select and move"]')!.click());
     expect(tool()).toBe('move');
     act(() => q('[aria-label^="Pan"]')!.click());
     expect(tool()).toBe('hand');
-    // Size: the same slider the tool uses (line art: its stroke size).
-    act(() => q('[aria-label="Line art"]')!.click());
-    act(() => q('button[aria-label="Size"]')!.click());
-    const slider = document.querySelector<HTMLInputElement>('.popover input[aria-label="Size"]')!;
-    expect(slider).not.toBeNull();
-    expect(Number(slider.value)).toBe(useStore.getState().ui.lineart.size);
-    act(() => q('button[aria-label="Size"]')!.click());
-    // Color: the shared color picker (hex field), editing the line-art color.
-    act(() => q('.studio-palette .tool-rail > [aria-label^="Color"]')!.click());
-    expect(document.querySelector('.popover input[aria-label="Hex"]')).not.toBeNull();
-    act(() => q('.studio-palette .tool-rail > [aria-label^="Color"]')!.click());
-    // Shapes: the rail's own group menu.
-    act(() => q('.studio-palette .tool-group-btn')!.click());
-    const rect = [...document.querySelectorAll<HTMLElement>('.popover [role="menuitem"], .popover button')].find((b) => b.textContent?.startsWith('Rectangle'))!;
-    expect(rect).toBeDefined();
-    act(() => rect.click());
-    expect(tool()).toBe('rect');
   });
   it('a tool left over from the full Designer is replaced by pick and move', () => {
     setUi({ tool: 'brush' });

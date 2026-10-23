@@ -130,4 +130,12 @@ describe('ToolDock real interaction', () => {
     const panes = [...card.querySelectorAll<HTMLElement>('.brush-card-pane')];
     expect(panes.filter((p) => !p.hasAttribute('inert')).length).toBe(1);
   });
+
+  it('limits the families and variants to the tools it is given (Studio\'s board) and has no Layout, Brush or Settings then', async () => {
+    const tools = new Set(['move', 'hand', 'lineart', 'eraser', 'text', 'rect']) as ReadonlySet<never>;
+    await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc, tools })));
+    expect([...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Shapes', 'Pen', 'Eraser', 'Text']);
+    await click('Shapes');
+    expect([...host.querySelectorAll('[aria-label="Shapes variants"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Rectangle']);
+  });
 });

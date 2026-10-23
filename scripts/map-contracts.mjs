@@ -55,6 +55,7 @@ export default [
       ['src/components/designer/ToolDock.tsx', 'export function ToolDock'],
       ['src/components/composer/Composer.tsx', '<ToolDock '],
       ['src/components/designer/ToolPalette.tsx', '<ToolDock '],
+      ['src/components/studio/EmbeddedDesignerBar.tsx', '<ToolDock '],
     ],
     tests: ['tests/toolbox-dock.test.ts', 'tests/designer-inventory.test.ts', 'tests/designer-keys.test.ts'],
   },
