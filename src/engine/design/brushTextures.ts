@@ -1,6 +1,7 @@
 import { mulberry32 } from '../../lib/rng';
 import type { Stroke } from '../types';
 import { n, xmlEscape } from './export';
+import { simulatedPressure } from './brushEngine';
 import { drawSolidStroke, solidStrokeSvg, strokeBox, strokeSamples } from './strokes';
 
 /*
@@ -18,8 +19,12 @@ export interface StampDef {
 }
 
 const STAMP_PX = 64;
-/** Stamps per stroke; past this the spacing grows so long strokes stay cheap to draw and export. */
+/**
+ * Stamps per stroke; past this the spacing grows so long strokes stay cheap to draw and export, but only up to half
+ * a stamp (stamps still overlap, no gaps) unless the stroke would pass MAX_STAMPS_HARD.
+ */
 export const MAX_STAMPS = 1500;
+export const MAX_STAMPS_HARD = 6000;
 
 export const STAMPS: StampDef[] = [
   {
@@ -86,11 +91,16 @@ export function stampPlacements(s: Stroke): StampPlacement[] {
   if (!samples.length) return [];
   const total = samples[samples.length - 1].runningLength;
   let step = Math.max(0.5, tex.spacing * s.size);
-  if (total / step > MAX_STAMPS) step = total / MAX_STAMPS;
+  if (total / step > MAX_STAMPS) step = Math.max(Math.min(total / MAX_STAMPS, Math.max(step, s.size * 0.5)), total / MAX_STAMPS_HARD);
   const rnd = mulberry32(tex.seed);
   const out: StampPlacement[] = [];
   // perfect-freehand's radius is size × (0.5 − thinning × (0.5 − pressure)); this is the matching diameter.
   const widthAt = (p: number) => s.size * (1 - 2 * s.thinning * (0.5 - p));
+  // Simulated pressure as perfect-freehand gives it to the solid stroke: from each sample's own move, eased from
+  // the first ten samples' average, so stamps thin and swell where the outline does.
+  const sim = (prev: number, distance: number) => simulatedPressure(prev, distance, s.size);
+  const start = samples.slice(0, 10).reduce((acc, r) => (acc + sim(acc, r.distance)) / 2, samples[0].pressure);
+  const pressureOf = (i: number) => (s.simulatePressure ? sim(start, samples[i].distance) : samples[i].pressure);
   let j = 0;
   for (let d = 0; d <= total; d += step) {
     while (j < samples.length - 2 && samples[j + 1].runningLength < d) j++;
@@ -100,11 +110,11 @@ export function stampPlacements(s: Stroke): StampPlacement[] {
     const t = span > 0 ? (d - a.runningLength) / span : 0;
     const x = a.point[0] + (b.point[0] - a.point[0]) * t;
     const y = a.point[1] + (b.point[1] - a.point[1]) * t;
-    const pressure = a.pressure + (b.pressure - a.pressure) * t;
+    const pa = pressureOf(j), pressure = pa + (pressureOf(Math.min(j + 1, samples.length - 1)) - pa) * t;
     const dx = b.point[0] - a.point[0];
     const dy = b.point[1] - a.point[1];
     const angle = Math.atan2(dy, dx) + (rnd() - 0.5) * tex.jitter * Math.PI * 0.5;
-    const size = Math.max(0.5, widthAt(s.simulatePressure ? 0.5 : pressure));
+    const size = Math.max(0.5, widthAt(pressure));
     const off = (rnd() - 0.5) * tex.jitter * size * 0.5;
     const len = Math.hypot(dx, dy) || 1;
     out.push({ x: x - (dy / len) * off, y: y + (dx / len) * off, angle, size });
@@ -148,7 +158,8 @@ function renderTextured(s: Stroke) {
   const y = (box?.y ?? 0) - pad;
   const w = (box?.w ?? 0) + pad * 2;
   const h = (box?.h ?? 0) + pad * 2;
-  const scale = Math.max(0.25, Math.min(2, 4096 / Math.max(w, h, 1)));
+  // Never past 4096 px a side: a very large stroke is cached coarser instead.
+  const scale = Math.min(2, 4096 / Math.max(w, h, 1));
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(w * scale));
   canvas.height = Math.max(1, Math.ceil(h * scale));

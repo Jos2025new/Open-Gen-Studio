@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { bendStroke, DEFAULT_STROKE_STYLE, nearestPoint, newStroke, restyleStrokes, scaleStroke, strokeBox, strokePath, translateStroke } from '../src/engine/design/strokes';
 import { scaleLayer, translateLayer, cloneLayer } from '../src/engine/design/doc';
 import { docToSvg } from '../src/engine/design/export';
-import { MAX_STAMPS, stampPlacements, texturedStrokeSvg } from '../src/engine/design/brushTextures';
+import { MAX_STAMPS, MAX_STAMPS_HARD, stampPlacements, texturedStrokeSvg } from '../src/engine/design/brushTextures';
 import type { DesignDoc, Stroke, VectorLayer } from '../src/engine/types';
 
 const line = (): Stroke =>
@@ -92,7 +92,21 @@ describe('textured strokes (stamps along the path)', () => {
 
   it('caps the stamps of very long strokes', () => {
     const long = newStroke(Array.from({ length: 400 }, (_, i) => [i * 50, 0, 0.5] as [number, number, number]), { ...DEFAULT_STROKE_STYLE, size: 4, texture: { stamp: 'chalk', spacing: 0.05, jitter: 0, seed: 1 } }, true);
-    expect(stampPlacements(long).length).toBeLessThanOrEqual(MAX_STAMPS + 1);
+    expect(stampPlacements(long).length).toBeLessThanOrEqual(MAX_STAMPS_HARD + 1);
+  });
+
+  it('a long thin stroke past the soft cap keeps its stamps overlapping (no gaps)', () => {
+    const long = newStroke(Array.from({ length: 100 }, (_, i) => [i * 100, 0, 0.5] as [number, number, number]), { ...DEFAULT_STROKE_STYLE, size: 4, thinning: 0, texture: { stamp: 'chalk', spacing: 0.25, jitter: 0, seed: 1 } }, false);
+    const p = stampPlacements(long);
+    expect(p.length).toBeGreaterThan(MAX_STAMPS);
+    for (let i = 1; i < p.length; i++) expect(Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y)).toBeLessThanOrEqual(p[i].size);
+  });
+
+  it('with simulated pressure, stamps change size where the outline does (fast moves thin them)', () => {
+    const pts = [0, 2, 4, 6, 8, 10, 60, 110, 160, 210].map((x) => [x, 0, 0.5] as [number, number, number]);
+    const s = newStroke(pts, { ...DEFAULT_STROKE_STYLE, size: 10, thinning: 0.6, texture: { stamp: 'pencil', spacing: 0.3, jitter: 0, seed: 1 } }, true);
+    const sizes = stampPlacements(s).map((p) => p.size);
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBeGreaterThan(1);
   });
 
   it('exports one embedded stamp per stroke reused by <use>', () => {
