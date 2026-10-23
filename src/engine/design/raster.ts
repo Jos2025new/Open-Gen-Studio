@@ -465,6 +465,7 @@ function cancelScheduled(layerId: string): void {
 }
 
 function schedulePersist(layerId: string): void {
+  if (unreadable.has(layerId)) return;
   pending.add(layerId);
   rasterPending(layerId);
   cancelScheduled(layerId);
@@ -536,6 +537,9 @@ if (typeof window !== 'undefined') {
   });
 }
 
+/** D30: layers whose stored pixels failed to read or decode; never written until a load succeeds. */
+const unreadable = new Set<string>();
+
 /** Load buffers for layers that are not in memory yet (after reload). A stored full buffer is cropped to its box. */
 export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
   const layers = pixelLayers(allLayers);
@@ -543,12 +547,23 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
   const baseIds = new Set(layers.map((l) => l.paintBaseId).filter(Boolean));
   await Promise.all(
     layers.flatMap((l) => l.paintBaseId ? [l, { ...l, id: l.paintBaseId, paintBaseId: undefined }] : [l]).map(async (l) => {
-      if (buffers.has(l.id)) return;
-      const blob = await blobDb.get(keyFor(l.id)).catch(logged('read layer pixels'));
-      const full = blob ? await blobToCanvas(blob).catch((e) => (logged('decode layer pixels')(e), null)) : null;
+      if (buffers.has(l.id) && !unreadable.has(l.id)) return;
+      let failed = false;
+      const fail = (what: string) => (e: unknown) => { failed = true; logged(what)(e); return null; };
+      const blob = await blobDb.get(keyFor(l.id)).catch(fail('read layer pixels'));
+      const full = blob ? await blobToCanvas(blob).catch(fail('decode layer pixels')) : null;
+      // D30: stored pixels that could not be read are not an empty layer. No blank buffer, no write over them; the
+      // next load tries again. Nothing stored at all is a new, empty layer.
+      if (failed) {
+        if (!unreadable.has(l.id)) toast(`The pixels of a layer could not be read. It is kept as it is on disk and not saved over; reopen the design to try again.`, 'error');
+        unreadable.add(l.id);
+        return;
+      }
       // A missing foundation must never be replaced by blank pixels when objects are moved.
       if (!full && baseIds.has(l.id)) return;
-      if (buffers.has(l.id)) return;
+      // Recovered: the real pixels replace whatever was drawn on the blank stand-in (it was never saved).
+      const recovered = unreadable.delete(l.id);
+      if (buffers.has(l.id) && !recovered) return;
       buffers.set(l.id, full ? cropToContent(full) : emptyBox(l.pxWidth, l.pxHeight));
       changed = true;
     }),
