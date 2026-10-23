@@ -98,10 +98,12 @@ export function taperAt(distance: number, length: number | undefined, end: 'star
 /** The tip a new stroke records (always: even the plain hard tip replays through this engine). */
 export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const hardness = clamp01(o.hardness ?? BRUSH_DEFAULTS.hardness);
-  const texture = o.texture && o.texture !== 'none' && (o.textureStrength ?? 0) > 0 ? o.texture : undefined;
+  // A texture without a recorded strength (a preset, an older brush) gets the default, as the panel gives it.
+  const strength = o.textureStrength ?? BRUSH_DEFAULTS.textureStrength;
+  const texture = o.texture && o.texture !== 'none' && strength > 0 ? o.texture : undefined;
   const blend = !erase && o.blend && o.blend !== 'normal' ? o.blend : undefined;
   const keepOpacity = !erase && o.keepOpacity ? true : undefined;
-  return { hardness, ...(texture ? { texture, textureStrength: clamp01(o.textureStrength ?? 0) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  return { hardness, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */

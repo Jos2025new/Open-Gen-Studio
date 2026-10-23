@@ -30,6 +30,9 @@ describe('the tip a stroke records', () => {
     expect(tipFor({ size: 10, hardness: 0.4, texture: 'paper', textureStrength: 0.6, blend: 'multiply', keepOpacity: true, pressureDensity: true }, false))
       .toEqual({ hardness: 0.4, texture: 'paper', textureStrength: 0.6, blend: 'multiply', keepOpacity: true, densities: [] });
     expect(tipFor({ size: 10, hardness: 0.4, blend: 'multiply', keepOpacity: true }, true)).toEqual({ hardness: 0.4 });
+    // A texture with no recorded strength (a preset, an older brush) takes the default instead of vanishing.
+    expect(tipFor({ size: 10, texture: 'paper' }, false)).toMatchObject({ texture: 'paper', textureStrength: BRUSH_DEFAULTS.textureStrength });
+    expect(tipFor({ size: 10, texture: 'paper', textureStrength: 0 }, false).texture).toBeUndefined();
     expect(tipFor({ size: 10, texture: 'paper', textureStrength: 0 }, false)).toEqual({ hardness: 1 });
   });
   it('lays the mask with the stroke blend, or removes with the eraser', () => {
