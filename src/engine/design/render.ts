@@ -11,6 +11,7 @@ import { drawShapeMarkers } from './markers';
 import { gradientStyle } from './gradientPaint';
 import { bufferVersion, cloneCanvas, getBuffer, getRasterSurface, paintingLive, rasterBufferIds, redrawSoon } from './raster';
 import { bufferAlpha } from './hitAlpha';
+import { vectorLayerHit } from './objectHit';
 import { cachedBelow, keepBelow } from './belowFxCache';
 import type { FxLayer } from '../fx/types';
 import { drawStroke } from './brushTextures';
@@ -500,9 +501,8 @@ export function hitTestPixel(doc: DesignDoc, x: number, y: number): Layer | null
     if (!b || x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) continue;
     if (l.type === 'vector') {
       if (!maskContains(l, x, y)) continue;
-      // One of its own shapes or strokes, not the box around all of them.
-      const inside = (bx: Box | null) => bx && x >= bx.x && x <= bx.x + bx.w && y >= bx.y && y <= bx.y + bx.h;
-      if (l.shapes.some((sh) => inside(shapeBox(sh))) || (l.strokes ?? []).some((st) => inside(strokeBox(st)))) return l;
+      // One of its own shapes or strokes, on what it draws (objectHit.ts).
+      if (vectorLayerHit(l, x, y)) return l;
       continue;
     }
     if (l.type !== 'raster') return l;

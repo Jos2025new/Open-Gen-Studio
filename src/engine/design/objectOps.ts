@@ -1,4 +1,5 @@
 import { allVectorObjects, maskBounds, maskContains } from './vectorMask';
+import { vectorObjectHit } from './objectHit';
 import type { DesignDoc, Layer, RasterLayer, VectorLayer } from '../types';
 import { setDoc, toast, useStore } from '../../store/store';
 import { record } from './history';
@@ -46,7 +47,9 @@ export function objectAt(layer: Layer, x: number, y: number): string | null {
   const objs = layerObjects(layer);
   for (let i = objs.length - 1; i >= 0; i--) {
     const b = objs[i].box;
-    if (x >= b.x && x <= b.x + b.w && y >= b.y && y <= b.y + b.h) return objs[i].id;
+    if (x < b.x || x > b.x + b.w || y < b.y || y > b.y + b.h) continue;
+    if (layer.type === 'vector' && !vectorObjectHit(layer, objs[i].id, x, y)) continue;
+    return objs[i].id;
   }
   return null;
 }
