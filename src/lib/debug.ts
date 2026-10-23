@@ -59,16 +59,19 @@ export function imageSize(b: Uint8Array): { width: number; height: number } | un
 function inlineLabel(value: string): string | undefined {
   const prefix = /^data:([\w/+.-]+);base64,/.exec(value);
   const b64 = prefix ? value.slice(prefix[0].length) : value;
-  let bytes: Uint8Array;
+  const decode = (chars: number) => {
+    const bin = atob(b64.slice(0, chars - (chars % 4)).replace(/=+$/, '').replace(/-/g, '+').replace(/_/g, '/'));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  };
+  let dims: { width: number; height: number } | undefined;
   try {
-    // The first ~64 KB are enough for the header, also behind a JPEG's metadata.
-    const bin = atob(b64.slice(0, 87_380).replace(/=+$/, '').replace(/-/g, '+').replace(/_/g, '/'));
-    bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    // The first ~64 KB hold the header almost always; a JPEG whose metadata (EXIF, ICC) runs past them is read whole.
+    dims = imageSize(decode(87_380)) ?? (b64.length > 87_380 ? imageSize(decode(b64.length)) : undefined);
   } catch {
     return undefined;
   }
-  const dims = imageSize(bytes);
-  if (!dims) return prefix && !prefix[1].startsWith('image') ? `<${prefix[1].split('/')[0]}, ${sizeText(b64)}>` : undefined;
+  const kind = prefix?.[1].split('/')[0];
+  if (!dims) return kind ? `<${kind}, ${sizeText(b64)}>` : undefined;
   return `<image ${dims.width}×${dims.height}, ${sizeText(b64)}>`;
 }
 

@@ -196,6 +196,17 @@ describe('each image of a request is named for what it is', () => {
     expect(sent.params.referenceImages).toEqual(['<image 896×1200, 1 KB>', '<image 1376×768, 1 KB>']);
   });
 
+  it('finds a JPEG size behind metadata longer than the first 64 KB, and keeps the weight when it cannot', async () => {
+    const { redact } = await import('../src/lib/debug');
+    // SOI, a full-length APP1 (EXIF) segment, then SOF0.
+    const bytes = new Uint8Array(2 + 2 + 65535 + 13);
+    bytes.set([0xff, 0xd8, 0xff, 0xe1, 0xff, 0xff]);
+    bytes.set([0xff, 0xc0, 0, 11, 8, 768 >> 8, 768 & 255, 1376 >> 8, 1376 & 255, 3, 0, 0, 0], 65539);
+    const toB64 = (b: Uint8Array) => btoa(Array.from(b, (x) => String.fromCharCode(x)).join(''));
+    expect(redact(`data:image/jpeg;base64,${toB64(bytes)}`, { mime: 'image/jpeg', width: 999, height: 999 })).toBe('<image 1376×768, 66 KB>');
+    expect(redact(`data:image/jpeg;base64,${toB64(bytes.slice(0, 65539))}`, { mime: 'image/jpeg', width: 999, height: 999 })).toBe('<image, 66 KB>');
+  });
+
   it('reads WebP and GIF headers, and says only the kind when it cannot read one', async () => {
     const { imageSize, redact } = await import('../src/lib/debug');
     const vp8x = [...'RIFF'].map((c) => c.charCodeAt(0)).concat([0, 0, 0, 0], [...'WEBPVP8X'].map((c) => c.charCodeAt(0)), [0, 0, 0, 0, 0, 0, 0, 0], [639 & 255, 639 >> 8, 0, 479 & 255, 479 >> 8, 0]);

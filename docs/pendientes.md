@@ -8,10 +8,10 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 
 ## Lo más crítico ahora
 
-1. **A1 · `confirm_settings` repetida con el mismo modelo ya confirmado** (2026-10-22; familia del 2026-10-16). El usuario pidió un solo cambio y el agente puso otra tarjeta a esperar clic. Fricción de uso; arreglo propuesto, falta tu aprobación. [detalle](pendientes-agente.md)
-2. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
-3. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
-4. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
+1. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
+2. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
+3. **A1 · `confirm_settings` repetida con el mismo modelo ya confirmado** (2026-10-22; familia del 2026-10-16). El usuario pidió un solo cambio y el agente puso otra tarjeta a esperar clic. Fricción de uso; arreglo propuesto, falta tu aprobación. [detalle](pendientes-agente.md)
+4. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
 5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
 6. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)
 7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
