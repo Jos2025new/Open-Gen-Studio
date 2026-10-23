@@ -31,6 +31,7 @@ export async function fitTotal(
   raw: Array<{ id?: string; kind?: string; duration?: unknown }>,
   steps: Array<{ id: string; kind: string; modelRef?: string; settings?: { duration?: number } }>,
   getModel: (ref: string) => Promise<{ schema: ModelSchema } | null>,
+  adjustments: string[] = [],
 ): Promise<void> {
   const unsetIds = new Set(raw.filter((s) => s.kind === 'video' && s.duration == null).map((s) => s.id));
   const mine = steps.filter((s) => s.kind === 'video' && unsetIds.has(s.id) && s.settings && s.modelRef);
@@ -38,6 +39,9 @@ export async function fitTotal(
   const options = await Promise.all(mine.map(async (s) => durationChoices((await getModel(s.modelRef!))?.schema)));
   const picks = pickClipLengths(total, fixed, options);
   picks?.forEach((n, i) => { mine[i].settings!.duration = n; });
+  // The even share said earlier («about 8s for each») is no longer true: say the lengths chosen.
+  const at = adjustments.findIndex((a) => a.startsWith(`total ${total}s: about`));
+  if (picks && at >= 0) adjustments[at] = `total ${total}s: ${mine.map((s, i) => `${s.id} ${picks[i]}s`).join(', ')}`;
 }
 
 /**

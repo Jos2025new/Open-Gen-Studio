@@ -50,4 +50,4 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 - **B9 · bajo · 2026-10-21 · «Download failed (404)»** visible en una sesión previa del sandbox (informe, notas). No se atribuye a la prueba. Puede ser un enlace caducado de NanoGPT; sin investigar.
 - **B10 · cerrado 2026-10-23** · precio del plan con el modelo enviado y margen de precio del usuario: [050](history/050-2026-10-W43.md).
 - **B11 · cerrado 2026-10-23** · el cambio por crédito compara lo que cuesta el trabajo con sus ajustes: [050](history/050-2026-10-W43.md).
-- **B12 · medio · 2026-10-22 · E2-01 abierto** (la elección borrador/calidad se pide en cada vídeo; va con A1 y contradice la regla «una respuesta de una petición anterior no vale, salvo en una revisión» de `tests/draft-first.test.ts`: decide el usuario). E1-01 y E3-01 cerrados: [050](history/050-2026-10-W43.md).
+- **B12 · cerrado 2026-10-23** · E1-01, E3-01 y E2-01: [050](history/050-2026-10-W43.md).

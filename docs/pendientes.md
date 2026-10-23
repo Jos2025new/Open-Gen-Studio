@@ -71,7 +71,6 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | B7 | Prueba con gasto real de voz y efectos (usuario) | medio | 2026-10-08 |
 | B8 | Modelos `-spicy` excluidos de forma provisional | bajo | 2026-10-08 |
 | B9 | «Download failed (404)» en sesión previa del sandbox | bajo | 2026-10-21 |
-| B12 | Resto de la auditoría de Studio (E2-01, E3-01, E1-01) | medio | 2026-10-22 |
 
 ### Datos, guardado, calidad y pruebas (C) · [detalle](pendientes-sistema.md)
 

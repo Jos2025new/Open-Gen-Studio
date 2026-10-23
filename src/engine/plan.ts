@@ -973,7 +973,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
     }
   }
   if (errors.length) return { plan: null, errors };
-  if (share) await fitTotal(total, rawSteps, steps, ctx.getModel);
+  if (share) await fitTotal(total, rawSteps, steps, ctx.getModel, adjustments);
   const totalLine = totalNote(raw.total_duration, steps);
   if (totalLine) adjustments.push(totalLine);
   return {

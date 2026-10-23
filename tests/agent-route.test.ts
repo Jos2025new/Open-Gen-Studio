@@ -207,7 +207,7 @@ describe('skills and workflows index, guides and total length (R4)', () => {
     };
     const r = await normalizePlan({ title: 't', total_duration: 30, steps: [1, 2, 3].map((i) => ({ id: `s${i}`, kind: 'video', prompt: `shot ${i}` })) }, ctx, 'p');
     expect(r.plan!.steps.map((x) => (x as { settings: { duration?: number } }).settings.duration)).toEqual([10, 10, 10]);
-    expect(r.plan!.adjustments.join(' ')).toMatch(/total 30s: about 10s for each of s1, s2, s3/);
+    expect(r.plan!.adjustments.join(' ')).toMatch(/total 30s: s1 10s, s2 10s, s3 10s/);
   });
 
   const totalCtx = (options: number[]): PlanContext => {
@@ -223,6 +223,9 @@ describe('skills and workflows index, guides and total length (R4)', () => {
     expect(r.errors).toEqual([]);
     expect(durs(r)).toEqual([10, 10, 5]);
     expect(r.plan!.adjustments.join(' ')).not.toMatch(/video total/);
+    // The share note says the lengths chosen, not the even «about 8s».
+    expect(r.plan!.adjustments).toContain('total 25s: s1 10s, s2 10s, s3 5s');
+    expect(r.plan!.adjustments.join(' ')).not.toMatch(/about 8s/);
     const even = await normalizePlan({ title: 't', total_duration: 30, steps: clips(3) }, totalCtx([5, 10]), 'p');
     expect(durs(even)).toEqual([10, 10, 10]);
     expect(even.plan!.adjustments.join(' ')).not.toMatch(/video total/);
