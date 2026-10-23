@@ -282,7 +282,7 @@ import { drawRevision } from './drawRevision';
 import { forgetFrame, rememberFrame } from './framePeek';
 const fxCache = new Map<string, { key: unknown[]; canvas: HTMLCanvasElement; at: number }>();
 let fontEpoch = 0;
-if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; forgetFrame(); });
+if (typeof document !== 'undefined') document.fonts?.addEventListener?.('loadingdone', () => { fontEpoch++; forgetFrame(); redrawSoon(0); });
 function contentKey(l: Layer, s: { fx: FxLayer[] }, geom: unknown[]): unknown[] {
   // The pixels' versions go last: while a stroke is painted only they change (see cachedFx). The drawing revision
   // replaces the layer object, so moving or fading the layer keeps its filtered result.

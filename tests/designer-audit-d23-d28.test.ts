@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const dom = vi.hoisted(() => {
   const handlers: Record<string, (e: unknown) => void> = {};
+  const fonts: Record<string, () => void> = {};
   Object.assign(globalThis, { Element: class {},
     window: globalThis, addEventListener() {}, getSelection: () => null,
-    document: { addEventListener: (t: string, h: (e: unknown) => void) => { handlers[t] = h; }, removeEventListener() {} },
+    document: { addEventListener: (t: string, h: (e: unknown) => void) => { handlers[t] = h; }, removeEventListener() {}, fonts: { addEventListener: (t: string, h: () => void) => { fonts[t] = h; } } },
     ClipboardItem: class { constructor(public items: unknown) {} },
   });
-  return { handlers, cleared: 0 };
+  return { handlers, fonts, cleared: 0 };
 });
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined }, cacheDb: { get: async () => undefined }, blobDb: { set: async () => undefined } }));
 vi.mock('../src/lib/media', async () => {
@@ -149,6 +150,20 @@ describe('D27: the eyedropper reads the painted frame', () => {
     rememberFrame(doc, page([10, 20, 30, 255]), 1);
     forgetFrame();
     composed.calls = 0; sampleColor(doc, 5, 5); expect(composed.calls).toBe(1);
+  });
+});
+
+import { subscribeRaster } from '../src/engine/design/raster';
+
+describe('D28: a font that loads late redraws the page once', () => {
+  it('asks for one redraw when the font finishes loading', async () => {
+    let redraws = 0;
+    const off = subscribeRaster(() => { redraws++; });
+    dom.fonts.loadingdone();
+    dom.fonts.loadingdone();
+    await new Promise((r) => setTimeout(r, 20));
+    off();
+    expect(redraws).toBe(1);
   });
 });
 
