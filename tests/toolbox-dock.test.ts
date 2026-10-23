@@ -4,7 +4,8 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined } }));
 import { ToolDock } from '../src/components/designer/ToolDock';
-import { createDoc } from '../src/engine/design/doc';
+import { createDoc, newRasterLayer } from '../src/engine/design/doc';
+import { setLayerPicks } from '../src/engine/design/selection';
 import { setUi, useStore } from '../src/store/store';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -137,5 +138,28 @@ describe('ToolDock real interaction', () => {
     expect([...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Shapes', 'Pen', 'Eraser', 'Text']);
     await click('Shapes');
     expect([...host.querySelectorAll('[aria-label="Shapes variants"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Rectangle']);
+  });
+
+  it('Edit card follows the selection: one shows Transform and Align, two or more add Distribute and disabled Soon Boolean and Form builder', async () => {
+    const rect = { x: 0, y: 0, width: 10, height: 10 }, px = { width: 10, height: 10 };
+    const a = newRasterLayer('A', rect, px), b = newRasterLayer('B', rect, px);
+    const withLayers = { ...doc, layers: [a, b], activeLayerId: a.id };
+    const show = async (ids: string[]) => { await act(async () => { setUi({ selectMode: 'layers' }); setLayerPicks(withLayers.id, ids); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...withLayers } })); }); };
+    await show([]);
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Edit variants"] button[aria-label="Edit"]')!.click());
+    const card = () => host.querySelector('.edit-card')!;
+    expect(host.querySelector('[aria-label="Edit settings"] .edit-card')).toBeTruthy();
+    await show([a.id]);
+    expect(card().getAttribute('data-selection')).toBe('one');
+    expect(card().querySelector('[aria-label="Transform"]')).toBeTruthy();
+    expect(card().querySelector('[aria-label="Align selection"]')).toBeTruthy();
+    expect(card().querySelector('.edit-card-soon')).toBeNull();
+    await show([a.id, b.id]);
+    expect(card().getAttribute('data-selection')).toBe('many');
+    expect(card().querySelector('[aria-label="Align selection"]')).toBeTruthy();
+    expect(card().querySelector('[aria-label="Distribute selection"]')).toBeTruthy();
+    const soon = [...card().querySelectorAll<HTMLButtonElement>('.edit-card-soon button')];
+    expect(soon.map((x) => x.textContent)).toEqual(['Boolean', 'Form builder']);
+    for (const x of soon) { expect(x.disabled).toBe(true); expect(x.title).toContain('Soon:'); }
   });
 });

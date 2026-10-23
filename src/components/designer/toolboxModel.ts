@@ -31,6 +31,9 @@ export const TOOLBOX: ToolboxFamily[] = [
   family('settings', 'Settings', 'settings-2', [soon('settings', 'Toolbox settings', 'settings-2', 'Toolbox preferences are planned.')]),
 ];
 
+/** Edit with two or more objects selected: these join Align and Distribute, disabled and explained until they exist. */
+export const MULTI_SOON: ToolboxVariant[] = [soon('boolean', 'Boolean', 'combine', 'Boolean operations (union, subtract, intersect) are planned.'), soon('form-builder', 'Form builder', 'shapes', 'A form builder is planned.')];
+
 /** Every implemented drawing tool has a home, including tools without shortcuts. */
 export function toolboxTools(): DesignTool[] {
   return [...new Set(TOOLBOX.flatMap((item) => item.variants.flatMap((variant) => variant.tool ? [variant.tool] : [])))];
