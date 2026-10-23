@@ -556,6 +556,27 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
   if (changed) notify();
 }
 
+/**
+ * D19: free from memory the pixels of layers that were in a document and are in none now (deleted, merged). Undo keeps
+ * its own tile copies (snapshotHistoryBuffers) and the disk copy stays, so a layer brought back loads again
+ * (ensureBuffers). Never a layer waiting to be written, failed, or mid-stroke; never one not yet seen in a document.
+ */
+const seenLive = new Set<string>();
+export function releaseBuffers(liveIds: Iterable<string>, wereLive: Iterable<string> = []): number {
+  for (const id of wereLive) seenLive.add(id);
+  const live = new Set(liveIds);
+  let freed = 0;
+  for (const id of [...buffers.keys()]) {
+    if (live.has(id)) { seenLive.add(id); continue; }
+    if (!seenLive.has(id) || pending.has(id) || timers.has(id) || idles.has(id) || localFailed.has(id) || strokeSpan.has(id)) continue;
+    buffers.delete(id);
+    seenLive.delete(id);
+    freed++;
+  }
+  if (freed) notify();
+  return freed;
+}
+
 export async function deleteBuffers(layerIds: string[]): Promise<void> {
   for (const id of layerIds) {
     buffers.delete(id);

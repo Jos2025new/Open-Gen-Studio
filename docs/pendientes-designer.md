@@ -39,10 +39,10 @@ El usuario dijo que máscaras, ajustes, PSD y color son el próximo trabajo del 
 
 De la [auditoría del Designer](../../ogs-designer-audit-2026-10-22.md) (HEAD `64fd215`), comprobados en el código y ordenados por lo que sufre el usuario. Ninguno pide tarjetas ni paradas: se arreglan por debajo, con una prueba que reproduzca cada caso. Son 11 hallazgos en 10 entradas: D26 agrupa los dos pasos de deshacer vacíos.
 
-- **D19 · alto · 2026-10-22 · Las imágenes de capas borradas o fusionadas nunca se liberan.** `design/actions.ts:85`, `raster.ts:559`: solo se liberan al borrar el documento o la sesión; la memoria crece con el uso. Arreglo: liberar las que no usan ni el documento ni el historial; prueba de deshacer antes.
-- **D20 · alto · 2026-10-22 · «Merge down» con la capa de abajo oculta hace desaparecer lo visible.** `design/actions.ts:291`: el resultado hereda `visible` de la capa de abajo. Arreglo: visible si alguna de las dos lo era.
-- **D21 · alto · 2026-10-22 · La goma borra en capas ocultas.** `StagePaintCommit.ts:21`: el pincel exige capa visible y la goma no. Arreglo: la misma regla que el pincel.
-- **D22 · alto · 2026-10-22 · Rellenar una capa vectorial vacía la sube arriba del todo.** `Stage.tsx:1243`: la quita y la añade al final. Arreglo: rellenarla en su sitio.
+- **D19 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D20 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D21 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
+- **D22 · cerrado 2026-10-23** · [050](history/050-2026-10-W43.md).
 - **D23 · medio · 2026-10-22 · Cortar (Ctrl+X) puede borrar sin copiar.** `designerClipboard.ts:37-52`: borra antes de que el portapapeles confirme. Se recupera con deshacer. Arreglo: borrar al confirmarse la copia.
 - **D24 · medio · 2026-10-22 · Pintar con selección aplana los trazos sin aviso.** `StagePaintCommit.ts:89`: los trazos dejan de ser editables sin mensaje. Arreglo: el mismo aviso que el aplanado normal.
 - **D25 · medio · 2026-10-22 · «Flip horizontal» sobre una imagen girada la voltea en vertical (sin confirmar).** `transform.ts:105`: voltea en los ejes de la imagen, no de la pantalla. Confirmar con una prueba antes de arreglar.

@@ -68,3 +68,33 @@ describe('D22: drawing a shape into an empty vector layer keeps its place', () =
     expect(readFileSync('src/components/designer/Stage.tsx', 'utf8')).not.toMatch(/layers\.filter\(\(l\) => l\.id !== act\.id\), \{ \.\.\.act, shapes/);
   });
 });
+
+import { deleteLayer, undoDoc, redoDoc } from '../src/engine/design/actions';
+import { getBuffer } from '../src/engine/design/raster';
+describe('D19: pixels of a deleted layer leave memory, and undo still brings them back', () => {
+  const setup = () => {
+    const sid = useStore.getState().activeSessionId;
+    const keep = layer('Keep', true, [0, 0, 8, 8]), gone = layer('Gone', true, [0, 0, 4, 4]);
+    const doc = { ...createDoc('free', 8, 8), layers: [keep, gone], activeLayerId: gone.id };
+    addDoc(sid, doc);
+    return { sid, doc, keep, gone };
+  };
+  it('a saved layer is freed on delete; undo restores its pixels; redo frees it again', async () => {
+    const { sid, doc, keep, gone } = setup();
+    await flushRaster();
+    deleteLayer(sid, doc.id, gone.id);
+    expect(getBuffer(gone.id)).toBeUndefined();
+    expect(getBuffer(keep.id)).toBeDefined();
+    undoDoc(sid, doc.id);
+    expect(getDoc(sid, doc.id)!.layers.map((l) => l.id)).toContain(gone.id);
+    expect(getBuffer(gone.id)).toBeDefined();
+    await flushRaster();
+    redoDoc(sid, doc.id);
+    expect(getBuffer(gone.id)).toBeUndefined();
+  });
+  it('a layer whose pixels are not written yet stays in memory', () => {
+    const { sid, doc, gone } = setup();
+    deleteLayer(sid, doc.id, gone.id);
+    expect(getBuffer(gone.id)).toBeDefined();
+  });
+});

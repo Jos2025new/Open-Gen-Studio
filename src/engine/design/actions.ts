@@ -10,7 +10,7 @@ import { objectPick, setObjectPick, setShapeEdit, useShapeEdit } from './objectS
 import { layerObjects } from './objectOps';
 import { nodeSegs, pageSegs } from './pathNodes';
 import { placeFor } from '../place';
-import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, setBuffer} from './raster';
+import {rasterBufferIds, withPaintBase, copyBuffer, deleteBuffers, ensureBuffers, getBuffer, releaseBuffers, setBuffer} from './raster';
 import {composeRaster} from './rasterCompose';
 import { DEFAULT_STROKE_STYLE, newStroke } from './strokes';
 import { drawDoc, exportDoc, layoutText, textAscent } from './render';
@@ -49,6 +49,12 @@ export function mutateDoc(sessionId: string, docId: string, fn: (d: DesignDoc) =
   // Any change (delete, group, merge…) leaves no pick on a layer or object that is gone.
   const next = getDoc(sessionId, docId);
   if (next) prunePicks(next);
+  releaseUnused(rasterBufferIds(doc.layers));
+}
+
+/** Pixels of layers no open document uses any more leave memory (D19); `wereLive`: the layers before the change. */
+function releaseUnused(wereLive: string[] = []): void {
+  releaseBuffers(Object.values(get().sessions).flatMap((s) => s.docs.flatMap((d) => rasterBufferIds(d.layers))), wereLive);
 }
 
 export function addDoc(sessionId: string, doc: DesignDoc): void {
@@ -334,7 +340,7 @@ export function undoDoc(sessionId: string, docId: string): void {
   const prev = undo(doc);
   if (prev) {
     const restored = { ...prev, paintMode: doc.paintMode ?? prev.paintMode ?? paintModeOf(prev) };
-    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored));
+    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }
 
@@ -344,7 +350,7 @@ export function redoDoc(sessionId: string, docId: string): void {
   const next = redo(doc);
   if (next) {
     const restored = { ...next, paintMode: doc.paintMode ?? next.paintMode ?? paintModeOf(next) };
-    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored));
+    (setDoc(sessionId, docId, () => restored), prunePicks(restored), pruneNodePick(doc, restored), releaseUnused(rasterBufferIds(doc.layers)));
   }
 }
 

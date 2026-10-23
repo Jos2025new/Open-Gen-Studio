@@ -17,7 +17,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
 8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
-Después, por riesgo: los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
+Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
 ## Archivos de detalle
 
@@ -138,10 +138,6 @@ Después, por riesgo: los hallazgos altos de la auditoría del Designer (D19 a D
 | D16 | Capas FX: plan de pruebas completo | medio | 2026-10-08 |
 | D17 | Interfaz del Designer al estilo ibisPaint y Photoshop | medio | 2026-10-10 |
 | D18 | Lineart que se deforma al encoger (10 % residual) | medio | 2026-10-13 |
-| D19 | Las imágenes de capas borradas o fusionadas nunca se liberan | alto | 2026-10-22 |
-| D20 | «Merge down» con la capa de abajo oculta hace desaparecer lo visible | alto | 2026-10-22 |
-| D21 | La goma borra en capas ocultas | alto | 2026-10-22 |
-| D22 | Rellenar una capa vectorial vacía la sube arriba del todo | alto | 2026-10-22 |
 | D23 | Cortar (Ctrl+X) puede borrar sin copiar | medio | 2026-10-22 |
 | D24 | Pintar con selección aplana los trazos sin aviso | medio | 2026-10-22 |
 | D25 | «Flip horizontal» sobre una imagen girada la voltea en vertical (sin confirmar) | medio | 2026-10-22 |
