@@ -9,6 +9,7 @@ import { strokeBox, translateStroke } from './strokes';
 import { moveRasterStroke, rasterStrokeBox } from './rasterStrokes';
 import {composeRaster} from './rasterCompose';
 import { alignBoxDelta, turnVector, unionBoxes, type AlignTo, type Box, type RelativeTo, type Turn } from './transform';
+import { pixelsNotReady } from './rasterMissing';
 
 /*
  * Edit in Objects mode: the operations act on the objects picked inside the active layer (objectSelection.ts), and
@@ -172,7 +173,7 @@ export function commitObjects(sessionId: string, docId: string, next: Layer, rec
   const doc = docOf(sessionId, docId);
   if (!doc) return;
   if (next.locked) return void toast(`"${next.name}" is locked.`, 'error');
-  if (next.type === 'raster' && !composeRaster(next)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
+  if (next.type === 'raster' && !composeRaster(next)) return void toast(pixelsNotReady([next.id, next.paintBaseId]), 'error');
   if (recordFirst) record(doc);
   setDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), layers: d.layers.map((l) => (l.id === next.id ? (next.type === 'raster' ? { ...next, rev: next.rev + 1 } : next) : l)) }));
 }

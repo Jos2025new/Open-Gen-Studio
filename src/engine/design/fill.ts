@@ -6,6 +6,7 @@ import { drawDoc } from './render';
 import { getRasterSurface, setBuffer } from './raster';
 import { record } from './history';
 import { getSelection, selectionMask } from './pixelSelection';
+import { pixelsNotReady } from './rasterMissing';
 
 /** Sample visible colors, keeping the fill separate from the source artwork. */
 export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: number, color: string, opacity: number, options: { threshold?: number; expand?: number; smooth?: number } = {}): void {
@@ -15,7 +16,8 @@ export function fillRegion(sessionId: string, doc: DesignDoc, x: number, y: numb
   const w = Math.round(doc.width), h = Math.round(doc.height);
   x = Math.floor(x); y = Math.floor(y);
   if (x < 0 || y < 0 || x >= w || y >= h) return;
-  if (doc.layers.some((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id))) throw new Error('Layer pixels are still loading. Try again in a moment.');
+  const missing = doc.layers.filter((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id));
+  if (missing.length) throw new Error(pixelsNotReady(missing.map((l) => l.id)));
   const canvas = createCanvas(w, h);
   const ctx = ctx2d(canvas);
   drawDoc(ctx, doc, { origin: 'fill' });

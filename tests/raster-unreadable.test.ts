@@ -26,7 +26,8 @@ vi.mock('../src/lib/media', () => ({
   blobToCanvas: async () => ({ width: 4, height: 4, tag: 'original' }),
 }));
 
-import { deleteBuffers, ensureBuffers, getRasterSurface, pendingRaster, setBuffer } from '../src/engine/design/raster';
+import { deleteBuffers, ensureBuffers, getRasterSurface, isUnreadable, pendingRaster, setBuffer } from '../src/engine/design/raster';
+import { pixelsNotReady } from '../src/engine/design/rasterMissing';
 import type { RasterLayer } from '../src/engine/types';
 
 const layer = (id: string) => ({ id, type: 'raster', name: id, visible: true, locked: false, opacity: 1, blend: 'normal', x: 0, y: 0, width: 4, height: 4, pxWidth: 4, pxHeight: 4, rev: 1 }) as RasterLayer;
@@ -40,6 +41,10 @@ describe('unreadable layer pixels (D30)', () => {
     disk.mode = 'fail';
     await ensureBuffers([layer('a')]);
     expect(getRasterSurface('a')).toBeUndefined();
+    // Marked for the Layers panel, and an edit says why instead of "still loading".
+    expect(isUnreadable('a')).toBe(true);
+    expect(pixelsNotReady(['a'])).toMatch(/could not be read/);
+    expect(pixelsNotReady(['other'])).toMatch(/still loading/);
     setBuffer('a', painted());
     await vi.runAllTimersAsync();
     expect(disk.writes).toEqual([]);
@@ -59,6 +64,7 @@ describe('unreadable layer pixels (D30)', () => {
     await ensureBuffers([layer('c')]);
     disk.mode = 'ok';
     await ensureBuffers([layer('c')]);
+    expect(isUnreadable('c')).toBe(false);
     expect(getRasterSurface('c')).toBeDefined();
     setBuffer('c', painted());
     await vi.runAllTimersAsync();

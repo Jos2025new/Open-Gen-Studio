@@ -16,6 +16,7 @@ import { OpForm } from '../assets/OpForm';
 import { usePref } from '../ui/hooks';
 import { toast, useStore } from '../../store/store';
 import { LayerGeometry } from './LayerGeometry';
+import { LayerUnreadable } from './LayerUnreadable';
 import { EditOps, ToolSettings } from './ToolSettings';
 import { ShapeLookFields } from './ShapeLookFields';
 import { InlineColor, InlineSlider, InlineToggle } from './InlineControls';
@@ -219,6 +220,7 @@ export function LayersPanel({ sessionId, doc, selectedCurve }: { sessionId: stri
         </button>
         {layer?.id === l.id && <input key={l.id + l.name} className="layer-name-inline" aria-label="Name" defaultValue={l.name} disabled={l.locked} onBlur={(e) => { if (e.target.value.trim() && e.target.value !== l.name && !l.locked) patchLayer(sessionId, doc.id, l.id, { name: e.target.value.trim() }); }} onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { e.currentTarget.value = l.name; e.currentTarget.blur(); } e.stopPropagation(); }} />}
         <span className="layer-kind" data-tip={l.type === 'fx' ? `${l.group} layer · ${l.scope === 'layer' ? 'layer below' : 'everything below'}` : `${l.type} layer`} aria-label={l.type === 'fx' ? `${l.group} layer` : `${l.type} layer`}><Icon size={13} /></span>
+        <LayerUnreadable layer={l} />
         <IconButton className={`layer-toggle ${l.visible ? '' : 'is-on'}`} icon={l.visible ? Eye : EyeOff} label={`${l.visible ? 'Hide' : 'Show'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { visible: !l.visible })} />
         <IconButton className={`layer-toggle ${l.locked ? 'is-on' : ''}`} icon={l.locked ? Lock : Unlock} label={`${l.locked ? 'Unlock' : 'Lock'} ${l.name}`} size="sm" onClick={() => patchLayer(sessionId, doc.id, l.id, { locked: !l.locked })} />
       </div>{l.type === 'raster' && (paintModeOf(doc) === 'design' || hasEditableStrokes(l) || l.paintFlattened) && <RasterLimitControls sessionId={sessionId} docId={doc.id} layer={l} />}</Fragment>; })}

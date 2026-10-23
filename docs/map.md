@@ -20,9 +20,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 
 | Módulo | Importado por (src) | Tests directos |
 | --- | --- | --- |
-| [types.ts](../src/engine/types.ts) | 246 | 169 |
-| [store.ts](../src/store/store.ts) | 167 | 161 |
-| [primitives.tsx](../src/components/ui/primitives.tsx) | 73 | 0 |
+| [types.ts](../src/engine/types.ts) | 247 | 169 |
+| [store.ts](../src/store/store.ts) | 168 | 161 |
+| [primitives.tsx](../src/components/ui/primitives.tsx) | 74 | 0 |
 | [Popover.tsx](../src/components/ui/Popover.tsx) | 48 | 2 |
 | [media.ts](../src/lib/media.ts) | 48 | 40 |
 | [actions.ts](../src/engine/design/actions.ts) | 47 | 22 |
@@ -30,7 +30,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [ops.ts](../src/engine/ops.ts) | 39 | 16 |
 | [params.ts](../src/engine/params.ts) | 38 | 17 |
 | [catalog.ts](../src/engine/catalog.ts) | 34 | 18 |
-| [raster.ts](../src/engine/design/raster.ts) | 30 | 22 |
+| [raster.ts](../src/engine/design/raster.ts) | 32 | 22 |
 | [actions.ts](../src/engine/actions.ts) | 28 | 19 |
 | [format.ts](../src/lib/format.ts) | 28 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 26 | 6 |
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 16 | 5 |
 | `src/components/chat` | 21 | 11 |
 | `src/components/composer` | 11 | 7 |
-| `src/components/designer` | 44 | 15 |
+| `src/components/designer` | 45 | 15 |
 | `src/components/gallery` | 1 | 1 |
 | `src/components/node` | 8 | 4 |
 | `src/components/shell` | 26 | 15 |
@@ -58,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 16 | 4 |
 | `src/engine` | 60 | 219 |
 | `src/engine/agent` | 35 | 84 |
-| `src/engine/design` | 91 | 103 |
+| `src/engine/design` | 92 | 103 |
 | `src/engine/flow` | 11 | 14 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 227 |
 | `src/store` | 13 | 163 |
 
-157 de 435 módulos no tienen ningún test que los importe directamente.
+158 de 437 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
@@ -82,6 +82,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 - [DrawingChoice.tsx](../src/components/designer/DrawingChoice.tsx)
 - [FxPanel.tsx](../src/components/designer/FxPanel.tsx)
 - [LayerGeometry.tsx](../src/components/designer/LayerGeometry.tsx)
+- [LayerUnreadable.tsx](../src/components/designer/LayerUnreadable.tsx)
 - [LayersPanel.tsx](../src/components/designer/LayersPanel.tsx)
 - [RasterLimitControls.tsx](../src/components/designer/RasterLimitControls.tsx)
 - [ToolPalette.tsx](../src/components/designer/ToolPalette.tsx)

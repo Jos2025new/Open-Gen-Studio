@@ -10,6 +10,7 @@ import { drawDoc, drawLayer } from './render';
 import { floodMask } from './fill';
 import { invert } from './matrix';
 import { record } from './history';
+import { pixelsNotReady } from './rasterMissing';
 
 /*
  * Pixel selection of a design (rectangle or lasso): a polygon in page coordinates, optionally inverted. It lives in
@@ -176,7 +177,8 @@ export function wandSelection(doc: DesignDoc, x: number, y: number, o: WandOptio
   const only = o.sample === 'layer' ? activeLayer(doc) : null;
   if (o.sample === 'layer' && !only) return 'Select a layer first, or sample all layers.';
   const layers = only ? [only] : doc.layers;
-  if (layers.some((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id))) return 'Layer pixels are still loading. Try again in a moment.';
+  const missing = layers.filter((l) => l.visible && l.type === 'raster' && !getRasterSurface(l.id));
+  if (missing.length) return pixelsNotReady(missing.map((l) => l.id));
   const sample = createCanvas(w, h);
   const sc = ctx2d(sample);
   if (only) drawLayer(sc, { ...only, visible: true }); else drawDoc(sc, doc, { origin: 'selection' });
@@ -228,7 +230,7 @@ export function editableRaster(doc: DesignDoc): RasterLayer | string {
   if (l.locked) return `"${l.name}" is locked.`;
   if (!l.visible) return `"${l.name}" is hidden.`;
   if (isProtectedImage(l)) return `"${l.name}" is a placed image. Turn on "Allow painting" in Properties to change its pixels.`;
-  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return pixelsNotReady([l.id]);
   return l;
 }
 
@@ -286,13 +288,13 @@ export function selectionToLayer(sessionId: string, doc: DesignDoc): string | nu
   const l = activeLayer(doc);
   if (l?.type === 'vector') {
     const split = splitVectorSelection(doc, l, false);
-    if (!split) return 'Layer pixels are still loading. Try again in a moment.';
+    if (!split) return pixelsNotReady([l.pixelMask?.id]);
     record(doc);
     setDoc(sessionId, doc.id, d => insertLayer(d, split.lifted, 'above'));
     return null;
   }
   if (!l || l.type !== 'raster') return 'Select a raster layer.';
-  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return pixelsNotReady([l.id]);
   addPixelLayer(sessionId, doc, `${l.name} · selection`, selectedPixels(doc, l, sel));
   return null;
 }
@@ -317,7 +319,7 @@ export function selectedCrop(doc: DesignDoc): HTMLCanvasElement | string {
   if (!sel) return 'Nothing is selected.';
   const l = activeLayer(doc);
   if (!l || l.type !== 'raster') return 'Select a raster layer.';
-  if (!getRasterSurface(l.id)) return 'Layer pixels are still loading. Try again in a moment.';
+  if (!getRasterSurface(l.id)) return pixelsNotReady([l.id]);
   const box = selectionBox(doc, sel);
   if (!box) return 'The selection is outside the page.';
   const page = selectedPixels(doc, l, sel);

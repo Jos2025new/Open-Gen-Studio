@@ -1,4 +1,5 @@
 import { splitVectorSelection } from './vectorSelection';
+import { pixelsNotReady } from './rasterMissing';
 import type { DesignDoc, Layer } from '../types';
 import { createCanvas, ctx2d } from '../../lib/media';
 import { setDoc, toast } from '../../store/store';
@@ -19,7 +20,7 @@ export function startPixelMove(sessionId: string, doc: DesignDoc, start: Point, 
   if (!sel || start.x < 0 || start.y < 0 || start.x >= doc.width || start.y >= doc.height) return null;
   if (!ctx2d(selectionMask(doc, sel)).getImageData(Math.floor(start.x), Math.floor(start.y), 1, 1).data[3]) return null;
   const active = doc.layers.find(l => l.id === doc.activeLayerId);
-  const source = active?.type === 'vector' ? active.locked ? `"${active.name}" is locked.` : !active.visible ? 'The active layer is hidden.' : active.pixelMask && !getRasterSurface(active.pixelMask.id) ? 'Layer pixels are still loading.' : active : editableRaster(doc);
+  const source = active?.type === 'vector' ? active.locked ? `"${active.name}" is locked.` : !active.visible ? 'The active layer is hidden.' : active.pixelMask && !getRasterSurface(active.pixelMask.id) ? pixelsNotReady([active.pixelMask.id]) : active : editableRaster(doc);
   if (typeof source === 'string') { toast(source, 'error'); return true; }
   let lifted: Layer | null = null;
   return { update(point) {

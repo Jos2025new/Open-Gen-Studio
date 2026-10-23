@@ -12,6 +12,7 @@ import type { BrushOptions } from '../../engine/design/brushEngine';
 import { setDoc, toast } from '../../store/store';
 import { applyDrawingChoice, drawingPreference, justClosedChoice, requestDrawingChoice } from '../../engine/design/drawingChoice';
 import { hasEditableStrokes, paintModeOf } from '../../engine/design/paintMode';
+import { pixelsNotReady } from '../../engine/design/rasterMissing';
 
 /** The raster layer a brush stroke would land on (the active one, or the one above it), or null. */
 export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | null {
@@ -24,7 +25,7 @@ export function paintCandidate(doc: DesignDoc, erase: boolean): RasterLayer | nu
 export function prepareStagePaint(doc: DesignDoc, erase: boolean): boolean {
   const candidate = paintCandidate(doc, erase);
   if (candidate && (!getRasterSurface(candidate.id) || (!candidate.paintFlattened && candidate.paintBaseId && !getRasterSurface(candidate.paintBaseId)))) {
-    toast('Layer pixels are still loading. Try again in a moment.', 'error');
+    toast(pixelsNotReady([candidate.id, candidate.paintBaseId]), 'error');
     return false;
   }
   if (candidate && requiresRasterPaintApproval(candidate) && !consumeRasterPaintApproval(candidate.id)) {
@@ -110,3 +111,4 @@ export function drawingChoiceFirst(sessionId: string, docId: string, doc: Design
   else { const message = applyDrawingChoice(sessionId, docId, candidate.id, pref); if (message) toast(message, 'info'); }
   return true;
 }
+export { pixelsNotReady };

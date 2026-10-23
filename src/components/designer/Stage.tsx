@@ -50,7 +50,7 @@ import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
 import { clickCandidate } from '../../engine/design/autoSelect';
 import { usePanRequest } from './usePanRequest';
-import { commitStagePaintGesture, drawingChoiceFirst, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
+import { commitStagePaintGesture, drawingChoiceFirst, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
 
 
@@ -699,7 +699,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         else if (!top && owner(act) && objectAt(act!, p.x, p.y)) layer = act!;
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
-          if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast('Layer pixels are still loading. Try again in a moment.', 'error');
+          if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast(pixelsNotReady([layer.paintBaseId]), 'error');
           const cur = currentObject;
           if (additive) {
             // A modifier toggles an object; dragging an existing pick still moves the whole group.
@@ -816,7 +816,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       const target = erase ? act : ensurePaintLayer(sessionId, doc.id);
       if (!target || target.type !== 'raster') return;
       if (!getRasterSurface(target.id) || (!target.paintFlattened && target.paintBaseId && !getRasterSurface(target.paintBaseId))) {
-        toast('Layer pixels are still loading. Try again in a moment.', 'error');
+        toast(pixelsNotReady([target.id, target.paintBaseId]), 'error');
         if (getDoc(sessionId, doc.id)?.layers === current.layers) unrecord(current);
         return;
       }

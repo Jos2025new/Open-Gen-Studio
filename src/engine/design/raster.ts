@@ -539,6 +539,8 @@ if (typeof window !== 'undefined') {
 
 /** D30: layers whose stored pixels failed to read or decode; never written until a load succeeds. */
 const unreadable = new Set<string>();
+/** The layer's stored pixels failed to read (D30): the Layers panel marks it, edits say so. */
+export function isUnreadable(layerId: string): boolean { return unreadable.has(layerId); }
 
 /** Load buffers for layers that are not in memory yet (after reload). A stored full buffer is cropped to its box. */
 export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
@@ -555,8 +557,7 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
       // D30: stored pixels that could not be read are not an empty layer. No blank buffer, no write over them; the
       // next load tries again. Nothing stored at all is a new, empty layer.
       if (failed) {
-        if (!unreadable.has(l.id)) toast(`The pixels of a layer could not be read. It is kept as it is on disk and not saved over; reopen the design to try again.`, 'error');
-        unreadable.add(l.id);
+        if (!unreadable.has(l.id)) { unreadable.add(l.id); changed = true; toast(`The pixels of "${l.name}" could not be read. They are kept on disk as they are, never saved over; the warning on the layer tries again.`, 'error'); }
         return;
       }
       // A missing foundation must never be replaced by blank pixels when objects are moved.

@@ -116,7 +116,7 @@ describe('D26: no undo step for a gesture that changed nothing', () => {
     dropHistory(doc.id);
   });
   it('the stage drops the step when the stroke stops on a loading layer, and records a corner scale only once it moves', () => {
-    expect(stage).toMatch(/Try again in a moment\.', 'error'\);\s*if \(getDoc\([^\n]*unrecord\(current\)/);
+    expect(stage).toMatch(/toast\(pixelsNotReady\(\[target\.id, target\.paintBaseId\]\), 'error'\);\s*if \(getDoc\([^\n]*unrecord\(current\)/);
     expect(stage).not.toMatch(/record\(current\);\s*drag\.current = \{ kind: 'scale'/);
     expect(stage).toMatch(/kind: 'scale'[^\n]*pre: current/);
     expect(stage).toMatch(/else if \(d\.kind === 'scale' && started\(d, p\)\)/);
