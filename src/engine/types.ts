@@ -751,9 +751,10 @@ export interface GraphEdge {
   id: string;
   source: string;
   target: string;
-  /** Target port: 'prompt' | 'ref' | 'first' | 'last' | 'input'. */
+  /** Target port: prompt, ref, first, last, input. */
   targetHandle: string;
   sourceHandle: string;
+  outputIndex?: number;
 }
 
 /** A named frame around some nodes (each node is in one group at most). */

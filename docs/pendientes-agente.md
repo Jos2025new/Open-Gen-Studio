@@ -35,7 +35,7 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 - **A21 · medio · 2026-10-08 · Bucle de tarjetas con un vídeo caro (`3f551d1`) y P2, P3 y P4 (`95eab99`).** Lo prueba el usuario en el sandbox; con gasto.
 - **A22 · medio · 2026-10-14 · Modelos y prompting** (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer (usuario).
 - **A23 · bajo · 2026-10-21 · Decisión: cápsulas de respuesta rápida** bajo los mensajes del agente (elemento de interfaz nuevo; idea anotada).
-- **A24 · alto · 2026-10-22 · Nodes: cada conexión debe recordar qué resultado usa** ([auditoría de Studio](../../ogs-studio-audit-2026-10-22.md), E5-01). El tablero guarda un solo índice por nodo (`flow/graph.ts`, `outputIndex`), así que dos candidatos distintos de un paso acababan siendo el mismo. Hoy hay un parche (`3753f82`, `163db69`): el agente recibe un error y rehace el plan. Arreglo de verdad: el índice va en la conexión, los grafos antiguos se leen igual (campo opcional), y se retira el error al agente.
+- **A24 · cerrado 2026-10-23** · cada conexión de Nodes guarda el resultado que usa; retirado el error al agente: [050](history/050-2026-10-W43.md).
 
 ## Proveedores, precios y coste (B)
 

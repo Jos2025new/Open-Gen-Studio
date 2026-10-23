@@ -17,7 +17,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
 7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
 8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
-Después, por riesgo: A24 (Nodes, hacerlo bien), los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
+Después, por riesgo: los hallazgos altos de la auditoría del Designer (D19 a D22), B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
 ## Archivos de detalle
 
@@ -57,7 +57,6 @@ Después, por riesgo: A24 (Nodes, hacerlo bien), los hallazgos altos de la audit
 | A21 | Bucle de tarjetas con vídeo caro y P2 a P4 | medio | 2026-10-08 |
 | A22 | Modelos y prompting: prueba visual de shot-consistency y ref-roles | medio | 2026-10-14 |
 | A23 | Decisión: cápsulas de respuesta rápida | bajo | 2026-10-21 |
-| A24 | Nodes: cada conexión recuerda qué resultado usa (hoy, parche) | alto | 2026-10-22 |
 
 ### Proveedores, precios y coste (B) · [detalle](pendientes-agente.md)
 

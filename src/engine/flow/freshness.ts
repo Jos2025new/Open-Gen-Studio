@@ -14,6 +14,9 @@ export function comparableSettings(modelRef: string, settings: GenSettings, sche
   return { count: settings.count, params: { ...defaults, ...wireParams(schema, source, settings.count) } };
 }
 
+/** The result a subject binding names (`node#2` → 1), or undefined for the node's chosen result. */
+const pickOf = (from: string): number | undefined => { const m = /#(\d+)$/.exec(from); return m ? Math.max(0, Number(m[1]) - 1) : undefined; };
+
 export interface RequestContext { schemas?: Record<string, ModelSchema>; operation?: (node: GraphNode) => unknown }
 
 /** Compare the graph's logical request, before provider defaults, mention substitution and automatic seeds. */
@@ -25,7 +28,7 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     const data = src?.data;
     const gen = data && 'generationId' in data && data.generationId ? generations[data.generationId] : undefined;
     const value = data?.kind === 'text' ? data.text : data?.kind === 'asset' ? data.sketchAssetId ?? data.assetId
-      : gen?.text ?? (data && 'outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[data.outputIndex] : null);
+      : gen?.text ?? (data && 'outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[e.outputIndex ?? data.outputIndex] : null);
     return { port: e.targetHandle, value: value ?? null };
   });
   const promptText = incoming.find(e => e.port === 'prompt')?.value;
@@ -36,7 +39,7 @@ export function nodeRequest(graph: Graph, node: GraphNode, generations: Record<s
     const data = source?.data;
     const gen = data && 'generationId' in data && data.generationId ? generations[data.generationId] : undefined;
     const asset = binding.from.startsWith('asset:') ? binding.from.slice(6) : data?.kind === 'asset' ? data.sketchAssetId ?? data.assetId
-      : data && 'outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[data.outputIndex] : undefined;
+      : data && 'outputIndex' in data ? data.sketchAssetId ?? gen?.assetIds[pickOf(binding.from) ?? data.outputIndex] : undefined;
     const subject = { id: binding.name, name: binding.name, description: binding.description ?? '', kind: binding.kind ?? 'character', frontalAssetId: asset ?? undefined, refAssetIds: [] } as Subject;
     const index = locals.findIndex(s => s.name.toLowerCase() === subject.name.toLowerCase());
     if (index < 0) locals.push(subject); else locals[index] = subject;

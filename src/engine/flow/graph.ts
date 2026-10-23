@@ -166,10 +166,11 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
     const p = parseRef(ref);
     if (!p) return;
     let source: string | undefined;
+    // A24: the link keeps the result it uses (s1#2), so two links can use two candidates of one step.
+    let outputIndex: number | undefined;
     if (p.type === 'step') {
       source = nodeOf.get(p.id);
-      const n = nodes.find(n => n.id === source);
-      if (n && 'outputIndex' in n.data && p.index) n.data.outputIndex = p.index;
+      if (p.index) outputIndex = p.index;
     }
     else if (p.type === 'asset') {
       source = existingSource(p.id) ?? assetNodes.get(p.id);
@@ -179,7 +180,7 @@ export function planToGraph(plan: Plan, kindOf: (assetId: string) => string | un
         nodes.push({ id: source, position: { x: 0, y: 0 }, data: { kind: 'asset', title: 'Reference', assetId: p.id }, planId: plan.id });
       }
     }
-    if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle });
+    if (source) edges.push({ id: uid('edge'), source, target, sourceHandle: 'out', targetHandle: handle, ...(outputIndex ? { outputIndex } : {}) });
   };
 
   for (const n of nodes) {
@@ -313,13 +314,13 @@ export function nodeAttempt(node: GraphNode, generations: Record<string, Generat
   return latest;
 }
 
-export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>): string | null {
+export function nodeOutputAsset(node: GraphNode, generations: Record<string, Generation>, index?: number): string | null {
   const d = node.data;
   if (d.kind !== 'text' && d.sketchAssetId) return d.sketchAssetId;
   if (d.kind === 'asset') return d.assetId;
   if (runsGeneration(d)) {
     const g = d.generationId ? generations[d.generationId] : undefined;
-    if (g?.status === 'done') return g.assetIds[d.outputIndex] ?? null;
+    if (g?.status === 'done') return g.assetIds[index ?? d.outputIndex] ?? null;
   }
   return null;
 }
@@ -362,7 +363,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
   };
   targets.forEach(t => visit(t, options.force !== false));
 
-  const refFor = (sourceId: string): string | null => {
+  /** `index`: the result the link uses (edge.outputIndex); unset = the node's chosen result. */
+  const refFor = (sourceId: string, index?: number): string | null => {
     const n = byId.get(sourceId);
     if (!n || n.data.kind === 'text') return null;
     // A 3D source gives its view image (rendered when the model is shown or its view changes).
@@ -373,8 +375,9 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       errors.push(`"${n.data.title}" has no view image yet. Wait a moment for its preview to render, then run again.`);
       return null;
     }
-    if (run.has(sourceId)) return 'outputIndex' in n.data && n.data.outputIndex ? `${sourceId}#${n.data.outputIndex + 1}` : sourceId;
-    const asset = nodeOutputAsset(n, generations);
+    const at = index ?? ('outputIndex' in n.data ? n.data.outputIndex : 0);
+    if (run.has(sourceId)) return at ? `${sourceId}#${at + 1}` : sourceId;
+    const asset = nodeOutputAsset(n, generations, at);
     if (asset) return `asset:${asset}`;
     errors.push(`"${n.data.title}" has no output yet.`);
     return null;
@@ -408,7 +411,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
     if (d.kind === 'image' || d.kind === 'model3d') {
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'clip')
-        .map((e) => refFor(e.source))
+        .map((e) => refFor(e.source, e.outputIndex))
         .filter((r): r is string => Boolean(r));
       steps.push({ id, kind: d.kind, title: d.title, prompt: d.prompt, promptFrom, modelRef: d.modelRef, settings: d.settings, refs } satisfies ImageStep | Model3dStep);
     } else if (d.kind === 'video') {
@@ -416,7 +419,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       const last = inEdges.find((e) => e.targetHandle === 'last');
       const refs = inEdges
         .filter((e) => e.targetHandle === 'ref' || e.targetHandle === 'refVideo' || e.targetHandle === 'audio')
-        .map((e) => refFor(e.source))
+        .map((e) => refFor(e.source, e.outputIndex))
         .filter((r): r is string => Boolean(r));
       steps.push({
         id,
@@ -426,8 +429,8 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
         promptFrom,
         modelRef: d.modelRef,
         settings: d.settings,
-        firstFrame: first ? refFor(first.source) ?? undefined : undefined,
-        lastFrame: last ? refFor(last.source) ?? undefined : undefined,
+        firstFrame: first ? refFor(first.source, first.outputIndex) ?? undefined : undefined,
+        lastFrame: last ? refFor(last.source, last.outputIndex) ?? undefined : undefined,
         refs: refs.length ? refs : undefined,
       } satisfies VideoStep);
     } else if (d.kind === 'audio') {
@@ -444,7 +447,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       } satisfies AudioStep);
     } else if (d.kind === 'tool') {
       const input = inEdges.find((e) => e.targetHandle === 'input');
-      const ref = input ? refFor(input.source) : null;
+      const ref = input ? refFor(input.source, input.outputIndex) : null;
       if (!ref) errors.push(`"${d.title}" needs an ${OPS[d.op].input} input.`);
       steps.push({ id, kind: 'op', title: d.title, op: d.op, input: ref ?? '', params: d.params } satisfies OpStep);
     }
@@ -455,7 +458,7 @@ export function graphToSteps(graph: Graph, targets: string[], generations: Recor
       s.nodeSubjects = d.subjects.map(subj => {
         const p = parseRef(subj.from);
         const source = p?.type === 'step' ? byId.get(p.id) : undefined;
-        return { ...subj, from: source ? refFor(source.id) ?? subj.from : subj.from };
+        return { ...subj, from: source ? refFor(source.id, subj.from.includes('#') ? p?.index : undefined) ?? subj.from : subj.from };
       });
       s.after = s.nodeSubjects.flatMap(subj => { const p = parseRef(subj.from); return p?.type === 'step' ? [p.id] : []; });
     }

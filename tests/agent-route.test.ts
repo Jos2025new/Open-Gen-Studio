@@ -60,7 +60,7 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(errors.join(' ')).toMatch(/up to 20 characters \(this one has 21\).*\[PROMPT_TOO_LONG\]/);
   });
 
-  it('in Nodes, one step cannot feed two of its candidates: a node passes one chosen result (audit E5-01)', async () => {
+  it('in Nodes, one step may feed two of its candidates: each link keeps its result (A24, audit E5-01)', async () => {
     const model = { ref: 'fal::img', provider: 'fal', id: 'img', name: 'Img', kind: 'image', acceptsText: true, tags: [] } as never;
     const ctx: PlanContext = {
       workspace: 'node',
@@ -76,7 +76,7 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
       { id: 's3', kind: 'image', prompt: 'the face, serious', refs: [b] },
     ] });
     const split = await normalizePlan(plan('s1#1', 's1#2') as never, ctx, 'p');
-    expect(split.errors.join(' ')).toMatch(/s1: later steps use different results of it \(s1#1, s1#2\)/);
+    expect(split.errors).toEqual([]);
     const same = await normalizePlan(plan('s1#2', 's1#2') as never, ctx, 'p');
     expect(same.errors.join(' ')).not.toMatch(/different results/);
     // A step that names a subject made by s1 waits for s1 ("after"): that orders the run and picks no result.
