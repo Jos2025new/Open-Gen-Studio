@@ -1,138 +1,144 @@
-# Pendientes y propuestas
+# Pendientes: índice priorizado
 
-Lista viva, revisada contra el código de `task/agent-forcing`. Formato de cada línea: casilla, asunto, **fecha** del último cambio de estado, quién lo dijo y la evidencia. Al cerrar una, marca `[x]`, pon la fecha y la evidencia (commit, test o prueba), y muévela a «Hecho».
+Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de origen** (la primera vez que aparece) para que lo viejo se vea. Revisión completa del 2026-10-22 sobre `task/workflow-ask-first` (`c034614`): cada ítem se contrastó con el código, los commits o el informe de la prueba de sandbox del 2026-10-21. Lo ya resuelto está en [pendientes-cerrados](pendientes-cerrados.md), con su evidencia.
 
-Evidencia: **código** = leído en el código · **test** = cubierto por `npm test` · **real** = ejecutado contra el servidor o el proveedor real · **usuario** = lo afirma el usuario · **sandbox** = recorrido en el puerto 5183 · **propuesta** = trabajo o decisión aún sin implementar ni validar.
+**Prioridad** (criterio del usuario): *crítico* = promesa rota (el modelo o proveedor nunca cambia solo, nunca gastar más de lo mostrado, una alerta nunca dice algo falso), entregable equivocado, fricción de uso, datos y claves. *Alto* = velocidad o interfaz que se frena con el uso, y riesgos de dinero o datos que se pueden acotar. *Medio* = probar o completar. *Bajo* = opcional o sin decidir.
 
-## Decisiones del usuario
+**Cómo se mantiene.** Una fila por ítem, con ID estable (A1, B2…) que usan los archivos de detalle. Al cerrar uno: se quita de aquí y de su detalle y se añade a [cerrados](pendientes-cerrados.md) con commit o test. Un ítem nuevo lleva su fecha de hoy. Evidencia: **código** (leído), **test**, **sandbox** (puerto 5183), **usuario**, **informe** (prueba de GPT del 2026-10-21), **propuesta** (sin implementar).
 
-- [x] La velocidad va primero: «una interfaz que vaya lenta conforme más se usa deja la app inviable». Ordenar los arreglos por lo que más aporte al usuario y a la UX, con menos riesgo y más escalable. **2026-10-09**, el usuario.
-- [x] Cuando el usuario prueba un cambio, se anota con fecha qué cambio concreto probó y qué no. **2026-10-09**, el usuario (precedente en [depuracion.md](depuracion.md)).
-- [x] Brocha y panel del Designer: orden del panel, avanzados ocultos por defecto, aviso de presión solo sin simulación, extremos finos y un solo motor de punta. **2026-10-09**, probado y aprobado por el usuario. Antes de tocar el Designer o la exportación, revisar la tabla «Qué revisar a futuro» de [022](history/022-2026-10-W41.md).
-- [x] Conflictos entre ramas: rigen los cambios más nuevos salvo que introduzcan fallos; dejar una sola rama, `task/agent-forcing`. **2026-10-09**, el usuario.
-- [x] Calidad por defecto = resolución media (`mediumResolution`). **2026-10-08**, aprobado por el usuario.
-- [x] Operaciones con modelo de imagen: confirman su modelo; Auto una vez por sesión, Guided en cada petición, Direct usa el compositor (`454d721`, ADR 0009). **2026-10-08**, el usuario: «rige lo más nuevo». Sustituye la regla anterior, en la que heredaban el modelo de su origen.
-- [ ] Modelos `-spicy` excluidos salvo que se nombren: aplicado de forma provisional. Probablemente se bloqueen si la app deja de ser solo local. **2026-10-08**, pendiente del usuario.
-- [ ] ADR 0005, 0006, 0008 y 0009: propuestos, implementados y en uso. Falta su aprobación formal. **2026-10-08**.
-- [x] ~~Fusionar `task/agent-forcing` en `task/modelo-general`~~ (ver [fusion-agent-forcing.md](fusion-agent-forcing.md)). **Superado el 2026-10-09:** el usuario dejó una sola rama, `task/agent-forcing`, que contiene todo; `task/modelo-general` se borró en la purga. Queda decidir la fusión a `main`.
-- [x] Registro de rendimiento para sesiones de prueba ([ADR 0012](decisions/0012-registro-de-rendimiento.md)): aprobado; en la app y en el sandbox, apagado por defecto. **2026-10-08**, el usuario delegó el alcance.
-- [ ] Publicar la app (plataforma, acceso, claves en servidor). Hoy es solo local; ver [seguridad](seguridad.md). **2026-09-25**, sin decidir.
-- [ ] Prueba con gasto real de voz y efectos (NanoGPT): voz, instrucciones de tono y sonido. **2026-10-08**, la hará el usuario. **Sin verificar:** el formato real de la respuesta de cada modelo (audio directo o JSON con URL; se aceptan ambos) y si el efecto admite fijar la duración (hoy la elige el modelo).
+## Lo más crítico ahora
 
-## Por probar
+1. **A1 · `confirm_settings` repetida con el mismo modelo ya confirmado** (2026-10-22; familia del 2026-10-16). El usuario pidió un solo cambio y el agente puso otra tarjeta a esperar clic. Fricción de uso; arreglo propuesto, falta tu aprobación. [detalle](pendientes-agente.md)
+2. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
+3. **A2 · Etiqueta de proveedor falsa** (2026-10-21): el faro pasó de Atlas a NanoGPT, se guardó como Atlas y el agente no avisó. Alerta que dice algo falso. [detalle](pendientes-agente.md)
+4. **C0 · «Connected» verde con el servidor local caído; «Disk copy pending» sin causa** (2026-10-21). Esconde que no se está guardando. [detalle](pendientes-sistema.md)
+5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
+6. **A6 · El agente se saltó las tomas en imagen que pediste** (2026-10-21): entregable equivocado. [detalle](pendientes-agente.md)
+7. **B1 · Posible cobro de $0.068 por una generación interrumpida** (2026-10-16): sin comprobar en el panel del proveedor. [detalle](pendientes-agente.md)
+8. **B2 · Arreglos del relay sin llevar a la app real** (2026-10-21): lo de NanoGPT no se guarda y caduca (sandbox: 2026-10-27). Tú dijiste que no es urgente; la fecha cuenta. [detalle](pendientes-agente.md)
 
-- [ ] **Persistencia (`task/store-fixes`):** «Delete all» en el sandbox (borrar, recargar, comprobar) y el webm real de H5 en navegador. **2026-10-16**, pendiente; ver [039](history/039-2026-10-W42.md).
-- [ ] Interfaz por espacios (Home, Create, Tools, Studio con tablero, `task/gui-cohesion`): lo que queda, con su porqué y dónde, en [pendientes-gui.md](pendientes-gui.md) (incluye borrar capas y teclas de herramienta del Designer, `designerKeys.ts:87` y `:94`); cómo probarla, en [gui-cohesion-pruebas.md](gui-cohesion-pruebas.md). **2026-10-16**, código.
-- [ ] Modelos y prompting (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas.md](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer. **2026-10-14**, el usuario.
-- [ ] Tras 038 (**2026-10-15**, propuesta): `triggers.ts` con triggers demasiado amplios (no aprobado); tarjeta de ajustes en vivo (diferida hasta que el usuario pruebe); guías faltantes o sin verificar (Flash Omni 1.1, Kling O3, FLUX 3, MiniMax H3, Grok, HappyHorse); el fallback de realismo elige retrato para cualquier hombre/mujer; `inheritApproved` solo hereda imagen y vídeo. Detalle en [038](history/038-2026-10-W42.md).
-- [ ] `agentMetrics`: añadir fecha, modelo y proveedor por mensaje; `op` del plan con `realism` explícito; decidir UI de esfuerzos no admitidos (5c) y selector de roles. **2026-10-14**, propuesta.
-- [ ] Capas FX (ADR 0011): plan completo en [fx-pruebas.md](fx-pruebas.md). La rama `task/fx` ya está dentro de `task/agent-forcing` (2026-10-08) y se borró en la purga del 2026-10-09. **2026-10-08**, pendiente.
-- [ ] Bucle de tarjetas con un vídeo caro (`3f551d1`), y P2, P3 y P4 (`95eab99`). **2026-10-08**, lo prueba el usuario en el sandbox.
-- [ ] Precisión de `remove_bg`, `extract_frame` y `create_voice` con casos reales. **2026-10-08**, pendiente.
-- [ ] Calidad de los cortes de `grid_split` con una generación real. **2026-10-08**, pendiente.
-- [ ] **Formas: prueba permanente con Inkscape.** Exportar un SVG con todos los casos de forma, rasterizarlo con el CLI de Inkscape y comparar píxeles y atributos; saltarse con aviso si no hay Inkscape. Hoy solo hay comprobaciones puntuales (GPT y Claude, 2026-10-11). **2026-10-11**, propuesta del usuario.
-- [ ] **Nodos coincidentes y selección a zoom bajo:** corregido en `2949201` sin test propio (dos nodos a 0,45 px a 5 %; puntas de la flecha). **2026-10-11**, revisión GPT pendiente sobre ese commit.
-- [ ] **fal.ai: no probado** (generaciones y subida de vídeos grandes). El usuario no usa fal. En teoría funciona, pero nada se ha verificado con una generación real. **2026-10-08**.
+Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambió sin generar), A7 (plan inválido tras Continue), C1 (guardado, fase 2) y D14 (rendimiento del Designer).
 
-## Funciones propuestas sin implementar
+## Archivos de detalle
 
-- [ ] **Interfaz del Designer al estilo ibisPaint y Photoshop** ([propuesta](propuesta-gui-pintura.md)): lo que se toca a cada segundo siempre visible (tamaño y opacidad del pincel, deshacer, capas), herramientas con nombre y sin desbordamiento, capas con sus efectos dentro, interruptores de un toque, girar el lienzo e histograma. Segunda ronda con Feather 3D y SketchUp y correcciones del usuario: secuencia vigente de 8 pasos; el primero es el inventario de herramientas y funciones con un test de alcance, para no perder nada al reorganizar. **2026-10-10**, pedido por el usuario; sin decidir el orden.
-- [ ] **Designer, tras el 2026-10-09 (segunda parte):**
-  - probar en el navegador la brocha sin lectura del canvas, el zoom pixelado, los modos nuevos, fusionar, rasterizar, Grow/Shrink y el espejo;
-  - guardar cada sesión por separado (revisar antes con Astra; ADR primero);
-  - ~~niveles y curvas~~ y ~~reglas recta y elipse~~: hechos el 2026-10-10, también la regla de perspectiva (uno o dos puntos de fuga);
-  - sondas de brocha y guardado;
-  - ~~margen del ajuste a pantalla~~: hecho el 2026-10-10.
+- [pendientes-agente](pendientes-agente.md): agente (A1 a A23) y proveedores, precios y coste (B1 a B9).
+- [pendientes-sistema](pendientes-sistema.md): datos y guardado (C0 a C6), calidad y pruebas (C7 a C14), funciones propuestas (F1 a F7), decisiones y ramas (G1 a G7).
+- [pendientes-designer](pendientes-designer.md): Designer, formas, brocha y render (D1 a D18).
+- [pendientes-gui](pendientes-gui.md): interfaz por espacios, Home, tarjetas del chat (39 filas; abiertas, prioridad y origen en su cabecera).
+- [pendientes-cerrados](pendientes-cerrados.md): lo hecho, superado u obsoleto, con evidencia.
+- Otras fuentes únicas: [render-estado](render-estado.md) (render y rendimiento, D14), [modelos-pruebas](modelos-pruebas.md) (A22), [fx-pruebas](fx-pruebas.md) (D16), [gui-cohesion-pruebas](gui-cohesion-pruebas.md) (cómo probar la interfaz).
 
-  Detalle y razones en [022](history/022-2026-10-W41.md), sección «Pendiente al cierre de la segunda parte». **2026-10-09**, pendiente.
-- [ ] **Brocha, lo que falta de SAI** ([ADR 0013](decisions/0013-campos-y-brocha.md)): mezcla húmeda (Blending, Dilution, Persistence), calidad y multiplicador de tamaño. Medir antes el coste por movimiento de la punta con el [protocolo](depuracion.md#protocolo). **2026-10-09**, pendiente.
-- [ ] **Mismo campo fuera del Designer:** los deslizadores de la galería (columnas), el boceto (tamaño de brocha), el visor 3D y la tarjeta de ajustes siguen con su propio estilo. **2026-10-09**, pendiente; cambia la interfaz de otros espacios, así que hay que preguntar antes.
-- [ ] **Presión con un lápiz real:** tamaño y densidad mínimos solo se han probado con tests y con ratón (presión total). **2026-10-09**, lo prueba el usuario.
-- [ ] Importar el `.zip` de datos (el exportar ya existe). **2026-10-08**, pendiente.
-- [ ] Recortar un vídeo o quitarle el audio. El servidor local ya usa ffmpeg para `join_clips`; sería la vía más ligera. **2026-10-08**, pendiente.
-- [ ] Quitar el fondo de un vídeo (`pixelcut/video-background-removal`, NanoGPT; ID verificado). **2026-10-08**, pendiente.
-- [ ] Subir vídeos grandes a fal con su API de subida. Ligado a «fal no probado». **2026-10-08**, pendiente.
-- [ ] Designer: seguir el orden y los criterios de cierre de «Plan del Designer» más abajo. **2026-10-09**, **usuario**: máscaras, ajustes, PSD y color son el próximo trabajo; **propuesta**: orden de ejecución de Astra.
-- [ ] Limpiar copias `data.bak-*`: se crean solo al pulsar «Wipe all data» y solo ocupan disco, sin efecto en el funcionamiento ni en la interfaz. Las copias automáticas de `data/backups/` ya se limitan a 20. **2026-10-08**, solo si hace falta.
+## Lista abierta por área
 
-## Plan del Designer (orden de ejecución)
+### Agente (A) · [detalle](pendientes-agente.md)
 
-Rendimiento y guardado del Designer (render-bench): lo pendiente está solo en [render-estado.md](render-estado.md), sección «Pendiente (fuente única)». No se duplica aquí.
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| A1 | `confirm_settings` repetida con el mismo modelo confirmado | crítico | 2026-10-22 |
+| A2 | Etiqueta de proveedor falsa tras Atlas → NanoGPT | crítico | 2026-10-21 |
+| A3 | Keep/Change no nombra los dos proveedores (falla del informe) | crítico | 2026-10-21 |
+| A4 | Repetir la prueba visual del sandbox (1 falla, 4 dudosas, 9 sin ver) | crítico | 2026-10-21 |
+| A5 | DeepSeek en bucle sin `prompt`: la app debe cortar y decirlo | crítico | 2026-10-21 |
+| A6 | Tomas en imagen saltadas antes del vídeo | crítico | 2026-10-21 |
+| A7 | «1 problem to fix» / «could not produce a valid plan» tras Continue | alto | 2026-10-21 |
+| A8 | Decisión: tarjeta extra al nombrar un modelo | medio | 2026-10-21 |
+| A9 | Probar vídeo con 3 referencias (tope de coste antes) | medio | 2026-10-21 |
+| A10 | Sin comprobar: tope 1,5×, crédito vídeo/audio/máscaras, «cámbialo igual» | medio | 2026-10-21 |
+| A11 | Tamaño del contexto del agente (37 000 a 50 000 tokens) | medio | 2026-10-21 |
+| A12 | Paso 6 con LLM real sin ejecutar; `userPicked` usa `ctx.userText` | medio | 2026-10-19 |
+| A13 | Notas de operaciones en inglés; falso positivo de continuidad | medio | 2026-10-20 |
+| A14 | Cola de agentes («cuando X termine, haz Y»), sin código | medio | 2026-10-16 |
+| A15 | Tras 038: triggers amplios, guías faltantes, fallback de realismo | medio | 2026-10-15 |
+| A16 | `agentMetrics`, `realism` por op, UI de esfuerzos, selector de roles | bajo | 2026-10-14 |
+| A17 | Precisión de `remove_bg`, `extract_frame`, `create_voice` | medio | 2026-10-08 |
+| A18 | Cortes de `grid_split` con generación real | medio | 2026-10-07 |
+| A19 | «Casa» cuenta como lugar (sin comprobar si sigue) | bajo | 2026-10-07 |
+| A20 | Referencia a imagen anterior («de ella») no dispara la puerta | bajo | 2026-10-08 |
+| A21 | Bucle de tarjetas con vídeo caro y P2 a P4 | medio | 2026-10-08 |
+| A22 | Modelos y prompting: prueba visual de shot-consistency y ref-roles | medio | 2026-10-14 |
+| A23 | Decisión: cápsulas de respuesta rápida | bajo | 2026-10-21 |
 
-Afinar por partes, sin reescribir el motor. Este es el plan del Designer; las propuestas de producción de vídeo de la auditoría siguen aparte y no condicionan este recorrido.
+### Proveedores, precios y coste (B) · [detalle](pendientes-agente.md)
 
-- [x] **1. Sondas y exportación (esta tarea).** Cronometrar la lectura sincronizada; resolver latencia aun sin dominio render; atribuir pasos FX por render y origen; separar resolución de vista y entrega. **2026-10-09**, Astra, **test**: regresiones que fallan al retirar temporalmente cada arreglo; 1029 tests aprobados y build correcto. **sandbox**: aviso al exportar 8192×8192, latencia solo FX, tres orígenes y PNG real 256×128 con FX; 8K se comprobó con canvas doble. Commits de código: `eb2c7f4`, `c19fdf3`, `4e53d5d`, `722564a`.
-- [x] **1b. Regresión de exportación (bloquea dar la rama por buena).** El editor admite hasta 8192 px por lado (`canvasSize.ts`), pero `exportDoc` rechaza más de 33.554.432 píxeles incluso sin FX: 8192×8192 o 8000×6000 se crean y no se exportan. Arreglo acotado acordado con el usuario: retirar ese tope para documentos sin FX conservando las validaciones y los fallos reales; mantener la resolución completa; cambiar el test que exige el rechazo (`fx-render.test.ts`, «rejects 8192 × 8192») y la fila de [designer.md](features/designer.md). Comprobar en sandbox un PNG real de 8192×8192 sin FX. Caché, regiones y avisos de coste, fuera. **2026-10-09**, hallado por Claude, confirmado por Astra; **código**. Lo hace Astra. **Hecho el 2026-10-10:** Astra lo implementó; Claude lo validó (`npm test`: 1067 aprobados; build; PNG real de 8192×8192 sin FX en el sandbox, 1,27 MB en 1,1 s, y rechazo con FX).
-- [ ] **2. Caché de FX con presupuesto de memoria.** *Primer paso hecho el 2026-10-09 (ver Hecho): capas con FX de alcance «layer» en el editor. «Everything below» comparte el presupuesto desde el 2026-10-13 (`cacheBudget.ts`). Falta medir con el banco y liberar al cerrar documentos; ver [render-estado.md](render-estado.md).* Clave por contenido y dependencias efectivas, parámetros, alcance y resolución; invalidar solo lo afectado. Mover una capa ajena no debe recalcular los FX que no dependen de ella; cambiar una capa bajo «Everything below» sí. Limitar bytes, liberar al cerrar documentos y separar resultados de vista y exportación. **2026-10-09**, Astra, **código**: hoy se recompone cada fotograma; **propuesta**: primero caché acotada, reutilización de temporales si la medida la justifica, teselas después si siguen haciendo falta. Cierre: `FX_BENCH=50 npm run fx:check -- -g bench` y `npm run trace:report` antes y después, mismo documento, zoom, navegador y carga anotada, incluyendo aciertos/fallos y memoria de caché con sondas previas. El 95 % histórico no sirve de línea base confirmada.
-- [ ] **3. Recorrido completo de máscara.** Crear, pintar, mover con y sin vínculo a su capa, desactivar, deshacer/rehacer, guardar, recargar y exportar. Conservar máscaras de regiones vectoriales existentes; comprobar alfa y bordes con FX, sin perder píxeles ni buffers. Empezar después de cerrar los cinco contratos siguientes. **2026-10-09**, Astra, **propuesta**; **código**: `vectorMask.ts` ya cubre máscaras de regiones, no una máscara general de capa con todo este recorrido.
-- [ ] **4. Ajustes, composición de grupos y color.** Reutilizar el registro y el plan FX para ajustes no destructivos; definir grupos que realmente compongan, opacidad, fusión y alcance, con compatibilidad de documentos existentes; hacer explícito el color y las conversiones. Cada incorporación debe cerrar vista, undo, guardado y entrega antes de añadir otra. **2026-10-09**, Astra, **propuesta**; **código**: las carpetas actuales no aíslan composición y no limitan «Everything below» (ADR 0011).
-- [ ] **5. PSD.** Implementar el subconjunto acordado, probar con archivos externos y un recorrido de ida y vuelta, y avisar de lo no representable antes de exportar. No deducir fidelidad por poder abrir un archivo. **2026-10-09**, Astra, **propuesta**; **externo sin verificar**: compatibilidad con Photoshop/GIMP, máscaras, texto, ajustes, FX y perfiles.
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| B1 | Posible cobro de $0.068 por generación interrumpida | crítico | 2026-10-16 |
+| B2 | Relay de NanoGPT sin llevar a la app real (caduca 2026-10-27 en sandbox) | crítico | 2026-10-21 |
+| B3 | El presupuesto no es un máximo (avisa, se puede seguir) | alto | 2026-10-08 |
+| B4 | Gasto $15.46 → $15.45 sin generar, sin atribuir | alto | 2026-10-21 |
+| B5 | 3D (Tripo) «Failed to fetch»: host fuera de la lista, sin verificar | medio | 2026-10-18 |
+| B6 | fal.ai sin probar; subir vídeos grandes | bajo | 2026-10-08 |
+| B7 | Prueba con gasto real de voz y efectos (usuario) | medio | 2026-10-08 |
+| B8 | Modelos `-spicy` excluidos de forma provisional | bajo | 2026-10-08 |
+| B9 | «Download failed (404)» en sesión previa del sandbox | bajo | 2026-10-21 |
 
-### Cinco contratos que cerrar antes de las máscaras
+### Datos, guardado, calidad y pruebas (C) · [detalle](pendientes-sistema.md)
 
-Estas son decisiones de diseño propuestas y criterios de cierre; no describen funciones nuevas ya implementadas.
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| C0 | «Connected» verde con servidor caído; «Disk copy pending» sin causa | crítico | 2026-10-21 |
+| C1 | Guardado protegido, fase 2 y 3 (commit atómico, borrados, historial) | alto | 2026-10-16 |
+| C2 | Probar «Delete all» y el webm real de H5 en el sandbox | medio | 2026-10-16 |
+| C3 | Rescate de la pestaña abierta (probablemente obsoleto) | bajo | 2026-10-18 |
+| C4 | Conflicto de guardado de las 17:49, sin analizar | medio | 2026-10-18 |
+| C5 | `source-map-js` (alta): arreglo en rama no fusionada | medio | 2026-10-18 |
+| C6 | Limpiar copias `data.bak-*` | bajo | 2026-10-08 |
+| C7 | Unificar datos repetidos de proveedores | bajo | 2026-09-24 |
+| C8 | Tests intermitentes con carga (4, 11 y `writer-lock` 15c) | medio | 2026-10-08 |
+| C9 | Partir los 11 archivos de más de 30 KB | medio | 2026-10-07 |
+| C10 | Cobertura por riesgo: recorridos completos en sandbox | medio | 2026-10-08 |
+| C11 | Contraste de `--text-4` (2,8 a 3,7:1) | medio | 2026-10-07 |
+| C12 | Carga de la app: paquete de 1,64 MB | bajo | 2026-10-08 |
+| C13 | Medir por recorridos reales | medio | 2026-10-08 |
+| C14 | Una regla, un propietario (sacar políticas del runtime) | medio | 2026-10-08 |
 
-- [ ] **Orden máscara/efectos.** Propuesta: máscara del contenido antes de los FX de esa capa, conservando el orden de las máscaras vectoriales actuales; una futura máscara del resultado FX sería un objeto distinto. Especificar alfa parcial, halo/sombra fuera de la silueta y «Everything below», con ejemplos de píxeles esperados en vista y exportación. **2026-10-09**, Astra, **código**: `drawMaskedVector` precede al plan de FX de capa; **propuesta**: fijar el contrato general y su prueba antes de implementarlo.
-- [ ] **Carpetas y grupos.** Conservar las carpetas actuales como organización sin aislamiento de composición. Un grupo que componga deberá ser explícito, con versión/compatibilidad y alcance de FX definido; no cambiar la semántica de archivos guardados en silencio. **2026-10-09**, Astra, **código**: ADR 0011 y `fx/plan.ts`; **propuesta**: especificar los nuevos grupos antes de combinarlos con máscaras.
-- [ ] **Vida de los buffers.** Definir identidad y propiedad de cada máscara, incluirla en guardado, restauración y undo/redo, y evitar que borrar o deshacer libere un buffer todavía referenciado. Probar borrado, recuperación, recarga y fallo de escritura, sin introducir un segundo sistema de persistencia. **2026-10-09**, Astra, **propuesta**; **código**: `raster.ts`, historial y máscaras vectoriales son los mecanismos a extender, no a reemplazar.
-- [ ] **Promesa PSD.** Propuesta inicial: capas raster y máscaras alfa editables; texto, vectores, ajustes, FX y perfiles solo se anuncian como editables tras demostrarlo. Definir por separado qué se importa, qué se exporta y qué exige rasterizar con aviso. El modelo de máscara debe admitir esa correspondencia; no prometer un PSD idéntico ni round-trip completo. **2026-10-09**, Astra, **propuesta**, compatibilidad externa sin verificar.
-- [ ] **Espacio de color explícito.** Propuesta inicial: sRGB, 8 bits por canal; documentar alfa y dónde ocurren mezcla y ajustes. Definir conversión o rechazo visible para entradas fuera del contrato; perfiles ICC, gamut amplio y mayor profundidad quedan fuera hasta tener implementación y pruebas de entrega. **2026-10-09**, Astra, **código**: los filtros SVG declaran sRGB; **propuesta**: no confundirlo con gestión completa de color del documento.
+### Funciones propuestas (F) · [detalle](pendientes-sistema.md)
 
-### Observación abierta
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| F1 | Producción de varios planos revisable y retomable | medio | 2026-10-08 |
+| F2 | De Nodes a la entrega (`join_clips` en Nodes, montaje mínimo) | medio | 2026-10-08 |
+| F3 | Continuidad: revisión humana antes que automática | bajo | 2026-10-08 |
+| F4 | Ejecución fuera de la pestaña | bajo | 2026-10-08 |
+| F5 | Importar el `.zip` de datos | bajo | 2026-10-08 |
+| F6 | Recortar un vídeo o quitarle el audio | bajo | 2026-10-08 |
+| F7 | Quitar el fondo de un vídeo | bajo | 2026-10-08 |
 
-- [ ] **Clics nativos en el menú FX.** En la auditoría del sandbox algunos clics cerraron el menú sin añadir la capa; la invocación del comando compartido sí la añadió. Reproducir desde un perfil aislado y registrar eventos, selección y estado del menú antes de corregir. **2026-10-09**, Astra, **sandbox**: observación de la auditoría, causa sin confirmar; esta tarea no arregla ni da por resuelto ese comportamiento.
+### Decisiones del usuario y ramas (G) · [detalle](pendientes-sistema.md)
 
-## Calidad del código
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| G1 | Aprobación formal de ADR 0005, 0006, 0008, 0009 (y 0015) | medio | 2026-10-08 |
+| G2 | Fusiones: avance directo a `agent-stop`, `main`, app real | medio | 2026-09-25 |
+| G3 | Publicar la app (plataforma, acceso, claves) | medio | 2026-09-25 |
+| G4 | Estructura de QA con subagentes (sin comprobar si sigue) | bajo | 2026-10-09 |
+| G5 | Sistema visual de tarjetas, pasos 3 a 5 y revisión visual | medio | 2026-10-20 |
+| G6 | Sistema resuelve el modo claro a Claro (¿Blanco?) | bajo | 2026-10-21 |
+| G7 | Pestaña «Look» en inglés (¿«Apariencia»?) | bajo | 2026-10-20 |
 
-- [ ] **Commit del formato 2 del servidor no atómico** (`server/store-v2.js`: sesiones antes que `HEAD.json`). **2026-10-16**, propuesta; ver [039](history/039-2026-10-W42.md).
-- [ ] Partir los 13 archivos de más de 30 KB (`runtime.ts`, 115 KB). Afecta al desarrollo; no pueden crecer (ADR 0008). **2026-10-07**.
-- [ ] Cobertura por riesgo ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): pocas pruebas de recorrido completo en el sandbox, con el LLM y los proveedores simulados (petición → plan → aprobación → resultado; paso a Nodes y Designer). Hoy 129 de 199 módulos no tienen test directo. **2026-10-08**, decidido; sin implementar.
+### Designer, formas, brocha y render (D) · [detalle](pendientes-designer.md)
 
-- [ ] 4 tests fallaron una vez con la carga en 42 (procesos ajenos): `agent-direct-model`, `agent-retry`, `chat-to-nodes` y `join-clips`. Pasaron por separado y en dos ejecuciones completas posteriores (cargas 33 y 29). No se capturó el error: la causa no está confirmada, aunque probablemente sea el margen de tiempo superado con más carga que la medida en el [ADR 0010](decisions/0010-estrategia-de-pruebas.md). **2026-10-08**. Si se repite, guardar la salida de `npx vitest run` con el error.
-- [ ] 11 tests de 7 archivos fallaron una vez con la carga en 47–52 (`agent-contract-journey`, `agent-direct-model`, `composer-choice`, `join-clips`, `settings-phase`, `journeys/composer-variant`, `journeys/import-safety`); pasaron por separado (51 de 51) y en la ejecución completa siguiente. La auditoría externa vio fallar `import-safety` igual. Misma causa probable que el caso anterior; tampoco se capturó el error. **2026-10-08**.
-- [ ] El renderizador de líneas de los trazos raster anteriores al motor de punta no reconstruye fiel a lo pintado: 132 píxeles con más de 4 niveles de alfa de diferencia, máximo 72 (medido en `npm run brush:check`, 2026-10-09). Solo afecta a trazos antiguos al reconstruirse (al mover objetos). Los nuevos usan el motor y coinciden. **2026-10-09**.
-- [ ] Contraste de `--text-4` (2,39:1) en textos de 10 px. Afecta a la legibilidad. **2026-10-07**.
-- [ ] Medir la memoria del historial del Designer (40 entradas, unos 16 MB por copia de 2048×2048). **2026-09-24**. Parcial (2026-10-13): el historial de píxeles ya guarda mosaicos de 64² en memoria (`79bf595`); la medida del gesto sigue en [render-estado.md](render-estado.md).
-- [ ] Unificar los datos repetidos de los proveedores (opcional). **2026-09-24**.
+| ID | Asunto | Prio | Origen |
+| --- | --- | --- | --- |
+| D1 | Probar en el navegador brocha, zoom, modos, fusionar, rasterizar, espejo | medio | 2026-10-09 |
+| D2 | Brocha SAI: mezcla húmeda, calidad, multiplicador de tamaño | medio | 2026-10-09 |
+| D3 | Mismo campo fuera del Designer (preguntar antes) | bajo | 2026-10-09 |
+| D4 | Presión con un lápiz real | medio | 2026-10-09 |
+| D5 | Caché de FX con presupuesto de memoria (falta medir y liberar) | medio | 2026-10-09 |
+| D6 | Máscaras: recorrido completo y sus dos contratos | medio | 2026-10-09 |
+| D7 | Ajustes, grupos que componen y espacio de color | medio | 2026-10-09 |
+| D8 | PSD y su promesa | medio | 2026-10-09 |
+| D9 | Clics nativos en el menú FX cierran sin añadir capa | medio | 2026-10-09 |
+| D10 | Prueba permanente con Inkscape | medio | 2026-10-11 |
+| D11 | Nodos coincidentes a zoom bajo sin test propio | bajo | 2026-10-11 |
+| D12 | Trazos raster antiguos se reconstruyen con diferencias | bajo | 2026-10-09 |
+| D13 | Importar SVG de Inkscape con un archivo real | medio | 2026-10-13 |
+| D14 | Render y rendimiento (render-estado: 18 + 9 pendientes) | alto | 2026-10-13 |
+| D15 | Memoria del historial del Designer (parcial) | bajo | 2026-09-24 |
+| D16 | Capas FX: plan de pruebas completo | medio | 2026-10-08 |
+| D17 | Interfaz del Designer al estilo ibisPaint y Photoshop | medio | 2026-10-10 |
+| D18 | Lineart que se deforma al encoger (10 % residual) | medio | 2026-10-13 |
 
-## Auditoría externa (GPT 6 Astra, 2026-10-08)
+### Interfaz por espacios (GUI) · [detalle](pendientes-gui.md)
 
-Revisó `3f551d1`; su dictamen es refactorizar por partes, sin reescribir. Cada punto se comprobó contra `9c877cc` (**código** = leído; **sin comprobar** = depende de uso real). Son propuestas: el orden lo decide el usuario. La auditoría ordena pensando en vídeo, y el próximo trabajo del usuario es el Designer.
-
-- [x] **Una sola revisión candidata.** Hecho el **2026-10-09**: la purga dejó solo `task/agent-forcing` (más `main` y la rama de la app real), con todo el trabajo dentro. antes de evaluar o seguir: hoy hay tres líneas vivas (`modelo-general`, `agent-forcing` y `fx`). Primer paso: `task/fx` en `task/agent-forcing` (avance directo, preparado el 2026-10-08). **2026-10-08**, el usuario lo pidió.
-- [ ] **Producción de varios planos revisable y retomable:** brief, planos ordenados, toma elegida, duración y revisión, reutilizando `Asset`, `Generation`, `Plan` y `nodeIsCurrent` (`flow/freshness.ts:53`, código), sin hacerlo obligatorio para una imagen suelta. **2026-10-08**, propuesta.
-- [ ] **De Nodes a la entrega:** `join_clips` se rechaza en Nodes (`plan.ts:860`, código). Habilitarlo con el ejecutor existente; después, un montaje mínimo (orden, entrada y salida, duración, audio y exportación), no un editor completo. **2026-10-08**, propuesta.
-- [ ] **Continuidad declarada, conexión válida y calidad visual son cosas distintas:** `continuity` comprueba conexiones, no identidad ni geometría (código; ya lo dice [continuity-contract.md](continuity-contract.md)). Primero revisión humana por contacto; comprobaciones automáticas solo cuando compensen. **2026-10-08**, propuesta.
-- [ ] **El presupuesto no es un máximo:** `budget.ts:24-27` avisa, se puede aceptar seguir, y los precios desconocidos no cuentan (código). Para «hazlo solo hasta X» haría falta un modo con reservas, conciliación y una política para precios desconocidos. Nunca reintentar a ciegas un envío incierto. **2026-10-08**, propuesta.
-- [ ] **Una regla, un propietario:** sacar del runtime (1921 líneas) la política de preguntas y aprobaciones, la resolución de la petición efectiva y el ciclo de ejecución. Las decisiones creativas, en guías; los requisitos duros, en validadores. Enlaza con «Partir los 13 archivos». **2026-10-08**, propuesta.
-- [ ] **Ejecución fuera de la pestaña,** solo cuando haga falta para lotes o producciones largas: un ejecutor local con estado, intentos y cola acotada. Hoy una recarga recupera trabajos remotos, pero no reanuda los pasos que no habían empezado (sin comprobar en un caso real). **2026-10-08**, propuesta.
-- [ ] **Medir por recorridos:** unos pocos pedidos reales con su resultado esperado (planes válidos al primer intento, preguntas redundantes, pasos rehechos, tiempo hasta un resultado útil). Coincide con el ADR 0010. El protocolo de [depuracion.md](depuracion.md) da la base de medida sin gasto; la evaluación de pago, aparte y con presupuesto aprobado. **2026-10-08**, propuesta.
-- [ ] **Carga de la app:** paquete principal de 1,64 MB minificado (521 KB comprimido) y avisos de imports dinámicos que no separan módulos (dato de la auditoría, sin comprobar aquí). Medir el arranque con una sonda antes de optimizar. **2026-10-08**, propuesta.
-
-## Hecho
-
-- [x] **Nodos, lo que falta de Inkscape:** botón Delete segment entre nodos contiguos elegidos y soldar con Shift+J cuando no hay parejas de extremos. Reutiliza subtrazados, tipos y deshacer existentes. **2026-10-12**, 9 casos puros y 2 e2e nuevos, todos fallan al desactivar sus operaciones. Fuentes, selección y diferencia deliberada del punto medio en el [plan](plan-edicion-formas.md).
-
-- [x] **e2e de presión simulada y de la regla de trazo:** fallaban por el pincel guardado en el sandbox, no por la app. La presión depende de la distancia, no del tiempo, y un «Min size» de 0,55 impedía adelgazar; la regla no fijaba ni color ni opacidad. Investigación de MiMo 2.6 Flash, corroborada por Claude en el código y en sus logs. Los tests ahora fijan el pincel que miden. **2026-10-11**, **e2e**: con el sandbox contaminado a propósito, las versiones anteriores fallan (32 320; «rows 0») y las corregidas pasan.
-- [x] **2026-10-11, rendimiento raster medido:** con 50 trazos, recomponer 1080p 235,45 → 9,1 ms y 4K 793,65 → 49,6 ms; límites/cobertura reutilizados sin cambiar historial. Las copias completas permanecen (4K ~40 ms); reconsiderarlas solo con medición y diseño seguro. [Método, exactitud y límites](raster-pruebas.md).
-
-- [x] Formas, siguiente pasada: nodos esquina/suave/simétrico (barra y Shift+C/S/Y, guardados como `sodipodi:nodetypes`), añadir nodo con doble clic en el contorno y borrar el elegido (Supr o botón, nunca la capa), pista según el modo e iconos en Unión/Punta. **2026-10-11**, commits `21e99ea`, `5dce5ee`, `846888e` y el de la pista; **test** (1 126), **e2e** (10 de 10 en `shape-knots.spec.ts` y `path-nodes.spec.ts`; los de tipos y Supr fallan sin su corrección). Borrar conserva la forma de un nodo suave o simétrico como Inkscape (ajuste de una cúbica; Ctrl+Supr, recta): e2e que falla sin el ajuste (90 px).
-- [x] Opacidad y fusión de capa iguales en lienzo y SVG: con más de una operación de pintado (dos formas, o relleno y trazo) la capa se compone aparte y se mezcla una vez, como un grupo SVG. **2026-10-11**, **e2e** (7 casos, 0 píxeles > 8/255; sin la corrección 8 544–32 721), **medida** (10 formas a 1500×900: mediana 1,3–1,5 → 2,3–2,4 ms, solo en esas capas).
-- [x] Formas al estilo de Inkscape: esquinas Rx/Ry con tiradores, estilo de trazo, blur, un clic transforma y doble clic edita, formas giradas editables, nodos de trazados y «Convert to path». **2026-10-11**, Claude, rama `task/designer-ux` (`523dd35` → `2949201`), **test** (1 119), **e2e** (6 de 6 en `shape-knots.spec.ts`), **fuente** (Inkscape, por línea) y **revisión** de GPT en seis rondas. Detalle: [024](history/024-2026-10-W41.md).
-- [x] Designer lento al pintar y al usarlo (el usuario, 2026-10-09: «una interfaz que vaya lenta conforme más se usa deja la app inviable»). **2026-10-09**, Claude, rama `task/rendimiento`:
-  - **Caché de FX del editor:** una capa con FX «layer» reutiliza su resultado mientras no cambien la capa, la versión de contenido de sus píxeles, sus FX y la escala. Cada lienzo tiene ahora su versión, que sube también durante el trazo en vivo (lo que pidió Astra). Exportar siempre calcula. Tope 48 Mpx. **test** (`fx-render.test.ts`: reutiliza, recalcula al editar la capa, sus FX, un trazo en vivo o un commit sobre ella, no al pintar otra; los dos casos clave fallan sin la caché). En el documento del usuario el FX filtra la imagen de debajo, que no cambia al pintar.
-  - **Guardado:** solo se serializan de nuevo las sesiones que cambiaron; el JSON es idéntico byte a byte; una pasada completa cada 30 s detecta una sesión mutada en el sitio. **test** (`persist-json.test.ts`) y **medida** con el estado del sandbox (7,9 MB, Node, mediana de 10): 131 ms → 24 ms por guardado.
-  - **Sin medir en el navegador del usuario** (no hay sonda del guardado ni de la brocha). El estabilizador del usuario estaba en 10, que retrasa la brocha a propósito.
-- [x] Brocha de PaintTool SAI y campos unificados ([ADR 0013](decisions/0013-campos-y-brocha.md)): motor de punta, presión simulada, extremos finos (Taper start/end) y panel reordenado con ajustes avanzados plegables. **2026-10-09**, **test** (`npm test` en la fusión: 1049 aprobados; build correcto), **sandbox** (`npm run brush:check` 7/7) y **usuario** (probado y aprobado). Fusionado en `task/agent-forcing` en `aebf8de`.
-- [x] Purga de ramas y carpetas. **2026-10-09**, a petición del usuario. Solo se borró lo contenido por completo en `task/agent-forcing` (comprobado con `merge-base --is-ancestor`): ramas `task/brush`, `task/fx`, `task/modelo-general`, `task/review-20261008`, `task/designer-audit-20261008`, `task/architecture-analysis-20261008`, `stoic-montage-xt1207`, `claude/stoic-davinci-xt7o4z` (36 commits sin subir a GitHub, todos dentro de `task/agent-forcing`), y sus carpetas `ogs-brush`, `ogs-fx`, `ogs-modelo-general`, `ogs-review-20261008` y `ogs-analysis` (con sus `.sandbox/data`, copias de prueba). Quedan `main`, `task/agent-forcing` y `better-worflows-xyz765` (la carpeta original, de la que corre la app real).
-- [x] Sondas y exportación FX corregidas; plan del Designer documentado. **2026-10-09**, Astra, **test** y **sandbox**: cinco commits, en orden: `eb2c7f4b66b0fa65ecf88d7cef3cea6922724b8e`, `c19fdf31e7431b27645cccc46288a962d218050b`, `4e53d5ded1ccda1769cbaa6a661bd3165ba48785`, `722564ab26dc091d0521a38c9ee67b33d4321d81`, `6f0d84644bf4ba2289d4d42da940932cc3351b9b`. La línea se dejó sin commit para mantener cinco commits; guardada el **2026-10-09** en `9359c85` a petición del usuario.
-- [x] Generar voz y efectos de sonido. **2026-10-08**, **test** ([nanogpt-speech](../tests/nanogpt-speech.test.ts), 10 casos, con proveedor simulado). Modelos elegidos por el usuario: GPT-4o mini TTS 2025-12-15, Gemini 3.8 Flash TTS (por defecto: entre los tres primeros de Artificial Analysis y 0,05 USD por 1000 caracteres), ElevenLabs v4 y v4 Turbo, MiniMax Speech 2.8 Turbo y HD; efectos con ElevenLabs Sound Effects v2. Ver [catálogo](catalogo-voz-y-efectos.md).
-- [x] Tests fiables con carga ([ADR 0010](decisions/0010-estrategia-de-pruebas.md)): reloj falso en lugar de esperas reales, esperas por condición y 20 s de margen global para trabajo de CPU. **2026-10-08**, **real**: 4 de 4 ejecuciones completas sin fallos con carga entre 25 y 39 (antes, hasta 8 fallos).
-- [x] Exportar los datos en un `.zip`. **2026-10-08**, **real**: ruta `/x/store/export` en un servidor Vite con datos de prueba. Devuelve 200 y un zip con `asset/` y `state.json`, con las claves vaciadas (0 apariciones). Sin test automático.
-- [x] Precio exacto de Atlas antes de generar (`src/engine/quotes.ts`). **2026-10-08**, **real**: `POST /api/v1/model/calculate` con Wan 3.0 a 720p devuelve 0,40 USD para 5 s y 0,80 USD para 10 s. **test**: [quotes.test.ts](../tests/quotes.test.ts). **usuario**: funciona.
-- [x] 3D y Designer (`PLAN_3D_DESIGNER.md`, P1–P9): cuatro modelos 3D, visor, exportación PDF/SVG, lineart editable y pinceles con textura. **2026-10-08**, **código** y **test** ([3d-contracts](../tests/3d-contracts.test.ts), [model3d](../tests/model3d.test.ts), [design-export](../tests/design-export.test.ts), [brush-control](../tests/brush-control.test.ts): 22 aprobados). **usuario**: el visor se probó y se amplió después.
-- [x] Banco del agente, antes y después (R0d/R8). **usuario**: lo ejecutó en otras sesiones, con GPT y con Claude, con Grok y MiMo y con gasto real. En el repositorio: [comparación NanoGPT](nanogpt-price-comparison.md), [expansión 2](nanogpt-price-expansion-2.md) y `bench/2026-10-01-3273c0a.json`. No se volvió a ejecutar el 2026-10-08.
-
-## Importar SVG de Inkscape (2026-10-13)
-
-Hecho en `6278ed4` (Claude Sonnet 5.5): carpetas y capas con su nombre, formas editables, restos rasterizados y saneado; detalle en [inkscape-importacion.md](inkscape-importacion.md). Pendiente: probarlo con un archivo real del usuario y revisar qué elementos siguen rasterizados (ver [render-estado.md](render-estado.md), pendiente 5).
+39 filas abiertas. Las de prioridad **alta** (origen 2026-10-16): la tarjeta «Plan … Revised» enorme para cambios pequeños, el «error al seleccionar varias» salidas (sin reproducir) y el borrado de capas y teclas de herramienta que nunca se ejecutan (`designerKeys.ts:87`, decisión tuya de no arreglar todavía). El resto es **medio** (sin ver en navegador, 2026-10-15 a 18) o **bajo** (diseño sin decidir: Studio estrecho, pestaña Projects, herramientas ancladas, persistencia de Grid/List). Incluye el plan de 4 bloques de la persona entusiasta (2026-10-17) y la evidencia de Reddit incompleta.

@@ -4,7 +4,11 @@
 
 - [Reglas de trabajo](../AGENTS.md).
 - [Seguridad local](seguridad.md): riesgos reales y los descartados con prueba. Consúltala antes de avisar de un riesgo.
-- [Pendientes y propuestas](pendientes.md): qué falta decidir, probar o implementar, con su estado.
+- [Pendientes: índice priorizado](pendientes.md): lo más crítico ahora y la lista abierta por área, con prioridad y fecha de origen.
+- [Pendientes del agente, proveedores y coste](pendientes-agente.md): detalle de las filas A y B.
+- [Pendientes de datos, calidad, funciones y decisiones](pendientes-sistema.md): detalle de las filas C, F y G.
+- [Pendientes del Designer, formas, brocha y render](pendientes-designer.md): detalle de las filas D.
+- [Pendientes cerrados](pendientes-cerrados.md): lo hecho, superado u obsoleto, con su evidencia.
 - [Pendientes de la interfaz por espacios](pendientes-gui.md): Home, Create, Tools y Studio con tablero (`task/gui-cohesion`): qué queda, por qué y dónde.
 - [Cómo probar la interfaz por espacios](gui-cohesion-pruebas.md): lista para el sandbox, con qué cuesta dinero y qué es gratis.
 - [Capas FX: pruebas pendientes](fx-pruebas.md): validación visual, interfaz, exportación, agente y escala de ADR 0011.

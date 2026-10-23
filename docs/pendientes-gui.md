@@ -1,6 +1,8 @@
 # Pendientes de la interfaz por espacios (`task/gui-cohesion`)
 
-Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W42.md), con su porqué y dónde mirar. Formato: casilla, asunto, porqué, lugar. Al cerrar uno, marca `[x]` con fecha y evidencia. La rama no está fusionada (2026-10-16); el resto de pendientes del proyecto está en [pendientes.md](pendientes.md).
+Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W42.md), con su porqué y dónde mirar. Formato: casilla, asunto, porqué, lugar. Al cerrar uno, pásalo a [pendientes-cerrados](pendientes-cerrados.md) con fecha y evidencia. El resto de pendientes está en el [índice](pendientes.md).
+
+**Origen y prioridad (revisión del 2026-10-22).** Origen por sección: «Código sin arreglar» y «Diseño sin decidir» y «Sin ver en navegador», 2026-10-15/16 (039), salvo fecha propia; «Home rediseñado», 2026-10-17; «Tarjetas del chat», 2026-10-18. Prioridad por defecto: **medio** si es «sin ver en navegador», **bajo** si es diseño sin decidir. **Alto**: la F de abajo (fricción de uso), «Acciones de varias salidas» (error reportado por el usuario, sin reproducir) y «Borrar capas con el teclado» (decisión del usuario de no arreglar todavía). `gui-cohesion` ya está fusionada en esta línea (ver cerrados).
 
 ## Código sin arreglar (hallados, no introducidos)
 
@@ -34,16 +36,16 @@ Lista viva de lo que quedó sin hacer o sin ver tras [039](history/039-2026-10-W
 
 ## Verificar fuera del código
 
-- [ ] **Cobro posible de $0.068 por una generación interrumpida.** Una generación quedó «Interrupted by a page reload» mientras se editaba código en el worktree, con el servidor de desarrollo de la carpeta del worktree. No se ha comprobado si el proveedor cobró. Comprobar en el panel del proveedor (Spending o la cuenta) antes de dar la cuenta por buena. Lección ya anotada en [039](history/039-2026-10-W42.md): no lanzar generaciones de pago desde ese servidor mientras se edita.
+- Pasó a [B1 de pendientes-agente](pendientes-agente.md): posible cobro de $0.068 por una generación interrumpida (2026-10-16).
 
 ## Para fusionar
 
-- [ ] Fusión de `task/gui-cohesion` (1658e00 y, sobre él, `3985e31..e618fae`) en la rama raíz: decide el usuario tras probar. Regla de conflictos: gana lo más nuevo ([fusión](fusion-agent-forcing.md)).
+- Cerrado el 2026-10-22: `task/gui-cohesion` es ancestro de esta línea ([cerrados](pendientes-cerrados.md)).
 
 ## Prueba GUI 2026-10-16 (pendientes de aprobación)
 
-- **E. Auto: la tarjeta de settings reaparece por un cambio de aspecto.** Causa: `context.ts` («confirm_settings again only to change them») trata el aspecto como cambio. Propuesta: cambio solo de aspecto o cantidad con el kind ya confirmado → `ask_questions` de opción múltiple (formato, una o varias) y `propose_plan` con `aspect`, sin `confirm_settings`. `context.ts` no puede crecer.
-- **F. Tarjeta «Plan … Revised» enorme para cambios pequeños.** `src/components/chat/PlanCard.tsx:153`. Propuesta: variante compacta cuando `item.revised` y hay un paso: «Cambio: título», coste y botones, sin lista de pasos ni la palabra «Plan».
+- **E.** Pasó a [A1 de pendientes-agente](pendientes-agente.md), junto al caso nuevo del 2026-10-22 (misma tarjeta repetida).
+- **F. (alto, 2026-10-16) Tarjeta «Plan … Revised» enorme para cambios pequeños.** `src/components/chat/PlanCard.tsx:153`. Propuesta: variante compacta cuando `item.revised` y hay un paso: «Cambio: título», coste y botones, sin lista de pasos ni la palabra «Plan».
 - [ ] **Recortes ocultos del catálogo, lo que queda.** Hecho 2026-10-16: topes 200/400, filtro `tools` del Director, vídeo NanoGPT sin flags (`nano:v3:videos`, `nanoVideoInputs`). Queda: la lista blanca `NANO_3D_MODELS` (`nanogpt.ts` ~296) oculta a propósito los demás modelos 3D del catálogo; la de audio es decisión documentada y no se toca.
 
 ## Home rediseñado y persona entusiasta (2026-10-17, [042](history/042-2026-10-W42.md))
