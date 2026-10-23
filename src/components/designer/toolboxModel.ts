@@ -28,6 +28,7 @@ export const TOOLBOXES: Record<ToolboxMode, ToolboxFamily[]> = {
     family('blur', 'Blur', 'blend', [soon('blur', 'Blur', 'blend', 'Blur and smudge tools are planned.')]),
     family('ruler', 'Ruler', 'drafting-compass', [v('ruler-straight', 'Straight ruler', 'minus', 'ruler', { rulerKind: 'line' }), v('ruler-ellipse', 'Ellipse ruler', 'circle', 'ruler', { rulerKind: 'ellipse' }), v('ruler-perspective', 'Perspective ruler', 'ruler-dimension-line', 'ruler', { rulerKind: 'perspective' })]),
     family('text', 'Text', 'type', [v('text', 'Text', 'type', 'text')]),
+    family('settings', 'Settings', 'settings-2', [soon('settings', 'Toolbox settings', 'settings-2', 'Toolbox preferences are planned.')]),
   ],
   design: [
     family('edit', 'Edit', 'mouse-pointer-2', [v('edit', 'Edit', 'mouse-pointer-2', 'move'), v('hand', 'Pan', 'hand', 'hand')]),

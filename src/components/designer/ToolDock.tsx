@@ -83,6 +83,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
 
   const moveToolbarFocus = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.stopPropagation();
     const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
     const index = buttons.indexOf(event.target as HTMLButtonElement);
     if (index < 0) return;
@@ -92,7 +93,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
 
   const setHeightFrom = (next: number) => setHeight(Math.max(140, Math.min(window.innerHeight * 0.6, next)));
   const onGripKey = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.stopPropagation();
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); return; }
     event.preventDefault();
     setHeightFrom(height + (event.key === 'ArrowUp' ? 16 : -16));
   };
@@ -107,15 +110,15 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
     <div className="tool-dock-stack">
       {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
-          const active = (dockState.familyId === selectedFamily.id && dockState.variantId === variant.id) || (variant.tool === currentTool && (!variant.selectShape || variant.selectShape === currentShape) && (!variant.rulerKind || variant.rulerKind === rulerKind));
+          const active = !!variant.tool && variant.tool === currentTool && selectedVariant?.id === variant.id;
           return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
         })}
-        <span className="tool-dock-grow" />
+        {!selectedVariant?.soon && <><span className="tool-dock-grow" />
         <button type="button" className="icon-btn icon-btn-md tone-default" aria-label={depth === 'open' ? 'Hide tool settings' : 'Show tool settings'} aria-expanded={depth === 'open'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily.id })}>
           {depth === 'open' ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-        </button>
+        </button></>}
       </div>}
-      {depth === 'open' && selectedVariant && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
+      {depth === 'open' && selectedVariant && !selectedVariant.soon && <section className="tool-dock-card" aria-label={`${selectedVariant.label} settings`}>
         <button type="button" className="tool-dock-grip" role="separator" aria-orientation="horizontal" aria-label="Resize tool settings" tabIndex={0} onKeyDown={onGripKey} onPointerDown={(event) => {
           const startY = event.clientY; const startHeight = height; const el = event.currentTarget;
           el.setPointerCapture(event.pointerId);
@@ -132,16 +135,17 @@ export function ToolDock({ sessionId, doc, selectedCurve = null }: { sessionId: 
     <div className="tool-dock-family" role="toolbar" aria-label={`${mode} tools`} onKeyDown={moveToolbarFocus}>
       {shownFamilies.map((family, index) => {
         const active = !!toolFor(family, currentTool, currentShape, rulerKind, brushHardness);
-        const disabled = family.variants.every((variant) => !variant.tool && !variant.soon);
+        const soonReason = family.variants.every((variant) => !variant.tool) ? family.variants.find((variant) => variant.soon)?.soon : undefined;
         return <span className={family.id.startsWith('visitor-') ? 'tool-dock-visitor' : ''} key={`${family.id}-${index}`}>
           {family.id.startsWith('visitor-') && <span className="tool-dock-separator" aria-hidden="true" />}
-          {iconButton(family.icon, family.label, active || family.id === familyId, () => {
+          {iconButton(family.icon, `${family.label}${soonReason ? ` · Soon: ${soonReason}` : ''}`, active || family.id === familyId, () => {
+            if (soonReason) return;
             if (family.id !== familyId) {
               const initial = family.variants.find((variant) => variant.tool);
               if (initial) chooseVariant(initial);
             }
             dispatch({ type: 'family', familyId: family.id });
-          }, disabled, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); })}
+          }, false, (element) => { if (element) familyButtons.current.set(family.id, element); else familyButtons.current.delete(family.id); })}
         </span>;
       })}
       <span className="tool-dock-separator" aria-hidden="true" />

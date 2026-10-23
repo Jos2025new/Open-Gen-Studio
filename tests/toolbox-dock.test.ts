@@ -38,9 +38,18 @@ describe('ToolDock real interaction', () => {
     await click('Brush');
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeTruthy();
     expect(host.querySelector('[aria-label="Brush settings"]')).toBeNull();
+    let bubbled = false;
+    const onKey = () => { bubbled = true; };
+    document.body.addEventListener('keydown', onKey);
+    const brushVariant = host.querySelector('[aria-label="Brush variants"] button[aria-label="Brush"]')!;
+    await act(async () => brushVariant.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })));
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Pencil');
+    expect(bubbled).toBe(false);
+    document.body.removeEventListener('keydown', onKey);
     await click('Pencil');
     expect(useStore.getState().ui.tool).toBe('brush');
     expect(useStore.getState().ui.brush.hardness).toBe(1);
+    expect(['Brush', 'Pencil', 'Airbrush'].filter((label) => host.querySelector(`[aria-label="Brush variants"] button[aria-label="${label}"]`)?.getAttribute('aria-pressed') === 'true')).toEqual(['Pencil']);
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
     await click('Hide tool settings');
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeNull();
@@ -82,5 +91,13 @@ describe('ToolDock real interaction', () => {
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeNull();
     await act(async () => host.querySelector('[aria-label="Brush variants"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeNull();
+  });
+
+  it('keeps Settings as a disabled, explained Soon item without showing unrelated settings', async () => {
+    const settings = host.querySelector('[aria-label^="Settings · Soon:"]') as HTMLButtonElement;
+    expect(settings?.getAttribute('aria-disabled')).toBe('true');
+    expect(settings?.title).toContain('planned');
+    await act(async () => settings.click());
+    expect(host.querySelector('.tool-dock-card')).toBeNull();
   });
 });
