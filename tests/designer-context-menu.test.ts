@@ -41,6 +41,7 @@ it('opens a family, toggles its active variant, and keeps that tool selected', a
   await click('Brush', '.tool-dock-family'); expect(variants()).toBeNull();
 });
 it('switches the settings to another tool and follows keyboard tool changes', async () => {
+  await click('Pencil'); expect(host.querySelector('[aria-label="Pencil settings"]')).toBeNull();
   await click('Pencil'); expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
   expect(useStore.getState().ui.tool).toBe('brush');
   await act(async () => setUi({ tool: 'ruler' }));
@@ -49,7 +50,7 @@ it('switches the settings to another tool and follows keyboard tool changes', as
 it('opens variants for a selected family and activates its tool', async () => {
   await click('Edit', '.tool-dock-family'); await click('Brush', '.tool-dock-family');
   expect(variants()?.getAttribute('aria-label')).toBe('Brush variants');
-  await click('Fill');
+  await click('Fill'); await click('Fill');
   expect(useStore.getState().ui.tool).toBe('fill');
   expect(host.querySelector('[aria-label="Fill settings"]')).toBeTruthy();
 });

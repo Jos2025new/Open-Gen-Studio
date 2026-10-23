@@ -48,8 +48,10 @@ describe('ToolDock real interaction', () => {
     expect(bubbled).toBe(false);
     document.body.removeEventListener('keydown', onKey);
     await click('Pencil');
+    expect(host.querySelector('[aria-label="Pencil settings"]'), 'picking a variant does not open the card').toBeNull();
     expect(useStore.getState().ui.tool).toBe('brush');
     expect(useStore.getState().ui.brush.hardness).toBe(1);
+    await click('Pencil');
     expect(['Brush', 'Pencil', 'Airbrush'].filter((label) => host.querySelector(`[aria-label="Brush variants"] button[aria-label="${label}"]`)?.getAttribute('aria-pressed') === 'true')).toEqual(['Pencil']);
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
     await click('Hide tool settings');
@@ -101,7 +103,7 @@ describe('ToolDock real interaction', () => {
 
   it('keeps the Drawing/Design switch out of the toolbox and inside the brush card', async () => {
     expect(host.querySelector('.tool-dock-family .paint-mode')).toBeNull();
-    await click('Brush'); await click('Pencil');
+    await click('Brush'); await click('Pencil'); await click('Pencil');
     expect(host.querySelector('[aria-label="Pencil settings"]')).toBeTruthy();
     expect(host.querySelectorAll('.tool-dock-card .paint-mode').length).toBe(1);
   });
@@ -120,7 +122,7 @@ describe('ToolDock real interaction', () => {
   });
 
   it('lays the brush card out as the mockup: brush on the left, every other control in tabs that keep the height', async () => {
-    await click('Brush'); await click('Pencil');
+    await click('Brush'); await click('Pencil'); await click('Pencil');
     const card = host.querySelector('.brush-card')!;
     expect(card.querySelector('.brush-card-head .paint-mode')).toBeTruthy();
     expect([...card.querySelectorAll('.brush-card-tabs .segmented button')].map((b) => b.textContent)).toEqual(['Tip', 'Stroke', 'Pressure', 'Blend']);
@@ -162,7 +164,7 @@ describe('ToolDock real interaction', () => {
   });
 
   it('size preset dots grow at every step, small sizes included, and none is capped', async () => {
-    await click('Brush'); await click('Pencil');
+    await click('Brush'); await click('Pencil'); await click('Pencil');
     const dots = [...host.querySelectorAll<HTMLElement>('.opt-presets i')].map((i) => parseFloat(i.style.width));
     expect(dots.length).toBe(14);
     for (let i = 1; i < dots.length; i++) expect(dots[i], `dot ${i}`).toBeGreaterThan(dots[i - 1]);

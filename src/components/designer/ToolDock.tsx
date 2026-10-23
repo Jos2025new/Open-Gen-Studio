@@ -68,7 +68,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
   const chooseVariant = (variant: ToolboxVariant) => {
     if (variant.soon) return;
     if (!variant.tool) {
-      if (variant.action) dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id });
+      if (variant.action) dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id, open: true });
       return;
     }
     if (variant.selectShape) setUi({ selectShape: variant.selectShape });
@@ -112,7 +112,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
       {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
           const active = !!variant.tool && variant.tool === currentTool && selectedVariant?.id === variant.id;
-          return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
+          return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
         })}
         {!selectedVariant?.soon && <><span className="tool-dock-grow" />
         <button type="button" className="icon-btn icon-btn-md tone-default" aria-label={depth === 'open' ? 'Hide tool settings' : 'Show tool settings'} aria-expanded={depth === 'open'} onClick={() => dispatch({ type: 'settings', familyId: selectedFamily.id })}>

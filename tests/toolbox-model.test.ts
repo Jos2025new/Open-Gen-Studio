@@ -20,8 +20,10 @@ describe('toolbox model', () => {
   it('reduces the three dock depths and retains the active variant on Escape', () => {
     const opened = reduceToolboxState(initialToolboxState, { type: 'family', familyId: 'brush' });
     expect(opened).toEqual({ familyId: 'brush', variantId: null, depth: 'folded' });
-    const card = reduceToolboxState(opened, { type: 'variant', familyId: 'brush', variantId: 'pencil' });
+    expect(reduceToolboxState(opened, { type: 'variant', familyId: 'brush', variantId: 'pencil' }).depth, 'picking a variant keeps the card closed').toBe('folded');
+    const card = reduceToolboxState(opened, { type: 'variant', familyId: 'brush', variantId: 'pencil', open: true });
     expect(card).toEqual({ familyId: 'brush', variantId: 'pencil', depth: 'open' });
+    expect(reduceToolboxState(card, { type: 'variant', familyId: 'brush', variantId: 'airbrush' }).depth, 'an open card stays open').toBe('open');
     expect(reduceToolboxState(card, { type: 'escape' })).toEqual({ ...card, depth: 'folded' });
     const folded = reduceToolboxState(card, { type: 'family', familyId: 'brush' });
     expect(folded.depth).toBe('closed');

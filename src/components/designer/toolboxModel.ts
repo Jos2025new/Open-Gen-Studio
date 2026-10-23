@@ -39,13 +39,13 @@ export function toolboxTools(): DesignTool[] {
 }
 
 export type ToolboxState = { familyId: string | null; variantId: string | null; depth: 'closed' | 'folded' | 'open' };
-export type ToolboxAction = { type: 'family'; familyId: string } | { type: 'variant'; familyId: string; variantId: string } | { type: 'settings'; familyId: string } | { type: 'escape' };
+export type ToolboxAction = { type: 'family'; familyId: string } | { type: 'variant'; familyId: string; variantId: string; open?: boolean } | { type: 'settings'; familyId: string } | { type: 'escape' };
 export const initialToolboxState: ToolboxState = { familyId: null, variantId: null, depth: 'closed' };
 
-/** Transitions for the family → variants → full settings interaction. */
+/** Transitions for the family → variants → full settings interaction. Picking a variant only changes the tool: the card keeps its open/closed state (opened by the chevron, a second click on the active variant, or a variant that is only settings, like Sizes). */
 export function reduceToolboxState(state: ToolboxState, action: ToolboxAction): ToolboxState {
   if (action.type === 'escape') return state.depth === 'open' ? { ...state, depth: 'folded' } : state.depth === 'folded' ? { ...state, depth: 'closed' } : state;
-  if (action.type === 'variant') return { familyId: action.familyId, variantId: action.variantId, depth: 'open' };
+  if (action.type === 'variant') return { familyId: action.familyId, variantId: action.variantId, depth: action.open || state.depth === 'open' ? 'open' : 'folded' };
   if (action.type === 'settings') return { ...state, familyId: action.familyId, depth: state.depth === 'open' ? 'folded' : 'open' };
   if (action.familyId !== state.familyId || state.depth === 'closed') return { familyId: action.familyId, variantId: null, depth: 'folded' };
   return { ...state, depth: 'closed' };
