@@ -84,15 +84,14 @@ export function designerKey(e: KeyboardEvent, sessionId: string, doc: DesignDoc 
     const pk = objectPick(doc.id);
     if (pk && pickedHere(doc)) { if (!nudgeObjects(sessionId, doc.id, pk.layerId, pk.ids, ux * k, uy * k)) toast(`"${layer.name}" is locked. Unlock it to move it.`, 'info'); }
     else window.dispatchEvent(new CustomEvent('ogs:pan', { detail: { ux, uy, shift: e.shiftKey } }));
-    if ((e.key === 'Delete' || e.key === 'Backspace') && layer) {
-      // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
-      e.preventDefault();
-      const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
-      const kept = deleteLayers(sessionId, doc.id, ids);
-      if (kept) toast(kept === ids.length ? `"${layer.name}" is locked. Unlock it to delete it.` : `${kept} locked layer${kept === 1 ? '' : 's'} kept.`, 'info');
-    } else {
-      const tool = DESIGN_TOOL_KEYS[e.key.toLowerCase()];
-      if (tool && (!tools || tools.has(tool)) && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }
-    }
+  } else if (!mod && !e.altKey && (e.key === 'Delete' || e.key === 'Backspace') && layer) {
+    // Delete or Backspace: every picked layer at once (one undo step); locked ones stay.
+    e.preventDefault();
+    const ids = layerSelection(doc.id, doc.activeLayerId, doc.layers.map((l) => l.id));
+    const kept = deleteLayers(sessionId, doc.id, ids);
+    if (kept) toast(kept === ids.length ? `"${layer.name}" is locked. Unlock it to delete it.` : `${kept} locked layer${kept === 1 ? '' : 's'} kept.`, 'info');
+  } else if (!mod && !e.altKey && !e.shiftKey && DESIGN_TOOL_KEYS[e.key.toLowerCase()]) {
+    const tool = DESIGN_TOOL_KEYS[e.key.toLowerCase()];
+    if ((!tools || tools.has(tool)) && !toolBlockReason(tool, layer)) { e.preventDefault(); setUi({ tool }); }
   }
 }
