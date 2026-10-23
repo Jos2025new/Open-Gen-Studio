@@ -65,7 +65,7 @@ describe('the Designer view of the Studio board', () => {
     expect(getStudioBoard().view).toBe('designer');
     expect(useStore.getState().ui.workspace).toBe(ws);
     expect(q('.studio-designer .stage')).not.toBeNull();
-    for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Pen', 'Shapes', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
+    for (const label of ['File', 'Undo', 'Redo', 'Zoom in', 'Zoom out', 'Fit canvas', 'Select and move', 'Pen', 'Edit', 'Eraser', 'Text', 'Layers']) expect(q(`[aria-label="${label}"]`), label).not.toBeNull();
     expect(q('[aria-label^="Pan"]')).not.toBeNull();
     // Top bar keeps: select · hand · undo · redo · zoom − · % · zoom + · fit; the bottom bar has no select/hand.
     expect([...document.querySelectorAll('.studio-designer-tools [aria-label]')].map((b) => b.getAttribute('aria-label'))).toEqual(['Select and move', 'Pan (or hold Space and drag)', 'Undo', 'Redo', 'Zoom out', 'Zoom in', 'Fit canvas']);
@@ -97,7 +97,7 @@ describe('the Designer view of the Studio board', () => {
     const tool = () => useStore.getState().ui.tool;
     const dock = () => q('.studio-palette .tool-dock')!;
     const pick = (label: string) => act(() => [...dock().querySelectorAll<HTMLElement>(`button[aria-label="${label}"]`)].at(-1)!.click());
-    expect([...dock().querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Shapes', 'Pen', 'Eraser', 'Text']);
+    expect([...dock().querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Pen', 'Eraser', 'Text']);
     pick('Pen'); pick('Lineart');
     expect(tool()).toBe('lineart');
     expect(dock().querySelector('[aria-label="Pen variants"] button[aria-label="Bezier pen"]')).toBeNull();
@@ -111,9 +111,9 @@ describe('the Designer view of the Studio board', () => {
     expect((bar.querySelector('button[aria-label="Color"]') as HTMLButtonElement | null)?.disabled).toBe(true);
     pick('Text');
     expect(tool()).toBe('text');
-    pick('Shapes'); pick('Rectangle');
+    pick('Edit'); pick('Rectangle');
     expect(tool()).toBe('rect');
-    expect(dock().querySelector('[aria-label="Shapes variants"] button[aria-label="Arrow"]')).not.toBeNull();
+    expect(dock().querySelector('[aria-label="Edit variants"] button[aria-label="Arrow"]')).not.toBeNull();
     for (const no of ['Brush', 'Ruler', 'Layout']) expect(dock().querySelector(`[aria-label="Tools"] button[aria-label="${no}"]`), no).toBeNull();
     act(() => q('[aria-label="Select and move"]')!.click());
     expect(tool()).toBe('move');

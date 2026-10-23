@@ -60,14 +60,13 @@ describe('ToolDock real interaction', () => {
     expect(host.querySelector('[aria-label="Brush variants"]')).toBeTruthy();
   });
 
-  it('selects actual shape tools from the variant row', async () => {
+  it('selects actual shape tools from the Edit row: the shapes live with Edit and Pan, there is no Shapes family', async () => {
     doc = { ...doc, paintMode: 'design' };
     await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc })));
-    await click('Shapes');
+    expect(host.querySelector('[aria-label="Tools"] [aria-label="Shapes"]')).toBeNull();
+    expect([...host.querySelectorAll('[aria-label="Edit variants"] > span > button')].map((b) => b.getAttribute('aria-label')).slice(0, 4)).toEqual(['Edit', 'Pan', 'Rectangle', 'Ellipse']);
     await click('Rectangle');
     expect(useStore.getState().ui.tool).toBe('rect');
-    await click('Shapes');
-    await click('Shapes');
     await click('Ellipse');
     expect(useStore.getState().ui.tool).toBe('ellipse');
   });
@@ -77,7 +76,7 @@ describe('ToolDock real interaction', () => {
     const drawing = ids();
     await act(async () => { setUi({ tool: 'rect' }); root.render(createElement(ToolDock, { sessionId: 'test', doc: { ...doc, paintMode: 'design' } })); });
     expect(ids()).toEqual(drawing);
-    expect(host.querySelector('[aria-label="Shapes"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('[aria-label="Tools"] [aria-label="Edit"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(doc.paintMode).toBe('drawing');
   });
 
@@ -135,9 +134,8 @@ describe('ToolDock real interaction', () => {
   it('limits the families and variants to the tools it is given (Studio\'s board) and has no Layout, Brush or Settings then', async () => {
     const tools = new Set(['move', 'hand', 'lineart', 'eraser', 'text', 'rect']) as unknown as ReadonlySet<never>;
     await act(async () => root.render(createElement(ToolDock, { sessionId: 'test', doc, tools })));
-    expect([...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Shapes', 'Pen', 'Eraser', 'Text']);
-    await click('Shapes');
-    expect([...host.querySelectorAll('[aria-label="Shapes variants"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Rectangle']);
+    expect([...host.querySelectorAll('[aria-label="Tools"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Pen', 'Eraser', 'Text']);
+    expect([...host.querySelectorAll('[aria-label="Edit variants"] > span > button')].map((b) => b.getAttribute('aria-label'))).toEqual(['Edit', 'Pan', 'Rectangle']);
   });
 
   it('Edit card follows the selection: one shows Transform and Align, two or more add Distribute and disabled Soon Boolean and Form builder', async () => {
