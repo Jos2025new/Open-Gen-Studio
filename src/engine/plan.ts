@@ -953,6 +953,15 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   if (style) {
     for (const st of steps) applyPlanStyle(st, style);
   }
+  // A node gives one chosen output to all its links, so on the board one step cannot feed two of its candidates.
+  if (ctx.workspace === 'node') {
+    const picks = new Map<string, Set<number>>();
+    for (const st of steps) for (const r of stepDeps(st)) {
+      const p = parseRef(r);
+      if (p?.type === 'step') picks.set(p.id, (picks.get(p.id) ?? new Set()).add(p.index));
+    }
+    for (const [id, used] of picks) if (used.size > 1) errors.push(`${id}: later steps use different results of it (${[...used].sort((a, b) => a - b).map((i) => `${id}#${i + 1}`).join(', ')}), but on the Node board a node passes one chosen result to all its links. Fix: make each wanted result its own step (count 1), and link each one where it is used.`);
+  }
   // Candidates end a plan: no later step may take one of several results the user has not picked (not in Nodes).
   if (ctx.workspace !== 'node') {
     // Steps with count > 1, and ops that make several.

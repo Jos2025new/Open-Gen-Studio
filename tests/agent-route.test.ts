@@ -60,6 +60,27 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(errors.join(' ')).toMatch(/up to 20 characters \(this one has 21\).*\[PROMPT_TOO_LONG\]/);
   });
 
+  it('in Nodes, one step cannot feed two of its candidates: a node passes one chosen result (audit E5-01)', async () => {
+    const model = { ref: 'fal::img', provider: 'fal', id: 'img', name: 'Img', kind: 'image', acceptsText: true, tags: [] } as never;
+    const ctx: PlanContext = {
+      workspace: 'node',
+      getModel: async () => ({ model, schema: { ref: 'fal::img', params: [], slots: { prompt: 'prompt', images: { param: 'images', max: 4 } }, source: 'openapi' } as never }),
+      defaultModel: () => 'fal::img',
+      defaultSettings: () => ({}),
+      asset: () => undefined,
+      layer: () => undefined,
+    };
+    const plan = (a: string, b: string) => ({ title: 't', steps: [
+      { id: 's1', kind: 'image', prompt: 'a face', count: 2 },
+      { id: 's2', kind: 'image', prompt: 'the face, smiling', refs: [a] },
+      { id: 's3', kind: 'image', prompt: 'the face, serious', refs: [b] },
+    ] });
+    const split = await normalizePlan(plan('s1#1', 's1#2') as never, ctx, 'p');
+    expect(split.errors.join(' ')).toMatch(/s1: later steps use different results of it \(s1#1, s1#2\)/);
+    const same = await normalizePlan(plan('s1#2', 's1#2') as never, ctx, 'p');
+    expect(same.errors.join(' ')).not.toMatch(/different results/);
+  });
+
   it('counts the plan style, which is appended to the prompt after validation (audit E3-02)', async () => {
     const model = { ref: 'fal::m', provider: 'fal', id: 'm', name: 'M', kind: 'video', acceptsText: true, tags: [] } as never;
     const ctx: PlanContext = {
