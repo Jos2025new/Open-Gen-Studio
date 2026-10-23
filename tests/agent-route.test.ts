@@ -60,6 +60,22 @@ describe('reference protocols, model fit and prompt limits (R3)', () => {
     expect(errors.join(' ')).toMatch(/up to 20 characters \(this one has 21\).*\[PROMPT_TOO_LONG\]/);
   });
 
+  it('counts the plan style, which is appended to the prompt after validation (audit E3-02)', async () => {
+    const model = { ref: 'fal::m', provider: 'fal', id: 'm', name: 'M', kind: 'video', acceptsText: true, tags: [] } as never;
+    const ctx: PlanContext = {
+      workspace: 'chat',
+      getModel: async () => ({ model, schema: { ref: 'fal::m', params: [], slots: { prompt: 'prompt', promptMax: 30 }, source: 'openapi' } }),
+      defaultModel: () => 'fal::m',
+      defaultSettings: () => ({}),
+      asset: () => undefined,
+      layer: () => undefined,
+    };
+    const fits = await normalizePlan({ title: 't', steps: [{ id: 's1', kind: 'video', prompt: 'x'.repeat(20) }] }, ctx, 'p');
+    expect(fits.errors.join(' ')).not.toMatch(/PROMPT_TOO_LONG/);
+    const { errors } = await normalizePlan({ title: 't', style: 'warm film', steps: [{ id: 's1', kind: 'video', prompt: 'x'.repeat(20) }] }, ctx, 'p');
+    expect(errors.join(' ')).toMatch(/this one has 38, with the plan style\).*\[PROMPT_TOO_LONG\]/);
+  });
+
   it('each model of the purpose table gets its fit line, other models none', () => {
     expect(modelFit('minimax/h3-max-turbo/text-to-video')).toMatch(/drafts/);
     expect(modelFit('minimax/h3-developer/image-to-video')).toMatch(/normal clips \(cheapest/);

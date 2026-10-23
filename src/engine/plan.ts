@@ -704,7 +704,10 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
         if (cited && !refs.length && !s.first_frame && !s.last_frame) errors.push(`${where}: the prompt cites "${cited}" but the step has no refs, so the model would invent it. Fix: put that image in refs (asset:<id> or a step id), or drop the citation if the step is really made from text.`);
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required. Fix: write "prompt" (what happens and how it looks).`);
-        if (schema.slots.promptMax && prompt.length > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${prompt.length}). Shorten it. [PROMPT_TOO_LONG]`);
+        // Measured as sent: the plan style is appended to every image and video prompt after this check.
+        const planStyle = (kind === 'image' || kind === 'video') && raw.style?.trim() && !prompt.includes(raw.style.trim()) ? `\n\nStyle: ${raw.style.trim()}` : '';
+        const sentLength = prompt.length + planStyle.length;
+        if (schema.slots.promptMax && sentLength > schema.slots.promptMax) errors.push(`${where}: model "${modelRef}" takes prompts up to ${schema.slots.promptMax} characters (this one has ${sentLength}${planStyle ? ', with the plan style' : ''}). Shorten it${planStyle ? ' or the style' : ''}. [PROMPT_TOO_LONG]`);
         if (kind === 'model3d') {
           if (videoRefs.length || audioRefs.length) errors.push(`${where}: 3D models take only images in refs.`);
           // Sizes are checked by the job runner once the images exist.
