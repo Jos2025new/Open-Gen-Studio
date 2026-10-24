@@ -2,13 +2,16 @@ import type { UiState } from './store';
 import { PAGE_UNITS, type PageUnit } from '../engine/design/pageUnits';
 
 /** Canvas size card: the unit the page is shown in and the DPI used for mm/in. */
-export interface PageUiPrefs { pageUnit?: PageUnit; pageDpi?: number }
+export interface PageUiPrefs { pageUnit?: PageUnit; pageDpi?: number; showGuides?: boolean; lockGuides?: boolean }
 
 /** A loaded value that is not a known unit / a DPI in 1..1200 is dropped (the card then uses px / 96). */
 export function sanitizeUi<T extends PageUiPrefs>(ui: T): T {
   const unit = PAGE_UNITS.includes(ui.pageUnit as PageUnit) ? ui.pageUnit : undefined;
   const dpi = typeof ui.pageDpi === 'number' && Number.isFinite(ui.pageDpi) && ui.pageDpi >= 1 && ui.pageDpi <= 1200 ? ui.pageDpi : undefined;
-  return { ...ui, pageUnit: unit, pageDpi: dpi };
+  // Guide flags are booleans only; anything else falls back to the defaults (shown, unlocked).
+  const showGuides = typeof ui.showGuides === 'boolean' ? ui.showGuides : true;
+  const lockGuides = typeof ui.lockGuides === 'boolean' ? ui.lockGuides : false;
+  return { ...ui, pageUnit: unit, pageDpi: dpi, showGuides, lockGuides };
 }
 
 /**

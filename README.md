@@ -190,7 +190,7 @@ También están en **Settings → Shortcuts**. «Mod» es Ctrl, o ⌘ en Mac. Mi
 | Ctrl+Shift+I | Invert the selection |
 | Ctrl+J | Selected pixels to a new layer |
 | Ctrl+G | Group the selected layers |
-| Shift+R | Show or hide rulers and guides |
+| Shift+R | Show or hide rulers |
 | Delete (with a selection) | Erase the selected pixels |
 | Mod + Z | Undo |
 | Mod + Shift + Z | Redo |

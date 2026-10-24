@@ -18,28 +18,44 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
   const [anchor, setAnchor] = useState<Anchor>('middle-center');
   const unit = useStore((s) => s.ui.pageUnit ?? 'px'), dpi = useStore((s) => s.ui.pageDpi ?? DEFAULT_DPI);
   const setUnit = (v: PageUnit) => setUi({ pageUnit: v });
-  const setDpi = (v: number) => setUi({ pageDpi: v });
-  const [preset, setPreset] = useState('custom');
-  const [bg, setBg] = useState(doc.background ?? '#ffffff');
+  const [bgEdit, setBgEdit] = useState<string | null>(null);
+  const bg = bgEdit ?? doc.background ?? '#ffffff';
+  const [ratio, setRatio] = useState(doc.height ? doc.width / doc.height : 1);
   const dp = Math.max(1, dpi || DEFAULT_DPI);
+  /** The preset whose size (either orientation) is the current one at this DPI; otherwise Custom. */
+  const presetAt = (pw: number, ph: number, d: number) => FORMAT_PRESETS.find((f) => { const px = presetPx(f, d); return (px.w === pw && px.h === ph) || (px.w === ph && px.h === pw); });
+  const preset = presetAt(w, h, dp)?.id ?? 'custom';
+  /** A paper preset keeps its size in mm: a new DPI recalculates its px, same orientation; other sizes keep their px. */
+  const setDpi = (v: number) => {
+    const active = FORMAT_PRESETS.find((f) => f.id === preset);
+    if (active?.mm) {
+      const px = presetPx(active, Math.max(1, v || DEFAULT_DPI));
+      const land = orientationOf(w, h) === 'landscape';
+      const nw = land ? px.h : px.w, nh = land ? px.w : px.h;
+      setW(nw); setH(nh); setRatio(nw / nh);
+    }
+    setUi({ pageDpi: v });
+  };
   const step = unit === 'px' ? 1 : unit === 'in' ? 0.01 : 0.1;
   const open = () => { setW(doc.width); setH(doc.height); pop.toggle(); };
   const done = (err: string | null) => { if (err) toast(err, 'error'); else pop.close(); };
   useEffect(() => { if (inline) { setW(doc.width); setH(doc.height); } }, [inline, doc.width, doc.height]);
-  const setWidth = (v: number) => { setPreset('custom'); setW(v); if (lock && doc.width) setH(Math.round((v * doc.height) / doc.width)); };
-  const setHeight = (v: number) => { setPreset('custom'); setH(v); if (lock && doc.height) setW(Math.round((v * doc.width) / doc.height)); };
+  useEffect(() => { setBgEdit(null); }, [doc.background]);
+  const setWidth = (v: number) => { setW(v); if (lock) setH(Math.round(v / ratio)); };
+  const setHeight = (v: number) => { setH(v); if (lock) setW(Math.round(v * ratio)); };
   const pickPreset = (id: string) => {
-    setPreset(id);
     const p = FORMAT_PRESETS.find((f) => f.id === id);
     if (!p) return;
     const px = presetPx(p, dp);
-    const land = orientationOf(w, h) === 'landscape';
-    setW(land ? px.h : px.w); setH(land ? px.w : px.h);
+    // Match the page's orientation by comparing the preset's own W and H (HD/4K are landscape, Story is portrait); a square page takes the preset as is.
+    const swap = w !== h && orientationOf(px.w, px.h) !== orientationOf(w, h);
+    const nw = swap ? px.h : px.w, nh = swap ? px.w : px.h;
+    setW(nw); setH(nh); setRatio(nw / nh);
   };
-  const orient = (o: Orientation) => { if (o !== orientationOf(w, h)) { setW(h); setH(w); } };
+  const orient = (o: Orientation) => { if (o !== orientationOf(w, h)) { setW(h); setH(w); setRatio(h / w); } };
   const apply = () => {
     const err = resizeCanvas(sessionId, doc.id, w, h, anchor);
-    if (!err && bg !== (doc.background ?? '#ffffff')) mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: bg }));
+    if (!err && bgEdit !== null && bgEdit !== (doc.background ?? '#ffffff')) mutateDoc(sessionId, doc.id, (d) => ({ ...d, background: bgEdit }));
     done(err);
   };
   const form = <div className="canvas-size">
@@ -50,8 +66,8 @@ export function CanvasSize({ sessionId, doc, inline = false }: { sessionId: stri
         <label>H<input type="number" min={step} step={step} value={pxToUnit(h, unit, dp)} onChange={(e) => setHeight(Math.min(MAX_SIDE, unitToPx(+e.target.value, unit, dp)))} /></label>
         <Segmented size="sm" value={unit} options={PAGE_UNITS.map((u) => ({ value: u, label: u }))} onChange={setUnit} />
         {unit !== 'px' && <label>DPI<input type="number" min={1} max={1200} value={dpi} onChange={(e) => setDpi(+e.target.value)} /></label>}
-        <InlineColor label="Page color" value={bg} onChange={setBg} />
-        <label className="check-row"><input type="checkbox" checked={lock} onChange={(e) => setLock(e.target.checked)} />Keep ratio</label>
+        <InlineColor label="Page color" value={bg} onChange={setBgEdit} />
+        <label className="check-row"><input type="checkbox" checked={lock} onChange={(e) => { setLock(e.target.checked); if (e.target.checked && h) setRatio(w / h); }} />Keep ratio</label>
       </div>
       <span className="field-label">Anchor · where the current page stays</span>
       <div className="anchor-grid" role="radiogroup" aria-label="Anchor">

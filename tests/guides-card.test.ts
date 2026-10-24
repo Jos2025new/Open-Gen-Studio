@@ -53,4 +53,11 @@ describe('Layout → Guides', () => {
     undoDoc(sid, id);
     expect(getDoc(sid, id)!.guides!.x.length).toBe(3);
   });
+  it('Snap to guides turns general Snap on too (Drawing default) and shows as on', async () => {
+    const snapSw = () => [...host.querySelectorAll('button[role="switch"]')].find((x) => x.textContent === 'Snap to guides') as HTMLElement;
+    expect(snapSw().getAttribute('aria-checked')).toBe('false');
+    await act(async () => snapSw().click()); await render();
+    expect(snapSw().getAttribute('aria-checked')).toBe('true');
+    expect(useStore.getState().ui.snapByMode?.drawing?.on).toBe(true);
+  });
 });

@@ -22,14 +22,14 @@ export function GuidesCard({ sessionId, doc }: { sessionId: string; doc: DesignD
     const span = axis === 'x' ? doc.width : doc.height;
     placeGuide(sessionId, doc.id, axis, unit === '%' ? (pos / 100) * span : pos);
   };
-  // Same per-mode snap setting as the Snap menu; guides snapping only matters while snapping is on.
-  const setSnapGuides = (on: boolean) => setUi({ snapByMode: { ...byMode, [paintModeOf(doc)]: { ...snap, guides: on } } });
+  // Same per-mode snap setting as the Snap menu; turning guides on also turns general Snap on, since it does nothing otherwise.
+  const setSnapGuides = (on: boolean) => setUi({ snapByMode: { ...byMode, [paintModeOf(doc)]: { ...snap, guides: on, ...(on ? { on: true } : {}) } } });
   return <div className="guides-card">
     <div className="guides-col">
       <InlineToggle label="Show rulers" tip="Shift+R" checked={rulers} onChange={(v) => setUi({ rulers: v })} />
       <InlineToggle label="Show guides" checked={show} onChange={(v) => setUi({ showGuides: v })} />
       <InlineToggle label="Lock guides" tip="Edit cannot move or remove locked guides" checked={lock} onChange={(v) => setUi({ lockGuides: v })} />
-      <InlineToggle label="Snap to guides" tip={snap.on ? undefined : 'Turn on Snap while moving to use it'} checked={snap.on && snap.guides !== false} onChange={setSnapGuides} />
+      <InlineToggle label="Snap to guides" checked={snap.on && snap.guides !== false} onChange={setSnapGuides} />
     </div>
     <div className="guides-col">
       <InlineChoice<GuideAxis> label="Orientation" value={axis} options={[{ value: 'x', label: 'Vertical' }, { value: 'y', label: 'Horizontal' }]} onChange={setAxis} />
