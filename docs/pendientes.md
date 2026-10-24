@@ -19,7 +19,7 @@ Lista única de lo que sigue abierto, ordenada por prioridad y con la **fecha de
    - Trim: capa de pintura vacía, rectángulo con trazo grueso, contenido > 8192 px (se rechaza con mensaje).
    - SVG con Glow: aviso; trazo de degradado semitransparente igual que en el editor.
    - Clic en la esquina de la caja de una elipse y dentro de un bucle libre no selecciona; cerca de una línea diagonal sí.
-   - D30: icono de aviso en Layers con tooltip, al pulsar reintenta.
+   - D30: icono de aviso en Layers con tooltip, al pulsar reintenta; pintar en ella avisa y no guarda nada.
    - Opcional: borrar el «Design 1» de prueba del sandbox.
 4. **A3 y A4 · La tarjeta Keep/Change no nombra los dos proveedores y la prueba visual quedó a medias** (2026-10-21). Única falla del informe; 13 de 14 pruebas sin ver. Sin eso, ADR 0025 no está verificado en pantalla. [detalle](pendientes-agente.md)
 5. **A5 · DeepSeek V4.1 Flash repite un plan roto sin `prompt`** (2026-10-21): la app debería cortar y decirlo, sin cambiar de modelo sola. [detalle](pendientes-agente.md)
