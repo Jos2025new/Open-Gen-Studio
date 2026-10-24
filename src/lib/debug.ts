@@ -55,6 +55,8 @@ export function imageSize(b: Uint8Array): { width: number; height: number } | un
   return undefined;
 }
 
+const WHOLE_JPEG_CHARS = 5_592_408;
+
 /** "<image 1376×768, 1.2 MB>" read from the data itself, so each image of a request is named for what it is. */
 function inlineLabel(value: string): string | undefined {
   const prefix = /^data:([\w/+.-]+);base64,/.exec(value);
@@ -65,8 +67,11 @@ function inlineLabel(value: string): string | undefined {
   };
   let dims: { width: number; height: number } | undefined;
   try {
-    // The first ~64 KB hold the header almost always; a JPEG whose metadata (EXIF, ICC) runs past them is read whole.
-    dims = imageSize(decode(87_380)) ?? (b64.length > 87_380 ? imageSize(decode(b64.length)) : undefined);
+    // The first ~64 KB hold the header almost always; a JPEG whose metadata (EXIF, ICC) runs past them is read
+    // further, up to ~4 MB. Video, audio or anything larger is never decoded whole: this runs on every logged request.
+    const head = decode(87_380);
+    dims = imageSize(head);
+    if (!dims && head[0] === 0xff && head[1] === 0xd8 && b64.length > 87_380) dims = imageSize(decode(Math.min(b64.length, WHOLE_JPEG_CHARS)));
   } catch {
     return undefined;
   }
