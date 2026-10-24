@@ -38,7 +38,7 @@ export function studioLine(): string[] {
   if (useStore.getState().ui.workspace !== 'chat') return [];
   const b = getStudioBoard();
   const shows = !b.open ? 'closed' : b.view === 'nodes' ? 'Nodes (the node canvas is your canvas now)' : b.view === 'designer' ? 'the Designer (the designer canvas is your canvas now)' : 'Generations (the chat canvas)';
-  return [`You are in Studio (chat). The board shows: ${shows}.`];
+  return [`You are in Studio (chat). The board shows: ${shows}. Asked where you are, say Studio${b.open && b.view !== 'assets' ? `, with the board on ${b.view === 'nodes' ? 'Nodes' : 'the Designer'}` : ''}; the conversation is one, whatever the board shows.`];
 }
 
 export const openBoardSchema = z.object({ view: z.enum(['assets', 'nodes', 'designer', 'closed']) }).strict();

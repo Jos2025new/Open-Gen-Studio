@@ -129,8 +129,13 @@ function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentSt
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...(typeof patch === 'function' ? patch(s.agent) : patch) } }));
 }
 
+/** Where a row is shown: Studio's chat keeps every row as chat; its board only says where the agent works (agentCanvas). */
+const rowCanvas = (workspace: Workspace): Workspace => (get().ui.workspace === 'chat' ? 'chat' : workspace);
+/** Where a turn resumed from a row works: a chat row, where the Studio board is now. */
+const turnCanvas = (workspace: Workspace): Workspace => (workspace === 'chat' ? agentCanvas() : workspace);
+
 function feedBase(workspace: Workspace) {
-  return { id: uid('fd'), createdAt: Date.now(), workspace };
+  return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
 }
 
 function notice(sessionId: string, workspace: Workspace, text: string, level: 'info' | 'error' = 'error', retry?: NoticeFeedItem['retry']): void {
@@ -187,7 +192,7 @@ function toCanvas(sessionId: string, workspace: Workspace): void {
 /** The conversation of the canvas a feed item belongs to. */
 function toCanvasOfItem(sessionId: string, itemId: string): void {
   const item = session(sessionId)?.feed.find((f) => f.id === itemId);
-  if (item) toCanvas(sessionId, item.workspace);
+  if (item) toCanvas(sessionId, turnCanvas(item.workspace));
 }
 
 /** What the user wrote in this session (messages and answers): a model named there is the user's choice. */
@@ -262,7 +267,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   const pending = s.agent.pending;
   // A card waiting on another canvas closes as superseded.
-  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && f.workspace === workspace) : undefined;
+  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && f.workspace === rowCanvas(workspace)) : undefined;
 
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
@@ -396,7 +401,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   if (!item || item.type !== 'questions' || item.status !== 'pending') return;
   updateFeedItem<QuestionsFeedItem>(sessionId, itemId, { status: 'answered', answers });
   recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'questions.answered', reason: `answers submitted via ${how}`, sessionId, approvalId: itemId, before: { status: 'pending' }, after: { status: 'answered', answeredIds: item.questions.filter((q) => answers[q.id]?.trim()).map((q) => q.id), hasNote: Boolean(answers.note?.trim()) } });
-  const workspace = item.workspace;
+  const workspace = turnCanvas(item.workspace);
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined });
   const engine = agentEngine();
@@ -427,16 +432,16 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
   patchAgent(sessionId, { pending: undefined, questionRound: get().settings.guidedRounds });
   const engine = agentEngine();
   if (engine.kind === 'llm' && pending?.toolCallId) {
-    const ctx = buildContext(session(sessionId), contextOpts(sessionId, item.workspace, s.agent.draft?.attachments ?? []));
+    const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
     pushHistory(sessionId, {
       role: 'tool',
       tool_call_id: pending.toolCallId,
       content: `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`,
     });
-    await llmTurn(sessionId, item.workspace);
+    await llmTurn(sessionId, turnCanvas(item.workspace));
     return;
   }
-  await offlineTurn(sessionId, item.workspace);
+  await offlineTurn(sessionId, turnCanvas(item.workspace));
 }
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
@@ -458,9 +463,9 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   patchAgent(sessionId, (a) => confirmedState(a, item, sections));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
-  const ctx = buildContext(session(sessionId), contextOpts(sessionId, item.workspace, s.agent.draft?.attachments ?? []));
+  const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
   pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` });
-  await llmTurn(sessionId, item.workspace);
+  await llmTurn(sessionId, turnCanvas(item.workspace));
 }
 
 /**
@@ -475,7 +480,7 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
   if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine().kind !== 'llm') return;
   if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
   removeFeedItem(sessionId, noticeId);
-  await llmTurn(sessionId, item.workspace);
+  await llmTurn(sessionId, turnCanvas(item.workspace));
 }
 
 /** Stop the agent of the given session (by default the one on screen). */
@@ -1096,7 +1101,7 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   drainAgentNotes(sessionId);
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
 ${WRAPUP_RULE}`, []));
-  await llmTurn(sessionId, item.workspace, { textOnly: true });
+  await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -1270,7 +1275,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
   patchAgent(sessionId, { busy: true, phase: 'working' });
-  const log = activityLog(sessionId, workspace);
+  const log = activityLog(sessionId, rowCanvas(workspace));
   const showThinking = get().settings.agent.showThinking !== false;
   const controller = new AbortController();
   controllers.set(sessionId, controller);
@@ -1446,7 +1451,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         if (!result.text.trim()) {
           const cut = result.finishReason === 'length';
           notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {});
-        } else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, workspace)) {
+        } else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, rowCanvas(workspace))) {
           appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level: 'info', text: 'The agent replied without a plan.', proposePlan: true });
         }
         return;
@@ -1500,7 +1505,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
           }
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, workspace, call.id, v.data.summary, sections, parts) + sections.map((x) => resolutionNote(x.recommended.modelRef, offerRequest(ag()))).join('')); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts) + sections.map((x) => resolutionNote(x.recommended.modelRef, offerRequest(ag()))).join('')); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);

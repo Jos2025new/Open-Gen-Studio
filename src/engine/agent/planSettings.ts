@@ -45,7 +45,7 @@ function inlineSection(feed: FeedItem[], planId: string, kind: GenKind): { item:
 
 /** The card's sections, read from the plan's own steps (one per kind, images first); empty outside Auto. */
 export function planSections(feed: FeedItem[], plan: PlanFeedItem): SettingsSection[] {
-  if (plan.style !== 'auto' || plan.nodeRun || plan.workspace === 'node') return [];
+  if (plan.style !== 'auto' || plan.nodeRun || plan.plan.workspace === 'node') return [];
   const out: SettingsSection[] = [];
   for (const kind of ['image', 'video'] as const) {
     const steps = plan.plan.steps.filter(isGen).filter((s) => s.kind === kind);
