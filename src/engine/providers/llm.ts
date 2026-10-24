@@ -285,8 +285,8 @@ export async function chat(opts: {
   const body: Record<string, unknown> = {
     model: opts.model,
     messages: [{ role: 'system', content: opts.system }, ...withoutDetails(opts.messages, opts.provider)],
-    tools: opts.tools,
-    tool_choice: 'auto',
+    // A call without tools (the plan card's prompt rewrite) sends none: some providers reject an empty list.
+    ...(opts.tools.length ? { tools: opts.tools, tool_choice: 'auto' } : {}),
     stream: true,
     max_tokens: 16000,
   };

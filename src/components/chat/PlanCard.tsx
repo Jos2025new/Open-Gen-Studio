@@ -1,6 +1,6 @@
 import { previewRun } from '../../engine/flow/actions';
 import { useEffect, useState } from 'react';
-import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound } from 'lucide-react';
+import { Box, Check, ChevronDown, ChevronRight, CircleAlert, Film, Image as ImageIcon, LoaderCircle, Minus, Music, Type, Wand, Layers, ArrowRight, UserRound, RotateCw } from 'lucide-react';
 import { approvePlan, cancelPlan, resolveStepCostReview, sendAgentMessage } from '../../engine/agent/runtime';
 import { cancelGeneration } from '../../engine/jobs';
 import { plannedSpend, spentLabel } from './planSpent';
@@ -18,7 +18,9 @@ import { formatUsd } from '../../lib/format';
 import { setUi, updateFeedItem, useStore } from '../../store/store';
 import { priceMargin } from '../../engine/priceAuthorization';
 import { PlanRecoveryChips } from './RecoveryActions';
-import { Button, costLabel } from '../ui/primitives';
+import { Button, IconButton, costLabel } from '../ui/primitives';
+import { planSections, recheckPlanPrice, usePlanRewrite } from '../../engine/agent/planSettings';
+import { PlanSettings, RewriteFailed } from './PlanSettings';
 import { AspectShape } from './aspectShape';
 import { Collapsible, EditLine, RefThumb, SuggestBox, SuggestButton } from './PlanParts';
 import { ResultThumb, StepThumb } from './StepThumb';
@@ -141,6 +143,11 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const reused = useStore((s) => reusedDraft(s.sessions[sessionId]?.feed ?? [], item.id));
   const { plan } = item;
   const awaiting = item.status === 'awaiting';
+  // Auto: the settings card's choices live on this card; changing the model rewrites its prompts here.
+  const feed = useStore((s) => s.sessions[sessionId]?.feed);
+  const sections = awaiting ? planSections(feed ?? [], item) : [];
+  const rewriting = usePlanRewrite((s) => Boolean(s.busy[item.id]));
+  const rewriteFailed = usePlanRewrite((s) => s.failed[item.id]);
   const nodePreview = awaiting && item.nodeRun ? previewRun(sessionId, item.nodeRun.targets, item.nodeRun.force) : null;
   useEffect(() => {
     if (!nodePreview || !item.nodeRun || nodePreview.signature === item.nodeRun.signature) return;
@@ -188,11 +195,11 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         <div className="cc-head-main">
           <div className="cc-headline">
             <h4 className="plan-title cc-title">{plan.title}</h4>
-            {item.revised || revising ? <span className="cc-state faint">{revising ? 'Revising…' : 'Revised'}</span> : null}
+            {rewriting ? <span className="cc-state faint"><LoaderCircle size={12} className="spin" /> Adapting the prompt…</span> : item.revised || revising ? <span className="cc-state faint">{revising ? 'Revising…' : 'Revised'}</span> : null}
             {running ? <span className="cc-run num"><LoaderCircle size={14} className="spin accent" />{resultsDone} of {results.length}</span> : null}
           </div>
           {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
-          {reused ? (
+          {reused && !sections.length ? (
             <p className="plan-summary faint">
               {reused.kind === 'draft' ? DRAFT : reused.kind === 'hq' ? HQ : (reused.text ?? '').trim().slice(0, 40)} (como antes)
               {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [] }); }}>Cambiar</Button></> : null}
@@ -201,6 +208,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
           {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
       </header>
+      {sections.length ? <PlanSettings item={item} sessionId={sessionId} sections={sections} /> : null}
       {running ? (
         <ol className="plan-steps cc-results">
           {refIds.length ? (
@@ -313,6 +321,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
         </div>
       ) : null}
       {item.error ? <p className="plan-error">{item.error}</p> : null}
+      {awaiting && rewriteFailed ? <RewriteFailed text={rewriteFailed} item={item} sessionId={sessionId} sections={sections} /> : null}
       {item.status === 'error' || item.status === 'partial' ? <PlanRecoveryChips sessionId={sessionId} item={item} /> : null}
       {awaiting && suggest ? <SuggestBox onDone={() => setSuggest(false)} /> : null}
       <footer className="plan-foot">
@@ -325,15 +334,16 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             <Button variant="ghost" onClick={() => cancelPlan(sessionId, item.id)}>
               Cancel
             </Button>
+            {sections.length ? <IconButton icon={RotateCw} label="Check the price again" className="cc-recheck" disabled={rewriting} onClick={() => void recheckPlanPrice(sessionId, item.id)} /> : null}
             <Button
               variant="primary"
               className="cc-approve"
-              disabled={revising || none || Boolean(nodePreview?.errors.length)}
+              disabled={revising || rewriting || Boolean(rewriteFailed) || none || Boolean(nodePreview?.errors.length)}
               onClick={() => {
                 if (over) acceptOverLimit();
                 void approvePlan(sessionId, item.id);
               }}
-              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : costTip(total)}
+              data-tip={over ? overLimitText(total) : revising ? 'The agent is revising this plan' : rewriting ? 'The prompt is being adapted to the new model' : rewriteFailed ? 'Retry the prompt for the new model first' : costTip(total)}
             >
               {free ? 'Approve' : <>{over ? 'Approve anyway' : 'Approve'}<span className="cc-ap-sep" aria-hidden>·</span><span className="cc-ap-cost num">{costLabel(total, { short: true })}</span></>}
             </Button>

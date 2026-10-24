@@ -587,6 +587,8 @@ export interface SettingsFeedItem extends FeedBase {
   switchFrom?: SettingsChoice;
   /** With switchFrom: asks whether to continue with the switched model. */
   followUp?: boolean;
+  /** Auto: set by the app, no card. */
+  inline?: boolean;
 }
 
 /** What the user changed back in the conversation (for us, never sent to the agent). */
@@ -726,7 +728,7 @@ export interface ToolNodeData {
   params: Record<string, AdvancedValue>;
   generationId?: string;
   outputIndex: number;
-  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  /** Painted-over copy of the result (Sketch), as above. */
   sketchAssetId?: string;
 }
 
@@ -734,7 +736,7 @@ export interface AssetNodeData {
   kind: 'asset';
   title: string;
   assetId: string | null;
-  /** Painted-over copy of the result (Sketch). It replaces the result downstream; clearing it restores the original. */
+  /** Painted-over copy of the result (Sketch), as above. */
   sketchAssetId?: string;
 }
 

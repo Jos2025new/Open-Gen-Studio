@@ -122,13 +122,23 @@ describe('candidates end a plan', () => {
 describe('a video plan before the settings are confirmed', () => {
   const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
   let first: { name: string; args: unknown } = { name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', prompt: 'a cat walks', model: LOCAL_VIDEO_REF }] } };
+  let roundDone = false;
+  /** Guided refuses a plan before its question round, and a fresh request resets it: mark the round as done once the agent is called. */
+  const primeGuided = () => {
+    if (roundDone) return;
+    roundDone = true;
+    const id = useStore.getState().activeSessionId;
+    useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, questionRound: 1 } } } }));
+  };
   beforeEach(() => {
     sent.length = 0;
+    roundDone = false;
     let n = 0;
     vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       if (!body.messages) return new Response(JSON.stringify({ data: [] }));
       sent.push(body);
+      primeGuided();
       const call = n++ === 0 ? first : null;
       const chunk = call
         ? { choices: [{ delta: { tool_calls: [{ index: 0, id: 'c1', function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] }
@@ -139,7 +149,7 @@ describe('a video plan before the settings are confirmed', () => {
     const sid = st.activeSessionId;
     useStore.setState({
       settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
-      composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
+      composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
       sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
     });
   });

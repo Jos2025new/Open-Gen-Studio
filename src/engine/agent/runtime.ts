@@ -1,4 +1,4 @@
-import { cardDraft, carried, confirmedSections, draftGate, draftLines } from './draftActions';
+import { cardDraft, carried, confirmedSections, draftGate } from './draftActions';
 import { agentAccepts } from './sendGate';
 import { mayStartWork } from '../../lib/writerLock';
 import { costAskMessage, needsConfirmation, planRequiresSettings, roundsFor } from '../procedure';
@@ -80,9 +80,11 @@ import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
 import { overLimit, overLimitText, rerunNote } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
-import { guideForModel, modelGuide } from '../guides';
+import { modelGuide } from '../guides';
 import { repeatedConfirmation } from './confirmRepeat';
-import { confirmedState, keepConfirmed, switchNote, switchSection } from './switchModel';
+import { confirmedState, keepConfirmed, switchSection } from './switchModel';
+import { settingsResultText } from './settingsResult';
+import { autoConfirmSettings } from './autoSettings';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
@@ -455,31 +457,8 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   // The first part of each kind is that kind's settings; every part is kept, so a plan comparing two models keeps both.
   patchAgent(sessionId, (a) => confirmedState(a, item, sections));
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
-  const name = (ref: string) => modelSummary(ref)?.name ?? ref;
-  const lines = draftLines(item.draft, sections);
-  let guides = '';
-  for (const x of sections) {
-    const c = x.chosen;
-    const rec = x.recommended;
-    const changes = [
-      c.modelRef !== rec.modelRef ? `model ${name(rec.modelRef)} → ${name(c.modelRef)}` : '',
-      c.resolution !== rec.resolution ? `resolution ${rec.resolution ?? 'default'} → ${c.resolution ?? 'default'}` : '',
-      c.duration !== rec.duration ? `duration ${rec.duration ?? '?'} s → ${c.duration ?? '?'} s` : '',
-      c.aspect !== rec.aspect ? `aspect ${rec.aspect ?? "the image's"} → ${c.aspect ?? "the image's"}` : '',
-      c.count !== rec.count ? `images per step ${rec.count ?? 1} → ${c.count ?? 1}` : '',
-    ].filter(Boolean);
-    const several = sections.filter((y) => y.kind === x.kind).length > 1;
-    lines.push(`- ${x.kind}${several ? ` (one of ${sections.filter((y) => y.kind === x.kind).length} compared models: its steps write "model": "${c.modelRef}")` : ''}: ${describeChoice(name(c.modelRef), c)} (${c.modelRef}).${changes.length ? ` The user changed: ${changes.join('; ')}.` : ' As recommended.'} Write these prompts for ${name(c.modelRef)}, in its format${x.kind === 'video' && c.duration ? `; each clip lasts exactly ${c.duration} s: time its beats, shots and spoken lines to fill those seconds` : ''}${c.aspect ? `; frame for ${c.aspect}` : ''}${x.kind === 'image' && c.count ? (c.count > 1 ? `; ${c.count} candidates of the image being explored: ONE image step with ${c.count} "variations" (the shared prompt once, one short variation each), not one step per option` : '; one image per image step') : ''}.`);
-    const guide = guideForModel(c.modelRef.split('::')[1] ?? '');
-    const text = guide ? readGuide(`model:${guide.id}`) : undefined;
-    if (text && !inConversation(sessionId, text) && !guides.includes(text)) guides += `\n\n---\nPrompting guide of ${name(c.modelRef)} (model:${guide!.id}); write its prompts in this format:\n${text}`;
-  }
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, item.workspace, s.agent.draft?.attachments ?? []));
-  pushHistory(sessionId, {
-    role: 'tool',
-    tool_call_id: pending.toolCallId,
-    content: `Settings confirmed by the user (the app applies them to every step of each kind; with several models of one kind, to the steps that name that model):\n${lines.join('\n')}${note ? `\nUser note: ${note}` : ''}${switchNote(item, sections, name(sections[0].chosen.modelRef), name(item.switchFrom?.modelRef ?? ''))}\nNow write the prompts and call propose_plan.${guides}\n\n${ctx}`,
-  });
+  pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` });
   await llmTurn(sessionId, item.workspace);
 }
 
@@ -1516,10 +1495,11 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           }
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
           const stands = await repeatedConfirmation(sessionId, sections, parts); if (stands) { respond(stands); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, workspace, call.id, v.data.summary, sections, parts)); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model, { switchedTo: ag().switchedTo, auto: get().composer.agentStyle === 'auto' });
+          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
           appendFeed(sessionId, item);

@@ -51,10 +51,9 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { resumePlan, sendAgentMessage, confirmSettings } from '../src/engine/agent/runtime';
-import { selectDraft } from '../src/engine/agent/draftActions';
+import { resumePlan, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
-import type { PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
+import type { PlanFeedItem } from '../src/engine/types';
 
 type Call = { name: string; args: unknown };
 const sse = (call: Call) => {
@@ -96,15 +95,10 @@ const ugcPlan = {
   },
 };
 
-// Phase 2 as in real use: the agent asks for the settings, the user confirms the recommended ones, then the plan.
+// Phase 2 as in real use (Auto): the agent confirms the settings, the app does it silently (no card) and the same turn goes on to the plan.
 async function sendWithSettings(text: string) {
-  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }, { kind: 'video', start_image: true, model: 'local::studio-video' }] } }];
+  replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }, { kind: 'video', start_image: true, model: 'local::studio-video' }] } }, ugcPlan];
   await sendAgentMessage(text);
-  const card = useStore.getState().sessions[sid()].feed.find((f): f is SettingsFeedItem => f.type === 'settings')!;
-  // The draft choice lives on the settings card (default Borrador); the user picks high quality, then continues.
-  selectDraft(sid(), card.id, 'hq');
-  replies = [ugcPlan];
-  await confirmSettings(sid(), card.id, useStore.getState().sessions[sid()].feed.filter((f): f is SettingsFeedItem => f.type === 'settings')[0].sections.map((x) => x.chosen ?? x.recommended));
 }
 
 describe('recovering a failed plan', () => {

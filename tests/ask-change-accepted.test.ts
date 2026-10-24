@@ -33,13 +33,23 @@ void seen;
 let script: Array<{ name: string; args: unknown }> = [];
 const sse = (call: { name: string; args: unknown }) => new Response(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 
+/** Guided clears the confirmed settings on every fresh request and refuses a plan before its question round: restore both once the agent is called (a card answered earlier in the same request). */
+let primed = false;
+function prime() {
+  if (primed) return;
+  primed = true;
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } } }));
+}
+
 function setup() {
+  primed = false;
   const refs = [ATLAS, NANO, LITE, PRO];
   const models = Object.fromEntries(refs.map((ref) => [ref, { ref, id: ref.split('::')[1], provider: ref.split('::')[0], kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: ref === NANO, tags: [], price: { skus: [{ unit: 'image', usd: ref === PRO ? 0.13 : 0.067 }] } } as unknown as ModelSummary]));
   const schemas = Object.fromEntries(refs.map((ref) => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema]));
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+    prime();
     seen = body.messages.filter((m: { role: string }) => m.role === 'tool').map((m: { content: unknown }) => String(m.content));
     const next = script.shift();
     return next ? sse(next) : new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
@@ -47,7 +57,7 @@ function setup() {
   const s = useStore.getState();
   useStore.setState({
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k', atlas: 'k' }, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
-    composer: { ...s.composer, agentStyle: 'auto', attachments: [], image: { ...s.composer.image, modelRef: ATLAS } },
+    composer: { ...s.composer, agentStyle: 'guided', attachments: [], image: { ...s.composer.image, modelRef: ATLAS } },
     catalog: { ...s.catalog, models: { ...s.catalog.models, ...models }, schemas: { ...s.catalog.schemas, ...schemas } },
     sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, needsImage: false, count: 1, aspect: '1:1' } } } } },
   });

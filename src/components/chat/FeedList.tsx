@@ -171,7 +171,7 @@ export const FeedItemView = memo(function FeedItemView({ item, sessionId, compac
     case 'questions':
       return <QuestionsCard item={item} sessionId={sessionId} />;
     case 'settings':
-      return <SettingsCard item={item} sessionId={sessionId} />;
+      return item.inline ? null : <SettingsCard item={item} sessionId={sessionId} />;
     case 'plan':
       return <PlanCard item={item} sessionId={sessionId} />;
     case 'generation':

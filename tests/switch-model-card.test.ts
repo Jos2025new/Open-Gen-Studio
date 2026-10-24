@@ -12,7 +12,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { cancelPlan, confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
+import { confirmSettings, sendAgentMessage } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
@@ -26,15 +26,26 @@ const st = () => useStore.getState().sessions[sid()];
 afterEach(() => { vi.unstubAllGlobals(); useStore.setState(before); });
 
 let seen: string[] = [];
+void seen;
 let script: Array<{ name: string; args: unknown }> = [];
 const sse = (call: { name: string; args: unknown }) => new Response(`data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: call.name, arguments: JSON.stringify(call.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 
-function setup(style: 'auto' | 'direct' = 'auto') {
-  const models = Object.fromEntries([FLUX, GROK, OTHER].map((ref) => [ref, { ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: false, tags: [] } as ModelSummary]));
+/** Guided clears the confirmed settings on every fresh request and refuses a plan before its question round: restore both once the agent is called. */
+let primed = false;
+function prime() {
+  if (primed || useStore.getState().composer.agentStyle !== 'guided') return;
+  primed = true;
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], agent: { ...s.sessions[sid()].agent, questionRound: 1, settings: { image: { modelRef: FLUX, needsImage: false, count: 2, aspect: '1:1' } } } } } }));
+}
+
+function setup(style: 'guided' | 'direct' = 'guided') {
+  primed = false;
+  const models = Object.fromEntries([FLUX, GROK, OTHER].map((ref) => [ref, { ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'image', usd: 0.01 }] } } as unknown as ModelSummary]));
   const schemas = Object.fromEntries([FLUX, GROK, OTHER].map((ref) => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema]));
   vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+    prime();
     seen = body.messages.filter((m: { role: string }) => m.role === 'tool').map((m: { content: unknown }) => String(m.content));
     const next = script.shift();
     return next ? sse(next) : new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
@@ -63,6 +74,7 @@ describe('model switch: refusal, card, confirmation', () => {
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
       const body = init?.body ? JSON.parse(String(init.body)) : {};
       if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+      prime();
       tools.push(...body.messages.filter((m: { role: string }) => m.role === 'tool').map((m: { content: unknown }) => String(m.content)));
       const next = script.shift();
       return next ? sse(next) : new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: 'stop' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
@@ -128,98 +140,9 @@ describe('model switch: refusal, card, confirmation', () => {
   });
 });
 
-/** Request 1 names Grok and the user clicks Switch; returns once Grok is the switched part (FLUX stays confirmed). */
-async function switchToGrok() {
-  script = [ask];
-  await sendAgentMessage('Prueba ahora con grok image imagine');
-  const c = card()!;
-  script = [steps(GROK)];
-  await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-  expect(st().agent.switchedTo?.image?.modelRef).toBe(GROK);
-  newRequest();
-}
-/** The plan of the previous request is closed, so the next message is a new request (not a comment on that plan). */
-function newRequest() { for (const f of st().feed) if (f.type === 'plan' && f.status === 'awaiting') cancelPlan(sid(), f.id); }
 const cards = () => st().feed.filter((f) => f.type === 'settings') as SettingsFeedItem[];
-const followUp = () => cards().at(-1)!;
 
-describe('the next request after a switch asks which model to continue with (Auto)', () => {
-  beforeEach(() => { script = []; seen = []; });
-
-  it('trigger: no model named now -> the plan is refused with the exact fix, then confirm_settings makes the follow-up card', async () => {
-    setup();
-    await switchToGrok();
-    script = [steps(undefined), ask];
-    await sendAgentMessage('Hazme otra imagen de una taza');
-    expect(seen.join('\n')).toContain(`call confirm_settings for image with model ${GROK} first (the app asks: continue with Grok Imagine Image or go back to FLUX 3 Image Klein)`);
-    const c = followUp();
-    expect(c).toMatchObject({ status: 'pending', followUp: true });
-    expect(c.switchFrom?.modelRef).toBe(FLUX);
-    expect(c.sections[0].recommended.modelRef).toBe(GROK);
-    expect(c.sections[0].alternatives).not.toContain(GROK);
-    expect(c.sections[0].alternatives).not.toContain(FLUX);
-    expect(st().agent.settings?.image?.modelRef).toBe(FLUX);
-  });
-
-  it('Continue: the switched model becomes the confirmed one, the question is cleared and not asked again', async () => {
-    setup();
-    await switchToGrok();
-    script = [steps(undefined), ask];
-    await sendAgentMessage('Hazme otra imagen de una taza');
-    const c = followUp();
-    script = [steps(undefined)];
-    await confirmSettings(sid(), c.id, [c.sections[0].recommended]);
-    expect(st().agent.settings?.image?.modelRef).toBe(GROK);
-    expect(st().agent.switchedTo?.image).toBeUndefined();
-    expect(refs()).toEqual([GROK]);
-    newRequest();
-    const n = cards().length;
-    script = [steps(undefined)];
-    await sendAgentMessage('Y otra de una lámpara');
-    expect(cards()).toHaveLength(n);
-    expect(refs()).toEqual([GROK]);
-  });
-
-  it('Back: the confirmed model stays, the switched part is dropped, cleared', async () => {
-    setup();
-    await switchToGrok();
-    script = [steps(undefined), ask];
-    await sendAgentMessage('Hazme otra imagen de una taza');
-    const c = followUp();
-    script = [steps(undefined)];
-    await confirmSettings(sid(), c.id, [{ ...c.switchFrom!, needsImage: false }]);
-    expect(st().agent.settings?.image?.modelRef).toBe(FLUX);
-    expect(st().agent.settingsParts?.map((p) => p.modelRef)).toEqual([FLUX]);
-    expect(st().agent.switchedTo?.image).toBeUndefined();
-    expect(refs()).toEqual([FLUX]);
-  });
-
-  it('another model from the list becomes the confirmed one', async () => {
-    setup();
-    await switchToGrok();
-    script = [steps(undefined), ask];
-    await sendAgentMessage('Hazme otra imagen de una taza');
-    const c = followUp();
-    script = [steps(undefined)];
-    await confirmSettings(sid(), c.id, [{ modelRef: OTHER, needsImage: false, count: 2 }]);
-    expect(st().agent.settings?.image?.modelRef).toBe(OTHER);
-    expect(st().agent.switchedTo?.image).toBeUndefined();
-  });
-
-  it('no card without a switch, and none when the current request names a model (the switch card applies instead)', async () => {
-    setup();
-    script = [steps(undefined)];
-    await sendAgentMessage('Una imagen de una taza');
-    expect(cards()).toHaveLength(0);
-    expect(refs()).toEqual([FLUX]);
-    newRequest();
-    await switchToGrok();
-    script = [steps(GROK), ask];
-    await sendAgentMessage('Ahora con grok image imagine otra vez');
-    expect(followUp().followUp).toBeUndefined();
-    expect(followUp().switchFrom?.modelRef).toBe(FLUX);
-  });
-
+describe('Direct never asks about a switch', () => {
   it('Direct never asks', async () => {
     setup('direct');
     useStore.setState({ sessions: { ...useStore.getState().sessions, [sid()]: { ...st(), agent: { ...st().agent, switchedTo: { image: { modelRef: GROK, needsImage: false } } } } } });

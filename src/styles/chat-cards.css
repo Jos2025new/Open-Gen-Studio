@@ -139,3 +139,7 @@
 .q-card.is-done:not(.cc-set-done) { padding: var(--sp-1) 0; }
 .q-card.is-done .q-kicker { gap: var(--feed-gap); }
 .q-card.is-done .q-ok { flex: none; width: var(--feed-icon); height: var(--feed-icon); color: var(--text-3); }
+/* Auto's one card: the settings card's choices on the plan (PlanSettings). */
+.plan-set { margin: 4px 0 10px; }
+.plan-set .cc-chips { margin: 8px 0 4px; }
+.cc-recheck { border-radius: 999px; }

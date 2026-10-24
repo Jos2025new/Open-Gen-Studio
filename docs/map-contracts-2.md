@@ -4,6 +4,7 @@ Generado por `node scripts/map.mjs --write`; [índice y cobertura](map.md). Se c
 
 | Contrato | Lugares | Tests |
 | --- | --- | --- |
+| **guided-asks** — Guided pregunta antes de cada plan: el prompt lo dice y el runtime rechaza un plan sin preguntas. | [context.ts](../src/engine/agent/context.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [agent-mode.test.ts](../tests/agent-mode.test.ts) |
 | **direct-guides** — Direct no tiene tarjeta de ajustes: las guías de los modelos del compositor llegan con la petición. | [context.ts](../src/engine/agent/context.ts), [requestGuides.ts](../src/engine/agent/requestGuides.ts) | [agent-direct-model.test.ts](../tests/agent-direct-model.test.ts) |
 | **settings-policy** — Qué pasos necesitan la tarjeta de ajustes: el texto para el agente y la puerta del runtime. | [procedure.ts](../src/engine/procedure.ts), [runtime.ts](../src/engine/agent/runtime.ts) | [general-model-gate.test.ts](../tests/general-model-gate.test.ts), [agent-force.test.ts](../tests/agent-force.test.ts) |
 | **automation-policy** — Cuándo se reutilizan ajustes sin preguntar (umbral de coste): el texto debe describir exactamente needsConfirmation. | [procedure.ts](../src/engine/procedure.ts) | [general-model.test.ts](../tests/general-model.test.ts), [general-model-gate.test.ts](../tests/general-model-gate.test.ts) |

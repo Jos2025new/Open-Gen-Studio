@@ -50,8 +50,7 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { confirmSettings, sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
-import { selectDraft } from '../src/engine/agent/draftActions';
+import { sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
 import { useStore } from '../src/store/store';
 import type { FeedItem, PlanFeedItem, QuestionsFeedItem, SettingsFeedItem } from '../src/engine/types';
 
@@ -103,28 +102,22 @@ describe('story request in Auto mode (F1–F4 together)', () => {
     expect(card).toMatchObject({ status: 'pending', maxRounds: 1 });
     expect(card!.questions[0].default).toBe('Acción');
 
-    // Phase 2: the structure is decided, the user confirms model and values before any prompt is written.
-    replies = [{ name: 'confirm_settings', args: { kind: 'video', summary: '3 clips de 7 s', count: 3, duration: 7, model: 'local::studio-video' } }];
-    await submitAnswers(useStore.getState().activeSessionId, card!.id, { tone: 'Acción' });
-    const settings = feed().find((f): f is SettingsFeedItem => f.type === 'settings');
-    expect(settings).toMatchObject({ status: 'pending', sections: [{ kind: 'video', count: 3, recommended: { modelRef: 'local::studio-video' } }] });
-    expect(feed().some((f) => f.type === 'plan')).toBe(false);
-
-    // The draft choice is on the settings card (no separate card); the user picks high quality.
+    // Phase 2 (Auto): the structure is decided and the app confirms the settings silently: no settings card, the same turn goes on to the plan.
     const planCall: Call = {
-        name: 'propose_plan',
-        args: {
-          title: 'Turno de guardia',
-          total_duration: 21,
-          subjects: [{ name: 'Reto', from: 'asset:char' }],
-          continuity: [{ source: 'asset:char', preserve: 'Reto identity and appearance', steps: ['s1', 's2', 's3'] }],
-          steps: [clip('s1', 'sighs at the door'), clip('s2', 'walks the corridor'), clip('s3', 'faces the open hatch'), { id: 's4', kind: 'op', title: 'Join', op: 'join_clips', input: 's1', more: ['s2', 's3'] }],
-        },
+      name: 'propose_plan',
+      args: {
+        title: 'Turno de guardia',
+        total_duration: 21,
+        subjects: [{ name: 'Reto', from: 'asset:char' }],
+        continuity: [{ source: 'asset:char', preserve: 'Reto identity and appearance', steps: ['s1', 's2', 's3'] }],
+        steps: [clip('s1', 'sighs at the door'), clip('s2', 'walks the corridor'), clip('s3', 'faces the open hatch'), { id: 's4', kind: 'op', title: 'Join', op: 'join_clips', input: 's1', more: ['s2', 's3'] }],
+      },
     };
-    replies = [planCall];
-    selectDraft(useStore.getState().activeSessionId, settings!.id, 'hq');
-    await confirmSettings(useStore.getState().activeSessionId, settings!.id, settings!.sections.map((x) => x.recommended));
-    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings confirmed by the user[\s\S]*Alta calidad[\s\S]*- video: Local[\s\S]*each clip lasts exactly 8 s/);
+    replies = [{ name: 'confirm_settings', args: { kind: 'video', summary: '3 clips de 7 s', count: 3, duration: 7, model: 'local::studio-video' } }, planCall];
+    await submitAnswers(useStore.getState().activeSessionId, card!.id, { tone: 'Acción' });
+    expect(feed().filter((f) => f.type === 'settings' && f.status === 'pending')).toHaveLength(0);
+    expect(feed().find((f): f is SettingsFeedItem => f.type === 'settings')).toMatchObject({ status: 'confirmed', inline: true, sections: [{ kind: 'video', count: 3, recommended: { modelRef: 'local::studio-video' } }] });
+    expect(String(sent[3].messages.at(-1)!.content)).toMatch(/^Settings chosen by the app[\s\S]*- video: Local[\s\S]*each clip lasts exactly 8 s/);
     await vi.waitFor(() => expect(feed().find((f): f is PlanFeedItem => f.type === 'plan')?.status).toBe('done'), { timeout: 5000 });
 
     const plan = feed().find((f): f is PlanFeedItem => f.type === 'plan')!;

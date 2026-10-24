@@ -60,10 +60,10 @@ vi.mock('../src/engine/jobs', async (importOriginal) => {
   };
 });
 
-import { approvePlan, confirmSettings, sendAgentMessage, settleInterruptedPlans } from '../src/engine/agent/runtime';
+import { approvePlan, sendAgentMessage, settleInterruptedPlans } from '../src/engine/agent/runtime';
 import { executeSteps } from '../src/engine/executor';
 import { useStore } from '../src/store/store';
-import type { PlanFeedItem, PlanStep, SettingsFeedItem } from '../src/engine/types';
+import type { PlanFeedItem, PlanStep } from '../src/engine/types';
 
 type Call = { name: string; args: unknown };
 const sse = (call: Call) =>
@@ -134,12 +134,9 @@ describe('a step is done only if its generation finished with results (T1)', () 
 
   it('the plan says failed and the closing message does not claim the image (ses_mursnwichu)', async () => {
     mode = 'error-status';
-    // Phase 2 as in real use: the agent asks for the settings, the user confirms the recommended ones, then the plan.
-    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }] } }];
+    // Phase 2 as in real use (Auto): confirm_settings is answered by the app with no card and the same turn proposes the plan.
+    replies = [{ name: 'confirm_settings', args: { parts: [{ kind: 'image', model: 'local::studio-image' }] } }, propose, 'Lista la imagen'];
     await sendAgentMessage('Crea una chica para vender una corneta bluetooth');
-    const card = useStore.getState().sessions[sid()].feed.find((f): f is SettingsFeedItem => f.type === 'settings')!;
-    replies = [propose, 'Lista la imagen'];
-    await confirmSettings(sid(), card.id, card.sections.map((x) => x.recommended));
     await approvePlan(sid(), planItem().id);
     await vi.waitFor(() => expect(planItem().status).toBe('error'));
     expect(planItem().stepStates).toMatchObject({ s1: 'error' });

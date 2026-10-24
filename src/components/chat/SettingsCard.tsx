@@ -63,7 +63,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
     <article className="q-card set-card cc-card cc-w">
       <header className="cc-head"><CardIcon /><h4 className="cc-title">Confirm settings</h4></header>
       {item.summary ? <ClampedText text={item.summary} /> : null}
-      {item.draft ? <DraftChoice item={item} sessionId={sessionId} /> : null}
+      {item.draft ? <DraftChoice draft={item.draft} onSelect={(kind, text) => selectDraft(sessionId, item.id, kind, text)} /> : null}
       {sections.map((x, i) => (
         <div key={`${x.kind}-${i}`} className={titled ? 'set-section' : undefined}>
           {titled ? <div className="set-section-title">{x.kind === 'image' ? `Images${x.count > 1 ? ` · ${x.count}` : ''}` : `Video${x.count > 1 ? ` · ${x.count} clips` : ''}`}{sameKind(i) ? ` · ${name(x.recommended.modelRef)}` : ''}</div> : null}
@@ -80,11 +80,10 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   );
 }
 
-/** Borrador / Alta calidad / Otra cosa…, mandatory on every video card: the draft locks the resolution below. */
-function DraftChoice({ item, sessionId }: { item: SettingsFeedItem; sessionId: string }) {
-  const d = item.draft!;
+/** Borrador / Alta calidad / Otra cosa…, mandatory on every video card (and on Auto's plan card): the draft locks the resolution below. */
+export function DraftChoice({ draft: d, onSelect }: { draft: DraftMode; onSelect: (kind: DraftMode['kind'], text?: string) => void }) {
   const opt = (kind: 'draft' | 'hq', label: string) => (
-    <button type="button" className={`q-opt ${d.kind === kind ? 'is-on' : ''}`} aria-pressed={d.kind === kind} onClick={() => selectDraft(sessionId, item.id, kind)}>
+    <button type="button" className={`q-opt ${d.kind === kind ? 'is-on' : ''}`} aria-pressed={d.kind === kind} onClick={() => onSelect(kind)}>
       {d.kind === kind ? <Check size={12} /> : null}
       {label}
     </button>
@@ -99,13 +98,14 @@ function DraftChoice({ item, sessionId }: { item: SettingsFeedItem; sessionId: s
         placeholder="Otra cosa…"
         aria-label="Otra cosa…"
         value={d.kind === 'other' ? d.text ?? '' : ''}
-        onChange={(e) => selectDraft(sessionId, item.id, 'other', e.target.value)}
+        onChange={(e) => onSelect('other', e.target.value)}
       />
     </div>
   );
 }
 
-function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }: { section: SettingsSection; index: number; itemId: string; sessionId: string; draft?: DraftMode }) {
+/** One kind's model and values. Auto's plan card passes onPick / onUnlock: its changes go to the plan's steps. */
+export function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft, onPick, onUnlock }: { section: SettingsSection; index: number; itemId: string; sessionId: string; draft?: DraftMode; onPick?: (c: SettingsChoice) => void; onUnlock?: () => void }) {
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
@@ -120,7 +120,8 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
   const locked = item.kind === 'video' && Boolean(draft?.locked);
   const update = (next: SettingsChoice) => {
     setChoice(next);
-    selectSettings(sessionId, itemId, index, next);
+    if (onPick) onPick(next);
+    else selectSettings(sessionId, itemId, index, next);
   };
   const opts = settingsOptions(schemas[choice.modelRef], item.kind);
   // A locked draft keeps the lowest resolution of whichever model is picked (the schema may arrive late).
@@ -179,7 +180,7 @@ function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft }
       {resShown ? (
         <ChipPop icon={<ResolutionIcon />} label={locked ? <>{resNow ?? 'Auto'}<Lock size={11} aria-label="Locked by the draft" /></> : resNow ?? 'Auto'} tip="Resolution">
           <div className="q-question">Resolution
-            {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => unlockDraft(sessionId, itemId)}><Lock size={12} /></button>
+            {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => (onUnlock ? onUnlock() : unlockDraft(sessionId, itemId))}><Lock size={12} /></button>
               : draft?.unlocked && item.kind === 'video' ? <LockOpen size={12} className="faint" aria-label="Resolución desbloqueada" /> : null}
           </div>
           <div className="q-options">

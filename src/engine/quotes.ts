@@ -90,3 +90,13 @@ export function knownAtlasQuote(ref: string, settings: GenSettings, requestMissi
   }
   return sum;
 }
+
+/** The plan card's price recheck: forget the quotes known for this request and ask Atlas again. */
+export function requote(ref: string, settings: GenSettings): void {
+  const parsed = parseModelRef(ref);
+  const schema = get().catalog.schemas[ref];
+  if (parsed?.provider !== 'atlas' || !schema) return;
+  const keys = new Set(Array.from({ length: Math.max(1, settings.count) }, (_, i) => keyOf(atlasQuoteBody(parsed.id, schema, settings, i + 1))));
+  useStore.setState((s) => ({ quotes: Object.fromEntries(Object.entries(s.quotes).filter(([k]) => !keys.has(k))) }));
+  knownAtlasQuote(ref, settings, true);
+}

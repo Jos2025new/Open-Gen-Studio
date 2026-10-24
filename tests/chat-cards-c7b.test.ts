@@ -167,11 +167,13 @@ describe('C7b plan card (awaiting)', () => {
     }
   });
 
-  it('footer is plain: budget left, Suggest changes, Cancel, Approve · $X', async () => {
+  it('footer is plain: budget left, Suggest changes, Cancel, the price recheck icon (Auto, image step), Approve · $X', async () => {
     setup();
     await mount(createElement(PlanCard, { item: plan(), sessionId: sid() }));
     const foot = host.querySelector('.plan-foot') as HTMLElement;
-    expect([...foot.querySelectorAll('button')].map((b) => b.textContent?.replace(/\s+/g, ' ').trim())).toEqual([expect.stringMatching(/^Suggest changes$/), 'Cancel', expect.stringMatching(/^Approve·\$0\.08/)]);
+    expect([...foot.querySelectorAll('button')].map((b) => b.textContent?.replace(/\s+/g, ' ').trim())).toEqual([expect.stringMatching(/^Suggest changes$/), 'Cancel', '', expect.stringMatching(/^Approve·\$0\.08/)]);
+    // The icon-only button next to Cancel (Auto's awaiting plan with image/video steps) rechecks the price.
+    expect(foot.querySelector('button.cc-recheck')?.getAttribute('aria-label')).toBe('Check the price again');
     expect(foot.querySelector('.plan-budget')?.textContent).toMatch(/Budget left|No spending limit|Nothing to pay/);
   });
 

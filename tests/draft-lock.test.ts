@@ -27,12 +27,23 @@ let replies: Call[] = [];
 const sent: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
 const REF = 'local::studio-video';
 
+/** Guided refuses a plan before its question round, and a fresh request resets it: mark the round as done once the agent is called. */
+let roundDone = false;
+function primeGuided() {
+  if (roundDone) return;
+  roundDone = true;
+  const id = useStore.getState().activeSessionId;
+  useStore.setState((s) => ({ sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, questionRound: 1 } } } }));
+}
+
 beforeEach(() => {
   sent.length = 0;
+  roundDone = false;
   vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
     sent.push(body);
+    primeGuided();
     return sse(replies.shift() ?? { name: 'none', args: {} });
   });
   const st = useStore.getState();
@@ -41,7 +52,7 @@ beforeEach(() => {
   const schema = { ...base, ref: REF, params: [{ key: 'resolution', label: 'Resolution', role: 'resolution', type: 'enum', options: ['480p', '720p', '1080p'], default: '720p' }] } as unknown as ModelSchema;
   useStore.setState({
     settings: { ...st.settings, keys: { ...st.settings.keys, nanogpt: 'k' }, agent: { ...st.settings.agent, provider: 'nanogpt', model: 'm' } },
-    composer: { ...st.composer, agentStyle: 'auto', attachments: [] },
+    composer: { ...st.composer, agentStyle: 'guided', attachments: [] },
     catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [REF]: schema } },
     sessions: { ...st.sessions, [id]: { ...st.sessions[id], feed: [], subjects: [], agent: { history: [], questionRound: 0, notes: [], busy: false } } },
   });
