@@ -37,9 +37,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [id.ts](../src/lib/id.ts) | 26 | 0 |
 | [render.ts](../src/engine/design/render.ts) | 21 | 8 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
+| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 18 | 0 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 | [idb.ts](../src/lib/idb.ts) | 18 | 201 |
-| [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 17 | 0 |
 
 ## Por área
 
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 16 | 5 |
 | `src/components/chat` | 21 | 11 |
 | `src/components/composer` | 11 | 7 |
-| `src/components/designer` | 50 | 22 |
+| `src/components/designer` | 52 | 23 |
 | `src/components/gallery` | 1 | 1 |
 | `src/components/node` | 8 | 4 |
 | `src/components/shell` | 26 | 15 |
@@ -58,7 +58,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/ui` | 16 | 4 |
 | `src/engine` | 60 | 227 |
 | `src/engine/agent` | 35 | 84 |
-| `src/engine/design` | 96 | 115 |
+| `src/engine/design` | 97 | 117 |
 | `src/engine/flow` | 11 | 14 |
 | `src/engine/fx` | 8 | 8 |
 | `src/engine/guides` | 1 | 1 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 231 |
 | `src/store` | 13 | 167 |
 
-159 de 446 módulos no tienen ningún test que los importe directamente.
+159 de 449 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

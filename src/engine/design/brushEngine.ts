@@ -1,4 +1,5 @@
 import type { BlendMode } from '../types';
+import { clampRoundness, toTipFrame, tipFrame, wrapAngle } from './brushTipShape';
 
 /*
  * The raster brush tip, as PaintTool SAI shapes it: a hardness profile, pressure on size and density, paper texture,
@@ -28,6 +29,11 @@ export interface BrushTip {
   densities?: number[];
   /** Painted with mirror: segments come in pairs, each followed by its reflection across the page's centre. */
   mirror?: boolean;
+  /** Elliptical tip (Photoshop's Brush Tip Shape): roundness 0.01–1 and angle -180..180°; absent = round, as every older stroke. */
+  roundness?: number;
+  angle?: number;
+  /** The angle is relative to the stroke's direction. */
+  follow?: boolean;
 }
 
 /** The brush settings the tip comes from (ui.brush). */
@@ -51,6 +57,10 @@ export interface BrushOptions {
   textureStrength?: number;
   blend?: BrushBlend;
   keepOpacity?: boolean;
+  /** Tip shape (see BrushTip); roundness 1 / angle 0 / follow off are the plain round tip. */
+  roundness?: number;
+  angle?: number;
+  follow?: boolean;
 }
 
 export const BRUSH_BLENDS: BrushBlend[] = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten'];
@@ -112,7 +122,11 @@ export function tipFor(o: BrushOptions, erase: boolean): BrushTip {
   const texture = o.texture && o.texture !== 'none' && strength > 0 ? o.texture : undefined;
   const blend = !erase && o.blend && o.blend !== 'normal' ? o.blend : undefined;
   const keepOpacity = !erase && o.keepOpacity ? true : undefined;
-  return { hardness, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
+  // A round tip records nothing, so those strokes stay byte-identical; angle and follow mean nothing without a squeeze.
+  const roundness = o.roundness !== undefined && o.roundness < 1 ? clampRoundness(o.roundness) : undefined;
+  const angle = roundness && o.angle ? wrapAngle(o.angle) : undefined;
+  const shape = roundness ? { roundness, ...(angle ? { angle } : {}), ...(o.follow ? { follow: true } : {}) } : {};
+  return { hardness, ...shape, ...(texture ? { texture, textureStrength: clamp01(strength) } : {}), ...(blend ? { blend } : {}), ...(keepOpacity ? { keepOpacity } : {}), ...(o.pressureDensity ? { densities: [] } : {}), ...(o.mirror ? { mirror: true } : {}) };
 }
 
 /** Coverage at distance d from the centre line, for a radius and hardness (the same curve the tip icons show). */
@@ -163,11 +177,16 @@ export function stampSegment(img: AlphaImage, ox: number, oy: number, seg: reado
   const x0 = Math.max(0, Math.floor(Math.min(ax, bx) - r - 1 - ox)), y0 = Math.max(0, Math.floor(Math.min(ay, by) - r - 1 - oy));
   const x1 = Math.min(img.width, Math.ceil(Math.max(ax, bx) + r + 1 - ox)), y1 = Math.min(img.height, Math.ceil(Math.max(ay, by) + r + 1 - oy));
   const strength = clamp01(tip.textureStrength ?? 0);
+  // Elliptical tip: measure in the tip's own frame, where it is a circle (brushTipShape.ts). Round tips take the same path with identity values.
+  const fr = tipFrame(tip, dx, dy);
+  let sax = ax, say = ay, sdx = dx, sdy = dy, slen2 = len2;
+  if (fr) { [sax, say] = toTipFrame(fr, ax, ay); const [qbx, qby] = toTipFrame(fr, bx, by); sdx = qbx - sax; sdy = qby - say; slen2 = sdx * sdx + sdy * sdy; }
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
-      const px = x + ox + 0.5, py = y + oy + 0.5;
-      const t = len2 ? clamp01(((px - ax) * dx + (py - ay) * dy) / len2) : 0;
-      const d = Math.hypot(px - ax - t * dx, py - ay - t * dy), rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
+      let px = x + ox + 0.5, py = y + oy + 0.5;
+      if (fr) [px, py] = toTipFrame(fr, px, py);
+      const t = slen2 ? clamp01(((px - sax) * sdx + (py - say) * sdy) / slen2) : 0;
+      const d = Math.hypot(px - sax - t * sdx, py - say - t * sdy), rt = Math.max(0.5, (w0 + (width - w0) * t) / 2);
       if (d > rt + 0.5) continue;
       let cov = profile(d, rt, tip.hardness) * (d0 + (d1 - d0) * t);
       if (tip.texture && strength) cov *= 1 - strength * (1 - textureAt(tip.texture, x + ox, y + oy));

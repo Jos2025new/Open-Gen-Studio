@@ -5,6 +5,7 @@ import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexR
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
+import { BrushTipShape } from './BrushTipShape';
 import { SizePresets } from './SizePresets';
 
 /*
@@ -121,6 +122,8 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
     {brush.texture && brush.texture !== 'none' && <InlineSlider label="Texture strength" unit="%" scale={100} min={0} max={1} step={0.01} value={brush.textureStrength ?? 0} onChange={(v) => set({ textureStrength: v })} />}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
+    <BrushTipShape angle={brush.angle ?? 0} roundness={brush.roundness ?? 1} onChange={set} />
+    <InlineToggle label="Follow stroke" tip="The tip turns with the stroke's direction; Angle is added to it. Needs Roundness below 100 %" checked={!!brush.follow} onChange={(v) => set({ follow: v })} />
     <InlineToggle label="Mirror" tip="Every stroke is also painted reflected across the page's vertical centre line" checked={!!brush.mirror} onChange={(v) => set({ mirror: v })} />
         </>)}
         {pane('stroke', <>
@@ -171,6 +174,8 @@ export function BrushSettings({ erase, compact = false, card = false, head }: { 
     {!erase && <div className="brush-row"><InlineSelect label="Blend" value={brush.blend ?? 'normal'} options={BRUSH_BLENDS.map((b) => ({ value: b, label: b[0].toUpperCase() + b.slice(1) }))} onChange={(v) => set({ blend: v as BrushBlend })} /></div>}
     <InlineChoice label="Tip" value={tipIndex} options={TIP_PRESETS.map((h, i) => ({ value: i, label: ['Hard', 'Firm', 'Soft', 'Airbrush'][i], render: <TipIcon hardness={h} /> }))} onChange={(i) => set({ hardness: TIP_PRESETS[i] })} />
     <InlineSlider label="Hardness" unit="%" scale={100} min={0} max={1} step={0.01} value={hardness} onChange={(v) => set({ hardness: v })} />
+    <BrushTipShape angle={brush.angle ?? 0} roundness={brush.roundness ?? 1} onChange={set} />
+    <InlineToggle label="Follow stroke" tip="The tip turns with the stroke's direction; Angle is added to it. Needs Roundness below 100 %" checked={!!brush.follow} onChange={(v) => set({ follow: v })} />
     <InlineToggle label="Mirror" tip="Every stroke is also painted reflected across the page's vertical centre line" checked={!!brush.mirror} onChange={(v) => set({ mirror: v })} />
     <InlineToggle label="Simulate pressure" tip="Pressure from your speed, as Lineart does it: fast strokes paint lighter and thinner" checked={!!brush.simulatePressure} onChange={(v) => set({ simulatePressure: v })} />
     {brush.simulatePressure && <InlineSlider label="Speed influence" unit="%" scale={100} min={0.25} max={2} step={0.05} value={brush.pressureSpeed ?? 1} onChange={(v) => set({ pressureSpeed: v })} />}

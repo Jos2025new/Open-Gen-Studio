@@ -127,3 +127,8 @@
 .tool-dock-actions .guides-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px; width: 100%; align-items: start; }
 .guides-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .guides-col .canvas-size-dims input[type='number'] { width: 70px; }
+/* Brush Tip Shape widget: the ellipse with its handles on the left, Angle and Roundness fields on the right. */
+.brush-tip-shape { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brush-tip-shape svg { flex: none; color: var(--text-2); touch-action: none; }
+.brush-tip-shape .tip-handle { cursor: grab; }
+.brush-tip-fields { display: flex; flex-direction: column; gap: 6px; flex: 1 1 0; min-width: 0; }
