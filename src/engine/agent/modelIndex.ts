@@ -7,6 +7,7 @@ import { REMOTE_PROVIDERS } from '../providers/registry';
 import { modelFit } from '../modelRules';
 import type { MediaKind, ModelSchema, ModelSummary } from '../types';
 import { useStore } from '../../store/store';
+import { limitsLine, loadLimits } from './modelLimits';
 
 /*
  * The models the agent may route to on request: only the app's refined catalog (the priority families in
@@ -115,7 +116,8 @@ export function describeIndexed(m: ModelSummary): string {
   const prompt = [s?.promptRefs ? `prompt: ${s.promptRefs}` : '', s?.promptMax ? `prompt ≤${s.promptMax} chars` : ''].filter(Boolean).join('; ');
   const fit = modelFit(m.id);
   const guide = guideForModel(m.id);
-  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}${guide ? ` — prompting guide: model:${guide.id}${guide.optional ? ' (optional)' : ''}` : ''}`;
+  const limits = m.kind === 'video' || m.kind === 'image' ? limitsLine(m.ref) : '';
+  return `${m.ref} — ${m.kind} — ${m.name} — inputs: ${inputs} — ${price}${limits ? ` — takes: ${limits}` : ''}${prompt ? ` — ${prompt}` : ''}${fit ? ` — ${fit}` : ''}${guide ? ` — prompting guide: model:${guide.id}${guide.optional ? ' (optional)' : ''}` : ''}`;
 }
 
 /** find_models tool result: one line per match, or a short "nothing found" the agent can act on. */
@@ -131,6 +133,8 @@ export async function findModelsResult(query: string, kind: MediaKind | undefine
   const found = searchIndex(indexedModels(), query, { kind });
   const note = failed.length ? `\n(The model list of ${failed.map((p) => PROVIDER_LABELS[p]).join(', ')} could not be loaded: a model there cannot be confirmed or ruled out — tell the user that, never that it does not exist.)` : '';
   if (!found.length) return failed.length ? `No match in the lists that loaded for "${query}".${note}` : `No supported model matches "${query}". Tell the user it is not available in the app and offer the closest listed model.`;
+  // What each model takes (lengths, resolutions, shapes) comes with it, so the plan never asks for what it cannot make.
+  await loadLimits(found.filter((m) => m.kind === 'video' || m.kind === 'image').slice(0, 6).map((m) => m.ref));
   return found.map(describeIndexed).join('\n') + note;
 }
 

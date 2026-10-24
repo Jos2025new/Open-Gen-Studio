@@ -84,6 +84,7 @@ import { modelGuide } from '../guides';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 import { settingsResultText } from './settingsResult';
 import { autoConfirmSettings } from './autoSettings';
+import { durationProblem, limitsLine, resolutionNote } from './modelLimits';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
@@ -1490,10 +1491,13 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
               { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
             ));
             if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
+            const long = d.kind === 'video' ? durationProblem(built.recommended.modelRef, d.duration, offerRequest(ag()), Object.keys(ag().draft?.answers ?? {}).length > 0) : undefined;
+            log.action({ icon: 'search', label: `Checked ${(await resolveModel(built.recommended.modelRef))?.model.name ?? built.recommended.modelRef}`, detail: limitsLine(built.recommended.modelRef) || undefined });
+            if (long) { failed = long; break; }
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
           }
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, workspace, call.id, v.data.summary, sections, parts)); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, workspace, call.id, v.data.summary, sections, parts) + sections.map((x) => resolutionNote(x.recommended.modelRef, offerRequest(ag()))).join('')); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);

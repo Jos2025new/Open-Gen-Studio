@@ -22,8 +22,10 @@ export default [
       ['src/components/chat/PlanCard.tsx', 'planSections(feed'],
       ['src/components/chat/PlanSettings.tsx', '<SettingsSectionBlock'],
       ['src/components/chat/SettingsCard.tsx', 'export function SettingsSectionBlock'],
+      ['src/engine/agent/runtime.ts', 'durationProblem('],
+      ['src/engine/agent/modelIndex.ts', 'limitsLine(m.ref)'],
     ],
-    tests: ['tests/auto-plan-card.test.ts'],
+    tests: ['tests/auto-plan-card.test.ts', 'tests/model-limits.test.ts'],
   },
   {
     id: 'model-switch',
