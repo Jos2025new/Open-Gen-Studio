@@ -116,3 +116,34 @@ describe('gradient handles', () => {
     expect(gradientKnots(r).map((k) => k.k)).toEqual(['p1', 'p2']);
   });
 });
+
+describe('primitive handles: full circle and the wrap (no sudden jumps)', () => {
+  const span = (s: ShapeSpec) => { const d = ((((s.prim!.a1 ?? 0) - (s.prim!.a0 ?? 0)) % 360) + 360) % 360; return d === 0 ? 360 : d; };
+  const apply = (s: ShapeSpec, patch: Partial<ShapeSpec> | null) => ({ ...s, ...patch }) as ShapeSpec;
+
+  it('a full circle (equal angles) shows one handle, not two on the same point', () => {
+    const s = shape({ kind: 'arc', a0: 270, a1: 270 });
+    expect(primKnots(s).map((k) => k.k)).toEqual(['from']);
+    expect(primKnots(shape({ kind: 'arc', a0: 270, a1: 10 })).map((k) => k.k)).toEqual(['from', 'to']);
+  });
+
+  it('dragging the start of a full circle across the end never flips it to a sliver', () => {
+    let s = shape({ kind: 'chord', a0: 270, a1: 270 });
+    let prev = span(s);
+    for (let deg = 268; deg <= 275; deg += 1) { // the pointer passes the other handle
+      s = apply(s, primKnotDrag(s, 'from', toBox(s, unitAt(deg)))!);
+      expect(Math.abs(span(s) - prev)).toBeLessThanOrEqual(180);
+      prev = span(s);
+    }
+  });
+
+  it('the angle wraps through 0/360 without a jump in the span', () => {
+    let s = shape({ kind: 'sector', a0: 10, a1: 100 });
+    let prev = span(s);
+    for (let deg = 20; deg >= -20; deg -= 5) {
+      s = apply(s, primKnotDrag(s, 'from', toBox(s, unitAt((deg + 360) % 360)))!);
+      expect(Math.abs(span(s) - prev)).toBeLessThan(30);
+      prev = span(s);
+    }
+  });
+});

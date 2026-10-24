@@ -1,8 +1,9 @@
 import type { DesignDoc } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
 import { pixelTarget } from '../../engine/design/autoSelect';
-import { objectAt, layerObjects } from '../../engine/design/objectOps';
-import { marqueeBounds, marqueeIds } from '../../engine/design/marquee';
+import { objectAt } from '../../engine/design/objectOps';
+import { marqueeBounds } from '../../engine/design/marquee';
+import { marqueeFind } from '../../engine/design/marqueePick';
 import { layerSelection, setLayerPicks } from '../../engine/design/selection';
 import { objectPick, setObjectPick } from '../../engine/design/objectSelection';
 import { setActiveLayer, getDoc } from '../../engine/design/actions';
@@ -69,29 +70,27 @@ export function finishEditMarquee(args: {
     return;
   }
   const current = getDoc(sessionId, doc.id) ?? doc;
-  const found = drag.mode === 'objects'
-    ? (() => {
-        const layer = current.layers.find((l) => l.id === current.activeLayerId);
-        if (!layer || !layer.visible || layer.locked) return [];
-        return marqueeIds(layerObjects(layer).map((o) => ({ id: o.id, box: o.box })), drag.startX, drag.startY, drag.x, drag.y);
-      })()
-    : marqueeIds(current.layers.filter((l) => l.visible && l.type !== 'fx').flatMap((l) => {
-        const box = layerBox(l);
-        return box ? [{ id: l.id, box }] : [];
-      }), drag.startX, drag.startY, drag.x, drag.y);
-  if (drag.mode === 'objects') {
+  const find = marqueeFind(current, drag.startX, drag.startY, drag.x, drag.y);
+  const activeId = current.activeLayerId;
+  // Objects mode: a rectangle that reaches only the active layer's objects picks those objects; one that reaches
+  // other layers or painted pixels (a baked drawing has no objects) picks whole layers, as Layers mode does.
+  const onlyActive = drag.mode === 'objects' && activeId != null && find.layers.length > 0 && find.layers.every((id) => id === activeId) && find.objects.has(activeId);
+  if (onlyActive) {
     const cur = objectPick(doc.id);
-    const base = cur?.layerId === current.activeLayerId ? cur.ids : [];
-    const ids = combineSelection(base, found, drag.combine);
+    const base = cur?.layerId === activeId ? cur.ids : [];
+    const ids = combineSelection(base, find.objects.get(activeId!)!, drag.combine);
     setLayerPicks(doc.id, []);
-    setObjectPick(doc.id, ids.length ? { layerId: current.activeLayerId!, ids } : null);
+    setObjectPick(doc.id, ids.length ? { layerId: activeId!, ids } : null);
+  } else if (find.layers.length === 0 && drag.combine !== 'replace') {
+    return;
   } else {
-    const base = layerSelection(doc.id, current.activeLayerId, current.layers.map((l) => l.id));
-    const ids = combineSelection(base, found, drag.combine);
+    const cur = objectPick(doc.id);
+    const base = cur ? [cur.layerId] : layerSelection(doc.id, activeId, current.layers.map((l) => l.id));
+    const ids = combineSelection(base, find.layers, drag.combine);
     setObjectPick(doc.id, null);
     setLayerPicks(doc.id, ids);
-    const activeId = ids.includes(current.activeLayerId ?? '') ? current.activeLayerId : ids.at(-1) ?? null;
-    if (activeId !== current.activeLayerId) setActiveLayer(sessionId, doc.id, activeId);
+    const nextActive = ids.includes(activeId ?? '') ? activeId : ids.at(-1) ?? null;
+    if (nextActive !== activeId) setActiveLayer(sessionId, doc.id, nextActive);
   }
 }
 

@@ -26,6 +26,9 @@ export const unitAt = (deg: number): Pt => { const r = ((deg - 90) * Math.PI) / 
 /** The angle of a unit point, in degrees clockwise from the top, 0–360. */
 export const angleOf = (u: Pt): number => (((Math.atan2(u[1], u[0]) * 180) / Math.PI + 90) % 360 + 360) % 360;
 
+const spanOf = (a0: number, a1: number) => { const d = (((a1 - a0) % 360) + 360) % 360; return d === 0 ? 360 : d; };
+const isFullTurn = (p: { a0?: number; a1?: number }) => spanOf(p.a0 ?? 0, p.a1 ?? 270) === 360;
+
 /** Where each handle of a primitive is, in box coordinates. Empty for a plain path. */
 export function primKnots(s: ShapeSpec): Array<{ k: PrimKnot; p: Pt }> {
   if (!s.prim) return [];
@@ -39,6 +42,8 @@ export function primKnots(s: ShapeSpec): Array<{ k: PrimKnot; p: Pt }> {
     out.push({ k: 'round', p: toBox(s, [v[0][0] + (v[1][0] - v[0][0]) * t, v[0][1] + (v[1][1] - v[0][1]) * t]) });
     return out;
   }
+  // Equal angles draw the full circle: both handles would sit on one point, so only the start shows (the end appears once it leaves).
+  if (isFullTurn(p)) return [{ k: 'from', p: toBox(s, unitAt(p.a0 ?? 0)) }];
   return [{ k: 'from', p: toBox(s, unitAt(p.a0 ?? 0)) }, { k: 'to', p: toBox(s, unitAt(p.a1 ?? 270)) }];
 }
 
@@ -65,5 +70,11 @@ export function primKnotDrag(s: ShapeSpec, k: PrimKnot, q: Pt, snap15 = false): 
   }
   let deg = angleOf(u);
   if (snap15) deg = Math.round(deg / 15) * 15 % 360;
+  // The span a0 → a1 is continuous except where the dragged handle crosses the other one (full circle ↔ sliver). A
+  // move that would jump the span by more than half a turn stays on the side the shape was on: the handle stops at
+  // the other one (full circle, or the thinnest slice) instead of the shape flipping.
+  const a0 = p.a0 ?? 0, a1 = p.a1 ?? 270, other = k === 'from' ? a1 : a0;
+  const now = spanOf(a0, a1), next = k === 'from' ? spanOf(deg, a1) : spanOf(a0, deg);
+  if (Math.abs(next - now) > 180) deg = now > 180 ? other : (other + (k === 'from' ? -1 : 1) + 360) % 360;
   return withPrim(s, k === 'from' ? { a0: deg } : { a1: deg }) as Partial<ShapeSpec>;
 }
