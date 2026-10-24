@@ -48,7 +48,7 @@ import { screenToDocument, zoomAt, type View } from '../../engine/design/viewCoo
 import { useCursorPreview } from '../../engine/design/useCursorPreview';
 import { BrushCursor } from './BrushCursor';
 import { uid } from '../../lib/id';
-import { clickCandidate, topObjectLayer } from '../../engine/design/autoSelect';
+import { clickCandidate, pixelTarget } from '../../engine/design/autoSelect';
 import { usePanRequest } from './usePanRequest';
 import { commitStagePaintGesture, drawingChoiceFirst, pixelsNotReady, prepareStagePaint, type StagePaintGesture } from './StagePaintCommit';
 import { paintsPixelsDirectly } from '../../engine/design/paintMode';
@@ -677,7 +677,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       }
       setSelectedCurve(null);
 
-      const marquee = beginEditMarquee({ doc: current, point: p, layersMode: editLayers, shift: e.shiftKey, alt: e.altKey });
+      const marquee = beginEditMarquee({ doc: current, point: p, layersMode: editLayers, shift: e.shiftKey, alt: e.altKey, autoSelect: useStore.getState().ui.autoSelect ?? false });
       if (marquee) {
         drag.current = marquee;
         setEditMarquee({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
@@ -695,7 +695,6 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
         if (additive) {
           if (pickedLayerIds.length < 2 && owner(act) && objectAt(act!, p.x, p.y) && (!currentObject || currentObject.layerId === act!.id)) layer = act!;
         } else if (owner(top) && objectAt(top!, p.x, p.y)) layer = top;
-        else if (!top) layer = topObjectLayer(current.layers, (l) => !!objectAt(l, p.x, p.y), act);
         const id = layer ? objectAt(layer, p.x, p.y) : null;
         if (layer && id) {
           if (layer.type === 'raster' && layer.paintBaseId && !getRasterSurface(layer.paintBaseId)) return void toast(pixelsNotReady([layer.paintBaseId]), 'error');
@@ -736,8 +735,9 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           return;
         }
         // A layer with no parts (image, text, a painted layer without strokes): its content is the object.
-        const whole = hitTestPixel(current, p.x, p.y);
-        if (whole && !(useStore.getState().ui.autoSelect ?? false) && whole.id !== current.activeLayerId) return;
+        const auto = useStore.getState().ui.autoSelect ?? false;
+        const whole = auto ? hitTestPixel(current, p.x, p.y) : pixelTarget(current, p.x, p.y, false);
+        if (!whole && !auto && hitTestPixel(current, p.x, p.y)) return;
         setObjectPick(doc.id, null);
         // Plain click on empty canvas clears both stores; a hit replaces a different layer group.
         if (!whole) {

@@ -1,4 +1,5 @@
-import type { Layer } from '../types';
+import type { DesignDoc, Layer } from '../types';
+import { hitTestPixel } from './render';
 
 /*
  * What a click on the canvas acts on (Photoshop's Auto-select). Off (the default): the active layer, and only when the
@@ -10,11 +11,11 @@ export function clickCandidate(autoSelect: boolean, topmost: Layer | null, activ
 }
 
 /**
- * Objects mode, when the layer a click would act on has no object under the pointer: the topmost visible, unlocked layer
- * that has one (the active layer first), so the click never falls into nothing.
+ * Edit tool, Objects mode: the layer whose painted pixels (alpha) are under the pointer, for baked drawings with no
+ * objects. Auto-select on: the topmost one; off: only the active layer. Hidden and locked layers are never a target.
  */
-export function topObjectLayer(layers: Layer[], hasObject: (l: Layer) => boolean, preferred?: Layer | null): Layer | null {
-  if (preferred && preferred.visible && !preferred.locked && hasObject(preferred)) return preferred;
-  for (let i = layers.length - 1; i >= 0; i--) if (layers[i].visible && !layers[i].locked && hasObject(layers[i])) return layers[i];
-  return null;
+export function pixelTarget(doc: DesignDoc, x: number, y: number, autoSelect: boolean): Layer | null {
+  if (autoSelect) { const h = hitTestPixel(doc, x, y); return h && h.visible && !h.locked ? h : null; }
+  const a = doc.layers.find((l) => l.id === doc.activeLayerId);
+  return a && a.visible && !a.locked && hitTestPixel({ ...doc, layers: [a] }, x, y) ? a : null;
 }

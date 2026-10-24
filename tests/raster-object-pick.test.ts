@@ -8,7 +8,9 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 import { layerObjects, objectAt, translateObjects } from '../src/engine/design/objectOps';
-import { topObjectLayer } from '../src/engine/design/autoSelect';
+import { setBuffer } from '../src/engine/design/raster';
+import { pixelTarget } from '../src/engine/design/autoSelect';
+import { editAreaOccupied } from '../src/components/designer/StageEditMarquee';
 import { newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
 import type { RasterLayer, RasterStroke } from '../src/engine/types';
 
@@ -32,19 +34,31 @@ describe('painted strokes of a layer that is shown through a transform', () => {
   });
 });
 
-describe('a click in Objects mode falls on the top object of any visible, unlocked layer', () => {
-  const active = paint([stroke('a', 100, 100, 200, 100)]);
-  const other = { ...paint([stroke('b', 600, 600, 700, 600)]), id: 'other' } as RasterLayer;
-  const hits = (l: RasterLayer | ReturnType<typeof newVectorLayer>, x: number, y: number) => Boolean(objectAt(l, x, y));
-  it('takes the strokes of another layer when the active one has nothing there', () => {
-    const layers = [other, active];
-    expect(hits(active, 650, 600)).toBe(false);
-    expect(topObjectLayer(layers, (l) => hits(l as RasterLayer, 650, 600))?.id).toBe('other');
+describe('Edit in Objects mode on a baked drawing (no strokes)', () => {
+  const baked = (id: string) => ({ ...paint([]), id, paintBaseId: undefined, paintStrokes: undefined }) as RasterLayer;
+  const other = baked('other'), active = baked('active');
+  // Pixels painted at x 0..99 / y 0..99 of each layer, the rest transparent.
+  const canvas = { width: 1000, height: 1000, getContext: () => ({ getImageData: () => { const d = new Uint8ClampedArray(4_000_000); for (let y = 0; y < 100; y++) for (let x = 0; x < 100; x++) d[(y * 1000 + x) * 4 + 3] = 255; return { data: d }; } }) } as unknown as HTMLCanvasElement;
+  for (const l of [other, active]) setBuffer(l.id, canvas, false);
+  const doc = { layers: [other, active], activeLayerId: 'active' } as never;
+  const onPixels = { x: 50, y: 50 }, empty = { x: 500, y: 500 };
+  it('auto-select on: the topmost painted layer under the pointer is the target, active or not', () => {
+    const d = { layers: [active, other], activeLayerId: 'active' } as never;
+    expect(pixelTarget(d, 50, 50, true)?.id).toBe('other');
+    expect(editAreaOccupied(d, onPixels, 'objects', true)).toBe(true);
   });
-  it('skips hidden and locked layers, and takes the topmost of several', () => {
-    const top = { ...other, id: 'top' } as RasterLayer;
-    expect(topObjectLayer([top, other], (l) => hits(l as RasterLayer, 650, 600))?.id).toBe('other');
-    expect(topObjectLayer([{ ...other, visible: false }, { ...top, locked: true }], () => true)).toBeNull();
-    expect(topObjectLayer([other, active], () => true)?.id).toBe(active.id);
+  it('auto-select off: only the active layer; other layers do nothing', () => {
+    const d = { layers: [active, other], activeLayerId: 'other' } as never;
+    expect(pixelTarget(doc, 50, 50, false)?.id).toBe('active');
+    expect(pixelTarget(d, 50, 50, false)?.id).toBe('other');
+    const none = { layers: [other], activeLayerId: 'zzz' } as never;
+    expect(pixelTarget(none, 50, 50, false)).toBeNull();
+    expect(editAreaOccupied(none, onPixels, 'objects', false)).toBe(false);
+  });
+  it('hidden or locked layers are never a target; transparent pixels start the marquee', () => {
+    expect(pixelTarget({ layers: [{ ...active, locked: true }], activeLayerId: 'active' } as never, 50, 50, true)).toBeNull();
+    expect(pixelTarget({ layers: [{ ...active, visible: false }], activeLayerId: 'active' } as never, 50, 50, false)).toBeNull();
+    expect(pixelTarget(doc, empty.x, empty.y, true)).toBeNull();
+    expect(editAreaOccupied(doc, empty, 'objects', true)).toBe(false);
   });
 });

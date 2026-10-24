@@ -1,5 +1,6 @@
 import type { DesignDoc } from '../../engine/types';
 import { layerBox } from '../../engine/design/render';
+import { pixelTarget } from '../../engine/design/autoSelect';
 import { objectAt, layerObjects } from '../../engine/design/objectOps';
 import { marqueeBounds, marqueeIds } from '../../engine/design/marquee';
 import { layerSelection, setLayerPicks } from '../../engine/design/selection';
@@ -12,10 +13,10 @@ export interface EditMarqueeDrag {
 }
 
 export function beginEditMarquee(args: {
-  doc: DesignDoc; point: { x: number; y: number }; layersMode: boolean; shift: boolean; alt: boolean;
+  doc: DesignDoc; point: { x: number; y: number }; layersMode: boolean; shift: boolean; alt: boolean; autoSelect?: boolean;
 }): EditMarqueeDrag | null {
   const mode = args.layersMode ? 'layers' : 'objects';
-  if (editAreaOccupied(args.doc, args.point, mode)) return null;
+  if (editAreaOccupied(args.doc, args.point, mode, args.autoSelect)) return null;
   return {
     kind: 'editMarquee', startX: args.point.x, startY: args.point.y,
     x: args.point.x, y: args.point.y, mode,
@@ -29,8 +30,10 @@ export function updateEditMarquee(drag: EditMarqueeDrag, point: { x: number; y: 
   return { x0: drag.startX, y0: drag.startY, x1: point.x, y1: point.y };
 }
 
-export function editAreaOccupied(doc: DesignDoc, p: { x: number; y: number }, mode: EditMarqueeDrag['mode']): boolean {
-  if (mode === 'objects') return doc.layers.some((l) => l.visible && !l.locked && objectAt(l, p.x, p.y) != null);
+export function editAreaOccupied(doc: DesignDoc, p: { x: number; y: number }, mode: EditMarqueeDrag['mode'], autoSelect = false): boolean {
+  if (mode === 'objects') {
+    return doc.layers.some((l) => l.visible && !l.locked && objectAt(l, p.x, p.y) != null) || pixelTarget(doc, p.x, p.y, autoSelect) != null;
+  }
   return doc.layers.some((l) => {
     if (!l.visible || l.type === 'fx') return false;
     const b = layerBox(l);

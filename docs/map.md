@@ -30,13 +30,13 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 42 |
 | [params.ts](../src/engine/params.ts) | 38 | 17 |
 | [catalog.ts](../src/engine/catalog.ts) | 34 | 18 |
-| [raster.ts](../src/engine/design/raster.ts) | 32 | 22 |
+| [raster.ts](../src/engine/design/raster.ts) | 32 | 23 |
 | [actions.ts](../src/engine/actions.ts) | 28 | 19 |
 | [format.ts](../src/lib/format.ts) | 28 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 26 | 6 |
 | [id.ts](../src/lib/id.ts) | 26 | 0 |
 | [objectSelection.ts](../src/engine/design/objectSelection.ts) | 20 | 6 |
-| [render.ts](../src/engine/design/render.ts) | 19 | 8 |
+| [render.ts](../src/engine/design/render.ts) | 20 | 8 |
 | [matrix.ts](../src/engine/design/matrix.ts) | 18 | 4 |
 | [idb.ts](../src/lib/idb.ts) | 18 | 199 |
 | [AssetMedia.tsx](../src/components/ui/AssetMedia.tsx) | 17 | 0 |
@@ -49,7 +49,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/assets` | 16 | 5 |
 | `src/components/chat` | 21 | 11 |
 | `src/components/composer` | 11 | 7 |
-| `src/components/designer` | 47 | 18 |
+| `src/components/designer` | 47 | 19 |
 | `src/components/gallery` | 1 | 1 |
 | `src/components/node` | 8 | 4 |
 | `src/components/shell` | 26 | 15 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 229 |
 | `src/store` | 13 | 165 |
 
-159 de 439 módulos no tienen ningún test que los importe directamente.
+158 de 439 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 
