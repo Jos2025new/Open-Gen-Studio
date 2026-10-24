@@ -81,7 +81,6 @@ import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults }
 import { overLimit, overLimitText, rerunNote } from '../budget';
 import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { modelGuide } from '../guides';
-import { repeatedConfirmation } from './confirmRepeat';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 import { settingsResultText } from './settingsResult';
 import { autoConfirmSettings } from './autoSettings';
@@ -1494,12 +1493,11 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
           }
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          const stands = await repeatedConfirmation(sessionId, sections, parts); if (stands) { respond(stands); continue; }
           if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, workspace, call.id, v.data.summary, sections, parts)); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
-          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model);
+          const sw = await switchSection(sections, ag().settings, ag().settingsParts, offerRequest(ag()), parts[0]?.model, undefined, parts[0]);
           const kept = sw ? undefined : await keepConfirmed(sections, ag().settings, parts, (k) => (composerChosen(k) ? get().composer[k].modelRef : undefined));
           const item: SettingsFeedItem = { ...feedBase(workspace), type: 'settings', summary: v.data.summary, status: 'pending', toolCallId: call.id, ...cardDraft(sessionId, sw ? [sw.section] : kept!.sections), ...(sw ? { switchFrom: sw.from, followUp: sw.followUp } : { keptAsked: kept!.asked }) };
           appendFeed(sessionId, item);

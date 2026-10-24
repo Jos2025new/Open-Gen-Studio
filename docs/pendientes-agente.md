@@ -6,7 +6,7 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 
 ## Agente (A)
 
-- **A1 · crítico · 2026-10-22 (familia E del 2026-10-16) · `confirm_settings` repetida tras la primera confirmación.** **Hecho (código y test: `confirmRepeat.ts`, `tests/a1-confirm-repeat.test.ts`); sin prueba visual ni con LLM real.**
+- **A1 · crítico · 2026-10-22 (familia E del 2026-10-16) · `confirm_settings` repetida tras la primera confirmación.** **Hecho y luego sustituido (2026-10-24):** Auto ya no muestra tarjeta de ajustes ([Auto: una tarjeta](features/agente-auto-tarjeta.md)); `confirmRepeat.ts` se eliminó y `tests/a1-confirm-repeat.test.ts` prueba lo nuevo.
   - Visto: en la sesión `ses_mvjaoagaqi0lng5tpk` (GPT-6 Luna, Auto) el usuario pidió un solo cambio («Haz a la presentadora más blanca») y el agente llamó otra vez a `confirm_settings` con el mismo modelo ya confirmado (`openrouter::bytedance-seed/seedream-5-0-flash`, 1K, 3:4). La app no tiene guarda: cada llamada pone una tarjeta a esperar un clic (`runtime.ts` ~1497 a 1531; **código**).
   - Por qué es crítico: es fricción de uso. Regla del usuario: tras la primera confirmación solo deben salir tarjetas de precio o de pregunta.
   - Empujones probables: `context.ts:291` («confirm_settings again only to change them») y las líneas ~48 y ~58 de la guía de proceso. `context.ts` no puede crecer (ADR 0008): el texto nuevo va a `changeRules.ts`.

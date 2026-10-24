@@ -152,3 +152,29 @@ describe('plan card settings', () => {
     expect(steps().find((x) => x.kind === 'image')?.settings).toMatchObject({ aspect: '1:1' });
   });
 });
+
+describe('Auto: which model and values, without a card (sandbox session 2026-10-24)', () => {
+  beforeEach(setup);
+  const withAspects = () => useStore.setState((s) => ({ catalog: { ...s.catalog, schemas: Object.fromEntries(Object.entries(s.catalog.schemas).map(([r, sc]) => [r, r === ATLAS || r === LITE ? { ...sc, params: [{ key: 'aspect_ratio', label: 'Aspect', role: 'aspect', type: 'enum', options: ['1:1', '16:9', '4:3', '9:16'], default: '1:1' }] } as ModelSchema : sc])) } }));
+
+  it('(g) a model switch keeps the values this request asked for, not the ones confirmed before', async () => {
+    withAspects();
+    script = [ask({ model: 'nano banana 2 lite', aspect: '4:3' }), proposal(LITE)];
+    await sendAgentMessage('Ahora con nano banana 2 lite, en 4:3');
+    expect(settingsItems()[0].sections[0].chosen).toMatchObject({ modelRef: LITE, aspect: '4:3' });
+  });
+
+  it('(h) no model named: the one picked in the composer is the model, not the confirmed one', async () => {
+    useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } } }));
+    script = [ask({ model: ATLAS }), proposal()];
+    await sendAgentMessage('Una imagen de un faro');
+    expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(LITE);
+  });
+
+  it('(i) a model named in the request wins over the composer pick', async () => {
+    useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } }, sessions: { ...s.sessions, [sid()]: { ...st(), agent: { ...st().agent, settings: undefined } } } }));
+    script = [ask({ model: ATLAS }), proposal(ATLAS)];
+    await sendAgentMessage('Una imagen de un faro con nano banana 2');
+    expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(ATLAS);
+  });
+});

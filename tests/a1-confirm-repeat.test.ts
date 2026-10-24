@@ -48,7 +48,9 @@ function setup(style: 'auto' | 'guided' = 'auto') {
     sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { image: { modelRef: ATLAS, resolution: '1K', needsImage: false, count: 1, aspect: '3:4' } } } } },
   });
 }
-const cards = () => st().feed.filter((f) => f.type === 'settings') as SettingsFeedItem[];
+/** Visible cards; Auto confirms with an inline item the feed does not draw (docs/features/agente-auto-tarjeta.md). */
+const cards = () => st().feed.filter((f) => f.type === 'settings' && !f.inline) as SettingsFeedItem[];
+const inline = () => st().feed.filter((f) => f.type === 'settings' && f.inline) as SettingsFeedItem[];
 const ask = (part: Record<string, unknown>) => ({ name: 'confirm_settings', args: { parts: [{ kind: 'image', ...part }] } });
 const plan = { name: 'propose_plan', args: { title: 'P', steps: [{ id: 's1', kind: 'image', title: 'I', prompt: 'p', count: 1 }] } };
 
@@ -70,22 +72,25 @@ describe('A1: confirm_settings repeated after the first confirmation', () => {
     expect(cards()).toHaveLength(0);
   });
 
-  it('a different model line still gets the card', async () => {
+  it('Auto: a different model line is applied without a card', async () => {
     script = [ask({ model: LITE })];
     await sendAgentMessage('Haz a la presentadora más blanca');
-    expect(cards()).toHaveLength(1);
+    expect(cards()).toHaveLength(0);
+    expect(inline()).toHaveLength(1);
   });
 
-  it('the user asks to change the model: the card appears', async () => {
+  it('Auto: the user asks to change the model: still no card', async () => {
     script = [ask({ model: ATLAS })];
     await sendAgentMessage('Cambia el modelo y haz a la presentadora más blanca');
-    expect(cards()).toHaveLength(1);
+    expect(cards()).toHaveLength(0);
+    expect(inline()).toHaveLength(1);
   });
 
-  it('the user asks for another resolution: the card appears', async () => {
+  it('Auto: the user asks for another resolution: still no card', async () => {
     script = [ask({ model: ATLAS })];
     await sendAgentMessage('Hazlo en resolución 2K');
-    expect(cards()).toHaveLength(1);
+    expect(cards()).toHaveLength(0);
+    expect(inline()).toHaveLength(1);
   });
 
   it('Guided keeps asking every request', async () => {
@@ -99,25 +104,7 @@ describe('A1: confirm_settings repeated after the first confirmation', () => {
     useStore.setState((s) => ({ composer: { ...s.composer, image: { ...s.composer.image, modelRef: LITE }, userPicked: { ...(s.composer.userPicked ?? {}), image: true } } }));
     script = [ask({ model: ATLAS })];
     await sendAgentMessage('Haz a la presentadora más blanca');
-    expect(cards()).toHaveLength(1);
-  });
-});
-
-import { repeatedConfirmation } from '../src/engine/agent/confirmRepeat';
-describe('A1: a video card is skipped only when a draft choice was already confirmed (no loop with the draft gate)', () => {
-  it('no draft choice yet: the card is shown; with one: the settings stand', async () => {
-    const V = 'atlas::alibaba/wan-3.0/text-to-video';
-    const s = useStore.getState();
-    useStore.setState({
-      settings: { ...s.settings, keys: { ...s.settings.keys, atlas: 'k' } },
-      composer: { ...s.composer, agentStyle: 'auto', userPicked: {} },
-      catalog: { ...s.catalog, models: { ...s.catalog.models, [V]: { ref: V, id: V.split('::')[1], provider: 'atlas', kind: 'video', name: 'Wan', acceptsText: true, tags: [] } as unknown as ModelSummary }, schemas: { ...s.catalog.schemas, [V]: { ref: V, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema } },
-      sessions: { ...s.sessions, [sid()]: { ...s.sessions[sid()], feed: [{ id: 'u', type: 'user', text: 'otra toma igual', createdAt: 1 } as never], agent: { history: [], questionRound: 0, notes: [], busy: false, settings: { video: { modelRef: V, needsImage: false } } } } },
-    });
-    const sections = [{ kind: 'video', count: 1, recommended: { modelRef: V }, alternatives: [] }] as never;
-    expect(await repeatedConfirmation(sid(), sections, [{ kind: 'video' }])).toBeUndefined();
-    const card = { id: 'c', type: 'settings', status: 'confirmed', draft: { kind: 'draft', locked: true }, createdAt: 0 } as never;
-    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...x.sessions[sid()], feed: [card, { id: 'u', type: 'user', text: 'una toma igual', createdAt: 1 } as never] } } }));
-    expect(await repeatedConfirmation(sid(), sections, [{ kind: 'video' }])).toMatch(/settings already confirmed/);
+    expect(cards()).toHaveLength(0);
+    expect(inline()[0].sections[0].chosen?.modelRef).toBe(LITE);
   });
 });

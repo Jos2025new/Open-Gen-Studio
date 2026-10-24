@@ -18,6 +18,8 @@ export async function switchSection(
   requestText: string,
   written: string | undefined,
   follow?: { switchedTo: AgentState['switchedTo']; auto: boolean },
+  /** What this request's confirm_settings asked (duration, aspect): it wins over the values carried from the confirmed model. */
+  asked?: { duration?: number; aspect?: string },
 ): Promise<{ section: SettingsSection; from: SettingsChoice; followUp?: boolean; change?: ModelChange } | undefined> {
   const sec = sections[0];
   const from = sec && sections.length === 1 ? confirmed?.[sec.kind] : undefined;
@@ -31,7 +33,7 @@ export async function switchSection(
     if (!to || userNamed([was.model.name], requestText)) return undefined;
     return { section: { ...sec, recommended: { ...to, needsImage: sec.recommended.needsImage }, alternatives: sec.alternatives.filter((r) => r !== to.modelRef && r !== from.modelRef) }, from, followUp: true };
   }
-  const carried = defaultChoice(sec.recommended.modelRef, now.schema, { kind: sec.kind, startImage: sec.recommended.needsImage, count: from.count }, { ...from, modelRef: sec.recommended.modelRef });
+  const carried = defaultChoice(sec.recommended.modelRef, now.schema, { kind: sec.kind, startImage: sec.recommended.needsImage, count: from.count }, { ...from, modelRef: sec.recommended.modelRef, ...(asked?.duration ? { duration: asked.duration } : {}), ...(asked?.aspect ? { aspect: asked.aspect } : {}) });
   return { section: { ...sec, count: from.count ?? sec.count, recommended: { ...carried, needsImage: sec.recommended.needsImage } }, from, change };
 }
 

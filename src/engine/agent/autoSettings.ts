@@ -1,5 +1,7 @@
 import { uid } from '../../lib/id';
-import { composerChosen } from '../catalog';
+import { composerChosen, modelSummary, resolveModel } from '../catalog';
+import { userNamed } from '../modelNaming';
+import { defaultChoice } from './settingsCard';
 import { offerRequest } from '../modelNamed';
 import { appendFeed, patchSession, useStore } from '../../store/store';
 import type { AgentState, SettingsChoice, SettingsFeedItem, SettingsSection, Workspace } from '../types';
@@ -17,8 +19,18 @@ import { confirmedState, keepConfirmed, switchSection } from './switchModel';
  */
 export async function autoConfirmSettings(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: Array<{ kind: string; model?: string }>): Promise<string> {
   const agent = () => useStore.getState().sessions[sessionId].agent;
-  const sw = await switchSection(sections, agent().settings, agent().settingsParts, offerRequest(agent()), parts[0]?.model);
-  const chosen = sw ? [sw.section] : (await keepConfirmed(sections, agent().settings, parts, (k) => (composerChosen(k) ? useStore.getState().composer[k].modelRef : undefined))).sections;
+  const sw = await switchSection(sections, agent().settings, agent().settingsParts, offerRequest(agent()), parts[0]?.model, undefined, parts[0] as { duration?: number; aspect?: string });
+  const picked = (k: SettingsSection['kind']) => (composerChosen(k) ? useStore.getState().composer[k].modelRef : undefined);
+  const kept = sw ? [sw.section] : (await keepConfirmed(sections, agent().settings, parts, picked)).sections;
+  // No model named now: the one picked in the composer is the model, with the values this request asked for.
+  const chosen = sw ? kept : await Promise.all(kept.map(async (x) => {
+    const ref = picked(x.kind);
+    const named = userNamed([modelSummary(x.recommended.modelRef)?.name ?? ''], offerRequest(agent()));
+    const got = ref && ref !== x.recommended.modelRef && !named ? await resolveModel(ref) : undefined;
+    if (!got) return x;
+    const r = x.recommended;
+    return { ...x, recommended: { ...defaultChoice(ref!, got.schema, { kind: x.kind, startImage: r.needsImage, duration: r.duration, aspect: r.aspect, count: r.count }), needsImage: r.needsImage }, alternatives: [r.modelRef, ...x.alternatives.filter((a) => a !== ref && a !== r.modelRef)] };
+  }));
   const draft = cardDraft(sessionId, chosen.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })));
   const base: SettingsFeedItem = { id: uid('fd'), createdAt: Date.now(), workspace, type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, ...draft };
   const item: SettingsFeedItem = { ...base, sections: confirmedSections(base, base.sections) };
