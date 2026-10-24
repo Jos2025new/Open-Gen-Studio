@@ -207,6 +207,21 @@ describe('each image of a request is named for what it is', () => {
     expect(redact(`data:image/jpeg;base64,${toB64(bytes.slice(0, 65539))}`, { mime: 'image/jpeg', width: 999, height: 999 })).toBe('<image, 66 KB>');
   });
 
+  it('a large video or an oversized JPEG is never decoded whole: only its head, so logging a request cannot freeze the UI', async () => {
+    const { redact } = await import('../src/lib/debug');
+    const decoded: number[] = [];
+    const atob = vi.spyOn(globalThis, 'atob').mockImplementation((s: string) => (decoded.push(s.length), 'x'.repeat(Math.floor((s.length * 3) / 4))));
+    try {
+      expect(redact(`data:video/mp4;base64,${'A'.repeat(40_000_000)}`)).toBe('<video, 30.0 MB>');
+      expect(Math.max(...decoded)).toBeLessThanOrEqual(87_380);
+      decoded.length = 0;
+      redact(`data:image/jpeg;base64,/9j/${'A'.repeat(40_000_000)}`);
+      expect(Math.max(...decoded)).toBeLessThanOrEqual(5_592_408);
+    } finally {
+      atob.mockRestore();
+    }
+  });
+
   it('reads WebP and GIF headers, and says only the kind when it cannot read one', async () => {
     const { imageSize, redact } = await import('../src/lib/debug');
     const vp8x = [...'RIFF'].map((c) => c.charCodeAt(0)).concat([0, 0, 0, 0], [...'WEBPVP8X'].map((c) => c.charCodeAt(0)), [0, 0, 0, 0, 0, 0, 0, 0], [639 & 255, 639 >> 8, 0, 479 & 255, 479 >> 8, 0]);
