@@ -95,9 +95,9 @@ function StrokeOptions({ sessionId, docId, layerId, shape }: { sessionId: string
 /** «Shape»: a primitive's parameters in a popover; nothing for a plain shape. */
 export function ShapeParams({ sessionId, docId, layerId, shape }: { sessionId: string; docId: string; layerId: string; shape: VectorShape }) {
   const pop = usePopover();
-  if (!shape.prim) return null;
+  if (!shape.prim && shape.type !== 'ellipse') return null;
   return <>
-    <button type="button" ref={pop.ref} className="opt" aria-haspopup="dialog" aria-expanded={pop.open} data-tip="The shape's parameters: sides, radii, angles" onClick={pop.toggle}>Shape</button>
+    <button type="button" ref={pop.ref} className="opt" aria-haspopup="dialog" aria-expanded={pop.open} data-tip="The shape's parameters: type, corners, radii, angles" onClick={pop.toggle}>Shape</button>
     <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} placement="bottom-start" width={240} label="Shape">
       <div className="swatch-panel"><PrimFields sessionId={sessionId} docId={docId} layerId={layerId} shape={shape} /></div>
     </Popover>

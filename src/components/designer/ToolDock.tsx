@@ -31,7 +31,7 @@ function iconButton(name: string, label: string, active: boolean, onClick: () =>
 }
 
 function toolFor(family: ToolboxFamily, current: DesignTool, shape: string, rulerKind: string, hardness: number): ToolboxVariant | undefined {
-  const matches = family.variants.filter((variant) => variant.tool === current);
+  const matches = family.variants.filter((variant) => variant.tool === current || !!variant.also?.includes(current));
   return matches.find((variant) => variant.selectShape ? variant.selectShape === shape : variant.rulerKind ? variant.rulerKind === rulerKind : variant.preset === 'pencil' ? hardness === TIP_PRESETS[0] : variant.preset === 'airbrush' ? hardness === TIP_PRESETS[3] : !variant.preset) ?? matches[0];
 }
 
@@ -77,7 +77,8 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
       const ruler = useStore.getState().ui.strokeRuler;
       setUi({ strokeRulerKind: variant.rulerKind, ...(ruler ? { strokeRuler: { ...ruler, kind: variant.rulerKind } } : {}) });
     }
-    setUi({ tool: variant.tool });
+    // A merged tool keeps the type chosen in its settings (sector, arc, chord, star, arrow) when its button is pressed again.
+    if (!variant.also?.includes(useStore.getState().ui.tool)) setUi({ tool: variant.tool });
     if (variant.preset === 'pencil') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[0] } });
     if (variant.preset === 'airbrush') setUi({ brush: { ...useStore.getState().ui.brush, hardness: TIP_PRESETS[3] } });
     dispatch({ type: 'variant', familyId: selectedFamily?.id ?? '', variantId: variant.id });
@@ -112,7 +113,7 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
     <div className="tool-dock-stack">
       {depth !== 'closed' && selectedFamily && <div className="tool-dock-variants" role="toolbar" aria-label={`${selectedFamily.label} variants`} onKeyDown={moveToolbarFocus}>
         {selectedFamily.variants.map((variant) => {
-          const active = !!variant.tool && variant.tool === currentTool && selectedVariant?.id === variant.id;
+          const active = !!variant.tool && (variant.tool === currentTool || !!variant.also?.includes(currentTool)) && selectedVariant?.id === variant.id;
           return <span key={variant.id}>{iconButton(variant.icon, `${variant.label}${variant.soon ? ` · Soon: ${variant.soon}` : ''}`, active, () => active ? dispatch({ type: 'settings', familyId: selectedFamily.id }) : chooseVariant(variant), !variant.soon && !!disabledReason(variant))}</span>;
         })}
         {!selectedVariant?.soon && <><span className="tool-dock-grow" />

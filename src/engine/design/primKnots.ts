@@ -1,5 +1,6 @@
 import type { ShapeSpec } from '../shapeSpec';
 import { normalizePrim, starVertices, withPrim } from './primitives';
+import { isWholeArc } from './shapeKinds';
 
 /*
  * Handles of a primitive, in the shape's own (box) coordinates: each one sits where its parameter is, and dragging it
@@ -27,7 +28,7 @@ export const unitAt = (deg: number): Pt => { const r = ((deg - 90) * Math.PI) / 
 export const angleOf = (u: Pt): number => (((Math.atan2(u[1], u[0]) * 180) / Math.PI + 90) % 360 + 360) % 360;
 
 const spanOf = (a0: number, a1: number) => { const d = (((a1 - a0) % 360) + 360) % 360; return d === 0 ? 360 : d; };
-const isFullTurn = (p: { a0?: number; a1?: number }) => spanOf(p.a0 ?? 0, p.a1 ?? 270) === 360;
+const isFullTurn = (p: { a0?: number; a1?: number }) => isWholeArc(p.a0 ?? 0, p.a1 ?? 270);
 
 /** Where each handle of a primitive is, in box coordinates. Empty for a plain path. */
 export function primKnots(s: ShapeSpec): Array<{ k: PrimKnot; p: Pt }> {
@@ -76,5 +77,10 @@ export function primKnotDrag(s: ShapeSpec, k: PrimKnot, q: Pt, snap15 = false): 
   const a0 = p.a0 ?? 0, a1 = p.a1 ?? 270, other = k === 'from' ? a1 : a0;
   const now = spanOf(a0, a1), next = k === 'from' ? spanOf(deg, a1) : spanOf(a0, deg);
   if (Math.abs(next - now) > 180) deg = now > 180 ? other : (other + (k === 'from' ? -1 : 1) + 360) % 360;
-  return withPrim(s, k === 'from' ? { a0: deg } : { a1: deg }) as Partial<ShapeSpec>;
+  // Inkscape's side rule (shape-editor-knotholders.cpp:1328-1341, 1351-1355): a handle dragged well outside the ellipse
+  // (x² + y² > 1.25) makes it a slice, well inside (< 0.75) an arc; the buffer between keeps the kind from flipping.
+  // Chords keep their kind: Inkscape's own rule would turn them into slices.
+  const r2 = u[0] * u[0] + u[1] * u[1];
+  const kind = p.kind === 'chord' ? p.kind : r2 > 1.25 ? 'sector' : r2 < 0.75 ? 'arc' : p.kind;
+  return withPrim(s, k === 'from' ? { a0: deg, kind } : { a1: deg, kind }) as Partial<ShapeSpec>;
 }

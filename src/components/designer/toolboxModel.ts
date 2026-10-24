@@ -11,6 +11,8 @@ export type ToolboxVariant = {
   preset?: 'pencil' | 'airbrush';
   action?: 'size' | 'guides';
   soon?: string;
+  /** Other tools this variant covers: the type or end option inside its settings (Ellipse: sector, arc, chord). */
+  also?: DesignTool[];
 };
 export type ToolboxFamily = { id: string; label: string; icon: string; variants: ToolboxVariant[] };
 
@@ -20,7 +22,7 @@ const family = (id: string, label: string, icon: string, variants: ToolboxVarian
 
 /** One toolbox for both paint modes, in the order of the mockup; Drawing/Design stays a document setting inside the brush card. */
 export const TOOLBOX: ToolboxFamily[] = [
-  family('edit', 'Edit', 'mouse-pointer-2', [v('edit', 'Edit', 'mouse-pointer-2', 'move'), v('hand', 'Pan', 'hand', 'hand'), v('rect', 'Rectangle', 'square', 'rect'), v('ellipse', 'Ellipse', 'circle', 'ellipse'), v('line', 'Straight line', 'minus', 'line'), v('arrow', 'Arrow', 'move-up-right', 'arrow'), v('polygon', 'Polygon', 'pentagon', 'polygon'), v('star', 'Star', 'star', 'star'), v('sector', 'Sector', 'chart-pie', 'sector'), v('arc', 'Arc', 'spline', 'arc'), v('chord', 'Chord', 'circle', 'chord')]),
+  family('edit', 'Edit', 'mouse-pointer-2', [v('edit', 'Edit', 'mouse-pointer-2', 'move'), v('hand', 'Pan', 'hand', 'hand'), v('rect', 'Rectangle', 'square', 'rect'), v('ellipse', 'Ellipse', 'circle', 'ellipse', { also: ['sector', 'arc', 'chord'] }), v('line', 'Line', 'minus', 'line', { also: ['arrow'] }), v('polygon', 'Polygon / Star', 'pentagon', 'polygon', { also: ['star'] })]),
   family('layout', 'Layout', 'layout-panel-top', [v('sizes', 'Sizes', 'crop', undefined, { action: 'size' }), soon('grid', 'Grid', 'grid-3x3', 'A layout grid is planned.'), v('guides', 'Guides', 'ruler-dimension-line', undefined, { action: 'guides' }), soon('templates', 'Templates', 'layout-template', 'Templates are planned.')]),
   family('pen', 'Pen', 'pen-tool', [v('lineart', 'Lineart', 'pen-tool', 'lineart'), v('curve', 'Curve', 'spline', 'curve'), soon('bezier-pen', 'Bezier pen', 'pen-tool', 'A vector Bezier pen is planned.'), soon('cutter', 'Cutter', 'scissors', 'A path cutter is planned.')]),
   family('brush', 'Brush', 'brush', [v('brush', 'Brush', 'brush', 'brush'), v('pencil', 'Pencil', 'pencil', 'brush', { preset: 'pencil' }), v('airbrush', 'Airbrush', 'airbrush', 'brush', { preset: 'airbrush' }), v('fill', 'Fill', 'paint-bucket', 'fill'), v('gradient', 'Gradient', 'blend', 'gradient'), v('selection-rect', 'Rectangular selection', 'square-dashed', 'select', { selectShape: 'rect' }), v('lasso', 'Lasso', 'lasso', 'select', { selectShape: 'lasso' }), v('wand', 'Magic wand', 'wand-sparkles', 'select', { selectShape: 'wand' }), v('eyedropper', 'Eyedropper', 'pipette', 'eyedropper'), soon('sculpt', 'Sculpt', 'sculpt', 'Sculpting brushes are planned.'), soon('blur', 'Blur', 'blend', 'Blur and smudge tools are planned.')]),
@@ -35,7 +37,7 @@ export const MULTI_SOON: ToolboxVariant[] = [soon('boolean', 'Boolean', 'combine
 
 /** Every implemented drawing tool has a home, including tools without shortcuts. */
 export function toolboxTools(): DesignTool[] {
-  return [...new Set(TOOLBOX.flatMap((item) => item.variants.flatMap((variant) => variant.tool ? [variant.tool] : [])))];
+  return [...new Set(TOOLBOX.flatMap((item) => item.variants.flatMap((variant) => variant.tool ? [variant.tool, ...(variant.also ?? [])] : [])))];
 }
 
 export type ToolboxState = { familyId: string | null; variantId: string | null; depth: 'closed' | 'folded' | 'open' };

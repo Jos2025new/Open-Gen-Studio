@@ -113,7 +113,8 @@ describe('the Designer view of the Studio board', () => {
     expect(tool()).toBe('text');
     pick('Edit'); pick('Rectangle');
     expect(tool()).toBe('rect');
-    expect(dock().querySelector('[aria-label="Edit variants"] button[aria-label="Arrow"]')).not.toBeNull();
+    expect(dock().querySelector('[aria-label="Edit variants"] button[aria-label="Polygon / Star"]')).not.toBeNull();
+    expect(dock().querySelector('[aria-label="Edit variants"] button[aria-label="Arrow"]'), 'Arrow is an option of Line').toBeNull();
     for (const no of ['Brush', 'Ruler', 'Layout']) expect(dock().querySelector(`[aria-label="Tools"] button[aria-label="${no}"]`), no).toBeNull();
     act(() => q('[aria-label="Select and move"]')!.click());
     expect(tool()).toBe('move');
