@@ -72,10 +72,11 @@
 .tool-dock-settings .stroke-controls { display: contents; }
 /* Sizes card: the page size on the left, the anchor on the right, both halves used. */
 .tool-dock-actions { width: 100%; grid-column: 1 / -1; }
-.tool-dock-actions .canvas-size { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "dims label" "dims anchor" "actions anchor"; align-items: start; gap: 8px 24px; width: 100%; }
+.tool-dock-actions .canvas-size { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "dims label" "dims anchor" "dims center" "actions center"; align-items: start; gap: 8px 24px; width: 100%; }
 .tool-dock-actions .canvas-size-dims { grid-area: dims; }
 .tool-dock-actions .canvas-size > .field-label { grid-area: label; }
 .tool-dock-actions .anchor-grid { grid-area: anchor; }
+.tool-dock-actions .anchor-center { grid-area: center; justify-self: start; }
 .tool-dock-actions .confirm-pop-actions { grid-area: actions; justify-content: flex-start; align-self: end; }
 .edit-card > .tool-setting { align-self: flex-start; }
 .tool-dock-end { display: inline-flex; align-items: center; gap: 3px; flex: none; }
@@ -122,3 +123,7 @@
 .edit-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .edit-card-align, .edit-card-soon { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .edit-card-soon .opt[disabled] { opacity: .5; cursor: not-allowed; }
+/* Guides card: switches on the left, add-a-guide on the right. */
+.tool-dock-actions .guides-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 24px; width: 100%; align-items: start; }
+.guides-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.guides-col .canvas-size-dims input[type='number'] { width: 70px; }

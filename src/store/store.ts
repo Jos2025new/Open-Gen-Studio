@@ -150,8 +150,7 @@ export interface UiState {
   selectShape?: 'rect' | 'lasso' | 'wand';
   /** Magic wand, like the bucket: color tolerance, grow, soft edge; how it combines; what it samples. */
   wand?: { threshold: number; expand: number; smooth: number; mode: 'replace' | 'add' | 'subtract'; sample: 'layer' | 'all' };
-  /** Designer rulers (and the guides dragged from them) shown. */
-  rulers?: boolean;
+  rulers?: boolean; showGuides?: boolean; lockGuides?: boolean;
   /** Stroke ruler (SAI 2): the guide the brush follows, and the kind the Ruler tool places next (strokeRuler.ts). */
   strokeRuler?: import('../engine/design/strokeRuler').StrokeRuler | null;
   strokeRulerKind?: import('../engine/design/strokeRuler').RulerKind;

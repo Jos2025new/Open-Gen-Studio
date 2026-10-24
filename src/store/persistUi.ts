@@ -15,6 +15,8 @@ export type PersistedUi = Pick<
   | 'swatches'
   | 'gradient'
   | 'rulers'
+  | 'showGuides'
+  | 'lockGuides'
   | 'selectShape'
   | 'wand'
   | 'strokeRuler'
@@ -41,6 +43,8 @@ export function pickUi(ui: UiState): PersistedUi {
     swatches: ui.swatches,
     gradient: ui.gradient,
     rulers: ui.rulers,
+    showGuides: ui.showGuides,
+    lockGuides: ui.lockGuides,
     selectShape: ui.selectShape,
     wand: ui.wand,
     strokeRuler: ui.strokeRuler,

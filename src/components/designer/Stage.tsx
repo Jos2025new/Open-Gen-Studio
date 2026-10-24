@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import { useBoardFocus } from '../studio/useBoardFocus';
+import { drawGuides } from './drawGuides';
 import { sameGuides, type GuideLines } from './guideLines';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
@@ -207,6 +208,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
   const rv = useSyncExternalStore(subscribeRaster, rasterVersion);
   const selVersion = useSelectionVersion();
   const rulers = useStore((s) => s.ui.rulers ?? false) && !board;
+  const guidesShown = useStore((s) => s.ui.showGuides ?? true) && !board, guidesLocked = useStore((s) => !!s.ui.lockGuides);
   // A guide being dragged (from a ruler or an existing guide), shown until pointer up.
   // Edit tool over a guide: the cursor says it can be dragged.
   const [guideHover, setGuideHover] = useState<GuideAxis | null>(null);
@@ -383,20 +385,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.round(sx(0)) + 0.5, Math.round(sy(0)) + 0.5, Math.round(doc.width * view.zoom), Math.round(doc.height * view.zoom));
     // Ruler guides across the whole view (the one being dragged replaces its saved position).
-    if (rulers) {
-      ctx.save();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = '#2fb8ff';
-      const line = (axis: GuideAxis, at: number) => {
-        ctx.beginPath();
-        if (axis === 'x') { const x = Math.round(sx(at)) + 0.5; ctx.moveTo(x, 0); ctx.lineTo(x, size.h); }
-        else { const y = Math.round(sy(at)) + 0.5; ctx.moveTo(0, y); ctx.lineTo(size.w, y); }
-        ctx.stroke();
-      };
-      for (const axis of ['x', 'y'] as const) (doc.guides?.[axis] ?? []).forEach((at, i) => { if (!(guidePreview?.axis === axis && guidePreview.index === i)) line(axis, at); });
-      if (guidePreview) { ctx.setLineDash([5, 4]); line(guidePreview.axis, guidePreview.at); }
-      ctx.restore();
-    }
+    if (guidesShown) drawGuides(ctx, doc.guides, guidePreview, sx, sy, size);
     // Snap guides: the line the moving layer sticks to, across the view.
     const g = guideLines;
     if (g.x != null || g.y != null) {
@@ -559,7 +548,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
       ctx.stroke(path);
       ctx.restore();
     }
-  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidePreview, paintFrame, targetSig, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
+  }, [doc, size, view, active, tool, preview, brush.size, shapeStyle, editingText, rv, live, objPick, editLayers, shiftDown, lineartMode, selectedCurve, picked.join(), guideLines, selectMode, selVersion, selDraft, editMarquee, rulers, guidesShown, guidesLocked, guidePreview, paintFrame, targetSig, handleMode, pivot, shapeEditing, gradientSpec.shape, gradientSpec.mode, gradientSpec.color, gradientSpec.color2, gradientSpec.reverse, gradientSpec.opacity]);
 
   // ---------------------------------------------------------------------------
   // Keyboard
@@ -642,7 +631,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
 
     // Edit tool on a guide: drag it (back onto its ruler removes it).
-    if (tool === 'move' && rulers) {
+    if (tool === 'move' && guidesShown && !guidesLocked) {
       const r = canvasRef.current!.getBoundingClientRect();
       const px = e.clientX - r.left, py = e.clientY - r.top;
       for (const axis of ['x', 'y'] as const) {
@@ -973,7 +962,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           : h.fx && h.fy ? (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize') : h.fx ? 'ew-resize' : 'ns-resize';
       if (c !== hoverHandle) setHoverHandle(c);
     }
-    if (!d && tool === 'move' && rulers) {
+    if (!d && tool === 'move' && guidesShown && !guidesLocked) {
       const near = (axis: GuideAxis) => (doc.guides?.[axis] ?? []).some((at) => Math.abs((axis === 'x' ? p.x : p.y) - at) * view.zoom <= 4);
       const over = near('x') ? 'x' : near('y') ? 'y' : null;
       if (over !== guideHover) setGuideHover(over);

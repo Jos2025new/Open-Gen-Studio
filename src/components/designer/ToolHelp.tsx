@@ -1,4 +1,4 @@
-import { HelpCircle, Ruler, X } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
 import { setUi, useStore } from '../../store/store';
 import type { DesignTool } from '../../engine/design/rules';
 import { TOOL_NAMES } from '../../engine/shortcuts';
@@ -45,10 +45,8 @@ export function ToolHelpLine() {
 
 /** The view group's switches (what you see, not how tools act): page rulers and guides, and the tool help line. */
 export function ViewToggles() {
-  const rulers = useStore((s) => s.ui.rulers ?? false);
   const help = useStore((s) => s.ui.toolHelp ?? true);
   return <>
-    <IconButton icon={Ruler} label={`${rulers ? 'Hide' : 'Show'} page rulers and guides (Shift+R)`} size="sm" active={rulers} aria-pressed={rulers} onClick={() => setUi({ rulers: !rulers })} />
     <IconButton icon={HelpCircle} label={`${help ? 'Hide' : 'Show'} tool help`} size="sm" active={help} aria-pressed={help} onClick={() => setUi({ toolHelp: !help })} />
   </>;
 }

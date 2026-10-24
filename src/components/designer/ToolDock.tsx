@@ -8,6 +8,7 @@ import { setUi, useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { ToolSettings } from './ToolSettings';
 import { CanvasSize } from './CanvasSize';
+import { GuidesCard } from './GuidesCard';
 import { EditCard } from './EditCard';
 import { TIP_PRESETS } from '../../engine/design/brushEngine';
 import { initialToolboxState, reduceToolboxState, TOOLBOX, type ToolboxFamily, type ToolboxVariant } from './toolboxModel';
@@ -129,8 +130,9 @@ export function ToolDock({ sessionId, doc, selectedCurve = null, tools }: { sess
         }}><GripHorizontal size={14} /></button>
         <div className="tool-dock-settings-grid">
           {selectedVariant.id === 'edit' && <div className="tool-dock-settings tool-dock-edit"><EditCard sessionId={sessionId} doc={doc} /></div>}
-          {selectedVariant.action !== 'size' && selectedVariant.id !== 'edit' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} card /></div>}
+          {!selectedVariant.action && selectedVariant.id !== 'edit' && <div className="tool-dock-settings"><ToolSettings sessionId={sessionId} doc={doc} selectedCurve={selectedCurve} card /></div>}
           {selectedVariant.action === 'size' && <div className="tool-dock-actions"><CanvasSize sessionId={sessionId} doc={doc} inline /></div>}
+          {selectedVariant.action === 'guides' && <div className="tool-dock-actions"><GuidesCard sessionId={sessionId} doc={doc} /></div>}
         </div>
       </section>}
     </div>

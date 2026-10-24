@@ -34,3 +34,12 @@ export function rulerStep(zoom: number): number {
   const pow = 10 ** Math.floor(Math.log10(target));
   return [1, 2, 5, 10].map((m) => m * pow).find((s) => s >= target) ?? 10 * pow;
 }
+
+/** Four guides on the page edges (left, right, top, bottom), skipping ones already there. One undo step. */
+export function guidesAroundPage(sessionId: string, docId: string): void {
+  const doc = getDoc(sessionId, docId);
+  if (!doc) return;
+  const g = doc.guides ?? { x: [], y: [] };
+  const add = (list: number[], vals: number[]) => [...list, ...vals.filter((v) => !list.includes(v))];
+  mutateDoc(sessionId, docId, (d) => ({ ...d, updatedAt: Date.now(), guides: { x: add(g.x, [0, d.width]), y: add(g.y, [0, d.height]) } }));
+}
