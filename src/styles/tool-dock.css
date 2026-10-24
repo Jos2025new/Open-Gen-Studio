@@ -39,8 +39,9 @@
   flex-direction: column;
   width: 100%;
   min-width: 0;
-  height: min(var(--tool-dock-card-height), 60vh);
-  max-height: 60vh;
+  /* As tall as its content, up to the height the grip sets (tabs share one cell, so they still never jump). */
+  height: auto;
+  max-height: min(var(--tool-dock-card-height), 60vh);
   overflow: auto;
   background: var(--surface);
   border: 1px solid var(--panel-line);
@@ -67,6 +68,9 @@
 .tool-dock-settings .tool-settings { display: contents; }
 .tool-dock-settings .opt-hint, .tool-dock-settings .brush-preview { grid-column: 1 / -1; }
 .tool-dock-actions { display: flex; align-items: center; }
+/* Nested groups of real controls (Lineart's stroke fields) flow into the card's two columns instead of filling one. */
+.tool-dock-settings .stroke-controls { display: contents; }
+.edit-card > .tool-setting { align-self: flex-start; }
 .tool-dock-end { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 /* In the composer the bar itself is the toolbox (mockup): one box, the row and card as wide as it, icons spread along it. */
 .composer:has(.composer-tools-bar) { position: relative; padding: 6px 8px; }
