@@ -2,14 +2,18 @@ import type { StrokeStyle } from '../../engine/types';
 import { STAMPS } from '../../engine/design/brushTextures';
 import { randomSeed } from '../../lib/rng';
 import { Field } from '../ui/primitives';
+import { SizePresets } from './SizePresets';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
+
+const SIZE_MAX = 120;
 
 /** Shared controls; callers choose whether edits affect new strokes or selected strokes. */
 export function StrokeStyleFields({ value, onChange }: { value: StrokeStyle; onChange: (patch: Partial<StrokeStyle>) => void }) {
   const range = (key: 'thinning' | 'smoothing' | 'streamline', label: string, min = 0) =>
     <InlineSlider label={label} min={min} max={1} step={0.01} value={value[key]} onChange={(v) => onChange({ [key]: v })} />;
   return <div className="stroke-controls">
-    <InlineSlider label="Size" unit="px" min={1} max={120} value={value.size} onChange={(size) => onChange({ size })} />
+    <InlineSlider label="Size" unit="px" min={1} max={SIZE_MAX} value={value.size} onChange={(size) => onChange({ size })} />
+    <SizePresets value={value.size} min={1} max={SIZE_MAX} onChange={(size) => onChange({ size })} />
     <InlineColor label="Color" showValue value={value.color} onChange={(color) => onChange({ color })} />
     <InlineSlider label="Opacity" unit="%" scale={100} min={0.05} max={1} step={0.01} value={value.opacity} onChange={(opacity) => onChange({ opacity })} />
     {range('thinning', 'Pressure thinning', -1)}

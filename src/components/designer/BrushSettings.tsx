@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { lastPressure, onPressure } from '../../engine/design/brushStroke';
 import { setUi, useStore } from '../../store/store';
-import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, SIZE_PRESETS, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
+import { atPressure, taperAt, BRUSH_BLENDS, BRUSH_DEFAULTS, BRUSH_TEXTURES, hexRgb, profile, textureAt, stampSegment, TIP_PRESETS, tipFor, type BrushBlend, type BrushTexture } from '../../engine/design/brushEngine';
 import { Circle, Droplet } from 'lucide-react';
 import { InlineChoice, InlineColor, InlineSelect, InlineSlider, InlineToggle } from './InlineControls';
 import { Segmented } from '../ui/primitives';
+import { SizePresets } from './SizePresets';
 
 /*
  * Brush and eraser settings, after PaintTool SAI's brush panel, in the app's own fields (one slider, one toggle,
@@ -72,16 +73,6 @@ function TextureIcon({ texture }: { texture: BrushTexture }) {
   }, [texture]);
   if (texture === 'none') return <span className="texture-icon is-none" aria-hidden="true" />;
   return <canvas ref={ref} className="texture-icon" width={36} height={36} aria-hidden="true" />;
-}
-
-/** One-click sizes, as in SAI's size grid. Dots grow on a log scale (3 → 18 px from the first to the last preset) so every step is visibly larger; sqrt made 1–5 look alike and capped 96–200. */
-const dotFor = (s: number) => Math.round((3 + 15 * Math.log(s / SIZE_PRESETS[0]) / Math.log(SIZE_PRESETS[SIZE_PRESETS.length - 1] / SIZE_PRESETS[0])) * 10) / 10;
-function SizePresets({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  return <div className="opt opt-presets" role="radiogroup" aria-label="Size presets">
-    {SIZE_PRESETS.map((s) => <button key={s} type="button" role="radio" aria-checked={s === value} aria-label={`${s} px`} className={s === value ? 'is-on' : ''} onClick={() => onChange(s)}>
-      <i style={{ width: dotFor(s), height: dotFor(s) }} /><span className="num">{s}</span>
-    </button>)}
-  </div>;
 }
 
 /** What the last stroke received: a pen with pressure, or a device without (then pressure settings do nothing). */
