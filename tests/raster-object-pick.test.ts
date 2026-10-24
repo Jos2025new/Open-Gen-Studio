@@ -11,7 +11,7 @@ import { layerObjects, objectAt, translateObjects } from '../src/engine/design/o
 import { setBuffer } from '../src/engine/design/raster';
 import { pixelTarget } from '../src/engine/design/autoSelect';
 import { editAreaOccupied } from '../src/components/designer/StageEditMarquee';
-import { newRasterLayer, newVectorLayer } from '../src/engine/design/doc';
+import { newRasterLayer } from '../src/engine/design/doc';
 import type { RasterLayer, RasterStroke } from '../src/engine/types';
 
 const stroke = (id: string, x0: number, y0: number, x1: number, y1: number): RasterStroke => ({ id, x: 0, y: 0, segments: [[x0, y0, x1, y1, 10]], color: '#fff', opacity: 1, erase: false });
