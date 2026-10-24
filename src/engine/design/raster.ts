@@ -24,6 +24,12 @@ const buffers = new Map<string, HTMLCanvasElement>();
 const strokeSpan = new Map<string, Region>();
 const listeners = new Set<() => void>();
 let version = 0;
+/**
+ * D30: layers whose stored pixels failed to read or decode; never written until a load succeeds. They never get a
+ * buffer either: an edit stored over one would be thrown away, without a word, when the real pixels come back.
+ */
+const unreadable = new Set<string>();
+export const UNREADABLE_EDIT = 'The pixels of this layer could not be read. They are kept on disk as they are; the warning on the layer in Layers tries again.';
 
 const keyFor = (layerId: string) => `raster:${layerId}`;
 
@@ -110,6 +116,7 @@ export function setBuffer(layerId: string, canvas: HTMLCanvasElement, persist = 
 }
 
 function storeCanvas(layerId: string, canvas: HTMLCanvasElement, persist: boolean, dirty: Dirty): void {
+  if (unreadable.has(layerId)) return void toast(UNREADABLE_EDIT, 'error');
   const previous = buffers.get(layerId);
   const same = previous !== undefined && sameBox(previous, canvas);
   const previousTiles = same && previous !== canvas ? historyTiles.get(previous) : undefined;
@@ -131,6 +138,7 @@ function storeCanvas(layerId: string, canvas: HTMLCanvasElement, persist: boolea
 export function restoreBuffers(map: Map<string, HTMLCanvasElement>): void {
   const end = span('raster', 'restore', { buffers: map.size, copiedPixels: 0 });
   for (const [id, c] of map) {
+    if (unreadable.has(id)) continue;
     buffers.set(id, c);
     layerOfCanvas.set(c, id);
     historyTiles.delete(c);
@@ -399,6 +407,8 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
   const current = buffers.get(layer.id) ?? emptyBox(layer.pxWidth, layer.pxHeight);
   flushHistoryTiles(current);
   const copy = cloneCanvas(current);
+  // Unreadable (D30): the edit runs on a copy that is never stored, so nothing is lost when the pixels come back.
+  if (unreadable.has(layer.id)) { toast(UNREADABLE_EDIT, 'error'); return copy; }
   buffers.set(layer.id, copy);
   layerOfCanvas.set(copy, layer.id);
   strokeSpan.delete(layer.id);
@@ -537,8 +547,6 @@ if (typeof window !== 'undefined') {
   });
 }
 
-/** D30: layers whose stored pixels failed to read or decode; never written until a load succeeds. */
-const unreadable = new Set<string>();
 /** The layer's stored pixels failed to read (D30): the Layers panel marks it, edits say so. */
 export function isUnreadable(layerId: string): boolean { return unreadable.has(layerId); }
 
@@ -562,9 +570,9 @@ export async function ensureBuffers(allLayers: Layer[]): Promise<void> {
       }
       // A missing foundation must never be replaced by blank pixels when objects are moved.
       if (!full && baseIds.has(l.id)) return;
-      // Recovered: the real pixels replace whatever was drawn on the blank stand-in (it was never saved).
-      const recovered = unreadable.delete(l.id);
-      if (buffers.has(l.id) && !recovered) return;
+      // Recovered: an unreadable layer never holds a buffer (storeCanvas, beginEdit), so nothing drawn is replaced.
+      unreadable.delete(l.id);
+      if (buffers.has(l.id)) return;
       buffers.set(l.id, full ? cropToContent(full) : emptyBox(l.pxWidth, l.pxHeight));
       changed = true;
     }),

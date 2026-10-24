@@ -26,7 +26,7 @@ vi.mock('../src/lib/media', () => ({
   blobToCanvas: async () => ({ width: 4, height: 4, tag: 'original' }),
 }));
 
-import { deleteBuffers, ensureBuffers, getRasterSurface, isUnreadable, pendingRaster, setBuffer } from '../src/engine/design/raster';
+import { beginEdit, deleteBuffers, ensureBuffers, getRasterSurface, isUnreadable, pendingRaster, restoreBuffers, setBuffer } from '../src/engine/design/raster';
 import { pixelsNotReady } from '../src/engine/design/rasterMissing';
 import type { RasterLayer } from '../src/engine/types';
 
@@ -57,6 +57,21 @@ describe('unreadable layer pixels (D30)', () => {
     setBuffer('b', painted());
     await vi.runAllTimersAsync();
     expect(disk.writes).toEqual(['raster:b=painted-on-blank']);
+  });
+
+  it('an edit is never stored on an unreadable layer, so a recovery has nothing drawn to throw away', async () => {
+    disk.mode = 'fail';
+    await ensureBuffers([layer('c')]);
+    setBuffer('c', painted());
+    beginEdit(layer('c'));
+    restoreBuffers(new Map([['c', painted()]]));
+    expect(getRasterSurface('c')).toBeUndefined();
+    disk.mode = 'ok';
+    await ensureBuffers([layer('c')]);
+    expect(isUnreadable('c')).toBe(false);
+    expect(getRasterSurface('c')).toBeDefined();
+    await vi.runAllTimersAsync();
+    expect(disk.writes).toEqual([]);
   });
 
   it('a later load that reads the pixels recovers the layer, and it saves again', async () => {
