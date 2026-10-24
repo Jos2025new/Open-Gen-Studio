@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { useBoardFocus } from '../studio/useBoardFocus';
-import { drawGuides } from './drawGuides';
+import { canDragGuides, drawGuides } from './drawGuides';
 import { sameGuides, type GuideLines } from './guideLines';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { DesignDoc, Layer, RasterLayer, Stroke, TextLayer } from '../../engine/types';
@@ -631,7 +631,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
     }
 
     // Edit tool on a guide: drag it (back onto its ruler removes it).
-    if (tool === 'move' && guidesShown && !guidesLocked) {
+    if (canDragGuides(tool, guidesShown, guidesLocked)) {
       const r = canvasRef.current!.getBoundingClientRect();
       const px = e.clientX - r.left, py = e.clientY - r.top;
       for (const axis of ['x', 'y'] as const) {
@@ -962,7 +962,7 @@ export function Stage({ sessionId, doc, selectedCurve, setSelectedCurve, board }
           : h.fx && h.fy ? (h.fx === h.fy ? 'nwse-resize' : 'nesw-resize') : h.fx ? 'ew-resize' : 'ns-resize';
       if (c !== hoverHandle) setHoverHandle(c);
     }
-    if (!d && tool === 'move' && guidesShown && !guidesLocked) {
+    if (!d && canDragGuides(tool, guidesShown, guidesLocked)) {
       const near = (axis: GuideAxis) => (doc.guides?.[axis] ?? []).some((at) => Math.abs((axis === 'x' ? p.x : p.y) - at) * view.zoom <= 4);
       const over = near('x') ? 'x' : near('y') ? 'y' : null;
       if (over !== guideHover) setGuideHover(over);

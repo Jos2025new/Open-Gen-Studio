@@ -1,4 +1,15 @@
 import type { UiState } from './store';
+import { PAGE_UNITS, type PageUnit } from '../engine/design/pageUnits';
+
+/** Canvas size card: the unit the page is shown in and the DPI used for mm/in. */
+export interface PageUiPrefs { pageUnit?: PageUnit; pageDpi?: number }
+
+/** A loaded value that is not a known unit / a DPI in 1..1200 is dropped (the card then uses px / 96). */
+export function sanitizeUi<T extends PageUiPrefs>(ui: T): T {
+  const unit = PAGE_UNITS.includes(ui.pageUnit as PageUnit) ? ui.pageUnit : undefined;
+  const dpi = typeof ui.pageDpi === 'number' && Number.isFinite(ui.pageDpi) && ui.pageDpi >= 1 && ui.pageDpi <= 1200 ? ui.pageDpi : undefined;
+  return { ...ui, pageUnit: unit, pageDpi: dpi };
+}
 
 /**
  * The `ui` slice that survives a reload: workspace, tools and the open Space. Listing it here (and not inside
@@ -17,6 +28,8 @@ export type PersistedUi = Pick<
   | 'rulers'
   | 'showGuides'
   | 'lockGuides'
+  | 'pageUnit'
+  | 'pageDpi'
   | 'selectShape'
   | 'wand'
   | 'strokeRuler'
@@ -45,6 +58,8 @@ export function pickUi(ui: UiState): PersistedUi {
     rulers: ui.rulers,
     showGuides: ui.showGuides,
     lockGuides: ui.lockGuides,
+    pageUnit: ui.pageUnit,
+    pageDpi: ui.pageDpi,
     selectShape: ui.selectShape,
     wand: ui.wand,
     strokeRuler: ui.strokeRuler,

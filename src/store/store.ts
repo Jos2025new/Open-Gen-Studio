@@ -3,7 +3,7 @@ import { markStateDirty, beginStateSave, failSave, hasPendingSave, saveStatus } 
 import { reportSave } from './saveReport';
 import { persistState } from './persistJson';
 import { keptDrafts } from './homeDrafts';
-import { pickUi, type PersistedUi } from './persistUi';
+import { pickUi, sanitizeUi, type PageUiPrefs, type PersistedUi } from './persistUi';
 import { historyDepth } from '../engine/design/history';
 import { pendingRaster } from '../engine/design/raster';
 import { useLayerSelection } from '../engine/design/selection';
@@ -117,7 +117,7 @@ export interface Toast {
   level: 'info' | 'error' | 'success';
 }
 
-export interface UiState {
+export interface UiState extends PageUiPrefs {
   workspace: Workspace;
   /** The Home view is showing instead of the workspace; any destination clears it. */
   home?: boolean;
@@ -448,12 +448,12 @@ export const useStore = create<AppState>()(
     merge: (persisted, current) => {
       const p = (persisted ?? {}) as Partial<Persisted>;
       const restored = p.sessions && Object.keys(p.sessions).length ? p.sessions : current.sessions;
-      // A reload interrupts any agent call in flight.
+      // A reload interrupts agent calls.
       const sessions = Object.fromEntries(Object.entries(restored).map(([id, s]) => [id, { ...s, agent: { ...s.agent, busy: false, phase: undefined, revising: undefined, waiting: undefined } }]));
       const activeSessionId = p.activeSessionId && sessions[p.activeSessionId] && !sessions[p.activeSessionId].hidden ? p.activeSessionId : Object.keys(sessions).find((id) => !sessions[id].hidden) ?? Object.keys(sessions)[0];
       const assets = p.assets ?? {};
-      const ui = { ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) };
-      // Home and a Space are never shown together; a tool input that no longer exists is dropped.
+      const ui = sanitizeUi({ ...current.ui, ...p.ui, homeDrafts: keptDrafts(p.ui?.homeDrafts, sessions) });
+      // Home and a Space never show together; a missing tool input is dropped.
       if (ui.home && ui.space) ui.home = false;
       if (ui.toolAsset && !assets[ui.toolAsset]) ui.toolAsset = undefined;
       return {

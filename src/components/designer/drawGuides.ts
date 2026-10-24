@@ -16,3 +16,6 @@ export function drawGuides(ctx: CanvasRenderingContext2D, guides: DesignDoc['gui
   if (preview) { ctx.setLineDash([5, 4]); line(preview.axis, preview.at); }
   ctx.restore();
 }
+
+/** Guides can be dragged only with the Edit (move) tool, while they are shown and not locked. */
+export function canDragGuides(tool: string, shown: boolean, locked: boolean): boolean { return tool === 'move' && shown && !locked; }
