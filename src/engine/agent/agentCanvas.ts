@@ -11,9 +11,12 @@ import type { Workspace } from '../types';
  * showing Nodes or the Designer makes that canvas the agent's. Read it again wherever the board may have changed.
  */
 export function agentCanvas(): Workspace {
-  const ws = useStore.getState().ui.workspace;
+  return canvasFor(useStore.getState().ui.workspace, getStudioBoard());
+}
+
+/** The canvas a workspace and Studio board drive (the same rule for the agent and for the chat rows). */
+export function canvasFor(ws: Workspace, b: { open: boolean; view: string }): Workspace {
   if (ws !== 'chat') return ws;
-  const b = getStudioBoard();
   return b.open && b.view === 'nodes' ? 'node' : b.open && b.view === 'designer' ? 'designer' : 'chat';
 }
 

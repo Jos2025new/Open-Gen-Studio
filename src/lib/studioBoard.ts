@@ -39,9 +39,10 @@ export function useStudioBoard(): StudioBoardPrefs {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, getStudioBoard, getStudioBoard);
 }
 
-/** The canvases whose messages Studio's chat shows: its own, and the one the board is showing. */
-export function studioCanvases(b: StudioBoardPrefs): Array<'chat' | 'node' | 'designer'> {
-  return b.open && b.view === 'nodes' ? ['chat', 'node'] : b.open && b.view === 'designer' ? ['chat', 'designer'] : ['chat'];
+/** The canvases whose messages Studio's chat shows: all of them, whichever the board is showing. */
+export function studioCanvases(_b: StudioBoardPrefs): Array<'chat' | 'node' | 'designer'> {
+  // Every canvas the board can show: switching its tab never hides what was said (2026-10-24: Nodes → Generations emptied the chat).
+  return ['chat', 'node', 'designer'];
 }
 
 /** Sessions whose board already opened by itself this run. In memory only: it is once per session of use, and a reload may open it again. */

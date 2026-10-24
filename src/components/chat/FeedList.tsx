@@ -7,6 +7,7 @@ import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
 import { AssetMedia } from '../ui/AssetMedia';
 import { studioCanvases, useStudioBoard } from '../../lib/studioBoard';
+import { canvasFor } from '../../engine/agent/agentCanvas';
 import { StudioGeneration } from './StudioGeneration';
 import { GenerationCard } from './GenerationCard';
 import { PlanCard } from './PlanCard';
@@ -56,6 +57,8 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
     return feed.length - 1 - feed.findIndex((f) => f.id === item.id);
   });
   const current = useStore((s) => s.ui.workspace);
+  // Studio's chat drives the board's Nodes or Designer: a message written there for them is still editable here (2026-10-24).
+  const editable = item.workspace === current || current === 'chat';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
   const save = () => {
@@ -104,7 +107,7 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
         <div className="msg-actions">
           {tag}
           <IconButton icon={Copy} label="Copy" size="sm" onClick={() => void copyText(item.text)} />
-          {item.workspace === current ? (
+          {editable ? (
             <IconButton icon={Pencil} label="Edit" size="sm" disabled={busy} onClick={() => { setDraft(item.text); setEditing(true); }} />
           ) : null}
           <IconButton icon={Trash} label="Delete" size="sm" tone="danger" disabled={busy} onClick={() => deleteUserMessage(sessionId, item.id)} />
@@ -145,8 +148,10 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
 
 /** One row. Memoized: while the agent writes only its own bubble changes, so the rest of the conversation is not redrawn. */
 export const FeedItemView = memo(function FeedItemView({ item, sessionId, compact, studio }: { item: FeedItem; sessionId: string; compact?: boolean; studio?: boolean }) {
-  const current = useStore((s) => s.ui.workspace);
-  const tag = item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
+  const board = useStudioBoard();
+  const current = useStore((s) => canvasFor(s.ui.workspace, board));
+  // Studio's chat is the whole conversation; the board only decides where the agent works, so rows carry no canvas tag.
+  const tag = !studio && item.workspace !== current ? <span className="ws-badge">{WS[item.workspace]}</span> : null;
   switch (item.type) {
     case 'user':
       return <UserMessage item={item} sessionId={sessionId} tag={tag} />;

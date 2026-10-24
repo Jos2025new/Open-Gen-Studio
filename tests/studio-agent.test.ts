@@ -62,11 +62,11 @@ describe('effective agent canvas', () => {
     setStudioBoard({ open: false });
     expect(studioLine()[0]).toContain('closed');
   });
-  it('Studio shows the chat and the board canvas; opening the board never changes the workspace', () => {
+  it('Studio shows the whole conversation whatever the board shows; opening the board never changes the workspace', () => {
     setStudioBoard({ view: 'nodes' });
-    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'node']);
+    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'node', 'designer']);
     setStudioBoard({ view: 'assets' });
-    expect(studioCanvases(getStudioBoard())).toEqual(['chat']);
+    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'node', 'designer']);
   });
 });
 
@@ -168,6 +168,6 @@ describe('open_board', () => {
     expect(results).not.toContain('view_canvas works only in the Designer');
     expect(results).not.toContain('designer_fx works only in the Designer');
     expect(buildContext(session(), { workspace: 'designer', style: 'auto', round: 1, maxRounds: 5, attachments: [] })).toContain('The board shows: the Designer');
-    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'designer']);
+    expect(studioCanvases(getStudioBoard())).toEqual(['chat', 'node', 'designer']);
   });
 });
