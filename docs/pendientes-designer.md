@@ -15,6 +15,7 @@ Detalle de las filas D del [índice](pendientes.md). Prioridad, **origen** y evi
 - **D15 · bajo · 2026-09-24 · Memoria del historial del Designer** (40 entradas, ~16 MB por copia de 2048×2048). Parcial desde el 2026-10-13: mosaicos de 64² en memoria (`79bf595`); falta medir el gesto (render-estado).
 - **D16 · medio · 2026-10-08 · Capas FX (ADR 0011):** plan de pruebas completo en [fx-pruebas](fx-pruebas.md); `task/fx` ya está dentro de la línea principal.
 - **D18 · medio · 2026-10-13 · Lineart que se deforma al encoger:** el usuario lo aprobó con reservas (90/100) y estima una deformación residual del 10 %; pedirle un caso concreto. [diagnostico-escala-lineart](diagnostico-escala-lineart.md).
+- **D31 · medio · 2026-10-24 · Compatibilidad completa con Inkscape** (pedido del usuario, para después; quizá como opción de exportación). Hoy (`4a882c3`) el SVG lleva `sodipodi:`/`inkscape:` en sector, arco, cuerda, polígono y estrella. Faltan: redondeo de polígono/estrella al estilo Inkscape (curvas por los vértices, `sp-star.cpp:346-410`; hoy sale como trazo sin atributos), sector completo sin la línea al centro, `<circle>` cuando rx = ry, Randomized (semilla por forma, parámetros nuevos), «mantener abertura» y Mayús-clic en los tiradores, y la prueba real abriendo el SVG en Inkscape (ver D10). Fuente de Inkscape: `~/Descargas/inkscape-src` (clon parcial).
 
 ## Trabajo propuesto (orden de Astra, 2026-10-09)
 

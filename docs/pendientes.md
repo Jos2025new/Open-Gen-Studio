@@ -130,6 +130,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | ID | Asunto | Prio | Origen |
 | --- | --- | --- | --- |
 | D29 | Borrar del disco los PNG de capas borradas o fusionadas (borrado de datos: pide aprobación) | bajo | 2026-10-23 |
+| D31 | Opción «compatibilidad completa con Inkscape» al exportar SVG | medio | 2026-10-24 |
 | D1 | Probar en el navegador brocha, zoom, modos, fusionar, rasterizar, espejo | medio | 2026-10-09 |
 | D2 | Brocha SAI: mezcla húmeda, calidad, multiplicador de tamaño | medio | 2026-10-09 |
 | D3 | Mismo campo fuera del Designer (preguntar antes) | bajo | 2026-10-09 |
