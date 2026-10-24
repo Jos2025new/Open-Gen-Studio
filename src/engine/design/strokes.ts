@@ -3,6 +3,7 @@ import { uid } from '../../lib/id';
 import type { Stroke, StrokeStyle } from '../types';
 import type { Box } from './doc';
 import { apply, lengthScale } from './matrix';
+import { nibActive, nibStrokeOutline } from './nibOutline';
 
 /** Strokes never get thinner than this (px) when scaled. Lives here: affine.ts imports it, and strokes.ts must not import affine (store.ts reads DEFAULT_STROKE_STYLE while loading). */
 export const MIN_STROKE_SIZE = 0.5;
@@ -62,7 +63,7 @@ function computed(s: Stroke): { outline: number[][]; path: string } {
   if (!c) {
     // The outline is computed in the stroke's own frame, with its own numbers, then mapped by the matrix: the
     // thresholds in perfect-freehand then see the geometry as it was drawn.
-    const local = getStroke(s.points, strokeOptions(s));
+    const local = nibActive(s) ? nibStrokeOutline(s.points, strokeOptions(s), s) : getStroke(s.points, strokeOptions(s));
     const outline = s.matrix ? local.map(([x, y]) => apply(s.matrix!, x, y)) : local;
     c = { outline, path: outlinePath(outline) };
     outlines.set(s, c);

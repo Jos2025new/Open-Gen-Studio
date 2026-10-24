@@ -3,6 +3,8 @@ import { STAMPS } from '../../engine/design/brushTextures';
 import { randomSeed } from '../../lib/rng';
 import { Field } from '../ui/primitives';
 import { SizePresets } from './SizePresets';
+import { BrushTipShape } from './BrushTipShape';
+import { NIB_DEFAULT_ANGLE, NIB_DEFAULT_MIN } from '../../engine/design/nibOutline';
 import { InlineColor, InlineSelect, InlineSlider } from './InlineControls';
 
 const SIZE_MAX = 120;
@@ -19,6 +21,9 @@ export function StrokeStyleFields({ value, onChange }: { value: StrokeStyle; onC
     {range('thinning', 'Pressure thinning', -1)}
     {range('smoothing', 'Smoothing')}
     {range('streamline', 'Streamline')}
+    <BrushTipShape angleOnly angle={value.nibAngle ?? NIB_DEFAULT_ANGLE} roundness={1} onChange={(p) => onChange({ nibAngle: p.angle })} />
+    <InlineSlider label="Fixation" unit="%" scale={100} min={0} max={1} step={0.01} value={value.nibFixation ?? 0} onChange={(nibFixation) => onChange({ nibFixation })} />
+    <InlineSlider label="Min width" unit="%" scale={100} min={0} max={1} step={0.01} value={value.nibMin ?? NIB_DEFAULT_MIN} onChange={(nibMin) => onChange({ nibMin })} />
     <InlineSelect label="Texture" value={value.texture?.stamp ?? ''} options={[{ value: '', label: 'Solid ink' }, ...STAMPS.map((s) => ({ value: s.id, label: s.label }))]} onChange={(stamp) => onChange({ texture: stamp ? { spacing: 0.15, jitter: 0.4, seed: randomSeed(), ...value.texture, stamp } : undefined })} />
     {value.texture ? <>
       <InlineSlider label="Spacing" unit="%" scale={100} min={0.05} max={1} step={0.01} value={value.texture.spacing} onChange={(spacing) => onChange({ texture: { ...value.texture!, spacing } })} />

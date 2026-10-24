@@ -13,6 +13,10 @@ export interface StrokeStyle {
   taperStart: number;
   taperEnd: number;
   opacity: number;
+  /** Calligraphic nib (design/nibOutline.ts); all optional, absent = plain line. Fixation > 0 turns it on. */
+  nibAngle?: number;
+  nibFixation?: number;
+  nibMin?: number;
   /** Stamped texture along the path (P9); absent = solid ink. */
   texture?: StrokeTexture;
 }
