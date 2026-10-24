@@ -129,9 +129,9 @@ function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentSt
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...(typeof patch === 'function' ? patch(s.agent) : patch) } }));
 }
 
-/** Where a row is shown: Studio's chat keeps every row as chat; its board only says where the agent works (agentCanvas). */
+/** Where a row is shown: Studio's chat keeps every row as chat, also while the agent works on a canvas it opened in the board. */
 const rowCanvas = (workspace: Workspace): Workspace => (get().ui.workspace === 'chat' ? 'chat' : workspace);
-/** Where a turn resumed from a row works: a chat row, where the Studio board is now. */
+/** Where a turn resumed from a row works: a chat row, the workspace the user is in (Studio is the chat canvas). */
 const turnCanvas = (workspace: Workspace): Workspace => (workspace === 'chat' ? agentCanvas() : workspace);
 
 function feedBase(workspace: Workspace) {
@@ -252,7 +252,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   const st = get();
   const sessionId = st.activeSessionId;
   if (!agentAccepts()) return;
-  // In Studio the board may show Nodes: that canvas is the agent's.
+  // Studio is the chat canvas whatever its board shows (agentCanvas).
   const workspace = agentCanvas();
   toCanvas(sessionId, workspace);
   const s = session(sessionId);

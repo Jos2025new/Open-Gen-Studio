@@ -7,38 +7,35 @@ import { z } from 'zod';
 import type { Workspace } from '../types';
 
 /**
- * The canvas the agent works on: the workspace the user is in, except in Studio (the chat), where an open board
- * showing Nodes or the Designer makes that canvas the agent's. Read it again wherever the board may have changed.
+ * The canvas a turn starts on: the workspace the user is in. Studio is the chat canvas whatever its board shows (the
+ * board is a viewer, 2026-10-24); the agent works on Nodes or the Designer from Studio only after it opens them itself
+ * (open_board, continue_in_canvas), for that turn.
  */
 export function agentCanvas(): Workspace {
-  return canvasFor(useStore.getState().ui.workspace, getStudioBoard());
+  return useStore.getState().ui.workspace;
 }
 
-/** The canvas a workspace and Studio board drive (the same rule for the agent and for the chat rows). */
-export function canvasFor(ws: Workspace, b: { open: boolean; view: string }): Workspace {
-  if (ws !== 'chat') return ws;
-  return b.open && b.view === 'nodes' ? 'node' : b.open && b.view === 'designer' ? 'designer' : 'chat';
-}
+const viewCanvas = (view: string): Workspace => (view === 'nodes' ? 'node' : view === 'designer' ? 'designer' : 'chat');
 
 /** The agent is back on the chat canvas: the board stops showing Nodes or the Designer (the board stays as open or closed as it was). */
 export function backToChatCanvas(): Workspace {
   if (getStudioBoard().view !== 'assets') setStudioBoard({ view: 'assets' });
-  return agentCanvas();
+  return useStore.getState().ui.workspace === 'chat' ? 'chat' : agentCanvas();
 }
 
 /** The agent moves work to Nodes or the Designer: in Studio the board opens on that tab and the workspace stays; elsewhere the workspace switches. */
 export function moveToCanvas(view: 'nodes' | 'designer'): Workspace {
   if (useStore.getState().ui.workspace === 'chat') setStudioBoard({ open: true, view });
-  else if (useStore.getState().ui.workspace !== (view === 'nodes' ? 'node' : 'designer')) setUi({ workspace: view === 'nodes' ? 'node' : 'designer', panel: null, lightbox: null });
-  return agentCanvas();
+  else if (useStore.getState().ui.workspace !== viewCanvas(view)) setUi({ workspace: viewCanvas(view), panel: null, lightbox: null });
+  return viewCanvas(view);
 }
 
 /** What the context says about Studio's board, or nothing outside Studio. */
 export function studioLine(): string[] {
   if (useStore.getState().ui.workspace !== 'chat') return [];
   const b = getStudioBoard();
-  const shows = !b.open ? 'closed' : b.view === 'nodes' ? 'Nodes (the node canvas is your canvas now)' : b.view === 'designer' ? 'the Designer (the designer canvas is your canvas now)' : 'Generations (the chat canvas)';
-  return [`You are in Studio (chat). The board shows: ${shows}. Asked where you are, say Studio${b.open && b.view !== 'assets' ? `, with the board on ${b.view === 'nodes' ? 'Nodes' : 'the Designer'}` : ''}; the conversation is one, whatever the board shows.`];
+  const shows = !b.open ? 'closed' : b.view === 'nodes' ? 'Nodes' : b.view === 'designer' ? 'the Designer' : 'Generations';
+  return [`You are in Studio (chat), on the chat canvas, whatever the board shows. The board shows: ${shows} (a viewer; it does not change your canvas). Asked where you are, say Studio${b.open && b.view !== 'assets' ? `, with the board on ${shows}` : ''}. Plan and confirm settings as in the chat; node or Designer work only when the user asks for it, after open_board.`];
 }
 
 export const openBoardSchema = z.object({ view: z.enum(['assets', 'nodes', 'designer', 'closed']) }).strict();
@@ -75,7 +72,7 @@ export function openBoard(input: unknown, graph: Parameters<typeof readGraph>[0]
   if (where !== 'chat') return { text: `open_board works only in Studio (the chat). The user is on the ${where} canvas now: use that canvas's own tools.` };
   const view = v.data.view;
   setStudioBoard(view === 'closed' ? { open: false } : { open: true, view });
-  const canvas = agentCanvas();
+  const canvas = view === 'closed' ? 'chat' : viewCanvas(view);
   const label = view === 'closed' ? 'Closed the board' : view === 'nodes' ? 'Opened the node canvas in the board' : view === 'designer' ? 'Opened the Designer in the board' : 'Showed Generations in the board';
   const docs = useStore.getState().sessions[sessionId]?.docs.length ?? 0;
   const text = canvas === 'designer'

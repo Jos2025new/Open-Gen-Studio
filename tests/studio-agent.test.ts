@@ -40,11 +40,11 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('effective agent canvas', () => {
-  it('is the workspace, except in Studio with the board showing Nodes', () => {
+  it('is the workspace: Studio is the chat canvas whatever its board shows (2026-10-24)', () => {
     goLive('chat');
     expect(agentCanvas()).toBe('chat');
     setStudioBoard({ view: 'nodes' });
-    expect(agentCanvas()).toBe('node');
+    expect(agentCanvas()).toBe('chat');
     setStudioBoard({ open: false });
     expect(agentCanvas()).toBe('chat');
     goLive('node');
@@ -54,11 +54,11 @@ describe('effective agent canvas', () => {
   });
   it('the context says where the user is in Studio', () => {
     goLive('chat');
-    expect(studioLine()).toEqual(['You are in Studio (chat). The board shows: Generations (the chat canvas). Asked where you are, say Studio; the conversation is one, whatever the board shows.']);
+    expect(studioLine()[0]).toContain('You are in Studio (chat), on the chat canvas, whatever the board shows. The board shows: Generations');
     setStudioBoard({ view: 'nodes' });
     const ctx = buildContext(session(), { workspace: agentCanvas(), style: 'auto', round: 0, maxRounds: 2, attachments: [] });
-    expect(ctx).toContain('You are in Studio (chat). The board shows: Nodes');
-    expect(ctx).toContain('workspace: node');
+    expect(ctx).toContain('The board shows: Nodes (a viewer');
+    expect(ctx).toContain('workspace: chat');
     expect(ctx).toContain('say Studio, with the board on Nodes');
     setStudioBoard({ open: false });
     expect(studioLine()[0]).toContain('closed');
@@ -91,15 +91,15 @@ describe('continue_in_canvas / continue_in_designer from Studio', () => {
     await sendAgentMessage('continue on nodes');
     expect(useStore.getState().ui.workspace).toBe('chat');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'nodes' });
-    expect(agentCanvas()).toBe('node');
+    expect(agentCanvas()).toBe('chat');
   });
   it('designer: same, on the Designer tab', async () => {
     goLive('chat');
     setStudioBoard({ open: false, view: 'assets' });
-    moveToCanvas('designer');
+    expect(moveToCanvas('designer')).toBe('designer');
     expect(useStore.getState().ui.workspace).toBe('chat');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'designer' });
-    expect(agentCanvas()).toBe('designer');
+    expect(agentCanvas()).toBe('chat');
   });
   it('from the node workspace nothing changes', async () => {
     goLive('node');
@@ -163,7 +163,6 @@ describe('open_board', () => {
     await sendAgentMessage('look at the design');
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'designer' });
     expect(useStore.getState().ui.workspace).toBe('chat');
-    expect(agentCanvas()).toBe('designer');
     const results = toolResults().join('\n');
     expect(results).toContain('designer canvas is your canvas now');
     expect(results).not.toContain('view_canvas works only in the Designer');
@@ -173,11 +172,11 @@ describe('open_board', () => {
   });
 });
 
-describe('Studio rows are the chat; the board only says where the agent works (2026-10-24)', () => {
-  it('a message sent with the board on Nodes is a chat row, and the turn works on Nodes', async () => {
+describe('Studio is independent of its board (2026-10-24)', () => {
+  it('a message sent with the board on Nodes is a chat row, and the turn works on the chat canvas', async () => {
     goLive('chat');
     setStudioBoard({ open: true, view: 'nodes' });
-    expect(agentCanvas()).toBe('node');
+    expect(agentCanvas()).toBe('chat');
     const { sendAgentMessage } = await import('../src/engine/agent/runtime');
     await sendAgentMessage('hola').catch(() => undefined);
     const users = session().feed.filter((f) => f.type === 'user');
