@@ -170,6 +170,7 @@
 - [050-2026-10-W43: precio honesto del plan (B10), margen de precio del usuario, frenos de Nodes con motivo (2026-10-23)](history/050-2026-10-W43.md).
 - [051-2026-10-W43: auditoría del pincel, lienzo/exportación/selección, D30 y presión simulada (2026-10-23)](history/051-2026-10-W43.md).
 - [052-2026-10-W43: un solo toolbox, tarjeta del pincel con pestañas, tarjeta Sizes y tarjeta Edit (2026-10-23)](history/052-2026-10-W43.md).
+- [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 
 ## Trazabilidad
 
