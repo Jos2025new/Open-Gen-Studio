@@ -11,6 +11,7 @@ import { layMask, strokeSegment } from './rasterDraw';
 export { drawRasterStroke, strokeSegment } from './rasterDraw';
 import { RASTER_HISTORY_TILE_SIZE, restoreRasterTiles, snapshotRasterTiles, tileKeysForRect, updateRasterTiles, type RasterHistorySnapshot } from './rasterHistoryTiles';
 import { carryLayerBox, extendLayerBox } from './rasterBounds';
+import { UNREADABLE_EDIT } from './rasterMissing';
 import { assembleFull, cropToContent, emptyBox, geometryOf, growTo, isPlaced, place, regionOf, regrid, sameBox, type Region, type RasterSurface } from './rasterSurface';
 
 /*
@@ -25,11 +26,10 @@ const strokeSpan = new Map<string, Region>();
 const listeners = new Set<() => void>();
 let version = 0;
 /**
- * D30: layers whose stored pixels failed to read or decode; never written until a load succeeds. They never get a
- * buffer either: an edit stored over one would be thrown away, without a word, when the real pixels come back.
+ * D30: layers whose stored pixels failed to read; never written until a load succeeds, and never given a buffer (an
+ * edit on one would be thrown away when the real pixels come back).
  */
 const unreadable = new Set<string>();
-export const UNREADABLE_EDIT = 'The pixels of this layer could not be read. They are kept on disk as they are; the warning on the layer in Layers tries again.';
 
 const keyFor = (layerId: string) => `raster:${layerId}`;
 
@@ -407,7 +407,7 @@ export function beginEdit(layer: RasterLayer): HTMLCanvasElement {
   const current = buffers.get(layer.id) ?? emptyBox(layer.pxWidth, layer.pxHeight);
   flushHistoryTiles(current);
   const copy = cloneCanvas(current);
-  // Unreadable (D30): the edit runs on a copy that is never stored, so nothing is lost when the pixels come back.
+  // Unreadable (D30): the edit runs on a copy that is never stored.
   if (unreadable.has(layer.id)) { toast(UNREADABLE_EDIT, 'error'); return copy; }
   buffers.set(layer.id, copy);
   layerOfCanvas.set(copy, layer.id);
