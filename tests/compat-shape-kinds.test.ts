@@ -35,7 +35,9 @@ describe('compatibility of stored shape kinds', () => {
   it('prim paths and their SVG export are unchanged', () => {
     const got = PRIMS.map((p, i) => {
       const s = { ...primShape(10, 20, 110, 90, p), ...look } as VectorShape;
-      return [`${i}:${p.kind}`, sha(primPath(p) + '|' + shapeSvg(s))];
+      // The Inkscape editing attributes (inkscapeShape.ts) are new; with them removed the text must be the old one.
+      const old = shapeSvg(s).replace(/ (?:sodipodi|inkscape):[\w-]+="[^"]*"/g, '');
+      return [`${i}:${p.kind}`, sha(primPath(p) + '|' + old)];
     });
     expect(Object.fromEntries(got)).toEqual(GOLDEN);
   });

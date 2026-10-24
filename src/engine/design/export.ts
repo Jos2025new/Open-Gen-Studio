@@ -5,6 +5,7 @@ import { gradientSvg } from './gradientPaint';
 const gradId = (s: VectorShape, side: 'f' | 's') => `g-${xmlEscape(s.id)}-${side}`;
 import { shapeMatrix } from './shapeTransform';
 import { multiply } from './matrix';
+import { inkscapePrimAttrs } from './inkscapeShape';
 import { blurFilterSvg, cornerRadii, roundRectPath, strokeLookSvg } from './shapeLook';
 import type { DesignDoc, Layer, TextLayer, VectorShape } from '../types';
 import { fontStack } from './doc';
@@ -74,7 +75,7 @@ function shapeBody(s: VectorShape): string {
     const k = Math.max(1e-6, Math.sqrt(Math.abs(t.sx * t.sy)));
     // A turned path (converted shape): its turn and its own placement in one matrix.
     const m = multiply(s.rot ? shapeMatrix(s) : [1, 0, 0, 1, 0, 0], [t.sx, 0, 0, t.sy, t.tx, t.ty]);
-    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})"${s.nodeTypes ? ` sodipodi:nodetypes="${xmlEscape(s.nodeTypes)}"` : ''} ${paint(s, s.scaleStroke ? s.strokeWidth : s.strokeWidth / k)}/>`;
+    return `<path d="${xmlEscape(s.d ?? '')}" transform="matrix(${m.map((v) => String(+v.toFixed(6))).join(' ')})"${s.prim ? inkscapePrimAttrs(s.prim) : ''}${s.nodeTypes ? ` sodipodi:nodetypes="${xmlEscape(s.nodeTypes)}"` : ''} ${paint(s, s.scaleStroke ? s.strokeWidth : s.strokeWidth / k)}/>`;
   }
   if (s.type === 'rect') {
     const x = Math.min(s.x, s.x + s.w);
