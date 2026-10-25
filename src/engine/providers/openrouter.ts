@@ -3,10 +3,11 @@ import { HttpError, requestJson, sleep } from '../../lib/http';
 import { fetchBlob } from '../../lib/media';
 import { roleForKey, humanizeKey, wireParams } from '../params';
 import type { ModelSchema, ModelSummary, ParamDef, PriceRule, PriceSku, RemoteJob } from '../types';
-import { encodeImage, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
+import { encodeImage, encodeVideo, extractOutputs, JSON_HEADERS, numberOrUndefined } from './shared';
 import type { GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
-
+import { commonImageParameters, imageProviderOptions } from './openrouterOptions';
+import type { SupportedParam } from './openrouterOptions';
 
 const BASE = 'https://openrouter.ai/api/v1';
 const DAY = 24 * 3600 * 1000;
@@ -30,10 +31,31 @@ interface OrVideoModel {
   generate_audio: boolean | null;
   seed: boolean | null;
   pricing_skus?: Record<string, string> | null;
+  allowed_passthrough_parameters?: string[];
 }
 
+interface OrImageEndpoints { endpoints?: import('./openrouterOptions').ImageEndpoint[] }
+
+async function fetchImageEndpoints(id: string): Promise<import('./openrouterOptions').ImageEndpoint[]> {
+  // Endpoint capabilities and allowlists: https://openrouter.ai/api/v1/images/models/{id}/endpoints
+  const res = await requestJson<OrImageEndpoints>(`${BASE}/images/models/${id}/endpoints`);
+  const endpoints = Array.isArray(res.endpoints) ? res.endpoints : [];
+  imageEndpointsRaw.set(id, endpoints);
+  return endpoints;
+}
+
+function passthroughSettings(settings: GenRequest['settings']): Record<string, unknown> {
+  return { ...settings.advanced, ...settings.extras };
+}
+
+function rawVideoOptions(modelId: string, allowed: string[] | undefined): string[] {
+  // The provider-specific video cookbook documents these fields for Veo on google-vertex.
+  const documented = ['personGeneration', 'aspectRatio', 'negativePrompt', 'conditioningScale', 'enhancePrompt'];
+  return /^google\/veo-/.test(modelId) ? documented.filter((key) => allowed?.includes(key)) : [];
+}
 
 const imageRaw = new Map<string, OrImageModel>();
+const imageEndpointsRaw = new Map<string, import('./openrouterOptions').ImageEndpoint[]>();
 const videoRaw = new Map<string, OrVideoModel>();
 
 export function orHeaders(key: string): Record<string, string> {
@@ -98,6 +120,7 @@ export function parseOrVideoPricing(skus: Record<string, string> | null | undefi
 
 function paramFromSupported(key: string, sp: SupportedParam): ParamDef | null {
   const role = roleForKey(key, sp.type === 'enum' ? sp.values : undefined);
+  if (sp.type === 'boolean') return { key, label: humanizeKey(key), role, type: 'boolean' };
   if (sp.type === 'enum') {
     if (!sp.values?.length) return null;
     return { key, label: humanizeKey(key), role, type: 'enum', options: sp.values };
@@ -215,8 +238,9 @@ export const openrouter: ProviderAdapter = {
       if (!imageRaw.has(model.id)) await openrouter.listModels(undefined);
       const raw = imageRaw.get(model.id);
       if (!raw) throw new Error(`Unknown OpenRouter image model ${model.id}`);
+      const endpoints = await fetchImageEndpoints(model.id);
       const params: ParamDef[] = [];
-      const sp = raw.supported_parameters ?? {};
+      const sp = commonImageParameters(endpoints);
       for (const [key, def] of Object.entries(sp)) {
         if (key === 'input_references') continue;
         const p = paramFromSupported(key, def);
@@ -269,6 +293,10 @@ export const openrouter: ProviderAdapter = {
         lastFrame: frames.includes('last_frame') ? { key: 'frame_images', format: 'content-part' } : undefined,
         // Reference-mode wording follows https://openrouter.ai/api/v1/videos/models; body form follows https://openrouter.ai/docs/cookbook/video-generation/reference-to-video
         images: referenceMode ? { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, multiple: true, format: 'content-part' } : undefined,
+        ...(mini ? {
+          refVideos: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, format: 'data-url' as const },
+          refAudios: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, format: 'data-url' as const },
+        } : {}),
         frameRules: referenceMode ? { refsWithFirst: false, refsWithLast: false } : undefined,
       },
       price: model.price ?? parseOrVideoPricing(raw.pricing_skus),
@@ -283,9 +311,12 @@ export const openrouter: ProviderAdapter = {
     Object.assign(body, wireParams(schema, req.settings, req.count));
 
     if (req.kind === 'image') {
+      // Image reference format and provider.options shape: https://openrouter.ai/docs/features/multimodal/image-generation
       if (req.refs.length && schema.slots.images) {
         body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
       }
+      const endpointOptions = imageProviderOptions(imageEndpointsRaw.get(req.model.id) ?? [], passthroughSettings(req.settings));
+      if (endpointOptions) body.provider = endpointOptions;
       req.onStatus('Generating');
       req.onRequest?.({ url: `${BASE}/images`, body });
       const res = await requestJson<Record<string, unknown>>(`${BASE}/images`, {
@@ -311,6 +342,19 @@ export const openrouter: ProviderAdapter = {
     // POST /videos input_references: https://openrouter.ai/docs/api/api-reference/video-generation/create-videos
     if (schema.slots.images && req.refs.length) {
       body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
+    }
+    if (schema.slots.refVideos && req.refVideos?.length) {
+      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...await Promise.all(req.refVideos.map(async (v) => ({ type: 'video_url', video_url: { url: await encodeVideo(v) } })))];
+    }
+    if (schema.slots.refAudios && req.refAudios?.length) {
+      body.input_references = [...(Array.isArray(body.input_references) ? body.input_references : []), ...await Promise.all(req.refAudios.map(async (a) => ({ type: 'audio_url', audio_url: { url: await encodeVideo(a) } })))];
+    }
+    // Cookbook's documented provider slug and nested parameters: https://openrouter.ai/docs/cookbook/video-generation/provider-specific-video-options
+    if (/^google\/veo-/.test(req.model.id)) {
+      const keys = rawVideoOptions(req.model.id, videoRaw.get(req.model.id)?.allowed_passthrough_parameters);
+      const values = passthroughSettings(req.settings);
+      const parameters = Object.fromEntries(keys.filter((key) => Object.hasOwn(values, key)).map((key) => [key, values[key]]));
+      if (Object.keys(parameters).length) body.provider = { options: { 'google-vertex': { parameters } } };
     }
     req.onStatus('Submitting');
     req.onRequest?.({ url: `${BASE}/videos`, body });
