@@ -77,4 +77,17 @@ describe('final video frame validation in the executor', () => {
     await runGeneration(g.id);
     expect(sent).toHaveBeenCalledOnce();
   });
+
+  it('keeps legacy source-video models without frame rules on their previous path', async () => {
+    install({}, true);
+    const st = useStore.getState();
+    const oldSchema = st.catalog.schemas[modelRef]!;
+    useStore.setState({ catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [modelRef]: { ...oldSchema, slots: {
+      prompt: 'prompt', video: { key: 'videoDataUrl', format: 'data-url' }, mixedRefs: { key: 'references', max: 9, min: 1 },
+    } } } } });
+    const g = createGeneration({ sessionId: sessionId(), kind: 'video', prompt: 'edit clip', modelRef, settings: { count: 1, advanced: {} }, inputs: { refs: [] },
+      op: { id: 'video_edit', sourceAssetId: 'clip', params: {} }, origin: 'op' });
+    await runGeneration(g.id);
+    expect(sent).toHaveBeenCalledOnce();
+  });
 });
