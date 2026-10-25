@@ -518,7 +518,7 @@ async function execute(id: string): Promise<string[]> {
         refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
       }
     }
-    if (kind === 'video') {
+    if (kind === 'video' && schema.slots.frameRules) {
       const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
       if (problem) throw new Error(`${model.name} ${problem}`);
     }
