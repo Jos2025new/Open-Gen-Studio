@@ -284,12 +284,20 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const modes = defs.mode?.options?.map((o) => String(o.value)) ?? [];
   const refModel = /reference-to-video/.test(raw.id);
   const takesRefs = (refModel || 'reference_images' in defs || modes.includes('reference-to-video')) && !urlOnly(defs.reference_images);
+  // End-frame compatibility is defined by NanoGPT's per-model catalog descriptions: https://nano-gpt.com/api/v1/video-models?detailed=true
+  const lastDescription = (defs.lastImageUrl ?? defs.last_image)?.description ?? '';
+  const frameRules = {
+    ...(/requires a start image/i.test(lastDescription) ? { lastNeedsFirst: true } : {}),
+    ...(/end frames cannot be combined with reference/i.test(lastDescription) ? { refsWithLast: false } : {}),
+    ...(/end frames cannot be combined with .*source video/i.test(lastDescription) ? { sourceWithLast: false } : {}),
+  };
   return {
     ref: model.ref,
     params,
     slots: {
       prompt: 'prompt',
       promptRequired: t2v && !i2v && !takesVideo(raw),
+      ...(Object.keys(frameRules).length ? { frameRules } : {}),
       firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
       // NanoGPT catalog documents lastImageUrl as accepting public URLs or base64 data URIs: https://nano-gpt.com/api/v1/video-models?detailed=true
       lastFrame: 'lastImageUrl' in defs ? { key: 'lastImageUrl', format: 'data-url' } : 'last_image' in defs && !urlOnly(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,

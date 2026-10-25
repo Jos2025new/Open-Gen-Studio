@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { nanogpt } from '../src/engine/providers/nanogpt';
+import { videoInputProblem } from '../src/engine/params';
 
 vi.mock('../src/lib/idb', () => ({ cacheDb: { get: async () => undefined, set: async () => undefined } }));
 
@@ -30,5 +31,22 @@ describe('NanoGPT video input catalog', () => {
   it('does not expose the undocumented referenceAudios request field', async () => {
     const schema = await schemaForVideo(videoModel('minimax/h3-max', { reference_audios: { type: 'text', description: 'Audio input references' } }));
     expect((await schema('minimax/h3-max')).slots.refAudios).toBeUndefined();
+  });
+
+  it('applies the catalog end-frame exclusions and start-frame requirement', async () => {
+    const schema = await schemaForVideo(
+      videoModel('minimax/h3-max', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image. End frames cannot be combined with reference media or reference-to-video mode.' }, reference_images: { type: 'text' }, reference_videos: { type: 'text' } }),
+      videoModel('google/gemini-omni-flash/v1.1', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image. End frames cannot be combined with reference images, reference videos, or a source video.' } }, { capabilities: { text_to_video: true, image_to_video: true, video_to_video: true } }),
+      videoModel('minimax/h3-max-turbo', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image.' } }),
+    );
+    const h3 = await schema('minimax/h3-max');
+    expect(h3.slots.frameRules).toMatchObject({ refsWithLast: false, lastNeedsFirst: true });
+    expect(videoInputProblem(h3.slots, { firstFrame: false, lastFrame: true, sourceVideo: false, images: 1, videos: 0 })).toMatch(/cannot combine reference/);
+    const gemini = await schema('google/gemini-omni-flash/v1.1');
+    expect(gemini.slots.frameRules).toMatchObject({
+      refsWithLast: false, sourceWithLast: false, lastNeedsFirst: true,
+    });
+    expect(videoInputProblem(gemini.slots, { firstFrame: false, lastFrame: true, sourceVideo: true, images: 0, videos: 0 })).toMatch(/cannot combine a source video/);
+    expect((await schema('minimax/h3-max-turbo')).slots.frameRules).toMatchObject({ lastNeedsFirst: true });
   });
 });
