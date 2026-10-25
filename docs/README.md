@@ -175,6 +175,7 @@
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 - [Auditoría OpenRouter contra su doc oficial (2026-10-25)](audits/auditoria-openrouter.md): modelos de vídeo e imagen principales; vídeo sin `input_references` ni passthrough; nada corregido aún.
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
+- [Plan: proveedores contra su doc oficial (2026-10-25)](plan-proveedores-2026-10-25.md): 4 fases atómicas con evidencia, decisiones D1-D4 y verificación; propuesto, sin implementar.
 - [Auditoría NanoGPT contra su doc oficial (2026-10-25)](audits/auditoria-nanogpt.md) y [segunda pasada](audits/auditoria-nanogpt-2.md): referencias solo por enlace, sin subida; último fotograma de H3 Max y Gemini Omni; nada corregido aún.
 
 ## Trazabilidad
