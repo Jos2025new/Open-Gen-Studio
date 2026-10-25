@@ -216,6 +216,9 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
       params.push({ key, label: humanizeKey(key), role: roleForKey(key, options), type: 'enum', options, default: d.default as string | undefined });
     } else if (d.type === 'range') {
       params.push({ key, label: humanizeKey(key), role: roleForKey(key), type: 'integer', min: num(d.min), max: num(d.max), default: num(d.default) });
+    // Nano Banana 2.1's catalog defines seed and enable_web_search here: https://nano-gpt.com/api/v1/images/models
+    } else if (d.type === 'integer' || d.type === 'boolean') {
+      params.push({ key, label: humanizeKey(key), role: roleForKey(key), type: d.type, min: num(d.min), max: num(d.max), default: d.default as number | boolean | undefined });
     } else if (Array.isArray(def) && def.length && def.every((v) => typeof v === 'string' || typeof v === 'number')) {
       // Plain value lists, e.g. Ideogram rendering_speed: ["TURBO", "BALANCED", "QUALITY"].
       const options = (def as Array<string | number>).map(String);
