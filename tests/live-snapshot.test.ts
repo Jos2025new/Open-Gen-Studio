@@ -26,7 +26,7 @@ function describeModel(m: ModelSummary, s: ModelSchema | string): string {
     return `${name}=${o.key}${o.multiple ? '[]' : ''}${o.max != null ? `≤${o.max}` : ''}${o.min ? ` min${o.min}` : ''}${o.format ? ` ${o.format}` : ''}${o.convention ? ` ${o.convention}` : ''}${o.required ? ' required' : ''}`;
   };
   const slots = Object.entries(s.slots)
-    .map(([k, v]) => (k === 'prompt' ? `prompt=${v}${s.slots.promptRequired ? '*' : ''}` : k === 'promptRequired' ? null : slot(k, v)))
+    .map(([k, v]) => (k === 'prompt' ? `prompt=${v}${s.slots.promptRequired ? '*' : ''}` : k === 'frameRules' ? `frameRules=${JSON.stringify(v)}` : k === 'promptRequired' ? null : slot(k, v)))
     .filter(Boolean);
   lines.push(`  slots: ${slots.join(' ') || '-'}`);
   lines.push(`  inputs (as the agent reads them): ${capabilityHints(s, m.kind).join('; ')}`);

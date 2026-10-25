@@ -4284,7 +4284,7 @@ nanogpt::xai/grok-imagine-image/v2.0/text-to-image [image] text
   resolution: aspect enum[1:1,2:1,20:9,19.5:9,16:9,4:3,3:2,2:3,3:4,9:16,9:19.5,9:20,1:2]
   n: count integer(1..4) =1
 nanogpt::xai/grok-imagine-video/v1.5/image-to-video [video] text,image
-  slots: prompt=prompt frameRules=undefined firstFrame=imageDataUrl data-url
+  slots: prompt=prompt frameRules={"firstFrameResolutions":["480p","720p"]} firstFrame=imageDataUrl data-url
   inputs (as the agent reads them): first_frame
   mode: other enum[auto,text-to-video,image-to-video,reference-to-video] =auto
   duration: duration enum[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] =6
