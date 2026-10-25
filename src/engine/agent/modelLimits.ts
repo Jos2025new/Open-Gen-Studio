@@ -14,7 +14,18 @@ const schemaOf = (ref: string): ModelSchema | undefined => useStore.getState().c
 const seconds = (schema: ModelSchema | undefined) => durationChoices(schema).filter((d) => d > 0);
 const resolutions = (schema: ModelSchema | undefined) => (paramByRole(schema, 'resolution')?.options ?? []).map(String).filter((r) => !/auto|default/i.test(r));
 
-/** "720p, 1080p · 5–12 s · 16:9, 9:16" from the loaded schema; empty when it has none of them. */
+/** The images a model takes, in the words the validator uses ("1 start image, no reference images"), so a plan is written for them. */
+function imagesLine(schema: ModelSchema | undefined): string {
+  const sl = schema?.slots;
+  if (!sl) return '';
+  if (sl.mixedRefs) return `up to ${sl.mixedRefs.max} references (images, videos, audio)`;
+  const start = sl.firstFrame ? '1 start image' : '';
+  const max = sl.keyframes?.max ?? sl.images?.max ?? 0;
+  const refs = max ? `up to ${max} ${sl.keyframes ? 'keyframe' : 'reference'} images` : 'no reference images';
+  return [start, refs].filter(Boolean).join(', ');
+}
+
+/** "720p, 1080p · 5–12 s · 16:9, 9:16 · 1 start image, no reference images" from the loaded schema; empty when it has none of them. */
 export function limitsLine(ref: string): string {
   const schema = schemaOf(ref);
   const s = seconds(schema);
@@ -23,6 +34,7 @@ export function limitsLine(ref: string): string {
     resolutions(schema).join(', '),
     s.length ? (s.length > 2 && s[s.length - 1] - s[0] === s.length - 1 ? `${s[0]}–${s[s.length - 1]} s` : `${s.join(', ')} s`) : '',
     aspects.length && aspects.length <= 8 ? aspects.map(aspectLabel).join(', ') : '',
+    modelSummary(ref)?.kind === 'video' ? imagesLine(schema) : '',
   ].filter(Boolean).join(' · ');
 }
 

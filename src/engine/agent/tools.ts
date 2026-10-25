@@ -252,7 +252,7 @@ export const TOOLS: ToolSpec[] = [
                 id: { type: 'string', description: 'Unique id: s1, s2, … (l1… for layers).' },
                 kind: { type: 'string', enum: [...stepKinds] },
                 title: { type: 'string', description: 'Short label shown on the card or node.' },
-                prompt: { type: 'string', description: 'image/video: full generation prompt (English, except quoted dialogue and on-screen text). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
+                prompt: { type: 'string', description: 'image/video: full generation prompt, at most 4000 characters (English, except quoted dialogue and on-screen text). model3d: the object (shape, materials, style). audio: the music description, or the lyrics theme for a lyrics model.' },
                 prompt_from: { type: 'string', description: 'image/video/audio: id of a text step whose text prefixes the prompt.' },
                 lyrics_from: { type: 'string', description: 'audio (music models): id of a step whose text becomes the song lyrics (a lyrics step or a text step).' },
                 model: { type: 'string', description: 'Confirmed or user-named/selected model ref "provider::id" or compatible family; also supported for edit/animate ops. Omit to use the app default/source precedence, not necessarily the composer model.' },

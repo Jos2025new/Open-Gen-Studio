@@ -1,4 +1,4 @@
-import { composerChosen, defaultModelFor, inputVariant, resolveModel } from '../catalog';
+import { composerChosen, defaultModelFor, inputVariant, modelSummary, resolveModel } from '../catalog';
 import { offerRequest, partModel } from '../modelNamed';
 import { OPS } from '../ops';
 import { useStore } from '../../store/store';
@@ -56,9 +56,24 @@ export async function autoAnswer(sessionId: string, workspace: Workspace, toolCa
  * Auto: a plan with image or video steps came before any settings were confirmed. The app runs the confirm path itself
  * and answers with the effective settings; the plan sent is not shown, so the prompts are written for them first.
  */
-export async function settingsForPlan(sessionId: string, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[3]): Promise<string> {
+export async function settingsForPlan(sessionId: string, workspace: Workspace, toolCallId: string, steps: Parameters<typeof partsOfSteps>[0], until: <T>(work: Promise<T>) => Promise<T>, log: Parameters<typeof sectionsOfParts>[3]): Promise<string | null> {
   const parts = partsOfSteps(steps);
   const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
   if (failed || !sections.length) return failed || 'The plan has no image or video step to confirm settings for.';
-  return `${await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts)}\nThe plan you sent was not shown. Now write the prompts for these settings and call propose_plan again.`;
+  const text = await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts);
+  // The prompts already fit what the app chose (same model, length and frame): the plan is shown as sent, written once.
+  return fitsChosen(sessionId, parts) ? null : `${text}\nThe plan you sent was not shown. Now write the prompts for these settings and call propose_plan again.`;
+}
+
+const words = (t: string) => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+/** Every part names no other model, length or frame than the settings the app confirmed for its kind. */
+function fitsChosen(sessionId: string, parts: SettingsPart[]): boolean {
+  const chosen = useStore.getState().sessions[sessionId].agent.settings;
+  return parts.every((p) => {
+    const c = chosen?.[p.kind as 'image' | 'video'];
+    if (!c) return false;
+    const name = words(modelSummary(c.modelRef)?.name ?? c.modelRef);
+    const model = !p.model || words(p.model).includes(name) || name.includes(words(p.model));
+    return model && (p.duration == null || p.duration === c.duration) && (p.aspect == null || p.aspect === c.aspect);
+  });
 }

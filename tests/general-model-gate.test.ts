@@ -110,12 +110,13 @@ describe('Auto: the settings card comes once per kind; spending is approved on t
     expect(feedOf('plan').length).toBeGreaterThanOrEqual(1);
     expect(settingsCards()).toHaveLength(0);
   });
-  it('a kind never confirmed still blocks: video asks its own card', async () => {
+  it('a kind never confirmed: Auto confirms the video settings itself (no card) and shows the plan that fits them', async () => {
     forcedUsd = 0.1;
-    replies = [{ name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', title: 'Clip', prompt: 'a dress twirling' }] } }, 'Necesito ajustes.'];
+    replies = [{ name: 'propose_plan', args: { title: 'Clip', steps: [{ id: 's1', kind: 'video', title: 'Clip', prompt: 'a dress twirling' }] } }, 'Listo.'];
     await sendAgentMessage('Un clip del vestido');
-    expect(feedOf('plan')).toHaveLength(0);
-    expect(sentMessages.join('\n')).toContain('confirm_settings');
+    expect(settingsCards().filter((f) => !(f as unknown as SettingsFeedItem).inline)).toHaveLength(0);
+    expect(feedOf('settings').some((f) => (f as unknown as SettingsFeedItem).inline && (f as unknown as SettingsFeedItem).sections.some((x) => x.kind === 'video'))).toBe(true);
+    expect(feedOf('plan')).toHaveLength(1);
   });
 });
 

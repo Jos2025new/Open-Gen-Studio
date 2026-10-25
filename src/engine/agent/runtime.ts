@@ -1748,11 +1748,13 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
           if (gate || draft) {
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
-            const auto = get().composer.agentStyle === 'auto';
-            if (!auto) recordMetric(sessionId, { type: 'rejected' });
-            else if (!settled) { settled = true; iteration--; }
-            respond(auto ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!);
-            continue;
+            const told = get().composer.agentStyle === 'auto' ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!;
+            if (told !== null) {
+              if (get().composer.agentStyle !== 'auto') recordMetric(sessionId, { type: 'rejected' });
+              else if (!settled) { settled = true; iteration--; }
+              respond(told);
+              continue;
+            }
           }
           patchAgent(sessionId, { phase: 'checking' });
           const waits = waitHooks({ patch: (fn) => patchAgent(sessionId, fn), action: (entry) => log.action(entry) });

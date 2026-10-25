@@ -46,8 +46,15 @@ describe('model limits for the agent', () => {
   beforeEach(() => setup());
 
   it('limitsLine and find_models say what the model takes', () => {
-    expect(limitsLine(SEED)).toBe('720p, 1080p · 5–12 s · 16:9, 9:16, 4:3');
+    expect(limitsLine(SEED)).toBe('720p, 1080p · 5–12 s · 16:9, 9:16, 4:3 · no reference images');
     expect(describeIndexed(useStore.getState().catalog.models[SEED])).toContain('takes: 720p, 1080p · 5–12 s');
+  });
+
+  it('a model that takes one start image says so before the plan is written (2026-10-24: three images on Seedance 2.0 Mini at OpenRouter)', () => {
+    const s = useStore.getState();
+    const schema = s.catalog.schemas[SEED];
+    useStore.setState({ catalog: { ...s.catalog, schemas: { ...s.catalog.schemas, [SEED]: { ...schema, slots: { ...schema.slots, firstFrame: { key: 'image' } } } as ModelSchema } } });
+    expect(limitsLine(SEED)).toContain('1 start image, no reference images');
   });
 
   it('askedSeconds reads the user words', () => {
@@ -168,8 +175,15 @@ describe('Auto: a plan sent before any settings makes the app confirm them (item
   beforeEach(() => setup());
   afterEach(() => vi.unstubAllGlobals());
 
-  it('propose_plan with video and no confirmation: the app confirms, the agent gets the guide and writes the prompts again, then the plan card appears', async () => {
-    const { sent, plansSeen } = await drive([videoPlan(), videoPlan('a runner at dawn, slow dolly'), 'listo'], 'Un video de un corredor en la playa');
+  it('propose_plan with video and no confirmation that fits the chosen settings: the app confirms them and shows that plan, written once (2026-10-24)', async () => {
+    await drive([{ ...videoPlan('a runner at dawn, slow dolly'), args: { ...videoPlan().args, steps: [{ ...videoPlan().args.steps[0], prompt: 'a runner at dawn, slow dolly', duration: undefined, aspect: undefined }] } }, 'listo'], 'Un video de un corredor en la playa');
+    expect(settingsItems()).toHaveLength(1);
+    expect(plans()).toHaveLength(1);
+    expect((plans()[0].plan.steps[0] as { prompt: string }).prompt).toContain('dolly');
+  });
+
+  it('propose_plan with video and no confirmation in a frame the model lacks: the app confirms, the agent gets the guide and writes the prompts again, then the plan card appears', async () => {
+    const { sent, plansSeen } = await drive([{ ...videoPlan(), args: { ...videoPlan().args, steps: [{ ...videoPlan().args.steps[0], aspect: '1:1' }] } }, videoPlan('a runner at dawn, slow dolly'), 'listo'], 'Un video de un corredor en la playa');
     expect(settingsItems()).toHaveLength(1);
     expect(settingsItems()[0]).toMatchObject({ status: 'confirmed', inline: true, sections: [{ chosen: { modelRef: SEED } }] });
     // The second model call carries the app's answer to the first plan; no plan card existed yet.
