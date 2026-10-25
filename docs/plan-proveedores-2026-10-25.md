@@ -1,6 +1,6 @@
 # Plan: proveedores de vídeo e imagen contra su doc oficial (2026-10-25)
 
-Estado: **propuesto, sin implementar; D1-D4 decididas por el usuario; para la segunda auditoría (GPT 6.1)**. Rama `task/auto-plan-card`, worktree `ogs-auto-plan-card`. El código se cita en el commit `e7fa70d`, igual en la cabeza actual (desde entonces solo cambió `docs/`). Nada se fusiona.
+Estado: **implementación de código integrada en `task/provider-plan`, pendiente de las pruebas de proveedor del usuario (R5/R6)**. Worktree `ogs-provider-plan`, base `696bd6c`. El código citado en las tablas corresponde al commit auditado `e7fa70d`; las rutas, pruebas y límites actuales están en el [registro de ejecución](proveedores-ejecucion-2026-10-25.md). D1-D4 se conservan. Nada se fusiona con la app original.
 
 Tercera revisión de GPT 6.1 (sobre `6911984`): tres ajustes, comprobados y aplicados. F0.2 añade `sourceVideo` al contrato. F3.1 y F3.2 fijan qué endpoint gobierna (opciones comunes; passthrough por slug). F4.1 sale del plan porque su formato no está documentado.
 
@@ -125,7 +125,7 @@ Cita: «lo que yo quiero es que sea posible enlazarlas como lo hacen la mayoria 
 ## Cómo se corrobora que nada se rompió
 
 1. **Tests nuevos por punto**, en la tabla de cada fase, en `tests/providers.test.ts` o en archivos nuevos `tests/openrouter-refs.test.ts` y `tests/nanogpt-frames.test.ts`.
-2. **Red existente:** `npm test` completo (hoy 1101 tests en verde con `test:related`), en especial `tests/providers.test.ts`, `tests/storyboard-sheet.test.ts`, `tests/auto-plan-card.test.ts` y el snapshot `tests/fixtures/live/expected.txt`. Si el snapshot cambia, el diff se revisa línea por línea y se explica en el commit, no se acepta a ciegas (lección de `3dbc579`).
+2. **Red existente:** `npm test` completo, en especial `tests/providers.test.ts`, `tests/storyboard-sheet.test.ts`, `tests/auto-plan-card.test.ts` y el snapshot `tests/fixtures/live/expected.txt`. El plan original citaba 1101 tests relacionados, no el resultado de la suite completa; la evidencia integrada se registra en el [historial 053](history/053-2026-10-W43.md). Si el snapshot cambia, el diff se revisa línea por línea y se explica en el commit, no se acepta a ciegas (lección de `3dbc579`).
 3. **Atlas y fal sin cambios:** `frameRules` (F0) solo lo ponen OpenRouter y NanoGPT. Sin él, `routeVideoInputs` y `videoInputProblem` dan lo mismo que hoy, y los tests actuales de Atlas y fal deben pasar sin tocarlos.
 4. **Guardas del repo:** `check-docs`, `map`, tamaños de `size-baseline.json` (`types.ts` 37306 y `params.ts` 61913 no pueden crecer: se compensa acortando comentarios del mismo archivo).
 5. **Prueba del usuario en el sandbox** al cerrar F1 y F3.4 (R5, R6), con el cuerpo enviado leído del registro.
