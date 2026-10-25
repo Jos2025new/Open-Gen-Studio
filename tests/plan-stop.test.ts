@@ -149,3 +149,18 @@ describe('a step waiting for price review does not spend after Cancel', () => {
     expect(result.skipped).toContain('a');
   });
 });
+
+describe('Keep lines on a plan card', () => {
+  const card = async (style: string) => {
+    const continuity = [{ preserve: 'the boy in the green shirt', source: 'asset:a', steps: ['a', 'b'] }];
+    const item = { id: `k_${style}`, createdAt: 0, workspace: 'chat', type: 'plan', style, status: 'running', stepStates: {}, stepGenerations: {}, estimate: { usd: 0.1 }, plan: { id: `pk_${style}`, title: 'T', workspace: 'chat', adjustments: [], continuity, steps: [step('a'), step('b')] } } as unknown as PlanFeedItem;
+    const host = document.createElement('div');
+    document.body.append(host);
+    await act(async () => { createRoot(host).render(createElement(PlanCard, { item, sessionId: sid() })); });
+    return host.textContent ?? '';
+  };
+  it('Auto shows none, also while the plan runs; Guided keeps them', async () => {
+    expect(await card('auto')).not.toContain('Keep:');
+    expect(await card('guided')).toContain('Keep:');
+  });
+});

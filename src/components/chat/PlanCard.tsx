@@ -206,7 +206,8 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [] }); }}>Cambiar</Button></> : null}
             </p>
           ) : null}
-          {sections.length ? null : plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
+          {/* Auto's card shows no Keep lines (a34ba6a), also once it runs and no longer shows its settings. */}
+          {sections.length || item.style === 'auto' ? null : plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
       </header>
       {sections.length ? <PlanSettings item={item} sessionId={sessionId} sections={sections} /> : null}
