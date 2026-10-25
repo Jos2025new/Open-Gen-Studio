@@ -4,6 +4,19 @@ import agentContracts from './map-contracts-agent.mjs';
 export default [
   ...agentContracts,
   {
+    id: 'reference-mentions',
+    what: 'El autocompletado @ reutiliza el campo actual en composer y plan; conserva el orden de refs y los sujetos por nombre, sin otra tarjeta ni confirmación.',
+    sides: [
+      ['src/components/ui/ReferenceMentions.tsx', 'export function useReferenceMentions'],
+      ['src/components/ui/ReferenceMentions.tsx', 'export function stepReferenceChoices'],
+      ['src/components/composer/Composer.tsx', 'mentions.onKeyDown(e)'],
+      ['src/components/chat/PlanParts.tsx', 'mentions.onKeyDown(e)'],
+      ['src/components/chat/PlanCard.tsx', 'stepReferenceChoices(step, plan.steps'],
+      ['src/engine/subjectPrompts.ts', 'export function mapSubjectPrompts'],
+    ],
+    tests: ['tests/reference-mentions.test.ts'],
+  },
+  {
     id: 'partial-generation-retry',
     what: 'Retry conserva assets, pide solo resultados o variantes pendientes con nueva semilla y muestra presupuesto de lo pendiente en recuperación directa y de plan.',
     sides: [

@@ -24,6 +24,7 @@ import { PlanSettings, RewriteFailed } from './PlanSettings';
 import { AspectShape } from './aspectShape';
 import { ClampText, Collapsible, EditLine, RefThumb, SuggestBox, SuggestButton } from './PlanParts';
 import { ResultThumb, StepThumb } from './StepThumb';
+import { stepReferenceChoices } from '../ui/ReferenceMentions';
 
 function stepIcon(s: PlanStep) {
   switch (s.kind) {
@@ -187,7 +188,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const spent = spentLabel(plannedSpend(item.stepGenerations, generations));
   const stopRun = () => { stopPlanRun(plan.id); for (const id of Object.values(item.stepGenerations)) if (generations[id] && ['running', 'queued'].includes(generations[id].status)) cancelGeneration(id); };
   /** Only a waiting plan can be edited: the other states show the same lines without the Edit button. */
-  const editable = (label: string, node: React.ReactNode) => (awaiting ? <EditLine label={label}>{node}</EditLine> : node);
+  const editable = (label: string, node: React.ReactNode, step?: PlanStep) => (awaiting ? <EditLine label={label} references={step ? stepReferenceChoices(step, plan.steps, assets, library, plan.subjects, 'modelRef' in step ? schemas[step.modelRef]?.slots.promptRefs : undefined) : []}>{node}</EditLine> : node);
 
   return (
     <article className={`plan-card cc-w status-${item.status}${sections.length ? ' is-auto' : ''}`} data-pop-bound>
@@ -270,7 +271,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                             >
                               {full.slice(0, full.length - v.length)}<u className="cc-delta">{v}</u>
                             </Collapsible>
-                          ))}
+                          ), s)}
                         </span>
                       );
                     })}
@@ -278,7 +279,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                 ) : script ? (
                   <>
                     <span className="cc-lab">Prompt{sections.length && 'modelRef' in s ? ` · adaptado a ${name(s.modelRef)}` : ''}</span>
-                    {editable(`"${s.title}"`, <Collapsible name={`the prompt of ${s.title}`}>{script}</Collapsible>)}
+                    {editable(`"${s.title}"`, <Collapsible name={`the prompt of ${s.title}`}>{script}</Collapsible>, s)}
                   </>
                 ) : null}
                 {state === 'review' && item.status !== 'canceled' && item.stepCostReviews?.[s.id] ? (

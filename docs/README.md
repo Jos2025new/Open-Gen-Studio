@@ -177,7 +177,7 @@
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
 - [Investigación: sondeo de trabajos de vídeo (2026-10-25)](investigacion-sondeo-video.md): intervalos de OpenMontage, ComfyUI, fal, Replicate, Runway, Vercel AI SDK y LiteLLM; base de la decisión D4.
 - [Plan: proveedores contra su doc oficial (2026-10-25)](plan-proveedores-2026-10-25.md): fases atómicas con evidencia, decisiones D1-D4 y verificación.
-- [Selector de referencias con @: investigación](investigacion-selector-referencias.md) y [maqueta antes/después](mockups/referencias-arroba.html): F5.1 y F5.2; aprobación visual pendiente antes de F5.3.
+- [Autocompletado de referencias con @: investigación](investigacion-selector-referencias.md) y [maqueta histórica](mockups/referencias-arroba.html): el usuario pide solo el selector en los campos actuales, sin rediseño ni aprobación de maqueta.
 - [Auditoría NanoGPT contra su doc oficial (2026-10-25)](audits/auditoria-nanogpt.md) y [segunda pasada](audits/auditoria-nanogpt-2.md): referencias solo por enlace, sin subida; último fotograma de H3 Max y Gemini Omni; nada corregido aún.
 
 ## Trazabilidad

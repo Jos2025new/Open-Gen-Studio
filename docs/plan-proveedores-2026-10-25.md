@@ -97,14 +97,16 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 | F4.4 | MiniMax H3: aclarar que `resolution` es para LoRA, edición y extensión | `nanogpt.ts` (`videoSchema`) | Fila 7 (confirmado por Manus §3) | Test de la etiqueta |
 | F4.5 | Seedance 2.5 talking-avatar: avisar antes de enviar si el audio pasa de 4 MB | `providers/bodyBudget.ts` | P2-7 | Test con un audio grande: error claro, sin envío |
 
-## Fase 5: selector `@` para enlazar referencias (pedido del usuario, D2)
+## Fase 5: autocompletado `@` en los campos actuales (pedido del usuario, D2)
+
+Aclaración del usuario durante la ejecución (2026-10-25): «no quiero ningun cambio de GUI, solo que se referencien», «con un arroba y puedes seleccionar que quieres referenciar, mas nada». Se conserva la GUI: solo autocompletado y selección de referencias en el campo existente, sin nuevas tarjetas, rediseño ni aprobación de maqueta. Esta aclaración sustituye el requisito anterior de F5.2.
 
 Cita: «lo que yo quiero es que sea posible enlazarlas como lo hacen la mayoria de apps donde puedes referencias con el arroba y aparece un pequeño plegable con las opciones de enlazarla a imagen 1, imagen 2, etc.» (2026-10-25). Hoy `@Name` existe, pero se escribe a mano (`components/composer/MediaControls.tsx:381-405`, `components/assets/AssetActions.tsx:246`).
 
 | ID | Qué | Dónde | Por qué (evidencia) | Cómo se comprueba |
 | --- | --- | --- | --- | --- |
 | F5.1 | Investigar cómo lo resuelven otras apps (comportamiento, teclado, qué se lista) antes de diseñar | Informe en `docs/` | Memorias «Research pro solutions first» y «Own style, not copies» | Informe con fuentes |
-| F5.2 | Maqueta antes y después, con nuestro estilo de tarjetas | `docs/mockups/` | Cambio de interfaz: AGENTS.md, reglas 3 y 6 (aprobación explícita) | Aprobación del usuario |
+| F5.2 | Retirado por aclaración del usuario: ninguna maqueta ni rediseño como requisito de implementación | `docs/mockups/referencias-arroba.html` queda solo como propuesta histórica, sin aplicarse | Autorización directa del usuario para el autocompletado en los campos actuales | Sin aprobación visual pendiente |
 | F5.3 | Implementar: escribir `@` abre un desplegable con las imágenes adjuntas y los sujetos (Image 1, Image 2, @Name, con miniatura); elegir una inserta su `@`; teclado y escape. Se usa el mismo componente en el composer y en el prompt editable de la tarjeta del plan | Componentes del composer y `components/chat/PlanParts.tsx` | D2 | Test jsdom: `@` abre la lista, la flecha y Enter insertan, Escape cierra. Prueba visual del usuario |
 
 ## Fuera del plan (R3), con motivo

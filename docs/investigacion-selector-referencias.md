@@ -1,6 +1,6 @@
 # Selector de referencias con @ (F5.1)
 
-2026-10-25. Investigación documental; no es una prueba de esas aplicaciones. Implementación de F5.3 pendiente de aprobación de la [maqueta](mockups/referencias-arroba.html), como exige F5.2 del [plan](plan-proveedores-2026-10-25.md).
+2026-10-25. Investigación documental; no es una prueba de esas aplicaciones. El usuario aclaró durante la ejecución que solo quiere autocompletado @ en los campos actuales, sin cambios de GUI ni aprobación de maqueta. Sustituye F5.2 del [plan](plan-proveedores-2026-10-25.md); la [maqueta](mockups/referencias-arroba.html) es únicamente una propuesta histórica y no se aplica como rediseño.
 
 ## Referencias consultadas
 

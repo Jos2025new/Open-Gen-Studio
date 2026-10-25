@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button } from '../ui/primitives';
+import { useReferenceMentions, type ReferenceChoice } from '../ui/ReferenceMentions';
 
 /** A paragraph cut to two lines with «…»; when it is really cut, clicking it (or Enter) shows the whole text. */
 export function ClampText({ className, children }: { className: string; children: ReactNode }) {
@@ -63,9 +64,11 @@ export function Collapsible({ head, name, children, preview }: { head?: ReactNod
  * A line the user can ask to change: "Edit" shows on hover or focus and opens a short field. What is written goes to the
  * agent as a comment on the waiting plan (the existing revision path), prefixed with the line it is about.
  */
-export function EditLine({ label, children }: { label: string; children: ReactNode }) {
+export function EditLine({ label, children, references = [] }: { label: string; children: ReactNode; references?: ReferenceChoice[] }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const field = useRef<HTMLInputElement>(null);
+  const mentions = useReferenceMentions(field, text, setText, references);
   const send = () => {
     const t = text.trim();
     if (!t) return;
@@ -79,15 +82,20 @@ export function EditLine({ label, children }: { label: string; children: ReactNo
       <button type="button" className="cc-edit-btn" aria-label={`Edit ${label}`} onClick={() => { setOpen((o) => !o); setText(''); }}>Edit</button>
       {open ? (
         <input
+          ref={field}
           autoFocus
           className="q-custom cc-edit-input"
           placeholder="What should change here?"
           aria-label={`What should change in ${label}`}
           value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
+          {...mentions.aria}
+          onChange={(e) => { setText(e.target.value); mentions.sync(e.currentTarget); }}
+          onSelect={(e) => mentions.sync(e.currentTarget)}
+          onBlur={mentions.onBlur}
+          onKeyDown={(e) => { if (mentions.onKeyDown(e) || e.nativeEvent.isComposing) return; if (e.key === 'Enter') send(); if (e.key === 'Escape') setOpen(false); }}
         />
       ) : null}
+      {open ? mentions.menu : null}
     </div>
   );
 }

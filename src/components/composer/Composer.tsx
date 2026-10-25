@@ -1,4 +1,5 @@
 import { ComposerAlerts } from './ComposerAlerts';
+import { referenceChoices, useReferenceMentions } from '../ui/ReferenceMentions';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, CircleStop, Layers, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
@@ -238,6 +239,7 @@ export function Composer() {
   const attachments = useStore((s) => s.composer.attachments);
   const editing = useStore((s) => s.composer.editing);
   const editingPrompt = useStore((s) => (s.composer.editing ? s.generations[s.composer.editing.generationId]?.prompt : undefined));
+  const subjects = useStore((s) => s.library);
   const workspace = useStore((s) => s.ui.workspace);
   const focusTick = useStore((s) => s.ui.focusComposer);
   const busy = useStore((s) => s.sessions[s.activeSessionId]?.agent.busy ?? false);
@@ -307,6 +309,12 @@ export function Composer() {
   // picks by hand stays until they attach or remove something.
   const imageCount = liveAttachments.filter((id) => assets[id]?.kind === 'image').length;
   const currentRef = useStore((s) => (mode === 'image' || mode === 'video' ? s.composer[mode].modelRef : ''));
+  const mentionChoices = useMemo(() => {
+    const imageIds = liveAttachments.filter(id => assets[id]?.kind === 'image');
+    const refs = mode === 'video' && mediaSlots ? routeVideoInputs(mediaSlots, imageIds, []).images : imageIds;
+    return referenceChoices(refs.map((id, i) => ({ id, assetId: id, label: assets[id]?.name || `Image ${i + 1}` })), subjects, currentRef, mediaSlots?.promptRefs);
+  }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode]);
+  const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices);
   const lastCount = useRef(imageCount);
   useEffect(() => {
     const before = lastCount.current;
@@ -450,9 +458,13 @@ export function Composer() {
             className="composer-input"
             rows={1}
             value={text}
+            {...mentions.aria}
             placeholder={mode === 'agent' ? PLACEHOLDER.agent[workspace] : PLACEHOLDER[mode]}
-            onChange={(e) => setComposer({ text: e.target.value })}
+            onChange={(e) => { setComposer({ text: e.target.value }); mentions.sync(e.currentTarget); }}
+            onSelect={(e) => mentions.sync(e.currentTarget)}
+            onBlur={mentions.onBlur}
             onKeyDown={(e) => {
+              if (mentions.onKeyDown(e)) return;
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 submit();
@@ -467,6 +479,7 @@ export function Composer() {
             }}
             aria-label="Prompt"
           />
+          {mentions.menu}
         </div>
         <div className="composer-bar">
           <ComposerOptions
