@@ -269,6 +269,8 @@ function catalogParams(defs: Record<string, NanoVideoParam>, skip: RegExp): Para
 
 /** A catalog field that takes links only (its description names URLs and no data URI / base64): local files cannot go there. */
 const urlOnly = (def: { description?: string } | undefined) => Boolean(def?.description && /\burls?\b/i.test(def.description) && !/data\s*ur[il]|base64/i.test(def.description));
+// Local data needs explicit support (video-models URL above).
+const acceptsDataImage = (def: { description?: string } | undefined) => Boolean(def?.description && /data\s*ur[il]|base64/i.test(def.description));
 
 function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const defs = raw.supported_parameters?.parameters ?? {};
@@ -307,8 +309,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       promptRequired: t2v && !i2v && !takesVideo(raw),
       ...(Object.keys(frameRules).length ? { frameRules } : {}),
       firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
-      // NanoGPT catalog documents lastImageUrl as accepting public URLs or base64 data URIs: https://nano-gpt.com/api/v1/video-models?detailed=true
-      lastFrame: 'lastImageUrl' in defs && !urlOnly(defs.lastImageUrl) ? { key: 'lastImageUrl', format: 'data-url' } : 'last_image' in defs && !urlOnly(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
+      lastFrame: acceptsDataImage(defs.lastImageUrl) ? { key: 'lastImageUrl', format: 'data-url' } : acceptsDataImage(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
       images: takesRefs && inputs.includes('image')
         ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,

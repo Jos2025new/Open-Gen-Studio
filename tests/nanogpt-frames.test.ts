@@ -24,11 +24,15 @@ async function schemaForVideo(...models: ReturnType<typeof videoModel>[]) {
 describe('NanoGPT video input catalog', () => {
   it('enables a data URL last frame only when the catalog accepts one', async () => {
     const schema = await schemaForVideo(
-      videoModel('minimax/h3-max', { imageUrl: { type: 'string' }, lastImageUrl: { type: 'string', description: 'Public HTTP(S) image URL or base64 image data URI' } }),
-      videoModel('minimax/h3-max-url-only', { lastImageUrl: { type: 'string', description: 'Public HTTP(S) URL of the ending frame' } }),
+      videoModel('minimax/h3-max', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image. Public HTTP(S) image URL or base64 image data URI (data:image/...;base64,...). Raw base64 without the data URI prefix is not supported. End frames cannot be combined with reference media or reference-to-video mode.' } }),
+      videoModel('minimax/h3-max-turbo', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image. Public HTTP(S) image URL or base64 image data URI (data:image/...;base64,...). Raw base64 without the data URI prefix is not supported.' } }),
+      videoModel('google/gemini-omni-flash/v1.1', { lastImageUrl: { type: 'string', description: 'Optional end frame for image-to-video. Requires a start image. Public HTTP(S) image URL or base64 image data URI (data:image/...;base64,...). Raw base64 without the data URI prefix is not supported. End frames cannot be combined with reference images, reference videos, or a source video.' } }, { capabilities: { text_to_video: true, image_to_video: true, video_to_video: true } }),
+      videoModel('kling-4.0', { lastImageUrl: { type: 'string', description: 'Optional ending JPEG/PNG in image or extend mode. At most 30 MB.' } }),
     );
     expect((await schema('minimax/h3-max')).slots.lastFrame).toEqual({ key: 'lastImageUrl', format: 'data-url' });
-    expect((await schema('minimax/h3-max-url-only')).slots.lastFrame).toBeUndefined();
+    expect((await schema('minimax/h3-max-turbo')).slots.lastFrame).toEqual({ key: 'lastImageUrl', format: 'data-url' });
+    expect((await schema('google/gemini-omni-flash/v1.1')).slots.lastFrame).toEqual({ key: 'lastImageUrl', format: 'data-url' });
+    expect((await schema('kling-4.0')).slots.lastFrame).toBeUndefined();
   });
   it('does not expose the undocumented referenceAudios request field', async () => {
     const schema = await schemaForVideo(videoModel('minimax/h3-max', { reference_audios: { type: 'text', description: 'Audio input references' } }));
