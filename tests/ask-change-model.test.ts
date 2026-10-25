@@ -183,8 +183,8 @@ describe('name resolution without false positives', () => {
     expect(resolveNamedModel('nano banana pro', 'image', false)).toEqual({ ref: PRO });
   });
 
-  it('an unknown provider is an error, not a guess', () => {
-    expect(resolveNamedModel('nano banana 2', 'image', false, 'midjourney')).toMatchObject({ error: expect.stringContaining('Unknown provider') });
+  it('a provider that is none of ours (the maker) is ignored: the model is found by its name (2026-10-24, "ByteDance")', () => {
+    expect(resolveNamedModel('nano banana 2', 'image', false, 'midjourney')).toEqual(resolveNamedModel('nano banana 2', 'image', false));
   });
 
   it('searchIndex tolerates a missing or wrong letter in words of 5+ letters, never in numbers or short words', () => {

@@ -101,8 +101,8 @@ export function partModel(part: { kind: MediaKind; model?: string; provider?: st
  */
 export function resolveNamedModel(name: string, kind: MediaKind, needsImage: boolean, provider?: string): { ref: string } | { error: string } {
   const n = name.trim();
+  // A provider that is none of ours (the maker, "ByteDance") names no provider: the model is found among all of them.
   const want = provider ? providerNamed(provider) : undefined;
-  if (provider && !want) return { error: `Unknown provider "${provider}". Use one of: ${REMOTE.map((p) => PROVIDER_LABELS[p]).join(', ')}.` };
   const exact = n.includes('::') ? modelSummary(n) : undefined;
   if (exact && (!want || exact.provider === want)) return { ref: exact.ref };
   const pool = indexedModels().filter((m) => m.kind === kind && (!want || m.provider === want));

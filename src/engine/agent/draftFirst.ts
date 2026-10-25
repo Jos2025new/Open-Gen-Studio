@@ -90,7 +90,9 @@ export function draftGate(steps: Array<{ kind?: string }>, feed: FeedItem[], sty
   const auto = style === 'auto';
   const change = auto && asksDraftChange(lastUserText(feed));
   if ((revision || auto) && !change && latestDraft(feed)) return null;
-  return `Not shown: a video plan needs the draft choice, which is on the video settings card. Call confirm_settings (kind video) and wait for the user to continue; then call propose_plan again.`;
+  return auto
+    ? `Not shown: call confirm_settings (kind video) first. In Auto it shows no card: the app sets the values and the draft choice and answers at once; then call propose_plan again, in this turn.`
+    : `Not shown: a video plan needs the draft choice, which is on the video settings card. Call confirm_settings (kind video) and wait for the user to continue; then call propose_plan again.`;
 }
 
 /** The choice with the mode's resolution applied (draft: always the lowest, whatever it held). */
