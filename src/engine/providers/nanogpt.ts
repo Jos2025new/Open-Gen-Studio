@@ -83,7 +83,6 @@ function needsVideo(m: NanoVideoModel): boolean {
 
 /** NanoGPT documents a 4 MB limit for `videoDataUrl`. */
 const MAX_VIDEO_DATA_URL_BYTES = 4 * 1024 * 1024;
-const MAX_TALKING_AVATAR_AUDIO_BYTES = 4_000_000;
 
 /** "Up to 9 reference images" → 9. */
 function upTo(d: NanoVideoParam | undefined, fallback: number): number {
@@ -515,9 +514,9 @@ export const nanogpt: ProviderAdapter = {
     if (req.refs.length && slots.images) body[slots.images.key] = await Promise.all(req.refs.slice(0, slots.images.max).map((r) => encodeImage(r, 'data-url')));
     if (req.refVideos?.length && slots.refVideos) body[slots.refVideos.key] = await Promise.all(req.refVideos.slice(0, slots.refVideos.max).map((v) => encodeVideo(v)));
     if (req.audio && slots.audio) {
-      // Seedance 2.5 talking-avatar audio input is limited to 4 MB: https://docs.nano-gpt.com/api-reference/video-generation
-      if (req.model.id === 'bytedance/seedance-2.5/talking-avatar' && req.audio.blob.size > MAX_TALKING_AVATAR_AUDIO_BYTES) {
-        throw new Error(`NanoGPT talking-avatar audio accepts up to 4 MB (this file is ${(req.audio.blob.size / 1_000_000).toFixed(1)} MB). Trim the audio before submitting. Nothing was sent or charged.`);
+      // App request-body budget (NANOGPT_BODY_LIMIT), not a documented model audio limit.
+      if (req.model.id === 'bytedance/seedance-2.5/talking-avatar' && req.audio.blob.size > NANOGPT_BODY_LIMIT) {
+        throw new Error(`This audio exceeds the app request-body budget of 4 MB (this file is ${(req.audio.blob.size / 1_000_000).toFixed(1)} MB). Trim the audio before submitting. Nothing was sent or charged.`);
       }
       body[slots.audio.key] = await encodeVideo(req.audio);
     }

@@ -69,12 +69,12 @@ describe('NanoGPT catalog controls', () => {
     let requests = 0;
     vi.stubGlobal('fetch', async () => { requests++; throw new Error('unexpected request'); });
     const audio = { assetId: 'a', blob: new Blob([new Uint8Array(4_000_001)], { type: 'audio/mpeg' }), mime: 'audio/mpeg', width: 0, height: 0 };
-    await expect(nanogpt.generate(baseRequest(model, schema, { audio }))).rejects.toThrow(/audio.*4 MB/i);
+    await expect(nanogpt.generate(baseRequest(model, schema, { audio }))).rejects.toThrow(/audio.*app.*4 MB/i);
     expect(requests).toBe(0);
   });
 
   it('explains when an audio-only data URL exceeds the body limit', async () => {
-    await expect(fitBody({ audio: `data:audio/mpeg;base64,${'a'.repeat(NANOGPT_BODY_LIMIT)}` }, NANOGPT_BODY_LIMIT)).rejects.toThrow(/audio.*4 MB.*Nothing was sent or charged/i);
+    await expect(fitBody({ audio: `data:audio/mpeg;base64,${'a'.repeat(NANOGPT_BODY_LIMIT)}` }, NANOGPT_BODY_LIMIT)).rejects.toThrow(/audio.*app.*4 MB.*Nothing was sent or charged/i);
   });
 
 });

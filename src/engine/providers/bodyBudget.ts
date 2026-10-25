@@ -47,7 +47,7 @@ export async function fitBody(body: Record<string, unknown>, limit: number, shri
   }
   const hasAudio = Object.entries(body).some(([key, value]) => /audio/i.test(key) && typeof value === 'string' && value.startsWith('data:audio/'));
   const tooLarge = (now: number) => new Error(!slots.length && hasAudio
-    ? `The audio input makes the request ${mb(now)} MB; NanoGPT accepts up to 4 MB. Shorten the audio. Nothing was sent or charged.`
+    ? `The audio input makes the request ${mb(now)} MB; the app request-body budget is 4 MB. Shorten the audio. Nothing was sent or charged.`
     : `The request to NanoGPT is ${mb(now)} MB and NanoGPT accepts up to 4.5 MB${slots.length ? ', even with the images reduced to 1024 px' : ''}. Nothing was sent or charged. Use fewer or lighter input images.`);
   if (!slots.length) throw tooLarge(before);
   for (const step of SHRINK_STEPS) {
