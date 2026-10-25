@@ -9,6 +9,7 @@ import { cardDraft, confirmedSections } from './draftActions';
 import { askedQuality, draftMode } from './draftFirst';
 import { inConversation } from './requestGuides';
 import { settingsResultText } from './settingsResult';
+import { betterProvider, wantedOf } from './providerFit';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 
 /**
@@ -34,10 +35,21 @@ export async function autoConfirmSettings(sessionId: string, workspace: Workspac
   }));
   // The quality the user's words clearly ask for in this request wins over the inherited choice.
   const asked = askedQuality(userRequest(agent()));
-  const draft = cardDraft(sessionId, chosen.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })), asked && draftMode(asked));
+  // The provider that cannot take what was asked gives way to the same model and variant at one that can (providerFit).
+  const notes: string[] = [];
+  const fitted = await Promise.all(chosen.map(async (x) => {
+    const images = parts.filter((p) => p.kind === x.kind).reduce((n, p) => n + ((p as { refs?: number }).refs ?? 0), 0);
+    const better = x.kind === 'video' ? await betterProvider(x.recommended.modelRef, wantedOf(x.recommended, offerRequest(agent()), images), offerRequest(agent())) : undefined;
+    const got = better ? await resolveModel(better.ref) : undefined;
+    if (!better || !got) return x;
+    notes.push(better.note);
+    const r = x.recommended;
+    return { ...x, recommended: { ...defaultChoice(better.ref, got.schema, { kind: x.kind, startImage: r.needsImage, duration: r.duration, aspect: r.aspect, count: r.count }), needsImage: r.needsImage }, alternatives: [r.modelRef, ...x.alternatives.filter((a) => a !== better.ref && a !== r.modelRef)] };
+  }));
+  const draft = cardDraft(sessionId, fitted.map((x) => ({ ...x, chosen: x.chosen ?? x.recommended })), asked && draftMode(asked));
   const base: SettingsFeedItem = { id: uid('fd'), createdAt: Date.now(), workspace, type: 'settings', summary, status: 'confirmed', toolCallId, inline: true, ...draft };
   const item: SettingsFeedItem = { ...base, sections: confirmedSections(base, base.sections) };
   appendFeed(sessionId, item);
   patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, ...confirmedState(s.agent, item, item.sections) } as AgentState }));
-  return settingsResultText(item, item.sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), undefined, true);
+  return settingsResultText(item, item.sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), undefined, true) + notes.join('');
 }
