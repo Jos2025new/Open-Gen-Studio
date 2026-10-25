@@ -84,7 +84,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
   const answered = Object.keys(final()).length;
 
   return (
-    <article className="q-card q-ask">
+    <article className="q-card q-ask card-m">
       {item.maxRounds > 1 ? <div className="q-kicker">{`Round ${item.round} of ${item.maxRounds}`}</div> : null}
       {item.intro ? (() => {
         const { title, context } = introParts(item.intro);
@@ -98,7 +98,7 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
       {item.questions.map((q) => (
         <div key={q.id} className="q-block">
           <div className="q-question">{q.question}</div>
-          <div className={`q-options${q.options.some((o) => o.length > LONG_OPTION) ? ' is-list' : ''}`}>
+          <div className={`q-options${q.options.some((o) => optionParts(o).label.length > LONG_OPTION) ? ' is-list' : ''}`}>
             {q.options.map((o) => {
               const on = (answers[q.id] ?? []).includes(o);
               const { label, detail } = optionParts(o);
@@ -107,12 +107,18 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
                   {on ? <Check size={12} /> : null}
                   <span className="q-opt-text">
                     <span className="q-opt-label">{label}</span>
-                    {detail ? <span className="q-opt-detail">{detail}</span> : null}
+                    {detail && q.options.some((x) => optionParts(x).label.length > LONG_OPTION) ? <span className="q-opt-detail">{detail}</span> : null}
                   </span>
                 </button>
               );
             })}
           </div>
+          {(() => {
+            // Short options side by side: what the chosen one means goes on one quiet line under them.
+            if (q.options.some((x) => optionParts(x).label.length > LONG_OPTION)) return null;
+            const said = (answers[q.id] ?? []).map((o) => optionParts(o).detail).filter(Boolean);
+            return said.length ? <p className="q-opt-note">{said.join(' · ')}</p> : null;
+          })()}
           {q.allowCustom && !typing[q.id] && !custom[q.id] ? (
             <button type="button" className="q-other" onClick={() => setTyping((t) => ({ ...t, [q.id]: true }))}>Otra respuesta…</button>
           ) : q.allowCustom ? (
