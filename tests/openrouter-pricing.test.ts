@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { openrouter, parseOrVideoPricing } from '../src/engine/providers/openrouter';
+import { imagePrice, openrouter, parseOrVideoPricing } from '../src/engine/providers/openrouter';
 import type { ModelSummary } from '../src/engine/types';
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -43,18 +43,26 @@ beforeEach(() => {
 });
 
 describe('OpenRouter image price cache (fix 2)', () => {
-  it('does not keep a failed lookup as "token billed": the next load asks again', async () => {
+  it('does not cache failed capabilities: the next schema load retries the authoritative endpoint', async () => {
     let calls = 0;
     routeFetch(() => {
       calls++;
       if (calls === 1) return json({ error: 'boom' }, 500);
       return json({ endpoints: [{ pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] });
     });
-    const first = await priceOf(imageModel);
-    expect(first.skus).toEqual([]);
+    await expect(priceOf(imageModel)).rejects.toThrow('boom');
     expect([...cache.keys()].filter((k) => k.startsWith('or:price'))).toEqual([]);
     const second = await priceOf(imageModel);
     expect(second.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
+    expect(calls).toBe(3); // failed capabilities, successful capabilities, then pricing
+  });
+
+  it('does not cache a failed pricing lookup as token-billed', async () => {
+    let calls = 0;
+    routeFetch(() => ++calls === 1 ? json({ error: 'boom' }, 500) : json({ endpoints: [{ pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] }));
+    expect(await imagePrice(imageModel.id)).toBeUndefined();
+    expect([...cache.keys()].filter(k => k.startsWith('or:price'))).toEqual([]);
+    expect((await imagePrice(imageModel.id))?.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
     expect(calls).toBe(2);
   });
 
