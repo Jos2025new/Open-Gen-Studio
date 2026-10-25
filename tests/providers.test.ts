@@ -83,7 +83,8 @@ describe('model classification', () => {
     expect(ref.slots.images).toMatchObject({ key: 'referenceImages', max: 9 });
     expect(ref.slots.refVideos).toMatchObject({ key: 'referenceVideos', max: 3 });
     const seedance20 = await nanogpt.loadSchema(by('bytedance-seedance-2-0'), undefined);
-    expect(seedance20.slots.lastFrame?.key).toBe('last_image');
+    // Its last_image is "an end-frame image URL": links only, which local files cannot be (no slot).
+    expect(seedance20.slots.lastFrame).toBeUndefined();
   });
 });
 

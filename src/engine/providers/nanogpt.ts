@@ -277,7 +277,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const inputs = raw.architecture?.input_modalities ?? [];
   // Reference lists: we can only send local images as data URLs (NanoGPT documents no upload). A list the catalog
   // describes as URLs only ("Optional JSON array of image URLs", Seedance 2.0) rejects them: sandbox 2026-10-25,
-  // "Each reference image must be a non-empty HTTP or HTTPS URL". Such a model has no reference slot here.
+  // "Each reference image must be a non-empty HTTP or HTTPS URL". Such a list (references, last frame) has no slot here.
   const modes = defs.mode?.options?.map((o) => String(o.value)) ?? [];
   const refModel = /reference-to-video/.test(raw.id);
   const takesRefs = (refModel || 'reference_images' in defs || modes.includes('reference-to-video')) && !urlOnly(defs.reference_images);
@@ -288,7 +288,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       prompt: 'prompt',
       promptRequired: t2v && !i2v && !takesVideo(raw),
       firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
-      lastFrame: 'last_image' in defs ? { key: 'last_image', format: 'data-url' } : undefined,
+      lastFrame: 'last_image' in defs && !urlOnly(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
       images: takesRefs && inputs.includes('image')
         ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,
@@ -301,7 +301,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
           : inputs.includes('audio') && /lip-?sync|avatar/.test(raw.id)
             ? { key: 'audioDataUrl', required: true, format: 'data-url' }
             : undefined,
-      refAudios: 'reference_audios' in defs ? { key: 'referenceAudios', max: upTo(defs.reference_audios, 3), min: 0, format: 'data-url' } : undefined,
+      refAudios: 'reference_audios' in defs && !urlOnly(defs.reference_audios) ? { key: 'referenceAudios', max: upTo(defs.reference_audios, 3), min: 0, format: 'data-url' } : undefined,
       video: takesVideo(raw) ? { key: 'videoDataUrl', format: 'data-url' } : undefined,
     },
     price: model.price,
