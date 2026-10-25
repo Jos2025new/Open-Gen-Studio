@@ -291,6 +291,13 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
     ...(/end frames cannot be combined with reference/i.test(lastDescription) ? { refsWithLast: false } : {}),
     ...(/end frames cannot be combined with .*source video/i.test(lastDescription) ? { sourceWithLast: false } : {}),
   };
+  // NanoGPT's Grok v1.5 catalog limits image/reference modes to the listed tiers: https://nano-gpt.com/api/v1/video-models?detailed=true
+  const resolutionDescription = defs.resolution?.description ?? '';
+  const imageResolutionText = /image and reference modes support ([^.]+)/i.exec(resolutionDescription)?.[1];
+  const firstFrameResolutions = /1080p is available for text-to-video/i.test(resolutionDescription) && imageResolutionText
+    ? [...imageResolutionText.matchAll(/\d+(?:\.\d+)?p/gi)].map(([tier]) => tier).filter((tier) => defs.resolution?.options?.some((o) => String(o.value).toLowerCase() === tier.toLowerCase()))
+    : [];
+  if (firstFrameResolutions.length) Object.assign(frameRules, { firstFrameResolutions });
   return {
     ref: model.ref,
     params,
