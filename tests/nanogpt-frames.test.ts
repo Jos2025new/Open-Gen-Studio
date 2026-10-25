@@ -49,4 +49,14 @@ describe('NanoGPT video input catalog', () => {
     expect(videoInputProblem(gemini.slots, { firstFrame: false, lastFrame: true, sourceVideo: true, images: 0, videos: 0 })).toMatch(/cannot combine a source video/);
     expect((await schema('minimax/h3-max-turbo')).slots.frameRules).toMatchObject({ lastNeedsFirst: true });
   });
+
+  it('allows Grok Imagine 1.5 1080p for text-to-video but rejects it with a start image', async () => {
+    const schema = await schemaForVideo(videoModel('xai/grok-imagine-video/v1.5/image-to-video', {
+      resolution: { type: 'select', label: 'Resolution', description: '1080p is available for text-to-video. Image and reference modes support 480p and 720p.', options: [{ value: '480p' }, { value: '720p' }, { value: '1080p' }] },
+    }));
+    const grok = await schema('xai/grok-imagine-video/v1.5/image-to-video');
+    expect(grok.slots.frameRules).toMatchObject({ firstFrameResolutions: ['480p', '720p'] });
+    expect(videoInputProblem(grok.slots, { firstFrame: true, lastFrame: false, sourceVideo: false, images: 0, videos: 0, resolution: '1080p' })).toBe('does not support 1080p with a start image.');
+    expect(videoInputProblem(grok.slots, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 0, resolution: '1080p' })).toBeNull();
+  });
 });
