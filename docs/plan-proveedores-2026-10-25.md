@@ -2,7 +2,7 @@
 
 Estado: **propuesto, sin implementar; D1-D4 decididas por el usuario; para la segunda auditoría (GPT 6.1)**. Rama `task/auto-plan-card`, worktree `ogs-auto-plan-card`. El código se cita en el commit `e7fa70d`, igual en la cabeza actual (desde entonces solo cambió `docs/`). Nada se fusiona.
 
-Segunda revisión de GPT 6.1 (sobre `2c8faa5`): tres ajustes, comprobados en el código y aplicados. F0.2 y F0.3 quedan en un solo commit de contrato. La nueva F0.3 valida en el ejecutor con las entradas completas, incluido el vídeo fuente. F1.3 excluye también referencias con último fotograma.
+Segunda revisión de GPT 6.1 (sobre `2c8faa5`): tres ajustes, comprobados en el código y aplicados. El cambio del validador y de sus 5 llamadas queda en un solo commit (F0.2). La nueva F0.3 valida en el ejecutor con las entradas completas, incluido el vídeo fuente. F1.3 excluye también referencias con último fotograma.
 
 Revisión de GPT 6.1 (2026-10-25, 3 subagentes, sobre `4c605aa`): tres observaciones, comprobadas en el código y aplicadas aquí. P1 enrutamiento: F1.3 se reescribe. P1 contrato del validador: nace F0 y se reescriben F2.2 y F2.5. P2 máximo de 7: F2.3 sale del plan.
 
