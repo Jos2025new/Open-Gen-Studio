@@ -13,7 +13,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { approvePlan, sendAgentMessage } from '../src/engine/agent/runtime';
 import { confirmSettingsSchema } from '../src/engine/agent/tools';
 import { changePlanChoice, changePlanDraft, planSections, rewritePrompts, setPromptWriter, usePlanRewrite } from '../src/engine/agent/planSettings';
 import { useStore } from '../src/store/store';
@@ -90,6 +90,12 @@ describe('Auto: confirm_settings without a card', () => {
     expect(settingsItems()[0].switchFrom).toBeUndefined();
     expect(st().agent.pending).toBeUndefined();
     expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
+    await approvePlan(sid(), planItem()!.id);
+    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    // The next request names no model and the agent writes the old one: the approved one stays.
+    script = [ask({}), proposal(ATLAS)];
+    await sendAgentMessage('Ahora un faro de noche');
     expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
   });
 });
@@ -221,9 +227,18 @@ describe('Auto: a model named in a reply to the waiting plan (sandbox session 20
     expect(planItem()?.status).toBe('awaiting');
     script = [ask({ model: LITE }), proposal(LITE)];
     await sendAgentMessage('Nano banana 2 es muy caro. Usa mejor nano banana 2 lite');
-    expect(settingsItems().at(-1)?.sections[0].chosen?.modelRef).toBe(LITE);
-    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
     expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
+  });
+});
+
+describe('Auto: approving a plan confirms what it runs', () => {
+  beforeEach(setup);
+
+  it('(k) a plan that runs another model than the confirmed one makes it the confirmed one; unchecked steps do not count', async () => {
+    put([img('s1', { modelRef: LITE, settings: { aspect: '16:9', count: 1, advanced: {} } }), img('s2', { modelRef: ATLAS })]);
+    useStore.setState((x) => ({ sessions: { ...x.sessions, [sid()]: { ...st(), feed: st().feed.map((f) => (f.type === 'plan' ? { ...f, skipped: ['s2'] } : f)), agent: { ...st().agent, pending: { kind: 'plan', feedItemId: 'pl1' } as never } } } }));
+    await approvePlan(sid(), 'pl1');
+    expect(st().agent.settings?.image).toMatchObject({ modelRef: LITE, aspect: '16:9' });
   });
 });
 

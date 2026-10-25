@@ -91,7 +91,7 @@ import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides }
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
 import { describeChoice, sectionsOf } from './settingsCard';
-import { inheritApproved } from './inherit';
+import { confirmApproved, inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
@@ -836,6 +836,7 @@ export async function approvePlan(sessionId: string, itemId: string): Promise<vo
     if (pending.toolCallId) pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `Approved by the user.${note}${adjustedNote(plan)} The app is executing the plan now.` });
     closeRequest(sessionId, 'approved', total.usd);
     if (item.style === 'direct') inheritApproved(chosen);
+    else if (item.style === 'auto') confirmApproved(sessionId, chosen);
     patchAgent(sessionId, { pending: undefined, questionRound: 0, draft: undefined });
   }
   updateFeedItem<PlanFeedItem>(sessionId, itemId, (it) => ({
