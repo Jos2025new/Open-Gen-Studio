@@ -18,7 +18,7 @@ vi.mock('../src/engine/providers/shared', async (load) => {
 
 import { openrouter } from '../src/engine/providers/openrouter';
 import type { GenRequest, MediaInput } from '../src/engine/providers/types';
-import type { ModelSummary } from '../src/engine/types';
+import type { ModelSummary, RemoteJob } from '../src/engine/types';
 import { REFERENCE_PROTOCOLS } from '../src/engine/modelRules';
 import { refMentionStyle } from '../src/engine/params';
 
@@ -105,6 +105,17 @@ describe('OpenRouter reference-to-video inputs (F1)', () => {
     expect(rule?.note).toContain('storyboard sets shot order and framing');
     expect(rule?.note).toContain('@Image1');
     expect(refMentionStyle('openrouter::bytedance/seedance-2.0-mini')).toEqual({ template: '@Image{n}', zeroBased: false });
+  });
+
+  it('normalizes relative polling metadata when resuming a persisted job', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      seen.push(url);
+      return json({ status: 'failed', error: 'stop test' });
+    });
+    const job: RemoteJob = { provider: 'openrouter', id: 'resume-1', meta: { polling_url: '/api/v1/videos/resume-1' } };
+    await expect(openrouter.resume!(job, { kind: 'video', apiKey: 'test', signal: new AbortController().signal, onStatus: () => undefined })).rejects.toThrow('stop test');
+    expect(seen).toEqual(['https://openrouter.ai/api/v1/videos/resume-1']);
   });
 
   it('resolves relative polling URLs and preserves absolute polling URLs', async () => {
