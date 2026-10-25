@@ -383,8 +383,10 @@ export const openrouter: ProviderAdapter = {
 
 async function pollVideo(job: RemoteJob, ctx: ResumeContext): Promise<GenResult> {
   const started = Date.now();
+  // Persisted jobs may predate URL normalization; resolve at the polling boundary as well.
+  const pollingUrl = new URL(job.meta.polling_url, 'https://openrouter.ai').href;
   for (;;) {
-    const st = await requestJson<{ status: string; error?: string; unsigned_urls?: string[]; usage?: { cost?: number | null } }>(job.meta.polling_url, {
+    const st = await requestJson<{ status: string; error?: string; unsigned_urls?: string[]; usage?: { cost?: number | null } }>(pollingUrl, {
       headers: orHeaders(ctx.apiKey),
       signal: ctx.signal,
     });
