@@ -342,7 +342,7 @@ export const openrouter: ProviderAdapter = {
       frames.push({ ...((await encodeImage(req.lastFrame, 'content-part')) as object), frame_type: 'last_frame' });
     }
     if (frames.length) body.frame_images = frames;
-    // POST /videos input_references: https://openrouter.ai/docs/api/api-reference/video-generation/create-videos
+    // POST /videos input_references: https://openrouter.ai/docs/api/api-reference/video-generation/submit-a-video-generation-request
     if (schema.slots.images && req.refs.length) {
       body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
     }
