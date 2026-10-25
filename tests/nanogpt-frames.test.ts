@@ -25,8 +25,10 @@ describe('NanoGPT video input catalog', () => {
   it('enables a data URL last frame only when the catalog accepts one', async () => {
     const schema = await schemaForVideo(
       videoModel('minimax/h3-max', { imageUrl: { type: 'string' }, lastImageUrl: { type: 'string', description: 'Public HTTP(S) image URL or base64 image data URI' } }),
+      videoModel('minimax/h3-max-url-only', { lastImageUrl: { type: 'string', description: 'Public HTTP(S) URL of the ending frame' } }),
     );
     expect((await schema('minimax/h3-max')).slots.lastFrame).toEqual({ key: 'lastImageUrl', format: 'data-url' });
+    expect((await schema('minimax/h3-max-url-only')).slots.lastFrame).toBeUndefined();
   });
   it('does not expose the undocumented referenceAudios request field', async () => {
     const schema = await schemaForVideo(videoModel('minimax/h3-max', { reference_audios: { type: 'text', description: 'Audio input references' } }));
