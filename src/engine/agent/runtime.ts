@@ -247,6 +247,12 @@ function planContext(sessionId: string, workspace: Workspace, strict = false) {
 // ---------------------------------------------------------------------------
 // Entry points
 
+/** A reply to a waiting card is part of the request: what the app reads for a model or provider the user named (userRequest) includes it. */
+function addReplyToRequest(sessionId: string, text: string, attachments: string[]): void {
+  const draft = session(sessionId).agent.draft;
+  patchAgent(sessionId, { draft: { request: `${draft?.request ?? ''} ${text}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments.filter((id) => !draft?.attachments?.includes(id))] } });
+}
+
 /** Send a message from the composer in agent mode. */
 export async function sendAgentMessage(text: string, opts: { attachments?: string[] } = {}): Promise<void> {
   const st = get();
@@ -280,6 +286,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     updateFeedItem<SettingsFeedItem>(sessionId, pendingItem.id, { status: 'skipped' });
     const engine = agentEngine();
     if (engine.kind === 'llm' && pending.toolCallId) {
+      addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       pushHistory(sessionId, {
         role: 'tool',
@@ -297,6 +304,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'plan-revision', event: 'plan.comment_received', reason: 'user replied while plan awaits approval', sessionId, planId: pendingItem.plan.id, approvalId: pendingItem.id, before: { status: pendingItem.status, adjustments: pendingItem.plan.adjustments } });
     const engine = agentEngine();
     if (engine.kind === 'llm' && pending.toolCallId) {
+      addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
       pushHistory(sessionId, {
         role: 'tool',
@@ -312,8 +320,8 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
       removeDraftNodes(sessionId, pendingItem.plan.id);
-      const draft = s.agent.draft;
-      patchAgent(sessionId, { pending: undefined, draft: { request: `${draft?.request ?? ''} ${clean}`.trim(), answers: draft?.answers ?? {}, attachments: [...(draft?.attachments ?? []), ...attachments] } });
+      addReplyToRequest(sessionId, clean, attachments);
+      patchAgent(sessionId, { pending: undefined });
       await offlineTurn(sessionId, workspace);
     }
     return;

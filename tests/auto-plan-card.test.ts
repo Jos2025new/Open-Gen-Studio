@@ -210,6 +210,23 @@ describe('Auto: which model and values, without a card (sandbox session 2026-10-
   });
 });
 
+describe('Auto: a model named in a reply to the waiting plan (sandbox session 2026-10-25)', () => {
+  beforeEach(setup);
+
+  it('(j) becomes the confirmed model, and the next request keeps it instead of putting the old one back', async () => {
+    // No published price: the plan waits for approval, as it did in the sandbox.
+    useStore.setState((x) => ({ catalog: { ...x.catalog, models: Object.fromEntries(Object.entries(x.catalog.models).map(([r, m]) => [r, r === ATLAS || r === LITE ? { ...m, price: undefined } : m])) } }));
+    script = [ask({}), proposal()];
+    await sendAgentMessage('Una imagen de un faro');
+    expect(planItem()?.status).toBe('awaiting');
+    script = [ask({ model: LITE }), proposal(LITE)];
+    await sendAgentMessage('Nano banana 2 es muy caro. Usa mejor nano banana 2 lite');
+    expect(settingsItems().at(-1)?.sections[0].chosen?.modelRef).toBe(LITE);
+    expect(st().agent.settings?.image?.modelRef).toBe(LITE);
+    expect(planItem()?.plan.steps.map((x) => (x as ImageStep).modelRef)).toEqual([LITE]);
+  });
+});
+
 describe('confirm_settings numbers as text', () => {
   it('a numeric string duration is accepted as a number', () => {
     const r = confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', duration: '8' }] });
