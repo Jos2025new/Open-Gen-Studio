@@ -942,15 +942,14 @@ function castOption(p: ParamDef, value: string): string | number {
 // Video inputs
 
 /**
- * Where a video model's inputs go. The first image is the start frame when the model has one; the other
- * images are references (all of them when there is no start frame). Videos are always references.
+ * Route video inputs. First image is the start frame when supported; remaining images and videos are references.
  */
 export function routeVideoInputs<T>(slots: InputSlots, images: T[], videos: T[], firstFrame?: T): { firstFrame?: T; images: T[]; videos: T[] } {
   // Keyframe models pin every image, the start frame first.
   if (slots.keyframes) return { firstFrame: undefined, images: firstFrame ? [firstFrame, ...images] : [...images], videos };
   const rest = [...images];
   let first = firstFrame;
-  if (!first && slots.firstFrame && rest.length) first = rest.shift();
+  if (!first && slots.firstFrame && rest.length && slots.frameRules?.refsWithFirst !== false) first = rest.shift();
   if (first && !slots.firstFrame && (slots.images || slots.mixedRefs)) {
     rest.unshift(first);
     first = undefined;
