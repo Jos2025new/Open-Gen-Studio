@@ -1,5 +1,7 @@
 # Agente — Auto: una tarjeta
 
+> **Estado (2026-10-24): bajo prueba, frágil.** Lo de esta página añadido el 2026-10-24 no está cerrado: casi nada se ha visto con el agente real. Puntos frágiles y pendientes en [053](../history/053-2026-10-W43.md).
+
 Pedido del usuario (2026-10-24): en Auto, sin tarjeta «Confirm settings» ni pregunta de cambio de modelo. Una sola tarjeta de plan que reúne lo que ya tenían las dos (inspirada en la secuencia de OpenArt, con nuestra identidad). Guided y Direct no cambian.
 
 | Comportamiento documentado | Código | Test |

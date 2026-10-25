@@ -1,5 +1,7 @@
 # Studio: chat y tablero (pasos 1 a 3)
 
+> **Estado (2026-10-24): bajo prueba, frágil.** Lo de esta página añadido el 2026-10-24 no está cerrado: casi nada se ha visto con el agente real. Puntos frágiles y pendientes en [053](../history/053-2026-10-W43.md).
+
 2026-10-15, `task/gui-cohesion`. Studio es el espacio de trabajo de chat (`ui.workspace = 'chat'`), no un `ui.space`: una sola conversación, con el chat a la izquierda y una columna de tablero a la derecha. No cambia proveedores, lógica de generación, costes ni datos; solo presentación y preferencias de UI.
 
 | Comportamiento documentado | Código | Test |
