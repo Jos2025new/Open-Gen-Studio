@@ -190,7 +190,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
   const editable = (label: string, node: React.ReactNode) => (awaiting ? <EditLine label={label}>{node}</EditLine> : node);
 
   return (
-    <article className={`plan-card cc-w status-${item.status}`}>
+    <article className={`plan-card cc-w status-${item.status}${sections.length ? ' is-auto' : ''}`} data-pop-bound>
       <header className="plan-head cc-head">
         <div className="cc-head-main">
           <div className="cc-headline">
@@ -205,7 +205,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
               {awaiting ? <> <Button size="sm" variant="ghost" onClick={() => { void sendAgentMessage('Quiero cambiar la elección de borrador/calidad', { attachments: [] }); }}>Cambiar</Button></> : null}
             </p>
           ) : null}
-          {plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
+          {sections.length ? null : plan.continuity?.map((group, i) => <p className="plan-summary" key={i}>Keep: {group.preserve} · from {refName(group.source)} · {group.steps.length} steps. Reference use is checked; visual fidelity still needs review.</p>)}
         </div>
       </header>
       {sections.length ? <PlanSettings item={item} sessionId={sessionId} sections={sections} /> : null}
@@ -254,7 +254,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   {plan.steps.length > 1 && perStep && perStep[s.id] && (perStep[s.id].usd ?? 1) > 0 ? <span className="step-cost num faint">{costLabel(perStep[s.id], { short: true })}</span> : null}
                   {!awaiting ? <StateIcon state={state} /> : null}
                 </span>
-                <DetailLine step={s} detail={detail} />
+                {sections.length && plan.steps.length === 1 ? null : <DetailLine step={s} detail={detail} />}
                 {variations ? (
                   <>
                     <span className="cc-lab">Prompts · base + variation</span>
@@ -277,7 +277,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
                   </>
                 ) : script ? (
                   <>
-                    <span className="cc-lab">Prompt</span>
+                    <span className="cc-lab">Prompt{sections.length && 'modelRef' in s ? ` · adaptado a ${name(s.modelRef)}` : ''}</span>
                     {editable(`"${s.title}"`, <Collapsible name={`the prompt of ${s.title}`}>{script}</Collapsible>)}
                   </>
                 ) : null}

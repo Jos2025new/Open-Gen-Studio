@@ -60,7 +60,11 @@ export function Popover({ open, anchor, onClose, placement = 'top-start', width 
       next.maxHeight = r.bottom - MARGIN;
     } else {
       const left = placement === 'bottom-center' || placement === 'top-center' ? r.left + (r.width - w) / 2 : r.right - w;
-      next.left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
+      // Inside a [data-pop-bound] box (a chat card) the popover stays within it, never over the rail beside the chat.
+      const box = a.closest('[data-pop-bound]')?.getBoundingClientRect();
+      const lo = Math.max(MARGIN, box?.left ?? 0);
+      const hi = Math.min(vw - MARGIN, box?.right ?? vw);
+      next.left = Math.max(lo, Math.min(left, hi - w));
       const above = r.top - GAP - MARGIN;
       const below = vh - r.bottom - GAP - MARGIN;
       const openAbove = openPopoverAbove(placement, above, below, contentH);

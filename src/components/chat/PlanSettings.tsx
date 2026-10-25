@@ -12,7 +12,6 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
   const titled = sections.length > 1;
   return (
     <div className="plan-set">
-      {sections.some((x) => x.kind === 'video') ? <DraftChoice draft={draft} onSelect={(kind, text) => changePlanDraft(sessionId, item.id, kind, text)} /> : null}
       {sections.map((x, i) => (
         <div key={x.kind} className={titled ? 'set-section' : undefined}>
           {titled ? <div className="set-section-title">{x.kind === 'image' ? 'Images' : 'Video'} · {models[x.recommended.modelRef]?.name ?? x.recommended.modelRef}</div> : null}
@@ -24,6 +23,7 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
             draft={x.kind === 'video' ? draft : undefined}
             onPick={(c) => void changePlanChoice(sessionId, item.id, x.kind as GenKind, c)}
             onUnlock={() => changePlanDraft(sessionId, item.id, draft.kind, draft.text, true)}
+            extra={x.kind === 'video' ? <DraftChoice compact draft={draft} onSelect={(kind, text) => changePlanDraft(sessionId, item.id, kind, text)} /> : undefined}
           />
         </div>
       ))}

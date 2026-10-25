@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowRight, Check, ChevronDown, Lock, LockOpen } from 'lucide-react';
+import { ArrowRight, Check, Lock, LockOpen } from 'lucide-react';
 import { confirmSettings, selectSettings } from '../../engine/agent/runtime';
 import { selectDraft, unlockDraft } from '../../engine/agent/draftActions';
 import { IMAGE_COUNTS, sectionsOf, choiceEstimate, settingsOptions } from '../../engine/agent/settingsCard';
@@ -60,7 +60,7 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
   if (item.switchFrom && item.followUp) return <FollowUpCard item={item} sessionId={sessionId} name={name} />;
   if (item.switchFrom) return <SwitchModelCard item={item} sessionId={sessionId} name={name} />;
   return (
-    <article className="q-card set-card cc-card cc-w">
+    <article className="q-card set-card cc-card cc-w" data-pop-bound>
       <header className="cc-head"><CardIcon /><h4 className="cc-title">Confirm settings</h4></header>
       {item.summary ? <ClampedText text={item.summary} /> : null}
       {item.draft ? <DraftChoice draft={item.draft} onSelect={(kind, text) => selectDraft(sessionId, item.id, kind, text)} /> : null}
@@ -81,7 +81,15 @@ export function SettingsCard({ item, sessionId }: { item: SettingsFeedItem; sess
 }
 
 /** Borrador / Alta calidad / Otra cosa…, mandatory on every video card (and on Auto's plan card): the draft locks the resolution below. */
-export function DraftChoice({ draft: d, onSelect }: { draft: DraftMode; onSelect: (kind: DraftMode['kind'], text?: string) => void }) {
+export function DraftChoice({ draft: d, onSelect, compact }: { draft: DraftMode; onSelect: (kind: DraftMode['kind'], text?: string) => void; compact?: boolean }) {
+  // On the plan card: a small two-way switch in the chips row (the question and the free text belong to the settings card).
+  if (compact) {
+    return (
+      <span className="cc-seg" role="group" aria-label="Borrador o alta calidad">
+        {(['draft', 'hq'] as const).map((k) => <button key={k} type="button" className={d.kind === k ? 'is-on' : ''} aria-pressed={d.kind === k} onClick={() => onSelect(k)}>{k === 'draft' ? DRAFT : HQ}</button>)}
+      </span>
+    );
+  }
   const opt = (kind: 'draft' | 'hq', label: string) => (
     <button type="button" className={`q-opt ${d.kind === kind ? 'is-on' : ''}`} aria-pressed={d.kind === kind} onClick={() => onSelect(kind)}>
       {d.kind === kind ? <Check size={12} /> : null}
@@ -105,7 +113,7 @@ export function DraftChoice({ draft: d, onSelect }: { draft: DraftMode; onSelect
 }
 
 /** One kind's model and values. Auto's plan card passes onPick / onUnlock: its changes go to the plan's steps. */
-export function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft, onPick, onUnlock }: { section: SettingsSection; index: number; itemId: string; sessionId: string; draft?: DraftMode; onPick?: (c: SettingsChoice) => void; onUnlock?: () => void }) {
+export function SettingsSectionBlock({ section: item, index, itemId, sessionId, draft, onPick, onUnlock, extra }: { section: SettingsSection; index: number; itemId: string; sessionId: string; draft?: DraftMode; onPick?: (c: SettingsChoice) => void; onUnlock?: () => void; extra?: ReactNode }) {
   const models = useStore((s) => s.catalog.models);
   const schemas = useStore((s) => s.catalog.schemas);
   const [choice, setChoice] = useState<SettingsChoice>(item.chosen ?? item.recommended);
@@ -115,9 +123,10 @@ export function SettingsSectionBlock({ section: item, index, itemId, sessionId, 
   }, [item]);
   // The draft choice (selectDraft) changes the stored selection from outside: follow it.
   useEffect(() => { if (item.chosen && item.chosen.resolution !== choice.resolution) setChoice(item.chosen); }, [item.chosen?.resolution]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [aspectOpen, setAspectOpen] = useState(false);
 
   const locked = item.kind === 'video' && Boolean(draft?.locked);
+  // Locked or unlocked, the lock keeps its place so the chip does not move when it opens.
+  const lockable = item.kind === 'video' && Boolean(draft?.locked || draft?.unlocked);
   const update = (next: SettingsChoice) => {
     setChoice(next);
     if (onPick) onPick(next);
@@ -170,18 +179,23 @@ export function SettingsSectionBlock({ section: item, index, itemId, sessionId, 
       />
 
       {opts.aspects.length || px ? (
-        <button type="button" className={`cc-chip${aspectOpen ? ' is-open' : ''}`} aria-expanded={aspectOpen} aria-label="Aspect ratio" data-tip={aspectOpen ? undefined : 'Aspect ratio'} onClick={() => setAspectOpen((o) => !o)}>
-          {aspectNow ? <AspectShape value={aspectNow} /> : null}
-          <span className="cc-chip-label">{aspectNow ? aspectLabel(aspectNow) : item.recommended.needsImage ? 'Like the image' : 'Auto'}</span>
-          <ChevronDown size={11} className="cc-chip-chev" aria-hidden />
-        </button>
+        <ChipPop icon={aspectNow ? <AspectShape value={aspectNow} /> : null} label={aspectNow ? aspectLabel(aspectNow) : item.recommended.needsImage ? 'Like the image' : 'Auto'} tip="Aspect ratio" width={360}>
+          <AspectPicker
+            values={aspectValues}
+            value={aspectNow}
+            onPick={pickAspect}
+            extra={item.recommended.needsImage ? (
+              <button type="button" className={`q-opt cc-like ${choice.aspect == null ? 'is-on' : ''}`} aria-pressed={choice.aspect == null} onClick={() => update({ ...choice, aspect: undefined })}>Like the image</button>
+            ) : null}
+          />
+        </ChipPop>
       ) : null}
 
       {resShown ? (
-        <ChipPop icon={<ResolutionIcon />} label={locked ? <>{resNow ?? 'Auto'}<Lock size={11} aria-label="Locked by the draft" /></> : resNow ?? 'Auto'} tip="Resolution">
+        <ChipPop icon={<ResolutionIcon />} label={<>{resNow ?? 'Auto'}{lockable ? <span className="cc-lock">{locked ? <Lock size={11} aria-label="Locked by the draft" /> : <LockOpen size={11} aria-label="Unlocked" />}</span> : null}</>} tip="Resolution">
           <div className="q-question">Resolution
             {locked ? <button type="button" className="set-lock" title="Bloqueada por el borrador: pulsa para cambiarla" aria-label="Desbloquear la resolución" onClick={() => (onUnlock ? onUnlock() : unlockDraft(sessionId, itemId))}><Lock size={12} /></button>
-              : draft?.unlocked && item.kind === 'video' ? <LockOpen size={12} className="faint" aria-label="Resolución desbloqueada" /> : null}
+              : lockable ? <span className="set-lock faint"><LockOpen size={12} aria-label="Resolución desbloqueada" /></span> : null}
           </div>
           <div className="q-options">
             {opts.resolutions.length
@@ -204,17 +218,8 @@ export function SettingsSectionBlock({ section: item, index, itemId, sessionId, 
           <StepSlider values={allSecs} value={choice.duration ?? allSecs[0]} unit="s" label="Duration" onChange={(n) => update({ ...choice, duration: n })} />
         </ChipPop>
       ) : null}
+      {extra}
     </div>
-    {aspectOpen && (opts.aspects.length || px) ? (
-      <AspectPicker
-        values={aspectValues}
-        value={aspectNow}
-        onPick={pickAspect}
-        extra={item.recommended.needsImage ? (
-          <button type="button" className={`q-opt cc-like ${choice.aspect == null ? 'is-on' : ''}`} aria-pressed={choice.aspect == null} onClick={() => update({ ...choice, aspect: undefined })}>Like the image</button>
-        ) : null}
-      />
-    ) : null}
     </>
   );
 }

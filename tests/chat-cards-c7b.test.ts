@@ -177,13 +177,14 @@ describe('C7b plan card (awaiting)', () => {
     expect(foot.querySelector('.plan-budget')?.textContent).toMatch(/Budget left|No spending limit|Nothing to pay/);
   });
 
-  it('shows the reference image with a REF badge and counts it in the meta', async () => {
+  it('shows the reference image with a REF badge; Auto\'s one-step card has no meta line (the chips say it)', async () => {
     setup();
     useStore.setState({ assets: { a1: asset('a1') } });
     await mount(createElement(PlanCard, { item: plan({ refs: ['asset:a1'] }), sessionId: sid() }));
     expect(host.querySelector('.plan-step [data-ref-thumb="a1"]')).not.toBeNull();
     expect(host.querySelector('.cc-ref-badge')?.textContent).toBe('REF');
-    expect(host.querySelector('.step-detail')?.textContent).toMatch(/· 1 ref$/);
+    expect(host.querySelector('.step-detail')).toBeNull();
+    expect(host.querySelector('.plan-set .cc-chips')).not.toBeNull();
     expect(host.querySelector('.plan-step [data-pending]')).toBeNull();
   });
 });
