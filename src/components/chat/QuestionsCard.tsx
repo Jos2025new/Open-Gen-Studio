@@ -98,26 +98,40 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
       {item.questions.map((q) => (
         <div key={q.id} className="q-block">
           <div className="q-question">{q.question}</div>
-          <div className={`q-options${q.options.some((o) => optionParts(o).label.length > LONG_OPTION) ? ' is-list' : ''}`}>
-            {q.options.map((o) => {
-              const on = (answers[q.id] ?? []).includes(o);
-              const { label, detail } = optionParts(o);
-              return (
-                <button key={o} type="button" className={`q-opt ${on ? 'is-on' : ''}`} onClick={() => toggle(q.id, o, q.multi)} aria-pressed={on} aria-label={o} data-tip={detail ? o : undefined}>
-                  {on ? <Check size={12} /> : null}
-                  <span className="q-opt-text">
-                    <span className="q-opt-label">{label}</span>
-                    {detail && q.options.some((x) => optionParts(x).label.length > LONG_OPTION) ? <span className="q-opt-detail">{detail}</span> : null}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
           {(() => {
-            // Short options side by side: what the chosen one means goes on one quiet line under them.
-            if (q.options.some((x) => optionParts(x).label.length > LONG_OPTION)) return null;
-            const said = (answers[q.id] ?? []).map((o) => optionParts(o).detail).filter(Boolean);
-            return said.length ? <p className="q-opt-note">{said.join(' · ')}</p> : null;
+            const list = q.options.some((o) => optionParts(o).label.length > LONG_OPTION);
+            // Short options are one segmented control, like Borrador / Alta calidad; long ones are rows with their detail.
+            if (!list) {
+              const said = (answers[q.id] ?? []).map((o) => optionParts(o).detail).filter(Boolean);
+              return (
+                <>
+                  <span className="q-options cc-seg" role="group" aria-label={q.question}>
+                    {q.options.map((o) => {
+                      const on = (answers[q.id] ?? []).includes(o);
+                      return <button key={o} type="button" className={on ? 'is-on' : ''} onClick={() => toggle(q.id, o, q.multi)} aria-pressed={on} aria-label={o}>{on ? <Check size={12} /> : null}{optionParts(o).label}</button>;
+                    })}
+                  </span>
+                  {said.length ? <p className="q-opt-note">{said.join(' · ')}</p> : null}
+                </>
+              );
+            }
+            return (
+              <div className="q-options is-list">
+                {q.options.map((o) => {
+                  const on = (answers[q.id] ?? []).includes(o);
+                  const { label, detail } = optionParts(o);
+                  return (
+                    <button key={o} type="button" className={`q-opt ${on ? 'is-on' : ''}`} onClick={() => toggle(q.id, o, q.multi)} aria-pressed={on} aria-label={o} data-tip={detail ? o : undefined}>
+                      {on ? <Check size={12} /> : null}
+                      <span className="q-opt-text">
+                        <span className="q-opt-label">{label}</span>
+                        {detail ? <span className="q-opt-detail">{detail}</span> : null}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
           })()}
           {q.allowCustom && !typing[q.id] && !custom[q.id] ? (
             <button type="button" className="q-other" onClick={() => setTyping((t) => ({ ...t, [q.id]: true }))}>Otra respuesta…</button>

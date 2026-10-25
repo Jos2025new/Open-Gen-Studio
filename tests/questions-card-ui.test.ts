@@ -52,8 +52,8 @@ describe('questions card layout', () => {
   it('480p and 720p side by side (labels only); the chosen one\'s meaning under them; long options one per row', () => {
     act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
     const [short, long] = host.querySelectorAll('.q-options');
-    expect(short.className).not.toContain('is-list');
-    expect([...short.querySelectorAll('.q-opt')].map((b) => b.textContent)).toEqual(['480p', '720p']);
+    expect(short.className).toContain('cc-seg');
+    expect([...short.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['480p', '720p']);
     expect(host.querySelector('.q-opt-note')?.textContent).toBe('usaré el storyboard y las imágenes de personajes como referencias.');
     expect(long.className).toContain('is-list');
   });
