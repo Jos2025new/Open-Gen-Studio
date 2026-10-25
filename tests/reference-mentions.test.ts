@@ -107,7 +107,7 @@ describe('reference autocomplete in the existing prompt field', () => {
     const assets = { a: img('a'), b: img('b'), c: img('c'), d: img('d') };
     const gen = (id: string, sessionId: string, createdAt: number, assetIds: string[], extra: Partial<Generation> = {}) => ({ id, sessionId, createdAt, assetIds, kind: 'image', ...extra } as Generation);
     const generations = { g1: gen('g1', 's', 1, ['a']), g2: gen('g2', 's', 2, ['b', 'c']), g3: gen('g3', 'other', 3, ['d']), g4: gen('g4', 's', 4, ['d'], { discard: true }) };
-    expect(spaceImages(generations, assets, ['s'], ['c'])).toEqual(['b', 'a']);
+    expect(spaceImages(generations, assets, ['s'], ['c']).map((x) => x.id)).toEqual(['b', 'a']);
   });
   it('picking a made image attaches it and writes the number it takes', async () => {
     const onAttach = vi.fn();
@@ -135,6 +135,18 @@ describe('reference autocomplete in the existing prompt field', () => {
     found.setSelectionRange(9, 9);
     await act(async () => { found.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
     expect(labels().join()).toContain('Walk cycle');
+  });
+  it('finds an image by the prompt that made it and shows the part that matched', async () => {
+    const list: ReferenceChoice[] = [
+      { id: 'made:x', assetId: 'x', label: 'Image', mention: '@Image1', attach: true, search: 'Turnaround sheet of the girl with straight black hair and a yellow top' },
+      { id: 'made:y', assetId: 'y', label: 'Image', mention: '@Image1', attach: true, search: 'Turnaround sheet of the boy with curly hair' },
+    ];
+    const input = await mount('Use @black', list);
+    input.setSelectionRange(10, 10);
+    await act(async () => { input.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
+    const options = document.querySelectorAll('[role=option]');
+    expect(options).toHaveLength(1);
+    expect(options[0].querySelector('.mention-sub b')?.textContent).toBe('black');
   });
 });
 

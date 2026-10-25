@@ -318,27 +318,28 @@ export function Composer() {
     const refs = route(imageIds);
     const attached = referenceChoices(refs.map((id, i) => ({ id, assetId: id, label: assets[id]?.name || `Image ${i + 1}` })), subjects, currentRef, mediaSlots?.promptRefs);
     // Images made here can be picked too: picking one attaches it, and its mention is the number it takes once attached.
-    const made = spaceImages(generations, assets, [sessionId, ...(spaceId ? [spaceId] : [])], imageIds).flatMap((id) => {
+    const made = spaceImages(generations, assets, [sessionId, ...(spaceId ? [spaceId] : [])], imageIds).flatMap(({ id, prompt }) => {
       const at = route([...imageIds, id]).indexOf(id);
       if (at < 0) return [];
       const numbered = referenceChoices(route([...imageIds, id]).map((x) => ({ id: x, label: '' })), [], currentRef, mediaSlots?.promptRefs)[at];
-      return [{ id: `made:${id}`, assetId: id, label: assets[id]?.name || 'Image', mention: numbered.mention, attach: true }];
+      return [{ id: `made:${id}`, assetId: id, label: assets[id]?.name || 'Image', mention: numbered.mention, attach: true, search: prompt }];
     });
     const images = attached.filter((c) => !c.id.startsWith('subject:'));
     const saved = attached.filter((c) => c.id.startsWith('subject:')).map((c) => ({ ...c, saved: true }));
     // Favorites of any kind (image, video, sound), newest first; images take their reference number, the rest their kind's.
     const taken = new Set([...liveAttachments, ...made.map((c) => c.assetId)]);
+    const promptOf = (id: string) => generations[assets[id]?.generationId ?? '']?.prompt ?? '';
     const count = (kind: string) => liveAttachments.filter((id) => assets[id]?.kind === kind).length + 1;
     const favorites = Object.values(assets)
       .filter((a) => a.favorite && !taken.has(a.id) && (a.kind === 'image' || a.kind === 'video' || a.kind === 'audio'))
       .sort((a, b) => b.createdAt - a.createdAt)
       .slice(0, 24)
       .flatMap((a) => {
-        if (a.kind !== 'image') return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || (a.kind === 'video' ? 'Video' : 'Audio'), mention: `@${a.kind === 'video' ? 'Video' : 'Audio'}${count(a.kind)}`, attach: true, saved: true }];
+        if (a.kind !== 'image') return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || (a.kind === 'video' ? 'Video' : 'Audio'), mention: `@${a.kind === 'video' ? 'Video' : 'Audio'}${count(a.kind)}`, attach: true, saved: true, search: promptOf(a.id) }];
         const order = route([...imageIds, a.id]);
         const at = order.indexOf(a.id);
         if (at < 0) return [];
-        return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || 'Image', mention: referenceChoices(order.map((x) => ({ id: x, label: '' })), [], currentRef, mediaSlots?.promptRefs)[at].mention, attach: true, saved: true }];
+        return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || 'Image', mention: referenceChoices(order.map((x) => ({ id: x, label: '' })), [], currentRef, mediaSlots?.promptRefs)[at].mention, attach: true, saved: true, search: promptOf(a.id) }];
       });
     return [...images, ...made, ...saved, ...favorites];
   }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode, generations, sessionId, spaceId]);
@@ -442,6 +443,7 @@ export function Composer() {
       <ComposerAlerts />
       <div
         className={`composer ${dragOver ? 'is-drop' : ''}`}
+        data-mention-box
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes('Files') || e.dataTransfer.types.includes('application/x-ogs-asset')) {
             e.preventDefault();

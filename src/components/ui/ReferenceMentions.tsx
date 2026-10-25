@@ -6,7 +6,7 @@ import { Popover } from './Popover';
 
 /** `attach`: not attached yet; picking it attaches it, and `mention` is the number it gets.
  * `saved`: a saved character or favorite, listed under «+ More» (or when searching). */
-export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string; attach?: boolean; saved?: boolean }
+export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string; attach?: boolean; saved?: boolean; /** Also searched: the prompt that made it. */ search?: string }
 const MORE: ReferenceChoice = { id: 'more', label: '+ More', mention: 'Saved characters and favorites' };
 export function referenceChoices(images: Array<{ id: string; label: string; assetId?: string }>, subjects: Subject[], modelId = '', promptRefs?: string): ReferenceChoice[] {
   const style = refMentionStyle(modelId, promptRefs);
@@ -17,11 +17,11 @@ export function referenceChoices(images: Array<{ id: string; label: string; asse
 }
 
 /** Images made in this session, newest first, that are not attached yet (at most `limit`). */
-export function spaceImages(generations: Record<string, Generation>, assets: Record<string, Asset>, sessionIds: string[], attached: string[], limit = 24): string[] {
+export function spaceImages(generations: Record<string, Generation>, assets: Record<string, Asset>, sessionIds: string[], attached: string[], limit = 24): Array<{ id: string; prompt: string }> {
   return Object.values(generations)
     .filter(g => !g.discard && g.kind === 'image' && sessionIds.includes(g.sessionId))
     .sort((a, b) => b.createdAt - a.createdAt)
-    .flatMap(g => g.assetIds.filter(id => assets[id]?.kind === 'image' && !attached.includes(id)))
+    .flatMap(g => g.assetIds.filter(id => assets[id]?.kind === 'image' && !attached.includes(id)).map(id => ({ id, prompt: g.prompt ?? '' })))
     .slice(0, limit);
 }
 
@@ -52,7 +52,7 @@ export function useReferenceMentions(
   const dismissed = useRef<{ value: string; end: number } | null>(null);
   // Saved things wait behind «+ More» until asked for or searched.
   const pool = more || query?.text ? choices : choices.filter(c => !c.saved);
-  const found = query?.value === value ? pool.filter(c => `${c.label} ${c.mention}`.toLowerCase().includes(query.text.toLowerCase())) : [];
+  const found = query?.value === value ? pool.filter(c => `${c.label} ${c.mention} ${c.search ?? ''}`.toLowerCase().includes(query.text.toLowerCase())) : [];
   const matches = query?.value === value && !more && !query.text && choices.some(c => c.saved) ? [...found, MORE] : found;
   const open = Boolean(query && query.value === value && matches.length);
   const index = Math.min(active, Math.max(0, matches.length - 1));
@@ -86,15 +86,33 @@ export function useReferenceMentions(
     else setActive((index + (e.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length);
     return true;
   };
+  // The list sits over the whole box the user types in ([data-mention-box], else the field), left-aligned, as chat apps do.
+  const box = useRef<HTMLElement | null>(null);
+  box.current = ref.current?.closest<HTMLElement>('[data-mention-box]') ?? ref.current;
+  const width = open ? Math.round(box.current?.getBoundingClientRect().width || 300) : 300;
+  const q = query?.text.toLowerCase() ?? '';
+  const mark = (text: string) => {
+    const at = q ? text.toLowerCase().indexOf(q) : -1;
+    return at < 0 ? text : <>{text.slice(0, at)}<b>{text.slice(at, at + q.length)}</b>{text.slice(at + q.length)}</>;
+  };
+  // Found by its prompt and not by its name: the part of the prompt that matched.
+  const snippet = (choice: ReferenceChoice) => {
+    const text = choice.search ?? '';
+    const at = q && !choice.label.toLowerCase().includes(q) ? text.toLowerCase().indexOf(q) : -1;
+    if (at < 0) return null;
+    const from = Math.max(0, at - 24);
+    return <> · {from ? '…' : ''}{text.slice(from, at)}<b>{text.slice(at, at + q.length)}</b>{text.slice(at + q.length, at + q.length + 40)}…</>;
+  };
   return {
     sync, onKeyDown, onBlur: close,
     aria: { 'aria-autocomplete': 'list' as const, 'aria-haspopup': 'listbox' as const, 'aria-expanded': open, 'aria-controls': open ? id : undefined, 'aria-activedescendant': open ? `${id}-${index}` : undefined },
-    menu: <Popover open={open} anchor={ref} onClose={close} width={300} label="Reference suggestions">
+    menu: <Popover open={open} anchor={box} onClose={close} width={width} label="Reference suggestions" className="mention-pop">
       <div role="listbox" id={id} aria-label="References">
         {matches.map((choice, i) => <button key={choice.id} id={`${id}-${i}`} type="button" role="option" aria-selected={i === index}
-          className={`menu-item${i === index ? ' is-active' : ''}`} onPointerDown={e => e.preventDefault()} onClick={() => insert(choice)}>
-          {choice.assetId ? <span className="subject-thumb"><AssetMedia assetId={choice.assetId} /></span> : null}
-          <span className="subject-main"><span>{choice.label}</span><span className="faint">{choice.attach ? `Attach as ${choice.mention}` : choice.mention}</span></span>
+          className={`menu-item mention-row${i === index ? ' is-active' : ''}`} onPointerDown={e => e.preventDefault()} onClick={() => insert(choice)}>
+          {choice.assetId ? <span className="mention-thumb"><AssetMedia assetId={choice.assetId} /></span> : <span className="mention-thumb is-empty" aria-hidden />}
+          <span className="mention-label">{mark(choice.label)}</span>
+          <span className="mention-sub faint">{choice.attach ? `Attach as ${choice.mention}` : choice.mention}{snippet(choice)}</span>
         </button>)}
       </div>
     </Popover>,

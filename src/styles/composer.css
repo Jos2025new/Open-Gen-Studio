@@ -155,3 +155,11 @@ textarea.composer-input { display: block; width: 100%; resize: none; border: non
 .composer-alert-text { flex: 1 1 260px; min-width: 0; line-height: 1.45; }
 .composer-alert-close { margin-left: auto; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; color: var(--text-2); }
 .composer-alert-close:hover { color: var(--text); background: var(--surface-3); }
+/* @ suggestions: one line per row (thumb, name, what it inserts), the whole composer wide. */
+.mention-pop .mention-row { display: flex; align-items: center; gap: var(--sp-2); width: 100%; min-height: 36px; text-align: left; }
+.mention-thumb { width: 28px; height: 28px; flex-shrink: 0; border-radius: var(--r-s, 4px); overflow: hidden; background: var(--surface-2); }
+.mention-thumb.is-empty { background: transparent; }
+.mention-thumb .media { width: 100%; height: 100%; object-fit: cover; }
+.mention-label { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mention-label b, .mention-sub b { color: var(--text); font-weight: 600; }
+.mention-sub { flex: 1; min-width: 0; font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
