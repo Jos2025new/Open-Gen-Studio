@@ -66,7 +66,7 @@ function imagesFit(ref: string, parts: SettingsPart[]): string {
   const lacks = missing(useStore.getState().catalog.schemas[ref], { startImage: start, images });
   const n = images + (start ? 1 : 0);
   return lacks.length
-    ? ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit it: plan only what it takes (for one start image, put the main image in first_frame and leave the rest out, saying so in one line), before writing the prompts.`
+    ? ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit it: plan only what it takes (for one start image, put the image the clip opens on in first_frame, a character or scene, never a storyboard sheet, and leave the rest out, saying so in one line), before writing the prompts.`
     : ` Your ${n} image${n > 1 ? 's fit' : ' fits'}.`;
 }
 

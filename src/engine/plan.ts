@@ -7,7 +7,7 @@ import { parsePath } from './design/path';
 import { model3dProblem } from './modelRules';
 import { OPS } from './ops';
 import { normalizeStepRefs, opStepRefs, placeRoles, stepRolesLine, type RefSpec } from './refRoles';
-import { videoFix } from './planFix';
+import { storyboardProblem, videoFix } from './planFix';
 import { withRealismSetting, type Realism } from './realism';
 import { withCaptureSetting } from './captureStyles';
 import { aspectOfShape, fitPlanSteps, fitState, fitStepParams, longEdgeOf } from './agent/fit';
@@ -524,13 +524,15 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           else s.refs = [...(s.refs ?? []), token];
           adjustments.push(`${s.id}: ${token} moved from the prompt to the step's ${asStart ? 'start frame' : 'references'}`);
         }
-        // The start frame listed again in refs is the same input twice: keep it as the start frame only.
+        // A start frame also in refs is one input twice: keep it as the start frame.
         if (s.first_frame && s.refs?.includes(s.first_frame)) s.refs = s.refs.filter((r) => r !== s.first_frame);
         const refs = ((s.refs ?? []) as string[]).filter(Boolean);
         if (s.prompt_from) {
           const k = refKind(s.prompt_from, where);
           if (k && k !== 'text') errors.push(`${where}: prompt_from must reference a text step. Fix: write the text in "prompt" and drop prompt_from (an image or clip goes in refs or first_frame).`);
         }
+        const sheet = kind === 'video' && storyboardProblem(s);
+        if (sheet) errors.push(`${where}: ${sheet}`);
         // References are images, videos (reference-video / clip models) or audio (lip-sync, soundtrack, reference audio).
         const refKinds = refs.map((r) => refKind(r, where));
         refKinds.forEach((k, i) => {

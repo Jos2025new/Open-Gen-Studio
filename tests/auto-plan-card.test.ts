@@ -15,7 +15,7 @@ vi.mock('../src/lib/idb', () => ({
 
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 import { confirmSettingsSchema } from '../src/engine/agent/tools';
-import { changePlanChoice, changePlanDraft, planSections, rewritePrompts, usePlanRewrite } from '../src/engine/agent/planSettings';
+import { changePlanChoice, changePlanDraft, planSections, rewritePrompts, setPromptWriter, usePlanRewrite } from '../src/engine/agent/planSettings';
 import { useStore } from '../src/store/store';
 import type { FeedItem, ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
 
@@ -34,10 +34,12 @@ const sse = (r: Reply) => new Response(`data: ${JSON.stringify(typeof r === 'str
   ? { choices: [{ delta: { content: r }, finish_reason: 'stop' }] }
   : { choices: [{ delta: { tool_calls: [{ index: 0, id: `c${Math.random()}`, function: { name: r.name, arguments: JSON.stringify(r.args) } }] }, finish_reason: 'tool_calls' }] })}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
 let calls = 0;
+let bodies: Array<{ messages: Array<{ role: string; content: unknown }> }> = [];
 
 function setup() {
   script = [];
   calls = 0;
+  bodies = [];
   const refs = [ATLAS, LITE];
   const models = Object.fromEntries(refs.map((ref) => [ref, { ref, id: ref.split('::')[1], provider: 'atlas', kind: 'image', name: NAME[ref], acceptsText: true, acceptsImage: false, tags: [], price: { skus: [{ unit: 'image', usd: 0.067 }] } } as unknown as ModelSummary]));
   const schemas = Object.fromEntries(refs.map((ref) => [ref, { ref, source: 'catalog', params: [], slots: { prompt: 'prompt' } } as ModelSchema]));
@@ -47,6 +49,7 @@ function setup() {
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     if (!body.messages) return new Response(JSON.stringify({ data: [] }));
     calls++;
+    bodies.push(body);
     return sse(script.shift() ?? 'ok');
   });
   const s = useStore.getState();
@@ -143,6 +146,33 @@ describe('plan card settings', () => {
     expect(usePlanRewrite.getState().failed[id]).toMatch(/not rewritten/);
     expect(steps().map((x) => x.prompt)).toEqual(['rewritten one', 'rewritten two', 'clip v1']);
     expect(calls).toBe(2);
+  });
+
+  it('(e2) the writer knows the card: values, what each image is for, English, the 4000 limit; a longer answer is retried once; the agent is told it did not write it', async () => {
+    put([vid('v1', { firstFrame: 'asset:a1', refs: ['asset:a2'], settings: { aspect: '4:3', duration: 7, resolution: '480p', advanced: {} } })]);
+    script = [`{"v1":"${'x'.repeat(4100)}"}`, '{"v1":"short clip"}'];
+    await rewritePrompts(sid(), 'pl1', 'video');
+    const sys = (bodies[0].messages[0].content as string);
+    const user = JSON.stringify(bodies[0].messages[1].content);
+    expect(sys).toMatch(/English/);
+    expect(sys).toMatch(/At most 4000 characters/);
+    expect(user).toMatch(/7 s, 4:3, 480p/);
+    expect(user).toMatch(/start image asset:a1: the clip opens on it/);
+    expect(user).toMatch(/references in order asset:a2/);
+    expect(JSON.stringify(bodies[1].messages[1].content)).toMatch(/over 4000 characters/);
+    expect(steps()[0].prompt).toBe('short clip');
+    expect(st().agent.notes.at(-1)).toMatch(/prompt writer, not you, rewrote.*v1: "short clip"/);
+  });
+
+  it('(e3) "Ajustar prompt" off: a change on the card sends the prompt as written; turning it on adapts it', async () => {
+    put([vid('v1')]);
+    setPromptWriter(sid(), 'pl1', false);
+    await changePlanChoice(sid(), 'pl1', 'video', { modelRef: VID, aspect: '16:9', duration: 8, resolution: '1080p', needsImage: false });
+    expect(calls).toBe(0);
+    expect(steps()[0]).toMatchObject({ prompt: 'clip v1', settings: { duration: 8 } });
+    script = ['{"v1":"clip for 8 s"}'];
+    setPromptWriter(sid(), 'pl1', true);
+    await vi.waitFor(() => expect(steps()[0].prompt).toBe('clip for 8 s'));
   });
 
   it('(f) changePlanDraft("draft") locks the lowest resolution on the video steps', () => {

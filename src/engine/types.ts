@@ -909,6 +909,7 @@ export interface AgentState {
   /** Model added by the last switch, per kind. */
   switchedTo?: Partial<Record<'video' | 'image', SettingsChoice>>;
   draftMode?: DraftMode;
+  enhance?: boolean; // off: prompts sent as written
   questionRound: number;
   /** Facts for the model with the next user turn. */
   notes: string[];

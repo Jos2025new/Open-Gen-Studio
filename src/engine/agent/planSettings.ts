@@ -2,11 +2,13 @@ import { create } from 'zustand';
 import { ensureSchema, inputVariant, modelSummary } from '../catalog';
 import { guideForModel } from '../guides';
 import { chat } from '../providers/llm';
+import { VIDEO_DIRECTION_POLICY } from '../procedure';
 import { requote } from '../quotes';
 import { readGuide } from '../skills';
 import { addSpend, patchSession, updateFeedItem, useStore } from '../../store/store';
 import type { FeedItem, PlanFeedItem, PlanStep, SettingsChoice, SettingsFeedItem, SettingsSection } from '../types';
 import { draftMode, withModeResolution, type DraftMode } from './draftFirst';
+import { agentSeesImages, attachmentParts, userMessage } from './attachments';
 import { agentEngine, llmCallUsd } from './runtime';
 import { settingsOptions } from './settingsCard';
 
@@ -91,7 +93,7 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: now.plan.steps.map((s) => (isGen(s) && s.kind === kind ? applyChoice(s, c) : s)) } });
   remember(sessionId, kind, c);
   const prompts = stepModel(c.modelRef, before) !== before.modelRef;
-  if (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect) await rewritePrompts(sessionId, itemId, kind);
+  if (promptWriterOn(sessionId) && (prompts || c.duration !== before.settings.duration || c.aspect !== before.settings.aspect)) await rewritePrompts(sessionId, itemId, kind);
 }
 
 /** Borrador / Alta calidad / the user's words on the plan card: the app sets (a draft locks) the video resolution. */
@@ -123,7 +125,32 @@ export async function recheckPlanPrice(sessionId: string, itemId: string): Promi
 
 const fenced = (text: string) => text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
 
-/** Rewrite the prompts of one kind for the model now on the card (its prompting guide); only the prompts change. */
+/** The plan card's prompt writer is on unless the user turned it off (then prompts are sent as written). */
+export const promptWriterOn = (sessionId: string) => get().sessions[sessionId]?.agent.enhance !== false;
+
+/** The switch on the plan card; turning it on adapts the prompts to the card as it is now. */
+export function setPromptWriter(sessionId: string, itemId: string, on: boolean): void {
+  patchSession(sessionId, (s) => ({ ...s, agent: { ...s.agent, enhance: on } }));
+  const item = planOf(sessionId, itemId);
+  if (on && item) for (const kind of new Set(item.plan.steps.filter(isGen).map((x) => x.kind))) void rewritePrompts(sessionId, itemId, kind);
+}
+
+const MAX_PROMPT = 4000;
+const assetsOf = (s: GenStep) => [s.kind === 'video' ? s.firstFrame : undefined, ...(s.refs ?? [])].filter((r): r is string => Boolean(r?.startsWith('asset:'))).map((r) => r.slice(6));
+
+/** What the writer must know of a step besides its prompt: the card's values and what each input image is for. */
+function stepInputs(s: GenStep): string {
+  const v = s.settings;
+  const out = [`${s.kind}${v.duration ? `, ${v.duration} s` : ''}${v.aspect ? `, ${v.aspect}` : ''}${v.resolution ? `, ${v.resolution}` : ''}`];
+  if (s.kind === 'video' && s.firstFrame) out.push(`start image ${s.firstFrame}: the clip opens on it; describe what moves and changes from it, never cite it as @Image`);
+  if (s.refs?.length) out.push(`references in order ${s.refs.join(', ')}: cite them with the model's syntax (@Image1… in this order), each with its role`);
+  return out.join('; ');
+}
+
+/**
+ * Rewrite the prompts of one kind for the card as it is now: its model (and prompting guide), duration, aspect and the
+ * images each step sends, with the agent's video rules. The agent is told that the card's writer wrote them, not it.
+ */
 export async function rewritePrompts(sessionId: string, itemId: string, kind: GenKind): Promise<void> {
   const engine = agentEngine();
   const item = planOf(sessionId, itemId);
@@ -136,26 +163,36 @@ export async function rewritePrompts(sessionId: string, itemId: string, kind: Ge
   const name = modelSummary(ref)?.name ?? ref;
   const guide = guideForModel(ref.split('::')[1] ?? '');
   const text = guide ? readGuide(`model:${guide.id}`) : undefined;
-  const s0 = steps[0].settings;
-  const system = `You adapt generation prompts to another model. Rewrite each prompt for ${name}${text ? ', following its prompting guide below' : ''}. Keep the same content and intent: subjects, @names, the role of each reference image, actions, style, language of on-screen words${kind === 'video' && s0.duration ? `, a clip of exactly ${s0.duration} s (time the beats to it)` : ''}${s0.aspect ? `, framed for ${s0.aspect}` : ''}. Change only what the guide asks for (order, wording, format, length). Answer only a JSON object {"<step id>": "<new prompt>"}, nothing else.${text ? `\n\n---\nPrompting guide of ${name}:\n${text}` : ''}`;
-  const content = JSON.stringify(steps.map((s) => ({ id: s.id, title: s.title, prompt: s.prompt })));
+  const style = item.plan.style ? ` The app appends this style block to every prompt; never repeat or restate it: "${item.plan.style}".` : '';
+  const system = `You are the plan card's prompt writer. The user changed the card; rewrite each prompt for ${name} and the step's settings and inputs listed with it${text ? ', following the prompting guide below' : ''}. Keep the content and intent: subjects, @names, the role of each image, actions, the style. Rules: English, except quoted dialogue and on-screen text, which stay as written. At most ${MAX_PROMPT} characters each; shorter is better. Fit the beats to the duration: drop beats rather than compress them, whole seconds only.${style}${kind === 'video' ? ` ${VIDEO_DIRECTION_POLICY}` : ''} The images of each step are attached after its line: look at them. Answer only a JSON object {"<step id>": "<new prompt>"}, nothing else.${text ? `\n\n---\nPrompting guide of ${name}:\n${text}` : ''}`;
+  const lines = steps.map((s) => `${s.id} (${stepInputs(s)}) "${s.title}":\n${s.prompt}`).join('\n\n');
+  const parts = agentSeesImages() ? await attachmentParts([...new Set(steps.flatMap(assetsOf))]) : [];
+  let tooLong = '';
   try {
-    const result = await chat({ provider: engine.provider, apiKey: engine.key, model: engine.model, system, messages: [{ role: 'user', content }], tools: [], signal: new AbortController().signal });
-    addSpend(llmCallUsd(engine.provider, engine.model, result.usage), { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
-    if (runs.get(itemId) !== run) return;
-    const out = JSON.parse(fenced(result.text)) as Record<string, unknown>;
-    const now = planOf(sessionId, itemId);
-    if (!now) return setRewrite(itemId, false);
-    let changed = 0;
-    const next = now.plan.steps.map((s) => {
-      const p = out[s.id];
-      if (!isGen(s) || s.kind !== kind || typeof p !== 'string' || !p.trim()) return s;
-      changed++;
-      return { ...s, prompt: p.trim() } as GenStep;
-    });
-    if (!changed) throw new Error('the answer had no prompts');
-    updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: next } });
-    setRewrite(itemId, false);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const content = attempt ? `${lines}\n\nYour last answer had a prompt over ${MAX_PROMPT} characters (${tooLong}). Write them shorter.` : lines;
+      const result = await chat({ provider: engine.provider, apiKey: engine.key, model: engine.model, system, messages: [userMessage(content, parts)], tools: [], signal: new AbortController().signal });
+      addSpend(llmCallUsd(engine.provider, engine.model, result.usage), { category: 'agent', provider: engine.provider, model: engine.model, sessionId, estimated: result.usage?.costUsd == null });
+      if (runs.get(itemId) !== run) return;
+      const out = JSON.parse(fenced(result.text)) as Record<string, unknown>;
+      const long = steps.filter((s) => typeof out[s.id] === 'string' && (out[s.id] as string).trim().length > MAX_PROMPT);
+      if (long.length) { tooLong = long.map((s) => `${s.id}: ${(out[s.id] as string).trim().length}`).join(', '); continue; }
+      const now = planOf(sessionId, itemId);
+      if (!now) return setRewrite(itemId, false);
+      const done: string[] = [];
+      const next = now.plan.steps.map((s) => {
+        const p = out[s.id];
+        if (!isGen(s) || s.kind !== kind || typeof p !== 'string' || !p.trim()) return s;
+        done.push(`${s.id}: "${p.trim()}"`);
+        return { ...s, prompt: p.trim() } as GenStep;
+      });
+      if (!done.length) throw new Error('the answer had no prompts');
+      updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: next } });
+      patchSession(sessionId, (x) => ({ ...x, agent: { ...x.agent, notes: [...x.agent.notes, `The plan card's prompt writer, not you, rewrote these prompts of "${now.plan.title}" after the user changed the card (${name}); they are what runs. No need to mention it. ${done.join(' ')}`] } }));
+      setRewrite(itemId, false);
+      return;
+    }
+    throw new Error(`the prompt came out over ${MAX_PROMPT} characters`);
   } catch (e) {
     if (runs.get(itemId) === run) setRewrite(itemId, false, `The prompt was not rewritten for ${name}: ${e instanceof Error ? e.message : String(e)}`);
   }
