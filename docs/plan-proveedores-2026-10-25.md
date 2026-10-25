@@ -1,6 +1,6 @@
 # Plan: proveedores de vídeo e imagen contra su doc oficial (2026-10-25)
 
-Estado: **implementación de código integrada en `task/provider-plan`, pendiente de las pruebas de proveedor del usuario (R5/R6)**. Worktree `ogs-provider-plan`, base `696bd6c`. El código citado en las tablas corresponde al commit auditado `e7fa70d`; las rutas, pruebas y límites actuales están en el [registro de ejecución](proveedores-ejecucion-2026-10-25.md). D1-D4 se conservan. Nada se fusiona con la app original.
+Estado: **implementación de código integrada en `task/provider-plan`, pendiente de prueba del usuario en el sandbox para todas las fases (R5), y de proveedor donde corresponda (R6)**. Worktree `ogs-provider-plan`, base `696bd6c`. El código citado en las tablas corresponde al commit auditado `e7fa70d`; las rutas, pruebas y límites actuales están en el [registro de ejecución](proveedores-ejecucion-2026-10-25.md). D1-D4 se conservan. Nada se fusiona con la app original.
 
 Tercera revisión de GPT 6.1 (sobre `6911984`): tres ajustes, comprobados y aplicados. F0.2 añade `sourceVideo` al contrato. F3.1 y F3.2 fijan qué endpoint gobierna (opciones comunes; passthrough por slug). F4.1 sale del plan porque su formato no está documentado.
 
@@ -95,7 +95,7 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 | F4.2 | Nano Banana 2.1: `seed` y `enable_web_search` | `nanogpt.ts:191-237` (`imageSchema`) | P2-12 (confirmado por Manus §4) | Test del esquema |
 | F4.3 | MiniMax H3 Max: no borrar `aspect_ratio: adaptive` | `nanogpt.ts:505` | P2-9 | Test del cuerpo |
 | F4.4 | MiniMax H3: aclarar que `resolution` es para LoRA, edición y extensión | `nanogpt.ts` (`videoSchema`) | Fila 7 (confirmado por Manus §3) | Test de la etiqueta |
-| F4.5 | Seedance 2.5 talking-avatar: avisar antes de enviar si el audio pasa de 4 MB | `providers/bodyBudget.ts` | P2-7 | Test con un audio grande: error claro, sin envío |
+| F4.5 | Seedance 2.5 talking-avatar: avisar antes de enviar si el audio supera el presupuesto de cuerpo de la app (4 MB, `NANOGPT_BODY_LIMIT`) | `providers/bodyBudget.ts` | P2-7 | Test con un audio grande: error claro, sin envío |
 
 ## Fase 5: autocompletado `@` en los campos actuales (pedido del usuario, D2)
 
@@ -106,7 +106,7 @@ Cita: «lo que yo quiero es que sea posible enlazarlas como lo hacen la mayoria 
 | ID | Qué | Dónde | Por qué (evidencia) | Cómo se comprueba |
 | --- | --- | --- | --- | --- |
 | F5.1 | Investigar cómo lo resuelven otras apps (comportamiento, teclado, qué se lista) antes de diseñar | Informe en `docs/` | Memorias «Research pro solutions first» y «Own style, not copies» | Informe con fuentes |
-| F5.2 | Retirado por aclaración del usuario: ninguna maqueta ni rediseño como requisito de implementación | `docs/mockups/referencias-arroba.html` queda solo como propuesta histórica, sin aplicarse | Autorización directa del usuario para el autocompletado en los campos actuales | Sin aprobación visual pendiente |
+| F5.2 | Retirado por aclaración del usuario: ninguna maqueta ni rediseño como requisito de implementación | `docs/mockups/referencias-arroba.html` queda solo como propuesta histórica, sin aplicarse | Autorización directa del usuario para el autocompletado en los campos actuales | Maqueta retirada; aceptación del comportamiento en sandbox pendiente (R5) |
 | F5.3 | Implementar: escribir `@` abre un desplegable con las imágenes adjuntas y los sujetos (Image 1, Image 2, @Name, con miniatura); elegir una inserta su `@`; teclado y escape. Se usa el mismo componente en el composer y en el prompt editable de la tarjeta del plan | Componentes del composer y `components/chat/PlanParts.tsx` | D2 | Test jsdom: `@` abre la lista, la flecha y Enter insertan, Escape cierra. Prueba visual del usuario |
 
 ## Fuera del plan (R3), con motivo
