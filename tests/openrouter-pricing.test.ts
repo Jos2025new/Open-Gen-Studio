@@ -19,7 +19,7 @@ import type { ModelSummary } from '../src/engine/types';
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 /** Frozen catalog: one image model whose endpoint answer is set per test. */
-const IMAGES = { data: [{ id: 'acme/pic-1', name: 'Acme: Pic 1', architecture: { input_modalities: ['text'], output_modalities: ['image'] }, supported_parameters: {} }] };
+const IMAGES = { data: [{ id: 'acme/pic-1', name: 'Acme: Pic 1', architecture: { input_modalities: ['text'], output_modalities: ['image'] }, supported_parameters: { quality: { type: 'enum', values: ['low', 'high'] }, input_references: { type: 'range', min: 0, max: 3 } } }] };
 
 function routeFetch(endpoints: () => Promise<Response> | Response) {
   vi.stubGlobal('fetch', async (url: string) => {
@@ -43,18 +43,35 @@ beforeEach(() => {
 });
 
 describe('OpenRouter image price cache (fix 2)', () => {
-  it('does not cache failed capabilities: the next schema load retries the authoritative endpoint', async () => {
+  it('loads catalog options after an endpoint failure and retries without caching a failed price', async () => {
     let calls = 0;
     routeFetch(() => {
       calls++;
       if (calls === 1) return json({ error: 'boom' }, 500);
       return json({ endpoints: [{ pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] });
     });
-    await expect(priceOf(imageModel)).rejects.toThrow('boom');
+    const schema = await openrouter.loadSchema(imageModel, 'k');
+    expect(schema.price?.skus).toEqual([]);
+    expect(schema.params.find(p => p.key === 'quality')?.options).toEqual(['low', 'high']);
+    expect(schema.slots.images).toMatchObject({ key: 'input_references', max: 3 });
     expect([...cache.keys()].filter((k) => k.startsWith('or:price'))).toEqual([]);
     const second = await priceOf(imageModel);
     expect(second.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
-    expect(calls).toBe(3); // failed capabilities, successful capabilities, then pricing
+    expect(calls).toBe(2);
+  });
+
+  it('retains catalog options and image references when endpoints are empty, then retries', async () => {
+    let calls = 0;
+    routeFetch(() => ++calls === 1 ? json({ endpoints: [] }) : json({ endpoints: [{ supported_parameters: { quality: { type: 'enum', values: ['high'] } }, pricing: [{ billable: 'image_output', unit: 'image', cost_usd: 0.04 }] }] }));
+    const first = await openrouter.loadSchema(imageModel, 'k');
+    expect(first.params.find(p => p.key === 'quality')?.options).toEqual(['low', 'high']);
+    expect(first.slots.images).toMatchObject({ key: 'input_references', max: 3 });
+    expect(first.price?.skus).toEqual([]);
+    expect([...cache.keys()].filter(k => k.startsWith('or:price'))).toEqual([]);
+    const second = await openrouter.loadSchema(imageModel, 'k');
+    expect(second.params.find(p => p.key === 'quality')?.options).toEqual(['high']);
+    expect(second.price?.skus).toEqual([{ unit: 'output', usd: 0.04 }]);
+    expect(calls).toBe(2);
   });
 
   it('does not cache a failed pricing lookup as token-billed', async () => {

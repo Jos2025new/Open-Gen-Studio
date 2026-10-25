@@ -40,7 +40,8 @@ async function fetchImageEndpoints(id: string): Promise<import('./openrouterOpti
   // Endpoint capabilities and allowlists: https://openrouter.ai/api/v1/images/models/{id}/endpoints
   const res = await requestJson<OrImageEndpoints>(`${BASE}/images/models/${id}/endpoints`);
   const endpoints = Array.isArray(res.endpoints) ? res.endpoints : [];
-  imageEndpointsRaw.set(id, endpoints);
+  if (endpoints.length) imageEndpointsRaw.set(id, endpoints);
+  else imageEndpointsRaw.delete(id);
   return endpoints;
 }
 
@@ -139,13 +140,13 @@ const priceCacheKey = (id: string) => `or:price:v2:${id}`;
  * Image price from the model's endpoints. Only a valid answer is cached (v2 key: v1 entries saved failures as
  * «token-billed» for 24 h). A failed request returns undefined and is not cached, so the next load asks again.
  */
-export async function imagePrice(id: string): Promise<PriceRule | undefined> {
+export async function imagePrice(id: string, endpoints?: import('./openrouterOptions').ImageEndpoint[]): Promise<PriceRule | undefined> {
   const cacheKey = priceCacheKey(id);
   const cached = await cacheDb.get<PriceRule>(cacheKey, DAY);
   if (cached) return cached;
   let res: { endpoints?: Array<{ pricing?: Array<{ billable: string; unit: string; cost_usd: number; resolution?: string }> }> };
   try {
-    res = await requestJson(`${BASE}/images/models/${id}/endpoints`);
+    res = endpoints ? { endpoints } : await requestJson(`${BASE}/images/models/${id}/endpoints`);
   } catch {
     return undefined;
   }
@@ -238,9 +239,11 @@ export const openrouter: ProviderAdapter = {
       if (!imageRaw.has(model.id)) await openrouter.listModels(undefined);
       const raw = imageRaw.get(model.id);
       if (!raw) throw new Error(`Unknown OpenRouter image model ${model.id}`);
-      const endpoints = await fetchImageEndpoints(model.id);
+      // A transient endpoint failure keeps the catalog capabilities; no failed lookup is cached.
+      let endpoints: import('./openrouterOptions').ImageEndpoint[] = [];
+      try { endpoints = await fetchImageEndpoints(model.id); } catch { imageEndpointsRaw.delete(model.id); }
       const params: ParamDef[] = [];
-      const sp = commonImageParameters(endpoints);
+      const sp = endpoints.length ? commonImageParameters(endpoints) : raw.supported_parameters ?? {};
       for (const [key, def] of Object.entries(sp)) {
         if (key === 'input_references') continue;
         const p = paramFromSupported(key, def);
@@ -258,7 +261,7 @@ export const openrouter: ProviderAdapter = {
               ? { key: 'input_references', max: refs.max ?? 1, min: refs.min ?? 0, multiple: true, format: 'content-part' }
               : undefined,
         },
-        price: (await imagePrice(model.id)) ?? { skus: [], note: TOKEN_NOTE },
+        price: (endpoints.length ? await imagePrice(model.id, endpoints) : undefined) ?? { skus: [], note: TOKEN_NOTE },
         source: 'catalog',
       };
       return schema;
