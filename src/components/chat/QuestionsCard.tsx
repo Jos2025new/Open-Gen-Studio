@@ -1,9 +1,18 @@
 import { useState } from 'react';
 import { ArrowRight, Check, FastForward } from 'lucide-react';
 import { EditAnswerButton } from './EditAnswerButton';
+import { ClampText } from './PlanParts';
 import { skipQuestions, submitAnswers } from '../../engine/agent/runtime';
 import type { QuestionsFeedItem } from '../../engine/types';
 import { Button } from '../ui/primitives';
+
+/** An option the agent wrote as "label: what it means" shows the label first and the rest as a quiet line. Its value is unchanged. */
+export function optionParts(o: string): { label: string; detail?: string } {
+  const i = o.indexOf(': ');
+  return i > 0 && i <= 40 ? { label: o.slice(0, i), detail: o.slice(i + 2) } : { label: o };
+}
+/** Long options go one per row, aligned, instead of chips of uneven width. */
+const LONG_OPTION = 28;
 
 export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; sessionId: string }) {
   // The agent's recommended options start selected: one click on Continue accepts them.
@@ -66,20 +75,22 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
 
   return (
     <article className="q-card">
-      <div className="q-kicker">
-        {`Round ${item.round} of ${item.maxRounds}`}
-      </div>
-      {item.intro ? <p className="q-intro">{item.intro}</p> : null}
+      {item.maxRounds > 1 ? <div className="q-kicker">{`Round ${item.round} of ${item.maxRounds}`}</div> : null}
+      {item.intro ? <ClampText className="q-intro">{item.intro}</ClampText> : null}
       {item.questions.map((q) => (
         <div key={q.id} className="q-block">
           <div className="q-question">{q.question}</div>
-          <div className="q-options">
+          <div className={`q-options${q.options.some((o) => o.length > LONG_OPTION) ? ' is-list' : ''}`}>
             {q.options.map((o) => {
               const on = (answers[q.id] ?? []).includes(o);
+              const { label, detail } = optionParts(o);
               return (
-                <button key={o} type="button" className={`q-opt ${on ? 'is-on' : ''}`} onClick={() => toggle(q.id, o, q.multi)} aria-pressed={on}>
+                <button key={o} type="button" className={`q-opt ${on ? 'is-on' : ''}`} onClick={() => toggle(q.id, o, q.multi)} aria-pressed={on} aria-label={o} data-tip={detail ? o : undefined}>
                   {on ? <Check size={12} /> : null}
-                  {o}
+                  <span className="q-opt-text">
+                    <span className="q-opt-label">{label}</span>
+                    {detail ? <span className="q-opt-detail">{detail}</span> : null}
+                  </span>
                 </button>
               );
             })}

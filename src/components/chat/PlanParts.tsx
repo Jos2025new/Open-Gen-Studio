@@ -1,8 +1,29 @@
-import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, MessageSquarePlus } from 'lucide-react';
 import { sendAgentMessage } from '../../engine/agent/runtime';
 import { AssetMedia } from '../ui/AssetMedia';
 import { Button } from '../ui/primitives';
+
+/** A paragraph cut to two lines with «…»; when it is really cut, clicking it (or Enter) shows the whole text. */
+export function ClampText({ className, children }: { className: string; children: ReactNode }) {
+  const ref = useRef<HTMLParagraphElement>(null);
+  const [open, setOpen] = useState(false);
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) setCut(el.scrollHeight > el.clientHeight + 1);
+  });
+  const can = cut || open;
+  return (
+    <p
+      ref={ref}
+      className={`${className} cc-clamp${open ? ' is-open' : ''}`}
+      {...(can ? { role: 'button', tabIndex: 0, 'aria-expanded': open, onClick: () => setOpen((o) => !o), onKeyDown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((o) => !o); } } } : {})}
+    >
+      {children}
+    </p>
+  );
+}
 
 /**
  * A prompt (or a variation of one) clamped to two lines with a chevron that opens the whole text. The chevron shows only

@@ -22,7 +22,7 @@ import { Button, IconButton, costLabel } from '../ui/primitives';
 import { planSections, recheckPlanPrice, usePlanRewrite } from '../../engine/agent/planSettings';
 import { PlanSettings, RewriteFailed } from './PlanSettings';
 import { AspectShape } from './aspectShape';
-import { Collapsible, EditLine, RefThumb, SuggestBox, SuggestButton } from './PlanParts';
+import { ClampText, Collapsible, EditLine, RefThumb, SuggestBox, SuggestButton } from './PlanParts';
 import { ResultThumb, StepThumb } from './StepThumb';
 
 function stepIcon(s: PlanStep) {
@@ -198,7 +198,7 @@ export function PlanCard({ item, sessionId }: { item: PlanFeedItem; sessionId: s
             {rewriting ? <span className="cc-state faint"><LoaderCircle size={12} className="spin" /> Adapting the prompt…</span> : item.revised || revising ? <span className="cc-state faint">{revising ? 'Revising…' : 'Revised'}</span> : null}
             {running ? <span className="cc-run num"><LoaderCircle size={14} className="spin accent" />{resultsDone} of {results.length}</span> : null}
           </div>
-          {plan.summary ? <p className="plan-summary">{plan.summary}</p> : null}
+          {plan.summary ? <ClampText className="plan-summary">{plan.summary}</ClampText> : null}
           {reused && !sections.length ? (
             <p className="plan-summary faint">
               {reused.kind === 'draft' ? DRAFT : reused.kind === 'hq' ? HQ : (reused.text ?? '').trim().slice(0, 40)} (como antes)
