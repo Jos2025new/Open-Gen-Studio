@@ -4,6 +4,9 @@ import { act, createElement as h, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { referenceChoices, stepReferenceChoices, useReferenceMentions } from '../src/components/ui/ReferenceMentions';
 import type { Asset, PlanStep } from '../src/engine/types';
+import { EditLine } from '../src/components/chat/PlanParts';
+import { sendAgentMessage } from '../src/engine/agent/runtime';
+vi.mock('../src/engine/agent/runtime', () => ({ sendAgentMessage: vi.fn() }));
 vi.mock('../src/components/ui/AssetMedia', () => ({ AssetMedia: () => null }));
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -76,6 +79,19 @@ describe('reference autocomplete in the existing prompt field', () => {
   });
   it('does not treat an email address as a reference', async () => {
     await mount('name@example.test'); expect(document.querySelector('[role=listbox]')).toBeNull();
+  });
+  it('selecting a mention in the existing plan editor does not send a revision', async () => {
+    const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+    await act(async () => root.render(h(EditLine, { label: 'Clip', references: choices, children: 'Existing prompt' })));
+    await act(async () => { host.querySelector<HTMLButtonElement>('button')!.click(); });
+    const input = host.querySelector('input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '@');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(document.querySelectorAll('[role=option]')).toHaveLength(3);
+    await key(input, 'Enter');
+    expect(input.value).toBe('@Image1 '); expect(sendAgentMessage).not.toHaveBeenCalled();
   });
   it('uses the edited step refs, including future images, and prefers plan subjects over library names', () => {
     const source = { id: 'sheet', kind: 'image', title: 'Storyboard' } as PlanStep;
