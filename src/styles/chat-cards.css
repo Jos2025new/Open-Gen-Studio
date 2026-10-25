@@ -88,6 +88,8 @@
 .cc-edit-btn { position: absolute; right: 6px; top: 5px; opacity: 0; pointer-events: none; font-size: 11px; font-weight: 600; color: var(--text-2); background: var(--surface-3); padding: 2px 8px; border-radius: 6px; }
 .cc-edit:hover > .cc-edit-btn, .cc-edit:focus-within > .cc-edit-btn, .cc-edit-btn:focus, .cc-edit-btn:focus-visible { opacity: 1; pointer-events: auto; }
 .cc-edit-input { display: block; width: 100%; margin-top: 6px; }
+/* Edit floats top-right: the expand arrow sits left of it, never under it. */
+.cc-edit > .cc-coll > .cc-coll-row { padding-right: 40px; }
 .cc-style { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 .cc-style .cc-lab { margin-top: 0; }
 .cc-style .cc-coll-row .cc-ctext { font-size: 12.5px; color: var(--text-3); }
@@ -100,7 +102,9 @@
 .cc-sb-row small { flex: 1; color: var(--text-4); font-size: 11px; }
 
 .plan-card .plan-foot, .cc-card .q-foot { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 12px 0 0; background: none; border-radius: 0; border: 0; border-top: 1px solid var(--border); }
-.plan-card .plan-budget { margin-right: auto; font-size: var(--fs-s); color: var(--text-4); }
+.plan-card .plan-budget { margin-right: auto; font-size: var(--fs-s); color: var(--text-4); min-width: 0; flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Approve stays on the right like every card, also if the row ever wraps. */
+.plan-card .plan-foot .cc-approve { margin-left: auto; }
 .cc-suggest { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-weight: 500; padding: 9px 8px; }
 .cc-suggest:hover { color: var(--text-2); }
 .cc-suggest.is-on { color: var(--accent); }
