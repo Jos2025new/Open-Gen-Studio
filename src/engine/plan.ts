@@ -373,10 +373,7 @@ function cleanParams(p: Record<string, unknown> | undefined): Record<string, Adv
   return out;
 }
 
-/**
- * Turn a raw plan (from the agent tool call) into a validated Plan.
- * Returns human-readable errors for the agent when the plan cannot be used.
- */
+/** Validate a raw agent plan and return a usable plan or repair errors. */
 export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: string): Promise<{ plan: Plan | null; errors: string[] }> {
   const errors: string[] = [];
   const adjustments: string[] = [...(raw.carried ?? [])];

@@ -321,12 +321,7 @@ export function runGeneration(id: string): Promise<string[]> {
   return p;
 }
 
-/**
- * One run, with the two things the app retries by itself (T4):
- * no credit at the provider (the same model elsewhere at the same price or less runs instead, said above the
- * prompt box; otherwise the choices or "recharge" are shown there and the failure stands). Atlas's intermittent
- * "Upstream access denied" is retried per request inside `execute`, so finished images are never redone.
- */
+/** Retry provider credit and Atlas access failures as appropriate. */
 async function attempt(id: string): Promise<string[]> {
   try {
     return await execute(id);
