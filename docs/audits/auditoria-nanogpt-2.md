@@ -104,3 +104,13 @@ Reglas comunes de la primera pasada (`input_references` vs `imageDataUrls`, 30 M
 - https://api.nano-gpt.com/api/v1/images/models/xai/grok-imagine-image/v2.0/edit/endpoints
 - https://api.nano-gpt.com/api/v1/images/models/ideogram/v4.5/edit/endpoints
 - Las páginas de docs de la primera pasada (video-generation, image-generation, api-hosts).
+
+## Verificación de Manus AI (2026-10-25)
+
+Correcciones aplicadas en la tabla de [la primera parte](auditoria-nanogpt.md). Prioridades que propone, con las que coincidimos:
+
+- P0: compresión de imágenes y uso de URLs de origen cuando el activo ya tiene una; fotogramas finales de H3 Max, Gemini Omni, Wan 3 y Seedance 2.5.
+- P1: referencias multimodales y exclusiones entre entradas; `multi_prompt` y `element_list` de Kling; controles de Grok Image, Ideogram y Nano Banana 2.1.
+- P2: camelCase/snake_case, máximos de referencias y parámetros no documentados.
+
+No cambiar el tope global de 4 MB ni añadir claves especulativas al adaptador sin evidencia. Sin verificar todavía (doc pública insuficiente): los 193 modelos iguales en ambos hosts, el rechazo real de `referenceAudios`, los alias del último fotograma por ruta, y si los campos anunciados fuera de `supported_parameters` se pueden enviar.
