@@ -426,6 +426,7 @@ async function execute(id: string): Promise<string[]> {
       if (g.inputs.firstFrame) firstFrame = await mediaInput(g.inputs.firstFrame);
       if (g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     }
+    if (g.op && g.inputs.lastFrame) lastFrame = await mediaInput(g.inputs.lastFrame);
     // Mask operations (Edit region, Remove object): only models that declare a mask, in their convention.
     let mask: MediaInput | undefined;
     const engine = g.op ? OPS[g.op.id].engine : undefined;
@@ -516,6 +517,10 @@ async function execute(id: string): Promise<string[]> {
         const views = chosen.flatMap((s) => s.refAssetIds).slice(0, room - chosen.length);
         refs = [...refs, ...frontals, ...(await Promise.all(views.map((id) => mediaInput(id))))];
       }
+    }
+    if (kind === 'video') {
+      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
+      if (problem) throw new Error(`${model.name} ${problem}`);
     }
     const promptMax = schema.slots.promptMax;
     if (promptMax && prompt.length > promptMax) throw new InputError('PROMPT_TOO_LONG', `${model.name} takes prompts up to ${promptMax} characters (this one has ${prompt.length}).`);
