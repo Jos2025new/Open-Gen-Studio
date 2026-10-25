@@ -1,5 +1,5 @@
 import { uid } from '../../lib/id';
-import { composerChosen, modelSummary, resolveModel } from '../catalog';
+import { composerChosen, lineRoutes, modelSummary, resolveModel } from '../catalog';
 import { userNamed } from '../modelNaming';
 import { defaultChoice } from './settingsCard';
 import { offerRequest, userRequest } from '../modelNamed';
@@ -9,7 +9,7 @@ import { cardDraft, confirmedSections } from './draftActions';
 import { askedQuality, draftMode } from './draftFirst';
 import { inConversation } from './requestGuides';
 import { settingsResultText } from './settingsResult';
-import { betterProvider, wantedOf } from './providerFit';
+import { betterProvider, missing, wantedOf } from './providerFit';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 
 /**
@@ -35,9 +35,20 @@ export async function autoConfirmSettings(sessionId: string, workspace: Workspac
   }));
   // The quality the user's words clearly ask for in this request wins over the inherited choice.
   const asked = askedQuality(userRequest(agent()));
+  // The chosen model's line on its provider, in the variant that takes the images this request declares (never ignore them).
+  const variants = await Promise.all(chosen.map(async (x) => {
+    const p = parts.filter((q) => q.kind === x.kind) as Array<{ refs?: number; start_image?: boolean }>;
+    const want = { startImage: p.some((q) => q.start_image), images: p.reduce((n, q) => n + (q.refs ?? 0), 0) };
+    const r = x.recommended;
+    if (x.kind !== 'video' || (!want.images && !want.startImage) || !missing(useStore.getState().catalog.schemas[r.modelRef], want).length) return x;
+    const alt = want.images ? lineRoutes(r.modelRef).reference : lineRoutes(r.modelRef).image;
+    const got = alt && alt !== r.modelRef ? await resolveModel(alt) : undefined;
+    if (!got || missing(got.schema, want).length) return x;
+    return { ...x, recommended: { ...defaultChoice(alt!, got.schema, { kind: x.kind, startImage: r.needsImage, duration: r.duration, aspect: r.aspect, count: r.count }), needsImage: r.needsImage }, alternatives: [r.modelRef, ...x.alternatives.filter((a) => a !== alt && a !== r.modelRef)] };
+  }));
   // The provider that cannot take what was asked gives way to the same model and variant at one that can (providerFit).
   const notes: string[] = [];
-  const fitted = await Promise.all(chosen.map(async (x) => {
+  const fitted = await Promise.all(variants.map(async (x) => {
     const images = parts.filter((p) => p.kind === x.kind).reduce((n, p) => n + ((p as { refs?: number }).refs ?? 0), 0);
     const better = x.kind === 'video' ? await betterProvider(x.recommended.modelRef, wantedOf(x.recommended, offerRequest(agent()), images), offerRequest(agent())) : undefined;
     const got = better ? await resolveModel(better.ref) : undefined;

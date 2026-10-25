@@ -328,3 +328,49 @@ describe('the notice of a turn that really fails (item 6)', () => {
     expect(rejectionOf('Not shown: call confirm_settings first')).toBeDefined();
   });
 });
+
+import { buildContext } from '../src/engine/agent/context';
+
+describe('the agent knows what the chosen model takes before it writes (2026-10-24: three images on a one-start-image model)', () => {
+  const startOnly = () => {
+    const s = useStore.getState();
+    const schema = s.catalog.schemas[SEED];
+    useStore.setState({ catalog: { ...s.catalog, schemas: { ...s.catalog.schemas, [SEED]: { ...schema, slots: { ...schema.slots, firstFrame: { key: 'image' } } } as ModelSchema } } });
+  };
+  beforeEach(() => { setup(); startOnly(); });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a video model confirmed earlier: the context line says what it takes', () => {
+    const s = useStore.getState();
+    const session = { ...s.sessions[sidOf()], agent: { ...s.sessions[sidOf()].agent, settings: { video: { modelRef: SEED, resolution: '720p', duration: 12, aspect: '16:9' } } } };
+    expect(buildContext(session as never, { workspace: 'chat', style: 'auto', round: 0, maxRounds: 2, attachments: [] })).toContain('(takes: 720p, 1080p · 5–12 s · 16:9, 9:16, 4:3 · 1 start image, no reference images)');
+  });
+
+  it('confirm_settings with three images on it: the answer says what it takes and that they do not fit, before any prompt is written', async () => {
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
+    expect(sent[1]).toContain('takes: 720p, 1080p');
+    expect(sent[1]).toContain('Your 3 images do not fit it');
+  });
+
+  it('one start image on it: the answer says it fits', async () => {
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', start_image: true }] } }, 'ok'], 'Anima esta imagen');
+    expect(sent[1]).toContain('Your 1 image fits.');
+  });
+});
+
+describe('the composer model keeps the variant the declared images need (2026-10-24)', () => {
+  const R2V = 'nanogpt::bytedance-seedance-2-0-mini-reference-to-video';
+  beforeEach(() => {
+    setup();
+    const s = useStore.getState();
+    const [m, schema] = video(R2V, 'Seedance 2.0 Mini Reference to Video', ['5', '8', '12'], ['720p', '1080p']);
+    useStore.setState({ catalog: { ...s.catalog, models: { ...s.catalog.models, [R2V]: m }, schemas: { ...s.catalog.schemas, [R2V]: { ...schema, slots: { prompt: 'prompt', images: { key: 'images', max: 4 } } } as unknown as ModelSchema } } });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('three images with the composer on the text/start-image line: the app confirms its reference variant, and they fit', async () => {
+    const { sent } = await drive([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', refs: 3 }] } }, 'ok'], 'Usa estas tres imágenes para un video');
+    expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(R2V);
+    expect(sent[1]).toContain('Your 3 images fit.');
+  });
+});

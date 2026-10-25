@@ -1,3 +1,4 @@
+import { limitsLine } from './modelLimits';
 import { OPS } from '../ops';
 import { captureLines } from './captureContext';
 import { DRAFT_RULE } from './draftFirst';
@@ -29,6 +30,8 @@ import { viewReferenceLabel } from './assetSearch';
 import { assetShape } from './assetShape';
 
 const get = useStore.getState;
+/** What a confirmed model takes: a plan reusing it is written for it. */
+const takes = (ref: string) => (limitsLine(ref) ? ` (takes: ${limitsLine(ref)})` : '');
 
 export const SYSTEM_PROMPT = `You are the operator of Open Gen Studio, a creative production tool for images, video, music and layered design. You turn requests into precise, executable plans: you take the creative decisions yourself, you never invent what only the user can give, and you do exactly what was asked — no extra deliverables, no filler.
 
@@ -288,7 +291,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
     lines.push(`video route models picked by the user: ${videoOverrides.map(([mode, ref]) => `${mode} → ${ref}`).join(', ')}; use each only for that input route`);
   }
   const confirmed = Object.entries(session.agent.settings ?? {}).filter(([, c]) => c);
-  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}`).join('; ')}`);
+  if (confirmed.length && opts.workspace !== 'node') lines.push(`settings confirmed by the user, kept for these kinds (confirm_settings again only to change them): ${confirmed.map(([k, c]) => `${k} → ${describeChoice(st.catalog.models[c!.modelRef]?.name ?? c!.modelRef, c!)}${takes(c!.modelRef)}`).join('; ')}`);
   lines.push(`audio model: ${describeModel('audio')}`);
   lines.push(`3D model: ${describeModel('model3d')}`);
   lines.push(`other models:\n${alternatives()}`);

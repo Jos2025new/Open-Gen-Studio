@@ -6,6 +6,7 @@ import type { SettingsSection, Workspace } from '../types';
 import { autoConfirmSettings } from './autoSettings';
 import { durationProblem, limitsLine, resolutionNote } from './modelLimits';
 import { suggestModel } from './modelIndex';
+import { missing } from './providerFit';
 import { buildSettings } from './settingsCard';
 
 /** What a confirm_settings part asks (the tool's input, one kind). */
@@ -44,12 +45,29 @@ export async function sectionsOfParts(sessionId: string, parts: SettingsPart[], 
 }
 
 /** Auto confirms these sections itself: what the agent reads (values, guide), plus a line for a resolution the model lacks. */
-export async function autoAnswer(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[]): Promise<string> {
+export async function autoAnswer(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[], log?: Parameters<typeof sectionsOfParts>[3]): Promise<string> {
   const request = offerRequest(useStore.getState().sessions[sessionId].agent);
   const text = await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts);
-  // The note reads the model the app chose (a composer pick may replace the recommended one), never the one it replaced.
+  // What follows reads the model the app chose (a composer pick or another provider may replace the recommended one).
   const chosen = useStore.getState().sessions[sessionId].agent.settings;
-  return text + sections.map((x) => resolutionNote(chosen?.[x.kind as 'image' | 'video']?.modelRef ?? x.recommended.modelRef, request)).join('');
+  return text + sections.map((x) => {
+    const ref = chosen?.[x.kind as 'image' | 'video']?.modelRef ?? x.recommended.modelRef;
+    const name = modelSummary(ref)?.name ?? ref;
+    if (ref !== x.recommended.modelRef) log?.action({ icon: 'search', label: `Checked ${name}`, detail: limitsLine(ref) || undefined });
+    return `${limitsLine(ref) ? `\n${name} (${ref}) takes: ${limitsLine(ref)}.` : ''}${imagesFit(ref, parts.filter((p) => p.kind === x.kind))}${resolutionNote(ref, request)}`;
+  }).join('');
+}
+
+/** Whether the images the parts declare fit the chosen model; when they do not, what to do before writing. */
+function imagesFit(ref: string, parts: SettingsPart[]): string {
+  const images = parts.reduce((n, p) => n + (p.refs ?? 0), 0);
+  const start = parts.some((p) => p.start_image);
+  if (!images && !start) return '';
+  const lacks = missing(useStore.getState().catalog.schemas[ref], { startImage: start, images });
+  const n = images + (start ? 1 : 0);
+  return lacks.length
+    ? ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit it: plan only what it takes (for one start image, put the main image in first_frame and leave the rest out, saying so in one line), before writing the prompts.`
+    : ` Your ${n} image${n > 1 ? 's fit' : ' fits'}.`;
 }
 
 /**
@@ -60,7 +78,7 @@ export async function settingsForPlan(sessionId: string, workspace: Workspace, t
   const parts = partsOfSteps(steps);
   const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
   if (failed || !sections.length) return failed || 'The plan has no image or video step to confirm settings for.';
-  const text = await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts);
+  const text = await autoAnswer(sessionId, workspace, toolCallId, undefined, sections, parts, log);
   // The prompts already fit what the app chose (same model, length and frame): the plan is shown as sent, written once.
   return fitsChosen(sessionId, parts) ? null : `${text}\nThe plan you sent was not shown. Now write the prompts for these settings and call propose_plan again.`;
 }
