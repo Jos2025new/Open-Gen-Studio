@@ -254,7 +254,7 @@ export function checkDirect(kind: MediaKind): DirectCheck {
   } else {
     const videoAtt = attachments.filter((id) => st.assets[id]?.kind === 'video');
     const routed = routeVideoInputs(schema.slots, imageAtt, videoAtt);
-    const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioAtt.length });
+    const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), lastFrame: false, sourceVideo: false, images: routed.images.length, videos: routed.videos.length, audios: audioAtt.length, resolution: settings.resolution });
     if (problem) return { ok: false, reason: `This model ${problem}`, estimate };
     const shots = schema.slots.shots ? shotsProblem(settings.shots, settings.duration) : null;
     if (shots) return { ok: false, reason: `Multi-shot: ${shots}`, estimate };

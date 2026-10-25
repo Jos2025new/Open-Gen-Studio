@@ -65,8 +65,8 @@ describe('audio inputs in live schemas', () => {
     expect(audioInputProblem({}, 1)).toBe('does not accept audio.');
     // MiniMax refers: audio counts among the references but cannot stand alone.
     const refers = atlasSchema('minimax/h3/reference-to-video').slots;
-    expect(videoInputProblem(refers, { firstFrame: false, images: 0, videos: 0, audios: 1 })).toMatch(/at least one reference image or video/);
-    expect(videoInputProblem(refers, { firstFrame: false, images: 1, videos: 0, audios: 1 })).toBeNull();
+    expect(videoInputProblem(refers, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 0, audios: 1 })).toMatch(/at least one reference image or video/);
+    expect(videoInputProblem(refers, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 1, videos: 0, audios: 1 })).toBeNull();
   });
 });
 
@@ -145,7 +145,7 @@ describe('talking avatars (Atlas)', () => {
   it('sends portrait and voice to OmniHuman and polls where Atlas says', async () => {
     const schemas = (atlasSnapshot as Loose).models.find((m: Loose) => m.model === 'bytedance/avatar-omni-human-v1.5').schemaDoc.components.schemas;
     const schema = schemaFromJson({ ref: 'atlas::omni', kind: 'video', properties: schemas.Input.properties, required: schemas.Input.required, resolve: () => undefined, imageFormat: 'url', source: 'openapi' });
-    expect(videoInputProblem(schema.slots, { firstFrame: false, images: 0, videos: 0, audios: 1 })).toBe('needs a start image.');
+    expect(videoInputProblem(schema.slots, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 0, audios: 1 })).toBe('needs a start image.');
     const polled: string[] = [];
     let body: Record<string, unknown> = {};
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {

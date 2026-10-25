@@ -694,7 +694,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           }
           // Same routing as the composer and the job runner (params.routeVideoInputs).
           const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
-          const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length });
+          const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), lastFrame: Boolean(s.last_frame), sourceVideo: false, images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length, resolution: s.resolution });
           if (problem) errors.push(`${where}: model "${modelRef}" ${problem} Fix: ${videoFix(schema.slots, routed, Boolean(s.model))}`);
           if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame. Fix: drop last_frame and describe the ending in the prompt${s.model ? ', or name a model with a last-frame input' : ''}.`);
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);

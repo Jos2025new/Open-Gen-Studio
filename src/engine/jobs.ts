@@ -461,7 +461,7 @@ async function execute(id: string): Promise<string[]> {
       // A reference-to-video model has no start frame: an image given as one becomes a reference.
       const routed = routeVideoInputs(schema.slots, refs, refVideos, firstFrame);
       ({ firstFrame, images: refs, videos: refVideos } = routed);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), images: refs.length, videos: refVideos.length, audios: audios.length });
+      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(firstFrame), lastFrame: Boolean(lastFrame), sourceVideo: Boolean(video), images: refs.length, videos: refVideos.length, audios: audios.length, resolution: g.settings.resolution });
       if (problem) throw new Error(`${model.name} ${problem}`);
     }
     if (video && !schema.slots.video) throw new Error(`${model.name} does not take a source video. Pick a video-to-video model in Settings → Operations.`);

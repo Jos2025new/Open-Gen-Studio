@@ -9,7 +9,6 @@ import type {
   ParamRole,
 } from './types';
 
-// ---------------------------------------------------------------------------
 // Key classification
 
 const ROLE_KEYS: Record<Exclude<ParamRole, 'other'>, string[]> = {
@@ -974,7 +973,12 @@ export function audioInputProblem(slots: InputSlots, audios: number): string | n
 }
 
 /** Why a video model cannot take these routed inputs, or null. Sentence without subject ("needs …"). */
-export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; images: number; videos: number; audios?: number }): string | null {
+export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; lastFrame: boolean; sourceVideo: boolean; images: number; videos: number; audios?: number; resolution?: string }): string | null {
+  const rules = slots.frameRules;
+  if (rules?.refsWithLast === false && n.lastFrame && n.images + n.videos > 0) return 'cannot combine reference images or videos with a last frame.';
+  if (rules?.sourceWithLast === false && n.sourceVideo && n.lastFrame) return 'cannot combine a source video with a last frame.';
+  if (rules?.lastNeedsFirst && n.lastFrame && !n.firstFrame) return 'needs a start image when using a last frame.';
+  if (rules?.firstFrameResolutions && n.firstFrame && n.resolution && !rules.firstFrameResolutions.includes(n.resolution)) return `does not support ${n.resolution} with a start image.`;
   if (n.firstFrame && !slots.firstFrame) return 'cannot start from an image.';
   const audioProblem = audioInputProblem(slots, n.audios ?? 0);
   if (audioProblem) return audioProblem;
@@ -999,10 +1003,7 @@ export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; i
   return null;
 }
 
-/**
- * Keyframe frame indices (BFL FLUX 3 guide): one image opens the clip, two pin start and end, three to ten are
- * spread evenly. Seconds set by the user win. Indices are unique and within 0..duration × fps.
- */
+/** BFL FLUX 3 frame indices; user seconds win, and indices stay within the clip. */
 export function placeKeyframes(count: number, duration: number, fps: number, seconds: Array<number | null | undefined> = []): number[] {
   const last = Math.max(0, Math.round(duration * fps));
   const frames: number[] = [];
@@ -1140,11 +1141,7 @@ export function mentionSubjects(prompt: string, subjects: Array<{ id: string; na
   return { prompt: out + prompt.slice(at), ids };
 }
 
-/**
- * O5 · "@Name" for a model that gets no image of the subject: no proper name (models render it as nothing or as
- * text), its saved description on the first mention ("a woman in her 30s, short black bob") and its first trait
- * after that ("the woman in her 30s"). Without a description the name is all there is.
- */
+/** Expand @Name from its saved description when a model receives no subject image. */
 export function describeMentions(prompt: string, subjects: Array<{ id: string; name: string; description?: string }>): string {
   const mark = '\u0000';
   const { prompt: marked, ids } = mentionSubjects(prompt, subjects, `${mark}{n}${mark}`);
@@ -1161,11 +1158,7 @@ export function describeMentions(prompt: string, subjects: Array<{ id: string; n
   });
 }
 
-/**
- * How a model's prompt names its n-th reference image, for subjects sent as references (R10): the syntax the
- * endpoint's schema states first, else its family's protocol (modelRules REFERENCE_PROTOCOLS). `zeroBased`
- * marks syntaxes that count from 0 (<IMAGE_0>). Undefined: no known syntax, the plain name is kept.
- */
+/** Reference mention syntax: schema first, then model family. `zeroBased` marks zero-indexed forms. */
 export function refMentionStyle(modelId: string, promptRefs?: string): { template: string; zeroBased: boolean } | undefined {
   const said = promptRefs ?? '';
   if (/@image\s?\d/i.test(said)) return { template: '@Image{n}', zeroBased: false };

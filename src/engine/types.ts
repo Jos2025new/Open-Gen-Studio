@@ -67,7 +67,7 @@ export interface InputSlots {
   video?: { key: string; format: ImageInputFormat };
   /** Reference videos (multi-reference models). */
   refVideos?: { key: string; max: number; min: number; format: ImageInputFormat };
-  /** One list for every reference medium, each item `{ url, type }` (Atlas `refers`). Replaces `images` and `refVideos`. */
+  /** Typed references; replaces `images` and `refVideos`. */
   mixedRefs?: { key: string; max: number; min: number };
   /** Images pinned to frame positions (FLUX 3: `{ image_url, frame_index }`, 24 fps). Takes every input image. */
   keyframes?: { key: string; max: number; min: number; imageKey: string; indexKey: string; fps: number };
