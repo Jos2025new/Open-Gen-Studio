@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/lib/idb', () => ({ stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined }, cacheDb: { get: async () => undefined, set: async () => undefined }, getAssetBlob: async () => undefined, putAssetBlob: async (id: string) => id }));
+vi.mock('../src/engine/jobs', async (orig) => ({ ...(await orig<typeof import('../src/engine/jobs')>()), runGeneration: vi.fn(async () => []) }));
 import { checkDirect } from '../src/engine/actions';
+import { generateDirect } from '../src/engine/actions';
 import { previewRun } from '../src/engine/flow/actions';
 import { normalizePlan, type PlanContext } from '../src/engine/plan';
 import { missing } from '../src/engine/agent/providerFit';
@@ -32,6 +34,15 @@ describe('video frame caller wiring', () => {
     const st = useStore.getState();
     useStore.setState({ composer: { ...st.composer, mode: 'video', text: 'move', attachments: ['start'], video: { modelRef: videoRef, settings: { count: 1, resolution: '1080p', advanced: {} } } } });
     expect(checkDirect('video')).toMatchObject({ ok: false, reason: expect.stringMatching(/1080p with a start image/) });
+  });
+
+  it('generateDirect keeps storyboard and character as references for a model that forbids an implicit start frame', async () => {
+    const st = useStore.getState();
+    useStore.setState({ assets: { ...st.assets, subject: asset('subject') }, composer: { ...st.composer, mode: 'video', text: 'move', attachments: ['ref', 'subject'], video: { modelRef: videoRef, settings: { count: 1, resolution: '480p', advanced: {} } } },
+      catalog: { ...st.catalog, schemas: { ...st.catalog.schemas, [videoRef]: schema({ refsWithFirst: false, refsWithLast: false }) } } });
+    await generateDirect('video');
+    const created = Object.values(useStore.getState().generations).find((g) => g.prompt === 'move');
+    expect(created?.inputs).toMatchObject({ firstFrame: undefined, refs: ['ref', 'subject'] });
   });
 
   it('normalizePlan passes an explicit last_frame through the plan check', async () => {

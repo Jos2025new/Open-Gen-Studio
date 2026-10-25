@@ -20,7 +20,7 @@ import { openrouter } from '../src/engine/providers/openrouter';
 import type { GenRequest, MediaInput } from '../src/engine/providers/types';
 import type { ModelSummary, RemoteJob } from '../src/engine/types';
 import { REFERENCE_PROTOCOLS } from '../src/engine/modelRules';
-import { refMentionStyle } from '../src/engine/params';
+import { refMentionStyle, routeVideoInputs, videoInputProblem } from '../src/engine/params';
 
 const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { 'content-type': 'application/json' } });
 const seedanceIds = [
@@ -33,7 +33,7 @@ const seedanceIds = [
 const videoRows = [
   { id: 'bytedance/seedance-2.0', name: 'ByteDance: Seedance 2.0', description: 'Seedance 2.0 is a video generation model from ByteDance. It supports text-to-video, image-to-video with first and last frame control, and multimodal reference-to-video. It is particularly strong at preserving character consistency,...', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: null, generate_audio: null, seed: null },
   { id: 'bytedance/seedance-2.0-fast', name: 'ByteDance: Seedance 2.0 Fast', description: 'Seedance 2.0 Fast is a video generation model from ByteDance. It supports text-to-video, image-to-video with first and last frame control, and multimodal reference-to-video. It prioritizes generation speed and lower cost...', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: null, generate_audio: null, seed: null },
-  { id: 'bytedance/seedance-2.0-mini', name: 'ByteDance: Seedance 2.0 Mini', description: 'Seedance 2.0 Mini is a video generation model from ByteDance. It supports text-to-video, image-to-video with first and last frame control, and multimodal reference-to-video with image, video, and audio inputs. It...', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: null, generate_audio: null, seed: null },
+  { id: 'bytedance/seedance-2.0-mini', name: 'ByteDance: Seedance 2.0 Mini', description: 'Seedance 2.0 Mini is a video generation model from ByteDance. It supports text-to-video, image-to-video with first and last frame control, and multimodal reference-to-video with image, video, and audio inputs. It...', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: ['first_frame', 'last_frame'], generate_audio: null, seed: null },
   { id: 'bytedance/seedance-2.5', name: 'ByteDance: Seedance 2.5', description: 'Seedance 2.5 is a video generation model from ByteDance. It is suited for long-form storytelling, multimodal reference-based generation, video editing, and video extension. It supports first-frame and first-and-last-frame control, up...', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: null, generate_audio: null, seed: null },
   { id: 'alibaba/wan-3.0', name: 'Alibaba: Wan 3.0', description: 'Wan 3.0 is a video generation model from Alibaba for text-to-video, image-to-video, and reference-guided video generation. It produces 480p, 720p, or 1080p video with durations from 2 to 30 seconds.', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: null, generate_audio: null, seed: null },
   { id: 'alibaba/wan-3.0-prime', name: 'Alibaba: Wan 3.0 Prime', description: 'Wan 3.0 Prime is a fast-mode variant of [Wan 3.0](https://openrouter.ai/alibaba/wan-3.0) from Alibaba. It supports text-to-video and first-frame image-to-video generation.', supported_resolutions: ['480p'], supported_aspect_ratios: null, supported_durations: [4], supported_frame_images: ['first_frame'], generate_audio: null, seed: null },
@@ -98,6 +98,19 @@ describe('OpenRouter reference-to-video inputs (F1)', () => {
     ]);
     expect(sent).not.toHaveProperty('frame_images');
     expect(seen).toEqual(['https://openrouter.ai/api/v1/videos/job-1']);
+  });
+
+  it('routes Mini storyboard and character as references, and rejects explicit frames with references', async () => {
+    catalogFetch();
+    const listed = await openrouter.listModels('test');
+    const miniSchema = await openrouter.loadSchema(listed.find((row) => row.id === 'bytedance/seedance-2.0-mini')!, 'test');
+    expect(miniSchema.slots.firstFrame).toEqual({ key: 'frame_images', format: 'content-part' });
+    expect(miniSchema.slots.lastFrame).toEqual({ key: 'frame_images', format: 'content-part' });
+    const routed = routeVideoInputs(miniSchema.slots, ['storyboard', 'character'], []);
+    expect(routed).toEqual({ images: ['storyboard', 'character'], videos: [] });
+    expect(videoInputProblem(miniSchema.slots, { firstFrame: true, lastFrame: false, sourceVideo: false, images: 2, videos: 0 })).toMatch(/cannot combine reference media with a start frame/);
+    expect(videoInputProblem(miniSchema.slots, { firstFrame: false, lastFrame: true, sourceVideo: false, images: 2, videos: 0 })).toMatch(/cannot combine reference media with a last frame/);
+    expect(videoInputProblem(miniSchema.slots, { firstFrame: true, lastFrame: true, sourceVideo: false, images: 2, videos: 0 })).toMatch(/cannot combine reference media with a start frame/);
   });
 
   it('applies the OpenRouter Seedance reference protocol to the prompt writer', () => {

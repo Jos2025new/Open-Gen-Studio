@@ -57,7 +57,7 @@ describe('final video frame validation in the executor', () => {
   it('checks subject references added after initial validation against the last frame', async () => {
     install({ refsWithLast: false });
     const g = createGeneration({ sessionId: sessionId(), kind: 'video', prompt: '@Ana waves', modelRef, settings: { count: 1, advanced: {} }, inputs: {
-      refs: ['ref'], lastFrame: 'last', subjects: [{ id: 'ana', name: 'Ana', frontalAssetId: 'subject', refAssetIds: [] } as never],
+      refs: [], lastFrame: 'last', subjects: [{ id: 'ana', name: 'Ana', frontalAssetId: 'subject', refAssetIds: [] } as never],
     }, origin: 'composer' });
     await expect(runGeneration(g.id)).rejects.toThrow(/reference media with a last frame/);
     expect(sent).not.toHaveBeenCalled();
