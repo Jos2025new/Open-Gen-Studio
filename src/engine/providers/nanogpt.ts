@@ -517,8 +517,8 @@ export const nanogpt: ProviderAdapter = {
       if (req.video.blob.size > MAX_VIDEO_DATA_URL_BYTES) throw new Error(`NanoGPT accepts source videos up to 4 MB (this one is ${(req.video.blob.size / 1048576).toFixed(1)} MB). Trim it or use Atlas Cloud.`);
       body[slots.video.key] = await encodeVideo(req.video);
     }
-    // Some aspect params are orientation based; keep the ratio-derived value only when valid.
-    if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto') delete body.aspect_ratio;
+    // H3 Max documents `adaptive` as a valid aspect_ratio: https://nano-gpt.com/api/v1/video-models?detailed=true
+    if (typeof body.aspect_ratio === 'string' && ratioOf(body.aspect_ratio) == null && body.aspect_ratio !== 'auto' && !(req.model.id === 'minimax/h3-max' && body.aspect_ratio === 'adaptive')) delete body.aspect_ratio;
     req.onStatus('Submitting');
     await fitBody(body, NANOGPT_BODY_LIMIT);
     req.onRequest?.({ url: `${BASE}/generate-video`, body });
