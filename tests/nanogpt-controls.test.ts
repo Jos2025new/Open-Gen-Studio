@@ -50,4 +50,10 @@ describe('NanoGPT catalog controls', () => {
     expect(sent?.aspect_ratio).toBe('adaptive');
   });
 
+  it('clarifies that H3 Max resolution applies to LoRA, editing, and extension', async () => {
+    const models = await listed([], [videoModel('minimax/h3-max', { resolution: { type: 'select', label: 'Resolution', options: [{ value: '480p' }, { value: '768p' }, { value: '1080p' }] } })]);
+    const schema = await nanogpt.loadSchema(models.find((m) => m.id === 'minimax/h3-max')!, undefined);
+    expect(schema.params.find((p) => p.key === 'resolution')?.description).toMatch(/LoRA.*editing.*extension/i);
+  });
+
 });
