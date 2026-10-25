@@ -27,5 +27,8 @@ describe('NanoGPT video input catalog', () => {
     );
     expect((await schema('minimax/h3-max')).slots.lastFrame).toEqual({ key: 'lastImageUrl', format: 'data-url' });
   });
-
+  it('does not expose the undocumented referenceAudios request field', async () => {
+    const schema = await schemaForVideo(videoModel('minimax/h3-max', { reference_audios: { type: 'text', description: 'Audio input references' } }));
+    expect((await schema('minimax/h3-max')).slots.refAudios).toBeUndefined();
+  });
 });
