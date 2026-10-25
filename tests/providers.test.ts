@@ -47,13 +47,13 @@ describe('video input routing', () => {
   it('turns a start frame into a reference when the model has no start frame', () => {
     const r = routeVideoInputs(refs, [], [], 'a');
     expect(r).toEqual({ firstFrame: undefined, images: ['a'], videos: [] });
-    expect(videoInputProblem(refs, { firstFrame: false, images: 1, videos: 0 })).toBeNull();
+    expect(videoInputProblem(refs, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 1, videos: 0 })).toBeNull();
   });
   it('explains what a model cannot take', () => {
-    expect(videoInputProblem(i2v, { firstFrame: true, images: 1, videos: 0 })).toBe('takes one start image.');
-    expect(videoInputProblem(refs, { firstFrame: false, images: 0, videos: 0 })).toBe('needs a reference image.');
-    expect(videoInputProblem(i2v, { firstFrame: false, images: 0, videos: 1 })).toMatch(/does not accept reference videos/);
-    expect(videoInputProblem({ mixedRefs: { key: 'refers', max: 9, min: 1 } }, { firstFrame: false, images: 0, videos: 0 })).toMatch(/needs at least one/);
+    expect(videoInputProblem(i2v, { firstFrame: true, lastFrame: false, sourceVideo: false, images: 1, videos: 0 })).toBe('takes one start image.');
+    expect(videoInputProblem(refs, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 0 })).toBe('needs a reference image.');
+    expect(videoInputProblem(i2v, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 1 })).toMatch(/does not accept reference videos/);
+    expect(videoInputProblem({ mixedRefs: { key: 'refers', max: 9, min: 1 } }, { firstFrame: false, lastFrame: false, sourceVideo: false, images: 0, videos: 0 })).toMatch(/needs at least one/);
   });
 });
 
