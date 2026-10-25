@@ -2,6 +2,8 @@
 
 Estado: **propuesto, sin implementar, para auditar (GPT 6.1)**. Rama `task/auto-plan-card`, worktree `ogs-auto-plan-card`, base `e7fa70d`. Nada se fusiona.
 
+Revisión de GPT 6.1 (2026-10-25, 3 subagentes, sobre `4c605aa`): tres observaciones, comprobadas en el código y aplicadas aquí. P1 enrutamiento: F1.3 se reescribe. P1 contrato del validador: nace F0 y se reescriben F2.2 y F2.5. P2 máximo de 7: F2.3 sale del plan.
+
 Fuentes de este plan:
 - Auditorías: [OpenRouter](audits/auditoria-openrouter.md) (filas #1-#14), [verificación de Manus de OpenRouter](audits/auditoria-openrouter-manus.md), [NanoGPT](audits/auditoria-nanogpt.md) (filas 1-12 y P2-1 a P2-13) y su [segunda pasada](audits/auditoria-nanogpt-2.md).
 - Evidencia del fallo: `.sandbox/data/logs/app.log`, rechazo del plan del 2026-10-25T02:40:47Z («model "openrouter::bytedance/seedance-2.0-mini" takes one start image… drop asset:… from refs»), repetido 5 veces entre el 24 y el 25. Sesión `ses_mvnqkurt4w2hudnbot` (sandbox, no versionada).
@@ -38,6 +40,16 @@ Fuentes de este plan:
 | D3 | Describir a las personajes en el prompt | `peopleLook.ts:11` dice: si una referencia o imagen de inicio muestra a la persona, «cite it, do not describe or change it». En el fallo, la imagen de inicio era un plano general con figuras diminutas y el prompt cortaba a planos cercanos sin describirlas (prompt en la sesión del sandbox) | Con referencias se mantiene «citar». Con solo imagen de inicio y cortes a otros planos, describir los rasgos visibles (pelo, ojos, piel, ropa) |
 | D4 | Intervalo de sondeo de vídeo en OpenRouter | La doc sugiere «e.g. 30 seconds», no obligatorio (Manus §7). Hoy son 5 s (`openrouter.ts:364`). Prioridad del usuario: sin latencia (memoria «User priorities») | Mantener 5 s. Se anota la desviación |
 
+## Fase 0: contrato de entradas de vídeo (base de F1.3, F2.2 y F2.5)
+
+Hallazgo P1 de GPT 6.1: un solo flag no expresa las reglas del último fotograma, y el validador no recibe ni `lastFrame` ni la resolución.
+
+| ID | Qué | Dónde | Por qué (evidencia) | Cómo se comprueba |
+| --- | --- | --- | --- | --- |
+| F0.1 | `InputSlots.frameRules?`, reglas por modelo que pone cada adaptador: `refsWithFirst`, `refsWithLast` y `videoWithLast` (si es `false`, no se combinan); `lastNeedsFirst` (`true`: el último fotograma necesita imagen de inicio); `firstFrameResolutions` (las resoluciones que admite con imagen de inicio). Sin `frameRules`, todo sigue como hoy | `types.ts:50-76` (`InputSlots`); el tamaño se compensa acortando comentarios (baseline 37306) | OpenRouter: precedencia de `frame_images` (guía). NanoGPT: P2-2 «End frames cannot be combined with reference media or reference-to-video mode», «Requires a start image»; P2-6 1080p solo en t2v | Test de tipos más tests de F1.3, F2.2 y F2.5 |
+| F0.2 | `videoInputProblem` recibe también `lastFrame: boolean` y `resolution?: string`, y aplica `frameRules` con un mensaje por regla | `params.ts:978` | Hoy `n` solo tiene `firstFrame`, `images`, `videos` y `audios`; el último fotograma se comprueba aparte en `plan.ts:700` y la resolución no se comprueba | Tests por regla, con modelo con y sin `frameRules` |
+| F0.3 | Actualizar las 5 llamadas a `videoInputProblem` para que pasen `lastFrame` y `resolution` | `jobs.ts:464`, `actions.ts:257`, `plan.ts:697`, `flow/actions.ts:289`, `agent/providerFit.ts:32` | Contrato del punto F0.2. Las 5 se cambian en el mismo commit (AGENTS.md, regla 4) | `npm run test:related`, más un test de cada llamada con un modelo que tenga `frameRules` |
+
 ## Fase 1: referencias de imagen en OpenRouter (caso del usuario: U1, U2)
 
 Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no como imagen de inicio.
@@ -46,7 +58,7 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 | --- | --- | --- | --- | --- |
 | F1.1 | Slot de referencias en vídeo: `images: { key: 'input_references', format: 'content-part', max: D1 }`, solo si la descripción del catálogo dice `reference-to-video`, `reference-based` o `reference-guided` | `providers/openrouter.ts:266-275` (`loadSchema` vídeo) | OR #1. Catálogo del 2026-10-25: Seedance 2.0, 2.0 Fast y 2.0 Mini dicen «multimodal reference-to-video», 2.5 «multimodal reference-based generation», Wan 3.0 «reference-guided». Wan 3.0 Prime solo «text-to-video and first-frame» (Manus §2), así que queda fuera | Test nuevo con las descripciones reales: los cinco tienen slot y Prime no |
 | F1.2 | Enviar `body.input_references` con cada referencia como `{type:'image_url', image_url:{url}}` | `openrouter.ts:303-312` (`generate`); el formato sale de `shared.ts:11` | OpenAPI `POST /videos`: `input_references` son partes `image_url` ([referencia](https://openrouter.ai/docs/api/api-reference/video-generation/submit-a-video-generation-request.md)) | Test del cuerpo comparado con el ejemplo del [cookbook reference-to-video](https://openrouter.ai/docs/cookbook/video-generation/reference-to-video.md) |
-| F1.3 | Referencias e imagen de inicio no van juntas: si hay referencias, no se envía `frame_images` y el plan explica por qué. Flag nuevo en `InputSlots` (`framesOrRefs`), lo pone solo OpenRouter | `types.ts` (InputSlots, l. 50-76), `params.ts:978` `videoInputProblem`, `planFix.ts:7-10` | Doc: «If both fields are provided, frame_images takes precedence and the request is treated as image-to-video» (guía de vídeo; OR #5 y Manus §2) | Tests: referencias más imagen de inicio da un problema con su arreglo; solo referencias pasa; solo imagen de inicio pasa. Los tests de NanoGPT y Atlas no cambian |
+| F1.3 | Enrutamiento y exclusión. Con `frameRules.refsWithFirst = false` (F0), `routeVideoInputs` deja **todas** las imágenes como referencias cuando el paso no fija `first_frame`; hoy la primera pasa a imagen de inicio sola (`params.ts:953`, `if (!first && slots.firstFrame && rest.length) first = rest.shift()`). Con `first_frame` explícito y referencias, el validador da un problema con su arreglo («referencias o imagen de inicio, no las dos») y no se envía `frame_images` | `params.ts:948-959` (`routeVideoInputs`), `params.ts:978` (`videoInputProblem`), `planFix.ts:7-10` | Doc: «If both fields are provided, frame_images takes precedence and the request is treated as image-to-video» (guía de vídeo; OR #5 y Manus §2). Hallazgo P1 de GPT 6.1 | Tests: (a) storyboard y personaje en `refs` sin `first_frame` llegan los dos a `input_references` y el cuerpo no lleva `frame_images`, con el mismo resultado en las 6 llamadas de `routeVideoInputs` (`plan.ts:696`, `jobs.ts:462`, `actions.ts:256` y `:294`, `flow/actions.ts:288`, `Composer.tsx:321`); (b) `first_frame` más referencias da un problema; (c) solo imagen de inicio pasa. Los tests de NanoGPT y Atlas no cambian |
 | F1.4 | `acceptsImage` también es verdadero cuando el modelo acepta referencias | `openrouter.ts:212` | Hoy solo cuenta `first_frame`; el agente y el selector creen que no hay referencias | Test de `listModels` |
 | F1.5 | Resolver `polling_url` con `new URL(url, 'https://openrouter.ai')` | `openrouter.ts:321` | El OpenAPI muestra la URL relativa y el cookbook la resuelve así (OR #7, Manus §7) | Test con URL relativa y con absoluta |
 | F1.6 | Nombrar las referencias según D2 | `modelRules.ts:102-104` (excepción por proveedor) y el texto que lee el agente | D2 | Test de la regla que recibe el agente para `openrouter::bytedance/seedance-2.0-mini` |
@@ -59,10 +71,9 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 | ID | Qué | Dónde | Por qué (evidencia) | Cómo se comprueba |
 | --- | --- | --- | --- | --- |
 | F2.1 | Último fotograma de MiniMax H3 Max, H3 Max Turbo y Gemini Omni Flash 1.1: clave `lastImageUrl` con data URL cuando el catálogo la lista | `providers/nanogpt.ts:291` (hoy exige `last_image`) | P2-1: el catálogo dice «Public HTTP(S) image URL or base64 image data URI». Es el único último fotograma local documentado | Test con la entrada real del catálogo: slot presente, clave `lastImageUrl` |
-| F2.2 | Exclusiones del catálogo: el último fotograma no va con referencias ni con vídeo fuente, y necesita imagen de inicio. Usa el mismo mecanismo que F1.3 | `nanogpt.ts` (`videoSchema`), `params.ts:978` | P2-2: «End frames cannot be combined with reference media…», «Requires a start image» | Tests de las tres combinaciones |
-| F2.3 | Máximo de referencias de Grok Imagine reference-to-video: 7 | `nanogpt.ts:293` (`upTo(…, 4)`) | Manus NanoGPT §3 B: la ficha de NanoGPT anuncia hasta 7. URL exacta de la ficha: pendiente de que la aporte Manus | Test: `max` = 7 para ese id |
+| F2.2 | Exclusiones del catálogo con `frameRules` (F0): `refsWithLast: false`, `videoWithLast: false` y `lastNeedsFirst: true` para H3 Max, H3 Max Turbo y Gemini Omni Flash 1.1, solo cuando su catálogo trae la frase | `nanogpt.ts` (`videoSchema`, l. 269-310) | P2-2: «End frames cannot be combined with reference media or reference-to-video mode», «…with reference images, reference videos, or a source video», «Requires a start image» | Tests de las tres reglas con las entradas reales del catálogo |
 | F2.4 | Desactivar la clave `referenceAudios` | `nanogpt.ts:304` | NanoGPT fila 5: no documentada (confirmado por Manus). R3 | Test: sin slot `refAudios`. Hoy no se activa nunca (los campos son solo URL), así que el usuario no nota cambio |
-| F2.5 | 1080p de Grok Imagine Video 1.5 solo sin imagen de inicio | `nanogpt.ts` (`videoSchema`), `params.ts:978` | P2-6: 1080p solo en t2v (catálogo; confirmado por Manus) | Test: 1080p con imagen de inicio da un problema |
+| F2.5 | 1080p de Grok Imagine Video 1.5 solo sin imagen de inicio: `frameRules.firstFrameResolutions` sin 1080p | `nanogpt.ts` (`videoSchema`), `params.ts:978` (F0.2) | P2-6: 1080p solo en t2v (catálogo; confirmado por Manus) | Test: 1080p con imagen de inicio da un problema; 1080p sin ella pasa |
 
 ## Fase 3: OpenRouter, opciones por proveedor
 
@@ -85,6 +96,8 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 
 ## Fuera del plan (R3), con motivo
 
+- **Máximo de 7 referencias de Grok Imagine reference-to-video (antes F2.3):** sin fuente verificable. El catálogo (`/api/v1/video-models?detailed=true`, id `grok-imagine-video-reference-to-video`, leído el 2026-10-25) no da máximo: solo «Requires one or more reference images». Manus citó la ficha sin URL, y las rutas de ficha probadas dan 404. Hallazgo P2 de GPT 6.1. Sigue en 4 (`nanogpt.ts:293`) hasta tener una URL.
+
 - **Último fotograma de Wan 3 y de Seedance 2.5 en NanoGPT:** el catálogo no nombra el campo (fila 3, P2-1; Manus §3 A).
 - **Calidad y 1K/2K de Grok Image, calidad y máscara de Ideogram, style ID de Recraft:** existen en NanoGPT, pero no se conoce el nombre del campo (P2-10, P2-11, P2-13; Manus §4).
 - **Cambiar a `api.nano-gpt.com` o subir el tope de 4 MB:** un límite HTTP mayor no prueba que el endpoint lo acepte (fila 1; Manus §1). Se queda como está.
@@ -96,7 +109,7 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 
 1. **Tests nuevos por punto**, en la tabla de cada fase, en `tests/providers.test.ts` o en archivos nuevos `tests/openrouter-refs.test.ts` y `tests/nanogpt-frames.test.ts`.
 2. **Red existente:** `npm test` completo (hoy 1101 tests en verde con `test:related`), en especial `tests/providers.test.ts`, `tests/storyboard-sheet.test.ts`, `tests/auto-plan-card.test.ts` y el snapshot `tests/fixtures/live/expected.txt`. Si el snapshot cambia, el diff se revisa línea por línea y se explica en el commit, no se acepta a ciegas (lección de `3dbc579`).
-3. **Atlas y fal sin cambios:** F1.3 y F2.2 solo actúan con el flag nuevo, que ponen OpenRouter y NanoGPT. Sus tests actuales deben pasar sin tocarlos.
+3. **Atlas y fal sin cambios:** `frameRules` (F0) solo lo ponen OpenRouter y NanoGPT. Sin él, `routeVideoInputs` y `videoInputProblem` dan lo mismo que hoy, y los tests actuales de Atlas y fal deben pasar sin tocarlos.
 4. **Guardas del repo:** `check-docs`, `map`, tamaños de `size-baseline.json` (`types.ts` 37306 y `params.ts` 61913 no pueden crecer: se compensa acortando comentarios del mismo archivo).
 5. **Prueba del usuario en el sandbox** al cerrar F1 y F3.4 (R5, R6), con el cuerpo enviado leído del registro.
 6. **Revisión independiente** del diff de cada fase antes de reportarla (GPT 6.1 o un subagente), contra este documento.
