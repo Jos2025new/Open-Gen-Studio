@@ -2,9 +2,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /*
- * Questions card (2026-10-25, user's screenshots): medium size of the card system (card-m), short options side by side
- * with what the chosen one means on a quiet line under them, long options one per row. Only the look: the answer sent is
- * the whole option text, as before.
+ * Questions card (2026-10-25, user's screenshots and «1/3 … continue te lleva a la siguiente … skip question … plan now»):
+ * medium size (card-m), one question at a time, short options side by side, long ones one per row. The answers sent are
+ * the whole option texts, as before; a skipped question is left out; skipping all plans now.
  */
 vi.mock('../src/lib/idb', () => ({
   stateDb: { get: async () => undefined, set: async () => undefined, del: async () => undefined },
@@ -42,26 +42,53 @@ beforeEach(() => {
   root = createRoot(host);
 });
 
-describe('questions card layout', () => {
-  it('card-m; the closing question is the title; no "Round 1 of 1"', () => {
+const click = (label: string) => act(() => ([...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === label || b.getAttribute('aria-label') === label) as HTMLButtonElement).click());
+
+describe('questions card: one question at a time', () => {
+  it('card-m; a 1/2 counter, no title, no "Round 1 of 1"; only the first question shows', () => {
     act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
     expect(host.querySelector('article')?.className).toContain('card-m');
-    expect(host.querySelector('.q-title')?.textContent).toBe('¿Qué priorizamos y con qué imagen abre?');
+    expect(host.querySelector('.q-count')?.textContent).toBe('1/2');
+    expect(host.querySelector('.q-title')).toBeNull();
     expect(host.textContent).not.toMatch(/Round 1 of 1/);
+    expect([...host.querySelectorAll('.q-question')].map((x) => x.textContent)).toEqual(['¿Qué variante prefieres?']);
   });
-  it('480p and 720p side by side (labels only); the chosen one\'s meaning under them; long options one per row', () => {
+  it('short options side by side (labels, check beside); the chosen one\'s meaning under them', () => {
     act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
-    const [short, long] = host.querySelectorAll('.q-options');
-    expect(short.className).toContain('cc-seg');
-    expect([...short.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['480p', '720p']);
+    const seg = host.querySelector('.q-options')!;
+    expect(seg.className).toContain('cc-seg');
+    expect([...seg.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['480p', '720p']);
     expect(host.querySelector('.q-opt-note')?.textContent).toBe('usaré el storyboard y las imágenes de personajes como referencias.');
-    expect(long.className).toContain('is-list');
   });
-  it('the answer sent is the whole option text', () => {
+  it('Continue goes to 2/2 (long options one per row); Continue on the last sends the whole option texts', () => {
     const submit = vi.spyOn(runtime, 'submitAnswers').mockResolvedValue(undefined);
     act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
-    act(() => (host.querySelectorAll('.q-options')[1].querySelector('.q-opt') as HTMLButtonElement).click());
-    act(() => ([...host.querySelectorAll('button')].find((b) => b.textContent?.includes('Continue')) as HTMLButtonElement).click());
+    click('Continue');
+    expect(host.querySelector('.q-count')?.textContent).toBe('2/2');
+    expect(host.querySelector('.q-options')?.className).toContain('is-list');
+    act(() => (host.querySelector('.q-opt') as HTMLButtonElement).click());
+    click('Continue');
     expect(submit).toHaveBeenCalledWith('s', 'q1', { v: R720, f: 'El primer panel del storyboard: plano general del parque.' });
+  });
+  it('Skip question leaves that one out; Back brings it back', () => {
+    const submit = vi.spyOn(runtime, 'submitAnswers').mockResolvedValue(undefined);
+    act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
+    click('Skip question');
+    click('Previous question');
+    expect(host.querySelector('.q-count')?.textContent).toBe('1/2');
+    click('Skip question');
+    act(() => (host.querySelector('.q-opt') as HTMLButtonElement).click());
+    click('Continue');
+    expect(submit).toHaveBeenCalledWith('s', 'q1', { f: 'El primer panel del storyboard: plano general del parque.' });
+  });
+  it('skipping every question plans now; Plan now skips them all at once', () => {
+    const skip = vi.spyOn(runtime, 'skipQuestions').mockResolvedValue(undefined);
+    act(() => root.render(createElement(QuestionsCard, { item, sessionId: 's' })));
+    click('Skip question');
+    click('Skip question');
+    expect(skip).toHaveBeenCalledTimes(1);
+    act(() => root.render(createElement(QuestionsCard, { item: { ...item, id: 'q2' } as QuestionsFeedItem, sessionId: 's' })));
+    click('Plan now');
+    expect(skip).toHaveBeenCalledWith('s', 'q2');
   });
 });

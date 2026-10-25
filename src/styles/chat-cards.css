@@ -171,8 +171,6 @@
 .q-options.is-list .q-opt { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
 
 /* Questions card (2026-10-25, second before/after): a title, flat option rows, one strong colour (Continue). */
-.q-ask .q-head { margin-bottom: 4px; }
-.q-ask .q-title { margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--text); }
 .q-ask .q-options.is-list { gap: 2px; }
 .q-ask .q-options.is-list .q-opt { border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--text-2); }
 .q-ask .q-options.is-list .q-opt:hover { background: var(--surface-3); color: var(--text); }
@@ -185,10 +183,12 @@
 
 /* Questions card at the medium size of the card system (card-m: 512 px, 15 / 13 / 11), 2026-10-25. */
 .q-card.card-m { width: min(var(--card-w-m), 100%); margin-right: auto; padding: var(--card-pad-m); }
-.q-ask.card-m .q-title { font-size: 15px; }
-.q-ask.card-m .q-question { font-size: 13px; font-weight: 650; }
+.q-ask.card-m .q-question { font-size: 15px; font-weight: 700; color: var(--text); }
 .q-ask.card-m .q-intro, .q-ask.card-m .q-opt-detail { font-size: 12px; }
+.q-ask .q-block { margin: 10px 0 4px; }
 .q-ask .q-opt-note { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
 .q-ask .q-options.cc-seg { display: inline-flex; flex-wrap: wrap; }
 .q-ask .cc-seg button { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .q-ask .cc-seg button > svg { color: var(--select-on); }
+.q-ask .q-foot-gap { flex: 1; }
+.q-ask .q-count { font-variant-numeric: tabular-nums; color: var(--text-3); }
