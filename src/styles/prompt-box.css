@@ -79,3 +79,6 @@
 .composer-options-file .menu-right { margin-left: auto; }
 .composer-options-file.is-open { background: var(--surface-hover); }
 .composer-options-file.is-active { background: var(--active-bg); color: var(--active-text); }
+/* In the chat, what scrolls under the composer is hidden from the box's middle down to the window's edge, as chat apps do. */
+.composer-dock.dock-chat::before { content: ''; position: absolute; z-index: -1; left: -24px; right: -24px; top: 28px; bottom: -40px; background: var(--bg-canvas); pointer-events: none; }
+.ws-chat:has(.chat-empty) .composer-dock.dock-chat::before { content: none; }
