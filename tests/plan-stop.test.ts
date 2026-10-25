@@ -159,8 +159,8 @@ describe('Keep lines on a plan card', () => {
     await act(async () => { createRoot(host).render(createElement(PlanCard, { item, sessionId: sid() })); });
     return host.textContent ?? '';
   };
-  it('Auto shows none, also while the plan runs; Guided keeps them', async () => {
+  it('no card shows them, in any mode or state: they go to the debug log', async () => {
     expect(await card('auto')).not.toContain('Keep:');
-    expect(await card('guided')).toContain('Keep:');
+    expect(await card('guided')).not.toContain('Keep:');
   });
 });

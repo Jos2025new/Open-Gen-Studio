@@ -957,6 +957,8 @@ async function executePlanItem(
     const groups = plan.continuity.map(g => ({ ...g, source: mapSource(g.source), steps: g.steps.map(id => workspace === 'node' ? nodeOf(id) : id).filter(id => ids.has(id)) }));
     const subjects = plan.subjects?.map(s => ({ ...s, from: mapSource(s.from) }));
     const errors = continuityErrors(groups, steps, subjects, get().library, get().catalog.schemas);
+    // What each step keeps from which source is for debugging, not for the card: the reference use is checked, fidelity is not.
+    logEvent('agent', { event: 'plan.continuity', sessionId, planId: plan.id, groups: groups.map((g) => ({ keep: g.preserve, from: g.source, steps: g.steps })), check: errors.length ? errors : 'references used' });
     if (errors.length) {
       updateFeedItem<PlanFeedItem>(sessionId, itemId, { status: 'error', error: errors.join(' ') });
       return;
