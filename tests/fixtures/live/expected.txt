@@ -3924,8 +3924,8 @@ nanogpt::minimax-h3/image-to-video-spicy [video] image
   seed: seed number =-1
   generateAudio: audio boolean =false
 nanogpt::minimax-h3/reference-to-video [video] text,image
-  slots: prompt=prompt images=referenceImages[]≤9 data-url refVideos=referenceVideos≤3 data-url refAudios=referenceAudios≤3 data-url
-  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs; up to 3 reference audio refs
+  slots: prompt=prompt images=referenceImages[]≤9 data-url refVideos=referenceVideos≤3 data-url
+  inputs (as the agent reads them): up to 9 reference image refs; up to 3 reference video refs
   resolution: resolution enum[480p,540p,768p,1080p] =480p
   duration: duration enum[3,4,5,6,7,8,9,10,11,12,13,14,15] =5
   aspect_ratio: aspect enum[16:9,9:16,1:1,4:3,3:4,21:9,9:21] =16:9
