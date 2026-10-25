@@ -288,7 +288,8 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       prompt: 'prompt',
       promptRequired: t2v && !i2v && !takesVideo(raw),
       firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
-      lastFrame: 'last_image' in defs && !urlOnly(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
+      // NanoGPT catalog documents lastImageUrl as accepting public URLs or base64 data URIs: https://nano-gpt.com/api/v1/video-models?detailed=true
+      lastFrame: 'lastImageUrl' in defs ? { key: 'lastImageUrl', format: 'data-url' } : 'last_image' in defs && !urlOnly(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
       images: takesRefs && inputs.includes('image')
         ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,
