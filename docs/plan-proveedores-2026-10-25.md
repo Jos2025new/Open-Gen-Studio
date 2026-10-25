@@ -35,10 +35,10 @@ Fuentes de este plan:
 
 | ID | Pregunta | Datos | Recomendación |
 | --- | --- | --- | --- |
-| D1 | Máximo de referencias de imagen por clip en OpenRouter | La doc de vídeo no fija máximo (auditoría OR #10, Manus §8). La de imagen dice 16. Atlas da 9 para el mismo Seedance 2.0 Mini (historial 053, punto 15) | 9, marcado frágil. El caso del usuario usa 3 |
-| D2 | Cómo nombrar las referencias en el prompt en OpenRouter | La doc de OR no define sintaxis y el cookbook pide lenguaje natural (OR #11, Manus §9). La regla de Seedance en `modelRules.ts:102-104` (`@Image1`) viene de Atlas | Para OpenRouter, lenguaje natural por orden y rol («image 1 is the storyboard…»), sin `@`. Atlas no cambia |
-| D3 | Describir a las personajes en el prompt | `peopleLook.ts:11` dice: si una referencia o imagen de inicio muestra a la persona, «cite it, do not describe or change it». En el fallo, la imagen de inicio era un plano general con figuras diminutas y el prompt cortaba a planos cercanos sin describirlas (prompt en la sesión del sandbox) | Con referencias se mantiene «citar». Con solo imagen de inicio y cortes a otros planos, describir los rasgos visibles (pelo, ojos, piel, ropa) |
-| D4 | Intervalo de sondeo de vídeo en OpenRouter | La doc sugiere «e.g. 30 seconds», no obligatorio (Manus §7). Hoy son 5 s (`openrouter.ts:364`). Prioridad del usuario: sin latencia (memoria «User priorities») | Mantener 5 s. Se anota la desviación |
+| D1 | Máximo de referencias de imagen por clip en OpenRouter | La doc de vídeo no fija máximo (auditoría OR #10, Manus §8). | **Decidido por el usuario (2026-10-25): «el maximo de referencias posibles, siempre, todas».** Sin tope de la app: el máximo del catálogo si lo da, y si no, todas las que haya. Si OpenRouter rechaza por número o tamaño (400/413), su error se muestra tal cual y no se envía nada recortado en silencio |
+| D2 | Cómo nombrar las referencias en el prompt | La doc de OR no define sintaxis (OR #11, Manus §9). La regla de Seedance en `modelRules.ts:102-104` (`@Image1`) viene de Atlas y de la doc de ByteDance | **Decidido por el usuario: «Nombralas con @»**, `@Image1`, `@Image2`… en el orden de las referencias, también en OpenRouter. Además pide un selector al escribir `@` (F5) |
+| D3 | Describir a las personajes en el prompt | `peopleLook.ts:11` dice: si una referencia o imagen de inicio muestra a la persona, «cite it, do not describe or change it». En el fallo, la imagen de inicio era un plano general con figuras diminutas y el prompt cortaba a planos cercanos sin describirlas (prompt en la sesión del sandbox) | Pendiente: el usuario pidió una explicación (2026-10-25). Recomendación: con referencias se mantiene «citar». Con solo imagen de inicio y cortes a otros planos, describir los rasgos visibles (pelo, ojos, piel, ropa) |
+| D4 | Intervalo de sondeo de vídeo en OpenRouter | La doc sugiere «e.g. 30 seconds», no obligatorio (Manus §7). Hoy son 5 s (`openrouter.ts:364`) | **Decidido por el usuario: «La mas optima»**, según cómo lo hacen OpenMontage y apps similares. Investigación encargada a Haiku; el valor se fija con su informe |
 
 ## Fase 0: contrato de entradas de vídeo (base de F1.3, F2.2 y F2.5)
 
@@ -93,6 +93,16 @@ Objetivo: el storyboard y las personajes llegan a Seedance como referencias, no 
 | F4.3 | MiniMax H3 Max: no borrar `aspect_ratio: adaptive` | `nanogpt.ts:505` | P2-9 | Test del cuerpo |
 | F4.4 | MiniMax H3: aclarar que `resolution` es para LoRA, edición y extensión | `nanogpt.ts` (`videoSchema`) | Fila 7 (confirmado por Manus §3) | Test de la etiqueta |
 | F4.5 | Seedance 2.5 talking-avatar: avisar antes de enviar si el audio pasa de 4 MB | `providers/bodyBudget.ts` | P2-7 | Test con un audio grande: error claro, sin envío |
+
+## Fase 5: selector `@` para enlazar referencias (pedido del usuario, D2)
+
+Cita: «lo que yo quiero es que sea posible enlazarlas como lo hacen la mayoria de apps donde puedes referencias con el arroba y aparece un pequeño plegable con las opciones de enlazarla a imagen 1, imagen 2, etc.» (2026-10-25). Hoy `@Name` existe, pero se escribe a mano (`components/composer/MediaControls.tsx:381-405`, `components/assets/AssetActions.tsx:246`).
+
+| ID | Qué | Dónde | Por qué (evidencia) | Cómo se comprueba |
+| --- | --- | --- | --- | --- |
+| F5.1 | Investigar cómo lo resuelven otras apps (comportamiento, teclado, qué se lista) antes de diseñar | Informe en `docs/` | Memorias «Research pro solutions first» y «Own style, not copies» | Informe con fuentes |
+| F5.2 | Maqueta antes y después, con nuestro estilo de tarjetas | `docs/mockups/` | Cambio de interfaz: AGENTS.md, reglas 3 y 6 (aprobación explícita) | Aprobación del usuario |
+| F5.3 | Implementar: escribir `@` abre un desplegable con las imágenes adjuntas y los sujetos (Image 1, Image 2, @Name, con miniatura); elegir una inserta su `@`; teclado y escape. Se usa el mismo componente en el composer y en el prompt editable de la tarjeta del plan | Componentes del composer y `components/chat/PlanParts.tsx` | D2 | Test jsdom: `@` abre la lista, la flecha y Enter insertan, Escape cierra. Prueba visual del usuario |
 
 ## Fuera del plan (R3), con motivo
 
