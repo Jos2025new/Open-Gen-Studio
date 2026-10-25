@@ -297,7 +297,7 @@ export function buildContext(session: Session, opts: { workspace: Workspace; sty
   lines.push(`other models:\n${alternatives()}`);
   if (opts.attachments.length) {
     lines.push(
-      `attached by the user in selection order: ${opts.attachments
+      `attached by the user, @Image1 first: ${opts.attachments
         .map((id) => {
           const a = st.assets[id];
           const view = a ? viewReferenceLabel(a, st.assets) : '';

@@ -2,8 +2,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement as h, useRef, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { referenceChoices, stepReferenceChoices, useReferenceMentions } from '../src/components/ui/ReferenceMentions';
-import type { Asset, PlanStep } from '../src/engine/types';
+import { referenceChoices, spaceImages, stepReferenceChoices, useReferenceMentions, type ReferenceChoice } from '../src/components/ui/ReferenceMentions';
+import type { Asset, Generation, PlanStep } from '../src/engine/types';
 import { EditLine } from '../src/components/chat/PlanParts';
 import { sendAgentMessage } from '../src/engine/agent/runtime';
 vi.mock('../src/engine/agent/runtime', () => ({ sendAgentMessage: vi.fn() }));
@@ -14,10 +14,10 @@ let root: Root;
 afterEach(async () => { if (root) await act(async () => root.unmount()); document.body.innerHTML = ''; });
 
 const choices = referenceChoices([{ id: 'a', label: 'Storyboard' }, { id: 'b', label: 'Character' }], [{ id: 'ana', name: 'Ana', refAssetIds: [] }], 'bytedance/seedance-2.0-mini');
-function Field({ initial = 'Follow @' }: { initial?: string }) {
+function Field({ initial = 'Follow @', list = choices, onAttach }: { initial?: string; list?: ReferenceChoice[]; onAttach?: (id: string) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const [value, setValue] = useState(initial);
-  const mentions = useReferenceMentions(ref, value, setValue, choices);
+  const mentions = useReferenceMentions(ref, value, setValue, list, onAttach);
   return h('div', null, h('textarea', { ref, value, 'aria-label': 'Prompt', ...mentions.aria,
     onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => { setValue(e.target.value); mentions.sync(e.currentTarget); },
     onSelect: (e: React.SyntheticEvent<HTMLTextAreaElement>) => mentions.sync(e.currentTarget),
@@ -25,9 +25,9 @@ function Field({ initial = 'Follow @' }: { initial?: string }) {
     onKeyDown: mentions.onKeyDown,
   }), mentions.menu);
 }
-async function mount(initial?: string) {
+async function mount(initial?: string, list?: ReferenceChoice[], onAttach?: (id: string) => void) {
   const host = document.createElement('div'); document.body.append(host); root = createRoot(host);
-  await act(async () => root.render(h(Field, { initial })));
+  await act(async () => root.render(h(Field, { initial, list, onAttach })));
   const input = host.querySelector('textarea')!;
   input.focus(); input.setSelectionRange(input.value.length, input.value.length);
   await act(async () => { input.dispatchEvent(new Event('select', { bubbles: true })); });
@@ -101,5 +101,20 @@ describe('reference autocomplete in the existing prompt field', () => {
     const result = stepReferenceChoices(video, [source], assets, [{ id: 'ana', name: 'Ana', frontalAssetId: 'old', refAssetIds: [] }], [{ name: 'Ana', from: 'asset:person' }]);
     expect(result.map(c => c.mention)).toEqual(['@Image1', '@Image2', '@Ana']);
     expect(result.map(c => c.assetId)).toEqual([undefined, 'person', 'person']);
+  });
+  it('lists the images made in this session, newest first, without the attached ones', () => {
+    const img = (id: string) => ({ id, kind: 'image' } as Asset);
+    const assets = { a: img('a'), b: img('b'), c: img('c'), d: img('d') };
+    const gen = (id: string, sessionId: string, createdAt: number, assetIds: string[], extra: Partial<Generation> = {}) => ({ id, sessionId, createdAt, assetIds, kind: 'image', ...extra } as Generation);
+    const generations = { g1: gen('g1', 's', 1, ['a']), g2: gen('g2', 's', 2, ['b', 'c']), g3: gen('g3', 'other', 3, ['d']), g4: gen('g4', 's', 4, ['d'], { discard: true }) };
+    expect(spaceImages(generations, assets, ['s'], ['c'])).toEqual(['b', 'a']);
+  });
+  it('picking a made image attaches it and writes the number it takes', async () => {
+    const onAttach = vi.fn();
+    const input = await mount('Use @', [{ id: 'made:x', assetId: 'x', label: 'Sheet', mention: '@Image1', attach: true }], onAttach);
+    expect(document.querySelector('[role=option]')?.textContent).toContain('Attach as @Image1');
+    await key(input, 'Enter');
+    expect(onAttach).toHaveBeenCalledWith('x');
+    expect(input.value).toBe('Use @Image1 ');
   });
 });

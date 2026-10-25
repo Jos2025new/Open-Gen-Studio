@@ -16,6 +16,7 @@ import { AgentAttachToggle } from '../assets/AgentAttachToggle';
 import { StopFollowingPopover } from './StopFollowing';
 import { setStudioBoard } from '../../lib/studioBoard';
 import { GenerationNotices } from './GenerationNotices';
+import { chatResults } from './GenerationCard';
 
 /** A running placeholder opens the Generations board on Ongoing. */
 function showOngoing() {
@@ -61,6 +62,12 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
         {picked.length ? <Button variant="primary" size="sm" icon={Check} className="studio-pick-go" onClick={confirmPick}>{noun}{SINGLE.includes(k) ? '' : ` ${picked.length}`}</Button> : <span>{SINGLE.includes(k) ? 'Select an image' : 'Select images first'}</span>}
         <IconButton icon={X} label="Cancel selection" size="sm" onClick={cancelPick} />
       </span> : null;
+  // The viewer steps through every result of this chat, as the full card does.
+  const openViewer = (id: string, i: number) => {
+    const all = chatResults(g.sessionId);
+    const at = all.indexOf(id);
+    setUi({ lightbox: at >= 0 ? { assetIds: all, index: at } : { assetIds: outputs, index: i } });
+  };
   return <div className="studio-gen" id={`gen-${g.id}`} aria-label={busy ? 'Generating' : 'Generated'}>
     {busy ? <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status" tabIndex={0} aria-label="Show in Ongoing" onClick={showOngoing} onKeyDown={(e) => { if (e.key === 'Enter') showOngoing(); }}><KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <div className="studio-pending-text is-quiet"><span>Ongoing</span></div>
@@ -70,7 +77,7 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
       <ChevronDown size={13} className={open ? '' : 'is-closed'} />
     </button>
     {open ? <div className="studio-gen-row">
-      {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => pick ? toggleId(id) : setUi({ lightbox: { assetIds: outputs, index: i } })}>
+      {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => pick ? toggleId(id) : openViewer(id, i)}>
         <KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />
         {g.kind === 'video' ? <span className="studio-thumb-play" aria-hidden><Play size={16} fill="currentColor" /></span> : null}

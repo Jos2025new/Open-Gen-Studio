@@ -39,7 +39,7 @@ function metaLine(g: Generation): string {
 }
 
 /** Results of this chat's generations, oldest first (not those of the node canvas or the designer). */
-function chatResults(sessionId: string): string[] {
+export function chatResults(sessionId: string): string[] {
   const st = useStore.getState();
   const session = st.sessions[sessionId];
   const canvas = session ? canvasIndex(session, st.generations) : undefined;

@@ -209,9 +209,17 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
           {everywhere ? 'Show only this canvas' : `Show the other canvases too (${others})`}
         </button>
       ) : null}
-      {feed.map((item) => (
-        <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} studio={studio} />
-      ))}
+      {(studio ? studioRuns(feed) : feed).map((row) =>
+        Array.isArray(row) ? (
+          <div key={row[0].id} className="feed-gen-run">
+            <div className="feed-gen-grid">
+              {row.map((item) => <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} studio={studio} />)}
+            </div>
+          </div>
+        ) : (
+          <FeedItemView key={row.id} item={row} sessionId={sessionId} compact={compact} studio={studio} />
+        ),
+      )}
       {showStatus ? (
         <div className="agent-status faint" role="status">
           <LoaderCircle size={13} className="spin" />
@@ -220,6 +228,26 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
       ) : null}
     </div>
   );
+}
+
+/** Studio's chat lays consecutive results side by side: each run of two or more generations becomes one row group. */
+export function studioRuns(feed: FeedItem[]): Array<FeedItem | FeedItem[]> {
+  const rows: Array<FeedItem | FeedItem[]> = [];
+  let run: FeedItem[] = [];
+  const flush = () => {
+    if (run.length > 1) rows.push(run);
+    else rows.push(...run);
+    run = [];
+  };
+  for (const item of feed) {
+    if (item.type === 'generation') run.push(item);
+    else {
+      flush();
+      rows.push(item);
+    }
+  }
+  flush();
+  return rows;
 }
 
 const EMPTY: FeedItem[] = [];

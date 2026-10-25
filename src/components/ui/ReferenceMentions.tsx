@@ -1,16 +1,26 @@
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { refMentionStyle } from '../../engine/params';
-import type { Asset, PlanStep, PlanSubject, Subject } from '../../engine/types';
+import type { Asset, Generation, PlanStep, PlanSubject, Subject } from '../../engine/types';
 import { AssetMedia } from './AssetMedia';
 import { Popover } from './Popover';
 
-export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string }
+/** `attach`: an image of the space not attached yet; picking it attaches it, and `mention` is the number it gets. */
+export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string; attach?: boolean }
 export function referenceChoices(images: Array<{ id: string; label: string; assetId?: string }>, subjects: Subject[], modelId = '', promptRefs?: string): ReferenceChoice[] {
   const style = refMentionStyle(modelId, promptRefs);
   return [
     ...images.map((image, i) => ({ ...image, mention: style ? style.template.replace('{n}', String(i + (style.zeroBased ? 0 : 1))) : `@Image${i + 1}` })),
     ...subjects.map(s => ({ id: `subject:${s.id}`, label: s.name, mention: `@${s.name}`, assetId: s.frontalAssetId })),
   ];
+}
+
+/** Images made in this session, newest first, that are not attached yet (at most `limit`). */
+export function spaceImages(generations: Record<string, Generation>, assets: Record<string, Asset>, sessionIds: string[], attached: string[], limit = 24): string[] {
+  return Object.values(generations)
+    .filter(g => !g.discard && g.kind === 'image' && sessionIds.includes(g.sessionId))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .flatMap(g => g.assetIds.filter(id => assets[id]?.kind === 'image' && !attached.includes(id)))
+    .slice(0, limit);
 }
 
 export function stepReferenceChoices(step: PlanStep, steps: PlanStep[], assets: Record<string, Asset>, library: Subject[], local: PlanSubject[] = [], promptRefs?: string) {
@@ -31,7 +41,7 @@ export function stepReferenceChoices(step: PlanStep, steps: PlanStep[], assets: 
  * https://www.w3.org/WAI/ARIA/apg/patterns/combobox/ */
 export function useReferenceMentions(
   ref: RefObject<HTMLInputElement | HTMLTextAreaElement | null>, value: string,
-  onChange: (value: string) => void, choices: ReferenceChoice[],
+  onChange: (value: string) => void, choices: ReferenceChoice[], onAttach?: (assetId: string) => void,
 ) {
   const id = useId();
   const [query, setQuery] = useState<{ start: number; end: number; text: string; value: string } | null>(null);
@@ -54,6 +64,7 @@ export function useReferenceMentions(
   const insert = (choice: ReferenceChoice) => {
     if (!query || query.value !== value) return;
     const suffix = value.slice(query.end);
+    if (choice.attach && choice.assetId) onAttach?.(choice.assetId);
     const token = choice.mention + (/^\s/.test(suffix) ? '' : ' ');
     onChange(value.slice(0, query.start) + token + suffix);
     close();
@@ -76,7 +87,7 @@ export function useReferenceMentions(
         {matches.map((choice, i) => <button key={choice.id} id={`${id}-${i}`} type="button" role="option" aria-selected={i === index}
           className={`menu-item${i === index ? ' is-active' : ''}`} onPointerDown={e => e.preventDefault()} onClick={() => insert(choice)}>
           {choice.assetId ? <span className="subject-thumb"><AssetMedia assetId={choice.assetId} /></span> : null}
-          <span className="subject-main"><span>{choice.label}</span><span className="faint">{choice.mention}</span></span>
+          <span className="subject-main"><span>{choice.label}</span><span className="faint">{choice.attach ? `Attach as ${choice.mention}` : choice.mention}</span></span>
         </button>)}
       </div>
     </Popover>,

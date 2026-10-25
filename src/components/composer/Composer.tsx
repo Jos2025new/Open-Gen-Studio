@@ -1,10 +1,11 @@
 import { ComposerAlerts } from './ComposerAlerts';
-import { referenceChoices, useReferenceMentions } from '../ui/ReferenceMentions';
+import { referenceChoices, spaceImages, useReferenceMentions } from '../ui/ReferenceMentions';
+import { isSpaceSession } from '../../store/spaceSession';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowUp, CircleStop, Layers, Pencil, X, Zap } from 'lucide-react';
 import { setComposer, setUi, toast, useStore } from '../../store/store';
 import { sendAgentMessage, stopAgent } from '../../engine/agent/runtime';
-import { attachFiles, checkDirect, generateDirect } from '../../engine/actions';
+import { attachFiles, checkDirect, generateDirect, useAsReference } from '../../engine/actions';
 import { lineRoutes, modelSummary, opModelFromRef, pickComposerModel } from '../../engine/catalog';
 import { activeLayer } from '../../engine/design/doc';
 import { activeDoc } from '../../engine/design/actions';
@@ -309,12 +310,24 @@ export function Composer() {
   // picks by hand stays until they attach or remove something.
   const imageCount = liveAttachments.filter((id) => assets[id]?.kind === 'image').length;
   const currentRef = useStore((s) => (mode === 'image' || mode === 'video' ? s.composer[mode].modelRef : ''));
+  const generations = useStore((s) => s.generations);
+  const spaceId = useStore((s) => (s.ui.space ? Object.values(s.sessions).find(isSpaceSession)?.id : undefined));
   const mentionChoices = useMemo(() => {
     const imageIds = liveAttachments.filter(id => assets[id]?.kind === 'image');
-    const refs = mode === 'video' && mediaSlots ? routeVideoInputs(mediaSlots, imageIds, []).images : imageIds;
-    return referenceChoices(refs.map((id, i) => ({ id, assetId: id, label: assets[id]?.name || `Image ${i + 1}` })), subjects, currentRef, mediaSlots?.promptRefs);
-  }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode]);
-  const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices);
+    const route = (ids: string[]) => (mode === 'video' && mediaSlots ? routeVideoInputs(mediaSlots, ids, []).images : ids);
+    const refs = route(imageIds);
+    const attached = referenceChoices(refs.map((id, i) => ({ id, assetId: id, label: assets[id]?.name || `Image ${i + 1}` })), subjects, currentRef, mediaSlots?.promptRefs);
+    // Images made here can be picked too: picking one attaches it, and its mention is the number it takes once attached.
+    const made = spaceImages(generations, assets, [sessionId, ...(spaceId ? [spaceId] : [])], imageIds).flatMap((id) => {
+      const at = route([...imageIds, id]).indexOf(id);
+      if (at < 0) return [];
+      const numbered = referenceChoices(route([...imageIds, id]).map((x) => ({ id: x, label: '' })), [], currentRef, mediaSlots?.promptRefs)[at];
+      return [{ id: `made:${id}`, assetId: id, label: assets[id]?.name || 'Image', mention: numbered.mention, attach: true }];
+    });
+    const images = attached.filter((c) => !c.id.startsWith('subject:'));
+    return [...images, ...made, ...attached.filter((c) => c.id.startsWith('subject:'))];
+  }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode, generations, sessionId, spaceId]);
+  const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices, useAsReference);
   const lastCount = useRef(imageCount);
   useEffect(() => {
     const before = lastCount.current;
