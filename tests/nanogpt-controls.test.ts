@@ -18,7 +18,7 @@ async function listed(images: unknown[] = [], videos: unknown[] = []) {
   return nanogpt.listModels(undefined);
 }
 const baseRequest = (model: ModelSummary, schema: ModelSchema, extra: Partial<GenRequest> = {}): GenRequest => ({
-  kind: 'video', model, schema, prompt: 'Test', settings: { count: 1, advanced: { aspect_ratio: 'adaptive' } }, count: 1,
+  kind: 'video', model, schema, prompt: 'Test', settings: { count: 1, aspect: 'adaptive', advanced: {} }, count: 1,
   refs: [], apiKey: 'unused-test-key', signal: new AbortController().signal, onStatus: () => undefined, onRemoteJob: () => undefined,
   ...extra,
 });
@@ -34,6 +34,20 @@ describe('NanoGPT catalog controls', () => {
       expect.objectContaining({ key: 'seed', type: 'integer', role: 'seed', default: -1 }),
       expect.objectContaining({ key: 'enable_web_search', type: 'boolean', default: false }),
     ]));
+  });
+
+  it('keeps the catalog adaptive aspect ratio in the H3 Max request body', async () => {
+    const models = await listed([], [videoModel('minimax/h3-max', { aspect_ratio: { type: 'select', options: [{ value: 'adaptive' }, { value: '16:9' }] } })]);
+    const model = models.find((m) => m.id === 'minimax/h3-max')!;
+    const schema = await nanogpt.loadSchema(model, undefined);
+    let sent: Record<string, unknown> | undefined;
+    vi.stubGlobal('location', { href: 'http://localhost/' });
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') sent = JSON.parse(String(init.body));
+      throw new Error('stop after capturing submit body');
+    });
+    await expect(nanogpt.generate(baseRequest(model, schema))).rejects.toThrow(/Network error reaching nano-gpt.com/);
+    expect(sent?.aspect_ratio).toBe('adaptive');
   });
 
 });
