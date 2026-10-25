@@ -3,7 +3,7 @@ import { ArrowDownUp, Check, ChevronDown, KeyRound, Search, Settings2 } from 'lu
 import { connectedProviders } from '../../engine/catalog';
 import { PROVIDER_LABELS } from '../../engine/providers/types';
 import { recommendedRefs } from '../../engine/providers/registry';
-import { groupLines, groupVariants, modelFamily, variantLabel, type VariantGroup } from '../../engine/variants';
+import { groupLines, groupVariants, matchesSearch, modelFamily, variantKey, variantLabel, type VariantGroup } from '../../engine/variants';
 import { formatUsd } from '../../lib/format';
 import { requestImagePrice } from '../../engine/priceLoad';
 import type { MediaKind, ModelSummary, ProviderId } from '../../engine/types';
@@ -145,8 +145,10 @@ export function ModelList({
     // An operation picker (filter) is already the curated list: show every model that does the operation.
     if (filter) return all;
     if (kind === 'image') return all.filter((m) => m.provider === 'local' || familyOf(m) || m.ref === value);
+    // A recommended variant keeps every provider's copy, so its row says where else it is served.
     const rec = recommendedRefs();
-    return all.filter((m) => m.provider === 'local' || rec.has(m.ref) || m.ref === value);
+    const keys = new Set(all.filter((m) => rec.has(m.ref) || m.ref === value).map(variantKey));
+    return all.filter((m) => m.provider === 'local' || keys.has(variantKey(m)));
   }, [all, value, kind, filter]);
   const needle = q.trim().toLowerCase();
   // Searching always covers the whole catalog; with no recommendations there is nothing to curate.
@@ -159,7 +161,7 @@ export function ModelList({
       (full ? all : recommended)
         .filter((m) => provider === 'all' || m.provider === provider)
         .filter((m) => feature === 'all' || badges(m).includes(feature))
-        .filter((m) => !needle || m.name.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
+        .filter((m) => !needle || matchesSearch(`${m.name} ${m.id} ${PROVIDER_LABELS[m.provider]}`, needle)),
       providers,
     );
     const byName = (a: VariantGroup, b: VariantGroup) => a.best.name.localeCompare(b.best.name);

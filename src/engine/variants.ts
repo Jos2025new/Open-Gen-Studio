@@ -65,6 +65,17 @@ export function variantKey(m: Pick<ModelSummary, 'provider' | 'id' | 'kind' | 'r
   return `${m.kind}|${[...new Set(words)].sort().join(' ')}`;
 }
 
+/** Search words: lower case, "2.0" = "2", punctuation and maker prefixes split off ("bytedance/seedance-2.0-mini" → seedance 2 mini). */
+function searchWords(text: string): string[] {
+  return text.toLowerCase().replace(/(\d)[.-]0(?![\d.])/g, '$1').replace(/(\d)-(\d)/g, '$1.$2').split(/[^a-z0-9.]+/).filter(Boolean);
+}
+
+/** Every typed word is found in the name, id or provider: numbers whole ("2" ≠ "2.5"), words by prefix. */
+export function matchesSearch(text: string, query: string): boolean {
+  const have = searchWords(text);
+  return searchWords(query).every((q) => have.some((w) => (/^[\d.]+$/.test(q) ? w === q : w.startsWith(q))));
+}
+
 /** Listed price when two variants can be compared (same unit), else undefined. */
 function comparable(a: ModelSummary, b: ModelSummary): [number, number] | undefined {
   const sa = a.price?.skus[0];
