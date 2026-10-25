@@ -263,6 +263,9 @@ function catalogParams(defs: Record<string, NanoVideoParam>, skip: RegExp): Para
   return params;
 }
 
+/** A catalog field that takes links only (its description names URLs and no data URI / base64): local files cannot go there. */
+const urlOnly = (def: { description?: string } | undefined) => Boolean(def?.description && /\burls?\b/i.test(def.description) && !/data\s*ur[il]|base64/i.test(def.description));
+
 function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const defs = raw.supported_parameters?.parameters ?? {};
   const params = catalogParams(defs, /trajectory|keyframe|script|story|voice|character|lora/i).filter((p) => p.role === 'negative' || p.type !== 'string');
@@ -272,11 +275,12 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const i2v = Boolean(raw.capabilities?.image_to_video);
   const t2v = Boolean(raw.capabilities?.text_to_video);
   const inputs = raw.architecture?.input_modalities ?? [];
-  // Reference lists: the catalog declares them as reference_images/_videos (URL fields); the video guide
-  // documents referenceImages/referenceVideos with URLs or data URLs, which is what we can send.
+  // Reference lists: we can only send local images as data URLs (NanoGPT documents no upload). A list the catalog
+  // describes as URLs only ("Optional JSON array of image URLs", Seedance 2.0) rejects them: sandbox 2026-10-25,
+  // "Each reference image must be a non-empty HTTP or HTTPS URL". Such a model has no reference slot here.
   const modes = defs.mode?.options?.map((o) => String(o.value)) ?? [];
   const refModel = /reference-to-video/.test(raw.id);
-  const takesRefs = refModel || 'reference_images' in defs || modes.includes('reference-to-video');
+  const takesRefs = (refModel || 'reference_images' in defs || modes.includes('reference-to-video')) && !urlOnly(defs.reference_images);
   return {
     ref: model.ref,
     params,
@@ -288,7 +292,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       images: takesRefs && inputs.includes('image')
         ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,
-      refVideos: 'reference_videos' in defs ? { key: 'referenceVideos', max: upTo(defs.reference_videos, 3), min: 0, format: 'data-url' } : undefined,
+      refVideos: 'reference_videos' in defs && !urlOnly(defs.reference_videos) ? { key: 'referenceVideos', max: upTo(defs.reference_videos, 3), min: 0, format: 'data-url' } : undefined,
       // Audio: the catalog's `audio` field (Seedance talking avatar), else the documented audioDataUrl for
       // audio-driven models (lip-sync, avatar). referenceAudios follows the referenceImages/Videos naming (unverified).
       audio:

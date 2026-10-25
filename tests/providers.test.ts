@@ -87,6 +87,25 @@ describe('model classification', () => {
   });
 });
 
+describe('NanoGPT reference lists that take links only (sandbox 2026-10-25)', () => {
+  // NanoGPT documents no upload, so local images go as data URLs. Seedance 2.0 Mini's list is "image URLs" and the
+  // provider answered "Each reference image must be a non-empty HTTP or HTTPS URL": no reference slot for such a model.
+  const entry = (id: string, description: string) => ({
+    id, name: id, architecture: { input_modalities: ['text', 'image'] }, capabilities: { video_generation: true, text_to_video: true, image_to_video: true },
+    supported_parameters: { parameters: { reference_images: { type: 'text', label: 'Reference image URLs', description }, reference_videos: { type: 'text', label: 'Reference videos', description: description.replace('image', 'video') } } },
+  });
+  it('a list of URLs only: no reference images or videos, the start image stays', async () => {
+    vi.stubGlobal('fetch', async (url: string) => new Response(JSON.stringify({ data: url.includes('video-models') ? [entry('bytedance-seedance-2-0-mini', 'Optional JSON array of image URLs'), entry('vidu-q4', 'Up to 12 image URLs or data URIs')] : [] })));
+    const models = await nanogpt.listModels(undefined);
+    const mini = await nanogpt.loadSchema(models.find((m) => m.id === 'bytedance-seedance-2-0-mini')!, undefined);
+    expect(mini.slots.images).toBeUndefined();
+    expect(mini.slots.refVideos).toBeUndefined();
+    expect(mini.slots.firstFrame?.key).toBe('imageDataUrl');
+    const vidu = await nanogpt.loadSchema(models.find((m) => m.id === 'vidu-q4')!, undefined);
+    expect(vidu.slots.images).toMatchObject({ key: 'referenceImages' });
+  });
+});
+
 describe('request payloads', () => {
   const clip = (size = 10): MediaInput => ({ assetId: 'v', blob: new Blob([new Uint8Array(size)], { type: 'video/mp4' }), mime: 'video/mp4', width: 1280, height: 720 });
   const request = (model: Partial<ModelSummary>, schema: ModelSchema, extra: Partial<GenRequest>): GenRequest => ({
