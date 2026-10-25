@@ -325,7 +325,22 @@ export function Composer() {
       return [{ id: `made:${id}`, assetId: id, label: assets[id]?.name || 'Image', mention: numbered.mention, attach: true }];
     });
     const images = attached.filter((c) => !c.id.startsWith('subject:'));
-    return [...images, ...made, ...attached.filter((c) => c.id.startsWith('subject:'))];
+    const saved = attached.filter((c) => c.id.startsWith('subject:')).map((c) => ({ ...c, saved: true }));
+    // Favorites of any kind (image, video, sound), newest first; images take their reference number, the rest their kind's.
+    const taken = new Set([...liveAttachments, ...made.map((c) => c.assetId)]);
+    const count = (kind: string) => liveAttachments.filter((id) => assets[id]?.kind === kind).length + 1;
+    const favorites = Object.values(assets)
+      .filter((a) => a.favorite && !taken.has(a.id) && (a.kind === 'image' || a.kind === 'video' || a.kind === 'audio'))
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 24)
+      .flatMap((a) => {
+        if (a.kind !== 'image') return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || (a.kind === 'video' ? 'Video' : 'Audio'), mention: `@${a.kind === 'video' ? 'Video' : 'Audio'}${count(a.kind)}`, attach: true, saved: true }];
+        const order = route([...imageIds, a.id]);
+        const at = order.indexOf(a.id);
+        if (at < 0) return [];
+        return [{ id: `fav:${a.id}`, assetId: a.id, label: a.name || 'Image', mention: referenceChoices(order.map((x) => ({ id: x, label: '' })), [], currentRef, mediaSlots?.promptRefs)[at].mention, attach: true, saved: true }];
+      });
+    return [...images, ...made, ...saved, ...favorites];
   }, [liveAttachments, assets, subjects, currentRef, mediaSlots, mode, generations, sessionId, spaceId]);
   const mentions = useReferenceMentions(taRef, text, value => setComposer({ text: value }), mentionChoices, useAsReference);
   const lastCount = useRef(imageCount);

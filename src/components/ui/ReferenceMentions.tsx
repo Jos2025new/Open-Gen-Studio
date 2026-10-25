@@ -4,8 +4,10 @@ import type { Asset, Generation, PlanStep, PlanSubject, Subject } from '../../en
 import { AssetMedia } from './AssetMedia';
 import { Popover } from './Popover';
 
-/** `attach`: an image of the space not attached yet; picking it attaches it, and `mention` is the number it gets. */
-export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string; attach?: boolean }
+/** `attach`: not attached yet; picking it attaches it, and `mention` is the number it gets.
+ * `saved`: a saved character or favorite, listed under «+ More» (or when searching). */
+export interface ReferenceChoice { id: string; label: string; mention: string; assetId?: string; attach?: boolean; saved?: boolean }
+const MORE: ReferenceChoice = { id: 'more', label: '+ More', mention: 'Saved characters and favorites' };
 export function referenceChoices(images: Array<{ id: string; label: string; assetId?: string }>, subjects: Subject[], modelId = '', promptRefs?: string): ReferenceChoice[] {
   const style = refMentionStyle(modelId, promptRefs);
   return [
@@ -46,11 +48,15 @@ export function useReferenceMentions(
   const id = useId();
   const [query, setQuery] = useState<{ start: number; end: number; text: string; value: string } | null>(null);
   const [active, setActive] = useState(0);
+  const [more, setMore] = useState(false);
   const dismissed = useRef<{ value: string; end: number } | null>(null);
-  const matches = query?.value === value ? choices.filter(c => `${c.label} ${c.mention}`.toLowerCase().includes(query.text.toLowerCase())) : [];
+  // Saved things wait behind «+ More» until asked for or searched.
+  const pool = more || query?.text ? choices : choices.filter(c => !c.saved);
+  const found = query?.value === value ? pool.filter(c => `${c.label} ${c.mention}`.toLowerCase().includes(query.text.toLowerCase())) : [];
+  const matches = query?.value === value && !more && !query.text && choices.some(c => c.saved) ? [...found, MORE] : found;
   const open = Boolean(query && query.value === value && matches.length);
   const index = Math.min(active, Math.max(0, matches.length - 1));
-  const close = () => { dismissed.current = ref.current ? { value: ref.current.value, end: ref.current.selectionStart ?? 0 } : null; setQuery(null); };
+  const close = () => { setMore(false); dismissed.current = ref.current ? { value: ref.current.value, end: ref.current.selectionStart ?? 0 } : null; setQuery(null); };
   const sync = (field: HTMLInputElement | HTMLTextAreaElement) => {
     const end = field.selectionStart ?? field.value.length;
     if (dismissed.current?.value === field.value && dismissed.current.end === end) return;
@@ -63,6 +69,7 @@ export function useReferenceMentions(
   };
   const insert = (choice: ReferenceChoice) => {
     if (!query || query.value !== value) return;
+    if (choice === MORE) { setMore(true); setActive(0); return; }
     const suffix = value.slice(query.end);
     if (choice.attach && choice.assetId) onAttach?.(choice.assetId);
     const token = choice.mention + (/^\s/.test(suffix) ? '' : ' ');

@@ -117,4 +117,24 @@ describe('reference autocomplete in the existing prompt field', () => {
     expect(onAttach).toHaveBeenCalledWith('x');
     expect(input.value).toBe('Use @Image1 ');
   });
+  it('keeps saved characters and favorites behind «+ More», and finds them when searching', async () => {
+    const list: ReferenceChoice[] = [
+      { id: 'made:x', assetId: 'x', label: 'Sheet', mention: '@Image1', attach: true },
+      { id: 'subject:ana', label: 'Ana', mention: '@Ana', saved: true },
+      { id: 'fav:v', assetId: 'v', label: 'Walk cycle', mention: '@Video1', attach: true, saved: true },
+    ];
+    const input = await mount('Use @', list);
+    const labels = () => [...document.querySelectorAll('[role=option]')].map((o) => o.textContent);
+    expect(labels()).toHaveLength(2);
+    expect(labels()[1]).toContain('+ More');
+    await key(input, 'ArrowDown'); await key(input, 'Enter');
+    expect(input.value).toBe('Use @');
+    expect(labels()).toHaveLength(3);
+    await key(input, 'Escape');
+    const found = await mount('Use @walk', list);
+    found.setSelectionRange(9, 9);
+    await act(async () => { found.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); });
+    expect(labels().join()).toContain('Walk cycle');
+  });
 });
+

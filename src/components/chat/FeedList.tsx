@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from 'react';
-import { CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
+import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
 import { askForPlan, deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { copyText } from '../../engine/actions';
@@ -211,11 +211,7 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
       ) : null}
       {(studio ? studioRuns(feed) : feed).map((row) =>
         Array.isArray(row) ? (
-          <div key={row[0].id} className="feed-gen-run">
-            <div className="feed-gen-grid">
-              {row.map((item) => <FeedItemView key={item.id} item={item} sessionId={sessionId} compact={compact} studio={studio} />)}
-            </div>
-          </div>
+          <StudioRun key={row[0].id} items={row} />
         ) : (
           <FeedItemView key={row.id} item={row} sessionId={sessionId} compact={compact} studio={studio} />
         ),
@@ -228,6 +224,26 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
       ) : null}
     </div>
   );
+}
+
+/** A run of results, three to a row; each row folds as a whole. */
+function StudioRun({ items }: { items: FeedItem[] }) {
+  const rows = Array.from({ length: Math.ceil(items.length / 3) }, (_, i) => items.slice(i * 3, i * 3 + 3));
+  return <div className="feed-gen-run">{rows.map((row) => <StudioRunRow key={row[0].id} items={row} />)}</div>;
+}
+
+function StudioRunRow({ items }: { items: FeedItem[] }) {
+  const [open, setOpen] = useState(true);
+  const files = useStore((s) => items.reduce((n, item) => n + (item.type === 'generation' ? s.generations[item.generationId]?.assetIds.length ?? 0 : 0), 0));
+  return <div className="feed-gen-row">
+    <button type="button" className="studio-gen-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+      Created {files} file{files === 1 ? '' : 's'}
+      <ChevronDown size={13} className={open ? '' : 'is-closed'} />
+    </button>
+    {open ? <div className="feed-gen-grid">
+      {items.map((item) => item.type === 'generation' ? <StudioGeneration key={item.id} generationId={item.generationId} grouped fallback={<GenerationCard generationId={item.generationId} initialOutputIndex={item.outputIndex} mirroredFrom={item.mirroredFrom} />} /> : null)}
+    </div> : null}
+  </div>;
 }
 
 /** Studio's chat lays consecutive results side by side: each run of two or more generations becomes one row group. */

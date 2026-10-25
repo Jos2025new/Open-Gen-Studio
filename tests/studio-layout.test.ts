@@ -337,6 +337,15 @@ describe('pick mode: several, and single-select actions', () => {
   });
 });
 
+describe('a result inside a row of results', () => {
+  it('has no fold of its own: the row folds as a whole', () => {
+    setData([gen('g1', 'done', ['a1'])]);
+    render(createElement(StudioGeneration, { generationId: 'g1', fallback: createElement('div'), grouped: true }));
+    expect(q('.studio-gen-head')).toBeNull();
+    expect(host.querySelectorAll('.studio-thumb')).toHaveLength(1);
+  });
+});
+
 describe('compact generation in Studio chat', () => {
   const fallback = createElement('div', { className: 'full-card' }, 'card');
   it('shows "Created N files" and small thumbnails that open the viewer; the line folds', () => {

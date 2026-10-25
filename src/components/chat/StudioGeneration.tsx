@@ -32,7 +32,8 @@ function showOngoing() {
 type PickKind = 'fav' | 'dl' | 'info' | 'copy' | 'reuse';
 const SINGLE: PickKind[] = ['info', 'copy', 'reuse'];
 
-export function StudioGeneration({ generationId, fallback }: { generationId: string; fallback: ReactNode }) {
+/** `grouped`: one of a row of results that folds as a whole, so it shows no fold of its own. */
+export function StudioGeneration({ generationId, fallback, grouped }: { generationId: string; fallback: ReactNode; grouped?: boolean }) {
   const g = useStore((s) => s.generations[generationId]);
   const [open, setOpen] = useState(true);
   const regen = usePopover();
@@ -72,11 +73,11 @@ export function StudioGeneration({ generationId, fallback }: { generationId: str
     {busy ? <div className="studio-gen-row"><div className="studio-thumb is-pending" role="status" tabIndex={0} aria-label="Show in Ongoing" onClick={showOngoing} onKeyDown={(e) => { if (e.key === 'Enter') showOngoing(); }}><KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <div className="studio-pending-text is-quiet"><span>Ongoing</span></div>
       </div></div> : <>
-    <button type="button" className="studio-gen-head" aria-expanded={open} onClick={() => setOpen(!open)}>
+    {grouped ? null : <button type="button" className="studio-gen-head" aria-expanded={open} onClick={() => setOpen(!open)}>
       Created {outputs.length} file{outputs.length === 1 ? '' : 's'}
       <ChevronDown size={13} className={open ? '' : 'is-closed'} />
-    </button>
-    {open ? <div className="studio-gen-row">
+    </button>}
+    {open || grouped ? <div className="studio-gen-row">
       {outputs.map((id, i) => <div key={id} className="attach-host"><button type="button" className="studio-thumb" aria-label={g.kind === 'video' ? 'Open video' : 'Open image'} onClick={() => pick ? toggleId(id) : openViewer(id, i)}>
         <KindBackdrop kind={g.kind === 'video' ? 'video' : 'image'} />
         <AssetMedia assetId={id} hoverPlay={false} autoPlay={false} draggable={false} />

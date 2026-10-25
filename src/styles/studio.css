@@ -16,13 +16,12 @@
 
 /* Generations in Studio's chat: small inline results, not cards. */
 .studio-gen { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
-/* Consecutive results sit three to a row at their usual size; a narrow chat drops to two, then one. */
-.feed-gen-run { container-type: inline-size; }
-.feed-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: 22px var(--sp-3); align-items: start; }
+/* Consecutive results sit three to a row at their usual size (narrower when the chat is); each row folds as a whole. */
+.feed-gen-run { display: flex; flex-direction: column; gap: 22px; }
+.feed-gen-row { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
+.feed-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: var(--sp-3); align-items: start; width: 100%; }
 .feed-gen-grid > .studio-gen { min-width: 0; }
 .feed-gen-grid .studio-thumb, .feed-gen-grid .studio-gen-row > .attach-host { width: 100%; }
-@container (max-width: 420px) { .feed-gen-grid { grid-template-columns: repeat(2, minmax(0, 200px)); } }
-@container (max-width: 220px) { .feed-gen-grid { grid-template-columns: minmax(0, 1fr); } }
 .studio-gen-head { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-s); color: var(--text-3); }
 .studio-gen-head:hover { color: var(--text); }
 .studio-gen-head svg.is-closed { transform: rotate(-90deg); }
