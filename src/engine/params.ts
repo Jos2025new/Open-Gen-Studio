@@ -126,10 +126,7 @@ export function aspectLabel(value: string | number | undefined): string {
 const PIXEL_SIZE = /^(\d+)\s*[x×*]\s*(\d+)$/i;
 const COMMON_RATIOS: Array<[number, number]> = [[1, 1], [4, 3], [3, 4], [3, 2], [2, 3], [16, 9], [9, 16], [21, 9], [9, 21], [5, 4], [4, 5], [2, 1], [1, 2]];
 
-/**
- * A size list given as exact pixels (Seedream: "2048x2048", "2368x1776"…), split into the two choices people make:
- * a size tier (1K, 1.5K, 2K…, by area) and a ratio. `pick` maps a choice back to the exact option.
- */
+/** Split exact pixel sizes into provider options grouped by area tier and ratio. */
 export function pixelSizes(options: Array<string | number> | undefined): {
   tiers: string[];
   ratios: string[];
@@ -937,7 +934,6 @@ function castOption(p: ParamDef, value: string): string | number {
   return value;
 }
 
-// ---------------------------------------------------------------------------
 // Video inputs
 
 /**
@@ -972,10 +968,13 @@ export function audioInputProblem(slots: InputSlots, audios: number): string | n
   return null;
 }
 
-/** Why a video model cannot take these routed inputs, or null. Sentence without subject ("needs …"). */
+/** Why these video inputs are unsupported, or null. */
 export function videoInputProblem(slots: InputSlots, n: { firstFrame: boolean; lastFrame: boolean; sourceVideo: boolean; images: number; videos: number; audios?: number; resolution?: string }): string | null {
   const rules = slots.frameRules;
-  if (rules?.refsWithLast === false && n.lastFrame && n.images + n.videos > 0) return 'cannot combine reference images or videos with a last frame.';
+  const refAudios = slots.mixedRefs ? n.audios ?? 0 : slots.refAudios ? Math.max(0, (n.audios ?? 0) - (slots.audio ? 1 : 0)) : 0;
+  const references = n.images + n.videos + refAudios;
+  if (rules?.refsWithFirst === false && n.firstFrame && references) return 'cannot combine reference media with a start frame.';
+  if (rules?.refsWithLast === false && n.lastFrame && references) return 'cannot combine reference media with a last frame.';
   if (rules?.sourceWithLast === false && n.sourceVideo && n.lastFrame) return 'cannot combine a source video with a last frame.';
   if (rules?.lastNeedsFirst && n.lastFrame && !n.firstFrame) return 'needs a start image when using a last frame.';
   if (rules?.firstFrameResolutions && n.firstFrame && n.resolution && !rules.firstFrameResolutions.includes(n.resolution)) return `does not support ${n.resolution} with a start image.`;
