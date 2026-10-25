@@ -272,11 +272,6 @@ const urlOnly = (def: { description?: string } | undefined) => Boolean(def?.desc
 function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
   const defs = raw.supported_parameters?.parameters ?? {};
   const params = catalogParams(defs, /trajectory|keyframe|script|story|voice|character|lora/i).filter((p) => p.role === 'negative' || p.type !== 'string');
-  // NanoGPT's H3 Max resolution control is for LoRA, editing, and extension: https://nano-gpt.com/api/v1/video-models?detailed=true
-  if (/^minimax\/h3-max(?:\/|$)/.test(raw.id)) {
-    const resolution = params.find((p) => p.key === 'resolution');
-    if (resolution && !resolution.description) resolution.description = 'For LoRA, video editing, and extension operations.';
-  }
   if (!params.some((p) => p.role === 'audio') && raw.capabilities?.audio_generation) {
     params.push({ key: 'generateAudio', label: 'Audio', role: 'audio', type: 'boolean', default: false });
   }

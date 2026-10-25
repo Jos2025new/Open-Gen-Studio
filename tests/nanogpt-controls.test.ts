@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import nanoCatalog from './fixtures/live/nanogpt.json';
 import { nanogpt } from '../src/engine/providers/nanogpt';
 import type { GenRequest } from '../src/engine/providers/types';
 import type { ModelSchema, ModelSummary } from '../src/engine/types';
@@ -50,10 +51,16 @@ describe('NanoGPT catalog controls', () => {
     expect(sent?.aspect_ratio).toBe('adaptive');
   });
 
-  it('clarifies that H3 Max resolution applies to LoRA, editing, and extension', async () => {
-    const models = await listed([], [videoModel('minimax/h3-max', { resolution: { type: 'select', label: 'Resolution', options: [{ value: '480p' }, { value: '768p' }, { value: '1080p' }] } })]);
-    const schema = await nanogpt.loadSchema(models.find((m) => m.id === 'minimax/h3-max')!, undefined);
-    expect(schema.params.find((p) => p.key === 'resolution')?.description).toMatch(/LoRA.*editing.*extension/i);
+  it('preserves the real catalog label and scope for MiniMax H3 LoRA/edit/extend resolution', async () => {
+    const modelEntry = nanoCatalog.video.find((m) => m.id === 'minimax-h3')!;
+    const models = await listed([], [modelEntry]);
+    const schema = await nanogpt.loadSchema(models.find((m) => m.id === 'minimax-h3')!, undefined);
+    expect(schema.params.find((p) => p.key === 'resolution')).toMatchObject({
+      label: 'LoRA / Edit / Extend Resolution',
+      description: 'LoRA generation supports all listed resolutions; edit/extend support 480p and 768p. Generation without LoRAs remains 2K.',
+    });
   });
+
+
 
 });
