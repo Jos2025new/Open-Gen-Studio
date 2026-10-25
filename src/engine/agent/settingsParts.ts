@@ -46,7 +46,10 @@ export async function sectionsOfParts(sessionId: string, parts: SettingsPart[], 
 /** Auto confirms these sections itself: what the agent reads (values, guide), plus a line for a resolution the model lacks. */
 export async function autoAnswer(sessionId: string, workspace: Workspace, toolCallId: string, summary: string | undefined, sections: SettingsSection[], parts: SettingsPart[]): Promise<string> {
   const request = offerRequest(useStore.getState().sessions[sessionId].agent);
-  return await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts) + sections.map((x) => resolutionNote(x.recommended.modelRef, request)).join('');
+  const text = await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts);
+  // The note reads the model the app chose (a composer pick may replace the recommended one), never the one it replaced.
+  const chosen = useStore.getState().sessions[sessionId].agent.settings;
+  return text + sections.map((x) => resolutionNote(chosen?.[x.kind as 'image' | 'video']?.modelRef ?? x.recommended.modelRef, request)).join('');
 }
 
 /**

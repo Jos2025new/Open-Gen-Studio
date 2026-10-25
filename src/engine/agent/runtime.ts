@@ -1284,6 +1284,8 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
   let lastBlock: string | undefined;
+  // Auto confirming the settings itself is the app's step, not the agent's: once per turn it gives the round back.
+  let settled = false;
   let hurryNoted = false;
   let transferredToDesigner = false;
   // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
@@ -1748,6 +1750,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
             const auto = get().composer.agentStyle === 'auto';
             if (!auto) recordMetric(sessionId, { type: 'rejected' });
+            else if (!settled) { settled = true; iteration--; }
             respond(auto ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!);
             continue;
           }

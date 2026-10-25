@@ -182,6 +182,14 @@ describe('Auto: a plan sent before any settings makes the app confirm them (item
     expect((plans()[0].plan.steps[0] as { prompt: string }).prompt).toContain('dolly');
   });
 
+  it('the app confirming settings gives the round back: guides read, two invalid plans and the settings step still end in a plan card (2026-10-24 sandbox)', async () => {
+    const guide = { name: 'read_guide', args: { id: 'model:seedance', ready: true } };
+    const long = videoPlan('x'.repeat(4001));
+    await drive([guide, guide, long, videoPlan(), long, videoPlan('a runner at dawn, slow dolly'), 'listo'], 'Un video de un corredor en la playa');
+    expect(plans()).toHaveLength(1);
+    expect(feedOf().some((f) => f.type === 'notice')).toBe(false);
+  });
+
   it('Guided keeps its gate: no inline item, the old message', async () => {
     const q = { name: 'ask_questions', args: { questions: [{ id: 'q1', question: '¿Cómo?', options: ['a', 'b'] }] } };
     const replies: Reply[] = [q];
