@@ -75,10 +75,18 @@ export function opRefList(opId: string, ids: string[], roles: RoleRef[]): { refs
   return { refs, problems };
 }
 
-/** Refs written as { ref, role } become plain ids on the raw steps; returns the roles per step id. */
-export function normalizeStepRefs(steps: Array<{ id?: string; refs?: RefSpec[] }>, errors: string[]): Map<string, RoleRef[]> {
+/** The user's attached images first, in attachment order (their @Image1, @Image2…), then the refs the plan adds, in its order. */
+export function userRefsFirst<T extends string | { ref: string }>(refs: T[], attached: string[]): T[] {
+  const rank = (r: T) => attached.indexOf(`${typeof r === 'string' ? r : r.ref}`.replace(/^asset:/, ''));
+  const mine = refs.filter((r) => rank(r) >= 0).sort((a, b) => rank(a) - rank(b));
+  return mine.length ? [...mine, ...refs.filter((r) => rank(r) < 0)] : refs;
+}
+
+/** Refs written as { ref, role } become plain ids on the raw steps (media steps list the user's attached images first); returns the roles per step id. */
+export function normalizeStepRefs(steps: Array<{ id?: string; kind?: string; refs?: RefSpec[] }>, errors: string[], attached: string[] = []): Map<string, RoleRef[]> {
   const byStep = new Map<string, RoleRef[]>();
   for (const s of steps) {
+    if (s.refs?.length && s.kind !== 'op' && attached.length) s.refs = userRefsFirst(s.refs, attached);
     if (!s.refs?.some((r) => typeof r !== 'string')) continue;
     const { ids, roles, problems } = splitRefs(s.refs);
     errors.push(...problems.map((m) => `Step ${s.id}: ${m}`));

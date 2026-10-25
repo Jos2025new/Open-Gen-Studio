@@ -377,11 +377,11 @@ function cleanParams(p: Record<string, unknown> | undefined): Record<string, Adv
 export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: string): Promise<{ plan: Plan | null; errors: string[] }> {
   const errors: string[] = [];
   const adjustments: string[] = [...(raw.carried ?? [])];
-  // The fit across steps (fit.ts): "múltiples ángulos" asked, or three angle steps in Direct; views as angles asked.
+  // Fit across steps (fit.ts): "múltiples ángulos" asked, or three angle steps in Direct; views as angles asked.
   const fit = fitState(Boolean(ctx.direct?.()), ctx.canAsk?.() ?? true, ctx.answered?.() ?? false);
   const planFit = fitPlanSteps(Array.isArray(raw.steps) ? raw.steps : [], ctx.requestText?.() ?? '', fit);
   const rawSteps = planFit.steps;
-  const stepRoles = normalizeStepRefs(rawSteps, errors);
+  const stepRoles = normalizeStepRefs(rawSteps, errors, ctx.requestImages?.());
   errors.push(...planFit.errors);
   adjustments.push(...planFit.adjustments);
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
