@@ -11,6 +11,14 @@ export function optionParts(o: string): { label: string; detail?: string } {
   const i = o.indexOf(': ');
   return i > 0 && i <= 40 ? { label: o.slice(0, i), detail: o.slice(i + 2) } : { label: o };
 }
+/** The agent's intro: its last question reads as the card's title; what comes before is a quiet context line. */
+export function introParts(text: string): { title?: string; context?: string } {
+  const sentences = text.trim().split(/(?<=[.!?])\s+/);
+  const last = sentences.at(-1) ?? '';
+  if (!last.endsWith('?') || last.length > 120) return { context: text.trim() };
+  const context = sentences.slice(0, -1).join(' ').trim();
+  return { title: last, ...(context ? { context } : {}) };
+}
 /** Long options go one per row, aligned, instead of chips of uneven width. */
 const LONG_OPTION = 28;
 
@@ -33,6 +41,8 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
     })),
   );
   const pending = item.status === 'pending';
+  // "Another answer" is a quiet link until used; a reopened card with the user's own words shows the field.
+  const [typing, setTyping] = useState<Record<string, boolean>>({});
 
   if (!pending) {
     return (
@@ -74,9 +84,17 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
   const answered = Object.keys(final()).length;
 
   return (
-    <article className="q-card">
+    <article className="q-card q-ask">
       {item.maxRounds > 1 ? <div className="q-kicker">{`Round ${item.round} of ${item.maxRounds}`}</div> : null}
-      {item.intro ? <ClampText className="q-intro">{item.intro}</ClampText> : null}
+      {item.intro ? (() => {
+        const { title, context } = introParts(item.intro);
+        return (
+          <header className="q-head">
+            {title ? <h3 className="q-title">{title}</h3> : null}
+            {context ? <ClampText className="q-intro">{context}</ClampText> : null}
+          </header>
+        );
+      })() : null}
       {item.questions.map((q) => (
         <div key={q.id} className="q-block">
           <div className="q-question">{q.question}</div>
@@ -95,10 +113,13 @@ export function QuestionsCard({ item, sessionId }: { item: QuestionsFeedItem; se
               );
             })}
           </div>
-          {q.allowCustom ? (
+          {q.allowCustom && !typing[q.id] && !custom[q.id] ? (
+            <button type="button" className="q-other" onClick={() => setTyping((t) => ({ ...t, [q.id]: true }))}>Otra respuesta…</button>
+          ) : q.allowCustom ? (
             <input
+              autoFocus={typing[q.id]}
               className="q-custom"
-              placeholder="Or type your own…"
+              placeholder="Escribe tu respuesta…"
               value={custom[q.id] ?? ''}
               onChange={(e) => {
                 const v = e.target.value;

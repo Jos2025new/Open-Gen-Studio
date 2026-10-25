@@ -169,3 +169,16 @@
 .q-opt.is-on .q-opt-detail { color: inherit; opacity: 0.75; }
 .q-options.is-list { flex-direction: column; align-items: stretch; }
 .q-options.is-list .q-opt { display: flex; align-items: center; gap: 8px; text-align: left; min-width: 0; }
+
+/* Questions card (2026-10-25, second before/after): a title, flat option rows, one strong colour (Continue). */
+.q-ask .q-head { margin-bottom: 4px; }
+.q-ask .q-title { margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.35; color: var(--text); }
+.q-ask .q-options.is-list { gap: 2px; }
+.q-ask .q-options.is-list .q-opt { border: 0; border-radius: 10px; padding: 8px 10px; background: transparent; color: var(--text-2); }
+.q-ask .q-options.is-list .q-opt:hover { background: var(--surface-3); color: var(--text); }
+.q-ask .q-options.is-list .q-opt.is-on { background: var(--surface-3); color: var(--text); }
+.q-ask .q-options.is-list .q-opt.is-on > svg { color: var(--select-on); }
+.q-ask .q-options.is-list .q-opt.is-on .q-opt-detail { color: var(--text-3); opacity: 1; }
+.q-ask .q-options.is-list .q-opt:not(.is-on) { padding-left: 30px; }
+.q-ask .q-other { margin-top: 6px; padding: 2px 10px; font-size: 12px; color: var(--text-3); }
+.q-ask .q-other:hover { color: var(--text); }
