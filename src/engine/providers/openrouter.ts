@@ -7,19 +7,9 @@ import { encodeImage, extractOutputs, JSON_HEADERS, numberOrUndefined } from './
 import type { GenRequest, GenResult, ProviderAdapter, ResumeContext } from './types';
 import { modelRef } from './types';
 
+
 const BASE = 'https://openrouter.ai/api/v1';
 const DAY = 24 * 3600 * 1000;
-
-interface RangeParam {
-  type: 'range';
-  min: number | null;
-  max: number | null;
-}
-interface EnumParam {
-  type: 'enum';
-  values: string[];
-}
-type SupportedParam = RangeParam | EnumParam;
 
 interface OrImageModel {
   id: string;
@@ -41,6 +31,7 @@ interface OrVideoModel {
   seed: boolean | null;
   pricing_skus?: Record<string, string> | null;
 }
+
 
 const imageRaw = new Map<string, OrImageModel>();
 const videoRaw = new Map<string, OrVideoModel>();
@@ -209,7 +200,8 @@ export const openrouter: ProviderAdapter = {
         name: m.name.replace(/^[^:]+:\s*/, ''),
         kind: 'video',
         acceptsText: true,
-        acceptsImage: Boolean(m.supported_frame_images?.includes('first_frame')),
+        // OpenRouter video catalog describes reference modes in prose; first_frame is a separate input path.
+        acceptsImage: Boolean(m.supported_frame_images?.includes('first_frame') || /reference-to-video|reference-based|reference-guided/i.test(m.description ?? '')),
         tags: [],
         description: m.description,
         price: parseOrVideoPricing(m.pricing_skus),
@@ -264,14 +256,20 @@ export const openrouter: ProviderAdapter = {
     if (raw.generate_audio) params.push({ key: 'generate_audio', label: 'Audio', role: 'audio', type: 'boolean', default: true });
     if (raw.seed) params.push({ key: 'seed', label: 'Seed', role: 'seed', type: 'integer' });
     const frames = raw.supported_frame_images ?? [];
+    const referenceMode = /reference-to-video|reference-based|reference-guided/i.test(raw.description ?? '');
+    const mini = raw.id === 'bytedance/seedance-2.0-mini';
     return {
       ref: model.ref,
       params,
       slots: {
         prompt: 'prompt',
         promptRequired: !frames.length,
+        promptRefs: mini ? '@Image1, @Video1, @Audio1… in input_references order' : undefined,
         firstFrame: frames.includes('first_frame') ? { key: 'frame_images', format: 'content-part' } : undefined,
         lastFrame: frames.includes('last_frame') ? { key: 'frame_images', format: 'content-part' } : undefined,
+        // Reference-mode wording follows https://openrouter.ai/api/v1/videos/models; body form follows https://openrouter.ai/docs/cookbook/video-generation/reference-to-video
+        images: referenceMode ? { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, multiple: true, format: 'content-part' } : undefined,
+        frameRules: referenceMode ? { refsWithFirst: false, refsWithLast: false } : undefined,
       },
       price: model.price ?? parseOrVideoPricing(raw.pricing_skus),
       source: 'catalog',
@@ -310,6 +308,10 @@ export const openrouter: ProviderAdapter = {
       frames.push({ ...((await encodeImage(req.lastFrame, 'content-part')) as object), frame_type: 'last_frame' });
     }
     if (frames.length) body.frame_images = frames;
+    // POST /videos input_references: https://openrouter.ai/docs/api/api-reference/video-generation/create-videos
+    if (schema.slots.images && req.refs.length) {
+      body.input_references = await Promise.all(req.refs.slice(0, schema.slots.images.max).map((r) => encodeImage(r, 'content-part')));
+    }
     req.onStatus('Submitting');
     req.onRequest?.({ url: `${BASE}/videos`, body });
     const submit = await requestJson<{ id: string; polling_url?: string; status: string }>(`${BASE}/videos`, {
@@ -318,7 +320,8 @@ export const openrouter: ProviderAdapter = {
       body: JSON.stringify(body),
       signal: req.signal,
     });
-    const job: RemoteJob = { provider: 'openrouter', id: submit.id, meta: { polling_url: submit.polling_url ?? `${BASE}/videos/${submit.id}` } };
+    // polling_url may be relative; resolution matches the cookbook's status polling example.
+    const job: RemoteJob = { provider: 'openrouter', id: submit.id, meta: { polling_url: submit.polling_url ? new URL(submit.polling_url, 'https://openrouter.ai').href : `${BASE}/videos/${submit.id}` } };
     req.onRemoteJob(job);
     return pollVideo(job, { kind: 'video', apiKey: req.apiKey, signal: req.signal, onStatus: req.onStatus });
   },

@@ -89,6 +89,11 @@ export interface ReferenceProtocol {
 
 export const REFERENCE_PROTOCOLS: ReferenceProtocol[] = [
   {
+    family: 'OpenRouter Seedance 2.0 Mini',
+    note: 'Use @Image1, @Image2… for the selected images, @Video1… for videos, and @Audio1… for audio. For a storyboard grid, the numbered storyboard sets shot order and framing; character references set identity. State each reference role and what it must not contribute; do not re-describe its appearance.',
+    source: 'User decision D2/D3 in docs/plan-proveedores-2026-10-25.md; OpenRouter video catalog description for bytedance/seedance-2.0-mini (multimodal reference-to-video with image, video, and audio inputs); guides/seedance.md',
+  },
+  {
     family: 'Gemini Omni Flash',
     note: '<IMAGE_REF_0>, <IMAGE_REF_1>… counted from zero; cite the image instead of describing it.',
     source: 'Atlas schema gemini-omni-1.1-flash/video-edit ("<IMAGE_REF_N> is the Nth entry in reference_images (0-based)")',
