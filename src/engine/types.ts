@@ -1,4 +1,4 @@
-/* Domain model shared by the store, engine, agent and UI. */
+/* Shared store, engine, agent and UI types. */
 
 import type { SentRequest } from '../lib/debug';
 import type { Mode, Place } from './placeTypes';
@@ -7,9 +7,9 @@ import type { FxLayer } from './fx/types';
 
 export type Workspace = 'chat' | 'node' | 'designer';
 export type ComposerMode = 'agent' | 'image' | 'video' | 'audio' | 'model3d';
-/** Agent mode: auto (a card only when something is missing), guided (asks), direct (no card). */
+/** auto (card if missing), guided (asks), direct (no card). */
 export type AgentStyle = 'auto' | 'guided' | 'direct';
-/** Every generated media type is also a persistable asset type. */
+/** Generated media types are persistable assets. */
 export type MediaKind = 'image' | 'video' | 'audio' | 'model3d';
 export type AssetKind = MediaKind;
 
@@ -55,8 +55,9 @@ export interface InputSlots {
   promptMax?: number;
   /** How the prompt cites references ("@Image1", "<IMAGE_0>"…), from the provider's schema. */
   promptRefs?: string;
-  /** Reference / source images. */
+  /** Reference or source images. */
   images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
+  frameRules?: { refsWithFirst?: boolean; refsWithLast?: boolean; sourceWithLast?: boolean; lastNeedsFirst?: boolean; firstFrameResolutions?: string[] };
   /** Models with a source image and a separate reference list (Ideogram Character remix). */
   source?: { key: string; format: ImageInputFormat };
   /** `required`: the model cannot run without it (talking avatars, lip-sync). */
@@ -74,7 +75,7 @@ export interface InputSlots {
   audio?: { key: string; required: boolean; format: ImageInputFormat };
   /** Reference audio list (`reference_audios`, `audio_urls`, `reference_audio_urls`). */
   refAudios?: { key: string; max: number; min: number; format: ImageInputFormat };
-  /** Reusable subjects (Kling elements), mentioned in the prompt as @Name and sent as the provider's element list. */
+  /** Reusable subjects mentioned as @Name and sent as provider elements. */
   elements?: {
     key: string;
     max: number;
