@@ -56,7 +56,7 @@ function UserMessage({ item, sessionId, tag }: { item: Extract<FeedItem, { type:
     return feed.length - 1 - feed.findIndex((f) => f.id === item.id);
   });
   const current = useStore((s) => s.ui.workspace);
-  // Studio's chat drives the board's Nodes or Designer: a message written there for them is still editable here (2026-10-24).
+  // A message written in Studio's chat stays editable there, whatever the board shows (2026-10-24).
   const editable = item.workspace === current || current === 'chat';
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.text);
@@ -191,7 +191,7 @@ export function FeedList({ sessionId, compact, studio }: { sessionId: string; co
   const all = useStore((s) => s.sessions[sessionId]?.feed ?? EMPTY);
   const canvas = useStore((s) => s.ui.workspace);
   const [everywhere, setEverywhere] = useState(false);
-  // Studio's chat also shows the canvas its board is showing (the agent works there while it does).
+  // Studio's chat shows every canvas's messages; the board only views a canvas and does not change where the agent works.
   const board = useStudioBoard();
   const shown: string[] = studio ? studioCanvases(board) : [canvas];
   const shownKey = shown.join();

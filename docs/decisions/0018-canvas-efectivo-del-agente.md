@@ -1,5 +1,7 @@
 # 0018 — Canvas efectivo del agente y la herramienta open_board
 
+> **Estado: reemplazada en parte (2026-10-24).** El tablero ya no fija el canvas del agente: un turno enviado desde Studio empieza en Chat; `open_board` y `continue_in_*` lo cambian solo para ese turno, y las filas de Studio son siempre de chat. Ver [studio.md](../features/studio.md).
+
 ## Estado
 
 Aceptado

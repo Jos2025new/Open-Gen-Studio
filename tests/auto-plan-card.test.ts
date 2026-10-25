@@ -14,6 +14,7 @@ vi.mock('../src/lib/idb', () => ({
 }));
 
 import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { confirmSettingsSchema } from '../src/engine/agent/tools';
 import { changePlanChoice, changePlanDraft, planSections, rewritePrompts, usePlanRewrite } from '../src/engine/agent/planSettings';
 import { useStore } from '../src/store/store';
 import type { FeedItem, ImageStep, ModelSchema, ModelSummary, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
@@ -176,5 +177,14 @@ describe('Auto: which model and values, without a card (sandbox session 2026-10-
     script = [ask({ model: ATLAS }), proposal(ATLAS)];
     await sendAgentMessage('Una imagen de un faro con nano banana 2');
     expect(settingsItems()[0].sections[0].chosen?.modelRef).toBe(ATLAS);
+  });
+});
+
+describe('confirm_settings numbers as text', () => {
+  it('a numeric string duration is accepted as a number', () => {
+    const r = confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', duration: '8' }] });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.parts[0].duration).toBe(8);
+    expect(confirmSettingsSchema.safeParse({ parts: [{ kind: 'video', duration: '121' }] }).success).toBe(false);
   });
 });

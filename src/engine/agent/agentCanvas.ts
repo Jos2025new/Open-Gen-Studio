@@ -45,7 +45,7 @@ export const OPEN_BOARD_TOOL = {
   function: {
     name: 'open_board',
     description:
-      'Studio (the chat) only. Sets what the board beside the chat shows: "assets" (Generations), "nodes" (the node canvas), "designer" (the Designer: layers on a stage) or "closed". While the board shows Nodes or the Designer, that canvas is your canvas: its tools (read_graph, edit_node…; view_canvas, designer_fx, layer plan steps…) work on it, in this same turn. Opens or switches the view only; nothing runs and nothing is charged. Call it before node or Designer work when the user is in Studio and the board does not show that canvas.',
+      'Studio (the chat) only. Sets what the board beside the chat shows: "assets" (Generations), "nodes" (the node canvas), "designer" (the Designer: layers on a stage) or "closed". After open_board with Nodes or the Designer, that canvas is your canvas for this turn: its tools (read_graph, edit_node…; view_canvas, designer_fx, layer plan steps…) work on it. Opens or switches the view only; nothing runs and nothing is charged. Call it before node or Designer work in Studio, whatever the board shows.',
     parameters: { type: 'object', properties: { view: { type: 'string', enum: ['assets', 'nodes', 'designer', 'closed'] } }, required: ['view'] },
   },
 };

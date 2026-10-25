@@ -72,7 +72,7 @@ describe('effective agent canvas', () => {
 });
 
 describe('continue_in_chat with a Studio board left on Nodes', () => {
-  it('the board goes back to Generations so the agent canvas is the chat in the same turn', async () => {
+  it('from the node workspace, continue_in_chat returns to chat and the board goes back to Generations, so the agent canvas is chat', async () => {
     goLive('node');
     setStudioBoard({ open: true, view: 'nodes' });
     script([{ name: 'continue_in_chat', args: {} }]);
@@ -84,7 +84,7 @@ describe('continue_in_chat with a Studio board left on Nodes', () => {
 });
 
 describe('continue_in_canvas / continue_in_designer from Studio', () => {
-  it('nodes: the workspace stays chat, the board opens on Nodes and the agent canvas is node', async () => {
+  it('nodes: the workspace stays chat, the board opens on Nodes and the agent canvas stays chat', async () => {
     goLive('chat');
     setStudioBoard({ open: false, view: 'assets' });
     script([{ name: 'continue_in_canvas', args: {} }]);
@@ -93,7 +93,7 @@ describe('continue_in_canvas / continue_in_designer from Studio', () => {
     expect(getStudioBoard()).toMatchObject({ open: true, view: 'nodes' });
     expect(agentCanvas()).toBe('chat');
   });
-  it('designer: same, on the Designer tab', async () => {
+  it('designer: same, on the Designer tab, and the agent canvas stays chat', async () => {
     goLive('chat');
     setStudioBoard({ open: false, view: 'assets' });
     expect(moveToCanvas('designer')).toBe('designer');
@@ -173,6 +173,20 @@ describe('open_board', () => {
 });
 
 describe('Studio is independent of its board (2026-10-24)', () => {
+  it('editing a message tagged node in Studio leaves the board unchanged', async () => {
+    goLive('node');
+    script([]);
+    await sendAgentMessage('uno');
+    goLive('chat');
+    setStudioBoard({ open: true, view: 'assets' });
+    const msg = session().feed.find((f) => f.type === 'user' && f.text === 'uno')!;
+    expect(msg.workspace).toBe('node');
+    const { editUserMessage } = await import('../src/engine/agent/runtime');
+    script([]);
+    await editUserMessage(sid, msg.id, 'uno, corregido');
+    expect(getStudioBoard()).toMatchObject({ open: true, view: 'assets' });
+    expect(useStore.getState().ui.workspace).toBe('chat');
+  });
   it('a message sent with the board on Nodes is a chat row, and the turn works on the chat canvas', async () => {
     goLive('chat');
     setStudioBoard({ open: true, view: 'nodes' });

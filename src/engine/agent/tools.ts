@@ -365,14 +365,15 @@ export const readGuideSchema = z.object({ id: z.string().min(1).max(80), ready: 
 
 export const recoverPlanSchema = z.object({ action: z.enum(['check_status', 'retry']) });
 
+const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
 const settingsPartSchema = z.object({
   kind: z.enum(['video', 'image']),
   // Video only; any other value (an image "purpose") is dropped instead of refusing the card.
   purpose: z.unknown().optional().transform((v) => (v === 'draft' || v === 'normal' || v === 'long' ? v : undefined)),
   start_image: z.boolean().optional(),
   refs: z.number().int().min(0).max(20).optional(),
-  count: z.number().int().min(1).max(24).optional(),
-  duration: z.number().min(0).max(120).optional(),
+  count: num.pipe(z.number().int().min(1).max(24)).optional(),
+  duration: num.pipe(z.number().min(0).max(120)).optional(),
   aspect: z.string().max(20).optional(),
   model: z.string().max(200).optional(),
   provider: z.string().max(40).optional(),
@@ -387,8 +388,6 @@ export const askQuestionsSchema = z.object({
   intro: z.string().max(400).optional(),
   questions: z.array(questionSchema).min(1).max(4),
 });
-
-const num = z.union([z.number(), z.string().regex(/^-?\d+(\.\d+)?$/).transform(Number)]);
 
 const stepSchema = z
   .object({

@@ -94,7 +94,6 @@ import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
-import { setStudioBoard } from '../../lib/studioBoard';
 import { endedWithoutPlan } from './endedWithoutPlan';
 import { checkingPlan, untilStopped, watchModel } from './turnStop';
 import { activityLog } from './activityLog';
@@ -719,9 +718,7 @@ export async function editUserMessage(sessionId: string, itemId: string, text: s
     draft: undefined,
     phase: undefined,
   }));
-  // In Studio the chat drives the board's Nodes or Designer: open it there instead of leaving the chat.
-  if (get().ui.workspace === 'chat' && item.workspace !== 'chat') setStudioBoard({ open: true, view: item.workspace === 'node' ? 'nodes' : 'designer' });
-  else if (get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
+  if (get().ui.workspace !== 'chat' && get().ui.workspace !== item.workspace) setUi({ workspace: item.workspace });
   await sendAgentMessage(text, { attachments: item.attachments });
 }
 

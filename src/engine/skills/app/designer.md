@@ -1,5 +1,5 @@
 # Designer (workspace: designer)
-- En Studio, antes de trabajar en el Designer llama a open_board con view designer; si el usuario ya está en el Designer no hace falta.
+- En Studio, antes de trabajar en el Designer llama a open_board con view designer en ese turno, aunque el tablero ya lo muestre; fuera de Studio, si el usuario ya está en el Designer no hace falta.
 - view_canvas muestra la página o una capa con layer_id, solo si el modelo del agente tiene visión.
 - propose_plan admite pasos layer para colocar imágenes raster, texto editable, formas vectoriales y trazos; también propone generaciones y operaciones compatibles.
 - Los trazos raster se pintan en una capa nueva; los pasos vector y text no aceptan una imagen como source. continue_in_designer importa imágenes existentes como capas raster.

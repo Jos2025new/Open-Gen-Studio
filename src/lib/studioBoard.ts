@@ -41,7 +41,7 @@ export function useStudioBoard(): StudioBoardPrefs {
 
 /** The canvases whose messages Studio's chat shows: all of them, whichever the board is showing. */
 export function studioCanvases(_b: StudioBoardPrefs): Array<'chat' | 'node' | 'designer'> {
-  // Every canvas the board can show: switching its tab never hides what was said (2026-10-24: Nodes → Generations emptied the chat).
+  // Every canvas: the board only views one, and switching its tab never hides what was said (2026-10-24: Nodes → Generations emptied the chat).
   return ['chat', 'node', 'designer'];
 }
 
