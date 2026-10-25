@@ -13,11 +13,14 @@ export interface ImageEndpoint {
 /**
  * OpenRouter's per-endpoint capabilities are authoritative when it may choose
  * any endpoint. Enum values are retained only when every endpoint accepts them.
+ * An endpoint that declares no capabilities is unknown, not empty: it is left
+ * out, and undefined (no endpoint declares any) means use the catalog.
  * Source: https://openrouter.ai/blog/announcements/image-api/
  */
-export function commonImageParameters(endpoints: ImageEndpoint[]): Record<string, SupportedParam> {
-  if (!endpoints.length || endpoints.some((endpoint) => !endpoint.supported_parameters)) return {};
-  const [first, ...rest] = endpoints;
+export function commonImageParameters(endpoints: ImageEndpoint[]): Record<string, SupportedParam> | undefined {
+  const declared = endpoints.filter((endpoint) => endpoint.supported_parameters);
+  if (!declared.length) return undefined;
+  const [first, ...rest] = declared;
   const out: Record<string, SupportedParam> = {};
   for (const [key, parameter] of Object.entries(first.supported_parameters ?? {})) {
     const peers = rest.map((endpoint) => endpoint.supported_parameters?.[key]);

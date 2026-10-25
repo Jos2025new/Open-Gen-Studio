@@ -81,6 +81,23 @@ describe('OpenRouter endpoint-aware image options (F3.1-F3.2)', () => {
     expect(schema.params.find((p) => p.key === 'n')).toMatchObject({ min: 2, max: 4 });
   });
 
+  it('ignores an endpoint that declares no capabilities instead of emptying the options', async () => {
+    const id = 'google/gemini-3-pro-image';
+    route(id, { endpoints: [
+      { supported_parameters: { aspect_ratio: { type: 'enum', values: ['1:1', '16:9'] } } },
+      { provider_slug: 'other' },
+    ] });
+    const schema = await openrouter.loadSchema(imageModel(id), 'test');
+    expect(schema.params.find((p) => p.key === 'aspect_ratio')?.options).toEqual(['1:1', '16:9']);
+  });
+
+  it('uses the catalog options when no endpoint declares capabilities', async () => {
+    const id = 'google/gemini-3-pro-image';
+    route(id, { endpoints: [{ provider_slug: 'a' }, { provider_slug: 'b' }] });
+    const schema = await openrouter.loadSchema(imageModel(id), 'test');
+    expect(schema.params.find((p) => p.key === 'resolution')?.options).toEqual(['1K', '2K']);
+  });
+
   it('sends only documented passthrough values under each provider slug', async () => {
     const id = 'recraft/recraft-v4';
     route(id, { endpoints: [{ provider_slug: 'recraft', allowed_passthrough_parameters: ['style', 'controls', 'text_layout'] }] });

@@ -243,7 +243,7 @@ export const openrouter: ProviderAdapter = {
       let endpoints: import('./openrouterOptions').ImageEndpoint[] = [];
       try { endpoints = await fetchImageEndpoints(model.id); } catch { imageEndpointsRaw.delete(model.id); }
       const params: ParamDef[] = [];
-      const sp = endpoints.length ? commonImageParameters(endpoints) : raw.supported_parameters ?? {};
+      const sp = commonImageParameters(endpoints) ?? raw.supported_parameters ?? {};
       for (const [key, def] of Object.entries(sp)) {
         if (key === 'input_references') continue;
         const p = paramFromSupported(key, def);
