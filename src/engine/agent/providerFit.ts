@@ -29,7 +29,7 @@ export function missing(schema: ModelSchema | undefined, want: Wanted): string[]
   if (want.duration && secs.length && !secs.includes(want.duration)) out.push(`${want.duration} s`);
   const aspects = (paramByRole(schema, 'aspect')?.options ?? []).map(String);
   if (want.aspect && aspects.length && !aspects.includes(want.aspect)) out.push(want.aspect);
-  if ((want.images || want.startImage) && videoInputProblem(schema.slots, { firstFrame: want.startImage, images: want.images, videos: 0 })) out.push(`${want.images + (want.startImage ? 1 : 0)} images`);
+  if ((want.images || want.startImage) && videoInputProblem(schema.slots, { firstFrame: want.startImage, lastFrame: false, sourceVideo: false, images: want.images, videos: 0 })) out.push(`${want.images + (want.startImage ? 1 : 0)} images`);
   return out;
 }
 

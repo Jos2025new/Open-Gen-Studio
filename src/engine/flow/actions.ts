@@ -286,7 +286,7 @@ export function previewRun(sessionId: string, targets: string[], force = true): 
       const videos = refs.filter(r => kind(r) === 'video');
       const audios = refs.filter(r => kind(r) === 'audio');
       const routed = routeVideoInputs(schema.slots, images, videos, step.firstFrame);
-      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), images: routed.images.length + subjects.length, videos: routed.videos.length, audios: audios.length });
+      const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), lastFrame: false, sourceVideo: false, images: routed.images.length + subjects.length, videos: routed.videos.length, audios: audios.length, resolution: step.settings.resolution });
       if (problem) errors.push(`${step.title}: ${problem}`);
     }
     if (step.kind === 'audio' && step.lyricsFrom && !schema.params.some(p => /lyrics/i.test(p.key))) errors.push(`${step.title}: the model takes no lyrics.`);
