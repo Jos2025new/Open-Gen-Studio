@@ -88,6 +88,8 @@ export function earlyModelGuide(sessionId: string, id: string): string | undefin
   const confirmed = get().sessions[sessionId].agent.settings?.video;
   const confirmedGuide = confirmed ? guideForModel(confirmed.modelRef.split('::')[1] ?? '')?.id : undefined;
   if (!confirmed) return `Not loaded: the video model is not confirmed yet. Call confirm_settings first; the prompting guide of the model the user confirms comes with the confirmation.`;
+  // Auto keeps the confirmed model unless the user names another (keepConfirmed): asking for one would only loop.
+  if (confirmedGuide !== guide.id && get().composer.agentStyle === 'auto') return `Not loaded: the app keeps ${modelSummary(confirmed.modelRef)?.name ?? confirmed.modelRef} for this request because the user did not name another model, and in Auto only a model the user names changes it. Write the prompts with its guide${confirmedGuide ? ` (model:${confirmedGuide})` : ''}.`;
   if (confirmedGuide !== guide.id) return `Not loaded: the confirmed video model is ${modelSummary(confirmed.modelRef)?.name ?? confirmed.modelRef}${confirmedGuide ? ` (its guide is model:${confirmedGuide})` : ''}. To use another model, call confirm_settings again.`;
   return undefined;
 }

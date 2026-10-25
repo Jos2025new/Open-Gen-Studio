@@ -23,7 +23,7 @@ import { chatToDesigner } from '../design/fromChat';
 import { findAssets, viewTargets, VIEW_MAX } from './assetSearch';
 import { normalizePlan, parseRef, pruneJoins, stepDeps, stepOutputKind, type RawPlan } from '../plan';
 import { adjustedNote, carryOverRevision } from '../planRevision';
-import { offerRequest, partModel, userRequest } from '../modelNamed';
+import { offerRequest, userRequest } from '../modelNamed';
 import { continuityErrors } from '../continuity';
 import { executeSteps, estimateSteps, type StepOutput } from '../executor';
 import { finalPlanStatus, reviewOpen } from '../planStop';
@@ -35,7 +35,7 @@ import { autoLayout, graphBounds, graphToSteps, planToGraph, nodeOutputAsset, ru
 import { activeDoc, ensureDoc, getDoc, placeAsset } from '../design/actions';
 import { activeSkill, workflowById, refreshLoadedGuides } from '../skills';
 import { chat, LLM_LABELS, type ChatResult } from '../providers/llm';
-import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes, inputVariant } from '../catalog';
+import { composerChosen, defaultModelChoice, defaultModelFor, loadLlmCatalog, resolveModel, modelSummary, lineRoutes } from '../catalog';
 import type {
   AgentStyle,
   LlmContentPart,
@@ -83,13 +83,14 @@ import { readGuide, guideWorkspaceProblem, skillById } from '../skills';
 import { modelGuide } from '../guides';
 import { confirmedState, keepConfirmed, switchSection } from './switchModel';
 import { settingsResultText } from './settingsResult';
-import { autoConfirmSettings } from './autoSettings';
-import { durationProblem, limitsLine, resolutionNote } from './modelLimits';
+import { durationOwed } from './modelLimits';
+import { autoAnswer, imagesFirst, sectionsOfParts, settingsForPlan } from './settingsParts';
+import { rejectionOf, stoppedText } from './stopNotice';
 import { cardInsteadOfGuide } from '../skills/workflowCard';
 import { earlyModelGuide, inConversation, modelGuidesFor, pickedWorkflowGuides } from './requestGuides';
 import { gateOps, steerNote } from './force';
 import { OPS } from '../ops';
-import { buildSettings, describeChoice, sectionsOf } from './settingsCard';
+import { describeChoice, sectionsOf } from './settingsCard';
 import { inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
@@ -131,7 +132,7 @@ function patchAgent(sessionId: string, patch: Partial<AgentState> | ((a: AgentSt
 /** Where a row is shown: Studio's chat keeps every row as chat, also while the agent works on a canvas it opened in the board. */
 const rowCanvas = (workspace: Workspace): Workspace => (get().ui.workspace === 'chat' ? 'chat' : workspace);
 /** Where a turn resumed from a row works: a chat row, the workspace the user is in (Studio is the chat canvas). */
-const turnCanvas = (workspace: Workspace): Workspace => (workspace === 'chat' ? agentCanvas() : workspace);
+const turnCanvas = (workspace: Workspace): Workspace => (workspace === 'chat' ? agentCanvas() : get().ui.workspace === 'chat' ? 'chat' : workspace);
 
 function feedBase(workspace: Workspace) {
   return { id: uid('fd'), createdAt: Date.now(), workspace: rowCanvas(workspace) };
@@ -266,7 +267,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
 
   const pending = s.agent.pending;
   // A card waiting on another canvas closes as superseded.
-  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && f.workspace === rowCanvas(workspace)) : undefined;
+  const pendingItem = pending ? s.feed.find((f) => f.id === pending.feedItemId && (workspace === 'chat' || f.workspace === workspace)) : undefined;
 
   // Typing while questions are open answers them.
   if (pending?.kind === 'questions' && pendingItem?.type === 'questions' && pendingItem.status === 'pending') {
@@ -1282,6 +1283,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   const turnStart = Date.now();
   const firstOutput = () => recordMetric(sessionId, { type: 'output', ms: clock.elapsed() });
   let planFailures = 0;
+  let lastBlock: string | undefined;
   let hurryNoted = false;
   let transferredToDesigner = false;
   // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
@@ -1468,7 +1470,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         }
       };
       for (const [index, call] of result.toolCalls.entries()) {
-        const respond = (content: string) => toolResults.push({ role: 'tool', tool_call_id: call.id, content });
+        const respond = (content: string) => { toolResults.push({ role: 'tool', tool_call_id: call.id, content }); lastBlock = rejectionOf(content) ?? lastBlock; };
         if (result.finishReason === 'length') {
           respond('Your output was cut off (length limit). Send a shorter tool call.');
           continue;
@@ -1483,26 +1485,10 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const v = confirmSettingsSchema.safeParse(parsed.value);
           if (!v.success) { respond(`Invalid confirm_settings input: ${formatZodError(v.error)}`); continue; }
           if (workspace === 'node') { respond('The node canvas has its own settings on each node: call propose_plan directly.'); continue; }
-          // One card for the plan that comes now: images first, then video.
-          const parts = [...v.data.parts].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'image' ? -1 : 1));
-          const sections: SettingsSection[] = [];
-          let failed = '';
-          for (const d of parts) {
-            // One part per kind, except to compare models: another part of that kind needs a model of its own.
-            const seen = parts.slice(0, parts.indexOf(d)).filter((x) => x.kind === d.kind);
-            if (seen.length && (!d.model || seen.some((x) => !x.model || x.model === d.model))) continue;
-            const built = await until(buildSettings(
-              { kind: d.kind, purpose: d.purpose ?? 'normal', startImage: d.start_image ?? false, refs: d.refs ?? 0, count: d.count ?? 1, duration: d.duration, aspect: d.aspect, model: partModel(d, ag().settings), provider: d.provider },
-              { getModel: resolveModel, suggestModel, composerChosen, routeModel: (mode) => get().composer.videoRoutes?.[mode], defaultModel: defaultModelFor, inputVariant: (r, k) => inputVariant(r, k)?.ref },
-            ));
-            if ('error' in built) { failed = `${d.kind}: ${built.error}`; break; }
-            const long = d.kind === 'video' ? durationProblem(built.recommended.modelRef, d.duration, offerRequest(ag()), Object.keys(ag().draft?.answers ?? {}).length > 0) : undefined;
-            log.action({ icon: 'search', label: `Checked ${(await resolveModel(built.recommended.modelRef))?.model.name ?? built.recommended.modelRef}`, detail: limitsLine(built.recommended.modelRef) || undefined });
-            if (long) { failed = long; break; }
-            sections.push({ kind: d.kind, count: d.count ?? 1, recommended: built.recommended, alternatives: built.alternatives });
-          }
+          const parts = imagesFirst(v.data.parts);
+          const { sections, failed } = await sectionsOfParts(sessionId, parts, until, log);
           if (failed || !sections.length) { respond(failed || 'confirm_settings needs at least one part.'); continue; }
-          if (get().composer.agentStyle === 'auto') { respond(await autoConfirmSettings(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts) + sections.map((x) => resolutionNote(x.recommended.modelRef, offerRequest(ag()))).join('')); continue; }
+          if (get().composer.agentStyle === 'auto') { respond(await autoAnswer(sessionId, rowCanvas(workspace), call.id, v.data.summary, sections, parts)); continue; }
           log.action({ icon: 'questions', label: 'Asked to confirm the settings', detail: sections.map((x) => modelSummary(x.recommended.modelRef)?.name).join(' · ') });
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
@@ -1519,7 +1505,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           const style = get().composer.agentStyle;
           const s = session(sessionId);
           // Auto allows one card for what changes the result or cost (F1); guided, the rounds set in Settings.
-          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds)) {
+          if (s.agent.questionRound >= roundsFor(style, get().settings.guidedRounds) && !durationOwed(s.agent.history)) {
             respond('Question rounds are used up. Use sensible defaults for anything still open and call propose_plan now.');
             continue;
           }
@@ -1754,20 +1740,15 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             respond('Guided mode: ask your questions first (ask_questions, one card), then propose the plan.');
             continue;
           }
-          if (workspace !== 'node' && get().composer.agentStyle !== 'direct') {
-            // An operation that runs on an image model needs the image kind confirmed, as an image step does.
-            const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
-            const gate = planRequiresSettings(workspace, kinds, session(sessionId).agent.settings);
-            if (gate) {
-              recordMetric(sessionId, { type: 'rejected' });
-              respond(gate);
-              continue;
-            }
-          }
+          // An operation that runs on an image model needs the image kind confirmed, as an image step does.
+          const kinds = v.data.steps.map((st) => (st.kind === 'op' && (OPS as Record<string, { engine: string }>)[st.op ?? '']?.engine === 'edit' ? 'image' : st.kind));
+          const gate = workspace !== 'node' && get().composer.agentStyle !== 'direct' ? planRequiresSettings(workspace, kinds, session(sessionId).agent.settings) : null;
           const draft = workspace === 'node' ? null : draftGate(v.data.steps, session(sessionId).feed, get().composer.agentStyle, v.data.revision === true);
-          if (draft) {
-            recordMetric(sessionId, { type: 'rejected' });
-            respond(draft);
+          if (gate || draft) {
+            // Auto: the app runs the confirm path itself and answers with the effective settings; the plan is not shown, so the prompts are written for them (a flow step, not a rejection).
+            const auto = get().composer.agentStyle === 'auto';
+            if (!auto) recordMetric(sessionId, { type: 'rejected' });
+            respond(auto ? await settingsForPlan(sessionId, rowCanvas(workspace), call.id, v.data.steps, until, log) : (gate ?? draft)!);
             continue;
           }
           patchAgent(sessionId, { phase: 'checking' });
@@ -1805,7 +1786,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         return;
       }
     }
-    notice(sessionId, workspace, 'The agent stopped after several attempts without a result.');
+    notice(sessionId, workspace, stoppedText(lastBlock));
   } catch (err) {
     if (!isAbort(err)) throw err; // Stop during a tool: finish() already ended the turn
   } finally {

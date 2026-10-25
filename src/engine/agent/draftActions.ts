@@ -57,9 +57,9 @@ export function draftLines(d: DraftMode | undefined, sections: Array<SettingsSec
 }
 
 /** Video cards carry the draft choice; the one set earlier in this request stays (a second card cannot lift the lock). */
-export function cardDraft<S extends SettingsSection>(sessionId: string, sections: S[]): { sections: S[]; draft?: DraftMode } {
+export function cardDraft<S extends SettingsSection>(sessionId: string, sections: S[], asked?: DraftMode): { sections: S[]; draft?: DraftMode } {
   if (!sections.some((x) => x.kind === 'video')) return { sections };
-  const draft = useStore.getState().sessions[sessionId].agent.draftMode ?? draftMode('draft');
+  const draft = asked ?? useStore.getState().sessions[sessionId].agent.draftMode ?? draftMode('draft');
   remember(sessionId, draft);
   return { sections: lockSections(sections, draft), draft };
 }

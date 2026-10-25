@@ -38,7 +38,7 @@ function setup(withLong = true) {
   const s = useStore.getState();
   useStore.setState({
     settings: { ...s.settings, keys: { ...s.settings.keys, nanogpt: 'k' } },
-    catalog: { ...s.catalog, models: { ...s.catalog.models, ...Object.fromEntries(list.map(([m]) => [m.ref, m])) }, schemas: { ...s.catalog.schemas, ...Object.fromEntries(list.map(([m, sc]) => [m.ref, sc])) } },
+    catalog: { ...s.catalog, status: { ...s.catalog.status, nanogpt: 'ready' }, models: { ...s.catalog.models, ...Object.fromEntries(list.map(([m]) => [m.ref, m])) }, schemas: { ...s.catalog.schemas, ...Object.fromEntries(list.map(([m, sc]) => [m.ref, sc])) } },
   });
 }
 
@@ -84,7 +84,7 @@ describe('model limits for the agent', () => {
   });
 });
 
-import { sendAgentMessage } from '../src/engine/agent/runtime';
+import { sendAgentMessage, submitAnswers } from '../src/engine/agent/runtime';
 describe('confirm_settings in Auto: the length gate and the visible check', () => {
   beforeEach(() => setup());
   afterEach(() => vi.unstubAllGlobals());
@@ -118,5 +118,191 @@ describe('confirm_settings in Auto: the length gate and the visible check', () =
     const acts = JSON.stringify(feed.filter((f) => f.type === 'activity'));
     expect(acts).toContain('"label":"Checked ');
     expect(acts).toContain('720p, 1080p · 5–12 s');
+  });
+});
+
+/*
+ * Auto resolves what the agent skipped (2026-10-24): a plan with video before any settings makes the app run the
+ * confirm path, quality words win over the inherited draft choice, the duration question reaches the user even once
+ * the round is used, and a turn that really fails says why and how to go on.
+ */
+import type { FeedItem, PlanFeedItem, SettingsFeedItem } from '../src/engine/types';
+type Reply = { name: string; args: unknown } | string;
+const sidOf = () => useStore.getState().activeSessionId;
+const feedOf = (): FeedItem[] => useStore.getState().sessions[sidOf()].feed;
+const agentOf = () => useStore.getState().sessions[sidOf()].agent;
+
+/** Runs one request in Auto (or `style`) with scripted agent replies; returns what each model call was sent and the plan cards seen at that moment. */
+async function drive(replies: Reply[], text: string, over: { style?: 'auto' | 'guided'; agent?: Record<string, unknown>; feed?: FeedItem[] } = {}) {
+  const sent: string[] = [];
+  const plansSeen: number[] = [];
+  vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
+    const body = init?.body ? JSON.parse(String(init.body)) : {};
+    if (!body.messages) return new Response(JSON.stringify({ data: [] }));
+    sent.push(JSON.stringify(body.messages));
+    plansSeen.push(feedOf().filter((f) => f.type === 'plan').length);
+    const r = replies.shift() ?? 'ok';
+    const chunk = typeof r === 'string' ? { choices: [{ delta: { content: r }, finish_reason: 'stop' }] } : { choices: [{ delta: { tool_calls: [{ index: 0, id: `c${sent.length}`, function: { name: r.name, arguments: JSON.stringify(r.args) } }] }, finish_reason: 'tool_calls' }] };
+    return new Response(`data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`, { headers: { 'content-type': 'text/event-stream' } });
+  });
+  const s = useStore.getState();
+  const sid = s.activeSessionId;
+  useStore.setState({
+    settings: { ...s.settings, agent: { ...s.settings.agent, provider: 'nanogpt', model: 'm' } },
+    composer: { ...s.composer, agentStyle: over.style ?? 'auto', attachments: [], video: { ...s.composer.video, modelRef: SEED } },
+    sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: over.feed ?? [], agent: { history: [], questionRound: 0, notes: [], busy: false, ...over.agent } } },
+  });
+  await sendAgentMessage(text);
+  return { sent, plansSeen };
+}
+/** The user answers the open questions card, which resumes the turn (a request whose question round is now used). */
+async function answer(): Promise<void> {
+  const q = feedOf().find((f) => f.type === 'questions' && f.status === 'pending')!;
+  await submitAnswers(sidOf(), q.id, { q1: 'Un solo clip de 12 s' });
+}
+const videoPlan = (prompt = 'a runner on a beach') => ({ name: 'propose_plan', args: { title: 'Run', steps: [{ id: 'v1', kind: 'video', title: 'Run', prompt, duration: 5, aspect: '16:9' }] } });
+const settingsItems = () => feedOf().filter((f): f is SettingsFeedItem => f.type === 'settings');
+const plans = () => feedOf().filter((f): f is PlanFeedItem => f.type === 'plan');
+
+describe('Auto: a plan sent before any settings makes the app confirm them (item 2)', () => {
+  beforeEach(() => setup());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('propose_plan with video and no confirmation: the app confirms, the agent gets the guide and writes the prompts again, then the plan card appears', async () => {
+    const { sent, plansSeen } = await drive([videoPlan(), videoPlan('a runner at dawn, slow dolly'), 'listo'], 'Un video de un corredor en la playa');
+    expect(settingsItems()).toHaveLength(1);
+    expect(settingsItems()[0]).toMatchObject({ status: 'confirmed', inline: true, sections: [{ chosen: { modelRef: SEED } }] });
+    // The second model call carries the app's answer to the first plan; no plan card existed yet.
+    expect(sent[1]).toContain('Prompting guide of ');
+    expect(sent[1]).toContain('call propose_plan again');
+    expect(sent[1]).not.toContain('Not shown: call confirm_settings');
+    expect(plansSeen[1]).toBe(0);
+    expect(plans()).toHaveLength(1);
+    expect((plans()[0].plan.steps[0] as { modelRef: string }).modelRef).toBe(SEED);
+    expect((plans()[0].plan.steps[0] as { prompt: string }).prompt).toContain('dolly');
+  });
+
+  it('Guided keeps its gate: no inline item, the old message', async () => {
+    const q = { name: 'ask_questions', args: { questions: [{ id: 'q1', question: '¿Cómo?', options: ['a', 'b'] }] } };
+    const replies: Reply[] = [q];
+    await drive(replies, 'Un video de un corredor', { style: 'guided' });
+    replies.push(videoPlan(), 'ok');
+    await answer();
+    expect(settingsItems()).toHaveLength(0);
+    expect(agentOf().history.map((m) => String(m.content)).join('\n')).toContain('Not shown: call confirm_settings first');
+  });
+});
+
+describe('Auto: requested quality takes effect (item 4)', () => {
+  beforeEach(() => setup());
+  afterEach(() => vi.unstubAllGlobals());
+  const ask = () => ({ name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 5 }] } });
+  /** An earlier request of the session confirmed high quality. */
+  const hq = (): FeedItem[] => [{ id: 'old', createdAt: 0, workspace: 'chat', type: 'settings', status: 'confirmed', inline: true, sections: [], draft: { kind: 'hq', locked: false } } as unknown as FeedItem];
+
+  it('a new session asking "en alta calidad" gets hq, not the locked draft resolution', async () => {
+    await drive([ask(), 'ok'], 'Un video de un corredor en alta calidad');
+    expect(settingsItems()[0].draft).toMatchObject({ kind: 'hq', locked: false });
+    expect(agentOf().draftMode).toMatchObject({ kind: 'hq' });
+    expect(settingsItems()[0].sections[0].chosen?.resolution).not.toBe('720p');
+  });
+  it('"borrador" over a previous hq goes back to the draft', async () => {
+    await drive([ask(), 'ok'], 'Ahora un borrador de un corredor', { feed: hq() });
+    expect(settingsItems().at(-1)?.draft).toMatchObject({ kind: 'draft', locked: true });
+  });
+  it('a request with no quality words keeps the previous hq; with no previous choice it is Borrador', async () => {
+    await drive([ask(), 'ok'], 'Un video de un corredor', { feed: hq() });
+    expect(settingsItems().at(-1)?.draft).toMatchObject({ kind: 'hq' });
+    await drive([ask(), 'ok'], 'Un video de un corredor');
+    expect(settingsItems().at(-1)?.draft).toMatchObject({ kind: 'draft', locked: true });
+  });
+  it('"cambia la resolución" alone keeps the previous choice', async () => {
+    await drive([ask(), 'ok'], 'cambia la resolución del corredor', { feed: hq() });
+    expect(settingsItems().at(-1)?.draft).toMatchObject({ kind: 'hq' });
+  });
+});
+
+describe('Auto: the duration question reaches the user (item 5)', () => {
+  beforeEach(() => setup());
+  afterEach(() => vi.unstubAllGlobals());
+  const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED }] } };
+  const question = { name: 'ask_questions', args: { questions: [{ id: 'q1', question: '¿Cómo seguimos?', options: ['4 clips unidos', 'Un solo clip de 12 s'] }] } };
+  /** A request whose one question round is used: a first card, answered. */
+  const roundUsed = async (second: Reply[], text: string) => {
+    const replies: Reply[] = [question];
+    await drive(replies, text);
+    replies.push(...second);
+    await answer();
+  };
+
+  it('with the question round already used, ask_questions still produces the card', async () => {
+    await roundUsed([over, question, 'ok'], 'Un video de 45 segundos con seedance 2.0 mini');
+    expect(feedOf().filter((f) => f.type === 'questions' && f.status === 'pending')).toHaveLength(1);
+    expect(agentOf().history.map((m) => String(m.content)).join('')).not.toContain('Question rounds are used up');
+  });
+  it('without a duration problem the used-up rule still refuses the question', async () => {
+    await roundUsed([{ name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 5 }] } }, question, 'ok'], 'Un video de 5 segundos');
+    expect(feedOf().filter((f) => f.type === 'questions' && f.status === 'pending')).toHaveLength(0);
+    expect(agentOf().history.map((m) => String(m.content)).join('')).toContain('Question rounds are used up');
+  });
+  it('the text confirms settings before it plans the clips', () => {
+    const why = durationProblem(SEED, 12, 'Haz un video de 45 segundos', false)!;
+    expect(why.indexOf('call confirm_settings again')).toBeGreaterThan(-1);
+    expect(why.indexOf('call confirm_settings again')).toBeLessThan(why.indexOf('plan the clips'));
+  });
+});
+
+import { earlyModelGuide } from '../src/engine/agent/requestGuides';
+import { rejectionOf, stoppedText } from '../src/engine/agent/stopNotice';
+describe('a model the app keeps is said, not offered again (item 3)', () => {
+  beforeEach(() => setup());
+  const confirmed = (style: 'auto' | 'guided') => {
+    const s = useStore.getState();
+    const id = s.activeSessionId;
+    useStore.setState({ composer: { ...s.composer, agentStyle: style }, sessions: { ...s.sessions, [id]: { ...s.sessions[id], agent: { ...s.sessions[id].agent, history: [], settings: { video: { modelRef: SEED, needsImage: false, duration: 5 } } } } } });
+    return id;
+  };
+  it('Auto: states the model kept and why, and never asks for confirm_settings', () => {
+    const text = earlyModelGuide(confirmed('auto'), 'model:kling')!;
+    expect(text).toContain('keeps Seedance 2.0 Mini');
+    expect(text).toContain('the user did not name another model');
+    expect(text).not.toContain('confirm_settings');
+  });
+  it('Guided keeps its text', () => {
+    expect(earlyModelGuide(confirmed('guided'), 'model:kling')).toContain('To use another model, call confirm_settings again.');
+  });
+});
+
+describe('the notice of a turn that really fails (item 6)', () => {
+  beforeEach(() => setup());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('a scripted agent that keeps hitting the length limit ends with the code and an explanation', async () => {
+    const over = { name: 'confirm_settings', args: { parts: [{ kind: 'video', duration: 45, model: SEED }] } };
+    await drive([over, over, over, over, over, over], 'Un video de 45 segundos con seedance 2.0 mini');
+    const note = feedOf().filter((f) => f.type === 'notice').at(-1) as { text: string; level: string };
+    expect(note.level).toBe('error');
+    expect(note.text).toContain('No pude preparar el plan: Seedance 2.0 Mini admite hasta 12 s por clip.');
+    expect(note.text).toContain('Código: DURACION');
+    expect(note.text).not.toContain('stopped after several attempts');
+  });
+
+  it('known causes map to a code; the rest is GENERAL; raw errors are never dumped', () => {
+    const code = (t?: string) => /Código: (\w+)$/.exec(stoppedText(t))?.[1];
+    expect(code('Not confirmed: 45 s were asked, but Seedance 2.0 Mini makes clips of at most 12 s (it takes 720p).')).toBe('DURACION');
+    expect(code('Not confirmed: Seedance 2.0 Mini takes at most 12 s per clip (720p).')).toBe('DURACION');
+    expect(code('Not shown: call confirm_settings first (kind "video") so the user')).toBe('AJUSTES');
+    expect(code('video: Unknown model "Foo". Call find_models')).toBe('MODELO');
+    expect(code('Plan rejected by the validator. Fix these problems:\n- Step v1: x')).toBe('PLAN');
+    expect(code('Invalid propose_plan input: [{"code":"invalid_type"}]')).toBe('PLAN');
+    expect(code('Graph actions work only on the node canvas.')).toBe('CANVAS');
+    expect(code('something else')).toBe('GENERAL');
+    expect(code(undefined)).toBe('GENERAL');
+    expect(stoppedText('Invalid propose_plan input: [{"code":"invalid_type","path":["steps"]}]')).not.toContain('invalid_type');
+  });
+
+  it('the app confirming settings itself is a flow step, not a rejection', () => {
+    expect(rejectionOf('Settings chosen by the app (Auto shows no settings card): ...\nNow write the prompts and call propose_plan.')).toBeUndefined();
+    expect(rejectionOf('Not shown: call confirm_settings first')).toBeDefined();
   });
 });

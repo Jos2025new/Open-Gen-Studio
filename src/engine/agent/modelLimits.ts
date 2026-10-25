@@ -69,7 +69,14 @@ export function durationProblem(ref: string, partSeconds: number | undefined, re
     others.length ? `"Cambiar a un modelo que llegue a ${want} s" (${others.join(', ')})` : '',
     `"Un solo clip de ${max} s" (compress the content into one ${max}-second clip)`,
   ].filter(Boolean);
-  return `Not confirmed: ${want} s were asked, but ${name} makes clips of at most ${max} s (it takes ${limitsLine(ref)}). Do not plan yet. Say it in one short sentence and ask the user with ask_questions (one question, these options): ${options.join('; ')}. If ask_questions is not available, say the choice in one line and plan the clips. Then call confirm_settings again with the chosen model and a duration it takes.`;
+  return `Not confirmed: ${want} s were asked, but ${name} makes clips of at most ${max} s (it takes ${limitsLine(ref)}). Do not plan yet. Say it in one short sentence and ask the user with ask_questions (one question, these options): ${options.join('; ')}. If ask_questions is not available, say the choice in one line. Then call confirm_settings again with the chosen model and a duration it takes (for several clips, the length of each), and only after that plan the clips.`;
+}
+
+const OWED = 'ask the user with ask_questions (one question';
+/** The length question is owed to the user: the last thing told to the agent was the length problem, and the user has not answered since. */
+export function durationOwed(history: Array<{ role: string; content?: unknown }>): boolean {
+  const last = [...history].reverse().find((m) => m.role === 'tool' && typeof m.content === 'string' && (m.content.includes(OWED) || m.content.startsWith('User answers')));
+  return Boolean(last && String(last.content).includes(OWED));
 }
 
 /** A resolution named in the request that the model does not have: the agent says so in one line and goes on. */

@@ -197,3 +197,34 @@ describe('Studio is independent of its board (2026-10-24)', () => {
     expect(users.at(-1)?.workspace).toBe('chat');
   });
 });
+
+describe('Studio keeps its context when a card is tagged for another canvas (2026-10-24)', () => {
+  const card = () => ({ id: 'q1', createdAt: 0, workspace: 'node', type: 'questions', status: 'pending', questions: [{ id: 'a', question: '¿Cuál?', options: ['x', 'y'], allowCustom: true, multi: false }] }) as never;
+  const arm = () => useStore.setState((s) => ({ sessions: { ...s.sessions, [sid]: { ...s.sessions[sid], feed: [card()], agent: { ...s.sessions[sid].agent, history: [], pending: { toolCallId: 't1', kind: 'questions', feedItemId: 'q1' } } } } }));
+
+  it('answering a card tagged node from Studio resumes the turn on the chat canvas', async () => {
+    goLive('chat');
+    arm();
+    script([]);
+    const { submitAnswers } = await import('../src/engine/agent/runtime');
+    await submitAnswers(sid, 'q1', { a: 'x' });
+    const answer = toolResults().find((t) => t.startsWith('User answers'))!;
+    expect(answer).toContain('workspace: chat');
+    expect(answer).not.toContain('workspace: node');
+  });
+  it('outside Studio the card keeps its own canvas', async () => {
+    goLive('node');
+    arm();
+    script([]);
+    const { submitAnswers } = await import('../src/engine/agent/runtime');
+    await submitAnswers(sid, 'q1', { a: 'x' });
+    expect(toolResults().find((t) => t.startsWith('User answers'))).toContain('workspace: node');
+  });
+  it('a typed reply in Studio finds a pending card tagged node', async () => {
+    goLive('chat');
+    arm();
+    script([]);
+    await sendAgentMessage('la x');
+    expect(session().feed.find((f) => f.id === 'q1')).toMatchObject({ status: 'answered' });
+  });
+});

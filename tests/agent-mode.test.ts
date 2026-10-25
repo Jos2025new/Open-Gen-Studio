@@ -111,12 +111,14 @@ describe('direct mode guides: the composer\'s model prompts are written for that
 });
 
 describe('auto stays as before', () => {
-  it('still blocks a plan whose image model was never confirmed', async () => {
+  it('a plan whose image model was never confirmed is not shown: the app confirms the settings itself and the agent writes the prompts again', async () => {
     setMode('auto');
     replies = [imagePlan, text('Necesito confirmar los ajustes.')];
+    sentMessages = [];
     await sendAgentMessage('Una imagen de una bicicleta roja en la playa');
     expect(feedOf('plan')).toHaveLength(0);
-    expect(feedOf('settings')).toHaveLength(0);
+    expect(feedOf('settings')).toHaveLength(1);
+    expect(sentMessages[1]).toContain('call propose_plan again');
     expect(toolNames[0]).toContain('confirm_settings');
   });
 });

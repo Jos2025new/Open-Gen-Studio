@@ -173,11 +173,11 @@ describe('the local planner uses the same gate', () => {
 });
 
 describe('your flow: keyword → tool call; Auto and Guided confirm the image model first, Direct inherits the composer', () => {
-  it('Auto without confirmed image settings: the route says confirm_settings first, and a plan with the operation waits for it', async () => {
+  it('Auto without confirmed image settings: the route says confirm_settings first, and a plan with the operation waits: the app confirms and asks for the plan again', async () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);
     const calls = await request('dame una vista lateral de esta imagen', ['img1'], [{ title: 'Ángulo', steps: [{ id: 's1', kind: 'op', op: 'angle', input: 'asset:img1' }] }]);
     expect(calls[0].messages).toContain('confirm_settings first (kind image');
-    expect(calls.map((c) => c.messages).join(' ')).toContain('call confirm_settings first');
+    expect(calls.map((c) => c.messages).join(' ')).toContain('call propose_plan again');
   });
   it('remove_bg has no model to choose: no card first', () => {
     withAssets([{ id: 'img1', kind: 'image', width: 1024, height: 1024 }]);

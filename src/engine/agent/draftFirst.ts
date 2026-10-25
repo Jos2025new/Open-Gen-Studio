@@ -57,6 +57,13 @@ export function draftAnswer(feed: FeedItem[], sinceLastUser = true): 'draft' | '
 /** The user's words ask to change the draft / quality choice ("en alta calidad", "mejor un borrador", "cambiar la resolución"). */
 export const asksDraftChange = (text: string | undefined): boolean => /borrador|draft|calidad|quality|resoluci|resolution/i.test(text ?? '');
 
+/** The quality a request clearly asks for ("alta calidad", "HQ" / "borrador", "draft"); "calidad" or "resolución" alone, or both kinds, ask nothing. */
+export function askedQuality(text: string | undefined): 'draft' | 'hq' | undefined {
+  const hq = /\b(alta\s+calidad|calidad\s+alta|high[\s-]quality|hq)\b/i.test(text ?? '');
+  const draft = /\b(borrador|draft)\b/i.test(text ?? '');
+  return hq === draft ? undefined : hq ? 'hq' : 'draft';
+}
+
 const lastUserText = (feed: FeedItem[]): string | undefined => {
   const u = [...feed].reverse().find((f) => f.type === 'user');
   return u?.type === 'user' ? u.text : undefined;
