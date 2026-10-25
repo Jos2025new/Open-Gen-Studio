@@ -682,7 +682,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           const audioProblem = audioInputProblem(schema.slots, audioRefs.length);
           if (audioProblem) errors.push(`${where}: model "${modelRef}" ${audioProblem}`);
         } else {
-          // A model that needs a start image, with none wired: the one image attached to this request is it.
+          // A required start image can use the request's sole attached image.
           const needsStart = Boolean(schema.slots.firstFrame?.required) || (!resolved.model.acceptsText && Boolean(schema.slots.firstFrame));
           const attached = ctx.requestImages?.() ?? [];
           if (needsStart && !s.first_frame && !refs.length && attached.length === 1) {
@@ -692,15 +692,14 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
           // Same routing as the composer and the job runner (params.routeVideoInputs).
           const routed = routeVideoInputs(schema.slots, imageRefs, videoRefs, s.first_frame);
           const problem = videoInputProblem(schema.slots, { firstFrame: Boolean(routed.firstFrame), lastFrame: Boolean(s.last_frame), sourceVideo: false, images: routed.images.length, videos: routed.videos.length, audios: audioRefs.length, resolution: s.resolution });
-          if (problem) errors.push(`${where}: model "${modelRef}" ${problem} Fix: ${videoFix(schema.slots, routed, Boolean(s.model))}`);
+          if (problem) errors.push(`${where}: model "${modelRef}" ${problem} Fix: ${videoFix(schema.slots, { ...routed, lastFrame: Boolean(s.last_frame), sourceVideo: false, audios: audioRefs.length, resolution: s.resolution }, Boolean(s.model))}`);
           if (s.last_frame && !schema.slots.lastFrame) errors.push(`${where}: model "${modelRef}" does not support last_frame. Fix: drop last_frame and describe the ending in the prompt${s.model ? ', or name a model with a last-frame input' : ''}.`);
           if (!s.first_frame && !refs.length && schema.slots.promptRequired === false && !resolved.model.acceptsText) errors.push(`${where}: model "${modelRef}" needs first_frame. Fix: set first_frame to an image step or asset:<id>${s.model ? ', or leave "model" out for a text-to-video model' : ''}.`);
           if (s.times?.some((t) => t != null) && !schema.slots.keyframes) adjustments.push(`${s.id}: times ignored, "${modelRef}" has no keyframes`);
         }
         const rolesLine = stepRolesLine(stepRoles.get(s.id!), imageRefs, modelRef, schema.slots.promptRefs, where, errors);
         const prompt = placeRoles(rolesLine, kind === 'video' && schema.slots.shots ? exposeShotSubjects((s.prompt ?? '').trim(), s.shots, schema.slots.shots.max) : (s.prompt ?? '').trim(), modelRef, kind);
-        // A prompt that cites an image the step does not carry would make something new (another person, another
-        // product): the reference was forgotten, not dropped on purpose.
+        // Cited images need a wired ref or frame; otherwise the model invents them.
         const cited = /@image\s*\d|<picture\s*\d>|<image_(ref_)?\d>|\b(image|picture)\s*\d\b/i.exec(prompt)?.[0];
         if (cited && !refs.length && !s.first_frame && !s.last_frame) errors.push(`${where}: the prompt cites "${cited}" but the step has no refs, so the model would invent it. Fix: put that image in refs (asset:<id> or a step id), or drop the citation if the step is really made from text.`);
         if (!prompt && !s.prompt_from && schema.slots.promptRequired) errors.push(`${where}: a prompt is required. Fix: write "prompt" (what happens and how it looks).`);

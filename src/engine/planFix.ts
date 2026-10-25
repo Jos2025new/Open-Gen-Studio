@@ -1,8 +1,15 @@
 import type { ModelSchema } from './types';
 
 /** The exact change that makes a video step's inputs fit its model (O2: constructive errors, one round). */
-export function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; images: string[]; videos: string[] }, named: boolean): string {
+export function videoFix(slots: ModelSchema['slots'], n: { firstFrame?: string; lastFrame?: boolean; sourceVideo?: boolean; images: string[]; videos: string[]; audios?: number; resolution?: string }, named: boolean): string {
   const other = named ? ' Or leave "model" out: the app picks a model for these inputs.' : '';
+  const rules = slots.frameRules;
+  const refs = n.images.length + n.videos.length + (slots.mixedRefs ? n.audios ?? 0 : slots.refAudios ? Math.max(0, (n.audios ?? 0) - (slots.audio ? 1 : 0)) : 0);
+  if (rules?.refsWithFirst === false && n.firstFrame && refs) return `use first_frame "${n.firstFrame}" or refs, not both: drop first_frame or drop refs.${other}`;
+  if (rules?.refsWithLast === false && n.lastFrame && refs) return 'use last_frame or refs, not both: drop last_frame or drop refs.' + other;
+  if (rules?.sourceWithLast === false && n.sourceVideo && n.lastFrame) return 'use the source video or last_frame, not both: remove one of them.' + other;
+  if (rules?.lastNeedsFirst && n.lastFrame && !n.firstFrame) return `add first_frame (an image step or asset:<id>) for last_frame.${other}`;
+  if (rules?.firstFrameResolutions && n.firstFrame && n.resolution && !rules.firstFrameResolutions.includes(n.resolution)) return `choose a resolution supported with first_frame (${rules.firstFrameResolutions.join(', ')}), or drop first_frame "${n.firstFrame}".${other}`;
   if (n.firstFrame && !slots.firstFrame) return `move first_frame "${n.firstFrame}" into refs, or drop it.${other}`;
   const imageMax = slots.mixedRefs?.max ?? slots.keyframes?.max ?? slots.images?.max ?? 0;
   if (n.images.length > imageMax) {
