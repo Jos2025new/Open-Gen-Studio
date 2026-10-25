@@ -57,7 +57,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/components/studio` | 8 | 2 |
 | `src/components/ui` | 17 | 5 |
 | `src/engine` | 60 | 248 |
-| `src/engine/agent` | 41 | 93 |
+| `src/engine/agent` | 42 | 94 |
 | `src/engine/design` | 98 | 118 |
 | `src/engine/flow` | 11 | 15 |
 | `src/engine/fx` | 8 | 8 |
@@ -67,7 +67,7 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | `src/lib` | 32 | 249 |
 | `src/store` | 13 | 178 |
 
-159 de 459 módulos no tienen ningún test que los importe directamente.
+159 de 460 módulos no tienen ningún test que los importe directamente.
 
 ## Sin ningún test que los alcance
 

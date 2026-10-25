@@ -28,6 +28,7 @@ import { assetContextName } from './attachments';
 import { studioLine, STUDIO_RULE } from './agentCanvas';
 import { viewReferenceLabel } from './assetSearch';
 import { assetShape } from './assetShape';
+import { LAYER_DOC } from './layerDoc';
 
 const get = useStore.getState;
 /** What a confirmed model takes: a plan reusing it is written for it. */
@@ -134,9 +135,10 @@ ${OP_LINES}
 ${OP_RESOLUTION}
 - text: text — copy, or a shared prompt used by image/video/audio steps through prompt_from (or as lyrics through lyrics_from).
 - layer (Designer workspace only): layer_type raster|text|vector.
-  raster: source (an image reference), target "base" | "new" | <raster layer id>. "base" is layer 1: the main generated image always goes to base.
-  text: text, style {font_family: Inter|Grotesk|Serif|Display|Condensed|Mono, font_size, font_weight, color "#hex", align left|center|right, line_height, letter_spacing}, box {x, y, width} in document pixels, target "new" or an existing text layer id.
-  vector: shapes [{type: rect|ellipse|line, x, y, w, h, fill "#hex"|null, stroke "#hex"|null, stroke_width, radius}], target "new" or an existing vector layer id.
+  raster: source (${LAYER_DOC.source}), target "base" | "new" | <raster layer id>.
+  text: text, style ${LAYER_DOC.style} box ${LAYER_DOC.box} target "new" or an existing text layer id.
+  vector: target "new" or an existing vector layer id; shapes: ${LAYER_DOC.shapes}
+  Drawing: strokes: ${LAYER_DOC.strokes}
   Images only go on raster layers, text only on text layers, shapes only on vector layers. Video cannot be placed on layers.
 - subjects (plan level, optional): [{name, kind, from, description}]. For temporary use of an existing image, use refs in each consuming step and cite its role with the model's reference syntax. from asset:<id> saves to the library when the approved plan runs: use only when the user explicitly asked to save or accepted an offer to save. from an image step is used by this plan only, never saved automatically, and needs no save consent; steps mention @Name and wait for that step. description = its fixed identity. Reuse existing library names without redefining them; an undeclared @Name is rejected.
 - style (plan level, optional): one short style block appended to every image and video prompt.

@@ -6,6 +6,7 @@ import type { ToolSpec } from '../providers/llm';
 import { MAX_PLAN_STEPS, type RawPlan } from '../plan';
 import { AGENT_OP_IDS } from '../ops';
 import { DESIGNER_TOOLS } from './designerTools';
+import { LAYER_DOC } from './layerDoc';
 
 /* Tools the agent can call. Inputs are validated with zod before use. */
 
@@ -288,25 +289,23 @@ export const TOOLS: ToolSpec[] = [
                 params: { type: 'object', description: 'op parameters; for image/video/audio/model3d steps, model parameters listed in the context (style values; audio: lyrics, is_instrumental, lyrics_optimizer, mode, title).' },
                 text: { type: 'string', description: 'text step content, or the text of a text layer.' },
                 layer_type: { type: 'string', enum: ['raster', 'text', 'vector'] },
-                source: { type: 'string', description: 'raster layer: image reference.' },
-                target: { type: 'string', description: 'layer: "base" (layer 1), "new", or an existing layer id of the same type.' },
-                style: { type: 'object', description: 'text layer style.' },
+                source: { type: 'string', description: `raster layer: ${LAYER_DOC.source}` },
+                target: { type: 'string', description: `layer: ${LAYER_DOC.target}` },
+                style: { type: 'object', description: `text layer style ${LAYER_DOC.style}` },
                 box: {
                   type: 'object',
                   properties: { x: { type: 'number' }, y: { type: 'number' }, width: { type: 'number' } },
-                  description: 'text layer position and wrap width in document pixels.',
+                  description: LAYER_DOC.box,
                 },
                 shapes: {
                   type: 'array',
                   items: { type: 'object' },
-                  description:
-                    'vector layer shapes in document px: {type: rect|ellipse|line, x, y, w, h, fill, stroke, stroke_width, radius} or {type: "path", d, fill, stroke, stroke_width} with absolute commands only (M L C Q S T Z) for precise curves.',
+                  description: LAYER_DOC.shapes,
                 },
                 strokes: {
                   type: 'array',
                   items: { type: 'object' },
-                  description:
-                    'freehand drawing in document px: [{points: [[x, y] or [x, y, pressure 0-1], …], color, size}]; enough points to follow each curve. vector layer → editable strokes; raster layer (target "new") → painted with the brush on a new layer.',
+                  description: LAYER_DOC.strokes,
                 },
               },
               required: ['id', 'kind'],
