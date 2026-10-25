@@ -4,6 +4,24 @@ Las propuestas nuevas del agente deben declarar la fuente y todos los consumidor
 
 El bloque de estilo común se aplica literalmente al prompt de cada paso y a cada prompt estructurado de shot. Se mantienen los formatos y límites del modelo confirmado. Las referencias dentro de shots también deben llegar al flujo de transporte de sujetos.
 
+### Mecanismo de estilo (2026-10-24). REVISAR DESPUÉS
+
+Cómo funciona hoy, de punta a punta:
+
+1. El agente escribe la fórmula de estilo una vez, en `propose_plan.style` (`context.ts`: «One style… do not restate it per step»).
+2. Al normalizar el plan, `applyPlanStyle` (`src/engine/continuity.ts:103`) añade `\n\nStyle: <bloque>` al final del prompt de cada paso de imagen y vídeo, y al de cada shot nativo (`settings.shots`). Si el prompt ya contiene el bloque literal, no lo repite.
+3. La guía de Seedance (`src/engine/guides/seedance.md`, animación) pide lo mismo: la fórmula idéntica en cada clip y activo, puesta en `style`; dentro de un prompt, una sola vez.
+4. El reescritor de la tarjeta (`planSettings.ts`, `rewritePrompts`) recibe el bloque y la orden de no repetirlo.
+5. La imagen de estilo como referencia sigue siendo el ancla más fuerte (fuente del usuario, punto 4).
+
+Origen: fuente del usuario del 2026-09-26 («la repites palabra por palabra en TODOS los planos y todos los activos»; historia 013), y L4 de la historia 009 (el estilo no depende de que el modelo lo repita). Hasta el 2026-10-24 la guía decía «in every shot» y chocaba con el punto 1: un prompt de 7 s salió con la fórmula cuatro veces y 4006 caracteres (historia 053).
+
+Abierto, sin prueba con el generador:
+- Que una sola vez por prompt mantenga el look en clips de varias tomas es una interpretación de la fuente, no una medición.
+- El bloque va al final del prompt; no se ha comparado con ponerlo al principio.
+- El límite de 4000 caracteres incluye el bloque.
+- Otras guías de animación (Wan, Kling, MiniMax) no se han revisado contra este mecanismo.
+
 Las menciones de cada shot se convierten a la sintaxis del proveedor manteniendo los índices de los sujetos para todo el clip. El esquema debe permitir el transporte de una referencia implícita; si no lo permite, solo una entrada explícita compatible puede establecer la conexión. Una vista secundaria de biblioteca también necesita una conexión explícita para no asumir que el runner la envía.
 
 Todos los modos reciben instrucciones comunes sobre roles y atributos heredados o excluidos, estado inicial, contacto, respuesta y estado final. La física respeta el medio solicitado: 2D, 3D estilizado o realista. La guía de dirección amplía orientación, encuadre, perspectiva, cámara y transiciones, sin imponer grano, óptica fotográfica o formato panorámico. Personajes, arquitectura, productos y anuncios reutilizan estas reglas con sus fuentes y propiedades pertinentes.

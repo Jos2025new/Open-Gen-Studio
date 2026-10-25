@@ -41,7 +41,7 @@ EDIT AND EXTEND (2.5, through the app's Edit video / Extend video operations)
 - Extend: describe where the action continues from the current end state. The aspect follows the extended clip.
 
 ANIMATION (2D, 3D, 2.5D, stop-motion) — same skeleton, different vocabulary
-- Replace the grade family with a STYLE FORMULA of 80–100 words and repeat it word for word in every shot and every asset. Literal repetition is the whole consistency mechanism; rephrasing it "similarly" in shot 3 loses the look.
+- Replace the grade family with a STYLE FORMULA of 50–100 words, identical word for word in every clip and every asset (character, location and prop images); rephrasing it "similarly" in clip 3 loses the look. Write it once as the plan's "style": the app appends it verbatim to every image and video prompt of the plan. Inside one prompt it appears once, never per shot; the shots carry only action, camera and time.
 - 2D / anime: ban photographic terms (bokeh, volumetric, realism, film grain, DSLR, live action). Use clean tapered contour lines, 2–3 tone flat cel shading, flat fills, painted watercolour backgrounds with paper grain, hard painted shadows, speed/impact lines, flat palette.
 - 3D (feature animation, game cinematic): render vocabulary is allowed — subsurface-scattered skin, PBR, global illumination, stylised hair clumps, rendered depth of field, rim light.
 - 2.5D (painterly 3D): 3D base with 2D treatment — drawn contours, halftone, chromatic aberration, painterly brush layers, paper texture.
@@ -58,6 +58,6 @@ A rust-grey desert canyon under a shattered moon; iron-oxide walls carved into f
 115° ultra-wide gimbal, pushing forward at 0.6 m/s, camera below her eyeline, never level. Storm-desat rust-and-ember palette, dusk skylight through dust, one warm amber point appearing at the end. Diegetic only — canyon wind, sand hiss, boot crunch, rising sub-bass thrum. No music, no score, no bgm.
 
 EXAMPLE (2D anime, 10 s)
-Style formula (repeat verbatim in every shot): 2D anime, hand-drawn line art with clean tapered black contours, flat cel shading in two tones, painted watercolour backgrounds with visible paper grain, muted teal-and-mustard palette, animation on twos, no photographic depth of field, no realism.
+Style formula (the plan's "style", appended once to this prompt and verbatim to every other clip or asset): 2D anime, hand-drawn line art with clean tapered black contours, flat cel shading in two tones, painted watercolour backgrounds with visible paper grain, muted teal-and-mustard palette, animation on twos, no photographic depth of field, no realism.
 A girl in a yellow raincoat waits alone under a bus shelter as the rain turns to petals.
 Locked low MS, 50mm-equivalent flat perspective, camera static, foreground puddle 10 cm from lens, subject in right third, never level with her eyes. Diegetic only — rain on corrugated roof, distant traffic hiss, one bicycle bell. No music, no score, no bgm.
