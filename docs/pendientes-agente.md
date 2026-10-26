@@ -37,6 +37,7 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 - **A23 · bajo · 2026-10-21 · Decisión: cápsulas de respuesta rápida** bajo los mensajes del agente (elemento de interfaz nuevo; idea anotada).
 - **A24 · cerrado 2026-10-23** · cada conexión de Nodes guarda el resultado que usa; retirado el error al agente: [050](history/050-2026-10-W43.md).
 - **A25 · medio · 2026-10-25 · «Ajustar prompt» activo mientras se adapta el prompt**: en la tarjeta del plan el botón sigue disponible durante «Adapting the prompt…» (o «Revising…»); pulsarlo entonces puede cruzar dos reescrituras. Debe quedar desactivado mientras dura. Código: [PlanSettings.tsx:34](../src/components/chat/PlanSettings.tsx), estado `rewriting` en [PlanCard.tsx:199](../src/components/chat/PlanCard.tsx) (`usePlanRewrite`). Anotado por el usuario; revisar después.
+- **A26 · alto · 2026-10-26 · Arrastrar el divisor chat/panel no es fluido**: al mover la barra entre el chat y el panel (Generations, Nodes, Designer) el contenido se solapa (las tarjetas del chat quedan bajo el panel) y al achicarlo va con retraso. Debe seguir al puntero sin saltos ni solapes, como en cualquier otra plataforma. Divisor: `.space-divider` en [space.css:24](../src/styles/space.css) y su lógica en [SpaceFrame.tsx](../src/components/space/SpaceFrame.tsx). Seguir el [protocolo de rendimiento](depuracion.md#protocolo) (sonda primero). Anotado por el usuario; revisar después.
 
 ## Proveedores, precios y coste (B)
 
