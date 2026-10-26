@@ -87,7 +87,9 @@ export async function changePlanChoice(sessionId: string, itemId: string, kind: 
   if (!item || !before) return;
   await Promise.all([ensureSchema(next.modelRef), ...item.plan.steps.filter(isGen).map((s) => ensureSchema(stepModel(next.modelRef, s)))]);
   const draft = kind === 'video' ? planDraft(sessionId) : undefined;
-  const c = kind === 'video' ? withModeResolution(next, draft, settingsOptions(get().catalog.schemas[next.modelRef], 'video').resolutions, next.resolution) : next;
+  // A resolution the user picks on the card is the one that runs and is priced (Alta calidad once swapped the lowest for the highest); a locked draft keeps its own.
+  const picked = next.resolution !== before.settings.resolution && !draft?.locked;
+  const c = kind === 'video' && !picked ? withModeResolution(next, draft, settingsOptions(get().catalog.schemas[next.modelRef], 'video').resolutions, next.resolution) : next;
   const now = planOf(sessionId, itemId);
   if (!now) return;
   updateFeedItem<PlanFeedItem>(sessionId, itemId, { plan: { ...now.plan, steps: now.plan.steps.map((s) => (isGen(s) && s.kind === kind ? applyChoice(s, c) : s)) } });

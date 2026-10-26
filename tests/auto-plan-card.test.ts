@@ -188,6 +188,15 @@ describe('plan card settings', () => {
     expect(st().agent.draftMode).toMatchObject({ kind: 'draft', locked: true });
     expect(steps().find((x) => x.kind === 'image')?.settings).toMatchObject({ aspect: '1:1' });
   });
+
+  it('(f2) with Alta calidad on, the resolution the user picks is the one the step runs and is priced at, the lowest too (sandbox 2026-10-26: 480p picked, 1080p kept)', async () => {
+    put([vid('v1')]);
+    changePlanDraft(sid(), 'pl1', 'hq');
+    expect(steps()[0].settings.resolution).toBe('1080p');
+    await changePlanChoice(sid(), 'pl1', 'video', { modelRef: VID, aspect: '16:9', duration: 5, resolution: '480p', needsImage: false });
+    expect(steps()[0].settings.resolution).toBe('480p');
+    expect(st().agent.settings?.video?.resolution).toBe('480p');
+  });
 });
 
 describe('Auto: which model and values, without a card (sandbox session 2026-10-24)', () => {

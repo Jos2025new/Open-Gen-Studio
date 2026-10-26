@@ -21,6 +21,8 @@
 .feed-gen-row { display: flex; flex-direction: column; gap: var(--sp-2); align-items: flex-start; }
 .feed-gen-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)); gap: var(--sp-3); align-items: start; width: 100%; }
 .feed-gen-grid > .studio-gen { min-width: 0; }
+/* A failed or canceled result in a row keeps its column (it once kept 300px and slid under the next image); long provider ids wrap. */
+.feed-gen-grid .gen-card { width: 100%; min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .feed-gen-grid .studio-thumb, .feed-gen-grid .studio-gen-row > .attach-host { width: 100%; }
 .studio-gen-head { display: inline-flex; align-items: center; gap: var(--sp-1); font-size: var(--fs-s); color: var(--text-3); }
 .studio-gen-head:hover { color: var(--text); }
