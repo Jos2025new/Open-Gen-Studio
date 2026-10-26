@@ -107,7 +107,9 @@ describe('the history of a new request (T6)', () => {
     const calls: number[] = [];
     let lastMessages: LlmMessage[] = [];
     vi.stubGlobal('fetch', async (_u: string, init?: RequestInit) => {
-      lastMessages = JSON.parse(String(init?.body)).messages;
+      const messages = JSON.parse(String(init?.body)).messages;
+      if (!messages) return new Response('{}'); // the turn log line
+      lastMessages = messages;
       calls.push(lastMessages.length);
       return replies[calls.length - 1]();
     });

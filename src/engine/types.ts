@@ -665,8 +665,6 @@ export interface NoticeFeedItem extends FeedBase {
   text: string;
   /** A transient agent failure (connection lost, provider busy): Retry reruns the turn from the last completed step. */
   retry?: { partialItemId?: string };
-  /** The agent answered a make-something request with text only (no plan, no questions): offer to ask for the plan. */
-  proposePlan?: boolean;
   /** The model wrote its tool call as text (e.g. DeepSeek's DSML markup): its reply item, which Delete removes. */
   garbledItemId?: string;
 }

@@ -75,6 +75,8 @@ import {
 import { SYSTEM_PROMPT, WRAPUP_RULE, buildContext } from './context';
 import { offlinePlan } from './offline';
 import { findModelsResult, suggestModel } from './modelIndex';
+import { editPairParts, WRAPUP_COMPARE_RULE } from './wrapUpPairs';
+import { startTurnLog, type TurnOutcome, type TurnRoute } from './turnLog';
 import { agentSeesImages, attachmentParts, stripImages, trimReferenceResults, userMessage } from './attachments';
 import { closeRequest, recordMetric, startRequest, turnClock } from './metrics';
 import { drainAgentNotes, priceDecision, priceDecisionNote, recordPriceResults } from './priceNotes';
@@ -95,7 +97,6 @@ import { confirmApproved, inheritApproved } from './inherit';
 import { lineKey, variantRoute } from '../variants';
 import { readGraph } from '../flow/graphView';
 import { agentCanvas, backToChatCanvas, moveToCanvas, openBoard } from './agentCanvas';
-import { endedWithoutPlan } from './endedWithoutPlan';
 import { checkingPlan, untilStopped, watchModel } from './turnStop';
 import { activityLog } from './activityLog';
 import { waitHooks } from './schemaWait';
@@ -294,7 +295,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
         content: `The user wrote instead of confirming the settings card. Nothing was confirmed; the card is closed:\n${userBlock(clean, workspace)}\nAnswer what they ask first, in text. If the work still stands, call confirm_settings again with any change they asked for (a model they named stays). Never say the settings were confirmed.\n\n${ctx}`,
       });
       patchAgent(sessionId, { pending: undefined });
-      await llmTurn(sessionId, workspace);
+      await llmTurn(sessionId, workspace, { route: 'settings-reply' });
       return;
     }
     patchAgent(sessionId, { pending: undefined });
@@ -303,26 +304,23 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   if (pending?.kind === 'plan' && pendingItem?.type === 'plan' && pendingItem.status === 'awaiting') {
     recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'plan-revision', event: 'plan.comment_received', reason: 'user replied while plan awaits approval', sessionId, planId: pendingItem.plan.id, approvalId: pendingItem.id, before: { status: pendingItem.status, adjustments: pendingItem.plan.adjustments } });
     const engine = agentEngine();
-    if (engine.kind === 'llm' && pending.toolCallId) {
+    // The engine decides who answers; a plan kept after a text-only reply has no open tool call, so it gets a user message.
+    if (engine.kind === 'llm') {
       addReplyToRequest(sessionId, clean, attachments);
       const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, attachments));
-      pushHistory(sessionId, {
-        role: 'tool',
-        tool_call_id: pending.toolCallId,
-        content: `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`,
-      });
+      replyToCard(sessionId, pending.toolCallId, `The user replied instead of approving:\n${userBlock(clean, workspace)}${adjustedNote(pendingItem.plan)}\nIf the user asks something, answer it first in one or two sentences of text. If this adjusts the plan (a model, a step, duration, count, which steps to keep), also call propose_plan with revision true: keep every other step, prompt and setting exactly as they were and change only what was asked. If it is a different request, use revision false. Answering only with text leaves this plan waiting as it is (never say you left a new one).\n\n${ctx}`);
       // Images attached to the comment: a user message after the tool result (tool results carry no images).
       const parts = await visibleAttachments(sessionId, workspace, attachments);
       if (parts.length) pushHistory(sessionId, userMessage('Attached with this comment:', parts));
       // The card stays until the revision replaces it (or closes at the end of the turn); Run waits meanwhile.
       patchAgent(sessionId, { pending: undefined, revising: pendingItem.id });
-      await llmTurn(sessionId, workspace);
+      await llmTurn(sessionId, workspace, { route: 'plan-comment' });
     } else {
       updateFeedItem<PlanFeedItem>(sessionId, pendingItem.id, { status: 'canceled' });
       removeDraftNodes(sessionId, pendingItem.plan.id);
       addReplyToRequest(sessionId, clean, attachments);
       patchAgent(sessionId, { pending: undefined });
-      await offlineTurn(sessionId, workspace);
+      await offlineTurn(sessionId, workspace, 'plan-comment');
     }
     return;
   }
@@ -340,7 +338,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
       const why = keys[agent.provider]?.trim() ? `No agent model is chosen for ${LLM_LABELS[agent.provider]}` : `There is no ${LLM_LABELS[agent.provider]} key`;
       notice(sessionId, workspace, `${why}, so the local planner answers. Fix it in Settings → Agent.`, 'info');
     }
-    await offlineTurn(sessionId, workspace);
+    await offlineTurn(sessionId, workspace, 'new');
     return;
   }
   startRequest(sessionId, { request: clean, workspace, engine: engineLabel(), attachments: attachments.length });
@@ -364,7 +362,7 @@ export async function sendAgentMessage(text: string, opts: { attachments?: strin
   // The route goes first: one buried after the context was followed after the prompt's own steps.
   const askFirst = session(sessionId).agent.questionRound === 0;
   pushHistory(sessionId, userMessage(`${forced}${userBlock(clean || '(no text)', workspace)}\n\n<app_context>\n${ctx}${pickedWorkflowGuides(sessionId, askFirst)}\n</app_context>`, parts));
-  await llmTurn(sessionId, workspace);
+  await llmTurn(sessionId, workspace, { route: 'new' });
 }
 
 /** The attached images as the model sees them; with a model that has no vision, a notice and text only. */
@@ -397,6 +395,11 @@ function resolvePendingAsSuperseded(sessionId: string): void {
   patchAgent(sessionId, { pending: undefined });
 }
 
+/** The answer to a card: the tool result when its call is open, else a user message (a plan kept after a text-only reply has no call). */
+function replyToCard(sessionId: string, toolCallId: string | null | undefined, content: string): void {
+  pushHistory(sessionId, toolCallId ? { role: 'tool', tool_call_id: toolCallId, content } : userMessage(`[app] ${content}`, []));
+}
+
 function pushHistory(sessionId: string, msg: LlmMessage): void {
   patchAgent(sessionId, (a) => ({ history: [...a.history, msg] }));
 }
@@ -413,12 +416,12 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined });
   const engine = agentEngine();
-  if (engine.kind === 'llm' && pending?.toolCallId) {
+  if (engine.kind === 'llm') {
     const lines = item.questions.map((q) => `- ${q.question}: ${answers[q.id] ?? '(no answer)'}`);
     if (answers.note) lines.push(`- User note: ${answers.note}`);
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, workspace, s.agent.draft?.attachments ?? []));
-    pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `User answers (${how}):\n${lines.join('\n')}\n\n${ctx}` });
-    await llmTurn(sessionId, workspace);
+    replyToCard(sessionId, pending?.toolCallId, `User answers (${how}):\n${lines.join('\n')}\n\n${ctx}`);
+    await llmTurn(sessionId, workspace, { route: 'answers' });
     return;
   }
   const draft = s.agent.draft ?? { request: '', answers: {}, attachments: [] };
@@ -426,7 +429,7 @@ export async function submitAnswers(sessionId: string, itemId: string, answers: 
   // A typed note on an offline card enriches the request itself.
   const request = answers.note ? `${draft.request} ${answers.note}`.trim() : draft.request;
   patchAgent(sessionId, { draft: { ...draft, request, answers: merged } });
-  await offlineTurn(sessionId, workspace);
+  await offlineTurn(sessionId, workspace, 'answers');
 }
 
 /** "Skip, plan now" on a questions card: no more questions, plan with sensible defaults. */
@@ -439,17 +442,13 @@ export async function skipQuestions(sessionId: string, itemId: string): Promise<
   const pending = s.agent.pending;
   patchAgent(sessionId, { pending: undefined, questionRound: get().settings.guidedRounds });
   const engine = agentEngine();
-  if (engine.kind === 'llm' && pending?.toolCallId) {
+  if (engine.kind === 'llm') {
     const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
-    pushHistory(sessionId, {
-      role: 'tool',
-      tool_call_id: pending.toolCallId,
-      content: `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`,
-    });
-    await llmTurn(sessionId, turnCanvas(item.workspace));
+    replyToCard(sessionId, pending?.toolCallId, `The user skipped the questions. Use sensible defaults and call propose_plan now.\n\n${ctx}`);
+    await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'skip' });
     return;
   }
-  await offlineTurn(sessionId, turnCanvas(item.workspace));
+  await offlineTurn(sessionId, turnCanvas(item.workspace), 'skip');
 }
 
 /** The selection on an open settings card, kept so a typed message confirms what the user sees. */
@@ -473,7 +472,7 @@ export async function confirmSettings(sessionId: string, itemId: string, chosen:
   if (agentEngine().kind !== 'llm' || !pending?.toolCallId) return;
   const ctx = buildContext(session(sessionId), contextOpts(sessionId, turnCanvas(item.workspace), s.agent.draft?.attachments ?? []));
   pushHistory(sessionId, { role: 'tool', tool_call_id: pending.toolCallId, content: `${settingsResultText(item, sections as Array<SettingsSection & { chosen: SettingsChoice }>, (t) => inConversation(sessionId, t), note)}\n\n${ctx}` });
-  await llmTurn(sessionId, turnCanvas(item.workspace));
+  await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'settings-confirm' });
 }
 
 /**
@@ -488,7 +487,7 @@ export async function retryAgentTurn(sessionId: string, noticeId: string): Promi
   if (!s || s.agent.busy || item?.type !== 'notice' || !item.retry || agentEngine().kind !== 'llm') return;
   if (item.retry.partialItemId) removeFeedItem(sessionId, item.retry.partialItemId);
   removeFeedItem(sessionId, noticeId);
-  await llmTurn(sessionId, turnCanvas(item.workspace));
+  await llmTurn(sessionId, turnCanvas(item.workspace), { route: 'retry' });
 }
 
 /** Stop the agent of the given session (by default the one on screen). */
@@ -501,7 +500,12 @@ export function stopAgent(sessionId: string = get().activeSessionId): void {
 // ---------------------------------------------------------------------------
 // Offline planner
 
-async function offlineTurn(sessionId: string, workspace: Workspace): Promise<void> {
+async function offlineTurn(sessionId: string, workspace: Workspace, route: TurnRoute): Promise<void> {
+  const end = startTurnLog(sessionId, 'offline', route);
+  end(await offlinePass(sessionId, workspace));
+}
+
+async function offlinePass(sessionId: string, workspace: Workspace): Promise<TurnOutcome> {
   const s = session(sessionId);
   const draft = s.agent.draft ?? { request: '', answers: {}, attachments: [] };
   const st = get();
@@ -520,14 +524,15 @@ async function offlineTurn(sessionId: string, workspace: Workspace): Promise<voi
   });
   if (action.kind === 'reply') {
     appendFeed(sessionId, { ...feedBase(workspace), type: 'assistant', text: action.text, engine: 'Local planner' });
-    return;
+    return 'text';
   }
   if (action.kind === 'questions') {
     showQuestions(sessionId, workspace, action.intro, action.questions, null);
-    return;
+    return 'questions';
   }
   const result = await presentPlan(sessionId, workspace, action.plan, null);
   if (result.errors.length) notice(sessionId, workspace, `The plan could not be built: ${result.errors.join(' ')}`);
+  return result.errors.length ? 'error' : 'plan';
 }
 
 function showQuestions(sessionId: string, workspace: Workspace, intro: string | undefined, questions: AgentQuestion[], toolCallId: string | null): void {
@@ -1108,9 +1113,11 @@ async function wrapUpPlan(sessionId: string, itemId: string, title: string, stat
   if (at < 0 || s.feed.slice(at + 1).some((f) => f.type === 'user')) return;
   const item = s.feed[at];
   drainAgentNotes(sessionId);
+  // After an edit the agent gets the original and the result to compare; otherwise it has not seen the result.
+  const pairs = item.type === 'plan' && agentSeesImages() ? await editPairParts(item) : [];
   pushHistory(sessionId, userMessage(`[app] Plan "${title}" finished (${status}): ${summary}
-${WRAPUP_RULE}`, []));
-  await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true });
+${pairs.length ? WRAPUP_COMPARE_RULE : WRAPUP_RULE}`, pairs));
+  await llmTurn(sessionId, turnCanvas(item.workspace), { textOnly: true, route: 'wrap-up' });
 }
 
 // ---------------------------------------------------------------------------
@@ -1254,14 +1261,6 @@ export function deleteGarbled(sessionId: string, noticeId: string): void {
   removeFeedItem(sessionId, noticeId);
 }
 
-/** "Propose the plan" under a reply without one: asks the agent for it as the user would. */
-export function askForPlan(sessionId: string, noticeId: string): void {
-  const s = session(sessionId);
-  if (!s || s.agent.busy || get().activeSessionId !== sessionId) return;
-  removeFeedItem(sessionId, noticeId);
-  void sendAgentMessage('Propose the plan now.');
-}
-
 /** A turn that says nothing for a minute says so (a long reasoning is legitimate); one that reaches five minutes is cut. */
 /** Direct mode asks nothing and shows no settings card, so those two tools are not offered to the model. */
 const DIRECT_HIDDEN_TOOLS = new Set(['ask_questions', 'confirm_settings']);
@@ -1277,12 +1276,14 @@ const HURRY_MS = 50_000;
 const HURRY_NOTE =
   '<system_warning>For this agent turn only, until the next user request: the user has been waiting over 50 seconds. Be brief. If you have the answer, give it now; if you need a tool, call it now; if you cannot do it, say so in one sentence. Do not deliberate further.</system_warning>';
 
-async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { textOnly?: boolean; creditRetried?: boolean } = {}): Promise<void> {
+async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { route: TurnRoute; textOnly?: boolean; creditRetried?: boolean }): Promise<void> {
   // The canvas can change inside the turn (open_board, continue_in_*): every gate below reads the current one.
   let workspace = startWorkspace;
   const engine = agentEngine();
   if (engine.kind !== 'llm' || !mayStartWork()) return;
   void loadLlmCatalog(engine.provider);
+  const endLog = startTurnLog(sessionId, 'llm', opts.route);
+  let outcome: TurnOutcome = 'text';
   patchAgent(sessionId, { busy: true, phase: 'working' });
   const log = activityLog(sessionId, rowCanvas(workspace));
   const showThinking = get().settings.agent.showThinking !== false;
@@ -1298,7 +1299,6 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   // Auto confirming the settings itself is the app's step, not the agent's: once per turn it gives the round back.
   let settled = false;
   let hurryNoted = false;
-  let transferredToDesigner = false;
   // If nothing comes out for a minute the activity block says so (Stop is in the composer); output re-arms it.
   // The five-minute cap is the only thing that ends a turn by force (T3).
   let silenceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -1322,6 +1322,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
     clearTimeout(silenceTimer);
     clearTimeout(capTimer);
     keepCommentedPlan(sessionId);
+    endLog(outcome);
     log.end();
     clock.end();
     patchAgent(sessionId, { busy: false, phase: undefined, waiting: undefined });
@@ -1329,18 +1330,20 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
   };
   const cut = () => {
     cutTurn = true;
+    outcome = 'cut';
     logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: TURN_CAP_MS });
     controller.abort();
     finish(limitNote);
   };
   const capTimer = setTimeout(cut, TURN_CAP_MS);
-  ending.set(controller, () => finish(() => notice(sessionId, workspace, 'Stopped.', 'info')));
+  ending.set(controller, () => { outcome = 'canceled'; finish(() => notice(sessionId, workspace, 'Stopped.', 'info')); });
   armSilence();
   try {
     for (let iteration = 0; iteration < 5; iteration++) {
       // The cap can also fall between two calls, where there is nothing to abort.
       if (cutTurn || Date.now() - turnStart > TURN_CAP_MS) {
         if (!cutTurn) logEvent('agent', { session: sessionId, event: 'turn-cut', limit: 'turn', ms: Date.now() - turnStart });
+        outcome = 'cut';
         limitNote();
         return;
       }
@@ -1388,6 +1391,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false });
         if (isAbort(err)) {
           // Stop and the cap already said so and ended the turn; this is an abort from elsewhere.
+          outcome = cutTurn ? 'cut' : 'canceled';
           if (!done) (cutTurn ? limitNote : () => notice(sessionId, workspace, 'Stopped.', 'info'))();
           return;
         }
@@ -1395,12 +1399,13 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
         // again once; otherwise the choices are shown above the prompt box and the notice keeps Retry.
         if (isCreditError(err) && !opts.creditRetried) {
           if (textItemId) removeFeedItem(sessionId, textItemId);
-          if (await until(onAgentCredit())) return llmTurn(sessionId, workspace, { ...opts, creditRetried: true });
+          if (await until(onAgentCredit())) { outcome = 'error'; return llmTurn(sessionId, workspace, { ...opts, creditRetried: true }); }
         }
         // History only grows with completed calls, so a retry repeats just the call that failed.
         const retry = isTransient(err) || isCreditError(err) ? { ...(textItemId ? { partialItemId: textItemId } : {}) } : undefined;
         // The call happened and cost time: it is a call in the metrics even though it produced nothing (T2).
         recordMetric(sessionId, { type: 'failedCall', error: (err as Error).message, ms: clock.elapsed() });
+        outcome = 'error';
         notice(sessionId, workspace, `${LLM_LABELS[engine.provider]}: ${(err as Error).message}`, 'error', retry);
         return;
       }
@@ -1431,6 +1436,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           retry: textItemId ? { partialItemId: textItemId } : {},
           ...(textItemId ? { garbledItemId: textItemId } : {}),
         });
+        outcome = 'error';
         return;
       }
       if (textItemId) updateFeedItem(sessionId, textItemId, { streaming: false, text: result.text.trim() });
@@ -1461,10 +1467,9 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
       if (!result.toolCalls.length) {
         // Nothing to show and nothing to run (T2): say what actually happened, and leave the turn retryable.
         if (!result.text.trim()) {
+          outcome = 'empty';
           const cut = result.finishReason === 'length';
           notice(sessionId, workspace, cut ? 'The model spent its whole output budget thinking and answered nothing. Lower the reasoning in Settings or pick another model, then try again.' : 'The model returned an empty answer.', 'error', {});
-        } else if (!opts.textOnly && !transferredToDesigner && endedWithoutPlan(sessionId, rowCanvas(workspace))) {
-          appendFeed(sessionId, { ...feedBase(workspace), type: 'notice', level: 'info', text: 'The agent replied without a plan.', proposePlan: true });
         }
         return;
       }
@@ -1512,6 +1517,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           recordJourneyEvent({ journeyId: journeyIdFor(sessionId) ?? sessionId, journey: 'settings-response', event: 'settings.presented', reason: 'agent requested settings confirmation', sessionId, approvalId: item.id, after: { choices: sections.map((x) => ({ kind: x.kind, modelRef: x.recommended.modelRef, count: x.count, duration: x.recommended.duration, needsImage: x.recommended.needsImage })) } });
           patchAgent(sessionId, { pending: { toolCallId: call.id, kind: 'settings', feedItemId: item.id } });
           if (get().ui.workspace !== 'chat') setThreadOpen(true);
+          outcome = 'settings';
           return;
         }
         if (call.name === 'ask_questions') {
@@ -1546,6 +1552,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
             })),
             call.id,
           );
+          outcome = 'questions';
           return;
         }
         if (call.name === 'find_models') {
@@ -1643,8 +1650,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           if (!v.success) respond(`Invalid continue_in_designer input: ${formatZodError(v.error)}`);
           else {
             const r = await until(chatToDesigner(sessionId, { assetIds: v.data.asset_ids, as: v.data.as }));
-            transferredToDesigner = r.docs.length > 0 || !!r.openedExisting;
-            if (transferredToDesigner) workspace = moveToCanvas('designer');
+            if (r.docs.length > 0 || !!r.openedExisting) workspace = moveToCanvas('designer');
             log.action({ icon: 'guide', label: r.docs.length ? `Sent ${r.docs.reduce((n, d) => n + d.layers, 0)} images to the Designer` : 'Nothing sent to the Designer' });
             const lines = [
               r.docs.length ? `In the Designer now (nothing generated): ${r.docs.map((d) => `design ${d.id} "${d.name}" (${d.layers} raster layer${d.layers === 1 ? '' : 's'})`).join('; ')}.` : r.openedExisting ? `No duplicates added. Chat images are already imported; opened existing design ${r.openedExisting} in the Designer.` : 'No image was sent. Do not claim anything was imported.',
@@ -1791,6 +1797,7 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
           // This call's result is sent when the user approves or cancels.
           ignoreRest(index);
           flushToolResults(sessionId, toolResults);
+          outcome = 'plan';
           return;
         }
         respond(`Unknown tool "${call.name}".`);
@@ -1798,10 +1805,12 @@ async function llmTurn(sessionId: string, startWorkspace: Workspace, opts: { tex
       flushToolResults(sessionId, toolResults);
       for (const m of afterTools) pushHistory(sessionId, m);
       if (planFailures >= 3) {
+        outcome = 'error';
         notice(sessionId, workspace, 'The agent could not produce a valid plan. Try rephrasing or pick another model.');
         return;
       }
     }
+    outcome = 'error';
     notice(sessionId, workspace, stoppedText(lastBlock));
   } catch (err) {
     if (!isAbort(err)) throw err; // Stop during a tool: finish() already ended the turn

@@ -8,7 +8,7 @@ vi.mock('../src/lib/idb', () => ({
   putAssetBlob: async () => undefined,
 }));
 
-import { approvePlan, cancelPlan, sendAgentMessage } from '../src/engine/agent/runtime';
+import { approvePlan, cancelPlan, sendAgentMessage, skipQuestions, submitAnswers } from '../src/engine/agent/runtime';
 import { toggleStep } from '../src/engine/plan';
 import { updateFeedItem } from '../src/store/store';
 import type { PlanStep } from '../src/engine/types';
@@ -144,5 +144,44 @@ describe('H11 consent across approval and revision', () => {
     expect(useStore.getState().library).toEqual([]);
     await approvePlan(useStore.getState().activeSessionId, plans()[0].id);
     expect(useStore.getState().library).toMatchObject([{ name: 'Kai', frontalAssetId: 'consent_ref' }]);
+  });
+});
+
+// Audit regression: a second comment after a text-only reply must still reach the configured agent.
+it('audit: second comment stays with the LLM after a text-only reply', async () => {
+  replies = [{ plan: { title: 'Clips', texts: ['a'] } }];
+  await sendAgentMessage('clips');
+  replies = [{ text: 'The plan stays as is.' }];
+  await sendAgentMessage('leave it as is');
+  expect(chatCalls).toBe(2);
+  replies = [{ text: 'I can explain that.' }];
+  await sendAgentMessage('explain the prompt');
+  expect(chatCalls).toBe(3);
+  expect(plans().map((p) => p.status)).toEqual(['awaiting']);
+});
+
+describe('a card with no open tool call still goes to the LLM', () => {
+  const questionsCard = () => {
+    const sid = useStore.getState().activeSessionId;
+    const item = { id: 'q1', createdAt: 1, workspace: 'chat', type: 'questions', questions: [{ id: 'a', question: 'Which?', options: ['x', 'y'], allowCustom: true, multi: false }], round: 1, maxRounds: 2, status: 'pending' };
+    useStore.setState((st) => ({ sessions: { ...st.sessions, [sid]: { ...st.sessions[sid], feed: [item as never], agent: { ...st.sessions[sid].agent, pending: { toolCallId: null, kind: 'questions', feedItemId: 'q1' } } } } }));
+    return sid;
+  };
+  const history = (sid: string) => useStore.getState().sessions[sid].agent.history;
+  it('answers arrive as a user message and the agent replies', async () => {
+    const sid = questionsCard();
+    replies = [{ plan: { title: 'P', texts: ['a'] } }];
+    await submitAnswers(sid, 'q1', { a: 'x' });
+    expect(chatCalls).toBe(1);
+    expect(history(sid).some((m) => m.role === 'user' && typeof m.content === 'string' && /^\[app\] User answers[\s\S]*Which\?: x/.test(m.content))).toBe(true);
+    expect(plans()).toHaveLength(1);
+  });
+  it('skipping arrives as a user message and the agent replies', async () => {
+    const sid = questionsCard();
+    replies = [{ plan: { title: 'P', texts: ['a'] } }];
+    await skipQuestions(sid, 'q1');
+    expect(chatCalls).toBe(1);
+    expect(history(sid).some((m) => m.role === 'user' && typeof m.content === 'string' && /^\[app\] The user skipped the questions/.test(m.content))).toBe(true);
+    expect(plans()).toHaveLength(1);
   });
 });

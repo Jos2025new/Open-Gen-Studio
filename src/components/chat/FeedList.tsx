@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from 'react';
 import { ChevronDown, CircleAlert, Copy, Info, LoaderCircle, Pencil, RotateCw, Trash } from 'lucide-react';
 import type { FeedItem, NoticeFeedItem } from '../../engine/types';
-import { askForPlan, deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
+import { deleteGarbled, deleteUserMessage, editUserMessage, retryAgentTurn, undoNodeDeletion } from '../../engine/agent/runtime';
 import { copyText } from '../../engine/actions';
 import { useStore } from '../../store/store';
 import { IconButton } from '../ui/primitives';
@@ -128,11 +128,6 @@ function NoticeView({ item, sessionId }: { item: NoticeFeedItem; sessionId: stri
       {item.garbledItemId !== undefined && isLast ? (
         <button type="button" className="notice-retry" disabled={busy} onClick={() => deleteGarbled(sessionId, item.id)}>
           Delete
-        </button>
-      ) : null}
-      {item.proposePlan && isLast ? (
-        <button type="button" className="notice-retry" disabled={busy} onClick={() => askForPlan(sessionId, item.id)}>
-          Propose the plan
         </button>
       ) : null}
       {item.retry && isLast ? (
