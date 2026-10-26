@@ -295,7 +295,7 @@ export const openrouter: ProviderAdapter = {
         firstFrame: frames.includes('first_frame') ? { key: 'frame_images', format: 'content-part' } : undefined,
         lastFrame: frames.includes('last_frame') ? { key: 'frame_images', format: 'content-part' } : undefined,
         // Reference-mode wording follows https://openrouter.ai/api/v1/videos/models; body form follows https://openrouter.ai/docs/cookbook/video-generation/reference-to-video
-        images: referenceMode ? { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, multiple: true, format: 'content-part' } : undefined,
+        images: referenceMode ? { key: 'input_references', max: Number.MAX_SAFE_INTEGER, from: 'assumed', min: 0, multiple: true, format: 'content-part' } : undefined,
         ...(mini ? {
           refVideos: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, format: 'data-url' as const },
           refAudios: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, min: 0, format: 'data-url' as const },

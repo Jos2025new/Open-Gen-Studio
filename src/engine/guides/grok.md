@@ -3,7 +3,7 @@ Source: high-end production practice supplied by the user (2026-09-26), adapted 
 
 VARIANTS ON OUR PROVIDERS (the app reads the limits from each variant's schema)
 - Grok Imagine Video (v1): text-to-video, image-to-video (start image), reference-to-video (1–7 images; on Atlas capped at 10 s), and edit / extend of an existing clip through the app's Edit video and Extend video operations.
-- Grok Imagine Video 1.5: text, start image or 1–7 reference images; up to 15 s; reference-to-video capped at 720p on Atlas.
+- Grok Imagine Video 1.5: text, start image or up to 14 reference images (xAI; 7 on v1); up to 15 s; reference-to-video capped at 720p on Atlas.
 - Resolution follows the chosen quality (medium by default).
 
 WHAT DEFINES HOW TO PROMPT IT

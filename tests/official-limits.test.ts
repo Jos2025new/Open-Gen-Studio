@@ -50,3 +50,18 @@ describe('the sheets that ship', () => {
     expect(sheet('acme/unknown-image')).toBeUndefined();
   });
 });
+
+describe('video sheets', () => {
+  const video = (id: string) => OFFICIAL_SHEETS.find((s) => s.kind === 'video' && s.match.test(id));
+  it('reference images per call from the maker; 2.5 and unnamed Grok versions stay conservative', () => {
+    expect(video('bytedance/seedance-2.0-mini')?.refsMax).toBe(9);
+    expect(video('bytedance/seedance-2.5')).toBeUndefined();
+    expect(video('xai/grok-imagine-video-1.5')?.refsMax).toBe(14);
+    expect(video('grok-imagine-video-reference-to-video')?.refsMax).toBe(7);
+    expect(video('google/veo-3.1-fast')?.refsMax).toBe(3);
+  });
+  it('OpenRouter declares no max: the most the model allows, never past it (D1, 2026-10-25)', () => {
+    const s: ModelSchema = { ref: 'openrouter::bytedance/seedance-2.0', params: [], slots: { prompt: 'prompt', images: { key: 'input_references', max: Number.MAX_SAFE_INTEGER, from: 'assumed', min: 0, multiple: true, format: 'content-part' } }, source: 'catalog' };
+    expect(withOfficialLimits(s, { id: 'bytedance/seedance-2.0', name: 'Seedance 2.0', kind: 'video' }).slots.images).toMatchObject({ max: 9, from: 'official' });
+  });
+});

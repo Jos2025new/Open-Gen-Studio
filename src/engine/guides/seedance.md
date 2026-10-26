@@ -22,7 +22,7 @@ WRITING STYLE (both versions)
 - Dialogue: short lines in double quotes, attributed, with tone ("'We leave at dawn,' she says, worn out."). Split long speech into lines and cuts.
 
 VERSION LIMITS (the prompt stretches only because 2.5 holds more)
-- 2.0: up to 15 s per generation. 5 s = one shot; 10–15 s = 2–4 shots. Up to 9 reference images (+ start/end frame), 3 videos, 3 audios.
+- 2.0: up to 15 s per generation. 5 s = one shot; 10–15 s = 2–4 shots. Up to 9 reference images, 3 videos, 3 audios (BytePlus); start/end frame is a separate mode, not sent with references.
 - 2.5: 4–30 s. 20–30 s = up to 8 shots with absolute-time headers across the whole timeline. Up to 30 images, 10 videos, 10 audios (reference videos and audios: 2–30 s each, 30 s combined). With many references the prompt concentrates on action and camera; the look comes from the references.
 - Resolution follows the chosen quality (medium by default). Do not ask for high resolution unless the user did.
 

@@ -37,6 +37,14 @@ export const OFFICIAL_SHEETS: OfficialSheet[] = [
   { model: 'Qwen Image 2.1', kind: 'image', match: /qwen[-_ ]?image[-_ .]?2[._-]?1/i, refsMax: 10, source: 'https://www.alibabacloud.com/help/en/model-studio/qwen-image-generation-and-editing-api-reference' },
   { model: 'Grok Imagine Image', kind: 'image', match: /grok[-_ ]?imagine[-_ ]?image/i, refsMax: 5, source: 'https://docs.x.ai/docs/guides/image-generations' },
   { model: 'P-Image-Edit', kind: 'image', match: /p-image[-_ ]?edit/i, refsMax: 5, source: 'https://docs.pruna.ai/en/stable/docs_pruna_endpoints/performance_models/p-image-edit.html' },
+  // Video: reference images per call. Inputs of other types and frame rules are not filled from here yet.
+  { model: 'Seedance 2.0', kind: 'video', match: /seedance[-_ .]?v?2(?![._-]?5)/i, refsMax: 9, source: 'https://docs.byteplus.com/en/docs/modelark/seedance-2-0' },
+  { model: 'Wan 3.0', kind: 'video', match: /wan[-_ .]?3/i, refsMax: 10, source: 'https://www.alibabacloud.com/help/en/model-studio/wan3-video-generation-api-reference' },
+  { model: 'MiniMax H3', kind: 'video', match: /minimax.*h3|hailuo/i, refsMax: 9, source: 'https://platform.minimax.io/docs/api-reference/video-generation-v2-create.md' },
+  { model: 'Kling O3 / v3 Omni', kind: 'video', match: /kling.*(o3|v3)/i, refsMax: 7, source: 'https://kling.ai/document-api/api/video/3-0-omni/video-omni' },
+  { model: 'Grok Imagine Video 1.5', kind: 'video', match: /grok[-_ ]?imagine[-_ ]?video[-_ .]?v?1[._-]?5/i, refsMax: 14, source: 'https://docs.x.ai/developers/model-capabilities/video/reference-to-video' },
+  { model: 'Grok Imagine Video', kind: 'video', match: /grok[-_ ]?imagine[-_ ]?video/i, refsMax: 7, source: 'https://docs.x.ai/developers/model-capabilities/video/reference-to-video' },
+  { model: 'Veo 3.1', kind: 'video', match: /veo[-_ .]?3[._-]?1/i, refsMax: 3, source: 'https://docs.cloud.google.com/vertex-ai/generative-ai/docs/video/use-reference-images-to-guide-video-generation' },
 ];
 
 export function officialSheet(m: Pick<ModelSummary, 'id' | 'name' | 'kind'>): OfficialSheet | undefined {

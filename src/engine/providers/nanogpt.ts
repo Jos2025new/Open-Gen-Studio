@@ -84,7 +84,7 @@ function needsVideo(m: NanoVideoModel): boolean {
 /** NanoGPT documents a 4 MB limit for `videoDataUrl`. */
 const MAX_VIDEO_DATA_URL_BYTES = 4 * 1024 * 1024;
 
-/** "Up to 9 reference images" → 9. */
+/** "Up to 9 …" → 9. */
 function upTo(d: NanoVideoParam | undefined, fallback: number): number {
   const m = /up to (\d+)/i.exec(d?.description ?? '');
   return m ? Number(m[1]) : fallback;
@@ -228,7 +228,7 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
   const maxIn = num(sp.max_input_images) ?? 0;
   const inputs = raw.architecture?.input_modalities ?? ['text'];
   const needsImage = !inputs.includes('text') || /(^|[/-])(edit|image-to-image|img2img)/.test(raw.id);
-  // Some text-only endpoints still declare max_input_images; images are only sent where the model takes them.
+  // Text-only endpoints may declare max_input_images; images go only where the model takes them.
   const takesImages = inputs.includes('image') && (maxIn > 0 || needsImage);
   return {
     ref: model.ref,
@@ -310,7 +310,7 @@ function videoSchema(model: ModelSummary, raw: NanoVideoModel): ModelSchema {
       firstFrame: i2v && !needsVideo(raw) && !refModel ? { key: 'imageDataUrl', format: 'data-url' } : undefined,
       lastFrame: acceptsDataImage(defs.lastImageUrl) ? { key: 'lastImageUrl', format: 'data-url' } : acceptsDataImage(defs.last_image) ? { key: 'last_image', format: 'data-url' } : undefined,
       images: takesRefs && inputs.includes('image')
-        ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
+        ? { key: 'referenceImages', max: upTo(defs.reference_images, 4), ...(upTo(defs.reference_images, 0) ? {} : { from: 'assumed' as const }), min: refModel && !inputs.includes('text') ? 1 : 0, multiple: true, format: 'data-url' }
         : undefined,
       refVideos: 'reference_videos' in defs && !urlOnly(defs.reference_videos) ? { key: 'referenceVideos', max: upTo(defs.reference_videos, 3), min: 0, format: 'data-url' } : undefined,
       // Audio inputs are audioDataUrl or the catalog's `audio` field; the endpoint does not document referenceAudios: https://docs.nano-gpt.com/api-reference/video-generation
