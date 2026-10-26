@@ -46,6 +46,8 @@
 .chat-column { max-width: 830px; padding-top: 50px; padding-bottom: calc(var(--composer-height, 200px) + 64px); }
 .jump-btn { bottom: calc(var(--composer-height, 200px) + 38px); }
 .bubble { border-radius: 20px 20px 5px 20px; padding: 16px; }
+/* The text is a <p>: without this its default 1em margins doubled the padding above and below (sandbox 2026-10-26). */
+.bubble > p { margin: 0; }
 .bubble.is-multiline { min-width: min(320px, 85%); }
 .bubble-attachments { gap: 10px; margin-bottom: 14px; overflow-x: auto; }
 .bubble-attachments .attach-thumb.small { width: 106px; height: 90px; border-radius: 12px; flex-shrink: 0; overflow: hidden; }
