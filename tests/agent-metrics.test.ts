@@ -160,7 +160,7 @@ describe('guides on demand (R4)', () => {
     await sendAgentMessage('a four-shot storyboard of a heist');
     expect(metrics()[0]).toMatchObject({ llmCalls: 2, guides: ['workflow:storyboard'], plans: 1 });
     const toolAnswer = bodies[1].messages.find((m) => m.role === 'tool');
-    expect(String(toolAnswer?.content)).toMatch(/Storyboard · 4 shots[\s\S]*continuity:/);
+    expect(String(toolAnswer?.content)).toMatch(/Storyboard[\s\S]*continuity:/);
   });
 });
 

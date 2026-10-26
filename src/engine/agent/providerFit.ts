@@ -6,6 +6,7 @@ import { lineKey, variantRoute } from '../variants';
 import type { ModelSchema, SettingsChoice } from '../types';
 import { useStore } from '../../store/store';
 import { indexedModels } from './modelIndex';
+import { loadLimits } from './modelLimits';
 
 /*
  * Auto (docs/features/agente-auto-tarjeta.md, "Proveedor que encaja"): the composer's provider, or the one picked before,
@@ -36,10 +37,11 @@ export function missing(schema: ModelSchema | undefined, want: Wanted): string[]
 /** The same model and variant at another connected provider that takes everything asked, or undefined. */
 export async function betterProvider(ref: string, want: Wanted, request: string): Promise<{ ref: string; note: string } | undefined> {
   const me = modelSummary(ref);
-  if (!me || me.kind !== 'video' || providersIn(request).length) return undefined;
+  if (!me || (me.kind !== 'video' && me.kind !== 'image') || providersIn(request).length) return undefined;
   const lacks = missing(useStore.getState().catalog.schemas[ref] ?? (await ensureSchema(ref)) ?? undefined, want);
   if (!lacks.length) return undefined;
-  const twins = indexedModels().filter((m) => m.provider !== me.provider && m.kind === me.kind && lineKey(m) === lineKey(me) && variantRoute(m) === variantRoute(me));
+  // Image providers split variants differently (fal: text-to-image and edit; OpenRouter: one model): its schema decides.
+  const twins = indexedModels().filter((m) => m.provider !== me.provider && m.kind === me.kind && lineKey(m) === lineKey(me) && (me.kind === 'image' || variantRoute(m) === variantRoute(me)));
   for (const m of twins) {
     const schema = useStore.getState().catalog.schemas[m.ref] ?? (await ensureSchema(m.ref).catch(() => null)) ?? undefined;
     if (schema && !missing(schema, want).length) {
@@ -52,3 +54,19 @@ export async function betterProvider(ref: string, want: Wanted, request: string)
 
 /** The wanted values of a section's choice and the request's words. */
 export const wantedOf = (c: SettingsChoice, request: string, images: number): Wanted => ({ resolution: askedResolution(request), duration: c.duration, aspect: c.aspect, startImage: Boolean(c.needsImage) && !images, images });
+
+/**
+ * Other connected models of the same kind that take everything asked (the images first of all), the composer's provider
+ * first: what the agent offers the user instead of planning with a model that would drop part of the request or fail.
+ */
+export async function fittingModels(ref: string, want: Wanted, limit = 3): Promise<string[]> {
+  const me = modelSummary(ref);
+  if (!me) return [];
+  const pool = indexedModels()
+    .filter((m) => m.kind === me.kind && lineKey(m) !== lineKey(me) && (!(want.images || want.startImage) || m.acceptsImage))
+    .sort((a, b) => Number(b.provider === me.provider) - Number(a.provider === me.provider))
+    .slice(0, 16);
+  await loadLimits(pool.map((m) => m.ref));
+  const schemas = useStore.getState().catalog.schemas;
+  return pool.filter((m) => schemas[m.ref] && !missing(schemas[m.ref], want).length).slice(0, limit).map((m) => m.ref);
+}

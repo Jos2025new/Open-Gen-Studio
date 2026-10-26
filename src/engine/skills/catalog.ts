@@ -66,7 +66,7 @@ export const SKILLS: Skill[] = [
     id: 'storyboard',
     name: 'Storyboard',
     description: 'Sequential frames with continuity.',
-    guidance: 'Break the idea into numbered beats. Keep style, characters and lighting continuous; reference the first frame in later frames.',
+    guidance: 'Story first: numbered beats, one main action each, each ending in the state the next starts from; the user approves them before any frame is made. As many frames as beats; the last one closes, never repeats the first. Keep style, characters and lighting continuous: later frames take the first for identity and style only, and the previous one for continuity.',
     promptHint: 'storyboard frame, consistent style, continuity',
   },
   {

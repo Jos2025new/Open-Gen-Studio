@@ -25,8 +25,12 @@ export function failedStepSummary(sessionId: string, itemId: string, stepId: str
       ? `\nDelivery: ${delivered.length} result${delivered.length === 1 ? '' : 's'} arrived before failure. Delivered asset IDs: ${delivered.join(', ')}.`
       : '';
   const policyBlock = /1012000|content.{0,40}(security|safety) polic|(?:blocked|refused).{0,40}(security|safety) polic/i.test(error);
+  // The provider refused an input or a value (too many images, a size, an unknown field): the same send fails again.
+  const inputRejected = !policyBlock && /\b(400|422)\b|invalid|unsupported|not supported|too many|exceed|at most|maximum|must be|not allowed/i.test(error);
   const recommendation = policyBlock
     ? '\nThis is a content safety policy block; do not blindly retry the unchanged request. Adjust the prompt or reference media before another attempt.'
-    : '';
+    : inputRejected
+      ? '\nThe provider rejected an input or a value, so the unchanged step fails again: do not retry it as is. Call find_models for the same model at another connected provider, or another model that takes these inputs, and offer the user the choice in one short question; the schema the app read may also be wrong, so say which value the provider refused.'
+      : '';
   return `${stepId} failed. Model used: ${g.modelName} (${g.modelRef}), provider ${g.provider ?? g.modelRef.split('::')[0]}, parameter schema: ${source}. Provider error, verbatim: ${error}${delivery}${recommendation}`;
 }

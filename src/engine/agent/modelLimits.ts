@@ -34,7 +34,7 @@ export function limitsLine(ref: string): string {
     resolutions(schema).join(', '),
     s.length ? (s.length > 2 && s[s.length - 1] - s[0] === s.length - 1 ? `${s[0]}–${s[s.length - 1]} s` : `${s.join(', ')} s`) : '',
     aspects.length && aspects.length <= 8 ? aspects.map(aspectLabel).join(', ') : '',
-    modelSummary(ref)?.kind === 'video' ? imagesLine(schema) : '',
+    modelSummary(ref)?.kind === 'video' || modelSummary(ref)?.kind === 'image' ? imagesLine(schema) : '',
   ].filter(Boolean).join(' · ');
 }
 
@@ -85,6 +85,8 @@ export function durationProblem(ref: string, partSeconds: number | undefined, re
 }
 
 const OWED = 'ask the user with ask_questions (one question';
+/** The question owed for a length or for images a model cannot take (settingsParts) uses this phrase too. */
+export const OWED_QUESTION = OWED;
 /** The length question is owed to the user: the last thing told to the agent was the length problem, and the user has not answered since. */
 export function durationOwed(history: Array<{ role: string; content?: unknown }>): boolean {
   const last = [...history].reverse().find((m) => m.role === 'tool' && typeof m.content === 'string' && (m.content.includes(OWED) || m.content.startsWith('User answers')));

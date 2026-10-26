@@ -42,7 +42,7 @@ const FLOW_ES: Record<string, string> = {
   'image-to-video': 'Diseña la imagen clave y después la anima.',
   'product-pack': 'Sesión de producto: principal, en uso, detalle y características; o un formato concreto (packshot, banner, carrusel, anuncios, try-on, CGI).',
   'character-sheet': 'Vistas de un personaje, sueltas o en una hoja.',
-  storyboard: 'Cuatro fotogramas seguidos de una escena.',
+  storyboard: 'Viñetas que cuentan una historia, tantas como necesite.',
   'social-set': 'Una imagen adaptada a 1:1, 4:5 y 9:16.',
   ugc: 'Vídeo vertical estilo creador: reseña, unboxing, prueba o tutorial.',
   'shot-sequence': 'Imagen clave, un primer clip y su continuación.',

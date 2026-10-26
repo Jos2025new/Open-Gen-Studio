@@ -6,8 +6,8 @@ import type { ModelSummary, ProviderId } from './types';
  * Model pickers show it once, say where it is served, and pick the cheapest provider.
  */
 
-// Maker prefixes and words that name the host, not the model. "developer" is Atlas's cheaper tier of the same variant.
-const NOISE = new Set(['fal', 'ai', 'google', 'openai', 'bytedance', 'xai', 'alibaba', 'black', 'forest', 'labs', 'blackforestlabs', 'bfl', 'pruna', 'developer', 'v']);
+// Maker prefixes and words that name the host, not the model. "developer" is Atlas's cheaper tier of the same variant; "seed" is OpenRouter's "bytedance-seed/" maker.
+const NOISE = new Set(['fal', 'ai', 'google', 'openai', 'bytedance', 'xai', 'alibaba', 'black', 'forest', 'labs', 'blackforestlabs', 'bfl', 'pruna', 'developer', 'v', 'seed']);
 
 /** Stable, provider-neutral families shown by the compact Agent picker. This classifies; it does not route. */
 const FAMILIES: Array<[RegExp, string, string]> = [

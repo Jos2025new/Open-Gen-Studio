@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import beforeSplit from './fixtures/skills/before-split.json';
 import { CONTINUITY_POLICY, WORKFLOW_CONTRACT } from '../src/engine/procedure';
-import { readGuide } from '../src/engine/skills';
+import { describeWorkflow, readGuide, skillById, workflowById } from '../src/engine/skills';
 
 const SEEDANCE_PATTERNS = [
   '- Timed script: segments with one shot type, one main action and one sound line each.',
@@ -32,6 +32,16 @@ it.each(Object.entries(beforeSplit))('read_guide preserves the exact pre-split t
     const lines = expected.split('\n');
     lines.splice(3, 0, PEOPLE_LOOK_LINE, '');
     expected = lines.join('\n');
+  }
+  if (id === 'workflow:storyboard') {
+    // 2026-10-25 (user): story first, as many frames as beats, the last one closes; refs s1 for identity and style plus the previous frame.
+    const w = workflowById('storyboard')!;
+    const before = text.split('\n');
+    const steps = describeWorkflow(w).split('\n').filter((l) => l.startsWith('  - '));
+    expected = [before[0], `${w.name}: ${w.description}`, ...steps, ...before.slice(6, 9), `  continuity: ${w.continuity}`, `skill Storyboard: ${skillById('storyboard')!.guidance}`].join('\n')
+      .replace('workflow (follow this structure, adapt prompts to the request):', `workflow (${WORKFLOW_CONTRACT}):`)
+      .replace('fixed (do not ask):', 'template defaults (unless the user specified otherwise):')
+      .replace('needs (ask the missing ones in the one questions card):', 'brief fields (reuse supplied values; ask only missing user data in Auto; creative choices optional in Guided):');
   }
   if (id.startsWith('workflow:')) {
     const lines = expected.split('\n');

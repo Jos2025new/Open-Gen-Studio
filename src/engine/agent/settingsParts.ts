@@ -4,9 +4,9 @@ import { OPS } from '../ops';
 import { useStore } from '../../store/store';
 import type { SettingsSection, Workspace } from '../types';
 import { autoConfirmSettings } from './autoSettings';
-import { durationProblem, limitsLine, resolutionNote } from './modelLimits';
+import { durationProblem, limitsLine, OWED_QUESTION, resolutionNote } from './modelLimits';
 import { suggestModel } from './modelIndex';
-import { missing } from './providerFit';
+import { fittingModels, missing } from './providerFit';
 import { buildSettings } from './settingsCard';
 
 /** What a confirm_settings part asks (the tool's input, one kind). */
@@ -50,24 +50,34 @@ export async function autoAnswer(sessionId: string, workspace: Workspace, toolCa
   const text = await autoConfirmSettings(sessionId, workspace, toolCallId, summary, sections, parts);
   // What follows reads the model the app chose (a composer pick or another provider may replace the recommended one).
   const chosen = useStore.getState().sessions[sessionId].agent.settings;
-  return text + sections.map((x) => {
+  const lines = await Promise.all(sections.map(async (x) => {
     const ref = chosen?.[x.kind as 'image' | 'video']?.modelRef ?? x.recommended.modelRef;
     const name = modelSummary(ref)?.name ?? ref;
     if (ref !== x.recommended.modelRef) log?.action({ icon: 'search', label: `Checked ${name}`, detail: limitsLine(ref) || undefined });
-    return `${limitsLine(ref) ? `\n${name} (${ref}) takes: ${limitsLine(ref)}.` : ''}${imagesFit(ref, parts.filter((p) => p.kind === x.kind))}${resolutionNote(ref, request)}`;
-  }).join('');
+    return `${limitsLine(ref) ? `\n${name} (${ref}) takes: ${limitsLine(ref)}.` : ''}${await imagesFit(ref, parts.filter((p) => p.kind === x.kind))}${resolutionNote(ref, request)}`;
+  }));
+  return text + lines.join('');
 }
 
-/** Whether the images the parts declare fit the chosen model; when they do not, what to do before writing. */
-function imagesFit(ref: string, parts: SettingsPart[]): string {
+/**
+ * Whether the images the parts declare fit the chosen model. When they do not, the agent never plans with a model that
+ * would drop them: it offers the connected models that take them all (fittingModels), and only without one plans what fits.
+ */
+export async function imagesFit(ref: string, parts: SettingsPart[]): Promise<string> {
   const images = parts.reduce((n, p) => n + (p.refs ?? 0), 0);
   const start = parts.some((p) => p.start_image);
   if (!images && !start) return '';
-  const lacks = missing(useStore.getState().catalog.schemas[ref], { startImage: start, images });
+  const want = { startImage: start, images };
+  const lacks = missing(useStore.getState().catalog.schemas[ref], want);
   const n = images + (start ? 1 : 0);
-  return lacks.length
-    ? ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit it: plan only what it takes (for one start image, put the image the clip opens on in first_frame, a character or scene, never a storyboard sheet, and leave the rest out, saying so in one line), before writing the prompts.`
-    : ` Your ${n} image${n > 1 ? 's fit' : ' fits'}.`;
+  if (!lacks.length) return ` Your ${n} image${n > 1 ? 's fit' : ' fits'}.`;
+  const others = await fittingModels(ref, want);
+  const name = modelSummary(ref)?.name ?? ref;
+  if (others.length) {
+    const options = others.map((r) => `"${modelSummary(r)?.name ?? r}" (${r})`).join('; ');
+    return ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit ${name} (${limitsLine(ref) || 'its inputs'}). Do not plan yet. Say it in one short sentence and ${OWED_QUESTION}, these options): ${options}; "Seguir con ${name} con menos imágenes". Then call confirm_settings again with the chosen model and plan for it.`;
+  }
+  return ` Your ${n} image${n > 1 ? 's do' : ' does'} not fit it and no connected model takes them all: plan only what it takes (for one start image, put the image the clip opens on in first_frame, a character or scene, never a storyboard sheet, and leave the rest out, saying so in one line), before writing the prompts.`;
 }
 
 /**

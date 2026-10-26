@@ -50,7 +50,7 @@ export async function autoConfirmSettings(sessionId: string, workspace: Workspac
   const notes: string[] = [];
   const fitted = await Promise.all(variants.map(async (x) => {
     const images = parts.filter((p) => p.kind === x.kind).reduce((n, p) => n + ((p as { refs?: number }).refs ?? 0), 0);
-    const better = x.kind === 'video' ? await betterProvider(x.recommended.modelRef, wantedOf(x.recommended, offerRequest(agent()), images), offerRequest(agent())) : undefined;
+    const better = x.kind === 'video' || x.kind === 'image' ? await betterProvider(x.recommended.modelRef, wantedOf(x.recommended, offerRequest(agent()), images), offerRequest(agent())) : undefined;
     const got = better ? await resolveModel(better.ref) : undefined;
     if (!better || !got) return x;
     notes.push(better.note);

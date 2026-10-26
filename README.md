@@ -102,7 +102,7 @@ Encargos completos que el agente sabe organizar paso a paso. Pídelos con tus pa
 | Image → Video | Diseña la imagen clave y después la anima. |
 | Product photoshoot | Sesión de producto: principal, en uso, detalle y características; o un formato concreto (packshot, banner, carrusel, anuncios, try-on, CGI). |
 | Character sheet | Vistas de un personaje, sueltas o en una hoja. |
-| Storyboard · 4 shots | Cuatro fotogramas seguidos de una escena. |
+| Storyboard | Viñetas que cuentan una historia, tantas como necesite. |
 | Social format set | Una imagen adaptada a 1:1, 4:5 y 9:16. |
 | UGC video | Vídeo vertical estilo creador: reseña, unboxing, prueba o tutorial. |
 | Shot sequence | Imagen clave, un primer clip y su continuación. |
