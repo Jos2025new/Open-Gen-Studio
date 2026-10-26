@@ -175,6 +175,7 @@
 - [Auditoría de Guides y Sizes (2026-10-23)](audits/auditoria-toolbox-guides-sizes.md): 7 hallazgos, corregidos en 1077248.
 - [Auditoría OpenRouter contra su doc oficial (2026-10-25)](audits/auditoria-openrouter.md): modelos de vídeo e imagen principales; vídeo sin `input_references` ni passthrough; nada corregido aún.
 - [Verificación de Manus AI de la auditoría OpenRouter, cruzada con el código (2026-10-25)](audits/auditoria-openrouter-manus.md): 10 puntos de código comprobados; nada corregido aún.
+- [Fichas oficiales de modelos (2026-10-25)](audits/fichas-oficiales-2026-10-25.json): límites por llamada de imagen y vídeo según cada fabricante, con URL y cita; base de `officialLimits.ts` y del trabajo de vídeo pendiente.
 - [Investigación: sondeo de trabajos de vídeo (2026-10-25)](investigacion-sondeo-video.md): intervalos de OpenMontage, ComfyUI, fal, Replicate, Runway, Vercel AI SDK y LiteLLM; base de la decisión D4.
 - [Plan: proveedores contra su doc oficial (2026-10-25)](plan-proveedores-2026-10-25.md): fases atómicas con evidencia, decisiones D1-D4 y verificación.
 - [Ejecución del plan de proveedores](proveedores-ejecucion-2026-10-25.md): cambios por fase, pruebas y límites de la evidencia.
