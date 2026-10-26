@@ -67,7 +67,7 @@ export async function imagesFit(ref: string, parts: SettingsPart[]): Promise<str
   const images = parts.reduce((n, p) => n + (p.refs ?? 0), 0);
   const start = parts.some((p) => p.start_image);
   if (!images && !start) return '';
-  const want = { startImage: start, images };
+  const want = { startImage: start, images, count: Math.max(1, ...parts.map((p) => p.count ?? 1)) };
   const lacks = missing(useStore.getState().catalog.schemas[ref], want);
   const n = images + (start ? 1 : 0);
   if (!lacks.length) return ` Your ${n} image${n > 1 ? 's fit' : ' fits'}.`;

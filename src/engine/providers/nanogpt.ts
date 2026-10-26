@@ -237,7 +237,7 @@ function imageSchema(model: ModelSummary, raw: NanoImageModel): ModelSchema {
       prompt: inputs.includes('text') ? 'prompt' : undefined,
       promptRequired: inputs.includes('text') && !needsImage,
       // POST /api/v1/images ignores `input_references` (despite the docs) and reads `imageDataUrls`; verified 2026-09-25.
-      images: takesImages ? { key: 'imageDataUrls', max: Math.max(1, maxIn), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
+      images: takesImages ? { key: 'imageDataUrls', ...(maxIn ? { max: maxIn } : { max: 1, from: 'assumed' as const }), min: needsImage ? 1 : 0, multiple: true, format: 'data-url' } : undefined,
     },
     price: model.price,
     source: 'catalog',

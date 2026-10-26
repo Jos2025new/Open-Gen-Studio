@@ -162,7 +162,7 @@ export function pixelSizes(options: Array<string | number> | undefined): {
 }
 
 /** Options that mean "let the model decide" (P Image: match_input_image; Seedance: adaptive). */
-/** An option that explicitly keeps the input's shape ("match_input_image", "adaptive"); plain "auto" lets the model choose. */
+/** An option that keeps the input's shape ("match_input_image", "adaptive"); "auto" lets the model choose. */
 export function matchInputOption(options: Array<string | number>): string | undefined {
   const o = options.find((x) => /^(match_input_image|adaptive)$/.test(String(x)));
   return o == null ? undefined : String(o);
@@ -293,7 +293,7 @@ function sizeOptions(p: JsonProp): { options: string[]; default?: string; omit?:
   return def ? { options, default: def } : { options: ['auto', ...options], default: 'auto', omit: 'auto' };
 }
 
-/** Kling elements: `{ element_name, frontal_image, refer_images… }` (Atlas) or `{ frontal_image_url, reference_image_urls… }` (fal). */
+/** Kling elements, Atlas or fal shape. */
 function elementList(p: JsonProp, resolve: (ref: string) => JsonProp | undefined): Omit<NonNullable<InputSlots['elements']>, 'key'> | null {
   if (primaryType(p) !== 'array' || !p.items) return null;
   const props = flattenProp(p.items, resolve).properties ?? {};
@@ -465,7 +465,7 @@ function isMixedRefList(p: JsonProp, resolve: (ref: string) => JsonProp | undefi
   return Boolean(item.properties?.url && type?.enum?.includes('image'));
 }
 
-/** Longest prompt from the schema: maxLength, or "up to / max(imum) N characters" in the description; recommendations do not count. */
+/** Longest prompt: maxLength, or "up to / max N characters" in the description (not recommendations). */
 export function promptLimit(p: JsonProp | undefined): number | undefined {
   const fromText = /(?:up to|max(?:imum)?(?: length)?(?: is| of)?)\s*([\d,]+)\s*characters/i.exec(p?.description ?? '');
   const limits = [p?.maxLength, fromText ? Number(fromText[1].replace(/,/g, '')) : undefined].filter((n): n is number => Number.isFinite(n) && n! > 0);
@@ -483,6 +483,9 @@ export function promptCitation(description: string | undefined): string | undefi
 function truncateText(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
+
+/** A list's declared max, else `d` marked assumed (officialLimits.ts). */
+const cap = (p: JsonProp, d: number) => (p.maxItems == null ? { max: d, from: 'assumed' as const } : { max: p.maxItems });
 
 export function schemaFromJson(opts: {
   ref: string;
@@ -534,7 +537,7 @@ export function schemaFromJson(opts: {
     const refs = MULTI_IMAGE_KEYS.map((k) => lower.get(k)).find((k) => k && !used.has(k));
     if (refs) {
       const p = flattenProp(properties[refs], resolve);
-      slots.images = { key: refs, max: p.maxItems ?? 4, min: required.includes(refs) ? Math.max(1, p.minItems ?? 1) : 0, multiple: true, format: imageFormat };
+      slots.images = { key: refs, ...cap(p, 4), min: required.includes(refs) ? Math.max(1, p.minItems ?? 1) : 0, multiple: true, format: imageFormat };
       used.add(refs);
     }
     const refVideos = REF_VIDEO_KEYS.map((k) => lower.get(k)).find((k) => k && !used.has(k));
@@ -564,7 +567,7 @@ export function schemaFromJson(opts: {
       const p = flattenProp(properties[multi], resolve);
       slots.images = {
         key: multi,
-        max: p.maxItems ?? 10,
+        ...cap(p, 10),
         min: required.includes(multi) ? Math.max(1, p.minItems ?? 1) : 0,
         multiple: true,
         format: imageFormat,
@@ -952,7 +955,7 @@ export function routeVideoInputs<T>(slots: InputSlots, images: T[], videos: T[],
   return { firstFrame: first, images: rest, videos };
 }
 
-/** Audio inputs: the first track goes to a single-track field (lip-sync, soundtrack) when there is one, the rest are references. */
+/** Audio inputs: the first track to a single-track field when there is one, the rest as references. */
 export function routeAudio<T>(slots: InputSlots, audios: T[]): { audio?: T; refAudios: T[] } {
   if (slots.audio && !slots.mixedRefs && audios.length) return { audio: audios[0], refAudios: audios.slice(1) };
   return { refAudios: [...audios] };

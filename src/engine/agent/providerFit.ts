@@ -7,6 +7,7 @@ import type { ModelSchema, SettingsChoice } from '../types';
 import { useStore } from '../../store/store';
 import { indexedModels } from './modelIndex';
 import { loadLimits } from './modelLimits';
+import { refsCap } from '../officialLimits';
 
 /*
  * Auto (docs/features/agente-auto-tarjeta.md, "Proveedor que encaja"): the composer's provider, or the one picked before,
@@ -15,7 +16,7 @@ import { loadLimits } from './modelLimits';
  * user named in words is never changed.
  */
 
-export interface Wanted { resolution?: string; duration?: number; aspect?: string; startImage: boolean; images: number }
+export interface Wanted { resolution?: string; duration?: number; aspect?: string; startImage: boolean; images: number; count?: number }
 
 /** The resolution the user wrote ("480p", "4k"), if any. */
 export const askedResolution = (text: string): string | undefined => /\b(\d{3,4}p|[1-8]k)\b/i.exec(text)?.[1]?.toLowerCase();
@@ -31,6 +32,8 @@ export function missing(schema: ModelSchema | undefined, want: Wanted): string[]
   const aspects = (paramByRole(schema, 'aspect')?.options ?? []).map(String);
   if (want.aspect && aspects.length && !aspects.includes(want.aspect)) out.push(want.aspect);
   if ((want.images || want.startImage) && videoInputProblem(schema.slots, { firstFrame: want.startImage, lastFrame: false, sourceVideo: false, images: want.images, videos: 0 })) out.push(`${want.images + (want.startImage ? 1 : 0)} images`);
+  const img = schema.slots.images;
+  if (want.images && img?.total && want.images > refsCap(img, want.count)) out.push(`${want.images} images with ${want.count ?? 1} result${(want.count ?? 1) > 1 ? 's' : ''}`);
   return out;
 }
 

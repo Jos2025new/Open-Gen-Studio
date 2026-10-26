@@ -136,7 +136,7 @@ export const fal: ProviderAdapter = {
 
   async loadSchema(model, apiKey) {
     // v3: reference slots, fixed/missing required fields, sizes as framing.
-    const cacheKey = `fal:schema:v3:${model.id}`;
+    const cacheKey = `fal:schema:v4:${model.id}`;
     let schema = await cacheDb.get<ModelSchema>(cacheKey, DAY);
     if (!schema) {
       const qs = `endpoint_id=${encodeURIComponent(model.id)}`;

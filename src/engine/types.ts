@@ -55,8 +55,8 @@ export interface InputSlots {
   promptMax?: number;
   /** How the prompt cites references ("@Image1", "<IMAGE_0>"…), from the provider's schema. */
   promptRefs?: string;
-  /** Reference or source images. */
-  images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat };
+  /** Reference or source images; `from`/`total`: officialLimits.ts. */
+  images?: { key: string; max: number; min: number; multiple: boolean; format: ImageInputFormat; from?: 'official' | 'assumed'; total?: number };
   frameRules?: { refsWithFirst?: boolean; refsWithLast?: boolean; sourceWithLast?: boolean; lastNeedsFirst?: boolean; firstFrameResolutions?: string[] };
   /** Models with a source image and a separate reference list (Ideogram Character remix). */
   source?: { key: string; format: ImageInputFormat };
@@ -71,7 +71,7 @@ export interface InputSlots {
   mixedRefs?: { key: string; max: number; min: number };
   /** Images pinned to frame positions (FLUX 3: `{ image_url, frame_index }`, 24 fps). Takes every input image. */
   keyframes?: { key: string; max: number; min: number; imageKey: string; indexKey: string; fps: number };
-  /** One audio track: lip-sync / avatar speech (`audio_url`, required there) or a soundtrack (`target_audio_url`). */
+  /** One audio track: lip-sync / avatar speech (required there) or a soundtrack. */
   audio?: { key: string; required: boolean; format: ImageInputFormat };
   /** Reference audio list (`reference_audios`, `audio_urls`, `reference_audio_urls`). */
   refAudios?: { key: string; max: number; min: number; format: ImageInputFormat };
@@ -135,7 +135,7 @@ export interface PriceRule {
   note?: string;
   /** true when the provider bills something we cannot predict (tokens, GPU time). */
   approximate?: boolean;
-  /** The published price is the cheapest configuration; higher resolution or audio cost more. Shown as "≥". */
+  /** Published price = cheapest configuration; shown as "≥". */
   lowerBound?: boolean;
   /** Price per run for each option set (NanoGPT 3D); the key comes from `variant3dKey`. */
   variants?: Record<string, number>;

@@ -21,7 +21,11 @@ function imagesLine(schema: ModelSchema | undefined): string {
   if (sl.mixedRefs) return `up to ${sl.mixedRefs.max} references (images, videos, audio)`;
   const start = sl.firstFrame ? '1 start image' : '';
   const max = sl.keyframes?.max ?? sl.images?.max ?? 0;
-  const refs = max ? `up to ${max} ${sl.keyframes ? 'keyframe' : 'reference'} images` : 'no reference images';
+  const img = sl.keyframes ? undefined : sl.images;
+  // Where the figure comes from, so the agent knows how far to trust it (officialLimits.ts).
+  const from = img?.from === 'official' ? ' (official sheet)' : img?.from === 'assumed' ? ' (not declared, assumed)' : '';
+  const total = img?.total ? `; references + results at most ${img.total} per call` : '';
+  const refs = max ? `up to ${max} ${sl.keyframes ? 'keyframe' : 'reference'} images${from}${total}` : 'no reference images';
   return [start, refs].filter(Boolean).join(', ');
 }
 

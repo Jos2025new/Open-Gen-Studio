@@ -1,4 +1,5 @@
 import { countFollowsCard } from './planCount';
+import { refsCap } from './officialLimits';
 import { fitTotal, promptTooLong, totalNote } from './planSent';
 import { aspectFor } from './planAspect';
 import { lineKey, type VariantRoute } from './variants';
@@ -386,7 +387,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
   adjustments.push(...planFit.adjustments);
   const maxSteps = ctx.maxSteps ?? MAX_PLAN_STEPS;
   if (!rawSteps.length) return { plan: null, errors: ['The plan has no steps.'] };
-  // A total length is split evenly over the video steps that set none (each share then snaps to the model's lengths).
+  // A total length is split evenly over video steps that set none (snapped to the model's lengths).
   const total = Number(raw.total_duration);
   const unset = rawSteps.filter((s) => s.kind === 'video' && s.duration == null);
   const setSecs = rawSteps.reduce((sum, s) => sum + (s.kind === 'video' && s.duration != null ? Number(s.duration) || 0 : 0), 0);
@@ -510,7 +511,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
       case 'model3d':
       case 'video': {
         const kind: MediaKind = s.kind;
-        // An asset id written in the prompt is an input the plan forgot to wire: it becomes the step's image (no rejection).
+        // An asset id in the prompt is an unwired input: it becomes the step's image.
         for (const token of new Set((s.prompt ?? '').match(/asset:[A-Za-z0-9_-]+/g) ?? [])) {
           const a = ctx.asset(token.slice(6));
           if (!a) continue;
@@ -530,7 +531,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         }
         const sheet = kind === 'video' && storyboardProblem(s);
         if (sheet) errors.push(`${where}: ${sheet}`);
-        // References are images, videos (reference-video / clip models) or audio (lip-sync, soundtrack, reference audio).
+        // References are images, videos or audio.
         const refKinds = refs.map((r) => refKind(r, where));
         refKinds.forEach((k, i) => {
           if (k && k !== 'image' && k !== 'raster' && k !== 'video' && k !== 'audio') errors.push(`${where}: ref "${refs[i]}" produces ${k}; refs must be images, videos or audio.`);
@@ -565,11 +566,11 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
             ? ctx.variantModel(conf.modelRef, route) ?? conf.modelRef
             : stepNeedsImage === conf.needsImage ? conf.modelRef : confName;
           // A family name (e.g. Nano Banana 2) is the same choice written loosely: not worth a note.
-          // Noted only when the plan named another model line: the confirmed model's own variant (edit, image-to-video) is the same choice.
+          // Noted only for another model line; the confirmed model's own variant is the same choice.
           const wroteModel = wrote?.includes('::') ? (await ctx.getModel(wrote))?.model : undefined;
           const confModel = (await ctx.getModel(conf.modelRef))?.model;
           if (wrote && wroteModel && confModel && modelChange(wroteModel, confModel)) adjustments.push(`${s.id}: ${modelMove(wroteModel, confModel)}`);
-          // Same meaning is not an adjustment: "1:1" and "2048x2048" are one ratio; "1776x2368" and "1776*2368" one size.
+          // Same meaning is not an adjustment ("1:1" = "2048x2048"; "1776x2368" = "1776*2368").
           const norm = (v: unknown) => String(v).toLowerCase().replace(/[×*]/g, 'x').replace(/\s+/g, '');
           const sameValue = (field: string, a: unknown, b: unknown) => {
             if (field === 'aspect') { const ra = ratioOf(String(a)), rb = ratioOf(String(b)); if (ra && rb) return Math.abs(ra / rb - 1) < 0.04; }
@@ -592,7 +593,7 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (named && userPicked && ctx.userText) {
           const found = await ctx.getModel(named);
           if (!userNamed([named, found?.model.name ?? ''], ctx.userText())) {
-            // Noted only when the plan named another real model: a name that matches nothing, or the user's own line, changes nothing.
+            // Noted only for another real model; an unknown name or the user's own line changes nothing.
             const mine = ctx.defaultModel(kind, imageRefs.length > 0 || Boolean(s.first_frame));
             const mineModel = mine ? (await ctx.getModel(mine))?.model : undefined;
             if (found && (!mineModel || lineKey(found.model) !== lineKey(mineModel))) adjustments.push(`${s.id}: kept your ${kind} model (the plan had named ${found.model.name})`);
@@ -673,8 +674,9 @@ export async function normalizePlan(raw: RawPlan, ctx: PlanContext, planId: stri
         if (kind === 'image' || kind === 'model3d') {
           const slot = schema.slots.images;
           const extra = schema.slots.source ? 1 : 0;
+          const cap = refsCap(slot, s.count) + extra;
           if (imageRefs.length && !slot) errors.push(`${where}: model "${modelRef}" does not accept reference images. Fix: ${s.model ? 'leave "model" out (the app switches to a variant that takes images) or ' : ''}drop refs.`);
-          else if (slot && imageRefs.length > slot.max + extra) errors.push(`${where}: model "${modelRef}" accepts at most ${slot.max + extra} reference image(s). Fix: refs: [${imageRefs.slice(0, slot.max + extra).map((r) => `"${r}"`).join(', ')}] (drop ${imageRefs.slice(slot.max + extra).join(', ')}), or merge them first in one image step.`);
+          else if (slot && imageRefs.length > cap) errors.push(`${where}: model "${modelRef}" accepts at most ${cap} reference image(s)${slot.total ? ` next to ${s.count ?? 1} result(s): references + results ≤ ${slot.total} per call` : ''}. Fix: refs: [${imageRefs.slice(0, cap).map((r) => `"${r}"`).join(', ')}] (drop ${imageRefs.slice(cap).join(', ')}), split the results, or merge refs first in one image step.`);
           if (imageRefs.length < (slot?.min ?? 0) + extra) errors.push(`${where}: model "${modelRef}" requires ${extra ? 'a source image first, then reference images' : 'an input image'} (refs). Fix: ${!imageRefs.length ? `if this step makes a new image from text, ${s.model ? 'name the text-to-image variant or leave "model" out' : 'leave refs empty and name a text-to-image model'}; add refs only when it really edits or uses an image — never an unrelated image just to satisfy the model.` : `put the image it edits (an image step or asset:<id>) in refs.`}`);
           const clips = schema.slots.clips;
           if (videoRefs.length && !clips) errors.push(`${where}: model "${modelRef}" does not take video refs. Fix: add a step { kind: "op", op: "extract_frame", input: "${videoRefs[0]}", params: { which: "last" } } and put that step in refs instead.`);

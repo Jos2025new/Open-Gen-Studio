@@ -157,7 +157,7 @@ export const atlas: ProviderAdapter = {
 
   async loadSchema(model) {
     // v3: reference slots, fixed/missing required fields, sizes as framing.
-    const cacheKey = `atlas:schema:v3:${model.id}`;
+    const cacheKey = `atlas:schema:v4:${model.id}`;
     const cached = await cacheDb.get<ModelSchema>(cacheKey, DAY);
     if (cached) return { ...cached, price: model.price ?? cached.price };
     if (!raws.has(model.id)) await atlas.listModels(undefined);

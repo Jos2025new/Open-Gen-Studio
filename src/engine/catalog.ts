@@ -1,4 +1,5 @@
 import { coerceSettings } from './params';
+import { withOfficialLimits } from './officialLimits';
 import { byCost, lineKey, variantRoute, type VariantRoute } from './variants';
 import { ADAPTERS, PREFERRED, REMOTE_PROVIDERS, editCounterpart, i2vCounterpart } from './providers/registry';
 import { LOCAL_IMAGE_REF, LOCAL_VIDEO_REF } from './providers/demo';
@@ -141,7 +142,7 @@ export function ensureSchema(ref: string): Promise<ModelSchema | null> {
         slots: {
           prompt: model.acceptsText ? 'prompt' : undefined,
           promptRequired: model.acceptsText && !model.acceptsImage,
-          images: (model.kind === 'image' || model.kind === 'model3d') && model.acceptsImage ? { key: 'image_urls', max: 1, min: model.acceptsText ? 0 : 1, multiple: true, format: 'data-url' } : undefined,
+          images: (model.kind === 'image' || model.kind === 'model3d') && model.acceptsImage ? { key: 'image_urls', max: 1, from: 'assumed', min: model.acceptsText ? 0 : 1, multiple: true, format: 'data-url' } : undefined,
           firstFrame: model.kind === 'video' && model.acceptsImage ? { key: 'image_url', format: 'data-url' } : undefined,
         },
         price: model.price,
@@ -150,6 +151,7 @@ export function ensureSchema(ref: string): Promise<ModelSchema | null> {
       };
     }
     if (!schema.price && model.price) schema = { ...schema, price: model.price };
+    schema = withOfficialLimits(schema, model);
     // Still derived: keep the object already shown, so views do not re-render into a loop of retries.
     if (schema.source === 'derived' && cached?.source === 'derived') return cached.loadError === schema.loadError ? cached : (setCatalog((c) => ({ schemas: { ...c.schemas, [ref]: schema } })), schema);
     setCatalog((c) => ({ schemas: { ...c.schemas, [ref]: schema } }));
