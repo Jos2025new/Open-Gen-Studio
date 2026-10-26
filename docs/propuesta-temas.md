@@ -15,6 +15,7 @@ Fecha: 2026-10-20. Estado: **aprobada (2026-10-20); pasos 1 y 2 del plan impleme
 - Original conserva sus colores y esquinas de 10 px y usa las plantillas nuevas.
 - Estas reglas son la identidad visual: cambiarlas exige aprobación explícita del usuario (regla 6 de AGENTS.md).
 - **Marco tranquilo** (2026-10-20, [ADR 0024 M](decisions/0024-identidad-visual-tarjetas-bases-resaltado.md)): el acento solo va en el botón principal o de enviar, la marca, la selección dentro de las tarjetas (casillas, interruptores, deslizadores) y lo que está en curso. Navegación, pestañas, chips y menús activos son neutros (`--active-bg` = `--surface-3`, `--active-text` = `--text`, sin línea); barra lateral, panel derecho y su cabecera sin contorno (`--frame-border` transparente). Dinero y «Connected» no usan el acento (el punto de conectado es `--ok`). «New session» es una acción con contorno, sin relleno (`--new-*`), para no confundirse con la fila activa; el dinero va en texto normal (`--money`). Original redefine esos tokens con el lima, los contornos y el verde de antes.
+- **Mensaje y caja de texto tenues** (2026-10-26, pedido por el usuario: «un contraste tan marcado entre prompt box y user messages»): el mensaje del usuario y la caja de texto usan `--surface`, el escalón más cercano al fondo (unos 10 puntos sobre `--bg-canvas`), no `--surface-2`/`--surface-3`; las paletas no cambian.
 
 **Pendiente:** nada.
 
