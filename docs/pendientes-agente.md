@@ -36,6 +36,7 @@ Evidencia: **código** = leído · **test** = cubierto por `npm test` · **sandb
 - **A22 · medio · 2026-10-14 · Modelos y prompting** (roles, realismo, guías, precios, latencia): lista en [modelos-pruebas](modelos-pruebas.md); prueba visual de `task/shot-consistency` y `task/ref-roles` sin hacer (usuario).
 - **A23 · bajo · 2026-10-21 · Decisión: cápsulas de respuesta rápida** bajo los mensajes del agente (elemento de interfaz nuevo; idea anotada).
 - **A24 · cerrado 2026-10-23** · cada conexión de Nodes guarda el resultado que usa; retirado el error al agente: [050](history/050-2026-10-W43.md).
+- **A25 · medio · 2026-10-25 · «Ajustar prompt» activo mientras se adapta el prompt**: en la tarjeta del plan el botón sigue disponible durante «Adapting the prompt…» (o «Revising…»); pulsarlo entonces puede cruzar dos reescrituras. Debe quedar desactivado mientras dura. Código: [PlanSettings.tsx:34](../src/components/chat/PlanSettings.tsx), estado `rewriting` en [PlanCard.tsx:199](../src/components/chat/PlanCard.tsx) (`usePlanRewrite`). Anotado por el usuario; revisar después.
 
 ## Proveedores, precios y coste (B)
 
