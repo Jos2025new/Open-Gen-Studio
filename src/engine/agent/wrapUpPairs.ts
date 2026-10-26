@@ -6,8 +6,8 @@ import { attachmentParts } from './attachments';
 const MAX_PAIRS = 3;
 
 /**
- * The wrap-up after an edit plan: for each edit step (an op or an image step on one existing image) that produced one
- * image, the original then the result, each labelled, with the change that was asked. Anything ambiguous or not
+ * The wrap-up after an edit plan: for each op step on an existing image (edits run as ops, ADR 0009; an image step with
+ * a reference is a new picture, not an edit) that produced one image, the original then the result, each labelled, with the change that was asked. Anything ambiguous or not
  * showable is left out; empty when the plan edited nothing.
  */
 export async function editPairParts(item: PlanFeedItem): Promise<LlmContentPart[]> {
@@ -16,11 +16,10 @@ export async function editPairParts(item: PlanFeedItem): Promise<LlmContentPart[
   let pairs = 0;
   for (const st of item.plan.steps) {
     if (pairs >= MAX_PAIRS) break;
-    const from = st.kind === 'op' ? [st.input] : st.kind === 'image' ? st.refs : [];
-    const source = from.length === 1 ? parseRef(from[0]) : null;
+    const source = st.kind === 'op' ? parseRef(st.input) : null;
     const out = item.stepOutputs?.[st.id]?.assetIds ?? [];
     if (source?.type !== 'asset' || out.length !== 1 || assets[source.id]?.kind !== 'image' || assets[out[0]]?.kind !== 'image') continue;
-    const asked = (st.kind === 'image' ? st.prompt : (st.kind === 'op' && st.note) || st.title).slice(0, 200);
+    const asked = ((st.kind === 'op' && st.note) || st.title).slice(0, 200);
     const original = await attachmentParts([source.id]);
     const result = await attachmentParts([out[0]]);
     if (![original, result].every((p) => p.some((x) => x.type === 'image_url'))) continue;

@@ -91,7 +91,7 @@ describe('wrap-up after a plan', () => {
   const asset = (id: string, kind = 'image') => ({ id, kind });
   beforeEach(() => useStore.setState((st) => ({ assets: { ...st.assets, a1: asset('a1'), r1: asset('r1'), r2: asset('r2'), v1: asset('v1', 'video') } as never })));
   it('an edit step yields original then result, labelled, with the change asked', async () => {
-    const parts = await editPairParts(item([{ id: 's1', kind: 'image', title: 't', prompt: 'make the sky red', refs: ['asset:a1'] }], { s1: { assetIds: ['r1'] } }));
+    const parts = await editPairParts(item([{ id: 's1', kind: 'op', title: 't', op: 'edit', input: 'asset:a1', note: 'make the sky red' }], { s1: { assetIds: ['r1'] } }));
     const texts = parts.filter((p) => p.type === 'text').map((p) => (p as { text: string }).text);
     expect(texts[0]).toMatch(/make the sky red.*ORIGINAL \(asset:a1\)/);
     expect(texts[2]).toMatch(/RESULT \(asset:r1\)/);
@@ -100,7 +100,7 @@ describe('wrap-up after a plan', () => {
   it('ambiguous or non-edit steps are left out; the pairs are capped at three', async () => {
     const steps = [
       { id: 'a', kind: 'image', title: 't', prompt: 'x', refs: [] },
-      { id: 'b', kind: 'image', title: 't', prompt: 'x', refs: ['asset:a1', 'asset:a1'] },
+      { id: 'b', kind: 'image', title: 't', prompt: 'x', refs: ['asset:a1'] },
       { id: 'c', kind: 'op', title: 't', op: 'upscale', input: 'asset:v1' },
       { id: 'd', kind: 'op', title: 't', op: 'upscale', input: 'asset:a1' },
     ];
