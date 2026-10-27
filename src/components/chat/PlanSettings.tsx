@@ -12,7 +12,7 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
   const writer = promptWriterOn(sessionId);
   const models = useStore((s) => s.catalog.models);
   const draft = planDraft(sessionId);
-  // A rewrite already running on this card: no second one may start (choosing a model rewrites the prompts too).
+  // While a rewrite runs the toggle waits; a model picked meanwhile starts a newer rewrite, and the newest one wins (runs in planSettings).
   const rewriting = usePlanRewrite((s) => Boolean(s.busy[item.id]));
   const titled = sections.length > 1;
   return (
@@ -26,7 +26,7 @@ export function PlanSettings({ item, sessionId, sections }: { item: PlanFeedItem
             itemId={item.id}
             sessionId={sessionId}
             draft={x.kind === 'video' ? draft : undefined}
-            onPick={(c) => { if (!rewriting) void changePlanChoice(sessionId, item.id, x.kind as GenKind, c, x.recommended.modelRef); }}
+            onPick={(c) => void changePlanChoice(sessionId, item.id, x.kind as GenKind, c, x.recommended.modelRef)}
             onUnlock={() => changePlanDraft(sessionId, item.id, draft.kind, draft.text, true)}
             extra={<>
               {x.kind === 'video' ? <DraftChoice compact draft={draft} onSelect={(kind, text) => changePlanDraft(sessionId, item.id, kind, text)} /> : null}
