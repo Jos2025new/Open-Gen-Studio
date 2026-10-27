@@ -31,9 +31,9 @@ Los más importados por el resto del código: un cambio aquí se propaga lejos. 
 | [index.ts](../src/engine/params/index.ts) | 41 | 21 |
 | [doc.ts](../src/engine/design/doc.ts) | 38 | 44 |
 | [raster.ts](../src/engine/design/raster.ts) | 33 | 23 |
+| [format.ts](../src/lib/format.ts) | 31 | 1 |
 | [id.ts](../src/lib/id.ts) | 29 | 0 |
 | [actions.ts](../src/engine/actions.ts) | 28 | 20 |
-| [format.ts](../src/lib/format.ts) | 28 | 1 |
 | [types.ts](../src/engine/providers/types.ts) | 27 | 9 |
 | [render.ts](../src/engine/design/render.ts) | 21 | 8 |
 | [InlineControls.tsx](../src/components/designer/InlineControls.tsx) | 20 | 0 |
