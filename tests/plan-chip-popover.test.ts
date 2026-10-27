@@ -8,7 +8,7 @@ const chip = readFileSync('src/components/chat/ChipPop.tsx', 'utf8');
 
 describe('the plan card chip popovers', () => {
   it('size to their content with moderate padding and the popover radius', () => {
-    expect(cards).toMatch(/\.cc-pop-plan \{ width: max-content !important; max-width: calc\(100vw - 16px\); padding: 10px; border-radius: var\(--pop-radius\); \}/);
+    expect(cards).toMatch(/\.cc-pop-plan \{ width: max-content; padding: 10px; border-radius: var\(--pop-radius\); \}/);
   });
   it('keep the shared .cc-pop look for every other popover', () => {
     expect(cards).toMatch(/\.cc-pop \{ background: var\(--surface-3\); border-radius: 16px; padding: 14px;/);
@@ -16,5 +16,9 @@ describe('the plan card chip popovers', () => {
   it('are marked only when the chip sits inside the plan card', () => {
     expect(chip).toMatch(/closest\('\.plan-card'\)/);
     expect(chip).toMatch(/cc-pop\$\{onPlan \? ' cc-pop-plan' : ''\}/);
+  });
+  it('are placed by their measured width, so a narrow box stays centred over its chip', () => {
+    expect(chip).toContain("width={onPlan ? 'content' : width}");
+    expect(readFileSync('src/components/ui/Popover.tsx', 'utf8')).toContain('fit ? el.offsetWidth : width');
   });
 });

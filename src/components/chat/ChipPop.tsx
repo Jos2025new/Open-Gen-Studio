@@ -14,7 +14,7 @@ export function ChipPop({ icon, label, tip, width = 320, children }: { icon: Rea
         <span className="cc-chip-label">{label}</span>
         <ChevronDown size={11} className="cc-chip-chev" aria-hidden />
       </button>
-      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={width} placement="top-center" label={tip} className={`cc-pop${onPlan ? ' cc-pop-plan' : ''}`}>
+      <Popover open={pop.open} anchor={pop.ref} onClose={pop.close} width={onPlan ? 'content' : width} placement="top-center" label={tip} className={`cc-pop${onPlan ? ' cc-pop-plan' : ''}`}>
         {children}
       </Popover>
     </>
