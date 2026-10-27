@@ -147,6 +147,8 @@ describe('test 15c: "Use here" hands the work over completely', () => {
     await hydrated(b);
     expect(b.lock.holdsWriterLock()).toBe(true);
     expect(b.state().spentUsd).toBe(6);
+    await b.store.saveNow(); // b's own debounced save ends here, not in the next test's storage
+    await settle();
   });
 
   it('without Web Locks the tab is read-only with its own state', async () => {
@@ -156,8 +158,12 @@ describe('test 15c: "Use here" hands the work over completely', () => {
     expect(a.lock.getWriterState().phase).toBe('unsupported');
     expect(a.lock.holdsWriterLock()).toBe(false);
     expect(a.state().hydrated).toBe(false);
+    // Compare with a snapshot, not "no spentUsd at all": this tab must write nothing, whatever is already stored.
+    const before = snapshotDbs();
     a.set({ spentUsd: 1 });
     await a.store.saveNow();
-    expect(snapshotDbs()).not.toContain('spentUsd');
+    await settle();
+    expect(snapshotDbs()).toBe(before);
+    expect(snapshotDbs()).not.toContain('spentUsd\\":1');
   });
 });
