@@ -21,6 +21,8 @@ Detalle de las filas C, F y G del [índice](pendientes.md). Prioridad, **origen*
 - **C12 · bajo · 2026-10-08 · Carga de la app:** paquete principal de 1,64 MB minificado (521 KB comprimido) e imports dinámicos que no separan módulos (dato de la auditoría externa, sin comprobar). Medir el arranque con una sonda antes de optimizar.
 - **C13 · medio · 2026-10-08 · Medir por recorridos:** pocos pedidos reales con resultado esperado (planes válidos al primer intento, preguntas redundantes, pasos rehechos, tiempo hasta un resultado útil). Base sin gasto en [depuracion](depuracion.md); la evaluación de pago, aparte y con presupuesto aprobado.
 - **C14 · medio · 2026-10-08 · Una regla, un propietario:** sacar del runtime la política de preguntas y aprobaciones, la petición efectiva y el ciclo de ejecución; decisiones creativas en guías, requisitos duros en validadores. Enlaza con C9.
+- **C15 · medio · 2026-10-27 · CI:** flujo en `.github/workflows` que corra `npm test`; el usuario debe activar Actions y la protección de ramas. Propuesta del auditor externo; no existe `.github`.
+- **C16 · bajo · 2026-10-27 · ESLint gradual** (propuesta del auditor externo; `tsc` ya corre al inicio de `npm test`, `71d5c1b`).
 
 ## Funciones propuestas sin implementar (F)
 
@@ -41,3 +43,4 @@ Detalle de las filas C, F y G del [índice](pendientes.md). Prioridad, **origen*
 - **G5 · medio · 2026-10-20 · Sistema visual de tarjetas** ([propuesta](propuesta-sistema-visual-tarjetas.md), ADR 0024): pasos 3 (plantillas), 4 (migración tarjeta a tarjeta, con B-02) y 5 (`check-card-style`); revisión visual del usuario de los pasos 1 y 2 y de «Marco tranquilo», «Blanco» y los bordes de paneles, todo sin ver en pantalla. Cada cambio visual exige su aprobación (regla 6).
 - **G6 · bajo · 2026-10-21 · Sistema resuelve el modo claro a Claro** (podría ser Blanco).
 - **G7 · bajo · 2026-10-20 · Pestaña «Look» en inglés:** el usuario quizá quiera «Apariencia».
+- **G8 · medio · 2026-10-27 · `main` y remoto tras la limpieza de ramas** ([054](history/054-2026-10-W44.md)): `main` local (`549f450`) y `origin/main` (`22a94af`) no se han actualizado a `task/workflow-ask-first`; `origin/task/provider-plan` no se ha borrado; falta quitar el worktree `ogs-audit-8772f19` (su test ya está en `tests/plan-revision.test.ts`). Decide el usuario; mover la app real sigue sujeto a G2.

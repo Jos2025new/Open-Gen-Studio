@@ -94,6 +94,8 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | C6 | Limpiar copias `data.bak-*` | bajo | 2026-10-08 |
 | C7 | Unificar datos repetidos de proveedores | bajo | 2026-09-24 |
 | C8 | Tests intermitentes con carga (4, 11 y `writer-lock` 15c) | medio | 2026-10-08 |
+| C15 | CI: flujo en `.github/workflows` (el usuario activa Actions y protección de ramas) | medio | 2026-10-27 |
+| C16 | ESLint gradual (propuesta del auditor externo) | bajo | 2026-10-27 |
 | C9 | Partir los 11 archivos de más de 30 KB | medio | 2026-10-07 |
 | C10 | Cobertura por riesgo: recorridos completos en sandbox | medio | 2026-10-08 |
 | C11 | Contraste de `--text-4` (2,8 a 3,7:1) | medio | 2026-10-07 |
@@ -124,6 +126,7 @@ Después, por riesgo: B3 (el presupuesto no es un máximo), B4 (gasto que cambi�
 | G5 | Sistema visual de tarjetas, pasos 3 a 5 y revisión visual | medio | 2026-10-20 |
 | G6 | Sistema resuelve el modo claro a Claro (¿Blanco?) | bajo | 2026-10-21 |
 | G7 | Pestaña «Look» en inglés (¿«Apariencia»?) | bajo | 2026-10-20 |
+| G8 | `main` (local `549f450`, origin `22a94af`) sin actualizar; `origin/task/provider-plan` sin borrar; quitar el worktree `ogs-audit-8772f19` | medio | 2026-10-27 |
 
 ### Designer, formas, brocha y render (D) · [detalle](pendientes-designer.md)
 
